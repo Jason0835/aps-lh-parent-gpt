@@ -100,10 +100,10 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     public AjaxResult syncFromWarn() {
         try {
             int count = lhMouldCleanPlanService.syncFromMouldCleanWarn();
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.operate.success") + "，" + String.format(I18nUtil.getMessage("ui.mould.clean.plan.sync.success"), count));
+            return AjaxResult.success("操作成功，成功生成" + count + "条模具清洗计划");
         } catch (Exception e) {
             log.error("从模具清洗预警同步生成计划失败", e);
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.operate.fail"));
+            return AjaxResult.error("操作失败");
         }
     }
 
