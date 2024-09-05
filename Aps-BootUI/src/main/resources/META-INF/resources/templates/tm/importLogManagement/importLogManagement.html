@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('工序导入日志管理')" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.import.functionName}]]：
+                            <input type="text" name="functionName"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.import.fileName}]]：
+                            <input type="text" name="fileName"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary single disabled" onclick="openErrorView()" shiro:hasPermission="tm:importLogManagement:errorView">
+                <i class="fa fa-edit"></i> [[#{ui.data.btn.import.errorLog}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var prefix = ctx + "tm/importLogManagement";
+    var PROCEDURE_CODE = [[${@dict.getType('PROCEDURE_CODE')}]];
+
+    $(function() {
+        var options = {
+            url: prefix + "/list",
+            errorUrl: prefix + "/errorView/{id}",
+            modalName: [[#{ui.data.column.tm.import.modelName}]],
+            singleSelect : true,
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: 'ID',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'procedureCode',
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.procedureCode}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(PROCEDURE_CODE, row.procedureCode);
+                    },
+                },
+                {
+                    field: 'functionCode',
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.functionCode}]],
+                },
+                {
+                    field: 'functionName',
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.functionName}]],
+                },
+                {
+                    field: 'fileName',
+                    halign:'center',
+                    align: 'left',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.fileName}]],
+                    formatter:function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a href="javascript:void(0)" onclick="downloadFile(\'' +value+'\',\'' +row.fileUrl+'\')">' + value + '</a> ');
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'fileUrl',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.fileUrl}]],
+                    visible: false
+                },
+                {
+                    field: 'successNum',
+                    halign:'center',
+                    align: 'right',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.successNum}]],
+                },
+                {
+                    field: 'failNum',
+                    halign:'center',
+                    align: 'right',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.failNum}]],
+                },
+                {
+                    field: 'createBy',
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.createBy}]],
+                },
+                {
+                    field: 'createTime',
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.import.createTime}]],
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs href="javascript:void(0)" onclick="openErrorView('+row.id+')"><i class="fa fa-edit"></i>' + [[#{ui.data.btn.import.errorLog}]] + '</a> ');
+                        return actions.join('');
+                    }
+                }
+            ]
+        };
+        $.table.init(options);
+    });
+    function openErrorView(id){
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }else{
+            $('#bootstrap-table').bootstrapTable('uncheckAll');
+            $('#bootstrap-table').bootstrapTable("checkBy",{field: 'id', values:[id]});
+        }
+        url = table.options.errorUrl.replace("{id}", id);
+        $.modal.openTab([[#{ui.data.frame.import.title}]], url);
+    }
+    function downloadFile(name,url){
+        window.location.href = prefix + "/download?name="+name+"&&url="+url;
+    }
+</script>
+</body>
+</html>

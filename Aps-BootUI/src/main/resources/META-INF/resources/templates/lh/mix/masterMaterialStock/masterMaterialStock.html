@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('母炼胶小料库存列表')" />
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                <label>[[#{ui.data.column.masterMaterialStock.factoryCode}]]：</label>
+                                <input type="text" name="factoryCode"/>
+                            </li>
+                            <li>
+                                <label>[[#{ui.data.column.masterMaterialStock.materialCode}]]：</label>
+                                <input type="text" name="materialCode"/>
+                            </li>
+                            <li class="select-time">
+                                <label>[[#{ui.data.column.masterMaterialStock.stockDate}]]：</label>
+                                <input type="text" class="time-input"
+                                       th:placeholder="yyyy-mm-dd" name="stockDate"/>
+                            </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+                <a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="lh:masterMaterialStock:add">
+                    <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+                </a>
+                <a class="btn btn-primary single disabled" onclick="$.operate.edit()" shiro:hasPermission="lh:masterMaterialStock:edit">
+                    <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+                </a>
+                <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="lh:masterMaterialStock:remove">
+                    <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+                </a>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table" data-resizable="true"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+     <th:block th:include="include :: bootstrap-table-resizable-js" />
+    <script th:inline="javascript">
+        var editFlag = [[${@permission.hasPermi('lh:masterMaterialStock:edit')}]];
+        var removeFlag = [[${@permission.hasPermi('lh:masterMaterialStock:remove')}]];
+        var prefix = ctx + "lh/mix/masterMaterialStock";
+
+        $(function() {
+            var options = {
+                url: prefix + "/list",
+                createUrl: prefix + "/add",
+                updateUrl: prefix + "/edit/{id}",
+                removeUrl: prefix + "/remove",
+                exportUrl: prefix + "/export",
+                importUrl: prefix + "/importData",
+                modalName: [[#{ui.data.column.masterMaterialStock.modelName}]],
+                columns: [{
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: [[#{ui.data.column.masterMaterialStock.id}]],
+                    sortable: true,
+                    visible: false
+                },
+                                {
+                    field: 'factoryCode',
+                    title: [[#{ui.data.column.masterMaterialStock.factoryCode}]],
+                    sortable: true,
+                },
+                                {
+                    field: 'materialCode',
+                    title: [[#{ui.data.column.masterMaterialStock.materialCode}]],
+                    sortable: true,
+                },
+                                {
+                    field: 'stockNum',
+                    title: [[#{ui.data.column.masterMaterialStock.stockNum}]],
+                    sortable: true,
+                },
+                                {
+                    field: 'stockDate',
+                    title: [[#{ui.data.column.masterMaterialStock.stockDate}]],
+                    sortable: true,
+                },
+                                                                                                                {
+                    field: 'remark',
+                    title: [[#{ui.data.column.remark}]],
+                    sortable: true,
+                },
+                                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>'+[[#{ui.frame.btn.update}]]+'</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>'+[[#{ui.frame.btn.delete}]]+'</a>');
+                        return actions.join('');
+                    }
+                }]
+            };
+            $.table.init(options);
+        });
+
+        // 下载模板
+        function importTemplate() {
+            window.location.href=prefix + "/importTemplate";
+        }
+    </script>
+</body>
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <!--调整文件上传支持国际化-->
+            <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

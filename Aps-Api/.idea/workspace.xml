@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="2c1b9d5b-362f-4edf-a4ad-a92a9c389f1b" name="Default" comment="增加api合集">
+      <change afterPath="$PROJECT_DIR$/.idea/jarRepositories.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-all-api/aps-all-api.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-all-api/aps-all-api.iml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectId" id="1t3ZJjuoPHRHbww7Q1KVty1QGv8" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="aspect.path.notification.shown" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../../project/jh-xuanyuan-java" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="project.structure.last.edited" value="Modules" />
+    <property name="project.structure.proportion" value="0.0" />
+    <property name="project.structure.side.proportion" value="0.0" />
+    <property name="settings.editor.selected.configurable" value="preferences.keymap" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.zlt.aps.tm.api.service" />
+      <recent name="com.zlt.aps.tm.api.domain.dto" />
+      <recent name="com.zlt.aps.tm.api.domain" />
+      <recent name="com.zlt.aps.tc.api" />
+      <recent name="com.zlt.aps.cx.api.domain" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\jl-api\src\main\java\com\zlt\aps\jl\api\domain" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="Applet" factoryName="Applet">
+      <option name="HTML_USED" value="false" />
+      <option name="WIDTH" value="400" />
+      <option name="HEIGHT" value="300" />
+      <option name="POLICY_FILE" value="$APPLICATION_HOME_DIR$/bin/appletviewer.policy" />
+      <module />
+    </configuration>
+    <configuration default="true" type="Application" factoryName="Application">
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JUnit" factoryName="JUnit">
+      <option name="TEST_OBJECT" value="class" />
+      <option name="WORKING_DIRECTORY" value="%MODULE_WORKING_DIR%" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="TestNG">
+      <option name="TEST_OBJECT" value="CLASS" />
+      <option name="WORKING_DIRECTORY" value="%MODULE_WORKING_DIR%" />
+      <properties />
+      <listeners />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="#org.jetbrains.idea.devkit.run.PluginConfigurationType">
+      <module name="" />
+      <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -XX:MaxPermSize=250m -ea" />
+      <option name="PROGRAM_PARAMETERS" />
+      <predefined_log_file enabled="true" id="idea.log" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SvnConfiguration" cleanupOnStartRun="true">
+    <configuration>C:\Users\zhangbinglin\AppData\Roaming\Subversion</configuration>
+    <supportedVersion>125</supportedVersion>
+  </component>
+  <component name="SvnFileUrlMappingImpl">
+    <option name="myMappingRoots">
+      <list>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\.idea" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\.idea" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cd15-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cd15-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cd90-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cd90-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cx-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\cx-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\gdyy-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\gdyy-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\gsq-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\gsq-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\jl-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\jl-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\nc-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\nc-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tc-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tc-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tm-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tm-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tq-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\tq-api" />
+        </SvnCopyRootSimple>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\xwyy-api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api\xwyy-api" />
+        </SvnCopyRootSimple>
+      </list>
+    </option>
+    <option name="myMoreRealMappingRoots">
+      <list>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\Aps-Api" />
+        </SvnCopyRootSimple>
+      </list>
+    </option>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="2c1b9d5b-362f-4edf-a4ad-a92a9c389f1b" name="Default" comment="" />
+      <created>1621837237891</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1621837237891</updated>
+      <workItem from="1621837241129" duration="7407000" />
+      <workItem from="1621924077402" duration="1899000" />
+      <workItem from="1621999665637" duration="15273000" />
+    </task>
+    <task id="LOCAL-00001" summary="pom修改">
+      <created>1622002652635</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1622002652635</updated>
+    </task>
+    <task id="LOCAL-00002" summary="pom修改">
+      <created>1622005198037</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1622005198037</updated>
+    </task>
+    <task id="LOCAL-00003" summary="pom修改">
+      <created>1622005848429</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1622005848429</updated>
+    </task>
+    <task id="LOCAL-00004" summary="增加api合集">
+      <created>1622006542935</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1622006542935</updated>
+    </task>
+    <task id="LOCAL-00005" summary="胶料组别顺序维护service">
+      <created>1622009825317</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1622009825317</updated>
+    </task>
+    <task id="LOCAL-00006" summary="增加api合集">
+      <created>1622015938572</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1622015938572</updated>
+    </task>
+    <task id="LOCAL-00007" summary="增加api合集">
+      <created>1622017540261</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1622017540261</updated>
+    </task>
+    <task id="LOCAL-00008" summary="增加api合集">
+      <created>1622023222864</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1622023222865</updated>
+    </task>
+    <task id="LOCAL-00009" summary="胶料组别顺序">
+      <created>1622030087717</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1622030087717</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="2" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="pom修改" />
+    <MESSAGE value="胶料组别顺序维护service" />
+    <MESSAGE value="增加api合集" />
+    <MESSAGE value="胶料组别顺序" />
+    <option name="LAST_COMMIT_MESSAGE" value="胶料组别顺序" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="182" y="4" key="CommitChangelistDialog2" timestamp="1622030086968">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="182" y="4" key="CommitChangelistDialog2/0.0.1536.824@0.0.1536.824" timestamp="1622030086968" />
+    <state x="542" y="170" key="FileChooserDialogImpl" timestamp="1621999853017">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="542" y="170" key="FileChooserDialogImpl/0.0.1536.824@0.0.1536.824" timestamp="1621999853017" />
+    <state width="1495" height="210" key="GridCell.Tab.0.bottom" timestamp="1622030250170">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1495" height="210" key="GridCell.Tab.0.bottom/0.0.1536.824@0.0.1536.824" timestamp="1622030250170" />
+    <state width="1495" height="210" key="GridCell.Tab.0.center" timestamp="1622030250170">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1495" height="210" key="GridCell.Tab.0.center/0.0.1536.824@0.0.1536.824" timestamp="1622030250170" />
+    <state width="1495" height="210" key="GridCell.Tab.0.left" timestamp="1622030250170">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1495" height="210" key="GridCell.Tab.0.left/0.0.1536.824@0.0.1536.824" timestamp="1622030250170" />
+    <state width="1495" height="210" key="GridCell.Tab.0.right" timestamp="1622030250170">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1495" height="210" key="GridCell.Tab.0.right/0.0.1536.824@0.0.1536.824" timestamp="1622030250170" />
+    <state x="292" y="119" key="RollbackChangesDialog" timestamp="1622006506599">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="292" y="119" key="RollbackChangesDialog/0.0.1536.824@0.0.1536.824" timestamp="1622006506599" />
+    <state x="545" y="274" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2" timestamp="1622006488210">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="545" y="274" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.0.1536.824@0.0.1536.824" timestamp="1622006488210" />
+    <state x="459" y="170" width="617" height="484" key="find.popup" timestamp="1622002605999">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="459" y="170" width="617" height="484" key="find.popup/0.0.1536.824@0.0.1536.824" timestamp="1622002605999" />
+    <state x="5" y="130" key="new project wizard" timestamp="1622006009929">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="5" y="130" key="new project wizard/0.0.1536.824@0.0.1536.824" timestamp="1622006009929" />
+  </component>
+  <component name="masterDetails">
+    <states>
+      <state key="ArtifactsStructureConfigurable.UI">
+        <settings>
+          <artifact-editor />
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+      <state key="FacetStructureConfigurable.UI">
+        <settings>
+          <last-edited>Spring</last-edited>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+      <state key="GlobalLibrariesConfigurable.UI">
+        <settings>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+      <state key="JdkListConfigurable.UI">
+        <settings>
+          <last-edited>1.8</last-edited>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+      <state key="ModuleStructureConfigurable.UI">
+        <settings>
+          <last-edited>tm-api</last-edited>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+                <option value="0.6" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+      <state key="ProjectLibrariesConfigurable.UI">
+        <settings>
+          <last-edited>Maven: ch.qos.logback:logback-classic:1.2.3</last-edited>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+    </states>
+  </component>
+</project>

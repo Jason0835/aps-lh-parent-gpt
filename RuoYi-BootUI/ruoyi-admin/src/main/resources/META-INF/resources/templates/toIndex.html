@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<script th:inline="javascript">
+		var lang=[[${lang}]];;
+		window.location.href="/index?lang="+lang;
+	</script>
+</head>
+
+</html>

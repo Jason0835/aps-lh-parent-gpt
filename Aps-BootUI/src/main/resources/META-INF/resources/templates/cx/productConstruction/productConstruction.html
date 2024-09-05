@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('投产施工信息列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.embryoCode}]]：</label>
+                            <input type="text" name="embryoCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.embryoVersion}]]：</label>
+                            <input type="text" name="embryoVersion"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.productionStage}]]：</label>
+                            <select name="productionStage" th:with="type=${@dict.getType('PRODUCTION_STAGE')}"
+                                    class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.halfPartsQueryType}]]：</label>
+                            <select name="halfPartsQueryType" th:with="type=${@dict.getType('HALF_PARTS_CODE')}"
+                                    class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.halfPartsQueryCode}]]：</label>
+                            <input type="text" name="halfPartsQueryCode"/>
+                        </li>
+
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('',500,500)"
+               shiro:hasPermission="cx:productConstruction:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',1200,500)"
+               shiro:hasPermission="cx:productConstruction:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="cx:stock:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cx:productConstruction:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var PRODUCTION_STAGE = [[${@dict.getType('PRODUCTION_STAGE')}]];
+    var prefix = ctx + "cx/productConstruction";
+
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            getVersions: prefix + "/edit1/{idAndQueryType}",
+            updateStageUrl: prefix + "/updateProductionStage/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.productConstruction.modelName}]],
+            uniqueId: 'id',
+            columns: [
+                [
+                    {title: [[#{ui.construction.baseInfo}]], align: 'center', colspan: 17},
+                    {title: [[#{ui.construction.carcassCloth}]], align: 'center', colspan: 18},
+                    {title: [[#{ui.construction.lining}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.construction.sidewall}]], align: 'center', colspan: 10},
+                    {title: [[#{ui.construction.supportingGlue}]], align: 'center', colspan: 3},
+                    {title: [[#{ui.construction.steelRing}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.construction.hexagonRing}]], align: 'center', colspan: 8},
+                    {title: [[#{ui.construction.steelStrip}]], align: 'center', colspan: 16},
+                    {title: [[#{ui.construction.crownBand}]], align: 'center', colspan: 1},
+                    {title: [[#{ui.construction.tread}]], align: 'center', colspan: 13}
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        align: 'center',
+                        halign: 'center',
+                        title: 'id',
+                    },
+                    {
+                        field: 'sapCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sapCode}]],
+                    },
+                    {
+                        field: 'embryoCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.embryoCode}]],
+                    },
+                    {
+                        field: 'embryoVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.embryoVersion}]],
+                    },
+                    {
+                        field: 'productionStage',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.productionStage}]],
+                        formatter: function (value, row, index) {
+                            value = $.table.selectDictLabel(PRODUCTION_STAGE, value);
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="changeProductionStage(\'' + row.id + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'consType',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.consType}]],
+                    },
+                    {
+                        field: 'dimension',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.dimension}]],
+                    },
+                    {
+                        field: 'specDesc',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.specDesc}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value);
+                        },
+                    },
+                    {
+                        field: 'noseWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.noseWidth}]],
+                    },
+                    {
+                        field: 'flipDiscDiameter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.flipDiscDiameter}]],
+                    },
+                    {
+                        field: 'sectionWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sectionWidth}]],
+                    },
+                    {
+                        field: 'fitDrumPerimeter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.fitDrumPerimeter}]],
+                    },
+                    {
+                        field: 'chuckDiameter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.chuckDiameter}]],
+                    },
+                    {
+                        field: 'stretchWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.stretchWidth}]],
+                    },
+                    {
+                        field: 'qualitativeWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.qualitativeWidth}]],
+                    },
+                    {
+                        field: 'embryoCircle',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.embryoCircle}]],
+                    },
+
+
+                    {
+                        field: 'tireFabricCode1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCode1}]],
+                    },
+                    {
+                        field: 'tireFabricSap1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricSap1}]],
+                    },
+                    {
+                        field: 'tireFabric1Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric1Version}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&TIRE_FABRIC1' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'tireFabricCraft1',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCraft1}]],
+                    },
+                    {
+                        field: 'tireFabricSideRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricSideRubber}]],
+                    },
+                    {
+                        field: 'tireFabricCode2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCode2}]],
+                    },
+                    {
+                        field: 'tireFabricSap2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricSap2}]],
+                    },
+                    {
+                        field: 'tireFabric2Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric2Version}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&TIRE_FABRIC2' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'tireFabricCraft2',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCraft2}]],
+                    },
+                    {
+                        field: 'tireFabricCode3',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCode3}]],
+                    },
+                    {
+                        field: 'tireFabricSap3',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricSap3}]],
+                    },
+                    {
+                        field: 'tireFabric3Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric3Version}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&TIRE_FABRIC3' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'tireFabricCraft3',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricCraft3}]],
+                    },
+                    {
+                        field: 'originalLineCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.originalLineCode}]],
+                    },
+                    {
+                        field: 'cordSpec',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.cordSpec}]],
+                    },
+                    {
+                        field: 'cordSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.cordSap}]],
+                    },
+                    {
+                        field: 'cordVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.cordVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&CORD' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'reinforceSealGlue',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.reinforceSealGlue}]],
+                    },
+
+
+                    {
+                        field: 'insideRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideRubber}]],
+                    },
+                    {
+                        field: 'insideCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideCode}]],
+                    },
+                    {
+                        field: 'insideSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideSap}]],
+                    },
+                    {
+                        field: 'insideVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&INSIDE' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'insideCraft',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideCraft}]],
+                    },
+
+
+                    {
+                        field: 'sidewallCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallCode}]],
+                    },
+                    {
+                        field: 'sidewallSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallSap}]],
+                    },
+                    {
+                        field: 'sidewallVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&SIDEWALL' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'sidewallCraft',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallCraft}]],
+                    },
+                    {
+                        field: 'sidewallMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallMouthPlate}]],
+                    },
+                    {
+                        field: 'sidewallCenter',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallCenter}]],
+                    },
+                    {
+                        field: 'sidewallLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallLength}]],
+                    },
+                    {
+                        field: 'sidewallRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallRubber}]],
+                    },
+                    {
+                        field: 'sidewallWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallWeight}]],
+                    },
+                    {
+                        field: 'sidewallWearpRubberWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallWearpRubberWeight}]],
+                    },
+
+
+                    {
+                        field: 'supportCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.supportCode}]],
+                    },
+                    {
+                        field: 'supportRubberCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.supportRubberCode}]],
+                    },
+                    {
+                        field: 'supportLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.supportLength}]],
+                    },
+
+
+                    {
+                        field: 'beadCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadCode}]],
+                    },
+                    {
+                        field: 'beadSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadSap}]],
+                    },
+                    {
+                        field: 'beadVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&BEAD' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'beadArrange',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadArrange}]],
+                    },
+                    {
+                        field: 'beadType',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadType}]],
+                    },
+
+
+                    {
+                        field: 'tireRingCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireRingCode}]],
+                    },
+                    {
+                        field: 'tireRingSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireRingSap}]],
+                    },
+                    {
+                        field: 'tireRingVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireRingVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&TIRE_RING' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'apexCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.apexCode}]],
+                    },
+                    {
+                        field: 'hexagonRubberCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.hexagonRubberCode}]],
+                    },
+                    {
+                        field: 'hexagonMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.hexagonMouthPlate}]],
+                    },
+                    {
+                        field: 'hexagonRubberDimension',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.hexagonRubberDimension}]],
+                    },
+                    {
+                        field: 'apexWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.apexWeight}]],
+                    },
+
+
+                    {
+                        field: 'beltCode1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltCode1}]],
+                    },
+                    {
+                        field: 'beltSap1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltSap1}]],
+                    },
+                    {
+                        field: 'belt1Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.belt1Version}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&BELT1' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'beltCraft1',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltCraft1}]],
+                    },
+                    {
+                        field: 'beltSideRubber1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltSideRubber1}]],
+                    },
+                    {
+                        field: 'beltRubber1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltRubber1}]],
+                    },
+                    {
+                        field: 'beltCode2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltCode2}]],
+                    },
+                    {
+                        field: 'beltSap2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltSap2}]],
+                    },
+                    {
+                        field: 'belt2Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.belt2Version}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&BELT2' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'beltCraft2',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltCraft2}]],
+                    },
+                    {
+                        field: 'beltSideRubber2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltSideRubber2}]],
+                    },
+                    {
+                        field: 'beltRubber2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltRubber2}]],
+                    },
+                    {
+                        field: 'beltCuttingAngle',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beltCuttingAngle}]],
+                    },
+
+                    {
+                        field: 'articleCrownSpec',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.articleCrownSpec}]],
+                    },
+                    {
+                        field: 'articleCrownSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.articleCrownSap}]],
+                    },
+                    {
+                        field: 'articleCrownVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.articleCrownVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&ARTICLE_CROWN' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+
+                    {
+                        field: 'articleCrownCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.articleCrownCode}]],
+                    },
+
+
+                    {
+                        field: 'treadCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadCode}]],
+                    },
+                    {
+                        field: 'treadSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadSap}]],
+                    },
+                    {
+                        field: 'treadVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadVersion}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = [[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="getVersions(\'' + row.id + '&TREAD' + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'treadShoulderWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadShoulderWidth}]],
+                    },
+                    {
+                        field: 'treadShoulderJwidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadShoulderJwidth}]],
+                    },
+                    {
+                        field: 'treadShoulderLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadShoulderLength}]],
+                    },
+                    {
+                        field: 'treadRubberCategory',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadRubberCategory}]],
+                    },
+                    {
+                        field: 'tireCrownUpWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireCrownUpWidthWeight}]],
+                    },
+                    {
+                        field: 'tireCrownDownWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireCrownDownWidthWeight}]],
+                    },
+                    {
+                        field: 'tireWingWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireWingWidthWeight}]],
+                    },
+                    {
+                        field: 'primerWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.primerWeight}]],
+                    },
+                    {
+                        field: 'conductingResinWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.conductingResinWeight}]],
+                    },
+                    {
+                        field: 'treadMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadMouthPlate}]],
+                    }
+                ]
+            ]
+        };
+        $.table.init(options, true);
+    });
+
+    function getVersions(idAndQueryType) {
+        url = table.options.getVersions.replace("{idAndQueryType}", idAndQueryType);
+        $.modal.open([[#{ui.data.column.productConstruction.partChangeVersion}]], url, 500, 550);
+    }
+
+    function changeProductionStage(id) {
+        url = table.options.updateStageUrl.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.productConstruction.productionStage}]], url, 500, 500);
+    }
+
+
+</script>
+</body>
+</html>

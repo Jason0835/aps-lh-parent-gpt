@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.TBaseMonthPlanSurplusMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.common.engine.domain.MonthPlanSurplusBaseEntity">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="monthPlanApsVersion" column="MONTH_PLAN_APS_VERSION" jdbcType="VARCHAR"/>
+            <result property="monthPlanVersion" column="MONTH_PLAN_VERSION" jdbcType="VARCHAR"/>
+            <result property="year" column="YEAR" jdbcType="VARCHAR"/>
+            <result property="month" column="MONTH" jdbcType="VARCHAR"/>
+            <result property="materialCode" column="MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="monthPlanQty" column="MONTH_PLAN_QTY" jdbcType="DECIMAL"/>
+            <result property="monthPlanModifyQty" column="MONTH_PLAN_MODIFY_QTY" jdbcType="DECIMAL"/>
+            <result property="monthFinishQty" column="MONTH_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="monthRemainQty" column="MONTH_REMAIN_QTY" jdbcType="DECIMAL"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,MONTH_PLAN_APS_VERSION,MONTH_PLAN_VERSION,
+        YEAR,MONTH,MATERIAL_CODE,
+        MONTH_PLAN_QTY,MONTH_PLAN_MODIFY_QTY,MONTH_FINISH_QTY,
+        MONTH_REMAIN_QTY,CREATE_BY,CREATE_TIME,
+        UPDATE_BY,UPDATE_TIME,DEL_FLAG,
+        REMARK
+    </sql>
+
+    <update id="mergeTm" parameterType="list">
+        merge into T_TM_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_TM_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeTc" parameterType="list">
+        merge into T_TC_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_TC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeNc" parameterType="list">
+        merge into T_NC_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_NC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeTq" parameterType="list">
+        merge into T_TQ_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_TQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeGsq" parameterType="list">
+        merge into T_GSQ_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_GSQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeCd15" parameterType="list">
+        merge into T_CD15_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_CD15_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeCd90" parameterType="list">
+        merge into T_CD90_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_CD90_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeXwyy" parameterType="list">
+        merge into T_XWYY_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.monthPlanQty2,jdbcType=DECIMAL} MONTH_PLAN_QTY2,
+            #{ITEM.monthPlanModifyQty2,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY2,
+            #{ITEM.monthFinishQty2,jdbcType=DECIMAL} MONTH_FINISH_QTY2,
+            #{ITEM.monthRemainQty2,jdbcType=DECIMAL} MONTH_REMAIN_QTY2,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.MONTH_PLAN_QTY2 = NVL(b.MONTH_PLAN_QTY2, 0),
+        a.MONTH_PLAN_MODIFY_QTY2 = NVL(b.MONTH_PLAN_MODIFY_QTY2, 0),
+        MONTH_FINISH_QTY2 = NVL(b.MONTH_FINISH_QTY2, 0),
+        MONTH_REMAIN_QTY2 = NVL(b.MONTH_REMAIN_QTY2, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.MONTH_PLAN_QTY2, a.MONTH_PLAN_MODIFY_QTY2, a.MONTH_FINISH_QTY2, a.MONTH_REMAIN_QTY2, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_XWYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0), NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+
+    <update id="mergeGdyy" parameterType="list">
+        merge into T_GDYY_MONTH_PLAN_SURPLUS a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.monthPlanApsVersion,jdbcType=VARCHAR} MONTH_PLAN_APS_VERSION,
+            #{ITEM.monthPlanVersion,jdbcType=VARCHAR} MONTH_PLAN_VERSION,
+            #{ITEM.year,jdbcType=VARCHAR} YEAR,
+            #{ITEM.month,jdbcType=VARCHAR} MONTH,
+            #{ITEM.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
+            #{ITEM.monthPlanQty,jdbcType=DECIMAL} MONTH_PLAN_QTY,
+            #{ITEM.monthPlanModifyQty,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY,
+            #{ITEM.monthFinishQty,jdbcType=DECIMAL} MONTH_FINISH_QTY,
+            #{ITEM.monthRemainQty,jdbcType=DECIMAL} MONTH_REMAIN_QTY,
+            #{ITEM.monthPlanQty2,jdbcType=DECIMAL} MONTH_PLAN_QTY2,
+            #{ITEM.monthPlanModifyQty2,jdbcType=DECIMAL} MONTH_PLAN_MODIFY_QTY2,
+            #{ITEM.monthFinishQty2,jdbcType=DECIMAL} MONTH_FINISH_QTY2,
+            #{ITEM.monthRemainQty2,jdbcType=DECIMAL} MONTH_REMAIN_QTY2,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        AND a.month = b.month
+        AND a.MATERIAL_CODE = b.MATERIAL_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.MONTH_PLAN_QTY = NVL(b.MONTH_PLAN_QTY, 0),
+        a.MONTH_PLAN_MODIFY_QTY = NVL(b.MONTH_PLAN_MODIFY_QTY, 0),
+        a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
+        a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
+        a.MONTH_PLAN_QTY2 = NVL(b.MONTH_PLAN_QTY2, 0),
+        a.MONTH_PLAN_MODIFY_QTY2 = NVL(b.MONTH_PLAN_MODIFY_QTY2, 0),
+        MONTH_FINISH_QTY2 = NVL(b.MONTH_FINISH_QTY2, 0),
+        MONTH_REMAIN_QTY2 = NVL(b.MONTH_REMAIN_QTY2, 0),
+        a.update_by = b.create_by,
+        a.update_time = sysdate
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.MONTH_PLAN_QTY2, a.MONTH_PLAN_MODIFY_QTY2, a.MONTH_FINISH_QTY2, a.MONTH_REMAIN_QTY2, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (T_GDYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0), NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+    
+    <!-- 获取指定年月的月度计划版本号 -->
+    <select id="selectMonthPlanApsVersion" resultType="string">
+    	SELECT DISTINCT MONTH_PLAN_APS_VERSION
+		  FROM T_MDM_MONTH_PLAN_MAIN
+		 WHERE YEAR = #{year}
+		   AND MONTH = #{month}
+		   AND IS_FINALIZED = '0'
+		   AND DEL_FLAG = '0'
+    </select>
+</mapper>

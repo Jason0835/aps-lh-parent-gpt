@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('成型计划投产状态列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" th:value="${beginDate}"
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="beginDate"/>
+                            <span  style='color: black;'>-</span>
+                            <input type="text" class="time-input" th:value="${endDate}"
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endDate"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.monthPlanApsVersion}]]：
+                            <input type="text" name="monthPlanApsVersion"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.sapCode}]]：
+                            <input type="text" name="sapCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.embryoCode}]]：
+                            <input type="text" name="embryoCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.bomDataVersion}]]：
+                            <input type="text" name="bomDataVersion"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.productStatus}]]：
+                            <select name="productStatus" th:with="type=${@dict.getType('PRODUCT_STATUS')}"  class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.productStatus.markUnProduct}]]：
+                            <select name="markUnProduct" th:with="type=${@dict.getType('MARK_UN_PRODUCT')}"  class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary single disabled" onclick="modifyQty()"
+               shiro:hasPermission="cx:productStatus:modifyQty">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.productStatus.modifyQty}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cx:productStatus:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="production()"
+               shiro:hasPermission="cx:productStatus:production">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.scheduleResult.production}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="markUnProduct()"
+               shiro:hasPermission="cx:productStatus:markUnProduct">
+                <i class="fa fa-remove"></i> [[#{ui.data.column.productStatus.markUnProduct}]]
+            </a>
+            <a class="btn btn-danger" onclick="closeItem()">
+                <i class="fa fa-reply-all"></i> [[#{ui.frame.btn.name.close}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var productStatusDatas = [[${@dict.getType('PRODUCT_STATUS')}]];
+    var markUnProductDatas = [[${@dict.getType('MARK_UN_PRODUCT')}]];
+
+    var prefix = ctx + "cx/productStatus";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            modifyQty: prefix + "/modifyQty/{id}",
+            production:  prefix + "/production/{ids}",
+            markUnProduct: prefix + "/markUnProduct",
+            editRemark: prefix + "/editRemark/{id}",
+            exportUrl: prefix + "/export",
+            uniqueId: 'id',
+            modalName: [[#{ui.data.column.productStatus.modalName}]],
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'monthPlanApsVersion',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.monthPlanApsVersion}]],
+                    sortable: true,
+                },
+                {
+                    field: 'bomDataVersion',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.bomDataVersion}]],
+                    sortable: true,
+                },
+                {
+                    field: 'monthPlanIds',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'sapCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.sapCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'embryoCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.embryoCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'monthPlanTotalQty',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.monthPlanTotalQty}]],
+                    sortable: true,
+                },
+                {
+                    field: 'beginDate',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'endDate',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productDetail',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'specDimension',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.specDimension}]],
+                    sortable: true,
+                },
+                {
+                    field: 'productStatus',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.productStatus}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(productStatusDatas, value);
+                    }
+                },
+                {
+                    field: 'markUnProduct',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.markUnProduct}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(markUnProductDatas, value);
+                    }
+                },
+                {
+                    field: 'remark',
+                    halign:'center',
+                    title: [[#{ui.data.column.remark}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        debugger;
+                        var _length = 20;
+                        var _text = "";
+                        var _value = $.common.nullToStr(value);
+                        if (_value.length > _length) {
+                            _text = _value.substr(0, _length) + "...";
+                            _value = _value.replace(/\'/g,"&apos;");
+                            _value = _value.replace(/\"/g,"&quot;");
+                            var actions = [];
+                            var content = ($.common.sprintf('<a href="javascript:void(0)" onclick="editRemark(\'' +row.id+'\')"  data-placement="top" data-toggle="popover" data-trigger="hover" data-content="%s"><span>%s</span></a>', _value, _text))
+                            actions.push(content)
+                            return actions.join('');
+                        } else {
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="editRemark(\'' +row.id+'\')">' + $.table.tooltip(value) + '</a> ');
+                            return actions.join('');
+                        }
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+    //计划量修改
+    function modifyQty(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        url = table.options.modifyQty.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.productStatus.modalName}]], url);
+    };
+
+    //投产
+    function production() {
+        table.set();
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        if (rows.length == 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var ids=rows.join();
+        url = table.options.production.replace("{ids}", ids);
+        $.modal.open([[#{ui.data.column.productStatus.modalName}]], url);
+    };
+
+    // 标记不投产
+    function markUnProduct() {
+        table.set();
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        if (rows.length == 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        $.modal.confirm([[#{ui.data.column.productStatus.markUnProduct}]]+"?", function() {
+            var url = table.options.markUnProduct;
+            var data = { "ids": rows.join() };
+            $.operate.submit(url, "post", "json", data);
+        });
+    };
+
+    //修改备注
+    function editRemark(id) {
+        table.set();
+        url = table.options.editRemark.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.productStatus.modalName}]], url, 500, 350);
+    };
+
+    /** 关闭选项卡 */
+    var closeItem = function (dataId) {
+        var topWindow = $(window.parent.document);
+        if ($.common.isNotEmpty(dataId)) {
+            window.parent.$.modal.closeLoading();
+            // 根据dataId关闭指定选项卡
+            $('.menuTab[data-id="' + dataId + '"]', topWindow).remove();
+            // 移除相应tab对应的内容区
+            $('.mainContent .RuoYi_iframe[data-id="' + dataId + '"]', topWindow).remove();
+            return;
+        }
+        var panelUrl = window.frameElement.getAttribute('data-panel');
+        $('.page-tabs-content .active i', topWindow).click();
+        if ($.common.isNotEmpty(panelUrl)) {
+            $('.menuTab[data-id="' + panelUrl + '"]', topWindow).addClass('active').siblings('.menuTab').removeClass('active');
+            $('.mainContent .RuoYi_iframe', topWindow).each(function () {
+                if ($(this).data('id') == panelUrl) {
+                    $(this).show().siblings('.RuoYi_iframe').hide();
+                    return false;
+                }
+            });
+        }
+    }
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TMesSapEmbryoBadNumberMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mps.domain.TMesSapEmbryoBadNumber">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="badDate" column="BAD_DATE" jdbcType="TIMESTAMP"/>
+            <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+            <result property="embryoCode" column="EMBRYO_CODE" jdbcType="VARCHAR"/>
+            <result property="badNum" column="BAD_NUM" jdbcType="DECIMAL"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+            <result property="bomDataVersion" column="bom_data_version" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,BAD_DATE,SAP_CODE,
+        EMBRYO_CODE,BAD_NUM,REMARK,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE,BOM_DATA_VERSION
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_MES_SAP_EMBRYO_BAD_NUMBER
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_MES_SAP_EMBRYO_BAD_NUMBER
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TMesSapEmbryoBadNumber" useGeneratedKeys="true">
+        insert into T_MES_SAP_EMBRYO_BAD_NUMBER
+        ( ID,BAD_DATE,SAP_CODE
+        ,EMBRYO_CODE,BAD_NUM,REMARK
+        ,DATA_VERSION,CREATE_DATE,UPDATE_DATE
+        ,IS_DELETE)
+        values (#{id,jdbcType=DECIMAL},#{badDate,jdbcType=TIMESTAMP},#{sapCode,jdbcType=VARCHAR}
+        ,#{embryoCode,jdbcType=VARCHAR},#{badNum,jdbcType=DECIMAL},#{remark,jdbcType=VARCHAR}
+        ,#{dataVersion,jdbcType=VARCHAR},#{createDate,jdbcType=TIMESTAMP},#{updateDate,jdbcType=TIMESTAMP}
+        ,#{isDelete,jdbcType=DECIMAL})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TMesSapEmbryoBadNumber" useGeneratedKeys="true">
+        insert into T_MES_SAP_EMBRYO_BAD_NUMBER
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="badDate != null">badDate,</if>
+                <if test="sapCode != null">sapCode,</if>
+                <if test="embryoCode != null">embryoCode,</if>
+                <if test="badNum != null">badNum,</if>
+                <if test="remark != null">remark,</if>
+                <if test="dataVersion != null">dataVersion,</if>
+                <if test="createDate != null">createDate,</if>
+                <if test="updateDate != null">updateDate,</if>
+                <if test="isDelete != null">isDelete,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="badDate != null">BAD_DATE = #{badDate,jdbcType=TIMESTAMP},</if>
+                <if test="sapCode != null">SAP_CODE = #{sapCode,jdbcType=VARCHAR},</if>
+                <if test="embryoCode != null">EMBRYO_CODE = #{embryoCode,jdbcType=VARCHAR},</if>
+                <if test="badNum != null">BAD_NUM = #{badNum,jdbcType=DECIMAL},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+                <if test="dataVersion != null">DATA_VERSION = #{dataVersion,jdbcType=VARCHAR},</if>
+                <if test="createDate != null">CREATE_DATE = #{createDate,jdbcType=TIMESTAMP},</if>
+                <if test="updateDate != null">UPDATE_DATE = #{updateDate,jdbcType=TIMESTAMP},</if>
+                <if test="isDelete != null">IS_DELETE = #{isDelete,jdbcType=DECIMAL},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.mps.domain.TMesSapEmbryoBadNumber">
+        update T_MES_SAP_EMBRYO_BAD_NUMBER
+        <set>
+                <if test="badDate != null">
+                    BAD_DATE = #{badDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="sapCode != null">
+                    SAP_CODE = #{sapCode,jdbcType=VARCHAR},
+                </if>
+                <if test="embryoCode != null">
+                    EMBRYO_CODE = #{embryoCode,jdbcType=VARCHAR},
+                </if>
+                <if test="badNum != null">
+                    BAD_NUM = #{badNum,jdbcType=DECIMAL},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+                <if test="dataVersion != null">
+                    DATA_VERSION = #{dataVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="createDate != null">
+                    CREATE_DATE = #{createDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateDate != null">
+                    UPDATE_DATE = #{updateDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="isDelete != null">
+                    IS_DELETE = #{isDelete,jdbcType=DECIMAL},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TMesSapEmbryoBadNumber">
+        update T_MES_SAP_EMBRYO_BAD_NUMBER
+        set 
+            BAD_DATE =  #{badDate,jdbcType=TIMESTAMP},
+            SAP_CODE =  #{sapCode,jdbcType=VARCHAR},
+            EMBRYO_CODE =  #{embryoCode,jdbcType=VARCHAR},
+            BAD_NUM =  #{badNum,jdbcType=DECIMAL},
+            REMARK =  #{remark,jdbcType=VARCHAR},
+            DATA_VERSION =  #{dataVersion,jdbcType=VARCHAR},
+            CREATE_DATE =  #{createDate,jdbcType=TIMESTAMP},
+            UPDATE_DATE =  #{updateDate,jdbcType=TIMESTAMP},
+            IS_DELETE =  #{isDelete,jdbcType=DECIMAL}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <select id="selectAllByDataVersionAndIsDelete" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_MES_SAP_EMBRYO_BAD_NUMBER
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+</mapper>

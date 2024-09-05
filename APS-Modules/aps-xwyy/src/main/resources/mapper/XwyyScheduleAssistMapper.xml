@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.mapper.XwyyScheduleAssistMapper">
+
+    <resultMap type="com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleAssist" id="XwyyScheduleAssistResult">
+        <result property="id" column="id"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="cd90BatchNo" column="cd90_batch_no"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="originalLineCode" column="original_line_code"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="supplyTime" column="supply_time"/>
+        <result property="dayPlanQty" column="day_plan_qty"/>
+        <result property="dayFinishQty" column="day_finish_qty"/>
+        <result property="daySysAnalysis" column="day_sys_analysis"/>
+        <result property="dayHandAnalysis" column="day_hand_analysis"/>
+        <result property="nightPlanQty" column="night_plan_qty"/>
+        <result property="nightFinishQty" column="night_finish_qty"/>
+        <result property="nightSysAnalysis" column="night_sys_analysis"/>
+        <result property="nightHandAnalysis" column="night_hand_analysis"/>
+        <result property="yesStock" column="yes_stock"/>
+        <result property="todayStock" column="today_stock"/>
+        <result property="dayUsed" column="day_used"/>
+        <result property="dayOut" column="day_out"/>
+        <result property="fac2Class1Plan" column="fac2_class1_plan"/>
+        <result property="fac2Class2Plan" column="fac2_class2_plan"/>
+        <result property="fac2Class3Plan" column="fac2_class3_plan"/>
+        <result property="fac2TotalPlan" column="fac2_total_plan"/>
+        <result property="fac5Class1Plan" column="fac5_class1_plan"/>
+        <result property="fac5Class2Plan" column="fac5_class2_plan"/>
+        <result property="fac5Class3Plan" column="fac5_class3_plan"/>
+        <result property="fac5TotalPlan" column="fac5_total_plan"/>
+        <result property="totalPlan" column="total_plan"/>
+        <result property="cxClass1Plan" column="cx_class1_plan"/>
+        <result property="cxClass2Plan" column="cx_class2_plan"/>
+        <result property="cxClass3Plan" column="cx_class3_plan"/>
+        <result property="cxClass4Plan" column="cx_class4_plan"/>
+        <result property="cxClass5Plan" column="cx_class5_plan"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="monthPlan" column="monthPlan"/>
+        <result property="monthPlanOs" column="monthPlanOs"/>
+        <result property="colorType" column="COLOR_TYPE"/>
+        <result property="colorCode" column="COLOR_CODE"/>
+        <result property="dataSource" column="data_source"/>
+    </resultMap>
+
+    <sql id="selectXwyyScheduleAssistVo">
+        select id, schedule_date, cd90_batch_no, batch_no, order_no, big_roll_code, original_line_code, machine_id, supply_time, day_plan_qty, day_finish_qty, day_sys_analysis, day_hand_analysis, night_plan_qty, night_finish_qty, night_sys_analysis, night_hand_analysis, yes_stock, today_stock, day_used, day_out, fac2_class1_plan, fac2_class2_plan, fac2_class3_plan, fac2_total_plan, fac5_class1_plan, fac5_class2_plan, fac5_class3_plan, fac5_total_plan, total_plan, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_xwyy_assist_schedule
+    </sql>
+
+    <sql id="column">
+        a.id, a.schedule_date, a.cd90_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.original_line_code, a.machine_id, a.supply_time, a.day_plan_qty, a.day_sys_analysis, a.day_hand_analysis, a.night_plan_qty, a.night_sys_analysis, a.night_hand_analysis, a.yes_stock, a.today_stock, a.day_used, a.day_out, a.fac2_class1_plan, a.fac2_class2_plan, a.fac2_class3_plan, a.fac2_total_plan, a.fac5_class1_plan, a.fac5_class2_plan, a.fac5_class3_plan, a.fac5_total_plan, a.total_plan, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time, a.mark_close_out_tip, a.production_status,a.data_source,
+    </sql>
+
+    <select id="selectXwyyScheduleAssistList" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleAssist"
+            resultType="com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleAssist">
+        select * from (
+            select
+                <include refid="column"/>
+                (NVL(day_plan_qty, 0) + NVL(night_plan_qty, 0)) as daily_total_qty,
+                b.MONTH_PLAN_QTY as month_plan,
+                CEIL(b.MONTH_REMAIN_QTY) as month_plan_os,
+                d.COLOR_TYPE,
+                d.COLOR_CODE
+            from t_xwyy_assist_schedule a
+            LEFT JOIN (
+                select MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY
+                from T_XWYY_MONTH_PLAN_SURPLUS
+                where YEAR=#{year,jdbcType=VARCHAR}
+                and MONTH= #{month,jdbcType=VARCHAR}
+                and del_flag = '0'
+            ) b on a.BIG_ROLL_CODE=b.MATERIAL_CODE
+            LEFT JOIN T_XWYY_BIG_ROLL_COLOR d ON a.BIG_ROLL_CODE = d.BIG_ROLL_CODE AND d.del_Flag = '0' and d.status='0'
+            where a.del_flag = '0'
+            <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+            <if test="bigRollCode != null  and bigRollCode != ''">
+                and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="originalLineCode != null  and originalLineCode != ''">
+                and INSTR(a.original_line_code, #{originalLineCode,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}</if>
+            <if test="machineId != null  and machineId != ''">and instr(','||a.machine_id||',', ','||#{machineId}||',')>0</if>
+            <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
+            order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.CREATE_TIME
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+</mapper>

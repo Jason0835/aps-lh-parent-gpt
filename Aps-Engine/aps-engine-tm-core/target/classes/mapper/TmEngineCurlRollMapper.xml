@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.engine.mapper.TmEngineCurlRollMapper">
+
+	<!-- 查询胎面卷曲设置列表 -->
+    <select id="getTmCurlRollList" parameterType="string" resultType="com.zlt.aps.tm.api.domain.entity.TmCurlRoll">
+        select id, tread_Code, curl_length
+          from T_TM_CURL_ROLL
+         where DEL_FLAG = 0
+    </select>
+
+</mapper>

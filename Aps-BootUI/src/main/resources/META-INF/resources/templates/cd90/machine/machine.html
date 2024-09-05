@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('机台信息列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.machine.machineCode}]]：</label>
+                            <input type="text" name="machineCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.machine.machineName}]]：</label>
+                            <input type="text" name="machineName"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.machine.status}]]：</label>
+                            <select class="form-control" name="status" th:with="type=${@dict.getType('STATUS')}">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('',850,$(window).height() - 50)" shiro:hasPermission="cd90:machine:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit()" shiro:hasPermission="cd90:machine:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-info" onclick="$.table.importExcel()" shiro:hasPermission="cd90:machine:import">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cd90:machine:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('cd90:machine:edit')}]];
+    var CLASS_SHIFT = [[${@dict.getType('CLASS_SHIFT')}]];
+    var CLASS_NUM = [[${@dict.getType('CLASS_NUM')}]];
+    var CLASS_NUM_THREE = [[${@dict.getType('CLASS_NUM_THREE')}]];
+    var IS_SUPPORTED = [[${@dict.getType('IS_SUPPORTED')}]];
+    for(var i = 0;i<CLASS_NUM.length;i++){
+        CLASS_NUM[i].dictLabel = CLASS_NUM[i].dictLabel.split("（")[0]
+    }
+    for(var i = 0;i<CLASS_NUM_THREE.length;i++){
+        CLASS_NUM_THREE[i].dictLabel = CLASS_NUM_THREE[i].dictLabel.split("（")[0]
+    }
+    var prefix = ctx + "cd90/machine";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.machine.info}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.id}]],
+                    visible: false
+                },
+                {
+                    field: 'machineCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.machineCode}]]
+                },
+                {
+                    field: 'machineName',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.machineName}]]
+                },
+                {
+                    field: 'isStickFilm',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.isStickFilm}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(IS_SUPPORTED, row.isStickFilm);
+                    },
+                },
+                {
+                    field: 'clothWithMax',
+                    sortable: true,
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.clothWithMax}]]
+                },
+                {
+                    field: 'clothWithMin',
+                    sortable: true,
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.clothWithMin}]]
+                },
+                {
+                    field: 'quata',
+                    sortable: true,
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.quata}]]
+                },
+                {
+                    field: 'classShift',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.classShift}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(CLASS_SHIFT, row.classShift);
+                    },
+                },
+                {
+                    field: 'openMachineClass',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.openMachineClass}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            return '';
+                        }
+                        if(row.classShift==CLASS_SHIFT[1].dictValue){
+                            return $.table.selectDictLabels(CLASS_NUM_THREE, row.openMachineClass);
+                        }
+                        return $.table.selectDictLabels(CLASS_NUM, row.openMachineClass);
+                    },
+                },
+                {
+                    field: 'status',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.status}]],
+                    formatter: function (value, row, index) {
+                        return statusTools(row);
+                    },
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit('+row.id+','+'850'+','+'$(window).height() - 50'+')"><i class="fa fa-edit"></i>'+[[#{ui.frame.btn.update}]]+'</a> ');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+    /* 状态显示 */
+    function statusTools(row) {
+        var datas=JSON.stringify(row)
+        if (row.status =='1') {
+            return "<i class=\"fa fa-toggle-off text-info fa-2x\" onclick='enable("+ datas + ")'></i> ";
+        } else {
+            return "<i class=\"fa fa-toggle-on text-info fa-2x\" onclick='disable("+ datas + ")'></i> ";
+        }
+    }
+
+    /*停用 */
+    function disable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isStop}]], function() {
+            datas.status='1';
+            $.operate.post(prefix + "/edit", datas);
+        })
+    }
+
+    /*启用 */
+    function enable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isOpen}]], function() {
+            datas.status='0';
+            $.operate.post(prefix + "/edit", datas);
+        })
+    }
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href=prefix + "/importTemplate";
+    }
+</script>
+</body>
+<!-- 导入区域 -->
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

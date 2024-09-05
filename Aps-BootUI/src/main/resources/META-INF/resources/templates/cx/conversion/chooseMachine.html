@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('半部件规格换算选机台')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-cxHalfPartConversion-edit">
+        <input name="halfPartType" th:value="${halfPartType}" type="hidden">
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.machineName}]]：</label>
+            <div class="col-sm-8">
+                <select name="machineId" class="form-control" th:with="type=${machineInfoList}"
+                        th:data-none-selected-text="#{ui.data.column.selectMachineName}">
+                    <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                    <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
+                            th:value="${machineInfo.machineId}" th:selected="${machineInfo.machineId == machineId}"></option>
+                </select>
+            </div>
+        </div>
+
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "cx/conversion";
+
+    $("#form-cxHalfPartConversion-edit").validate({
+        focusCleanup: true
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            let fromData = $('#form-cxHalfPartConversion-edit').serializeArray();
+            var halfPartType = fromData[0].value;
+            var value = fromData[1].value;
+            var parent = window.parent;
+            parent.$("#" + parent.table.options.id).bootstrapTable('updateCellByUniqueId', {
+                id: halfPartType,
+                field: "machineId",
+                value: value
+            });
+            $.modal.close();
+        }
+    }
+
+</script>
+</body>
+</html>

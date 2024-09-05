@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改成型定额设定')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-setting-edit" th:object="${quotaSetting}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.machine.machineType}]]：</label>
+                <div class="col-sm-8">
+                    <select name="machineType" class="form-control" th:with="type=${@dict.getType('CX_MACHINE_TYPE')}" required>
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{machineType}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.limit.specDimension}]]：</label>
+                <div class="col-sm-8">
+                    <input name="specDimension" th:field="*{specDimension}" class="form-control" type="number" required min="0" max="9999999">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.setting.carcassBothLayer}]]：</label>
+                <div class="col-sm-8">
+                    <input name="carcassBothLayer" th:field="*{carcassBothLayer}" class="form-control" type="number" digits="true" min="0" max="999" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.setting.reinforce}]]：</label>
+                <div class="col-sm-8">
+                    <label class="toggle-switch switch-solid">
+                        <input type="checkbox" id="reinforce" th:checked="${quotaSetting.reinforce == '0' ? true : false}">
+                        <span></span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.setting.tireType}]]：</label>
+                <div class="col-sm-8">
+                    <select name="tireType" class="form-control" th:with="type=${@dict.getType('TIRE_TYPE')}" required>
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{tireType}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.setting.sectionWidthMinimum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="sectionWidthMinimum" th:field="*{sectionWidthMinimum}" class="form-control" type="number" min="0" max="99999999" digits="true" required>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.setting.sectionWidthMaximum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="sectionWidthMaximum" th:field="*{sectionWidthMaximum}" class="form-control" type="number" min="0" max="99999999" digits="true" required>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.cx.setting.twoPersonQuota}]]：</label>
+                <div class="col-sm-8">
+                    <input name="twoPersonQuota" th:field="*{twoPersonQuota}" class="form-control" type="number" min="0" max="99999999" digits="true">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.cx.setting.onePersonQuota}]]：</label>
+                <div class="col-sm-8">
+                    <input name="onePersonQuota" th:field="*{onePersonQuota}" class="form-control" type="number" min="0" max="99999999" digits="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+        var prefix = ctx + "cx/quota";
+        $("#form-setting-edit").validate({
+            focusCleanup: true,
+            rules: {
+                specDimension: {
+                    range:[0,99999999.99],
+                },
+                carcassBothLayer: {
+                    range:[0,999],
+                },
+            }
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var data = $("#form-setting-edit").serializeArray();
+                var reinforce = $("input[id='reinforce']").is(':checked') == true ? '0' : '1';
+                data.push({"name": "reinforce", "value": reinforce});
+                $.operate.save(prefix + "/edit", data);
+            }
+        }
+    </script>
+</body>
+</html>

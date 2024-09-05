@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.TGdyyMonthPlanSurplusMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.common.engine.domain.TGdyyMonthPlanSurplus">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="monthPlanApsVersion" column="MONTH_PLAN_APS_VERSION" jdbcType="VARCHAR"/>
+            <result property="monthPlanVersion" column="MONTH_PLAN_VERSION" jdbcType="VARCHAR"/>
+            <result property="year" column="YEAR" jdbcType="VARCHAR"/>
+            <result property="month" column="MONTH" jdbcType="VARCHAR"/>
+            <result property="materialCode" column="MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="monthPlanQty" column="MONTH_PLAN_QTY" jdbcType="DECIMAL"/>
+            <result property="monthPlanModifyQty" column="MONTH_PLAN_MODIFY_QTY" jdbcType="DECIMAL"/>
+            <result property="monthFinishQty" column="MONTH_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="monthRemainQty" column="MONTH_REMAIN_QTY" jdbcType="DECIMAL"/>
+            <result property="monthPlanQty2" column="MONTH_PLAN_QTY2" jdbcType="DECIMAL"/>
+            <result property="monthPlanModifyQty2" column="MONTH_PLAN_MODIFY_QTY2" jdbcType="DECIMAL"/>
+            <result property="monthFinishQty2" column="MONTH_FINISH_QTY2" jdbcType="DECIMAL"/>
+            <result property="monthRemainQty2" column="MONTH_REMAIN_QTY2" jdbcType="DECIMAL"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,MONTH_PLAN_APS_VERSION,MONTH_PLAN_VERSION,
+        YEAR,MONTH,MATERIAL_CODE,
+        MONTH_PLAN_QTY,MONTH_PLAN_MODIFY_QTY,MONTH_FINISH_QTY,
+        MONTH_REMAIN_QTY,MONTH_PLAN_QTY2,MONTH_PLAN_MODIFY_QTY2,
+        MONTH_FINISH_QTY2,MONTH_REMAIN_QTY2,CREATE_BY,
+        CREATE_TIME,UPDATE_BY,UPDATE_TIME,
+        DEL_FLAG,REMARK
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_GDYY_MONTH_PLAN_SURPLUS
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_GDYY_MONTH_PLAN_SURPLUS
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TGdyyMonthPlanSurplus" useGeneratedKeys="true">
+        insert into T_GDYY_MONTH_PLAN_SURPLUS
+        ( ID,MONTH_PLAN_APS_VERSION,MONTH_PLAN_VERSION
+        ,YEAR,MONTH,MATERIAL_CODE
+        ,MONTH_PLAN_QTY,MONTH_PLAN_MODIFY_QTY,MONTH_FINISH_QTY
+        ,MONTH_REMAIN_QTY,MONTH_PLAN_QTY2,MONTH_PLAN_MODIFY_QTY2
+        ,MONTH_FINISH_QTY2,MONTH_REMAIN_QTY2,CREATE_BY
+        ,CREATE_TIME,UPDATE_BY,UPDATE_TIME
+        ,DEL_FLAG,REMARK)
+        values (T_GDYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL,#{monthPlanApsVersion,jdbcType=VARCHAR},#{monthPlanVersion,jdbcType=VARCHAR}
+        ,#{year,jdbcType=VARCHAR},#{month,jdbcType=VARCHAR},#{materialCode,jdbcType=VARCHAR}
+        ,#{monthPlanQty,jdbcType=DECIMAL},#{monthPlanModifyQty,jdbcType=DECIMAL},#{monthFinishQty,jdbcType=DECIMAL}
+        ,#{monthRemainQty,jdbcType=DECIMAL},#{monthPlanQty2,jdbcType=DECIMAL},#{monthPlanModifyQty2,jdbcType=DECIMAL}
+        ,#{monthFinishQty2,jdbcType=DECIMAL},#{monthRemainQty2,jdbcType=DECIMAL},#{createBy,jdbcType=VARCHAR}
+        ,#{createTime,jdbcType=TIMESTAMP},#{updateBy,jdbcType=VARCHAR},#{updateTime,jdbcType=TIMESTAMP}
+        ,#{delFlag,jdbcType=CHAR},#{remark,jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TGdyyMonthPlanSurplus" useGeneratedKeys="true">
+        insert into T_GDYY_MONTH_PLAN_SURPLUS
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="monthPlanApsVersion != null">monthPlanApsVersion,</if>
+                <if test="monthPlanVersion != null">monthPlanVersion,</if>
+                <if test="year != null">year,</if>
+                <if test="month != null">month,</if>
+                <if test="materialCode != null">materialCode,</if>
+                <if test="monthPlanQty != null">monthPlanQty,</if>
+                <if test="monthPlanModifyQty != null">monthPlanModifyQty,</if>
+                <if test="monthFinishQty != null">monthFinishQty,</if>
+                <if test="monthRemainQty != null">monthRemainQty,</if>
+                <if test="monthPlanQty2 != null">monthPlanQty2,</if>
+                <if test="monthPlanModifyQty2 != null">monthPlanModifyQty2,</if>
+                <if test="monthFinishQty2 != null">monthFinishQty2,</if>
+                <if test="monthRemainQty2 != null">monthRemainQty2,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateBy != null">updateBy,</if>
+                <if test="updateTime != null">updateTime,</if>
+                <if test="delFlag != null">delFlag,</if>
+                <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="monthPlanApsVersion != null">MONTH_PLAN_APS_VERSION = #{monthPlanApsVersion,jdbcType=VARCHAR},</if>
+                <if test="monthPlanVersion != null">MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR},</if>
+                <if test="year != null">YEAR = #{year,jdbcType=VARCHAR},</if>
+                <if test="month != null">MONTH = #{month,jdbcType=VARCHAR},</if>
+                <if test="materialCode != null">MATERIAL_CODE = #{materialCode,jdbcType=VARCHAR},</if>
+                <if test="monthPlanQty != null">MONTH_PLAN_QTY = #{monthPlanQty,jdbcType=DECIMAL},</if>
+                <if test="monthPlanModifyQty != null">MONTH_PLAN_MODIFY_QTY = #{monthPlanModifyQty,jdbcType=DECIMAL},</if>
+                <if test="monthFinishQty != null">MONTH_FINISH_QTY = #{monthFinishQty,jdbcType=DECIMAL},</if>
+                <if test="monthRemainQty != null">MONTH_REMAIN_QTY = #{monthRemainQty,jdbcType=DECIMAL},</if>
+                <if test="monthPlanQty2 != null">MONTH_PLAN_QTY2 = #{monthPlanQty2,jdbcType=DECIMAL},</if>
+                <if test="monthPlanModifyQty2 != null">MONTH_PLAN_MODIFY_QTY2 = #{monthPlanModifyQty2,jdbcType=DECIMAL},</if>
+                <if test="monthFinishQty2 != null">MONTH_FINISH_QTY2 = #{monthFinishQty2,jdbcType=DECIMAL},</if>
+                <if test="monthRemainQty2 != null">MONTH_REMAIN_QTY2 = #{monthRemainQty2,jdbcType=DECIMAL},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+                <if test="delFlag != null">DEL_FLAG = #{delFlag,jdbcType=CHAR},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.common.engine.domain.TGdyyMonthPlanSurplus">
+        update T_GDYY_MONTH_PLAN_SURPLUS
+        <set>
+                <if test="monthPlanApsVersion != null">
+                    MONTH_PLAN_APS_VERSION = #{monthPlanApsVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="monthPlanVersion != null">
+                    MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="year != null">
+                    YEAR = #{year,jdbcType=VARCHAR},
+                </if>
+                <if test="month != null">
+                    MONTH = #{month,jdbcType=VARCHAR},
+                </if>
+                <if test="materialCode != null">
+                    MATERIAL_CODE = #{materialCode,jdbcType=VARCHAR},
+                </if>
+                <if test="monthPlanQty != null">
+                    MONTH_PLAN_QTY = #{monthPlanQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthPlanModifyQty != null">
+                    MONTH_PLAN_MODIFY_QTY = #{monthPlanModifyQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthFinishQty != null">
+                    MONTH_FINISH_QTY = #{monthFinishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthRemainQty != null">
+                    MONTH_REMAIN_QTY = #{monthRemainQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthPlanQty2 != null">
+                    MONTH_PLAN_QTY2 = #{monthPlanQty2,jdbcType=DECIMAL},
+                </if>
+                <if test="monthPlanModifyQty2 != null">
+                    MONTH_PLAN_MODIFY_QTY2 = #{monthPlanModifyQty2,jdbcType=DECIMAL},
+                </if>
+                <if test="monthFinishQty2 != null">
+                    MONTH_FINISH_QTY2 = #{monthFinishQty2,jdbcType=DECIMAL},
+                </if>
+                <if test="monthRemainQty2 != null">
+                    MONTH_REMAIN_QTY2 = #{monthRemainQty2,jdbcType=DECIMAL},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="delFlag != null">
+                    DEL_FLAG = #{delFlag,jdbcType=CHAR},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.TGdyyMonthPlanSurplus">
+        update T_GDYY_MONTH_PLAN_SURPLUS
+        set 
+            MONTH_PLAN_APS_VERSION =  #{monthPlanApsVersion,jdbcType=VARCHAR},
+            MONTH_PLAN_VERSION =  #{monthPlanVersion,jdbcType=VARCHAR},
+            YEAR =  #{year,jdbcType=VARCHAR},
+            MONTH =  #{month,jdbcType=VARCHAR},
+            MATERIAL_CODE =  #{materialCode,jdbcType=VARCHAR},
+            MONTH_PLAN_QTY =  #{monthPlanQty,jdbcType=DECIMAL},
+            MONTH_PLAN_MODIFY_QTY =  #{monthPlanModifyQty,jdbcType=DECIMAL},
+            MONTH_FINISH_QTY =  #{monthFinishQty,jdbcType=DECIMAL},
+            MONTH_REMAIN_QTY =  #{monthRemainQty,jdbcType=DECIMAL},
+            MONTH_PLAN_QTY2 =  #{monthPlanQty2,jdbcType=DECIMAL},
+            MONTH_PLAN_MODIFY_QTY2 =  #{monthPlanModifyQty2,jdbcType=DECIMAL},
+            MONTH_FINISH_QTY2 =  #{monthFinishQty2,jdbcType=DECIMAL},
+            MONTH_REMAIN_QTY2 =  #{monthRemainQty2,jdbcType=DECIMAL},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
+            DEL_FLAG =  #{delFlag,jdbcType=CHAR},
+            REMARK =  #{remark,jdbcType=VARCHAR}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <insert id="insertBatch">
+        insert into T_GDYY_MONTH_PLAN_SURPLUS
+        (id,month_plan_aps_version,month_plan_version,
+        year,month,material_code,
+        month_plan_qty,month_plan_modify_qty,month_finish_qty,
+        month_remain_qty,month_plan_qty2,month_plan_modify_qty2,
+        month_finish_qty2,month_remain_qty2,remark,
+        del_flag,create_by,create_time,
+        update_by,update_time)
+        select T_GDYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="tGdyyMonthPlanSurplusCollection" item="item" separator=" union ">
+            select #{item.monthPlanApsVersion,jdbcType=VARCHAR},#{item.monthPlanVersion,jdbcType=VARCHAR},
+            #{item.year,jdbcType=VARCHAR},#{item.month,jdbcType=VARCHAR},#{item.materialCode,jdbcType=VARCHAR},
+            #{item.monthPlanQty,jdbcType=DECIMAL},#{item.monthPlanModifyQty,jdbcType=DECIMAL},#{item.monthFinishQty,jdbcType=DECIMAL},
+            #{item.monthRemainQty,jdbcType=DECIMAL},#{item.monthPlanQty2,jdbcType=DECIMAL},#{item.monthPlanModifyQty2,jdbcType=DECIMAL},
+            #{item.monthFinishQty2,jdbcType=DECIMAL},#{item.monthRemainQty2,jdbcType=DECIMAL},#{item.remark,jdbcType=VARCHAR},
+            #{item.delFlag,jdbcType=VARCHAR},#{item.createBy,jdbcType=VARCHAR},#{item.createTime,jdbcType=TIMESTAMP},
+            #{item.updateBy,jdbcType=VARCHAR},#{item.updateTime,jdbcType=TIMESTAMP}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <delete id="deleteByIds" parameterType="java.lang.Long">
+        update T_GDYY_MONTH_PLAN_SURPLUS
+        set
+        DEL_FLAG =  1
+        where  ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="getByParams" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_GDYY_MONTH_PLAN_SURPLUS
+        where
+        <if test="id != null">
+            ID = #{id,jdbcType=DECIMAL} AND
+        </if>
+        <if test="monthPlanApsVersion != null">
+            MONTH_PLAN_APS_VERSION = #{monthPlanApsVersion,jdbcType=VARCHAR} AND
+        </if>
+        <if test="monthPlanVersion != null">
+            MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR} AND
+        </if>
+        <if test="year != null">
+            YEAR = #{year,jdbcType=VARCHAR} AND
+        </if>
+        <if test="month != null">
+            MONTH = #{month,jdbcType=VARCHAR} AND
+        </if>
+        <if test="materialCode != null">
+            MATERIAL_CODE = #{materialCode,jdbcType=VARCHAR} AND
+        </if>
+        <if test="createBy != null">
+            CREATE_BY = #{createBy,jdbcType=VARCHAR} AND
+        </if>
+        <if test="createTime != null">
+            CREATE_TIME = #{createTime,jdbcType=TIMESTAMP} AND
+        </if>
+        <if test="updateBy != null">
+            UPDATE_BY = #{updateBy,jdbcType=VARCHAR} AND
+        </if>
+        <if test="updateTime != null">
+            UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP} AND
+        </if>
+        <if test="remark != null">
+            REMARK = #{remark,jdbcType=VARCHAR} AND
+        </if>
+        DEL_FLAG = 0
+    </select>
+    <select id="selectAllByMonthPlanApsVersionAndDelFlag" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_GDYY_MONTH_PLAN_SURPLUS
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+        AND del_flag = #{delFlag,jdbcType=VARCHAR}
+    </select>
+
+    <delete id="deleteByApsVersion">
+        delete from T_GDYY_MONTH_PLAN_SURPLUS
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+    </delete>
+    <select id="selectAllByMonthPlanApsVersionAndMaterialCodeInAndDelFlag" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_GDYY_MONTH_PLAN_SURPLUS
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+        AND material_code in
+        <foreach collection="materialCodeList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+        AND del_flag = #{delFlag,jdbcType=VARCHAR}
+    </select>
+    <update id="updateDelFlagByMonthPlanApsVersionAndMaterialCodeInAndDelFlag">
+        update T_GDYY_MONTH_PLAN_SURPLUS
+        set del_flag = 1
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+        AND material_code in
+        <foreach collection="materialCodeList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+        AND del_flag = #{delFlag,jdbcType=VARCHAR}
+    </update>
+    <delete id="deleteByMonthPlanApsVersionAndMaterialCodeIn">
+        delete from T_GDYY_MONTH_PLAN_SURPLUS
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+        AND material_code in (
+        WITH temp_table AS (
+        <foreach collection="materialCodeList" item="item" separator=" union ">
+            SELECT #{item} material_code FROM dual
+        </foreach>
+        )
+        SELECT material_code FROM temp_table)
+    </delete>
+</mapper>

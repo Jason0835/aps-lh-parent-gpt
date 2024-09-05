@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('主计划月度生产计划列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: bootstrap-editable-css" />
+    <th:block th:include="include :: datetimepicker-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.mdmMonthProdPlan.materialCode}]]：
+                            <input type="text" id="materialCode" name="materialCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.mdmMonthProdPlan.embryoCode}]]：
+                            <input type="text" id="embryoCode" name="embryoCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.mdmMonthProdPlan.hasVersion}]]：
+                            <select id="hasVersion" name="hasVersion" th:with="type=${@dict.getType('ISORNOT')}" class="form-control">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li class="select-time">
+                            <label style="width: 40px;margin-right: 10px;">[[#{ui.data.column.mdmMonthProdPlan.mainPlanMonth}]]：</label>
+                            <input id="mainPlanMonth" name="mainPlanMonth" class="form-control" th:value="${initDate}" th:placeholder="#{ui.data.column.cx.monthStock.stockMonth}" type="text">
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.productStatus.bomDataVersion}]]：</label>
+                            <input type="text" name="bomDataVersion"/>
+                        </li>
+
+                        <li>
+                            [[#{ui.data.column.cxScheduleResult.cxMachineCode}]]：
+                            <select id="cxMachineCode" name="cxMachineCode" th:with="type=${@cx.getMachineInfo()}" class="form-control">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
+                                        th:value="${machineInfo.machineCode}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <!--<a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="cx:mdmMonthProdPlan:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit()" shiro:hasPermission="cx:mdmMonthProdPlan:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="cx:mdmMonthProdPlan:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>-->
+            <a class="btn btn-info" onclick="$.operate.importScheduleData()" shiro:hasPermission="cx:mdmMonthProdPlan:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cx:mdmMonthProdPlan:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-warning" onclick="expectedExport()" shiro:hasPermission="cx:mdmMonthProdPlan:expectedExport">
+                <i class="fa fa-upload"></i> [[#{ui.data.column.mdmMonthProdPlan.expectedExport}]]
+            </a>
+            <a class="btn btn-warning" onclick="overProdExport()" shiro:hasPermission="cx:mdmMonthProdPlan:overProdExport">
+                <i class="fa fa-upload"></i> [[#{ui.data.column.mdmMonthProdPlan.overProdExport}]]
+            </a>
+            <a class="btn btn-success" onclick="issuePlan()" shiro:hasPermission="cx:mdmMonthProdPlan:issuePlan">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.mdmMonthProdPlan.issuePlan}]]
+            </a>
+            <a class="btn btn-success" onclick="showOrColumn(this)" shiro:hasPermission="cx:mdmMonthProdPlan:list">
+                <i id="showColumn" class="fa fa-check"></i> <span id="showText">[[#{ui.data.column.mdmMonthProdPlan.showColumn}]]</span>
+            </a>
+            <!--20230909 甘特图不参与版本部署UI注释-->
+            <!--<a class="btn btn-info" onclick="goToGantt('2')" shiro:hasPermission="cx:mdmMonthProdPlan:gantt">
+                <i class="fa fa-file-photo-o"></i> [[#{ui.data.column.scheduleResult.monthPlan.gantt}]]
+            </a>-->
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: datetimepicker-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var cxMachineNameList = [[${@cx.getMachineInfo()}]];
+    var stockLocationDatas = [[${@dict.getType('STORAGE_LOCATION')}]];
+    var quality_level = [[${@dict.getType('quality_level')}]];
+
+    var prefix = ctx + "cx/mdmMonthProdPlan";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            changeBomDataVersion: prefix + "/changeBomDataVersion/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            expectedExport: prefix + "/expectedExport",
+            overProdExport: prefix + "/overProdExport",
+            importUrl: prefix + "/importData",
+            pageSize: 50,
+            pageList: [50,100,150],
+            fixedColumns: true,
+            fixedNumber: 3,
+            modalName: [[#{ui.data.column.mdmMonthProdPlan.modelName}]],
+            onEditableSave: onEditableSave,
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'materialCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.materialCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'embryoCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.embryoCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'bomDataVersion',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.productStatus.bomDataVersion}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        if($.common.isEmpty(value)){
+                            value=[[#{ui.data.column.productConstruction.noVersion}]];
+                        }
+                        var actions = [];
+                        actions.push('<a href="javascript:void(0)" onclick="changeBomDataVersion(\'' +row.id+'\')">' + value + '</a> ');
+                        return actions.join('');
+                    }
+                },
+                {
+                    field: 'qualityGrade',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.qualityGrade}]],
+                    formatter: function(value, row, index) {
+                        var returnHtml=$.table.selectDictLabel(quality_level, value);
+                        if ($.common.isEmpty(returnHtml)){
+                            return value;
+                        }else{
+                            return returnHtml;
+                        }
+                    },
+                    sortable: true,
+                },
+                {
+                    field: 'cxMachineCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.cxScheduleResult.cxMachineCode}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            return '';
+                        }
+                        return selectMachineName(cxMachineNameList, value);
+                    }
+                },
+                {
+                    field: 'storageLocation',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.stockLocationSort.stockLocation}]],
+                    sortable: true,
+                    formatter: function(value, row, index) {
+                        return $.table.selectDictLabel(stockLocationDatas, value);
+                    }
+                },
+                {
+                    field: 'specDesc',
+                    align: 'left',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.specDesc}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value,45);
+                    },
+                    width:50,
+                },
+                {
+                    field: 'specDimension',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.specDimension}]],
+                    sortable: true,
+                },
+                {
+                    field: 'theoryProductionPlan',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.theoryProductionPlan}]],
+                    sortable: true,
+                },
+                {
+                    field: 'balance',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.balance}]],
+                    sortable: true,
+                },
+                {
+                    field: 'actualArrangement',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.actualArrangement}]],
+                    sortable: true,
+                },
+                {
+                    field: 'expectedExcessArrears',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.expectedExcessArrears}]],
+                    sortable: true,
+                    editable: {
+                        type: 'text',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.expectedExcessArrears}]],
+                        validate: function (value) {
+                            var regu = /^(^-?\d+$)$/;
+                            if(!regu.test(value)){
+                                return [[#{ui.data.column.mdmMonthProdPlan.feifuzhengshu}]];
+                            }
+                            if (value > 9999999) {
+                                return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                            }
+                            if (value < -9999999) {
+                                return [[#{ui.data.column.mdmMonthProdPlan.lessThan}]];
+                            }
+                        }
+                    }
+                },
+                {
+                    field: 'actualOverProduction',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.actualOverProduction}]],
+                    sortable: true,
+                },
+
+                {
+                    field: 'beginDate',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.beginDate}]],
+                    sortable: true,
+                },
+                {
+                    field: 'endDate',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.endDate}]],
+                    sortable: true,
+                },
+                {
+                    field: 'specialRequirements',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.specialRequirements}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value,45);
+                    },
+                    width:50,
+                },
+                {
+                    field: 'remark',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.remark}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value,45);
+                    },
+                    width:50,
+                },
+                {
+                    field: 'productQty1',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty1}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty2',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty2}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty3',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty3}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty4',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty4}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty5',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty5}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty6',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty6}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty7',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty7}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty8',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty8}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty9',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty9}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty10',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty10}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty11',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty11}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty12',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty12}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty13',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty13}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty14',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty14}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty15',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty15}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty16',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty16}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty17',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty17}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty18',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty18}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty19',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty19}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty20',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty20}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty21',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty21}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty22',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty22}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty23',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty23}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty24',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty24}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty25',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty25}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty26',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty26}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty27',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty27}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty28',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty28}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty29',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty29}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty30',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty30}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'productQty31',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.mdmMonthProdPlan.productQty31}]],
+                    sortable: true,
+                    visible: false
+                },
+                ],
+            onLoadSuccess: function (data) {
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH/oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if(total == contentRow +1) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 1.5*oneTr});
+                } else if(total == contentRow +2) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 2.5*oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+                }
+                /*固定表头end*/
+            }
+        };
+        $.table.init(options,true);
+
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function(){
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+            },1000)
+        });
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+
+    //预计超欠产导出
+    function expectedExport(formId) {
+        $.modal.confirm(frame.alter.exportAll2Excel + table.options.modalName+'-'+[[#{ui.data.column.mdmMonthProdPlan.expectedExcessArrears}]] + "?", function() {
+            var currentId = $.common.isEmpty(formId) ? $('form').attr('id') : formId;
+            var params = $("#" + currentId).serialize();
+            var url = table.options.expectedExport + "?" + params;
+            window.location.href = url;
+        });
+    }
+
+    //超欠产导出
+    function overProdExport(formId) {
+        $.modal.confirm(frame.alter.exportAll2Excel + table.options.modalName+'-'+[[#{ui.data.column.mdmMonthProdPlan.overProduction}]] + "?", function() {
+            var currentId = $.common.isEmpty(formId) ? $('form').attr('id') : formId;
+            var params = $("#" + currentId).serialize();
+            var url = table.options.overProdExport + "?" + params;
+            window.location.href = url;
+        });
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode == (item)) {
+                    var machineName = $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    function issuePlan() {
+        var cxMachineCode = $("#cxMachineCode").val();
+        var embryoCode = $("#embryoCode").val();
+        var materialCode = $("#materialCode").val();
+        var mainPlanMonth = $("#mainPlanMonth").val();
+        $.modal.confirm([[#{ui.biz.alter.issuePlan}]]+" "+mainPlanMonth+" "+[[#{ui.biz.alter.issuePlan2}]]+" ?", function () {
+            $.operate.post(prefix + "/issuePlan",
+                {
+                    "cxMachineCode": cxMachineCode,
+                    "embryoCode": embryoCode,
+                    "materialCode": materialCode,
+                    "mainPlanMonth": mainPlanMonth
+                });
+        })
+    }
+
+    function onEditableSave (field, row, rowIndex, oldValue, $el) {
+        var params = {
+            'id' : row.id
+        };
+        params[field] = row[field];
+        $.operate.post(prefix + "/updateExpectedExcessArrears", params);
+    }
+
+    function showOrColumn(a){
+        if($(a).hasClass("btn-success")) {
+            //显示
+            showColumn();
+            $(a).removeClass("btn-success").addClass("btn-danger");
+            $(a).children("i").removeClass("fa-check").addClass("fa-close");
+            $("#showText").val([[#{ui.data.column.mdmMonthProdPlan.showColumn}]]);
+        } else {
+            //隐藏
+            hideColumn();
+            $(a).removeClass("btn-danger").addClass("btn-success");
+            $(a).children("i").removeClass("fa-close").addClass("fa-check");
+            $("#showText").val([[#{ui.data.column.mdmMonthProdPlan.showColumn}]]);
+        }
+    }
+
+    function goToGantt(flag){
+        var url = prefix + '/gantt/2';
+        $.modal.openTab([[#{ui.data.column.scheduleResult.monthPlan.gantt}]],url,true);
+    }
+
+    // 显示表格指定列
+    function showColumn() {
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty1');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty2');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty3');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty4');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty5');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty6');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty7');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty8');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty9');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty10');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty11');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty12');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty13');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty14');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty15');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty16');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty17');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty18');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty19');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty20');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty21');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty22');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty23');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty24');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty25');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty26');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty27');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty28');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty29');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty30');
+        $("#bootstrap-table").bootstrapTable('showColumn', 'productQty31');
+
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty1');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty2');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty3');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty4');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty5');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty6');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty7');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty8');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty9');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty10');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty11');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty12');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty13');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty14');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty15');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty16');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty17');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty18');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty19');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty20');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty21');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty22');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty23');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty24');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty25');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty26');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty27');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty28');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty29');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty30');
+        // $("#bootstrap-table").bootstrapTable('showColumn', 'finishQty31');
+    }
+    // 隐藏表格指定列
+    function  hideColumn() {
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty1');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty2');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty3');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty4');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty5');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty6');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty7');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty8');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty9');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty10');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty11');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty12');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty13');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty14');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty15');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty16');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty17');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty18');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty19');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty20');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty21');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty22');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty23');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty24');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty25');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty26');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty27');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty28');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty29');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty30');
+        $("#bootstrap-table").bootstrapTable('hideColumn', 'productQty31');
+
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty1');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty2');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty3');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty4');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty5');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty6');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty7');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty8');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty9');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty10');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty11');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty12');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty13');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty14');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty15');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty16');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty17');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty18');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty19');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty20');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty21');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty22');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty23');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty24');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty25');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty26');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty27');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty28');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty29');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty30');
+        // $("#bootstrap-table").bootstrapTable('hideColumn', 'finishQty31');
+    }
+
+
+    // 日期控件
+    $("input[name='mainPlanMonth']").datetimepicker({
+        format: "yyyy-mm",
+        startView: 3,//代表日期控件打开默认展示的是月
+        minView: 3,//代表日期控件展示的最低到月
+        maxView: 4,//代表日期控件展示的最高到年
+        autoclose: true,
+    });
+
+    $(window).resize(function() {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh-(fixTop-50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+    });
+
+
+    //修改施工版本
+    function changeBomDataVersion(id){
+        url = table.options.changeBomDataVersion.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.productConstruction.changeEmbryoVersion}]], url, 500, 500);
+    }
+
+
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+    .pagination-detail{margin-top: 0px !important;margin-bottom: 0px !important;}
+    .select-table{padding-bottom: 5px !important;}
+</style>
+</html>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.engine.mapper.LhEngineAutoScheduleRecordMapper">
+
+    <resultMap type="com.zlt.aps.lh.engine.domain.LhEngineAutoScheduleRecord" id="LhEngineAutoScheduleRecordResult">
+                    <result property="id"    column="id"    />
+                    <result property="lhBatchNo"    column="lh_batch_no"    />
+                    <result property="cxBatchNo"    column="cx_batch_no"    />
+                    <result property="status"    column="status"    />
+                    <result property="scheduleDate"    column="schedule_date"    />
+                    <result property="createBy"    column="create_by"    />
+                    <result property="createTime"    column="create_time"    />
+                    <result property="updateBy"    column="update_by"    />
+                    <result property="updateTime"    column="update_time"    />
+                    <result property="delFlag"    column="del_flag"    />
+                    <result property="remark"    column="remark"    />
+            </resultMap>
+    
+    <sql id="selectLhEngineAutoScheduleRecordVo">
+        select id, lh_batch_no, cx_batch_no, status, schedule_date, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_auto_schedule_record
+    </sql>
+
+    <select id="selectLhEngineAutoScheduleRecordList" parameterType="com.zlt.aps.lh.engine.domain.LhEngineAutoScheduleRecord" resultMap="LhEngineAutoScheduleRecordResult">
+        <include refid="selectLhEngineAutoScheduleRecordVo"/>
+        <where>
+            del_flag='0' and status='0'
+            <if test="lhBatchNo != null  and lhBatchNo != ''"> and lh_batch_no = #{lhBatchNo}</if>
+            <if test="cxBatchNo != null  and cxBatchNo != ''"> and cx_batch_no = #{cxBatchNo}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="scheduleDate != null "> and schedule_date = #{scheduleDate}</if>
+        </where>
+    </select>
+
+    <select id="selectLhEngineAutoScheduleRecordById" parameterType="Long" resultMap="LhEngineAutoScheduleRecordResult">
+                    <include refid="selectLhEngineAutoScheduleRecordVo"/>
+            where id = #{id}
+            </select>
+
+    <insert id="insertLhEngineAutoScheduleRecord" parameterType="com.zlt.aps.lh.engine.domain.LhEngineAutoScheduleRecord">
+                    <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT seq_lh_auto_schedule_record.NEXTVAL as id FROM DUAL
+            </selectKey>
+                insert into t_lh_auto_schedule_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                            <if test="id != null">id,</if>
+                            <if test="lhBatchNo != null">lh_batch_no,</if>
+                            <if test="cxBatchNo != null">cx_batch_no,</if>
+                            <if test="status != null">status,</if>
+                            <if test="scheduleDate != null">schedule_date,</if>
+                            <if test="createBy != null">create_by,</if>
+                            <if test="createTime != null">create_time,</if>
+                            <if test="updateBy != null">update_by,</if>
+                            <if test="updateTime != null">update_time,</if>
+                            <if test="delFlag != null">del_flag,</if>
+                            <if test="remark != null">remark,</if>
+                    </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                            <if test="id != null">#{id},</if>
+                            <if test="lhBatchNo != null">#{lhBatchNo},</if>
+                            <if test="cxBatchNo != null">#{cxBatchNo},</if>
+                            <if test="status != null">#{status},</if>
+                            <if test="scheduleDate != null">#{scheduleDate},</if>
+                            <if test="createBy != null">#{createBy},</if>
+                            <if test="createTime != null">#{createTime},</if>
+                            <if test="updateBy != null">#{updateBy},</if>
+                            <if test="updateTime != null">#{updateTime},</if>
+                            <if test="delFlag != null">#{delFlag},</if>
+                            <if test="remark != null">#{remark},</if>
+                    </trim>
+    </insert>
+
+    <update id="updateLhEngineAutoScheduleRecord" parameterType="com.zlt.aps.lh.engine.domain.LhEngineAutoScheduleRecord">
+        update t_lh_auto_schedule_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lhBatchNo != null">lh_batch_no = #{lhBatchNo},</if>
+            <if test="cxBatchNo != null">cx_batch_no = #{cxBatchNo},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhEngineAutoScheduleRecordById" parameterType="Long">
+        update t_lh_auto_schedule_record set del_flag='1' where id = #{id}
+    </delete>
+
+    <!--根据排程日期进行抓取记录删除-->
+    <delete id="deleteAutoScheduleRecordByScheduleDate" parameterType="String">
+        update t_lh_auto_schedule_record set del_flag='1' where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+    </delete>
+
+    <delete id="deleteLhEngineAutoScheduleRecordByIds" parameterType="String">
+        update t_lh_auto_schedule_record set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!--查询最新的排程抓取记录-->
+    <select id="selectAutoScheduleRecordByScheduleDate" parameterType="String" resultMap="LhEngineAutoScheduleRecordResult">
+        <include refid="selectLhEngineAutoScheduleRecordVo"/>
+        <where>
+            del_flag='0'
+            and status='0'
+            <if test="scheduleDate!=null and scheduleDate!=''">
+                and schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+
+    </mapper>

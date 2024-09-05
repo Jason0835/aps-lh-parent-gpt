@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TLhClassShiftFinishQtyMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mps.domain.TLhClassShiftFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="lhMachineCode" column="LH_MACHINE_CODE" jdbcType="VARCHAR"/>
+            <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+            <result property="class1FinishQty" column="CLASS1_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="class2FinishQty" column="CLASS2_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="class3FinishQty" column="CLASS3_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,ORDER_NO,SCHEDULE_DATE,
+        LH_MACHINE_CODE,SAP_CODE,CLASS1_FINISH_QTY,
+        CLASS2_FINISH_QTY,CLASS3_FINISH_QTY,REMARK,
+        DEL_FLAG,CREATE_BY,CREATE_TIME,
+        UPDATE_BY,UPDATE_TIME
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_LH_CLASS_SHIFT_FINISH_QTY
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_LH_CLASS_SHIFT_FINISH_QTY
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TLhClassShiftFinishQty" useGeneratedKeys="true">
+        insert into T_LH_CLASS_SHIFT_FINISH_QTY
+        ( ID,ORDER_NO,SCHEDULE_DATE
+        ,LH_MACHINE_CODE,SAP_CODE,CLASS1_FINISH_QTY
+        ,CLASS2_FINISH_QTY,CLASS3_FINISH_QTY,REMARK
+        ,DEL_FLAG,CREATE_BY,CREATE_TIME
+        ,UPDATE_BY,UPDATE_TIME)
+        values (#{id,jdbcType=DECIMAL},#{orderNo,jdbcType=VARCHAR},#{scheduleDate,jdbcType=TIMESTAMP}
+        ,#{lhMachineCode,jdbcType=VARCHAR},#{sapCode,jdbcType=VARCHAR},#{class1FinishQty,jdbcType=DECIMAL}
+        ,#{class2FinishQty,jdbcType=DECIMAL},#{class3FinishQty,jdbcType=DECIMAL},#{remark,jdbcType=VARCHAR}
+        ,#{delFlag,jdbcType=CHAR},#{createBy,jdbcType=VARCHAR},#{createTime,jdbcType=TIMESTAMP}
+        ,#{updateBy,jdbcType=VARCHAR},#{updateTime,jdbcType=TIMESTAMP})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TLhClassShiftFinishQty" useGeneratedKeys="true">
+        insert into T_LH_CLASS_SHIFT_FINISH_QTY
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="orderNo != null">orderNo,</if>
+                <if test="scheduleDate != null">scheduleDate,</if>
+                <if test="lhMachineCode != null">lhMachineCode,</if>
+                <if test="sapCode != null">sapCode,</if>
+                <if test="class1FinishQty != null">class1FinishQty,</if>
+                <if test="class2FinishQty != null">class2FinishQty,</if>
+                <if test="class3FinishQty != null">class3FinishQty,</if>
+                <if test="remark != null">remark,</if>
+                <if test="delFlag != null">delFlag,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateBy != null">updateBy,</if>
+                <if test="updateTime != null">updateTime,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="orderNo != null">ORDER_NO = #{orderNo,jdbcType=VARCHAR},</if>
+                <if test="scheduleDate != null">SCHEDULE_DATE = #{scheduleDate,jdbcType=TIMESTAMP},</if>
+                <if test="lhMachineCode != null">LH_MACHINE_CODE = #{lhMachineCode,jdbcType=VARCHAR},</if>
+                <if test="sapCode != null">SAP_CODE = #{sapCode,jdbcType=VARCHAR},</if>
+                <if test="class1FinishQty != null">CLASS1_FINISH_QTY = #{class1FinishQty,jdbcType=DECIMAL},</if>
+                <if test="class2FinishQty != null">CLASS2_FINISH_QTY = #{class2FinishQty,jdbcType=DECIMAL},</if>
+                <if test="class3FinishQty != null">CLASS3_FINISH_QTY = #{class3FinishQty,jdbcType=DECIMAL},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+                <if test="delFlag != null">DEL_FLAG = #{delFlag,jdbcType=CHAR},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.mps.domain.TLhClassShiftFinishQty">
+        update T_LH_CLASS_SHIFT_FINISH_QTY
+        <set>
+                <if test="orderNo != null">
+                    ORDER_NO = #{orderNo,jdbcType=VARCHAR},
+                </if>
+                <if test="scheduleDate != null">
+                    SCHEDULE_DATE = #{scheduleDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="lhMachineCode != null">
+                    LH_MACHINE_CODE = #{lhMachineCode,jdbcType=VARCHAR},
+                </if>
+                <if test="sapCode != null">
+                    SAP_CODE = #{sapCode,jdbcType=VARCHAR},
+                </if>
+                <if test="class1FinishQty != null">
+                    CLASS1_FINISH_QTY = #{class1FinishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="class2FinishQty != null">
+                    CLASS2_FINISH_QTY = #{class2FinishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="class3FinishQty != null">
+                    CLASS3_FINISH_QTY = #{class3FinishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+                <if test="delFlag != null">
+                    DEL_FLAG = #{delFlag,jdbcType=CHAR},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TLhClassShiftFinishQty">
+        update T_LH_CLASS_SHIFT_FINISH_QTY
+        set 
+            ORDER_NO =  #{orderNo,jdbcType=VARCHAR},
+            SCHEDULE_DATE =  #{scheduleDate,jdbcType=TIMESTAMP},
+            LH_MACHINE_CODE =  #{lhMachineCode,jdbcType=VARCHAR},
+            SAP_CODE =  #{sapCode,jdbcType=VARCHAR},
+            CLASS1_FINISH_QTY =  #{class1FinishQty,jdbcType=DECIMAL},
+            CLASS2_FINISH_QTY =  #{class2FinishQty,jdbcType=DECIMAL},
+            CLASS3_FINISH_QTY =  #{class3FinishQty,jdbcType=DECIMAL},
+            REMARK =  #{remark,jdbcType=VARCHAR},
+            DEL_FLAG =  #{delFlag,jdbcType=CHAR},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+</mapper>

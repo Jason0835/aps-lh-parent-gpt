@@ -1,0 +1,4716 @@
+{
+  "bd": {
+    "rules": {
+      "validCode": "编码格式不正确",
+      "validSocialId": "统一社会信用代码格式不正确",
+      "validEmail": "邮箱格式不正确",
+      "validTel": "电话号码格式不正确",
+      "validFax": "传真格式不正确",
+      "validBank": "银行账号格式不正确",
+      "validSwift": "SWIFT格式不正确",
+      "validSerial": "序号格式错误",
+      "validNumber": "只能输入数字"
+    },
+    "serialNo": "序号",
+    "facNationName": "工厂国别",
+    "custName": "客商",
+    "province": "省",
+    "chineseName": "中文名称",
+    "englishName": "英文名称",
+    "vietnameseName": "越南语名称",
+    "crmCode": "CRM编码",
+    "areaChargesType": {
+      "costType": "加收费用类型"
+    },
+    "bank": {
+      "bankName": "银行名称",
+      "swift": "SWIFTCODE",
+      "bankAddr": "银行地址",
+      "foreignExchangeApplyPrefix": "外汇申报单号前缀",
+      "cnaps": "联行号",
+      "accountName": "账户名称",
+      "bankAccount": "银行账号"
+    },
+    "company": {
+      "corpCode": "公司代码",
+      "corpName": "公司名称",
+      "corpName_zh_CN": "公司中文名称",
+      "corpName_en_US": "公司英文名称",
+      "corpName_vi_VN": "公司越南语名称",
+      "socialId": "统一社会信用代码",
+      "corpType": "公司类型",
+      "companyStatus": "公司状态",
+      "addr": "地址",
+      "chineseAddr": "中文地址",
+      "englishAddr": "英文地址",
+      "vietnameseAddr": "越南语地址",
+      "tel": "电话",
+      "fax": "传真"
+    },
+    "contractNum": {
+      "saleNum": "销售数量",
+      "saleAmount": "销售金额"
+    },
+    "custSupplier": {
+      "basicInfo": "基本信息",
+      "ccode": "客商编码",
+      "cnameI18n": "客商名称",
+      "ccodeArea": "客商地域",
+      "ncodeName": "贸易国别(地区)",
+      "snCityCode": "市及地区",
+      "custType": "客商类型",
+      "CName": "名称",
+      "CCode": "客户编码",
+      "custAbbreviation": "客户简称",
+      "custProperty": "客户属性",
+      "businessLicenseNo": "营业执照号",
+      "webUrl": "WEB网址",
+      "eMail": "E-Mail地址",
+      "businessDetailedAddress": "经营详细地址",
+      "economicNature": "经济性质",
+      "custIndustry": "客户行业",
+      "status": "状态",
+      "postcode": "邮政编码",
+      "invAddrTel": "开票地址电话",
+      "sourceInfo": "基础信息",
+      "client": "委托方",
+      "custom": "客户",
+      "supplier": "供应商",
+      "service": "服务商",
+      "bfBuyerNo": "中信保买方代码",
+      "socialId": "统一社会信用代码",
+      "igRepresentative": "法人代表",
+      "corpPhone": "联系电话",
+      "taxQua": "纳税人资格",
+      "addr": "注册地址",
+      "invAccount": "开户行及账号",
+      "maddr": "邮寄地址",
+      "remark": "备注",
+      "annualScale": "年度规模",
+      "custCreditRating": "客户信用等级",
+      "custRegion": "客户所属区域",
+      "CN1": "CN1",
+      "CN2": "CN2",
+      "paymentMethod": "付款方式",
+      "superiorCustomer": "上级客户名称",
+      "custLevel": "客户级别",
+      "custGrade": "客户等级",
+      "custTag": "客户标签",
+      "isBenefits": "是否享惠",
+      "membershipGroup": "所属集团",
+      "pkTaxes": "税类",
+      "systemInfo": "系统信息",
+      "ratifyDate": "生效时间",
+      "consigneeInfo": "收货人",
+      "cscCode": "收货人编码",
+      "linkmanName": "名称",
+      "mobile": "移动电话",
+      "email": "邮箱",
+      "mailAddr": "通讯地址",
+      "consigneeAddr": "地址",
+      "isDefault": "是否默认",
+      "cStatus": "客户类型",
+      "oriCertType": "原产地证类型",
+      "country": "国家",
+      "goodsName": "商品名称",
+      "specialProvisions": "特殊条款",
+      "brand": "品牌",
+      "oriRemark": "证书备注信息",
+      "packType": "包装类型",
+      "bankAccountInfo": "银行账号",
+      "bStatus": "状态",
+      "cnaps": "联行号",
+      "bankAccount": "银行账号",
+      "bName": "账户名称",
+      "fcode": "默认币种",
+      "swift": "SWIFTCODE",
+      "province": "省份",
+      "county": "县市",
+      "iban": "IBAN",
+      "remit": "汇入地",
+      "employee": "业务员",
+      "salesmanInfo": "归属业务员",
+      "salesman": "业务员",
+      "gender": "性别",
+      "dept": "部门",
+      "relationshipInfo": "客商关系",
+      "sortIdx": "序号",
+      "relaType": "关系类型",
+      "subCNameI18n": "下级客商",
+      "caddr": "地址",
+      "cProvince": "所属省",
+      "addrType": "地址类型",
+      "city": "所属市",
+      "area": "所属区",
+      "linkMan": "联系人",
+      "linkManTel": "联系人电话",
+      "linkManEmail": "联系人Email",
+      "linker": "联系人",
+      "saleOrg": "销售组织",
+      "saleOrgCode": "组织编码",
+      "saleOrgName": "组织名称"
+    },
+    "exchangeRate": {
+      "targetCurrency": "目标币种",
+      "exchangeCurrency": "兑换币种",
+      "inPriceCash": "现钞(买入价)",
+      "inPriceExchange": "现汇(买入价)",
+      "middlePrice": "中间价",
+      "outPriceCash": "现钞(买出价)",
+      "outPriceExchange": "现汇(卖出价)",
+      "releaseTime": "发布时间"
+    },
+    "goods": {
+      "goodsTypePlaceHolder": "请输入类目名称",
+      "statisticalUnit": "统计单位",
+      "setpartsFlag": "是否成套件",
+      "productNumberProperties": "货号属性",
+      "ilevel": "层级",
+      "figure": "花纹",
+      "speedLevel": "速度级别",
+      "loadIndex": "负荷指数",
+      "marketableArea": "适销区域",
+      "beltTypeName": "带束层结构",
+      "sidewallName": "胎侧",
+      "featureCodeCode": "特性代码",
+      "patternDepth": "花纹深度",
+      "sectionWidth": "名义断面宽",
+      "rimSize": "轮辋直径",
+      "sellAreaName": "适销区域",
+      "factoryPackingInfo": "工厂装箱信息",
+      "orgWeight": "重量",
+      "orgVolume": "体积",
+      "qualityStateCode": "质控状态",
+      "compactQty": "紧凑型装箱量",
+      "boxInnerQty": "装箱量",
+      "gcode": "物料编码"
+    },
+    "goodsType": {
+      "goodsTypeCodePlaceHolder": "请输入商品类目编码",
+      "goodsTypeCode": "商品类目编码",
+      "goodsTypeName": "商品类目名称",
+      "simpleCode": "简码"
+    },
+    "loanAgencyCompany": {
+      "loanAgencyName": "货代公司",
+      "loanAgencyType": "供应商基本分类",
+      "shortName": "简称",
+      "email": "邮箱",
+      "tel": "联系方式",
+      "addr": "地址"
+    },
+    "loanAgencyBank": {
+      "accountName": "账户名称",
+      "bankAccount": "银行账号"
+    },
+    "outBankAccount": {
+      "outBankName": "外部银行",
+      "bankAccount": "账号",
+      "accountName": "账户名称",
+      "fcode": "默认币种",
+      "otherCurrencies": "其他币种",
+      "bankType": "账户类型",
+      "isBasicAccount": "基本户",
+      "isWaitCheck": "待核查户",
+      "isDrawback": "代办退税",
+      "isSettlementAccount": "结算户",
+      "isVirtualAccount": "虚拟账号",
+      "suject": "科目"
+    },
+    "port": {
+      "port": "港口",
+      "portCode": "港口编码",
+      "portName": "港口名称",
+      "portEnglishName": "港口英文名称",
+      "portCity": "港口城市"
+    },
+    "portCharges": {
+      "facNationCode": "工厂国别编码",
+      "facCode": "生产工厂编码",
+      "fcy": "原币金额"
+    },
+    "preShipDay": {
+      "departurePortName": "启运港",
+      "dischargePortName": "目的港",
+      "preShipDay": "预计船期天数",
+      "dayRule": "请输入1-9999999999的天数"
+    },
+    "settlePath": {
+      "settlePathCode": "序号",
+      "settlePathName": "结算路径",
+      "busiType": "业务类型",
+      "account": "户头",
+      "declBody": "报关主体",
+      "settleType": "结算方式",
+      "msg": {
+        "notSelectMainSettlePath": "请先点击您要添加的结算路径主记录",
+        "validCode": "序号格式不正确"
+      }
+    },
+    "shipCompany": {
+      "shippingCode": "船公司编码",
+      "shippingCompany": "船公司",
+      "shippingCompanyName": "船公司名称",
+      "shippingCompany_en_US": "英文名称",
+      "shortName": "简称",
+      "email": "邮箱",
+      "tel": "联系方式",
+      "addr": "地址"
+    },
+    "trdAuthenticate": {
+      "trdAuthDataFetch": "认证信息数据抓取",
+      "authId": "认证编码",
+      "authType": "认证类型"
+    },
+    "trdNcPath": {
+      "isSample": "是否样品",
+      "isUseWare": "是否使用仓库",
+      "warehouse": "仓库",
+      "isUseCurrency": "是否使用币种",
+      "operationFlow": "业务流程"
+    },
+    "unit": {
+      "column": {
+        "unitCode": "编码",
+        "unitName": "名称",
+        "status": "状态"
+      }
+    },
+    "settlePrice": "结算价",
+    "settleRatio": "结算比例",
+    "warehouse": {
+      "warehouse": "仓库",
+      "wCode": "仓库编码",
+      "simpleCode": "简码",
+      "wName": "仓库名称",
+      "addr": "地址",
+      "wType": "仓库类型",
+      "wClass": "仓库分类",
+      "spvType": "监管方式"
+    }
+  },
+  "book": {
+    "inquirySheetUpdate": "海运费询价单--修改",
+    "orderNo": "订舱单号",
+    "amountDemand": "需要额度",
+    "isOccupancyLimits": "占用额度",
+    "shipNo": "出运单号",
+    "deliveryOrderNo": "交货单号",
+    "deliveryOrderStatus": "交货单状态",
+    "billLadingNo": "提单号",
+    "destinationPort": "目的港",
+    "departurePort": "启运港",
+    "receiptPort": "接收港",
+    "destinationCountry": "目的国",
+    "planNum": "计划数量",
+    "boxNum": "箱数",
+    "boxNum1": "箱量",
+    "boxNumDesc": "箱量描述",
+    "flightNameVoyage": "航名航次",
+    "cargoValue": "货值",
+    "deliveryOrder": {
+      "createDeliveryOrder": "添加交货单",
+      "generateOutOrder": "生成出运单",
+      "totalDnBoxNum": "合计箱量",
+      "totalDnNum": "装箱数量",
+      "saleBillNo": "销售订单号",
+      "salNCode": "贸易国别",
+      "totalNum": "总装箱数量",
+      "totalTaxAmt": "商品金额(含税)",
+      "saleAmt": "商品金额(不含税)",
+      "finDate": "预计货好日期",
+      "assembleRim": "拼轮辋",
+      "isLock": "对货锁定",
+      "isTms": "派车",
+      "isDeparture": "发货",
+      "isNc": "上传NC",
+      "isPreShipOrd": "预出运交货单",
+      "lastUpdateBy": "最后修改人",
+      "lastUpdateTime": "最后修改时间",
+      "billStatus": "单据状态",
+      "addDnDetail": "添加明细",
+      "newDnDetai": "新增明细",
+      "changeHistory": "变更记录",
+      "warehouse": "仓库",
+      "orderNum": "订单数量",
+      "planStockNum": "计划+库存",
+      "loadingNum": "标准装箱量",
+      "dnNum": "装箱数量",
+      "dnBoxNum": "箱量",
+      "stTWeightNum": "标准单重",
+      "stWeightNum": "标准总重",
+      "salePrice": "单价",
+      "totalSaleAmt": "总金额",
+      "goods": "商品",
+      "addDetail": "添加",
+      "rowNo": "行号",
+      "isAssembleRim": "是否拼轮辋",
+      "msg": {
+        "distinctError": "选中项有收汇方式、目的国、销售公司、贸易国、币种、客户、装箱要求和工厂国别不一致的交货单，不允许生成",
+        "warehouseEmpty": "请选择仓库",
+        "factoryEmpty": "请选择仓库"
+      },
+      "confirm": {
+        "delete": "确定是否删除",
+        "withdraw": "确定是否撤回",
+        "deleteDnDetail": "是否删除此明细行",
+        "distinctContinue": "所选数据存在目的港、成交方式、收货地址、原产地证、费用方式、装运港、唛头、是否报检、是否享惠、包装、运输方式不一致，是否继续"
+      },
+      "history": {
+        "rowNo": "交货单明细行号",
+        "before": "变更前",
+        "after": "变更后",
+        "updateByName": "变更人",
+        "updateTime": "变更时间",
+        "dnPackBoxNum": "交货单数量：",
+        "factory": "生产工厂：",
+        "materialCode": "商品编码：",
+        "materialDesc": "商品描述：",
+        "warehouseCode": "仓库："
+      }
+    },
+    "confirm": {
+      "bookNo": "订舱编号",
+      "contractNo": "客户PO#",
+      "salesman": "销售业务员",
+      "dealMethods": "成交方式",
+      "bookDate": "预定船期",
+      "terms": "运输条款",
+      "shipper": "发货人",
+      "consignee": "收货人",
+      "subpackage": "可否分装",
+      "transport": "可否转运",
+      "notifier": "通知人",
+      "transhipmentPort": "转运港",
+      "shippingCompany": "船公司",
+      "cargoDesc": "货物描述",
+      "num": "商品数量",
+      "packMethod": "装箱方式",
+      "boxNum": "箱量",
+      "boxUnitPrice": "单箱海运价",
+      "totalPrice": "海运费合计",
+      "status": "状态",
+      "shipowner": "订船人",
+      "transportMode": "运输方式",
+      "customerPremium": "收客户保险费",
+      "customerSeaFreight": "收客户海运费",
+      "certificate": "证书",
+      "deliveryMethod": "U9 到货方式",
+      "lcl": "是否与轮钢拼箱",
+      "booker": "订舱人",
+      "prepaymentMethod": "预付方式",
+      "freightForwarderTelephone": "货代电话",
+      "createdTime": "制单时间",
+      "dealMethods2": "实际成交方式",
+      "freightForwarderCompany": "货代公司",
+      "freightForwarderContact": "货代联系人",
+      "freightForwarderEmail": "货代邮件",
+      "shippingMark": "唛头",
+      "instruction": "订舱说明",
+      "deliveryNoticeTime": "入货通知时间",
+      "station": "场站",
+      "shippingDate": "船期",
+      "boxDate": "放箱日期",
+      "catOffDate": "截单日期",
+      "placeOriginNum": "产地证号",
+      "portCatOffDate": "截港日期",
+      "oceanFreightInquirySheet": "海运费询价单",
+      "freightForwardSeaFreight": "付货代海运费",
+      "invoice1": "商检发票号",
+      "invoice2": "发票号",
+      "remark1": "小备注",
+      "remark2": "小备注",
+      "signingMethod": "签单方式",
+      "lock": "锁定"
+    },
+    "cost": {
+      "oceanFreight": "海运费",
+      "premium": "保险费",
+      "testingFree": "检测费",
+      "shippingDate1": "实际船期",
+      "shippingDate2": "结束船期",
+      "payDate": "付款日期",
+      "name": "财务组织",
+      "payAmount": "付款金额",
+      "payBank": "付款银行",
+      "priceNo": "询价编号",
+      "currency": "币种",
+      "invoiceNo": "发票号",
+      "saleOrg": "销售组织",
+      "shipNo": "出运单号",
+      "transactionMethod": "实际成交方式",
+      "shipCurrency": "订单币种",
+      "payFeeAmt": "实际付款金额",
+      "prePayDate": "预计付款日期",
+      "actualShipDate": "实际船期",
+      "feeMethod": "费用性质",
+      "cabinetNum": "柜量",
+      "packMethod": "箱型",
+      "salCode": "客户编号",
+      "salCodeName": "客户名称",
+      "effectiveDate": "生效日期",
+      "saleArea": "销售区域",
+      "recordByName": "记录人",
+      "archiSystem": "体系",
+      "forwarderCorp": "货代公司",
+      "ecEffectiveDate": "单证生效日期",
+      "buyBoxFeeAmt": "出运单买箱费",
+      "ecBuyBoxFeeAmt": "单证买箱费",
+      "buyBoxFeeCurrency": "买箱费币种",
+      "ecTestingFee": "单证检测费",
+      "testingFeeCurrency": "检测费币种",
+      "destPortFeeAmt": "出运单目的港费",
+      "ecDestPortFeeAmt": "单证目的港费",
+      "destPortFeeCurrency": "目的港费币种",
+      "dnNo": "出库单号",
+      "insuranceFeeAmt": "出运单保险费",
+      "ecActualPremium": "单证保险费",
+      "insuranceCurrency": "保险费币种",
+      "freightFeeAmt": "出运单海运费",
+      "ecActualFreightCost": "单证海运费",
+      "freightCurrency": "海运费币种",
+      "otherFeeAmt": "出运单其他费",
+      "avgPortChargesAmt": "单柜港杂费均值",
+      "additionalBookingFees": "订舱费用补充",
+      "billLadingNoInput": "请输入提单号",
+      "feeType": "费用类型",
+      "actualForwarderCorp": "实际货代公司",
+      "logisticsProviderName": "出运单货代公司",
+      "outShipAmt": "出运单费用",
+      "ecAmt": "单证费用",
+      "loanAgencyBankAccount": "货代银行账户",
+      "isPayFeeAmt": "是否已维护付款金额",
+      "msg": {
+        "billLadingNoInput": "请输入提单号进行搜索",
+        "emptyData": "没有数据，无法修改",
+        "curFeeType": "还没有选择费用类型",
+        "forwarderCorp": "还没有选择货代公司",
+        "prePayDate": "还没有选择付款日期",
+        "nowDate": "付款日期不能小于当前的日期",
+        "loanAgencyBankAccount": "还没有选择货代银行账户",
+        "greaterThan0": "付款金额需要大于零",
+        "numberFormat": "请输入正确格式的数字，整数位不能超过12位，小数位不能超过2位",
+        "notNumber": "未输入付款金额或输入的金额不是数字"
+      }
+    },
+    "shipRisk": {
+      "shipNo": "出运单号",
+      "warningType": "提醒类型",
+      "employee": "销售业务员",
+      "saleOrg": "销售组织",
+      "contractNo": "销售合同号",
+      "sal": "客户",
+      "salCode": "客户编号",
+      "salCodeName": "客户名称",
+      "poNo": "客户PO#",
+      "warningDate": "提醒时间",
+      "warningContent": "提醒内容",
+      "validateStatus": "校验状态",
+      "amount": "校验金额",
+      "balance": "余额",
+      "sourceCurrency": "兑换币种",
+      "targetCurrency": "目标币种",
+      "overDays": "逾期天数"
+    },
+    "sheet": {
+      "no": "询价单号",
+      "createdTime": "询价日期",
+      "endTime": "价格有效期",
+      "box1": "箱型40HC",
+      "box2": "箱型40H",
+      "box3": "箱型20GP",
+      "routeDays": "航线天数",
+      "frequency": "频率"
+    },
+    "createWaybill": {
+      "id": "#",
+      "deliveryOrderNo": "交货单号",
+      "createDate": "创建日期",
+      "saleOrderNo": "销售订单号",
+      "clientPO": "客户PO#",
+      "client": "客户",
+      "documentStatus": "单据状态",
+      "splitRim": "拼轮辋/铁路",
+      "isMatchGoods": "是否对货",
+      "isSendACar": "是否派车",
+      "isLocked": "是否锁定",
+      "isDelivery": "是否发货",
+      "isUpload": "是否上传",
+      "isPurchase": "是否采购",
+      "operation": "操作",
+      "preoccupationAmount": "预占额度",
+      "deliveryOrderNum": "交货单号",
+      "deliveryOrderStatus": "交货单状态",
+      "nation": "国家",
+      "salesman": "业务员",
+      "billOfLadingNum": "提单号",
+      "targetPort": "目的港",
+      "planCount": "计划数量",
+      "containerLoad": "箱量",
+      "goodsReadyDate": "货好时间",
+      "companyAccount": "公司",
+      "prepareDocumentPerson": "制单人",
+      "prepareDocumentDate": "制单时间",
+      "locked": "锁定",
+      "sendACar": "派车",
+      "deliveryGoods": "发货",
+      "upload": "上传"
+    },
+    "outwardWaybill": {
+      "letterCreditClaim": "信用证认领",
+      "examine": "查看",
+      "approvalRecord": "审批记录",
+      "print": "打印",
+      "update": "修改",
+      "delete": "删除",
+      "submit": "提交",
+      "bookSpaceOrderNum": "订舱单号",
+      "billOfLadingNum": "提单号",
+      "billLadingRemark": "提单号备注",
+      "divideLadingNo": "分提单号",
+      "contractNumber": "合同号",
+      "vesslAndVoyage": "船名航次",
+      "clientPO": "客户PO#",
+      "sailSchedule": "船期",
+      "client": "客户",
+      "freightForwarding": "货代",
+      "shipOwningCompany": "船公司",
+      "targetPort": "目的港",
+      "documentStatus": "单据状态",
+      "prepareDocumentPerson": "制单人",
+      "endDate": "结束日期",
+      "submitStatus": "提交状态",
+      "salNCode": "贸易国别(地区)",
+      "stWeightNum": "标准重量",
+      "boxNum": "柜量",
+      "tireNum": "轮胎数量",
+      "advertiseNum": "宣传品数量",
+      "lottingNo": "分票号",
+      "shipName": "船名",
+      "voyageName": "航次",
+      "shipReq": "发货备注",
+      "lcNo": "信用证号",
+      "deadlineBillDate": "截单日期",
+      "boxPlacementDate": "放箱日期",
+      "isPassRiskCheck": "风险检查通过",
+      "clientPONum": "客户PO#",
+      "containerLoadDesc": "箱量描述",
+      "quantity": "数量",
+      "lotCount": "分票数",
+      "descinationCountry": "目的国",
+      "sailEstimatiedTime": "预计船期",
+      "sailActualTime": "实际船期",
+      "prepareDocumentDate": "制单时间",
+      "serialNum": "序号",
+      "deliveryOrderNum": "交货单号",
+      "saleContractNum": "客户PO#",
+      "nationAndRegion": "国家地区",
+      "salesman": "业务员",
+      "containerLoad": "箱量",
+      "goodsValue": "货值",
+      "locked": "对货锁定",
+      "openContainerDetails": "分箱明细",
+      "endTime": "结束日期",
+      "status": "状态",
+      "id": "#",
+      "operation": "操作",
+      "clientPONo": "客户PO#",
+      "companyAccount": "公司",
+      "actualTradeMethod": "实际成交方式",
+      "preparedBy": "制单人",
+      "deliveryWarehouse": "发货仓库",
+      "deliveryNation": "目的国",
+      "notDeliveryCount": "外仓未发数量",
+      "alreadyDeliveryCount": "外仓已发数量",
+      "commodityInspectionDate": "商检时间",
+      "amount": "金额",
+      "maximumAvailableAmount": "最大可用余额",
+      "isConfirmSeaShip": "海运确认",
+      "isMatchGood": "对货完成",
+      "isSendFcEmail": "已发邮件",
+      "isPassShipRisk": "出运风险通过",
+      "isToTms": "已下传TMS",
+      "isBackfillPws": "回填件重尺",
+      "isToCustomsAffair": "已下传关务",
+      "isClearCustoms": "关务放行",
+      "isCutoffCustomsDecl": "报关结关",
+      "sendEmail": "发送邮件",
+      "toTms": "下传TMS",
+      "toCustomsAffair": "下传关务",
+      "checkShipRisk": "检测出运风险",
+      "backOutShip": "撤回",
+      "refreshTMSLockStatus": "刷新TMS解锁状态",
+      "refreshCustomsLockStatus": "刷新关务状态",
+      "updateLadingNoToTMS": "更新提单号",
+      "packingDetails": "装箱明细",
+      "collectionMethod": "收汇方式",
+      "fileAttachments": "文件附件",
+      "customsDeclaration": "报关分票",
+      "shipRiskReminder": "出运风险提醒",
+      "shipRiskDetectionPassed": "出运风险检测通过",
+      "autoCustomsAffair": "自动传关务",
+      "employee": "销售业务员",
+      "saleDept": "销售部门",
+      "saleCompany": "销售公司",
+      "saleNation": "贸易国别",
+      "oriCert": "原产地证",
+      "isEnjoyBenefit": "是否享惠",
+      "isReptInspection": "是否报检",
+      "goodsNum": "商品数量",
+      "annualWeekReq": "年周号要求",
+      "annualYear": "年周年度",
+      "isSelfTake": "配送方式",
+      "shipMode": "运输方式",
+      "packReq": "包装要求",
+      "isBatch": "是否分批",
+      "packMethod": "装箱方式",
+      "isCompact": "装箱要求",
+      "isAssembleRim": "拼轮辋",
+      "makeDesc": "唛头",
+      "consignee": "收货人",
+      "shipper": "发货人",
+      "consigneeAddr": "收货地址",
+      "shipmentAmount": "发货金额",
+      "shipTotalAmount": "发货总金额",
+      "book": "订舱",
+      "departurePort": "起运港",
+      "dischargePort": "目的港",
+      "station": "场站",
+      "finDate": "货好日期",
+      "transactionMethod": "实际成交方式",
+      "feeMethod": "费用方式",
+      "freightFeeAmt": "国际运费",
+      "insuranceFeeAmt": "国际保费",
+      "insuranceCoeffi": "保险系数",
+      "insuranceRate": "保险费率",
+      "buyBoxFeeAmt": "买箱费",
+      "deadlinePortDate": "截港日期",
+      "incomingNotifyNo": "入货通知号",
+      "incomingNotifyDate": "入货通知日期",
+      "forwarderCorp": "货代公司",
+      "forwarderEmail": "货代邮箱",
+      "billLadingDate": "提单日期",
+      "isChangeBill": "是否改单",
+      "bookingReq": "订舱备注",
+      "vietnam": "越南",
+      "loadingPort": "转运港",
+      "loadingNation": "转运国",
+      "invoiceNo": "发票号",
+      "signMethod": "签单方式",
+      "oriCertiNo": "CO号",
+      "coSignDate": "CO签发日期",
+      "coApplySt": "CO申请标准",
+      "lockTms": "TMS锁定",
+      "boxNo": "箱号",
+      "qfCode": "铅封号",
+      "tmsNetWeightNum": "TMS总净重",
+      "tmsGrossWeightNum": "TMS总毛重",
+      "tmsVolumeNum": "TMS总体积",
+      "tmsZdWeightNum": "TMS指定重量",
+      "tmsBoxPiWeightNum": "箱皮重",
+      "tmsGbWeightNum": "TMS过磅重量",
+      "dnDetail": "明细",
+      "regulatoryMethod": "监管方式",
+      "dnShipNo": "TMS发货单",
+      "shareFinGrossWeightNum": "总毛重",
+      "shareFinWeightNum": "总净重",
+      "shareFinVolumeNum": "总体积",
+      "pathName": "结算路径",
+      "pathCurrency": "结算币种",
+      "innerTransPrice": "结算单价",
+      "innerTransAmt": "结算总金额",
+      "salePrice": "销售单价(不含税)",
+      "totalSaleAmt": "销售总额(不含税)",
+      "taxPrice": "含税单价",
+      "totalTaxAmt": "含税总价",
+      "shareFreightFeeAmt": "海运费金额",
+      "shareInsuranceFeeAmt": "保费金额",
+      "shareBuyBoxFeeAmt": "买箱费金额",
+      "taxFcy": "税额",
+      "petTaxAmt": "FET税额",
+      "vatTaxRate": "VAT税率(%)",
+      "ynTaxRate": "越南增值税率(%)",
+      "exchangeRate": "出运汇率",
+      "customsAmt": "报关金额",
+      "customsCurrency": "报关币种",
+      "gwNum": "关务数量",
+      "gwPrice": "关务单价",
+      "gwAmt": "关务金额",
+      "isPercentCust": "是否百分百报关",
+      "ncBusiType": "NC业务类型",
+      "tradeMode": "收款方式",
+      "day": "天数",
+      "rate": "比例(%)",
+      "total": "合计",
+      "lottingInfo": "分票信息",
+      "detail": "详细",
+      "customsDeclSubject": "报关主体",
+      "containerNo": "集装箱号",
+      "entityNum": "实物数量",
+      "isDecl": "是否报关",
+      "isSampleTire": "是否样品",
+      "isFillBox": "是否填箱",
+      "price": "单价",
+      "freight": "运费",
+      "insurance": "保费",
+      "confirm": {
+        "deleteThisRecord": "是否删除此记录",
+        "unbindLetterCredit": "确定解绑信用证",
+        "toCustomsAffair": "是否确定下传关务",
+        "backOutShip": "确定撤回出运单",
+        "deleteDnLine": "是否删除此明细行",
+        "deleteTradeMode": "是否删除此收款方式"
+      },
+      "msg": {
+        "letterCreditEmpty": "请选择信用证",
+        "validEMail": "邮箱地址格式错误",
+        "amountNeedGreaterThan0": "请输入大于0的金额",
+        "validCorrectNumerType": "请输入正确的数值格式",
+        "validFinDate": "货好日期不满足， 请重新选择",
+        "customerEmpty": "请选择客户",
+        "dnEmpty": "请选择交货单",
+        "addDetailDistinctError": "选中项有收汇方式、目的国、销售公司、贸易国、币种、客户、装箱要求不一致的交货单，不允许生成",
+        "selfMakeDeclarationEmpty": "集装箱号、总净重、总毛重、总体积、实物数量不能为空"
+      }
+    }
+  },
+  "common": {
+    "button": {
+      "add": "新增",
+      "delete": "删除",
+      "batchDel": "批量删除",
+      "edit": "编辑",
+      "cancelEdit": "取消编辑",
+      "modify": "修改",
+      "detail": "详情",
+      "history": "历史记录",
+      "historyQuery": "历史查询",
+      "import": "导入",
+      "export": "导出",
+      "templateDownload": "模板下载",
+      "exportData": "导出数据",
+      "query": "查询",
+      "search": "搜索",
+      "reset": "重置",
+      "view": "查看",
+      "print": "打印",
+      "save": "保存",
+      "saveData": "保存数据",
+      "refresh": "刷新",
+      "refreshCache": "刷新缓存",
+      "confirm": "确定",
+      "cancel": "取消",
+      "effect": "生效",
+      "close": "关闭",
+      "submit": "提交",
+      "submitOA": "提交OA",
+      "generate": "生成",
+      "expandCollapse": "展开/折叠",
+      "selectAllNone": "全选/全不选",
+      "checkedTreeConnect": "父子联动",
+      "clear": "清空",
+      "more": "更多",
+      "back": "返回",
+      "hideSearch": "隐藏搜索",
+      "showSearch": "显示搜索"
+    },
+    "startTime": "起始时间",
+    "endTime": "结束时间",
+    "material": "商品",
+    "materialNo": "商品编码",
+    "materialCode": "商品编码",
+    "materialName": "商品名称",
+    "materialDesc": "商品描述",
+    "specDesc": "型号规格",
+    "goodsType": "商品类目",
+    "salCodeTab": "客户标签",
+    "gcodeTab": "产品标签",
+    "shipType": "发货模式",
+    "tradeMode": "成交方式",
+    "feeMethod": "费用方式",
+    "expeShipDate": "期望发货日期",
+    "shipRemark": "发货备注",
+    "shipAddress": "送达地址",
+    "payMode": "付款方式",
+    "oriCert": "原产地证",
+    "reptInspection": "是否报检",
+    "attestation": "认证信息",
+    "origin": "产地",
+    "shipMode": "运输方式",
+    "packReq": "包装要求",
+    "overShipRate": "溢短装率",
+    "weekYearRequirement": "年周号要求",
+    "weekYear": "年周号年度",
+    "packMethod": "装箱方式",
+    "isCompact": "装箱要求",
+    "deliveryMethod": "配送方式",
+    "isSelfTake": "配送方式",
+    "makeDesc": "唛头",
+    "status": "状态",
+    "approvalStatus": "审批状态",
+    "option": "操作",
+    "factory": "工厂",
+    "area": "区域",
+    "salesman": "业务员",
+    "salesmanDept": "业务员部门",
+    "country": "国家",
+    "countryArea": "国家地区",
+    "yes": "是",
+    "no": "否",
+    "companyAccount": "公司",
+    "num": "数量",
+    "saleOrderNo": "销售订单号",
+    "supplier": "供应商",
+    "row": "行",
+    "createByName": "创建人",
+    "createTime": "创建时间",
+    "createDate": "创建日期",
+    "updateByName": "修改人",
+    "updateTime": "修改时间",
+    "updateDate": "修改日期",
+    "effectTime": "生效时间",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "time": "时间",
+    "range": "区间",
+    "remark": "备注",
+    "bank": "银行",
+    "bankAccount": "银行账号",
+    "prompt": "提示",
+    "expand": "展开",
+    "archiSystem": "体系",
+    "code": "编码",
+    "name": "名称",
+    "type": "类型",
+    "productionFactory": "生产工厂",
+    "settleOrg": "销售组织",
+    "stockOrg": "库存组织",
+    "brand": "品牌",
+    "year": "年",
+    "month": "月",
+    "unit": "单位",
+    "currency": "币种",
+    "basicInfo": "基本信息",
+    "basesInfo": "基础信息",
+    "annexInfo": "附件信息",
+    "personalInfo": "个人信息",
+    "systemInfo": "系统信息",
+    "confirm": {
+      "save": "是否保存？",
+      "submit": "是否提交？",
+      "delete": "是否删除？",
+      "deleteSelected": "是否删除选中项？",
+      "effect": "是否确认生效？",
+      "revoke": "是否撤销？",
+      "sendBack": "是否撤单？",
+      "approvalOA": "是否提交OA审批？"
+    },
+    "rule": {
+      "select": "请选择",
+      "input": "请输入",
+      "notEmpty": "内容不能为空",
+      "email": "请输入正确的邮箱地址",
+      "phone": "请输入正确的手机号码",
+      "tel": "请输入正确的联络方式",
+      "max": "超过最大长度："
+    },
+    "upload": {
+      "dragFileText": "将文件拖到此处，或",
+      "clickUpload": "点击上传",
+      "onlyXlsXlsx": "仅允许导入xls、xlsx格式文件。",
+      "downloadTemplate": "下载模板",
+      "importResult": "导入结果"
+    },
+    "file": {
+      "error": {
+        "file": {
+          "upload": {
+            "invoke": {
+              "fail": "文件服务调用失败:{}"
+            },
+            "fail": "上传文件失败:",
+            "image": {
+              "fail": "上传图片异常，请联系管理员"
+            }
+          }
+        },
+        "service": {
+          "fail": "文件服务异常，请联系管理员"
+        }
+      }
+    },
+    "user": {
+      "email": {
+        "message": "邮箱格式不正确"
+      }
+    },
+    "ui": {
+      "data": {
+        "column": {
+          "announceList": {
+            "systemCode": "所属系统",
+            "deptId": "所属部门",
+            "announceTitle": "公告主题",
+            "announceTypeCode": "公告类型",
+            "sendBy": "发布人",
+            "sendTime": "发布时间",
+            "sendStatus": "发布状态",
+            "announceContent": "公告内容",
+            "modelName": "公告详情",
+            "remark": "备注"
+          },
+          "announcementReceived": {
+            "modelName": "接收人员",
+            "parentId": "父ID",
+            "deptId": "部门",
+            "roleId": "角色",
+            "userName": "用户",
+            "sendStatus": "发送状态",
+            "readStatus": "阅读状态",
+            "remark": "备注"
+          },
+          "billTemplateRef": {
+            "billTypeCode": "单据类型",
+            "msgChannel": "消息渠道"
+          },
+          "import": {
+            "nodata": "没有数据！"
+          }
+        },
+        "btn": {
+          "announceList": {
+            "detail": "详情",
+            "receivedStatus": "接收情况"
+          },
+          "announcementReceived": {
+            "dept": "增加部门",
+            "role": "增加角色",
+            "user": "增加用户"
+          }
+        }
+      }
+    },
+    "api": {
+      "dept": {
+        "error": {
+          "name": {
+            "overlength": "部门名称长度不能超过30个字符"
+          },
+          "order": {
+            "isnull": "显示顺序不能为空"
+          },
+          "telephone": {
+            "overlength": "联系电话长度不能超过11个字符"
+          },
+          "email": {
+            "incorrect": "邮箱格式不正确",
+            "overlength": "邮箱长度不能超过50个字符"
+          },
+          "parentDept": {
+            "isnull": "上级部门不能为空"
+          },
+          "deptName": {
+            "isnull": "部门名称不能为空"
+          },
+          "orderNum": {
+            "isnull": "显示排序不能为空"
+          }
+        },
+        "title": {
+          "addDept": "添加部门",
+          "modifyDept": "修改部门"
+        },
+        "columnname": {
+          "telephone": "联系电话",
+          "sort": "显示顺序",
+          "parentId": "上级部门id",
+          "id": "部门ID",
+          "email": "邮箱",
+          "status": "部门状态:0正常,1停用",
+          "langJson": "语言json",
+          "deptCode": "部门代码",
+          "isFactory": "是否工厂:N否,Y是",
+          "deptType": "部门类型",
+
+          "deptName": "部门名称",
+          "deptStatus": "部门状态",
+          "orderNum": "排序",
+          "parentDept": "上级部门",
+          "displayOrderNum": "显示排序",
+          "leader": "负责人",
+          "phone": "联系电话",
+          "langPackage": "语言包"
+        },
+        "placeholder": {
+          "deptName": "请输入部门名称",
+          "parentDept": "选择上级部门",
+          "leader": "请输入负责人",
+          "phone": "请输入联系电话",
+          "email": "请输入邮箱",
+          "langPackage": "请输入语言包"
+        },
+        "confirm": {
+          "detete": "是否确认删除名称为\"{deptName}\"的数据项？"
+        }
+      },
+      "log": {
+        "columnname": {
+          "operation": {
+            "orderno": "操作序号",
+            "module": "操作模块",
+            "type": "操作类别",
+            "time": "操作时间"
+          },
+          "bussiness": {
+            "type": "业务类型"
+          },
+          "request": {
+            "method": "请求方法",
+            "type": "请求方式"
+          },
+          "operator": "操作人员",
+          "deptname": "部门名称",
+          "requesturl": "请求地址",
+          "operationurl": "操作地址",
+          "requestparameter": "请求参数",
+          "responseparameter": "返回参数",
+          "status": "状态",
+          "errormsg": "错误消息"
+        }
+      },
+      "role": {
+        "order": {
+          "no": "角色序号"
+        },
+        "columnname": {
+          "name": "角色名称",
+          "auth": "角色权限",
+          "sort": "角色排序",
+          "datarange": "数据范围",
+          "status": "角色状态",
+          "roleKey": "权限字符",
+          "roleId": "角色编号",
+          "roleSort": "显示顺序",
+          "more": "更多",
+          "dataPermissions": "数据权限",
+          "assignUsers": "分配用户",
+          "menuPermissions": "菜单权限",
+          "permiScope": "权限范围",
+          "addUser": "添加用户",
+          "batchCancelAuth": "批量取消授权",
+          "cancelAuth": "取消授权"
+        },
+        "dataScopeOptions": {
+          "all": "全部数据权限",
+          "custom": "自定数据权限",
+          "dept": "本部门数据权限",
+          "deptAndBelow": "本部门及以下数据权限",
+          "onlySelf": "仅本人数据权限"
+        },
+        "placeholder": {
+          "roleName": "请输入角色名称",
+          "roleKey": "请输入权限字符",
+          "remark": "请输入内容"
+        },
+        "tips": {
+          "roleKey": "控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasRole('admin')`)",
+          "loding": "加载中，请稍候"
+        },
+        "title": {
+          "addRule": "添加角色",
+          "modifyRule": "修改角色",
+          "assignDataPermi": "分配数据权限",
+          "selectUser": "选择用户"
+        },
+        "confirm": {
+          "enable": "确认要启用\"{roleName}\"角色吗？",
+          "disable": "确认要停用\"{roleName}\"角色吗？",
+          "delete": "是否确认删除角色编号为\"{roleIds}\"的数据项？",
+          "cancelAuthUser": "确认要取消该用户\"{userName}\"角色吗？",
+          "batchCancelAuth": "是否取消选中用户授权数据项？"
+        },
+        "msg": {
+          "cancelAuthSuccess": "取消授权成功",
+          "noSelectUserError": "请选择要分配的用户"
+        },
+        "error": {
+          "name": {
+            "isnull": "角色名称不能为空",
+            "overlength": "角色名称长度不能超过30个字符"
+          },
+          "auth": {
+            "isnull": "权限字符不能为空",
+            "overlength": "权限字符长度不能超过100个字符"
+          },
+          "sort": {
+            "isnull": "显示顺序不能为空"
+          },
+          "roleSort": {
+            "isnull": "角色顺序不能为空"
+          }
+        }
+      },
+      "user": {
+        "columnname": {
+          "index": "序号",
+          "orderno": "用户序号",
+          "usercode": "用户编号",
+          "workNo": "工号",
+          "deptno": "部门编号",
+          "accountname": "登录名称",
+          "username": "用户名称",
+          "nickname": "用户昵称",
+          "email": "用户邮箱",
+          "telphone": "手机号码",
+          "sex": "用户性别",
+          "man": "男",
+          "woman": "女",
+          "status": "帐号状态",
+          "userStatus": "用户状态",
+          "password": "用户密码",
+          "post": "岗位",
+          "role": "角色",
+          "belongRole": "所属角色",
+          "login": {
+            "lasttime": "最后登录时间"
+          },
+          "deptname": "部门名称",
+          "parentName": "父部门名称",
+          "dept": {
+            "dept": "部门",
+            "belongDept": "归属部门",
+            "manager": {
+              "name": "部门负责人"
+            }
+          },
+          "grpName": "集团名称",
+          "comName": "分公司名称",
+          "facName": "分厂名称",
+          "modifyPwd": "修改密码",
+          "oldPassword": "旧密码",
+          "newPassword": "新密码",
+          "confirmPassword": "确认密码",
+          "resetPwd": "重置密码",
+          "assignRole": "分配角色",
+          "loginAccount": "登录账号",
+          "roleInfo": "角色信息"
+        },
+        "placeholder": {
+          "userName": "请输入用户名称",
+          "nickname": "请输入用户昵称",
+          "phoneNumber": "请输入手机号码",
+          "belongDept": "请选择归属部门",
+          "email": "请输入邮箱",
+          "password": "请输入用户密码",
+          "sex": "请选择性别",
+          "workNo": "请输入工号",
+          "post": "请选择岗位",
+          "role": "请选择角色",
+          "remark": "请输入内容",
+
+          "oldPassword": "请输入旧密码",
+          "newPassword": "请输入新密码",
+          "confirmPassword": "请确认新密码"
+        },
+        "title": {
+          "addUser": "添加用户",
+          "modifyUser": "修改用户",
+          "basicInfo": "基本资料"
+        },
+        "confirm": {
+          "enableUser": "确认要启用\"{userName}\"用户吗？",
+          "disableUser": "确认要停用\"{userName}\"用户吗？",
+          "resetPwd": "请输入\"{userName}\"的新密码",
+          "deleteUser": "是否确认删除用户编号为\"{userIds}\"的数据项？"
+        },
+        "msg": {
+          "resetPwdSuccess": "修改成功，新密码是：",
+          "authorizationSuccessful": "授权成功"
+        },
+        "error": {
+          "name": {
+            "overlength": "用户昵称长度不能超过30个字符"
+          },
+          "account": {
+            "isnull": "用户账号不能为空",
+            "overlength": "用户账号长度不能超过30个字符"
+          },
+          "email": {
+            "isnull": "邮箱地址不能为空",
+            "incorrect": "邮箱格式不正确",
+            "overlength": "邮箱长度不能超过50个字符"
+          },
+          "telephone": {
+            "isnull": "手机号码不能为空",
+            "overlength": "手机号码长度不能超过11个字符"
+          },
+          "deptId": {
+            "isnull": "部门不能为空"
+          },
+          "userName": {
+            "isnull": "用户名称不能为空",
+            "lengthLimit": "用户名称长度必须介于 2 和 20 之间"
+          },
+          "nickname": {
+            "isnull": "用户昵称不能为空"
+          },
+          "password": {
+            "isnull": "用户密码不能为空",
+            "lengthLimit": "用户密码长度必须介于 6 和 20 之间"
+          },
+          "oldPassword": {
+            "isnull": "旧密码不能为空"
+          },
+          "newPassword": {
+            "isnull": "新密码不能为空",
+            "lengthLimit": "长度在 6 到 20 个字符"
+          },
+          "confirmPassword": {
+            "isnull": "确认密码不能为空",
+            "equalToPassword": "两次输入的密码不一致"
+          }
+        }
+      },
+      "use": {
+        "columnname": {
+          "login": {
+            "lastip": "最后登录IP",
+            "workNo": "工号"
+          }
+        }
+      },
+      "factory": {
+        "error": {
+          "log": {
+            "server": {
+              "fail": "日志服务调用失败:{}"
+            }
+          },
+          "user": {
+            "server": {
+              "fail": "用户服务调用失败:{}"
+            }
+          },
+          "get": {
+            "user": {
+              "fail": "获取用户失败:{}",
+              "roleDeptL1": {
+                "fail": "获取用户角色的部门信息失败"
+              }
+            }
+          },
+          "cleancache": {
+            "user": {
+              "fail": "清除用户缓存失败:{}"
+            }
+          }
+        }
+      },
+      "config": {
+        "columnname": {
+          "orderNo": "参数主键",
+          "name": "参数名称",
+          "keyName": "参数键名",
+          "value": "参数键值",
+          "configType": "系统内置"
+        },
+        "placeholder": {
+          "configName": "请输入参数名称",
+          "keyName": "请输入参数键名",
+          "configValue": "请输入参数键值",
+          "remark": "请输入内容"
+        },
+        "title": {
+          "addConfig": "添加参数",
+          "modifyConfig": "修改参数"
+        },
+        "confirm": {
+          "detete": "是否确认删除参数编号为\"{configIds}\"的数据项？"
+        },
+        "error": {
+          "name": {
+            "isnull": "参数名称不能为空",
+            "overlength": "参数名称不能超过100个字符"
+          },
+          "keyName": {
+            "isnull": "参数键名不能为空",
+            "overlength": "参数键名长度不能超过100个字符"
+          },
+          "value": {
+            "isnull": "参数键值不能为空",
+            "overlength": "参数键值长度不能超过500个字符"
+          }
+        }
+      },
+      "dictData": {
+        "columnname": {
+          "code": "字典编码",
+          "sort": "字典排序",
+          "label": "字典标签",
+          "value": "字典键值",
+          "dataValue": "数据键值",
+          "dataLabel": "数据标签",
+          "dictType": "字典类型",
+          "isDefault": "是否默认",
+          "status": "状态",
+          "lang": "语言包",
+          "cssClass": "样式属性",
+          "listClass": "回显样式",
+          "displaySort": "显示排序"
+        },
+        "placeholder": {
+          "dictLabel": "请输入字典标签",
+          "dataStatus": "数据状态",
+          "dataValue": "请输入数据键值",
+          "dataLabel": "请输入数据标签",
+          "cssClass": "请输入样式属性",
+          "lang": "请输入语言包",
+          "remark": "请输入内容"
+        },
+        "listClass": {
+          "default": "默认",
+          "primary": "主要",
+          "success": "成功",
+          "info": "信息",
+          "warning": "警告",
+          "danger": "危险"
+        },
+        "title": {
+          "addDictData": "添加字典数据",
+          "modifyDictData": "修改字典数据"
+        },
+        "confirm": {
+          "detete": "是否确认删除字典编码为\"{dictCodes}\"的数据项？"
+        },
+        "error": {
+          "lablel": {
+            "isnull": "字典标签不能为空",
+            "overlength": "字典标签长度不能超过100个字符"
+          },
+          "value": {
+            "isnull": "字典键值不能为空",
+            "overlength": "字典键值长度不能超过100个字符"
+          },
+          "dictType": {
+            "isnull": "字典类型不能为空",
+            "overlength": "字典类型长度不能超过100个字符"
+          },
+          "cssClass": {
+            "overlength": "样式属性长度不能超过100个字符"
+          },
+          "dictLabel": {
+            "isnull": "数据标签不能为空"
+          },
+          "dictValue": {
+            "isnull": "数据键值不能为空"
+          },
+          "dictSort": {
+            "isnull": "数据顺序不能为空"
+          }
+        }
+      },
+      "dictType": {
+        "columnname": {
+          "orderno": "字典主键",
+          "dictId": "字典编号",
+          "name": "字典名称",
+          "dictType": "字典类型",
+          "status": "状态"
+        },
+        "placeholder": {
+          "dictName": "请输入字典名称",
+          "dictType": "请输入字典类型",
+          "dictStatus": "字典状态",
+          "remark": "请输入内容"
+        },
+        "title": {
+          "addDictType": "添加字典类型",
+          "modifyDictType": "修改字典类型"
+        },
+        "confirm": {
+          "detete": "是否确认删除字典编号为\"{dictIds}\"的数据项？"
+        },
+        "error": {
+          "name": {
+            "isnull": "字典名称不能为空",
+            "overlength": "字典类型名称长度不能超过100个字符"
+          },
+          "dictType": {
+            "isnull": "字典类型不能为空",
+            "overlength": "字典类型类型长度不能超过100个字符"
+          }
+        }
+      },
+      "importLog": {
+        "columnname": {
+          "functionCode": "功能代码",
+          "functionName": "功能名称",
+          "fileName": "导入文件名称",
+          "successNum": "成功记录数",
+          "failNum": "失败记录数",
+          "viewErrorLog": "查看错误日志",
+          "errorRow": "错误行数",
+          "errorDetail": "错误详细信息"
+        },
+        "placeholder": {
+          "functionName": "请输入功能名称",
+          "fileName": "请输入导入文件名称"
+        },
+        "title": {
+          "importLogDetail": "导入日志详细"
+        },
+        "error": {
+          "dataArray": "选择创建日期区间进行查询"
+        }
+      },
+      "logininfo": {
+        "model": "登录日志",
+        "columnname": {
+          "orderno": "序号",
+          "loginName": "用户账号",
+          "status": "状态",
+          "addr": "地址",
+          "detail": "描述",
+          "accessTime": "访问时间",
+          "ipaddr": "登录地址",
+          "loginStatus": "登录状态",
+          "loginTime": "登录时间",
+          "infoId": "访问编号",
+          "userName": "用户名称"
+        },
+        "placeholder": {
+          "ipaddr": "请输入登录地址",
+          "userName": "请输入用户名称"
+        },
+        "confirm": {
+          "detete": "是否确认删除访问编号为\"{infoIds}\"的数据项？",
+          "clearAll": "是否确认清空所有登录日志数据项？"
+        }
+      },
+      "operlog": {
+        "columnname": {
+          "operIp": "操作地址",
+          "sysModules": "系统模块",
+          "operName": "操作人员",
+          "businessType": "操作类型",
+          "operStatus": "操作状态",
+          "operTime": "操作时间",
+
+          "operId": "日志编号",
+          "requestMethod": "请求方式"
+        },
+        "placeholder": {
+          "operIp": "请输入操作地址",
+          "sysModules": "请输入系统模块",
+          "operName": "请输入操作人员"
+        },
+        "title": {
+          "operLogDetail": "操作日志详细"
+        },
+        "formLabel": {
+          "operModules": "操作模块：",
+          "operIp": "登录信息：",
+          "operUrl": "请求地址：",
+          "requestMethod": "请求方式：",
+          "method": "操作方法：",
+          "operParam": "请求参数：",
+          "jsonResult": "返回参数：",
+          "operStatus": "操作状态：",
+          "normal": "正常",
+          "fail": "失败",
+          "costTime": "消耗时间：",
+          "operTime": "操作时间：",
+          "errorMsg": "异常信息："
+        },
+        "confirm": {
+          "detete": "是否确认删除日志编号为\"{operIds}\"的数据项？",
+          "clearAll": "是否确认清空所有操作日志数据项？"
+        }
+      },
+      "sysmenu": {
+        "columnname": {
+          "menuName": "菜单名称",
+          "menuStatus": "菜单状态",
+          "visible": "显示状态",
+          "icon": "图标",
+          "orderNum": "排序",
+          "btPerms": "权限标识",
+          "btPermsChar": "权限字符",
+          "componentPath": "组件路径",
+          "parentId": "上级菜单",
+          "menuType": "菜单类型",
+          "mTypeM": "目录",
+          "mTypeC": "菜单",
+          "mTypeF": "按钮",
+          "menuIcon": "菜单图标",
+          "visualOrder": "显示排序",
+          "isFrame": "是否外链",
+          "path": "路由地址",
+          "query": "路由参数",
+          "isCache": "是否缓存",
+          "cache": "缓存",
+          "noChahe": "不缓存",
+          "langPackage": "语言包",
+          "mainCategories": "主类目"
+        },
+        "placeholder": {
+          "menuName": "请输入菜单名称",
+          "parentId": "选择上级菜单",
+          "icon": "点击选择图标",
+          "path": "请输入路由地址",
+          "componentPath": "请输入组件路径",
+          "btPerms": "请输入权限标识",
+          "query": "请输入路由参数",
+          "langPackage": "请输入语言包"
+        },
+        "title": {
+          "addMenu": "添加菜单",
+          "modifyMenu": "修改菜单"
+        },
+        "tips": {
+          "isFrame": "选择是外链则路由地址需要以`http(s)://`开头",
+          "path": "访问的路由地址，如：`user`，如外网地址需内链访问则以`http(s)://`开头",
+          "componentPath": "访问的组件路径，如：`system/user/index`，默认在`views`目录下",
+          "btPerms": "控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('system:user:list')`)",
+          "query": "访问路由的默认传递参数，如：`{\"id\": 1, \"name\": \"ry\"}`",
+          "isCache": "选择是则会被`keep-alive`缓存，需要匹配组件的`name`和地址保持一致",
+          "visible": "选择隐藏则路由将不会出现在侧边栏，但仍然可以访问",
+          "menuStatus": "选择停用则路由将不会出现在侧边栏，也不能被访问"
+        },
+        "confirm": {
+          "detete": "是否确认删除名称为\"{menuName}\"的数据项？"
+        },
+        "error": {
+          "name": {
+            "isnull": "菜单名称不能为空",
+            "overlength": "菜单名称长度不能超过50个字符"
+          },
+          "sort": {
+            "isnull": "显示顺序不能为空"
+          },
+          "path": {
+            "isnull": "路由地址不能为空",
+            "overlength": "路由地址不能超过200个字符"
+          },
+          "component": {
+            "overlength": "组件路径不能超过255个字符"
+          },
+          "menuType": {
+            "isnull": "菜单类型不能为空"
+          },
+          "perms": {
+            "overlength": "权限标识长度不能超过100个字符"
+          },
+          "orderNum": {
+            "isnull": "菜单顺序不能为空"
+          }
+        }
+      },
+      "sysNotice": {
+        "columnname": {
+          "noticeTitle": "公告标题",
+          "operators": "操作人员",
+          "noticeType": "公告类型",
+          "noticeId": "序号",
+          "createBy": "创建者",
+          "noticeContent": "内容"
+        },
+        "placeholder": {
+          "noticeTitle": "请输入公告标题",
+          "operators": "请输入操作人员",
+          "noticeType": "请选择公告类型"
+        },
+        "title": {
+          "addNotice": "添加公告",
+          "modifyNotice": "修改公告"
+        },
+        "confirm": {
+          "detete": "是否确认删除公告编号为\"{noticeIds}\"的数据项？"
+        },
+        "error": {
+          "noticeTitle": {
+            "isnull": "公告标题不能为空",
+            "overlength": "公告标题不能超过50个字符"
+          },
+          "noticeType": {
+            "isnull": "公告类型不能为空"
+          },
+          "noticeContent": {
+            "overlength": "公告内容过长！"
+          }
+        }
+      },
+      "syspost": {
+        "columnname": {
+          "orderno": "岗位序号",
+          "postId": "岗位编号",
+          "code": "岗位编码",
+          "name": "岗位名称",
+          "sort": "岗位排序",
+          "status": "状态",
+          "postStatus": "岗位状态",
+          "postSequence": "岗位顺序"
+        },
+        "placeholder": {
+          "postCode": "请输入岗位编码",
+          "postName": "请输入岗位名称",
+          "remark": "请输入内容"
+        },
+        "title": {
+          "addPost": "添加岗位",
+          "modifyPost": "修改岗位"
+        },
+        "confirm": {
+          "detete": "是否确认删除岗位编号为\"{postIds}\"的数据项？"
+        },
+        "error": {
+          "code": {
+            "isnull": "岗位编码不能为空",
+            "overlength": "岗位编码长度不能超过64个字符"
+          },
+          "name": {
+            "isnull": "岗位名称不能为空",
+            "overlength": "岗位名称长度不能超过50个字符"
+          },
+          "sort": {
+            "isnull": "显示顺序不能为空"
+          },
+          "postSort": {
+            "isnull": "岗位顺序不能为空"
+          }
+        }
+      }
+    },
+    "auth": {
+      "msg": {
+        "startup": "【启动结束】认证授权模块启动成功",
+        "login": {
+          "success": "登录成功"
+        },
+        "logout": {
+          "success": "退出成功"
+        },
+        "changelang": {
+          "log": "Token:{},改变语言",
+          "operator": "改变语言"
+        }
+      },
+      "error": {
+        "login": {
+          "username": {
+            "password": {
+              "require": "用户/密码必须填写"
+            }
+          },
+          "input": {
+            "outrange": "用户密码不在指定范围"
+          },
+          "notexist": {
+            "user": {
+              "account": "登录用户不存在",
+              "username": "登录用户：{}不存在"
+            },
+            "token": {
+              "info": "当前连接没有登录的用户数据"
+            }
+          }
+        },
+        "account": {
+          "deleted": "对不起，您的账号已被删除"
+        },
+        "user": {
+          "disabled": "用户已停用，请联系管理员",
+          "wrongpassword": "用户密码错误",
+          "lock": "密码连续输错{}次账号锁定，{}分钟后自动解锁",
+          "noexistorpassword": "用户不存在/密码错误"
+        }
+      }
+    },
+    "##############telecom-auth子模块配置#################common": {
+      "error": {
+        "global": {
+          "no": {
+            "auth": "没有权限，请联系管理员授权"
+          }
+        }
+      }
+    },
+    "common": {
+      "error": {
+        "global": {
+          "demo": {
+            "mode": {
+              "undo": "演示模式，不允许操作"
+            }
+          }
+        },
+        "feign": {
+          "invoke": {
+            "fail": "Feign接口服务调用异常:{}"
+          }
+        },
+        "sql": {
+          "running": {
+            "fail": "数据库脚本执行异常:{}"
+          }
+        },
+        "aspect": {
+          "before": {
+            "notice": {
+              "exception": "前置通知异常"
+            }
+          },
+          "exception": {
+            "info": "异常信息:{}"
+          }
+        },
+        "convert": {
+          "unknow": "未知"
+        },
+        "util": {
+          "file": {
+            "sheet": {
+              "noexist": "文件sheet不存在"
+            }
+          },
+          "export": {
+            "excel": {
+              "exception": "导出Excel异常{}",
+              "fail": "导出Excel失败{}"
+            }
+          },
+          "no": {
+            "find": {
+              "field": {
+                "exception": "在{} 中，没有找到{} 字段"
+              },
+              "method": {
+                "exception": "在 {}中，没有找到 {} 方法"
+              }
+            }
+          },
+          "impossible": {
+            "exception": "不可能抛出的异常{}"
+          },
+          "parameter": {
+            "noconform": "参数不符合规范，不能进行查询"
+          }
+        },
+        "i18n": {
+          "locale": {
+            "cache": {
+              "token": {
+                "nolocale": "没找到缓存TOKEN中的语言包设置:{0}",
+                "notimezone": "没找到缓存TOKEN中的语言包时区设置:{0}"
+              }
+            }
+          }
+        }
+      },
+      "user": {
+        "status": {
+          "normal": "正常",
+          "disabled": "停用",
+          "deleted": "删除"
+        }
+      },
+      "util": {
+        "remark": "注：",
+        "time": {
+          "desc": "{}天{}小时{}分钟"
+        },
+        "milli": {
+          "time": {
+            "desc": "{}小时{}分钟{}秒{}毫秒"
+          }
+        }
+      },
+      "msg": {
+        "base": {
+          "query": {
+            "success": "查询成功"
+          }
+        },
+        "ajax": {
+          "operation": {
+            "success": "操作成功",
+            "fail": "操作失败"
+          }
+        }
+      },
+      "webclient": {
+        "invoke": {
+          "kettle": {
+            "fail": "远程调用Kettle平台失败:{}"
+          }
+        }
+      }
+    },
+    "job": {
+      "title": {
+        "timejob": "定时任务",
+        "joblog": "任务调度日志",
+        "cronExpressionGenerator": "Cron表达式生成器",
+        "jobDetail": "任务详细",
+        "addJob": "添加任务",
+        "modifyJob": "修改任务",
+        "joblogDetail": "调度日志详细"
+      },
+      "column": {
+        "jobId": "任务编号",
+        "jobName": "任务名称",
+        "jobGroup": "任务组名",
+        "jobStatus": "任务状态",
+        "normal": "正常",
+        "pause": "暂停",
+        "invokeTarget": "调用目标字符串",
+        "cron": "cron表达式",
+        "cronExpression": "cron执行表达式",
+        "invokeMethod": "调用方法",
+        "misfirePolicy": "执行策略",
+        "defaultPolicy": "默认策略",
+        "concurrent": "是否并发",
+        "allow": "允许",
+        "ban": "禁止",
+        "executionStatus": "执行状态",
+        "fail": "失败",
+        "executionTime": "执行时间",
+        "jobLogId": "日志编号",
+        "logInfo": "日志信息"
+      },
+      "button": {
+        "log": "日志",
+        "runImmediate": "立即执行",
+        "runOnce": "执行一次",
+        "runAbandon": "放弃执行",
+        "jobDetail": "任务详细",
+        "jobLog": "调度日志",
+        "generateExpression": "生成表达式"
+      },
+      "placeholder": {
+        "jobName": "请输入任务名称",
+        "jobGroup": "请选择任务组名",
+        "jobStatus": "请选择任务状态",
+        "invokeTarget": "请输入调用目标字符串",
+        "cronExpression": "请输入cron执行表达式",
+        "executionStatus": "请选择执行状态"
+      },
+      "tips": {
+        "invokeMethod": {
+          "first": "Bean调用示例：ryTask.ryParams('ry')",
+          "second": "Class类调用",
+          "third": "参数说明：支持字符串，布尔类型，长整型，浮点型，整型"
+        }
+      },
+      "formLabel": {
+        "jobId": "任务编号：",
+        "jobName": "任务名称：",
+        "jobGroup": "任务分组：",
+        "createTime": "创建时间：",
+        "cronExpression": "cron表达式：",
+        "nextValidTime": "下次执行时间：",
+        "invokeTarget": "调用目标方法：",
+        "jobStatus": "任务状态：",
+        "concurrent": "是否并发：",
+        "misfirePolicy": "执行策略：",
+        "jobLogId": "日志序号：",
+        "executionTime": "执行时间：",
+        "invokeMethod": "调用方法：",
+        "jobMessage": "日志信息：",
+        "executionStatus": "执行状态：",
+        "exceptionInfo": "异常信息："
+      },
+      "confirm": {
+        "enable": "确认要启用\"{jobName}\"任务吗？",
+        "disable": "确认要停用\"{jobName}\"任务吗？",
+        "runImmediate": "确认要立即执行一次\"{jobName}\"任务吗？",
+        "delete": "是否确认删除定时任务编号为\"{jobIds}\"的数据项？",
+        "deletelog": "是否确认删除调度日志编号为\"{jobLogIds}\"的数据项？",
+        "clearLog": "是否确认清空所有调度日志数据项？"
+      },
+      "msg": {
+        "log": {
+          "run": {
+            "mulitparam": "执行多参方法： 字符串类型{0}，布尔类型{1}，长整型{2}，浮点型{3}，整形{4}",
+            "param": "执行有参方法：",
+            "noparam": "执行无参方法"
+          },
+          "usetime": "{} 总共耗时：{}毫秒"
+        },
+        "startup": "【启动结束】定时任务模块启动成功",
+        "success": {
+          "run": "执行成功"
+        }
+      },
+      "error": {
+        "log": {
+          "run": {
+            "exception": "任务执行异常  - ："
+          },
+          "schedule": {
+            "fail": "The task misfire policy '{}' cannot be used in cron schedule tasks {0}"
+          }
+        },
+        "add": {
+          "cron": {
+            "wrong": "新增任务'{0}'失败,cron表达式不正确"
+          },
+          "https": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'http(s)//'调用"
+          },
+          "rmi": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'rmi://'调用"
+          }
+        },
+        "edit": {
+          "cron": {
+            "wrong": "新增任务'{0}'失败,cron表达式不正确"
+          },
+          "https": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'http(s)//'调用"
+          },
+          "rmi": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'rmi://'调用"
+          }
+        },
+        "jobName": {
+          "isnull": "任务名称不能为空"
+        },
+        "invokeTarget": {
+          "isnull": "调用目标字符串不能为空"
+        },
+        "cronExpression": {
+          "isnull": "cron执行表达式不能为空",
+          "incorrect": "cron表达式格式不正确"
+        }
+      }
+    },
+    "online": {
+      "column": {
+        "tokenId": "会话编号",
+        "userName": "登录名称",
+        "ipaddr": "主机",
+        "loginTime": "登录时间"
+      },
+      "button": {
+        "forceLogout": "强退"
+      },
+      "confirm": {
+        "forceLogout": "是否确认强退名称为\"{userName}\"的用户？"
+      },
+      "msg": {
+        "success": {
+          "forceLogout": "强退成功"
+        }
+      }
+    },
+    "monitor": {
+      "msg": {
+        "startup": "【启动结束】监控中心启动成功"
+      }
+    },
+    "activiti": {
+      "msg": {
+        "startup": "【启动结束】审核流程模块启动成功"
+      }
+    },
+    "msg": {
+      "message": {
+        "startup": "【启动结束】消息中心模块启动成功"
+      },
+      "success": {
+        "edit": "编辑成功",
+        "modify": "修改成功",
+        "add": "新增成功",
+        "delete": "删除成功",
+        "refresh": "刷新成功",
+        "clear": "清空成功",
+        "enable": "启用成功",
+        "disable": "停用成功",
+        "operate": "操作成功"
+      }
+    },
+    "system": {
+      "title": {
+        "configmanage": "参数管理",
+        "configdate": "参数数据",
+        "deptmanage": "部门管理",
+        "dictdata": "字典数据",
+        "dicttype": "字典类型",
+        "logininfo": "登录日志",
+        "menumanage": "菜单管理",
+        "sysnotice": "通知公告",
+        "operlog": "操作日志",
+        "postmanage": "岗位数据",
+        "postdata": "岗位管理",
+        "personalprofile": "个人信息",
+        "rolemanage": "角色管理",
+        "roledata": "角色数据",
+        "usermanage": "用户管理",
+        "userdata": "用户数据",
+        "onlineuser": "在线用户"
+      },
+      "error": {
+        "conf": {
+          "add": {
+            "exist": "新增参数' {} '失败，参数键名已存在"
+          },
+          "update": {
+            "exist": "修改参数' {} '失败，参数键名已存在"
+          },
+          "cannotdelete": "内置参数【%1$s】不能删除"
+        },
+        "dept": {
+          "exist": {
+            "noadd": "新增部门'{}'失败，部门名称已存在",
+            "noupdatename": "修改部门'{}'失败，部门名称已存在"
+          },
+          "change": {
+            "parentisown": "修改部门'{}'失败，上级部门不能是自己"
+          },
+          "childdept": {
+            "inused": "该部门包含未停用的子部门！",
+            "nonone": "存在下级部门,不允许删除"
+          },
+          "haveuser": "部门存在用户,不允许删除",
+          "repeatingRecord": "重复记录！(唯一键:部门ID)",
+          "number": {
+            "exist": {
+              "noadd": "新增部门失败，部门ID已存在"
+            }
+          }
+        },
+        "dict": {
+          "exist": {
+            "noadd": "新增字典'{}'失败，字典类型已存在",
+            "noupdate": "修改字典'{}'失败，字典类型已存在"
+          },
+          "inused": "%1$s已分配,不能删除"
+        },
+        "menu": {
+          "childmenu": {
+            "nonone": "存在子菜单,不允许删除",
+            "inused": "菜单已分配,不允许删除"
+          },
+          "exist": {
+            "noadd": "新增菜单'{}'失败，菜单名称已存在",
+            "noupdate": "修改菜单'{}'失败，菜单名称已存在"
+          },
+          "urlhttp": {
+            "noadd": "新增菜单'{}'失败，地址必须以http(s)://开头",
+            "noupdate": "修改菜单'{}'失败，地址必须以http(s)://开头"
+          },
+          "change": {
+            "parentisown": "修改菜单'{}'失败，上级菜单不能选择自己"
+          }
+        },
+        "post": {
+          "exist": {
+            "noadd": "新增岗位'{}'失败，岗位名称已存在",
+            "code": {
+              "noadd": "新增岗位'{}'失败，岗位编码已存在",
+              "noupdate": "修改岗位'{}'失败，岗位编码已存在"
+            },
+            "noupdate": "修改岗位'{}'失败，岗位名称已存在"
+          },
+          "inused": "%1$s已分配,不能删除"
+        },
+        "user": {
+          "update": {
+            "fail": "修改个人信息异常，请联系管理员"
+          },
+          "pwd": {
+            "oldpwdwrong": "修改密码失败，旧密码错误",
+            "mustdiff": "新密码不能与旧密码相同",
+            "update": {
+              "fail": "修改密码异常，请联系管理员"
+            }
+          },
+          "nofound": "用户名或密码错误",
+          "exist": {
+            "noadd": "新增用户'{}'失败，登录账号已存在"
+          },
+          "telephone": {
+            "exist": {
+              "noadd": "新增用户'{}'失败，手机号码已存在",
+              "noupdate": "修改用户'{}'失败，手机号码已存在"
+            }
+          },
+          "email": {
+            "exist": {
+              "noadd": "新增用户'{}'失败，邮箱账号已存在",
+              "noupdate": "修改用户'{}'失败，邮箱账号已存在"
+            }
+          },
+          "superadmin": {
+            "nochange": "不允许操作超级管理员用户"
+          },
+          "import": {
+            "nodata": "导入用户数据不能为空",
+            "account": {
+              "exist": "<br/>{}、账号 {} 已存在",
+              "requireName": "<br/>{}、用户昵称必填",
+              "requireDeptId": "<br/>{}、更新时用户ID必填",
+              "fail": "<br/>{}、账号 {} 导入失败："
+            },
+            "fail": "很抱歉，导入失败！共 {} 条数据格式不正确，错误如下：",
+            "nickNameRequired": "用户昵称必填",
+            "userNameRequired": "登入名称必填",
+            "userIdRequired": "更新时用户ID必填",
+            "haveAccount": "账号 {} 已存在",
+            "fild": "账号 {} 导入失败",
+            "alreadyExist": "导入文件存在相同用户名，请修改文件",
+            "deptNoExist": "导入部门不存在"
+          },
+          "getUserAuth": {
+            "fail": "合并用户权限错误：{}"
+          }
+        },
+        "role": {
+          "exist": {
+            "noadd": "新增角色'{}'失败，角色名称已存在",
+            "code": {
+              "noadd": "新增角色'{}'失败，角色权限已存在",
+              "noupdate": "修改角色'{}'失败，角色权限已存在"
+            },
+            "noupdate": "修改角色'{}'失败，角色名称已存在"
+          },
+          "superadmin": {
+            "nochange": "不允许操作超级管理员角色"
+          },
+          "inused": "%1$s已分配,不能删除"
+        },
+        "login": {
+          "input": {
+            "verification": "密码要求由数字、字母、特殊字符组成，并且密码长度不得少于{}位"
+          }
+        }
+      },
+      "msg": {
+        "user": {
+          "import": {
+            "account": {
+              "success": "<br/>{}、账号 {} 导入成功"
+            },
+            "success": "恭喜您，数据已全部导入成功！共 {} 条，数据如下："
+          },
+          "update": {
+            "account": {
+              "success": "<br/>{}、账号 {} 更新成功"
+            }
+          }
+        },
+        "rowcount": "第%s行"
+      }
+    }
+  },
+  "customer": {
+    "po": "客户PO#",
+    "name": "客户",
+    "code": "客户编码",
+    "codeName": "客户名称",
+    "country": "客户国别"
+  },
+  "customerCredit": {
+    "exportQueryResult": "导出查询结果",
+    "confirmButtonText": "确定",
+    "cancelButtonText": "取消",
+    "update": "修改",
+    "delete": "删除",
+    "usageTime": "流水时间",
+    "recognizedType": "认领类型",
+    "debtType": "欠款类型",
+    "reciveAmount": "收",
+    "payAmount": "支",
+    "shipNo": "出运单号",
+    "issuingBank": "开证行",
+    "exportStatement": {
+      "exportQueryResult": "导出查询结果",
+      "clientID": "客户编码",
+      "billOfLadingNum": "提单号",
+      "submmitTime": "提交时间",
+      "finishTime": "--",
+      "settled": "已结算",
+      "unbalanced": "未结算",
+      "marketingOrgan": "销售组织",
+      "bookingNoteNum": "订舱单号",
+      "numbericalLink": "提单号",
+      "clientName": "客户名称",
+      "currency": "币种",
+      "count": "数量",
+      "seaFreight": "海运费",
+      "premium": "保险费",
+      "testFee": "检测费",
+      "goodsValue": "货值",
+      "FETTaxValue": "FET税额",
+      "invoiceValue": "发票金额",
+      "unclearedGoodsValue": "未清货值",
+      "unclearedOthers": "未清其他",
+      "invioceNumber": "发票号",
+      "documentPreparationTime": "制单时间",
+      "submitTime": "提交时间",
+      "sailSchedule": "船期",
+      "scheduledPaymentDate": "应回款日期",
+      "actualArrivalDate": "实际到门日期",
+      "actualArrivalMonth": "实际到门月份",
+      "organizer": "编制人",
+      "compilationTime": "编制时间",
+      "updater": "更新人",
+      "updateTime": "更新时间",
+      "DDPFreight": "DDP实际运费",
+      "tariff": "关税金额",
+      "otherAmounts": "其他金额",
+      "purchaseAmounts": "采购金额",
+      "VATTax": "VAT税额",
+      "monthSeaFreight": "海运费结算月",
+      "monthPremium": "保险费计算月",
+      "monthTariff": "关税月",
+      "monthGoodsSettlement": "货值结算月",
+      "monthFET": "FET结算月",
+      "monthVAT": "VAT结算月"
+    },
+    "EDIExportInsurance": {
+      "exportExcel": "导出",
+      "shipmentDeclaration": "出运申报",
+      "exchangeConfirmation": "收汇确认",
+      "invoiceNumber": "发票号",
+      "numbericalLink": "提单号",
+      "client": "客户",
+      "shipmentStatus": "出运状态",
+      "exchangeStatus": "收汇状态",
+      "region": "地区",
+      "nation": "国家",
+      "clientID": "客户编码",
+      "clientName": "客户名称",
+      "creditInsuranceId": "信保编码",
+      "ticketNumber": "交单发票号",
+      "vesselAndVoyage": "船名航次",
+      "sailSchedule": "船期",
+      "currency": "币种",
+      "invoiceValue": "发票金额",
+      "paymentMethod": "付款方式",
+      "contractPaymentMethod": "合同支付方式",
+      "payFeeMethod": "缴费支付方式",
+      "issuingBankCode": "开证行编码",
+      "paymentDays": "账期",
+      "predictMaymentAmount": "应回款金额",
+      "predictPaymentDate": "应回款日期",
+      "paymentAmount": "已回款金额",
+      "havePaymentAmount": "已回款日期",
+      "commodityID": "商品代码"
+    },
+    "amountOutstanding": {
+      "exportQueryResult": "导出查询结果",
+      "clientIDorName": "客户编码/名称",
+      "companyAccount": "公司",
+      "clientId": "客户编码",
+      "clientName": "客户名称",
+      "billOfLadingNum": "提单号",
+      "voucherType": "凭证类型",
+      "currency": "币种",
+      "invioceNumber": "发票号",
+      "amount": "金额",
+      "openAmount": "未清金额",
+      "actualDate": "实际船期",
+      "pridictPaymentDate": "应回款日期",
+      "overdueDays": "逾期天数",
+      "actualArrivalDate": "实际收货日期",
+      "DDPPredictPayment": "DDP应回款项"
+    },
+    "advancePaymentStatement": {
+      "clientIDorName": "客户编码/名称",
+      "clientID": "客户编码",
+      "clientName": "客户名称",
+      "deliveryOrderNumber": "交货单号",
+      "amount": "金额",
+      "prepaidAmount": "预付金额",
+      "advancePayment": "预付款",
+      "advanceOccupiedAmount": "预付款占用金额",
+      "availablePayment": "可用预付款",
+      "radio": "比例",
+      "state": "状态",
+      "forzenState": "冻结状态",
+      "statusContent": {
+        "unDownload": "未下载",
+        "downloaded": "已下载",
+        "notForzen": "未冻结",
+        "forzen": "已冻结"
+      }
+    },
+    "overdueStatements": {
+      "clientIDorName": "客户编码/名称",
+      "region": "区域",
+      "isOverdue": "是否逾期",
+      "isBookBalanced": "是否清账",
+      "nation": "国家/地区",
+      "clientID": "客户编码",
+      "clientName": "客户名称",
+      "invoiceNumber": "发票号",
+      "sailSchedule": "船期",
+      "receivableExchangeDate": "应收汇日期",
+      "overdueDays": "逾期天数",
+      "deliveryAmount": "发货金额",
+      "balanceDate": "清账时间",
+      "unClearBalance": "未清金额",
+      "exchangeAmount": "收汇金额",
+      "DDPActualArrival": "DDP实际到门",
+      "tradeType": "贸易类型",
+      "DDPPaymentDays": "DDP账期"
+    },
+    "exchangeDetail": {
+      "clientIDorName": "客户编码/客户名称",
+      "bankCollectionNumber": "银行回款编号",
+      "bank": "银行",
+      "remitter": "汇款人",
+      "receiptDateStart": "收汇日期",
+      "receiptDateEnd": "",
+      "financialOrgan": "财务组织",
+      "region": "区域",
+      "writter": "填写人",
+      "businessSuppler": "业务补充人",
+      "submitStatus": "提交状态",
+      "clientId": "客户编码",
+      "clientName": "客户名称",
+      "receiptDate": "收汇日期",
+      "type": "类型",
+      "invoiceNumber": "发票号",
+      "voucherNum": "凭证号",
+      "bankAccount": "银行账号",
+      "currency": "币种",
+      "thirdPartyPayment": "第三方付款",
+      "returnAmount": "回款金额",
+      "balance": "剩余金额",
+      "intoAccountAmount": "入账金额",
+      "serviceCharge": "手续费",
+      "creditNum": "信用证号",
+      "swiftCode": "SWIFT_CODE",
+      "issuingDate": "开证日期",
+      "expirationDate": "到期日期",
+      "remark": "备注",
+      "clearedValue": "清货值",
+      "clearingFreight": "清海运费",
+      "clearPremium": "清保险费",
+      "clearTestFee": "清检测费",
+      "clearToZeroAmount": "清零金额",
+      "clearRemark": "清零备注"
+    },
+    "clientCollectOROweMoney": {
+      "addCollect": "添加收款",
+      "addCredit": "添加信用证",
+      "clearBalance": "清账",
+      "clearResidue": "剩余清零",
+      "verification": "核销",
+      "operationLog": "操作记录",
+      "downloadAttachment": "下载附件",
+      "recognized": "认领",
+      "changeRate": "认领改汇率",
+      "confirmEffect": "确认认领生效",
+      "batchConfirmConfirm": "批量认领生效",
+      "claimWithdrawal": "认领撤回",
+      "adjust": "调账",
+      "custSystemBalance": "客户资金可用余额",
+      "exchangeOccupation": "客户预付占用查询",
+      "settleAccountRecord": "清账记录查询",
+      "returnClearCustDebt": "取消清账",
+      "recognizedNo": "认领单号",
+      "claimStatus": "认领状态",
+      "claimed": "已认领",
+      "unclaimed": "未认领",
+      "recognizedType": "认领类型",
+      "avaliableStatus": "可用状态",
+      "avaliable": "可用",
+      "notAvaliable": "不可用",
+      "receiveMoneyNo_bankStatementNo": "流水号/凭证号",
+      "receiveMoneyNo": "收汇登记号",
+      "bankStatementNo": "流水号",
+      "recognizedCurrency": "认领币种",
+      "curRcv": "收汇币种",
+      "recognizedMoney": "认领金额",
+      "recognizedRate": "认领汇率",
+      "claimant": "认领人",
+      "recognizedTime": "认领时间",
+      "isThirdPay": "是否第三方付款",
+      "recognizedRemark": "补充说明",
+      "outstandingAccount": "未清账",
+      "clearingAccounts": "部分清账",
+      "clearedAccount": "全部清账",
+      "submitInvoiceNo": "交单发票号",
+      "receivableAmount": "收汇金额",
+      "customerCode": "来款客户",
+      "avaliableBalance": "可用余额",
+      "outstandAmount": "欠款金额",
+      "balanceDebtAmount": "剩余欠款金额",
+      "cancelAmount": "撤销金额",
+      "clearingPerson": "清账人",
+      "clearingDate": "清账日期",
+      "title": {
+        "collectClaim2Cust": "收汇认领到客户",
+        "changeRate": "已认领收汇改汇率",
+        "confirm": "确认收汇认领",
+        "adjust": "新增收汇调账",
+        "availableAmount": "客户资金可用余额"
+      },
+      "clientIDorName": "客户编号/名称",
+      "clearBalanceStatus": "清账状态",
+      "receiptDate": "收汇日期",
+      "finishDate": "结束日期",
+      "orderNumber": "订单号/交货单号",
+      "receive": "收款",
+      "operation": "操作",
+      "sendBack": "退回",
+      "voucherType": "凭证类型",
+      "voucherNum": "凭证号",
+      "invoiceNumber": "发票号",
+      "remittanceAmount": "汇款金额",
+      "residue": "剩余",
+      "recordAmount": "入账金额",
+      "remitterName": "汇款人名称",
+      "bankANDaccount": "银行&账号",
+      "serviceCharge": "手续费",
+      "currency": "币种",
+      "exchargeRate": "汇率",
+      "clientID": "客户编号",
+      "clientName": "客户名称",
+      "financialOrgan": "财务组织",
+      "companyAccount": "公司",
+      "bankSlipNum": "银行回单编号",
+      "receiver": "收汇人",
+      "sub": "补充人",
+      "subTime": "补充时间",
+      "remark": "备注",
+      "creditNum": "信用证号",
+      "effectiveDate": "有效日期",
+      "expirationDate": "截止日期",
+      "isSubmitted": "已提交",
+      "thirdPartyPayment": "第三方付款",
+      "own": "欠款",
+      "billOfLadingNum": "提单号",
+      "actualSailSchedule": "实际船期",
+      "surrenderInvoiceNumber": "商业发票号",
+      "amount": "金额",
+      "scheduledPaymentDate": "应回款日期",
+      "overdueDays": "逾期天数",
+      "addCollectItem": "添加收款项",
+      "collectORowe": "收款/欠款",
+      "bankReceiptNumber": "银行回单编号",
+      "creditNumber": "信用证号",
+      "issuingBankSWIFT": "开证行SWIFT",
+      "issuingDate": "开证日期",
+      "issuingDateEnd": "到期日期",
+      "attachment": "附件",
+      "tip": "提示",
+      "verificationTip": "确认将此收款剩余金额核销?",
+      "clearBalanceRecord": "清账记录",
+      "recorder": "记录人",
+      "recordTime": "记录时间",
+      "clearAmount": "清账金额",
+      "collectionImformation": "收款项信息",
+      "settlementSameCurrency": "清账-同币种",
+      "availableAmount": "可用金额",
+      "msg": {
+        "notSelectionCollect": "请选择一笔收款数据",
+        "selectCustAvailableBalance": "请选择客户查询币种可用余额",
+        "notClaimNoCust": "未认领收款没有客户，无法查询币种可用余额",
+        "selectCustExchangeOccupation": "请选择客户查询预付款占用",
+        "longTermDepositNotAllowedSettle": "长期定金不能用于清账",
+        "notSelectionDebt": "请选择欠款",
+        "settleMustSame": "收款与欠款的户头、客户需要一致",
+        "currencyMustSame": "收款的认领币种与欠款币种需要一致",
+        "wrideOffMustSame": "核销的的币种与客户需要一致",
+        "wrideOffType": "核销的收汇只能是一笔调账与一笔贷款、返利、营销、理赔",
+        "wrideOffSymbolType": "请确认核销的收汇是否选择正确",
+        "wrideOffNotEnough": "可调整金额小于调整金额，无法提交",
+        "wrideOffCount": "请选择两笔收汇进行核销",
+        "actualReceiveMoney": {
+          "required": "请输入金额",
+          "validNumber": "输入的金额不是数字"
+        },
+        "currency": {
+          "required": "请选择币种"
+        },
+        "receiveMoneyDate": {
+          "required": "请输入收汇日期"
+        },
+        "companyCode": {
+          "required": "请选择公司户头"
+        },
+        "archiSystem": {
+          "required": "请选择体系"
+        },
+        "selfBankAccount": {
+          "required": "请选择银行&账号"
+        },
+        "remitter": {
+          "required": "请输入汇款人名称"
+        },
+        "salesman": {
+          "required": "请选择业务员"
+        },
+        "customerCode": {
+          "required": "请选择来款客户"
+        },
+        "recognizedType": {
+          "required": "请选择认领类型",
+          "validNegative": "调账类型金额只能为负数",
+          "validPositive": "该类型金额只能为正数"
+        },
+        "rate": {
+          "required": "请输入要变更的汇率"
+        },
+        "recognizedMoney": {
+          "validPositiveAndNegative": "金额与汇款金额符号不同"
+        },
+        "shouldReceiveMoney": {
+          "required": "请输入汇款金额",
+          "validMaxAmount": "汇款金额不能小于入账金额",
+          "validPositiveAndNegative": "输入的金额与入账金额符号不同"
+        },
+        "clearMustPositive": "清账金额需要大于0",
+        "totalOutweighAvailable": "输入的总清账金额大于可用金额",
+        "notNumber": "输入的不是数字",
+        "totalOutweighAvailableNeedChange": "总清账金额大于可用金额，请修改后再提交",
+        "returnClearCustDebt": "是否取消清账记录？"
+      },
+      "confirm": {
+        "batchEffect": "是否批量确认生效？",
+        "claimWithdrawal": "是否撤回认领？",
+        "wrideOffAoumt": "确认核销 {adjustAmount} 金额？"
+      }
+    },
+    "exchangeOccupation": {
+      "dnBillNo": "交货单号",
+      "rate": "汇率",
+      "occupationAmount": "占用金额",
+      "occupationType": "占用类型",
+      "ocTypeAdvanceCharge": "预付款",
+      "ocTypeLimit": "额度",
+      "occupiedTime": "占用时间",
+      "orgAmount": "原币金额",
+      "orgCurrency": "原币种",
+      "releasedAmount": "释放金额",
+      "releasedTime": "释放时间"
+    },
+    "exchangeFlow": {
+      "cancelAmount": "撤销金额",
+      "usageAmount": "使用金额",
+      "usageTime": "流水时间",
+      "usageType": "流水类型"
+    },
+    "overdueRecord": {
+      "documentNo": "出口单证号",
+      "shipDate": "船期",
+      "dueDate": "应回款日期",
+      "accountPeriod": "账期",
+      "dueDays": "逾期天数",
+      "debtShowType": "欠款类型",
+      "debtAmount": "欠款金额",
+      "outstandAmount": "未清金额",
+      "receiveAmount": "收汇金额",
+      "overdueStatus": "清账状态",
+      "unclear": "未清帐",
+      "clearing": "部分清账",
+      "cleared": "已清帐",
+      "deliveryDate": "到门日期",
+      "genDate": "欠款生成日期",
+      "lcNo": "信用证号",
+      "transactionMethod": "贸易类型"
+    },
+    "lineOfCredit": {
+      "query": "查询",
+      "export": "导出",
+      "accountStatement": "对账单",
+      "updateExchange": "更新收汇",
+      "EDIApply": "EDI申请",
+      "client": "客户",
+      "blockup": "停用",
+      "revoke": "撤销",
+      "viewHistory": "变更历史记录",
+      "deptCodeName": "地区",
+      "creditType": "额度类型",
+      "creditProp": "额度性质",
+      "issuingBank": "开证行",
+      "quota": "额度",
+      "sinosureQuota": "信保额度",
+      "effectiveDate": "有效日期",
+      "effectiveStartDate": "有效开始日期",
+      "effectiveDueDate": "有效截止日期",
+      "employeeCodeName": "登记人",
+      "employeeDept": "登记人部门",
+      "billDate": "登记日期",
+      "quotaGreaterOrEqual": "额度>=",
+      "operation": "操作",
+      "region": "区域",
+      "nation": "国家",
+      "clientID": "客户编号",
+      "creditInsuranceId": "信保编码",
+      "clientName": "客户名称",
+      "paymentMethod": "付款方式",
+      "paymentMethodDESC": "付款方式描述",
+      "creditPeriod": "付款期限",
+      "traceDays": "宽限天数",
+      "prepaymentRatio": "预付比例",
+      "currency": "币种",
+      "eliveryOccupy": "发货占用",
+      "creditLineOfCreditInsurance": "信保授信额度",
+      "deliveryReveivables": "发货应收",
+      "creditLineOfCompany": "公司授信额度",
+      "otherAmounts": "其他应收",
+      "longTermDeposit": "长期定金",
+      "receivableAmount": "收汇金额",
+      "prepaymentRatioQue": "预付比例(%)",
+      "updateTitle": "修改授信额度信息",
+      "quotaRegistration": "额度登记",
+      "beforeStartDate": "变更前额度起始日期",
+      "beforeDueDate": "变更前额度截止日期",
+      "beforeQuota": "变更前额度",
+      "afterStartDate": "变更后额度起始日期",
+      "afterDueDate": "变更后额度截止日期",
+      "afterQuota": "变更后额度",
+      "updateByName": "变更人",
+      "updateTime": "变更时间",
+      "msg": {
+        "notDraftDontNeedSubmit": "单据非草拟，不用操作提交",
+        "notEffectDontNeedRevoke": "单据非生效，不用操作撤销",
+        "pleaseSelect": "请选择",
+        "pleaseInput": "请输入",
+        "pleaseInputStartDate": "请输入有效开始日期",
+        "pleaseInputDueDate": "请输入有效截止日期"
+      }
+    },
+    "limitInquiry": {
+      "nationArea": "国别地区",
+      "creditType": "额度类型",
+      "issuingBank": "开证行",
+      "temporaryQuota": "临时额度",
+      "temporaryQuotaDate": "临时额度有效期",
+      "sumQuota": "公司授信额度",
+      "longQuota": "长期额度",
+      "companyCreditLimitOccupy": "公司授信额度占用",
+      "shipOccupyQuota": "出运单占用",
+      "advanceAmt": "预付款",
+      "goodAmt": "贷款",
+      "otherAmt": "其他费用",
+      "taxAmt": "税费",
+      "occupyQuota": "占用额度",
+      "remainQuota": "剩余公司授信额度",
+      "sinosureQuota": "中信保额度",
+      "sinosureCode": "信保编码",
+      "limit": "信保授信额度",
+      "limitOccupy": "信保占用额度",
+      "remainingLimit": "剩余信保授信额度",
+      "accountPeriod": "投保申报账期",
+      "overdueSituation": "逾期情况",
+      "outstandAmount": "当前逾期金额",
+      "overdueDays": "最长逾期天数",
+      "longDeposit": "长期定金",
+      "onTheWayQuota": "在途额度",
+      "actualReceiptQuota": "实际收货额度",
+      "fundQuota": "收汇金额",
+      "occupationReleaseDetails": "占用释放明细",
+      "accountPeriodDetails": "账期明细",
+      "queryDeadline": "查询截止日期",
+      "subTable": {
+        "billNo": "单据号",
+        "genDate": "欠款生成日期",
+        "dueDate": "应回款日期",
+        "shipDate": "实际船期",
+        "debtShowType": "欠款类型",
+        "outstandAmount": "欠款金额",
+        "age": "账龄(天)",
+        "accountPeriod": "账期(天)",
+        "isOverdue": "超账期",
+        "lcNo": "信用证号",
+        "occupyDate": "占用日期",
+        "occupyAmt": "占用金额",
+        "direction": "方向",
+        "releaseDate": "释放日期",
+        "releaseAmt": "释放金额",
+        "balance": "余额",
+        "billType": "单据类型",
+        "createByName": "操作人",
+        "createTime": "操作时间"
+      }
+    },
+    "certificateNumberType": {
+      "query": "查询",
+      "queryHistory": "历史查询",
+      "certigficateNumberType": "凭证号类型",
+      "collectAndOwe": "收/欠款",
+      "typeDesc": "类型描述",
+      "remark": "备注",
+      "operation": "操作",
+      "updateTitle": "凭证号类型--修改"
+    },
+    "clearingForm": {
+      "query": "查询",
+      "queryHistory": "历史查询",
+      "code": "编码",
+      "desc": "描述",
+      "creditPeriod": "付款期限",
+      "remark": "备注",
+      "operation": "操作",
+      "updateTitle": "结算方式--修改"
+    },
+    "paymentMethod": {
+      "query": "查询",
+      "queryHistory": "历史查询",
+      "code": "编码",
+      "desc": "描述",
+      "remark": "备注",
+      "paymentMethod": "付款方式",
+      "operation": "操作",
+      "updateTitle": "付款方式--修改"
+    },
+    "customerRebate": {
+      "add": "添加",
+      "claimSync": "理赔同步",
+      "clientID": "客户编号",
+      "rebateType": "返利类型",
+      "currency": "币种",
+      "infoSummarize": "汇总信息",
+      "rebateDetail": "返利明细",
+      "clientName": "客户名称",
+      "totalAmount": "总金额",
+      "orderOccupancyAmount": "订单占用金额",
+      "deliveryOrderOccupancyAmount": "交货单占用金额",
+      "actualUsedAmount": "实际使用金额",
+      "balance": "剩余金额",
+      "code": "编号",
+      "updateTime": "修改时间",
+      "updatePerson": "修改人",
+      "remark": "备注",
+      "addDialogTitle": "添加返利",
+      "chooseClientTitle": "请选择客户",
+      "clientShortName": "客户名称",
+      "confirm": "确认",
+      "client": "客户",
+      "amount": "金额"
+    },
+    "letterCreditClaim": {
+      "reset": "重置",
+      "open": "打开",
+      "claimOutOrder": "认领出运单",
+      "releaseOutOrder": "解绑出运单",
+      "creditNum": "信用证号",
+      "salesDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "issuingAmount": "开证金额",
+      "createDate": "创建日期",
+      "typeOfcreditLetter": "信用证类型",
+      "notificationBank": "通知行",
+      "status": "状态",
+      "maximumAvailableAmount": "余额",
+      "issuingDate": "开证日期",
+      "ERPClient": "ERP客户",
+      "issuingApplicant": "开证申请人",
+      "issuingProductName": "开证品名",
+      "issuingCurrency": "开证币种",
+      "maxUsableAmount": "最大可使用金额",
+      "createTime": "创建时间",
+      "registerNo": "登记单号",
+      "creditInfo": "信用证信息",
+      "latestShipmentDate": "最迟装运日期",
+      "deliveryDays": "交单天数",
+      "overflowRateOfAmount": "金额短溢装率",
+      "countryOfTheIssuer": "开证人国别(地区)",
+      "version": "版本",
+      "changeCreditRegistration": "改证登记",
+      "revisionContent": "改证内容",
+      "revisionBefore": "改证前",
+      "revisionAfter": "改证后",
+      "amendmentPerson": "改证人",
+      "amendmentTime": "改证时间",
+      "occupiedReleasedFlow": "占用释放流水",
+      "occupiedTime": "占用日期",
+      "releasedTime": "释放日期",
+      "occupiedAmount": "占用金额",
+      "operator": "操作人",
+      "operationTime": "操作时间",
+      "amount": "金额",
+      "isSpecialShip": "是否特殊发货审批",
+      "isFilterShowLc": "已绑信用证",
+      "creator": "制单人",
+      "creatorTime": "制单时间",
+      "msg": {
+        "selectValidLetterCredit": "请选择有效的信用证",
+        "deliveryDays": {
+          "validDays": "天数超过范围",
+          "number": "天数只能为数字值"
+        },
+        "overflowRateOfAmount": {
+          "validNumber": "输入的格式不正确"
+        },
+        "selCustAndComp": "请选择客户和公司",
+        "selCompany": "请选择公司",
+        "selCustomer": "请选择客户",
+        "selOutOrder": "请选择出运单"
+      }
+    },
+    "letterCreditUnbind": {
+      "applyStatus": "审批状态",
+      "country": "国别",
+      "receiveType": "收款方式",
+      "shipAmt": "出运单金额",
+      "lcBalance": "信用证剩余金额",
+      "applyUser": "申请人",
+      "applyDate": "申请时间",
+      "selOutOrderUnBindLetterCredit": "选择出运单解绑信用证",
+      "applyNo": "申请单号",
+      "applyReason": "申请原因",
+      "attachmentDetails": "附件详情",
+      "msg": {
+        "selEffectiveLCredit": "请选择有效的信用证",
+        "selLetterCreditToUnbind": "请选择信用证解绑申请",
+        "letterCreditCantRepeatApproval": "信用证解绑申请不能重复提交",
+        "selectData": "请选择数据",
+        "shipNo": { "required": "出运单号不能为空" },
+        "po": { "required": "客户PO#不能为空" },
+        "country": { "required": "国别不能为空" },
+        "customerCode": { "required": "客户不能为空" },
+        "receiveType": { "required": "收款方式不能为空" },
+        "shipAmt": { "required": "出运单金额不能为空" },
+        "lcNo": { "required": "信用证号不能为空" },
+        "bankName": { "required": "开证行不能为空" },
+        "lcBalance": { "required": "信用证剩余金额不能为空" },
+        "applyUser": { "required": "申请人不能为空" },
+        "applyDate": {
+          "required": "申请日期不能为空",
+          "valiNowDate": "申请日期不能小于当前日期"
+        },
+        "applyReason": { "required": "申请原因不能为空" },
+        "changeData": "变更数据后请先保存再提交审批"
+      }
+    }
+  },
+  "dialog": {
+    "search": "查询",
+    "reset": "重置",
+    "confirm": "确定",
+    "cancel": "取消",
+    "area": "地区",
+    "areaName": "地区名称",
+    "continent": "大洲",
+    "payeeAccount": "账号",
+    "payeeBank": "银行",
+    "accountName": "账户名称",
+    "payeeAccount_Bank_Name": "账号/银行/名称",
+    "salesDepartment": "部门",
+    "nameOrEnglishName": "名称/英文名称",
+    "name": "名称",
+    "englishName": "英文名称",
+    "pleaseInputName": "请输入名称",
+    "invoiceNo": "发票编号",
+    "operationAndEditNum": "出运单号",
+    "salesman": "业务员",
+    "createDate": "创建日期从",
+    "currency": "币种",
+    "amountShipped": "出运金额",
+    "transMode": "运输方式",
+    "buyerCode": "卖方代码",
+    "chineseNameOfMerchant": "客商中文名称",
+    "englishNameOfMerchant": "客商英文名称",
+    "chineseAddress": "中文地址",
+    "englishAddress": "英文地址",
+    "company": "公司",
+    "companyNameOrCompanyEnglishName": "公司名称/公司英文名称",
+    "companyName": "公司名称",
+    "companyEnglishName": "公司英文名称",
+    "codeOfProgramming": "编码",
+    "status": "状态",
+    "consignee": "收货人",
+    "consigneeCode": "收货人编码",
+    "linkmanName": "收货人名称",
+    "port": "港口",
+    "customs10DigitProductCode": "海关10位商品编码",
+    "customsCodeOrNameOfCustomsGoods": "海关编码/海关商品名",
+    "customsCode": "海关编码",
+    "nameOfCustomsGoods": "海关商品名称",
+    "factoryName": "工厂名称",
+    "goods": "商品",
+    "merchantName": "客商名称",
+    "merchantCode": "客商编码",
+    "forShort": "简称",
+    "tradeCountryAndRegion": "贸易国别(地区)",
+    "registeredAddress": "注册地址",
+    "sinosureBuyerCode": "中信保买方代码",
+    "pleaseInputCodeOrName": "请输入编码或名称",
+    "bankAccountOrNameOrAccountName": "银行账号/银行名称/账户名称",
+    "bankAccount": "银行账号",
+    "nameOrEnglishNameOrPhoneNum": "姓名/英文名/手机号码",
+    "compellation": "姓名",
+    "englishCompellation": "英文名",
+    "phoneNum": "手机号码",
+    "personnelCategory": "人员类别"
+  },
+  "dispatchSheet": {
+    "check": {
+      "button": {
+        "checkSatisfied": "对货满足",
+        "checkUnsatisfied": "对货不满足",
+        "runCheckGoods": "执行对货检查"
+      },
+      "shipmentNo": "出运单号",
+      "checkStatus": "对货状态",
+      "shipDate": "船期",
+      "version": "版本",
+      "employeeDept": "业务部门",
+      "allQty": "出运单数量",
+      "stockQty": "库存满足数量",
+      "dlStockFullDate": "库存满足日期",
+      "dlIsStockOk": "是否库存满足",
+      "partiallyFulfil": "部分满足",
+      "instruct": "已指令",
+      "noInstruct": "未指令",
+      "boxTime": "放箱时间",
+      "date1": "预计货好时间",
+      "date2": "预计派车日期",
+      "date3": "计划交货日期",
+      "date4": "截单日期",
+      "date5": "截关日期",
+      "date6": "确定时间",
+      "station": "场站",
+      "place": "装货地点",
+      "methods": "派车方式",
+      "ask": "派车要求",
+      "remark": "发货备注",
+      "orderNo": "订单号",
+      "msg": {
+        "selection": {
+          "empty": "请选择对货单！"
+        }
+      }
+    },
+    "checkDetail": {
+      "button": {
+        "updateFinDateBatch": "批量更新货好日期",
+        "gotoArrangeWorkbench": "在排发货工作台查看",
+        "gotoStockQuery": "在库存查询查看",
+        "gotoProductionSchedule": "在生产排程维护查看"
+      },
+      "goodsDetails": "对货明细",
+      "updateFinDate": "维护货好日期",
+      "deliveryOrderNum": "交货单号",
+      "deadlinePortDate": "截港时间",
+      "realDepartureTime": "离场时间",
+      "finDate": "预计货好日期",
+      "actualFinDate": "金宇货好日期",
+      "actualFinDateYd": "有道货好日期",
+      "packMethod": "集装箱类型",
+      "totalDnBoxNum": "箱量",
+      "totalNum": "数量",
+      "tmsShipNum": "实物数量",
+      "deliveryFactory": "生产工厂",
+      "dnNum": "交货单数量",
+      "stockQty": "库存数",
+      "planQty": "计划数",
+      "isStockOk": "库存满足",
+      "isShipOk": "船期满足"
+    },
+    "dispatchSheetSearch": {
+      "BLNum": "提单号",
+      "salesman": "业务员",
+      "preparedBy": "制单人",
+      "deliveryOrderNum": "交货单号",
+      "requireArrivalTime": "要求到厂时间",
+      "leaveTime": "离厂时间",
+      "closingTime": "截单时间",
+      "presentationTime": "交单时间",
+      "nation": "国家",
+      "region": "区域",
+      "PONum": "客户PO#",
+      "shipNo": "出运单号",
+      "salNCode": "贸易国别",
+      "saleArea": "销售区域",
+      "actualFinDate": "实际货好日期",
+      "containerNum": "集装箱号",
+      "sealNum": "铅封号",
+      "planCount": "计划数",
+      "actualIssuedQuantity": "实发数",
+      "totalStWeightNum": "标准总重",
+      "specifiedWeight": "指定重量",
+      "specifiedVolume": "指定体积",
+      "tmsVolumeNum": "实际总体积",
+      "tmsGrossWeightNum": "实际毛重",
+      "caseWeight": "箱皮重",
+      "VGM": "VGM",
+      "actualWeight": "实际货重",
+      "boxPile": "箱型",
+      "sailSchedule": "船期",
+      "logisticsCompany": "货代公司",
+      "loadLocation": "装货地点",
+      "driverPhoneNum": "司机电话",
+      "carLicenseNum": "车牌号",
+      "arrivalTime": "到厂时间",
+      "frieight": "运费",
+      "dischargePort": "目的港",
+      "dischargeNation": "目的国",
+      "actualTransactionMethod": "实际成交方式",
+      "boatCorp": "船公司",
+      "billLadingNo": "主提单号",
+      "billLadingRemark": "主提单号备注",
+      "divideLadingNo": "分提单号",
+      "lottingNo": "分票号",
+      "lottingNum": "分票数",
+      "shipName": "船名",
+      "voyageName": "航次",
+      "preShipDate": "预计船期",
+      "actualShipDate": "实际船期",
+      "deadlinePortDate": "截港日期",
+      "deadlineBillDate": "截单日期",
+      "actDeadlineBillDate": "实际截单日期",
+      "presentationDate": "交单日期",
+      "boxNum": "柜量",
+      "tireNum": "轮胎数量",
+      "advertiseNum": "宣传品数量",
+      "totalNum": "总数量",
+      "shipAmt": "金额",
+      "msg": {
+        "pleaseSelectTime": "请选择时间"
+      }
+    },
+    "truncatedQuery": {
+      "BLNum": "提单号",
+      "salesman": "业务员",
+      "preparedBy": "制单人",
+      "deliveryOrderNum": "交货单号",
+      "requireArrivalTime": "要求到厂时间",
+      "leaveTime": "离厂时间",
+      "closingTime": "截单时间",
+      "presentationTime": "交单时间",
+      "nation": "国家",
+      "region": "区域",
+      "PONum": "客户PO#",
+      "containerNum": "集装箱号",
+      "sealNum": "铅封号",
+      "planCount": "计划数",
+      "actualIssuedQuantity": "实发数",
+      "specifiedWeight": "指定重量",
+      "specifiedVolume": "指定体积",
+      "caseWeight": "箱皮重",
+      "VGM": "VGM",
+      "actualWeight": "实际货重",
+      "boxPile": "箱型",
+      "sailSchedule": "船期",
+      "logisticsCompany": "物流公司",
+      "loadLocation": "装货地点",
+      "driverPhoneNum": "司机电话",
+      "carLicenseNum": "车牌号",
+      "arrivalTime": "到厂时间",
+      "frieight": "运费"
+    },
+    "presentationQuery": {
+      "BLNum": "提单号",
+      "salesman": "业务员",
+      "preparedBy": "制单人",
+      "deliveryOrderNum": "交货单号",
+      "requireArrivalTime": "要求到厂时间",
+      "leaveTime": "离厂时间",
+      "presentationTime": "交单时间",
+      "closingTime": "截单时间",
+      "nation": "国家",
+      "region": "区域",
+      "PONum": "客户PO#",
+      "containerNum": "集装箱号",
+      "sealNum": "铅封号",
+      "planCount": "计划数",
+      "actualIssuedQuantity": "实发数",
+      "specifiedWeight": "指定重量",
+      "specifiedVolume": "指定体积",
+      "caseWeight": "箱皮重",
+      "VGM": "VGM",
+      "actualWeight": "实际货重",
+      "boxPile": "箱型",
+      "sailSchedule": "船期",
+      "logisticsCompany": "物流公司",
+      "loadLocation": "装货地点",
+      "driverPhoneNum": "司机电话",
+      "carLicenseNum": "车牌号",
+      "arrivalTime": "到厂时间",
+      "frieight": "运费"
+    }
+  },
+  "document": {
+    "add": "添加",
+    "searchHistory": "历史查询",
+    "commit": "提交",
+    "sendBack": "退回",
+    "settleAccounts": "结算",
+    "buttonOperation": "DDP修改",
+    "print": "打印",
+    "save": "保存",
+    "check": "查看",
+    "update": "修改",
+    "delete": "删除",
+    "commercialInvoiceNum": "商业发票号",
+    "invoiceNum": "发票号",
+    "billOfLadingNum": "提单号",
+    "arrivalDate": "到门日期",
+    "clientPO": "客户PO#",
+    "client": "客户",
+    "targetPort": "目的港",
+    "salesman": "业务员",
+    "operation": "操作",
+    "surrenderInvoiceNum": "交单发票号",
+    "salesContractNumber": "客户PO#",
+    "clientPONum": "客户PO#",
+    "customerAbbreviation": "客户名称",
+    "nation": "国家",
+    "salesmanAndDepartment": "业务员&部门",
+    "salesOrganization": "销售组织",
+    "deliveryConfirmTime": "发货确认时间",
+    "shippingDate": "船期",
+    "presenter": "提交人",
+    "submitTime": "提交时间",
+    "firstSubmissionTime": "第一次提交时间",
+    "shipInviceStatus": "出口销售发票开票状态",
+    "inviceStatus": "开票状态",
+    "printDate": "开票日期",
+    "factory": "开票方",
+    "shipNo": "出运单号",
+    "goodTotalNum": "轮胎数量",
+    "originalAmount": "轮胎货值",
+    "costAmtSum": "加收费用",
+    "invoiceAmount": "发票总金额",
+    "effectiveDate": "生效日期",
+    "actualShippingDate": "实际船期",
+    "claimWaybill": "认领出运单",
+    "documentDate": "单证日期",
+    "amountInfo": "金额信息",
+    "transportInfo": "运输信息",
+    "transactionMethod": "成交方式",
+    "costMethod": "费用方式",
+    "actualFreightCost": "国际运费",
+    "insuranceCoefficien": "保险系数",
+    "insuranceRate": "保险费率",
+    "actualPremium": "国际保费",
+    "buyBoxFeeAmt": "买箱费",
+    "tradeMode": "收汇方式",
+    "costDetails": "费用明细",
+    "goodsInfo": "商品信息",
+    "fileAttachments": "文件附件",
+    "speedLevel": "速度层级",
+    "day": "天数",
+    "rate": "比例(%)",
+    "englishNameOfExpense": "加收费用英文名称",
+    "originalCurrencyAmount": "加收费用金额",
+    "sum": "合计",
+    "exportDoc": {
+      "confirm": {
+        "sendback": "是否退回？"
+      },
+      "msg": {
+        "shipNoEmpty": "请选择出运单",
+        "empty": "请选择出口单证",
+        "repeat": "出口单证不能重复提交",
+        "surrenderInvoiceNumEmpty": "交单发票号为空，无法提交！",
+        "sendback": "请选择生效的出口单证退回",
+        "invoiceAmount": { "max": "总金额超过最大值，请调整费用明细后重试" },
+        "englishNameOfExpense": { "required": "请选择加收费用英文名称" },
+        "originalCurrencyAmount": {
+          "required": "请输入加收费用金额",
+          "min": "加收费用金额需要大于0"
+        }
+      }
+    },
+    "invoiceDate": "发票日期",
+    "salesperson": "销售业务员",
+    "nationAndRegion": "国家/区域",
+    "clientName": "客户名称",
+    "companyName": "公司",
+    "bankAndAccount": "银行/账号",
+    "issuingBank": "开证行",
+    "currency": "币种",
+    "paymentMethod": "付款方式",
+    "invoiceValue": "发票金额",
+    "prepayOffsetPayment": "预付款冲减金额",
+    "receivablesAmount": "应收款金额",
+    "excessTransferAmount": "转溢付款金额",
+    "extimatedExangeDate": "预计收汇日期",
+    "totalDeduction": "扣费合计",
+    "originator": "制单人",
+    "documentPreparationDate": "制单时间",
+    "remark": "备注",
+    "tab1": "其他费用&提单信息&实发商品信息栏",
+    "tab2": "其他加项/减项费用",
+    "testFee": "检测费",
+    "customerSeaFreight": "收客户海运费",
+    "customerPremium": "收客户保险费",
+    "actualArrivalDate": "实际到门日期",
+    "salesPercentage": "销售金额比例",
+    "clearanceAmountPercentage": "清关金额比例",
+    "tariffAmount": "关税金额",
+    "otherAmount": "其他费用",
+    "actualFreight": "实际运费",
+    "flightNameAndVoyage": "航名/航次",
+    "extimatedArrivalDate": "预计到港日期",
+    "startPort": "启运港",
+    "grossWeight": "毛重(KG)",
+    "netWeight": "净重(KG)",
+    "size": "尺码",
+    "containerVolumeDesc": "箱量描述",
+    "materialCode": "商品编码",
+    "materialDescription": "描述",
+    "specfication": "规格",
+    "brand": "品牌",
+    "category": "品类",
+    "loadingQuantity": "装箱量",
+    "figure": "花纹",
+    "unit": "单位",
+    "TTTL": "TT_TL",
+    "loadIndex": "负荷指数",
+    "speed": "速度缓?",
+    "actualQuantityIssued": "实发数量",
+    "actualQuantityIssuedCase": "实发箱量",
+    "unitSellingPrice": "销售单价",
+    "amount": "金额",
+    "taxAmount": "税额",
+    "oceanFreight": "海运费",
+    "premium": "保险费",
+    "tariff": "关税",
+    "paymentOfGoods": "货款",
+    "FET": "FET",
+    "VAT": "VAT",
+    "push": "推送",
+    "tempAccountPeriodAppl": {
+      "applyNo": "申请单号",
+      "applyStatus": "审批状态",
+      "area": "区域",
+      "country": "国别",
+      "debtAmt": "欠款金额",
+      "shipDate": "船期/到门日期",
+      "accountPeriod": "账期",
+      "shouldDueDate": "应回款日期",
+      "applyDays": "申请临时账期天数",
+      "finalDueDate": "特殊审批回款日期",
+      "applyUserName": "申请人",
+      "applyDate": "申请日期",
+      "attachmentDetails": "附件详情",
+      "selecttempAccountPeriodSource": "选择临时账期数据源",
+      "msg": {
+        "noSelectData": "请选择数据",
+        "empty": "请选择临时账期",
+        "repeat": "临时账期不能重复提交",
+        "shipNo": { "required": "出运单号不能为空" },
+        "po": { "required": "客户PO#不能为空" },
+        "country": { "required": "国别不能为空" },
+        "customerCode": { "required": "客户不能为空" },
+        "debtAmt": { "required": "欠款金额不能为空" },
+        "shipDate": { "required": "船期/到门日期不能为空" },
+        "accountPeriod": { "required": "账期不能为空" },
+        "shouldDueDate": { "required": "应回款日期不能为空" },
+        "applyDays": { "required": "申请临时账期天数不能为空" },
+        "finalDueDate": { "required": "特殊审批回款日期不能为空" },
+        "applyUser": { "required": "申请人不能为空" },
+        "applyDate": {
+          "required": "申请日期不能为空",
+          "nowDate": "申请日期不能小于当前日期"
+        },
+        "success": {
+          "edit": "编辑成功",
+          "add": "新增成功"
+        },
+        "changeData": "变更数据后请先保存再提交审批"
+      }
+    },
+    "originCertificate": {
+      "choiceExportDoc": "选择出口单证",
+      "oriCert": "原产地证号",
+      "originType": "原产地证类型",
+      "documentDate": "单证时间",
+      "salNCodeName": "进口国/地区",
+      "shipMode": "运输方式",
+      "consigneeName": "收货人",
+      "productName": "商品名称",
+      "packType": "包装类型",
+      "brand": "品牌",
+      "unit": "包装单位",
+      "actualShipDate": "实际船期",
+      "shipName": "船名",
+      "voyageName": "航次",
+      "portOfDepartureName": "启运港",
+      "loadingPortName": "转运港",
+      "portOfDestinationName": "目的港",
+      "makeDesc": "唛头",
+      "specialProvisions": "特殊条款",
+      "oriRemark": "证书备注信息",
+      "noContractingCompay": "第三方发票/非缔约方公司",
+      "msg": {
+        "emptyDocument": "请选择出口单证",
+        "emptyBillLadingDocument": "请选择有提单号的出口单证",
+        "invoiceNo": { "required": "发票号不能为空" },
+        "billLadingNo": { "required": "提单号不能为空" },
+        "salNCode": { "required": "进口国/地区不能为空" },
+        "consignee": { "required": "收货人不能为空" },
+        "unit": { "required": "包装单位不能为空" },
+        "shipDate": { "required": "开船日期不能为空" },
+        "shipName": { "required": "船名不能为空" },
+        "voyageName": { "required": "航次不能为空" },
+        "portOfDeparture": { "required": "起运港不能为空" },
+        "portOfDestination": { "required": "卸货港不能为空" },
+        "success": {
+          "edit": "编辑成功",
+          "add": "新增成功"
+        },
+        "changeData": "变更数据后请先保存再推送原产地证"
+      },
+      "confirm": {
+        "push": "是否推送原产地证？"
+      }
+    }
+  },
+  "exportOperation": {
+    "waitingDeclarationWordbench": {
+      "orderNo": "单号",
+      "client": "客户",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "creator": "创建人",
+      "createTimeStart": "创建日期",
+      "onlySeeWaiting": "只查待报关数量>0",
+      "contractNo": "合同协议号",
+      "declarationAgent": "报关主体",
+      "supervisionMethod": "监管方式",
+      "mainOrderNo": "主单号",
+      "ladingBillNo": "分提单号",
+      "estimatedShippingTime": "预计船期",
+      "containerQuantity": "柜量",
+      "voyageAndShipName": "航次/船名",
+      "nation": "国家",
+      "salesContractNo": "客户PO#",
+      "commodityCode": "商品编码",
+      "commodityName": "商品名称",
+      "brand": "品牌",
+      "spec": "规格型号",
+      "unit": "单位",
+      "shippedQuantity": "出运数量",
+      "alreadyDeclarationCount": "已报关数量",
+      "waitingDeclarationCount": "待报关数量",
+      "externalContractNo": "外部合同号",
+      "createTime": "创建时间",
+      "remark": "备注"
+    },
+    "logisticsProcessRegister": {
+      "transNo": "运编号",
+      "salesContractNo": "客户PO#",
+      "client": "客户",
+      "tradeNation": "销售国别(地区)",
+      "ETDStart": "ETD",
+      "ETDEnd": "到",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员",
+      "operation": "操作",
+      "signIn": "登记",
+      "status": "状态",
+      "tradeMethod": "成交方式",
+      "loadPort": "起运港",
+      "targetPort": "目的港",
+      "consignmentDate": "托运日期",
+      "ETD": "ETD",
+      "ETA": "ETA",
+      "containerCompletionDate": "装柜完成日期",
+      "customsReleaseDate": "海关放行日期",
+      "customsDeclarationNo": "报关单号",
+      "actualDateOfShipment": "实际装船日期",
+      "BLDate": "提单日期",
+      "billOfLadingNum": "提单号",
+      "vesslAndVoyage": "航次/船名",
+      "submitDate": "交单日期",
+      "company": "公司",
+      "bookSpace": "订舱",
+      "loadContainer": "装柜",
+      "customsClearance": "报关放行",
+      "loadShipment": "装船",
+      "billOfLading": "提单",
+      "tenderDocument": "交单/寄单",
+      "completed": "已完成",
+      "beExecuting": "正在执行",
+      "uncompleted": "未完成",
+      "containerLoadingCompletionTime": "装柜完成日期",
+      "customsInspection": "海关查验",
+      "containerOrSealNum": "集装箱/铅封号",
+      "customsDeclarationNum": "报关单号",
+      "exportDate": "出口日期",
+      "electronicCommissionBookNum": "电子委托书号",
+      "yes": "是",
+      "no": "否",
+      "billOfLadingDate": "提单日期",
+      "recoveryDate": "收回日期",
+      "presentationDate": "交单日期",
+      "presentationType": "交单类型",
+      "estimatedDateOfCollection": "预计收汇日期",
+      "presentingBank": "交单银行"
+    },
+    "exportInvoice": {
+      "invoiceNo": "发票号",
+      "invoiceBillNo": "发票流水号",
+      "invoiceType": "发票类型",
+      "invoiceIssuingEntity": "开票单位",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "createDateStart": "创建日期从",
+      "internalTypeOfDocuments": "单据内部分类",
+      "paymentStatus": "付款状态",
+      "status": "状态",
+      "currency": "币种",
+      "amount": "金额",
+      "invoiceDate": "开票日期",
+      "beRedPunch": "被红冲",
+      "redPunch": "红冲",
+      "remark": "备注",
+      "creator": "创建人",
+      "createTime": "创建时间"
+    },
+    "exportChargesPaymentApplication": {
+      "paymentApplicationNo": "付款申请单号",
+      "payee": "收款方",
+      "requestPaymentMethod": "申请支付方式",
+      "applicantDepartment": "申请人部门",
+      "applicant": "申请人",
+      "company": "公司",
+      "creator": "创建人",
+      "creatorStart": "创建日期从",
+      "status": "状态",
+      "paymentStatus": "支付状态",
+      "certificationStatus": "制证状态",
+      "requestPaymentDate": "申请支付日期",
+      "requestPaymentCurrency": "申请支付币种",
+      "requestPaymentAmount": "申请支付金额",
+      "alreadyPaymentAmount": "已支付金额",
+      "actualPaymentDate": "实际支付日期",
+      "paymentPurpose": "付款用途",
+      "remark": "备注",
+      "postscript": "附言",
+      "msg": {
+        "submitSuccess": "提交成功"
+      }
+    },
+    "exportChargesPaymentApplicationDetail": {
+      "basicInfo": "基本信息",
+      "basesInfo": "基础信息",
+      "feeType": "费用类型",
+      "paymentCompany": "支付公司",
+      "paymentAccount": "支付户头",
+      "payBankAccount": "付款银行账号",
+      "bearType": "费用承担方式",
+      "paymentOrder": "付款委托书",
+      "paymentPurpose": "付款用途",
+      "applyInfo": "申请人信息",
+      "receiveAccountInfo": "收款方账号信息",
+      "receiveAccount": "收款方账号",
+      "receiveBank": "收款方银行",
+      "account": "账户名称",
+      "SWIFTCODE": "SWIFTCODE",
+      "paymentDetail": "付款明细",
+      "systemInfo": "系统信息",
+      "effectTime": "生效时间",
+      "paymentRecords": "支付记录",
+      "actualPaymentRecords": "实付记录",
+      "shipNo": "出运单号",
+      "billLadingNo": "提单号",
+      "invoiceType": "发票类型",
+      "invoiceNo": "发票单号",
+      "paymentItems": "收付项目",
+      "bearDepart": "费用承担部门",
+      "receiptAndPayment": "收付",
+      "refundOrNot": "退款",
+      "currency": "币种",
+      "amount": "金额",
+      "prePayDate": "预计付款日期",
+      "feeApplyNo": "费用申请单号",
+      "index": "序号",
+      "paymentType": "支付类型",
+      "bankAccount": "银行账号",
+      "paymentAmount": "支付金额",
+      "payDate": "支付日期",
+      "forwarderCorp": "货代公司",
+      "paymentAmountSummary": "付款金额汇总",
+      "msg": {
+        "receiveAccount": { "required": "付款明细中有收款方账号为空的项！" },
+        "bearType": { "required": "请选择费用承担方式" },
+        "payBankAccount": { "required": "请选择付款银行账号" },
+        "payee": { "required": "收款方不能为空" },
+        "applyPayDate": {
+          "required": "请选择申请支付日期",
+          "nowDate": "申请支付日期不能小于当前日期"
+        },
+        "applyPayType": { "required": "请选择申请支付方式" },
+        "feeType": { "required": "请选择费用类型" },
+        "currency": { "required": "请选择申请支付币种" },
+        "paymentCompany": { "required": "请选择支付公司" },
+        "applyUser": { "required": "申请人不能为空" },
+        "applyDepartment": { "required": "申请人部门不能为空" },
+        "applyPayAmount": {
+          "max": "申请支付金额超出最大值，请修改付款明细金额"
+        },
+        "tempAmount": { "required": "金额不能为空" },
+        "sumApplyPayAmount": {
+          "max": "合计申请支付金额大于十位，请修改付款明细的金额"
+        },
+        "companyCode": { "required": "公司不能为空" },
+        "expenseInvoiceList": {
+          "required": "该先选择付款明细！",
+          "exist": "该明细已存在，请勿重复添加！"
+        },
+        "bearDepart": { "required": "请选择费用承担部门" },
+        "saleOrg": {
+          "distinct": "选择的项销售组织必须相同！",
+          "distinctOut": "无法添加与已选的明细销售组织不同的项！"
+        },
+        "forwarderCorp": {
+          "distinct": "港杂费选择的项货代公司必须相同！",
+          "distinctOut": "港杂费无法添加与已选的明细货代公司不同的项！"
+        },
+        "success": {
+          "edit": "编辑成功",
+          "add": "新增成功"
+        }
+      }
+    },
+    "exportFeeDifference": {
+      "exportResult": "导出查询结果",
+      "exportFeeDifferenceDetail": "出口费用差异详情",
+      "forwarderCorp": "货代公司",
+      "shipDate": "船期",
+      "shipNo": "出运单号",
+      "freightFeeAmt": "预付海运费",
+      "insuranceFeeAmt": "预付保险费",
+      "actFreightFeeAmt": "实付海运费",
+      "actInsuranceFeeAmt": "实付保险费",
+      "differenceAmount": "运保费差额"
+    },
+    "quotationsSheet": {
+      "quotationNum": "报价单号",
+      "inquiryNum": "询价单号",
+      "quotationDateFrom": "报价日期从",
+      "quotationDateTo": "报价日期到",
+      "salesDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "founder": "创建人",
+      "status": "状态",
+      "goodsCarrier": "承运商",
+      "quotationDate": "报价日期",
+      "isWinTheBid": "是否中标",
+      "timeOfCreation": "创建时间",
+      "remark": "备注"
+    },
+    "priceComparisonSheet": {
+      "comparisonNum": "比价单号",
+      "inquiryNum": "询价单号",
+      "comparisonDateFrom": "比价日期从",
+      "comparisonDateTo": "比价日期到",
+      "salesDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "founder": "创建人",
+      "status": "状态",
+      "quotationDate": "比价日期",
+      "inquiryDate": "询价日期",
+      "priceOfferDeadline": "报价截止日期",
+      "timeOfCreation": "创建时间",
+      "remark": "备注"
+    },
+    "declarationLottingStatus": {
+      "lottingNo": "分票号",
+      "customsNo": "报关单号",
+      "customsDeclSubject": "报关主体",
+      "customsBroker": "报关行",
+      "qfCode": "铅封号",
+      "shipNo": "出运单号",
+      "customsShipNo": "实际出货单号",
+      "customsCloseDate": "海关结关日期",
+      "customsReleaseDate": "海关放行日期",
+      "regulatoryMethod": "监管方式",
+      "lottingBillNo": "分票单据号",
+      "dnRowNo": "分箱行内码",
+      "isDecl": "是否报关",
+      "isSampleTire": "是否样品",
+      "isFillBox": "是否填箱",
+      "saleAmt": "金额",
+      "taxAmt": "税额",
+      "dnNum": "数量",
+      "salePrice": "单价",
+      "tmsNum": "件数",
+      "tmsNetWeightNum": "货重",
+      "tmsVolumeNum": "尺寸",
+      "shareFinGrossWeightNum": "总毛重",
+      "shareFinWeightNum": "总净重",
+      "shareFinVolumeNum": "总体积"
+    }
+  },
+  "financialManagement": {
+    "button": {
+      "exportQueryResult": "导出查询结果",
+      "addReceipts": "新建单据",
+      "addDetail": "添加明细",
+      "reviewOrDownloadRecords": "审核/下载记录",
+      "review": "审核",
+      "download": "下载"
+    },
+    "chargeToAccount": {
+      "entryBillNumber": "入账单号",
+      "billOfLadingNum": "提单号",
+      "compilingDate": "制单日期",
+      "endDate": "结束日期",
+      "operation": "操作",
+      "prepayMethod": "预付方式",
+      "paymentDate": "付款日期",
+      "companyAccount": "公司",
+      "remark": "备注",
+      "preparer": "制单人",
+      "categoryOfTollGatherer": "收费人类别",
+      "tollGatherer": "收费人",
+      "expenseItem": "费用项目",
+      "currency": "币种",
+      "amount": "金额",
+      "recordDate": "记录日期",
+      "isComputed": "是否计算"
+    },
+    "portSurchargeProvision": {
+      "billOfLadingNum": "提单号",
+      "nation": "国家",
+      "outboundTrackingNumber": "出库单号",
+      "sailSchedule": "船期",
+      "sailScheduleEnd": "",
+      "brand": "品牌",
+      "containerQuantity": "柜量",
+      "withdrawnAmount": "计提金额",
+      "region": "区域"
+    },
+    "customsClearanceAmount": {
+      "clientName": "客户名称",
+      "billOfLadingNum": "提单号",
+      "materialCode": "商品编码",
+      "materialName": "商品名称",
+      "factory": "工厂",
+      "inspectionDate": "商检日期",
+      "inspectionDateEnd": "",
+      "clientCode": "客户编码",
+      "purchaser": "买方",
+      "region": "区域",
+      "customsDeclarationNumber": "报关单号",
+      "invoiceNumber": "发票号",
+      "clientPO": "客户PO#",
+      "deliveryOrderNum": "交货单号",
+      "materialDesc": "商品描述",
+      "count": "数量",
+      "amount": "金额",
+      "declarationAmount": "报关金额",
+      "companyAccount": "公司",
+      "ratio": "比例"
+    },
+    "customClearanceOceanFreightException": {
+      "clientCodeOrName": "客户编码/名称",
+      "billOfLadingNum": "提单号",
+      "customsDeclarationStatus": "报关状态",
+      "orderNum": "订单号",
+      "clientPO": "客户PO",
+      "salesman": "业务员",
+      "nation": "国家",
+      "clientCode": "客户编码",
+      "clientName": "客户名称",
+      "oceanFreight": "海运费",
+      "premium": "保险费",
+      "customClearanceOceanFreight": "报关海运费",
+      "customsDeclarationPremium": "报关保险费",
+      "oceanFreightDifference": "海运费差额",
+      "premiumDifference": "保险费差额",
+      "customsDeclarationDate": "报关日期"
+    },
+    "portSurchargeDetail": {
+      "billOfLadingNum": "提单号",
+      "paymentDate": "付款日期",
+      "paymentEndDate": "--",
+      "touchingDocumentDate": "制单时间",
+      "touchingDucumentEndDate": "--",
+      "tollGatherer": "收费人",
+      "invoiceNumber": "发票号",
+      "shipmentTrackingNum": "出货单号"
+    },
+    "billingManagement": {
+      "billOfLadingNum": "提单号",
+      "shipmentTrackingNum": "出货单号",
+      "customsDeclarationStartDate": "报关开始时间",
+      "customsDeclarationEndDate": "报关结束时间",
+      "arrivalCountry": "目的国",
+      "clientCountry": "客户国家",
+      "region": "区域",
+      "companyAccount": "公司",
+      "departurePort": "启运港",
+      "targetPort": "目的港",
+      "currency": "币种",
+      "amount": "金额",
+      "latestTaxRates": "最新税率",
+      "taxRates": "税率",
+      "conversionOfRMB": "折算人民币",
+      "review": "审核",
+      "download": "下载"
+    },
+    "averageAccountsReceivable": {
+      "shouldReceiveAmt": "应收货值",
+      "otherReceiveAmt": "其他应收",
+      "receiveAmt": "收汇金额",
+      "owedAmt": "欠款额",
+      "deliveryOrderAmt": "交货单占用额",
+      "updateTime": "日期"
+    },
+    "exportSalesInvoice": {
+      "button": {
+        "invoicing": "开票",
+        "batchDownloadInvoice": "批量下载发票",
+        "repeal": "作废"
+      },
+      "orderNum": "单号",
+      "client": "客户",
+      "entrustingParty": "委托方",
+      "creatTimeStart": "创建日期从",
+      "createTimeEnd": "创建日期到",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "internalInvoiceClassification": "发票内部分类",
+      "printStatus": "打印状态",
+      "invoiceStatus": "发票状态",
+      "status": "状态",
+      "invoiceNo": "发票号",
+      "invoiceBillNo": "发票流水号",
+      "transNo": "出运单号",
+      "tradeNation": "贸易国别(地区)",
+      "salesContractNo": "客户PO#",
+      "tiresNum": "轮胎数量",
+      "physicalInvoiceNumber": "物理发票号",
+      "invoiceDate": "发票日期",
+      "printDate": "打印日期",
+      "expectedCollectionDate": "预计收汇日期",
+      "currency": "币种",
+      "amount": "金额",
+      "beRedPunch": "被红冲",
+      "redPunch": "红冲",
+      "factoryName": "开票方",
+      "saleOrgName": "收票方",
+      "transactionMethod": "成交方式",
+      "invoiceAmt": "发票金额",
+      "shareInsuranceFeeAmt": "国际保费",
+      "shareFreightFeeAmt": "国际运费",
+      "shareBuyBoxFeeAmt": "买箱费",
+      "customsNo": "报关单号",
+      "exchangeMethod": "收汇方式",
+      "invoiceNum": "开票数量",
+      "printNum": "打印次数",
+      "warehouseName": "仓库名称",
+      "taxPrice": "单价",
+      "salePrice": "不含税金额",
+      "noTaxOneAmt": "不含税单价",
+      "taxRate": "税率%",
+      "taxFcy": "税额",
+      "totalTaxAmt": "价税合计",
+      "cnyExchangeRate": "人民币汇率",
+      "cnyAmt": "人民币金额",
+      "invoiceMachineNo": "开票机号",
+      "invoiceType": "发票类型",
+      "afterOpenShow": "开票后展示",
+      "confirm": {
+        "repeal": "是否作废该发票？",
+        "invoice": "是否提交开票？"
+      },
+      "msg": {
+        "muitlSelection": "请只选一条进行开票",
+        "alreadyInvoiced": "选择的项目已开票或正在开票的信息，请重新选择",
+        "needInvoiced": "选择的项目需要都为已开票状态，请重新选择",
+
+        "invoiceMachineNo": { "required": "开票机号不能为空" },
+        "invoiceType": { "required": "发票类型不能为空" },
+        "remark": { "required": "请输入备注" },
+        "dialogAlreadyInvoiced": "选择的项目已开票或正在开票的信息，不能重复开票"
+      }
+    },
+    "statementAccount": {
+      "statement": "对账单",
+      "genCustReconcile": "生成对账单",
+      "send": "推送",
+      "reconciliationNo": "对账单号",
+      "checkStatus": "是否确认",
+      "isPush": "是否推送",
+      "isImportCallBack": "是否回函",
+      "startDate": "业务起始日期",
+      "deadlineDate": "业务截止日期",
+      "customerTime": "截止日期",
+      "updateStatementExcel": "更新对账单Excel",
+      "updateStatementWord": "更新对账单Word",
+      "importStatementReply": "导入对账单回函",
+      "msg": {
+        "confirmSuccess": "确认成功",
+        "time": { "required": "时间不能为空" },
+        "archiSystem": { "required": "体系不能为空" },
+        "send": "请选择未推送的对账单"
+      }
+    },
+    "innerSettle": {
+      "innerSettleId": "内部结算单行ID",
+      "innerTransAmt": "内部交易金额",
+      "innerTransPrice": "内部交易单价",
+      "tmsNum": "TMS实物数量"
+    }
+  },
+  "login": {
+    "title": "供应链订单ODMS",
+    "logIn": "登录",
+    "logIning": "登录中",
+    "register": "注册",
+    "username": "账号",
+    "password": "密码",
+    "code": "验证码",
+    "inputUsername": "请输入您的账号",
+    "inputPassword": "请输入您的密码",
+    "inputCode": "请输入验证码",
+    "remember": "请记住密码"
+  },
+  "page1": {
+    "title": " 页面 1",
+    "name": " 页面 name",
+    "desc": " 这是页面 1"
+  },
+  "plan": {
+    "button": {
+      "lock": "计划锁定",
+      "allSend": "全发",
+      "allNoSend": "全不发",
+      "binning": "分箱",
+      "deleteBatch": "删除批次",
+      "viewBox": "查看分箱"
+    },
+    "submission": {
+      "binning": "分箱",
+      "orderNum": "订单数量",
+      "num1": "提报数量",
+      "num2": "剩余数量",
+      "boxNum": "装箱量"
+    },
+    "unpublish": {
+      "plannedDeliveryTime": "计划行交期",
+      "newPlannedDeliveryTime": "最新计划行交期",
+      "newPlannedAllDeliveryTime": "最新计划整单交期",
+      "orderMonth": "订单月份",
+      "requestDelivery": "请求交货日期",
+      "destinationCountry": "目的国",
+      "boxNo": "箱号",
+      "orderNum": "订单数量",
+      "num1": "已计划未发货数",
+      "num2": "满足数量",
+      "amount": "金额",
+      "weight": "重量",
+      "singleWeight": "单重",
+      "ppk": "PPK",
+      "boxNum": "装箱量",
+      "boxNum2": "预计箱量",
+      "inspect": "商检",
+      "bookSpace": "订舱",
+      "order": "订单",
+      "deadlinePortDate": "截港日期",
+      "time1": "派车日期",
+      "time2": "到厂日期",
+      "time3": "签约日期",
+      "time4": "预计船期",
+      "actualShipDate": "实际船期",
+      "time5": "提报日期",
+      "currency": "币种",
+      "unitPrice": "单价",
+      "value": "货值",
+      "tag1": "产品标签",
+      "tag2": "客户标签",
+      "remark": "发货备注",
+      "ask1": "包装要求",
+      "ask2": "认证要求",
+      "ask3": "年周号要求",
+      "auth": "认证",
+      "info": "花纹信息",
+      "mode": "发货模式",
+      "address": "送达地点"
+    },
+    "shipments": {
+      "qualityControlStatus": "质控状态"
+    },
+    "deliveryCycle": {
+      "systemCategory": "体系类别",
+      "orderNum": "订单号",
+      "clientPO": "客户PO",
+      "companyAccount": "公司",
+      "clientId": "客户编码",
+      "clientName": "客户名称",
+      "clientNation": "客户国别",
+      "region": "区域",
+      "deliveryDate": "发货日期",
+      "planSubmmissionDate": "生产计划提报日期",
+      "orderLeadTime": "订单交付周期（生产提报日期-发货日期）",
+      "compareWith90": "90天内/外",
+      "materialDN": "物料+DN",
+      "deliveryMonth": "发货月份",
+      "dateOrderMarking": "订单制单日期",
+      "orderSigningDate": "订单签约日期",
+      "salesman": "业务员",
+      "targetPort": "目的港",
+      "targetNation": "目的国",
+      "productLabel": "产品标签",
+      "clientLabel": "客户标签",
+      "parckingRequirement": "包装要求",
+      "productCode": "产品编码",
+      "productDesc": "产品描述",
+      "brand": "品牌",
+      "specification": "规格",
+      "figure": "花纹",
+      "tier": "层级",
+      "quantity": "数量",
+      "loadingQuantity": "装箱量",
+      "containerLoad": "箱量",
+      "currency": "币种",
+      "ladingNumber": "提单号",
+      "stockOutNum": "出库单号",
+      "sailSchedule": "船期",
+      "caseNumber": "箱号",
+      "leadSealingNum": "铅封号",
+      "tareWeight": "箱皮重",
+      "invoiceNum": "发票号",
+      "factory": "工厂",
+      "deliveryWarehouse": "发货仓库",
+      "documentationDate": "制单日期",
+      "uploadState": "上传状态",
+      "producerOfExportDocument": "出口单证制作人"
+    },
+    "inventoryReport": {
+      "factory": "工厂",
+      "systemOrder": "体系",
+      "region": "区域",
+      "stock": "库存量",
+      "deliveryGoods": "发货",
+      "orderOccupiedInventory": "订单占用库存",
+      "reverseAndCustomsInventory": "储备、关单库存"
+    },
+    "arrangeWorkbench": {
+      "totalBoxNum": "合计箱量: ",
+      "packingNum": "装箱数量: ",
+      "autoSortGoods": "自动分货",
+      "reserved": "预留",
+      "cancelReservation": "取消预留",
+      "postponeOrder": "暂缓订单",
+      "cancelPostpone": "取消暂缓",
+      "priorityAdjustment": "优先级调整",
+      "maximumLimit": "限制最大分配",
+      "calcelLimit": "取消限制最大分配",
+      "manualReduction": "手工调减",
+      "manualIncrease": "手工调增",
+      "sortGoods": "分货",
+      "cancel": "取消",
+      "reallocation": "调分配",
+      "salesContractNum": "发货需求订单号",
+      "inventoryOrgan": "工厂",
+      "viewOnlyPlannedAndUnshipped": "只查看已计划未发货数量",
+      "theSystem": "体系",
+      "orderNum": "发货需求订单号",
+      "containerNum": "分箱号",
+      "orderSerialNum": "订单序号",
+      "lineNum": "行序号",
+      "postpone": "暂缓",
+      "loadingQuantity": "装箱量",
+      "containerLoad": "箱量",
+      "unshippedQuantity": "未出运箱量",
+      "handInDate": "提报日期",
+      "sortDate": "排序日期",
+      "suspendDate": "暂缓日期",
+      "releaseSuspendDate": "暂缓日期",
+      "clientCode": "客户编码",
+      "commodityCode": "商品编码",
+      "commodityName": "商品名称",
+      "targetNation": "目的国",
+      "dischargingPort": "目的港",
+      "orderCount": "订单数量",
+      "finishedOutwardCount": "已做出运单数量",
+      "hasPredictDeliverCount": "已预发货数量",
+      "plannedNotShippedCount": "已计划未发货数量",
+      "maximumAllocationLimit": "本次最大分配限制",
+      "currentContainerVolume": "本次箱量",
+      "inventoryAndPlan": "库存+计划",
+      "stockQuantity": "库存数",
+      "plannedQuantity": "计划数",
+      "expectedDisatchDate": "期望发货日期",
+      "deliveryLimitDate": "本次限制货好时间",
+      "fstOrdFinDate": "首次预计整单货好时间",
+      "preOrdFinDate": "最新预计整单货好时间",
+      "fstRowFinDate": "首次预计行货好时间",
+      "preRowOrdFinDate": "最新预计行货好时间",
+      "preCabnFinDate": "预计整柜货好时间",
+      "fstStockFinDate": "首次库存满足日期",
+      "stockFullDate": "库存满足日期",
+      "PO": "客户PO#",
+      "quantityControlStatus": "质控状态",
+      "currency": "币种",
+      "unitPrice": "单价",
+      "amount": "金额",
+      "weight": "重量",
+      "tradeNation": "贸易国别",
+      "deliveryMode": "发货模式",
+      "stockOrgan": "生产工厂",
+      "client": "客户",
+      "loadPort": "起运港",
+      "deliveryPort": "目的港",
+      "byTheSystem": "按体系",
+      "byTheFactory": "按工厂",
+      "factorySort": "按工厂分货",
+      "allSort": "全部排发货",
+      "process": "进度",
+      "limitQuantity": "限制数量",
+      "limitMaximumAllocationQuantity": "限制最大分配数量",
+      "modifySortTime": "修改排序时间",
+      "sortTime": "排序时间",
+      "manualReductionOfGoods": "手工调减分货",
+      "manualIncreaseOfGoods": "手工调增分货",
+      "commodityCodeName": "商品编码",
+      "updateSortTitle": "修改订单序号或者行序号",
+      "nowStockAndPlanStock": "当前库存+计划结余",
+      "factory": "工厂",
+      "stockCount": "库存数量",
+      "planCount": "计划数量",
+      "msg": {
+        "factoryEmpty": "请选择工厂",
+        "manualNoEmpty": "请输入序列号",
+        "updateSortSuccess": "更新排序成功"
+      },
+      "confirm": {
+        "reserved": "是否预留",
+        "cancelReserved": "是否取消预留",
+        "postpone": "是否暂缓",
+        "cancelPostpone": "是否取消暂缓",
+        "cancelLimit": "是否取消限制最大分配"
+      },
+      "tips": {
+        "yellow": "黄色",
+        "manuallyAdjustedRowPriority": "：手动调整过行优先级",
+        "red": "红色",
+        "alreadyDnRowAgainPlanPlusStockDiscontentDnOrderNumber": "：已做交货单的行，再次排发货时，计划加库存数不满足已做交货单数"
+      }
+    },
+    "waitingShippedWorkbench": {
+      "totalBoxNum": "合计箱量: ",
+      "packingNum": "装箱数量: ",
+      "salesContractNum": "客户PO#/发货需求订单号",
+      "inventoryOrgan": "生产工厂",
+      "viewOnlyPlannedAndUnshipped": "只查看已计划未发货数量",
+      "theSystem": "体系",
+      "deliveryOrderNum": "交货单单号",
+      "clientPO": "客户PO#",
+      "clientBriefName": "客户名称",
+      "nationAndRegion": "国家地区",
+      "salesmanAndRegion": "业务员&区域",
+      "companyAccount": "公司",
+      "count": "数量",
+      "containerLoad": "箱量",
+      "standardContainerLoad": "标准箱量",
+      "goodsReadyDate": "货好日期",
+      "tradeMethod": "贸易方式",
+      "clientLabel": "客户标签",
+      "parckingRequirement": "包装要求",
+      "targetPort": "目的港",
+      "deliveryFactory": "发货工厂",
+      "deliveryWarehouse": "发货仓库",
+      "goodsWaitingSelected": "待选商品",
+      "orderNum": "发货需求订单号",
+      "rowNo": "行号",
+      "containerNum": "分箱号",
+      "loadingQuantity": "装箱量",
+      "handInDate": "提报日期",
+      "declCust": "是否报关",
+      "clientCode": "客户编码",
+      "commodityCode": "商品编码",
+      "commodityName": "商品名称",
+      "commodityDesc": "商品描述",
+      "targetNation": "目的国",
+      "dischargingPort": "目的港",
+      "orderCount": "订单数量",
+      "finishedOutwardCount": "已做出运单数量",
+      "unfinishedOutwardCount": "未作出运单数量",
+      "finishedDeliverCount": "已完成发货数量",
+      "hasPredictDeliverCount": "已预发货数量",
+      "plannedNotShippedCount": "已计划未发货数量",
+      "maximumAllocationLimit": "本次最大分配限制",
+      "currentContainerVolume": "本次箱量",
+      "expectedDisatchDate": "期望发货日期",
+      "deliveryLimitDate": "本次限制货好时间",
+      "fstOrdFinDate": "预计整单货好时间",
+      "preOrdFinDate": "最新预计整单货好时间",
+      "fstRowFinDate": "首次预计行货好时间",
+      "preRowOrdFinDate": "最新预计行货好时间",
+      "preCabnFinDate": "预计整柜货好时间",
+      "fstStockFinDate": "首次库存满足日期",
+      "stockFullDate": "库存满足日期",
+      "PO": "客户PO#",
+      "salesman": "业务员",
+      "businessDepartment": "业务部门",
+      "quantityControlStatus": "质控状态",
+      "detailList": "交货单明细",
+      "generateDeliveryOrder": "生成交货单",
+      "lineNum": "行号",
+      "saleOrderNum": "销售订单号",
+      "materialCode": "商品编码",
+      "brand": "品牌",
+      "specification": "规格",
+      "figure": "花纹",
+      "tier": "层级",
+      "unit": "单位",
+      "beforeAdjustDeliveryFactory": "调整前发货仓库",
+      "afterAdjustDeliveryFactory": "调整后发货仓库",
+      "planCount": "计划数量",
+      "price": "定价",
+      "offerPrice": "报价",
+      "noDiscountPrice": "未折扣价",
+      "salePrice": "销售价",
+      "noDiscountSaleroom": "未折扣销售额",
+      "saleroom": "销售额",
+      "CIFSeaFreight": "CIF海运费单价",
+      "CIFPremium": "CIF保险费单价",
+      "taxAmount": "税额",
+      "materialDesc": "商品描述",
+      "actualDeliveryCount": "实发数量",
+      "deliveryOrderLoadCount": "交货单装箱数量",
+      "deliveryOrderContainerLoad": "交货单箱量",
+      "currency": "币种",
+      "companyPrice": "公司定价",
+      "msg": {
+        "distinctError": "选中项有收汇方式、目的国、销售公司、贸易国、币种、客户、装箱要求和工厂国别不一致的交货单，不允许生成"
+      },
+      "confirm": {
+        "distinctConfirm": "所选数据存在目的港、成交方式、收货地址、原产地证、费用方式、装运港、唛头、是否报检、是否享惠、包装、运输方式不一致，是否继续"
+      }
+    },
+    "planProduction": {
+      "scheduleVersionImport": "排程导入",
+      "detail": "明细",
+      "planVersion": "版本号",
+      "planYearMonth": "计划年月",
+      "validVersion": "有效版本",
+      "createByName": "制单人",
+      "createTime": "制单时间",
+      "productPlanNo": "计划号"
+    },
+    "productionSchedule": {
+      "productionYearMonth": "生产年月",
+      "adjustment": "调整",
+      "unscheduleQtc": "排产量",
+      "msg": {
+        "factoryEmpty": "请选择工厂",
+        "productionYearMonthEmpty": "请选择生产年月"
+      }
+    },
+    "productionScheduleDiff": {
+      "unscheduleQtc": "待排产量",
+      "stockNum": "库存量",
+      "diffNum": "差异量"
+    }
+  },
+  "saleOrder": {
+    "billNo": "销售订单编码",
+    "salCodePo": "客户PO",
+    "company": "公司",
+    "salNCode": "贸易国别",
+    "loadingPor": "装货港",
+    "dischargePort": "目的港",
+    "transitPort": "目的地",
+    "amount": "金额",
+    "contractDate": "签约日期",
+    "createOrdErName": "制单人",
+    "createOrdDate": "制单时间",
+    "historyVersion": "历史版本",
+    "latest": "最新",
+    "natCode": "目的国/地区",
+    "priceWeitRatio": "整单价重比",
+    "ordGrossRate": "整单毛利率",
+    "attestationTitle": "认证信息",
+    "materialInfoTitle": "货物信息",
+    "amountInfoTitle": "金额信息",
+    "transportInfoTitle": "运输信息",
+    "payTypeTitle": "收汇方式",
+    "goodsInfoTitle": "商品&费用信息",
+    "qty": "订单总数量",
+    "ordTotalWeight": "订单总重量",
+    "totalBoxNum": "箱量总计",
+    "fcy": "订单总金额",
+    "totalQuotationFcy": "报价总金额",
+    "acceOrgFcy": "接单总金额",
+    "includeTaxFcy": "含税订单金额",
+    "grossProfit": "毛利总额",
+    "cifTotalFreight": "CIF报价海运费总计",
+    "cifTotalInsurance": "CIF报价保险费总计",
+    "vietnamVat": "越南增值税",
+    "vatRate": "VAT税率",
+    "isLockWeight": "锁定标准重",
+    "payType": {
+      "tradeMode": "收款方式",
+      "day": "天数",
+      "rate": "比例(%)",
+      "fcy": "金额"
+    },
+    "shipMode": "运输方式",
+    "goodsInfo": {
+      "rowNo": "订单行序号",
+      "settlePath": "结算路径",
+      "declCust": "是否报关",
+      "sampleTire": "是否样品",
+      "fillBox": "是否填箱",
+      "isGift": "是否赠胎",
+      "specificationsName": "规格名称",
+      "figureCode": "花纹编号",
+      "qty": "数量",
+      "quotation": "销售单价",
+      "natUpric": "接单价",
+      "natFcy": "接单金额",
+      "addTaxRate": "税率(%)",
+      "addTaxScy": "税额",
+      "rebateDiscountSinPrice": "返利单价",
+      "rebateDiscountFcy": "返利金额",
+      "freightUpric": "CIF海运费单价",
+      "freightFcy": "CIF海运费金额",
+      "insuranceUpric": "CIF保费单价",
+      "insuranceFcy": "CIF保费金额",
+      "packNum": "装箱量",
+      "boxNum": "箱量",
+      "attestationInfo": "认证信息",
+      "finalPrice": "最终单价",
+      "grossProfit": "毛利",
+      "grossProfitRate": "毛利率",
+      "totalAmount": "金额小计",
+      "totalIncludeTax": "含税总计",
+      "costPrice": "成本价",
+      "facCostPrice": "工厂成本价",
+      "fetTax": "FET税",
+      "detailVatRate": "VAT税率(%)",
+      "detailVietnamVat": "越南增值税",
+      "isSmallBatch": "小批量",
+      "supplierCode": "供应商",
+      "totalFinalPrice": "最终价小计",
+      "rebateDiscountPrice": "年度返利单价",
+      "marketDiscountFcy": "营销返利单价",
+      "claimDiscountFcy": "理赔返利单价",
+      "rebateRate": "年度返利率(%)",
+      "marketRate": "营销返利率(%)",
+      "claimRate": "理赔返利率(%)",
+      "priceWeitRatio": "价重比",
+      "attestation": "认证",
+      "salFcy": "含税单价",
+      "poliDiscountFcy": "接单政策金额",
+      "poliDiscountTotal": "政策总折价金额",
+      "backlogDiscountFcy": "积压胎折价金额",
+      "backlogDiscountTotal": "积压胎总折价"
+    },
+    "clientId": "客户编码",
+    "clientName": "客户名称",
+    "client": "客户",
+    "targetNation": "目的国",
+    "region": "区域",
+    "orderCreateDate": "订单创建日期",
+    "orderNum": "订单号",
+    "orderMonth": "订单月份",
+    "requesetDeliveryDate": "请求交期",
+    "promiseDeliveryDate": "承诺交期",
+    "targetPort": "目的港",
+    "certificateType": "合格证类型",
+    "orderReviewState": "订单审核状态",
+    "plannerTime": "下达计划员时间",
+    "plannerCount": "下达计划员数量",
+    "orderFactoryTime": "下达工厂时间",
+    "orderFactoryCount": "下达工厂数量",
+    "orderFactoryTotalCount": "下达工厂总数量",
+    "assignConfirmDate": "分配确认订单日期",
+    "plannerReviewDate": "计划员审核日期",
+    "num": "数量",
+    "assignNum": "分配数量",
+    "lineNum": "行号",
+    "materialId": "物料编号",
+    "materialGroup": "物料组",
+    "brand": "品牌",
+    "specification": "规格",
+    "tier": "层级",
+    "figure": "花纹",
+    "speedLevel": "速级",
+    "loadIndex": "负荷指数",
+    "remark": "备注",
+    "loadingQuantity": "装箱量",
+    "companyAccount": "公司",
+    "factory": "工厂",
+    "orderQuantity": "订单数量",
+    "satisfiedQuantity": "满足数量",
+    "unsatisfiedQuantity": "不满足数量",
+    "closeOrderQuantity": "订单关闭数量",
+    "shippedGoodsQuantity": "已发运数量",
+    "deliveryOrderMadeQuantity": "已做交货单数量",
+    "noOrderedQuantity": "未下指令数量",
+    "actualSailSchedule": "实际船期",
+    "orderLoadPeriod": "订单交互周期",
+    "orderShippedGoodsPeriod": "订单发运周期",
+    "containerLoad": "箱量",
+    "reasonForRerect": "订单拒绝原因",
+    "currency": "货币",
+    "unitPrice": "单价",
+    "discountRatio": "折扣比例",
+    "packingRequirement": "包装要求",
+    "authentication": "认证",
+    "productionPlanSubmitDate": "生产计划提报日期",
+    "productionPlanPublishDate": "生产计划公布日期",
+    "completeDeliveryCycle": "整单交付周期",
+    "predictGoodsReadyDate": "计划货好日期",
+    "actualGoodsReatyDate": "实际货好日期",
+    "predictTransshipmentDate": "计划行交期",
+    "latestTransshipmentDate": "最新计划行交期",
+    "predictCompleteDeliveryDate": "计划整单交期",
+    "latestCompleteDeliveryDate": "最新计划整单交期",
+    "packingDate": "放箱日期",
+    "closingDate": "截关日期",
+    "portInterceptionDate": "截港日期",
+    "commodityInspectionDate": "商检日期",
+    "deliveryOrderMadeDate": "交货单制单日期",
+    "matchGoodsDate": "对货日期",
+    "vehicleDispactionDate": "派车日期",
+    "actualDeliveryDate": "实际发货日期",
+    "deliveryGoodsConfirmDate": "发货确认日期",
+    "daysUnissuedOfGoodsReady": "货好未发天数",
+    "latestCostTransshipment": "最新行交期-计划行交期间",
+    "otdDetail": "OTD_DETAIL",
+    "latestCostComplete": "最新整单交期-计划整单交期",
+    "orderQuantityChangeSheet": "订单数量变更表",
+    "clientPONum": "客户PO#",
+    "orderDate": "订单日期",
+    "nation": "国家",
+    "originalQuantity": "原始数量",
+    "submittedQuantity": "提报数量",
+    "quantityAfterChange": "更改后数量",
+    "modifiedQuantity": "变动数量",
+    "latestUpdateDate": "最后更改日期",
+    "overseasShipmentWorkbench": {
+      "retailMaking": "零售制单",
+      "DDPMaking": "DDP制单",
+      "shipNo": "出运单号",
+      "totalBoxNum": "合计箱量：",
+      "packingNum": "装箱数量：",
+      "saleOrderStatus": "销售订单状态",
+      "balanceQty": "订单剩余数量",
+      "availableStockQuantity": "可用库存数量",
+      "totalAmount": "合计金额",
+      "msg": {
+        "createItemError": "<br/>{key}：{msg}与目标{billNo} 不一致",
+        "materialItemError": "<br/>商品{key}：合计已分配库存 {allocated} 大于可用库存 {qty} ",
+        "createError": "无法创建海外出运单{msg}",
+        "shipEmpty": "请选择出运单"
+      }
+    },
+    "overseasWaybill": {
+      "overseasWaybill": "海外出运单",
+      "delivery": "送货",
+      "deliveryComplete": "送货完成",
+      "closeOrder": "关闭订单",
+      "overseasNo": "海外出运单号",
+      "salesEmployee": "销售业务员",
+      "salesDept": "销售部门",
+      "salesCompany": "销售公司",
+      "arrivalDate": "到门时间",
+      "buyBoxFee": "买箱费",
+      "destPortFee": "目的港费",
+      "CN1": "CN1",
+      "CN2": "CN2",
+      "shipper": "发货人",
+      "consignee": "收货人",
+      "consigneeAddr": "收货地址",
+      "transactionMethod": "实际成交方式",
+      "feeMethod": "费用方式",
+      "freightCurrency": "运费币种",
+      "freight": "运费",
+      "insuranceCoeffi": "保险系数",
+      "insuranceRate": "保险费率",
+      "insuranceCurrency": "保险币种",
+      "insurance": "保费",
+      "saleOfGoods": "销售商品",
+      "deliveryOrderNum": "交货单号",
+      "goodsValue": "货值",
+      "dnDetail": "明细",
+      "finalAmt": "最终总价",
+      "salePrice": "销售单价(不含税)",
+      "saleAmt": "销售总额(不含税)",
+      "taxPrice": "含税单价",
+      "taxTotalPrice": "含税总价",
+      "taxFcy": "税额",
+      "fetTaxAmt": "FET税额",
+      "vatTaxRate": "VAT税率(%)",
+      "vnTaxRate": "越南增值税率(%)",
+      "total": "合计",
+      "confirm": {
+        "delivery": "确认送货？",
+        "deliveryComplete": "确认送货完成？",
+        "closeOrder": "确认关闭订单？"
+      },
+      "msg": {
+        "arrivalDateEmpty": "请先维护到门时间"
+      }
+    },
+    "shippingDemandOrder": {
+      "shippingDemandOrder": "发货需求订单",
+      "billNo": "单号",
+      "shippingDemandOrderNo": "发货需求订单号",
+      "tradeNationAndRegion": "贸易国别(地区)",
+      "totalNum": "总数量",
+      "currency": "币种",
+      "amount": "金额",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员"
+    },
+    "shippingDemandOrderInfo": {
+      "basicInfo": "基本信息",
+      "basesInfo": "基础信息",
+      "isAutoPack": "分箱方式",
+      "isCompact": "装箱要求",
+      "packMethod": "装箱方式",
+      "saleOfGoods": "销售商品",
+      "copySaleOrder": "拷贝销售订单",
+      "expeShipDate": "期望发货日期",
+      "specifications": "规格型号",
+      "factory": "生产工厂",
+      "qty": "剩余数量",
+      "packQty": "本次分配数量",
+      "loadingQuantity": "装箱量",
+      "splitNum": "本箱分配数量",
+      "splitBoxNum": "本箱分配箱量",
+      "splittingDetails": "分箱明细",
+      "packingDetails": "装箱明细",
+      "boxNo": "分箱号",
+      "addNewBox": "新增分箱",
+      "packQtc": "分箱数量",
+      "allocationGoods": "分配商品",
+      "pickingGoods": "拣配商品",
+      "submitDate": "提报时间",
+      "modifySortTime": "修改排序时间",
+      "sortTime": "排序时间",
+      "msg": {
+        "selectEmpty": "请选择",
+        "selectSaleOrder": "请选择销售订单",
+        "inputBoxNo": "请输入分箱号",
+        "existSameBoxNo": "存在相同箱号",
+        "selectIsCompact": "存在不一致的装箱要求"
+      }
+    },
+    "specialShipmentReview": {
+      "applyNo": "申请单号",
+      "applicant": "申请人",
+      "applicantDepartment": "申请人部门",
+      "billLadingNo": "提单号",
+      "deliveryNo": "发货单号",
+      "waybillNo": "出运单号",
+      "client": "客户",
+      "salesmanDepartment": "业务员部门",
+      "salesman": "业务员",
+      "company": "公司",
+      "ETDstart": "ETD从",
+      "ETDend": "到",
+      "status": "状态",
+      "salesDeliveryOrderNo": "销售发货单号",
+      "fcy": "金额",
+      "ETD": "ETD",
+      "applyingReason": "申请原因",
+      "reasonDetail": "原因明细",
+      "creater": "创建人",
+      "createTime": "创建时间",
+      "updateByName": "修改人",
+      "updateTime": "修改时间",
+      "claimOutOrder": "认领出运单",
+      "msg": {
+        "empty": "请选择特殊发货申请",
+        "repeat": "特殊发货申请不能重复提交",
+        "reasonDetailEmpty": "原因明细为空，无法提交！",
+        "genEmpty": "请选择出运单",
+        "genLimitSameCurCustTMethod": "选择的出运单有客户、币种、成交方式不同的项，无法保存"
+      }
+    },
+    "specialShipmentReviewUpdate": {
+      "specialShipmentReview": "特殊发货申请",
+      "basesInfo": "基础信息",
+      "systemInfo": "系统信息",
+      "currency": "币种",
+      "psMode": "成交方式",
+      "theSystem": "体系",
+      "region": "区域",
+      "nation": "国家",
+      "clientCode": "客户编码",
+      "clientName": "客户名称",
+      "totalExcessFcy": "超授信美元金额",
+      "maxOverdueDay": "最长逾期天数",
+      "totalPrepayShortFcy": "预付款不足总额",
+      "origin": "产地",
+      "totalLcShortFcy": "信用证不足总金额",
+      "deliveryOrderNum": "出运单号",
+      "insufficientlyPrepaidAmount": "预付款金额不足",
+      "overdueAmount": "逾期金额",
+      "quotaType": "额度类型",
+      "excessAmount": "超公司授信金额",
+      "creditBankLimitInsufficient": "是否信用证开证行额度不足",
+      "bankShortfallFcy": "开证行不足金额",
+      "lcNo": "信用证号",
+      "insufficientAmount": "信用证金额不足",
+      "applyDate": "申请时间",
+      "applyMonth": "申请月份",
+      "applyPurpose": "申请目的",
+      "rule": {
+        "applicant": "申请人不能为空",
+        "salCode": "请选择客户后再保存",
+        "salCodeSubmit": "请选择客户保存后再提交审批",
+        "reasonDetail": "出运单特殊发货申请原因明细不能为空",
+        "reasonDetailSubmit": "原因明细为必填项，请保存后再提交审批",
+        "shipNo": "无出运单明细数据，无法保存"
+      }
+    },
+    "stockQuery": {
+      "warehouse": "仓库",
+      "warehouseCode": "仓库编码",
+      "warehouseName": "仓库名称",
+      "warehouseLocation": "仓库地点",
+      "stockDate": "库存日期",
+      "stockOrgCode": "库存组织",
+      "stockQtc": "库存量",
+      "stockUnit": "库存单位",
+      "archiSystem": "体系",
+      "allowOccupancy": "分配数量"
+    },
+    "shippingDetails": {
+      "billDate": "提报日期",
+      "deliveryCycle": "交货周期",
+      "ncOutStockTime": "发货日期",
+      "ncOutStockTimeMonth": "发货月份",
+      "ordCreateTime": "订单制单日期",
+      "contractDate": "订单签约日期",
+      "packReq": "包装要求",
+      "dnBoxNum": "装箱量",
+      "loadingNum": "箱量",
+      "salePrice": "最终单价",
+      "saleAmt": "金额",
+      "mainSingleWeight": "主数据单重",
+      "singleWeight": "单重",
+      "totalWeight": "重量",
+      "dnBillNo": "出库单号",
+      "customsNo": "报关单号",
+      "preShipDate": "船期",
+      "actualShipDate": "实际船期",
+      "tmsQfCode": "铅封号",
+      "tmsBoxPiWeightNum": "箱皮重",
+      "invoiceNo": "发票号",
+      "beforeFactory": "发货仓库",
+      "documentDate": "制单日期",
+      "creatorName": "出口单证制单人",
+      "shipBillNo": "出运单号",
+      "coNo": "CO号",
+      "coSignDate": "CO签发日期",
+      "quotoTableStand": "定额表标准",
+      "oriCert": "原产地证",
+      "rebateDiscountPrice": "年度返利单价",
+      "marketDiscountFcy": "营销返利单价",
+      "claimDiscountFcy": "理赔返利单价",
+      "poliDiscountFcy": "政策折价金额",
+      "backlogDiscountFcy": "积压胎折价金额",
+      "totalQuotationFcy": "CRM报价"
+    }
+  },
+  "setting": {
+    "title": "系统布局配置",
+    "theme": "主题色",
+    "tagsView": "开启 Tags-View",
+    "fixedHeader": "固定 Header",
+    "sidebarLogo": "侧边栏 Logo"
+  },
+  "tabTitle": {
+    "mainPage": "首页",
+    "personalCenter": "个人中心",
+    "custSupplier": {
+      "add": "客商-添加",
+      "info": "客商-详情"
+    },
+    "saleOrder": {
+      "info": "销售订单-详情"
+    },
+    "shippingDemandOrder": {
+      "info": "发货需求订单-详情"
+    },
+    "specialShipmentReview": {
+      "info": "特殊发货申请-详情"
+    },
+    "deliveryOrder": {
+      "history": "交货单-变更记录"
+    },
+    "outwardWaybill": {
+      "add": "出口出运单-新增",
+      "info": "出口出运单-详情"
+    },
+    "feeReplenish": {
+      "add": "订舱费用补充-新增"
+    },
+    "exportChargesPaymentApplication": {
+      "add": "出口费用付款申请-新增",
+      "info": "出口费用付款申请-详情"
+    },
+    "checkGoods": {
+      "info": "对货信息-详情"
+    },
+    "tempAccountPeriodAppl": {
+      "add": "临时账期申请-新增",
+      "info": "临时账期申请-详情"
+    },
+    "exportDocument": {
+      "info": "出口单证-详情"
+    },
+    "originCertificate": {
+      "add": "原产地证-新增",
+      "info": "原产地证-详情"
+    },
+    "statementAccount": {
+      "info": "对账单-详细"
+    },
+    "lineOfCredit": {
+      "add": "授信额度-添加",
+      "info": "授信额度-编辑",
+      "history": "授信额度-历史"
+    },
+    "reciveMoneyRecord": {
+      "add": "新增客户收款"
+    },
+    "exchangeOccupation": {
+      "query": "预付款占用查询"
+    },
+    "clientSettleAccountRecord": {
+      "query": "清账记录查询"
+    },
+    "letterCredit": {
+      "add": "信用证-新增",
+      "info": "信用证-详情"
+    },
+    "unbindLetterCredit": {
+      "add": "信用证解绑申请-新增",
+      "info": "信用证解绑申请-详情"
+    },
+    "bdGoods": {
+      "info": "商品-详细"
+    }
+  },
+  "tagsView": {
+    "refresh": "刷新",
+    "close": "关闭",
+    "closeOthers": "关闭其它",
+    "closeAll": "关闭所有"
+  },
+  "tire": {
+    "brand": "品牌",
+    "spec": "规格",
+    "specDesc": "规格型号",
+    "level": "层级",
+    "figure": "花纹",
+    "expressLevel": "速度等级",
+    "expressLevel2": "速级",
+    "loadIndex": "负荷指数",
+    "loadIndex2": "指数",
+    "factory": "工厂",
+    "speedIndex": "速度指数"
+  }
+}

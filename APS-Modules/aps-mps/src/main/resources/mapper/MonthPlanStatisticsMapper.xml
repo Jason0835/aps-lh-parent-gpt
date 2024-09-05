@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.MonthPlanStatisticsMapper">
+	<!-- 更新月度计划的实际超欠产 -->
+	<update id="updateActualOverProduction">
+		<![CDATA[
+		MERGE INTO T_MDM_MONTH_PROD_PLAN a
+		USING (SELECT M.MATERIAL_CODE,
+				      M.MONTH_PLAN_APS_VERSION,
+			          NVL(F.FINISH_QTY, 0) -
+			          (NVL(M.ACTUAL_ARRANGEMENT, 0) + NVL(S.PLAN_MODIFY_QTY, 0) +
+			           NVL(S.SAP_BAD_QTY, 0) - NVL(S.LAST_MONTH_STOCK, 0)) ACTUAL_OVER_PRODUCTION
+				 FROM (SELECT P.MATERIAL_CODE,
+				              MAX(P.MONTH_PLAN_APS_VERSION) MONTH_PLAN_APS_VERSION,
+				              NVL(SUM(P.ACTUAL_ARRANGEMENT), 0) ACTUAL_ARRANGEMENT
+				         FROM T_MDM_MONTH_PROD_PLAN P
+				        INNER JOIN T_MDM_MONTH_PLAN_MAIN M
+				           ON P.MONTH_PLAN_APS_VERSION = M.MONTH_PLAN_APS_VERSION
+				        WHERE M.YEAR = #{year}
+				          AND M.MONTH = #{month}
+				          AND M.DEL_FLAG = '0'
+				          AND P.DEL_FLAG = '0'
+				          AND M.IS_FINALIZED = '0'	/*只有定稿需要处理*/
+				        GROUP BY P.MATERIAL_CODE) M
+				 LEFT JOIN T_CX_MONTH_PLAN_SURPLUS S
+				   ON S.MONTH_PLAN_APS_VERSION = M.MONTH_PLAN_APS_VERSION
+				  AND S.SAP_CODE = M.MATERIAL_CODE
+				  AND DEL_FLAG = '0'
+				 LEFT JOIN (SELECT SAP_CODE,
+				                   SUM(NVL(DAY_FINISH_QTY, 0)) FINISH_QTY
+				              FROM T_LH_DAY_FINISH_QTY T
+				             WHERE FINISH_DATE BETWEEN #{startDate} AND
+				                   #{endDate}
+				               AND IS_DELETE = '0'
+				             GROUP BY SAP_CODE) F
+				   ON M.MATERIAL_CODE = F.SAP_CODE) B
+		ON (A.MATERIAL_CODE = B.MATERIAL_CODE AND A.MONTH_PLAN_APS_VERSION = B.MONTH_PLAN_APS_VERSION)
+		WHEN MATCHED THEN
+		  UPDATE SET ACTUAL_OVER_PRODUCTION = B.ACTUAL_OVER_PRODUCTION
+		]]>
+	</update>
+</mapper>

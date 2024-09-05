@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('主子表提交')"/>
+    <th:block th:include="include :: datetimepicker-css" />
+</head>
+<body class="gray-bg">
+<div class="main-content">
+    <form id="form-add" class="form-horizontal" th:object="${lhApsMoldAdjustPlan}">
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-4 control-label is-required">[[#{ui.data.column.lhApsMoldAdjustPlan.lhMachineCode}]]：</label>
+                    <div class="col-sm-8">
+                        <select id="lhMachineCode" name="lhMachineCode" class="form-control" th:with="type=${@lh.getMachineInfo('0')}">
+                            <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
+                                    th:value="${machineInfo.machineCode}" th:field="*{lhMachineCode}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{ui.data.column.lhApsMoldAdjustPlan.planDate}]]：</label>
+                    <div class="col-sm-8">
+                        <div class="input-group date">
+                            <input name="planDate"
+                                   th:value="${#dates.format(lhApsMoldAdjustPlan.planDate, 'yyyy-MM-dd')}"
+                                   class="form-control" placeholder="yyyy-MM-dd" type="text" autocomplete="off" required>
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4">[[#{ui.data.column.lhApsMoldAdjustPlan.detail}]]</h4>
+        <div class="row">
+            <div class="col-sm-12">
+                <button type="button" class="btn btn-white btn-sm" onclick="addColumn()"><i class="fa fa-plus">
+                    [[#{ui.frame.btn.add}]]</i>
+                </button>
+                <button type="button" class="btn btn-white btn-sm" onclick="delColumn()"><i class="fa fa-minus">
+                    [[#{ui.frame.btn.delete}]]</i></button>
+                <div class="col-sm-12 select-table table-striped">
+                    <table id="bootstrap-table"></table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: datetimepicker-js" />
+<script th:src="@{/js/jquery.tmpl.js}"></script>
+<script th:inline="javascript">
+    var changeTypeDatas = [[${@dict.getType('MOLD_CHANGE_TYPE')}]];
+    var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+    var prefix = ctx + "lh/lhApsMoldAdjustPlan";
+
+    $(function () {
+        var options = {
+            pagination: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            sidePagination: "client",
+            columns: [
+                {
+                    checkbox: true,
+                    widthUnit: '%',
+                    width: 1,
+                },
+                {
+                    field: 'index',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 1,
+                    title: [[#{ui.data.column.scheduleResult.no}]],
+                    formatter: function (value, row, index) {
+                        var columnIndex = $.common.sprintf("<input type='hidden' name='index' value='%s'>", $.table.serialNumber(index));
+                        return columnIndex + $.table.serialNumber(index);
+                    }
+                },
+                {
+                    field: 'changeMoldTime',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.changeMoldTime}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].changeMoldTime' name='apsMoldAdjustPlanList[%s].changeMoldTime' class='form-control' placeholder='yyyy-MM-dd HH:mm' type='text' value='%s' autocomplete='off'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'changeType',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.changeType}]],
+                    formatter: function (value, row, index) {
+                        var html = getChangeTypeHtml(index, value, changeTypeDatas);
+                        return html;
+                    }
+                },
+                {
+                    field: 'beforeSapCode',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.beforeSapCode}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].beforeSapCode' name='apsMoldAdjustPlanList[%s].beforeSapCode' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'beforeEmbryoCode',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.beforeEmbryoCode}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].beforeEmbryoCode' name='apsMoldAdjustPlanList[%s].beforeEmbryoCode' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'tireRoughStock',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.tireRoughStock}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].tireRoughStock' name='apsMoldAdjustPlanList[%s].tireRoughStock' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'useMoldNumber',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 5,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.useMoldNumber}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].useMoldNumber' name='apsMoldAdjustPlanList[%s].useMoldNumber' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'leftRightMold',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 5,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.leftRightMold}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].leftRightMold' name='apsMoldAdjustPlanList[%s].leftRightMold' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'afterSapCode',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.afterSapCode}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].afterSapCode' name='apsMoldAdjustPlanList[%s].afterSapCode' class='form-control' type='text' value='%s' required>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'afterEmbryoCode',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.afterEmbryoCode}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].afterEmbryoCode' name='apsMoldAdjustPlanList[%s].afterEmbryoCode' class='form-control' type='text' value='%s' required>", index, index, value);
+                        return html;
+                    }
+                },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 10,
+                    title: [[#{ui.common.column.remark}]],
+                    formatter: function (value, row, index) {
+                        var html = $.common.sprintf("<input id='apsMoldAdjustPlanList[%s].remark' name='apsMoldAdjustPlanList[%s].remark' class='form-control' type='text' value='%s'>", index, index, value);
+                        return html;
+                    }
+                }
+            ]
+        };
+        $.table.init(options);
+    });
+
+    $(function () {
+        addColumn();
+    })
+
+    function addColumn() {
+        let data = $("#bootstrap-table").bootstrapTable('getData');
+        if (data.length === 2) {
+            $.modal.alertWarning([[#{ui.data.message.lhApsMoldAdjustPlan.atMostTwoRecord}]]);
+            return ;
+        }
+        var row = {
+            changeMoldTime: "",
+            changeType: "",
+            beforeSapCode: "",
+            beforeEmbryoCode: "",
+            tireRoughStock: "",
+            useMoldNumber: "",
+            leftRightMold: "",
+            afterSapCode: "",
+            afterEmbryoCode: "",
+            remark: "",
+        }
+        sub.addColumn(row);
+    }
+
+    function delColumn() {
+        if ($("#bootstrap-table").bootstrapTable('getData').length === 1) {
+            $.modal.alertWarning([[#{ui.data.message.lhApsMoldAdjustPlan.atLeastOneRecord}]]);
+            return ;
+        }
+        sub.delColumn();
+    }
+
+    function getChangeTypeHtml(index, value, datas) {
+        var actions = [];
+        var startSelectHtml = $.common.sprintf("<select id='apsMoldAdjustPlanList[%s].changeType' name='apsMoldAdjustPlanList[%s].changeType' class='form-control'>", index, index);
+        actions.push(startSelectHtml);
+        $.each(datas, function (index, dict) {
+            var dictLabel;
+            var html2;
+            if (dict.dictValue == value) {
+                dictLabel = $.common.isEmpty(dict.dictLabel) ? "" : dict.dictLabel;
+                html2 = $.common.sprintf("<option value='%s' selected>%s</option>", dict.dictValue, dictLabel);
+                actions.push(html2);
+            }else{
+                dictLabel = $.common.isEmpty(dict.dictLabel) ? "" : dict.dictLabel;
+                html2 = $.common.sprintf("<option value='%s'>%s</option>", dict.dictValue, dictLabel);
+                actions.push(html2);
+            }
+        })
+        var endSelectHtml = "</select></div>";
+        actions.push(endSelectHtml);
+        return actions.join('');
+    }
+
+    $("input[name='planDate']").datetimepicker({
+        format: "yyyy-mm-dd",
+        minView: "month",
+        autoclose: true
+    });
+
+    $("#bootstrap-table").on("post-body.bs.table", function (e, args) {
+        $("input[name$='changeMoldTime']").datetimepicker({
+            format: "yyyy-mm-dd hh:ii:00",
+            autoclose: true,
+            pickerPosition:'top-right'
+        });
+    });
+
+    /* 主子表-提交 */
+    function submitHandler(index, layero) {
+        if ($.validate.form()) {
+            let data = $('#form-add').serializeArray();
+            let lhMachineName = $('#lhMachineCode option:selected').text();
+            data.push({name: 'lhMachineName', value: lhMachineName});
+            var config = {
+                url: prefix + "/checkIsRequired",
+                type: "post",
+                dataType: "json",
+                data: data,
+                success: function (result) {
+                    if(result.code === web_status.SUCCESS){
+                        $.operate.save(prefix + "/addSubData", data);
+                    }else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            };
+            $.ajax(config)
+        }
+    }
+</script>
+</body>
+<style>
+    .input-group.date label.error {
+        z-index: 99;
+        right: 45px;
+    }
+    td{
+        position: relative;
+    }
+    td label.error {
+        position: absolute;
+        right: 14px;
+        top: -10px;
+        color: #ef392b;
+        font-size: 12px;
+        z-index: 99;
+        margin-top: 24px;
+    }
+</style>
+</html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd90.mapper.Cd90QuotaSettingMapper">
+
+    <resultMap type="com.zlt.aps.cd90.api.domain.dto.Cd90QuotaSettingDto" id="quotaSettingResult">
+        <result property="id" column="id"/>
+        <result property="clothCode" column="cloth_code"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="machineName" column="machine_name"/>
+        <result property="quota" column="quota"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectCd90QuotaSettingVo">
+        select id, cloth_code, machine_id, quota, create_by, create_time, update_by, update_time, del_flag, remark from t_cd90_quota_setting
+    </sql>
+
+    <select id="selectQuotaSettingList" parameterType="com.zlt.aps.cd90.entity.Cd90QuotaSetting"
+            resultType="com.zlt.aps.cd90.api.domain.dto.Cd90QuotaSettingDto">
+        select * from (
+        SELECT
+        a.*,
+        b.MACHINE_NAME
+        FROM
+        T_CD90_QUOTA_SETTING a
+        LEFT JOIN T_CD90_MACHINE_INFO b
+        ON a.MACHINE_ID = b.ID
+        WHERE
+        a.del_flag = '0'
+        <if test="clothCode != null and clothCode != ''">
+            and INSTR(cloth_code, #{clothCode,jdbcType=VARCHAR}) > 0
+          </if>
+        <if test="machineId != null ">and a.machine_id = #{machineId}</if>
+        <if test="quota != null ">and a.quota = #{quota}</if>
+        <if test="orderStr == null">
+            order by a.CREATE_TIME desc
+        </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+
+    </select>
+
+    <select id="selectQuotaSettingById" parameterType="Long" resultMap="quotaSettingResult">
+        <include refid="selectCd90QuotaSettingVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.cd90.entity.Cd90QuotaSetting" resultMap="quotaSettingResult">
+        <include refid="selectCd90QuotaSettingVo"/>
+        where del_flag = '0'
+        <if test="id != null and id != ''">and id != #{id}</if>
+        <if test="machineId == null or machineId ==''">and machine_id is null</if>
+        <if test="machineId != null and machineId !=''">and machine_id = #{machineId,jdbcType=DECIMAL}</if>
+        <if test="clothCode == null or clothCode == ''">and cloth_code is null</if>
+        <if test="clothCode != null and clothCode != ''">and cloth_code = #{clothCode,jdbcType=VARCHAR}</if>
+    </select>
+
+    <delete id="deleteCd90QuotaSettingByIds" parameterType="long">
+        update t_cd90_quota_setting set del_flag = 1 where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_CD90_QUOTA_SETTING a USING (
+        <foreach collection="list" item="QuotaSetting" separator=" union ">
+            select
+            #{QuotaSetting.clothCode,jdbcType=VARCHAR} CLOTH_CODE,
+            #{QuotaSetting.machineId,jdbcType=DOUBLE} machine_id,
+            #{QuotaSetting.quota,jdbcType=DOUBLE} quota,
+            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
+            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
+            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
+            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        ((b.CLOTH_CODE is null and a.CLOTH_CODE is null) or (a.CLOTH_CODE = b.CLOTH_CODE))
+        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.quota = b.quota,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.CLOTH_CODE, a.machine_id, a.quota, a.create_by, a.create_time, a.remark, a.del_flag) values
+        (SEQ_QUOTA_SETTING.NEXTVAL, b.CLOTH_CODE, b.machine_id, b.quota, b.create_by, sysdate, b.remark, '0')
+    </update>
+
+</mapper>

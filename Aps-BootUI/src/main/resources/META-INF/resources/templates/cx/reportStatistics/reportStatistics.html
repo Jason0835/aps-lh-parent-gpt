@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('报表统计')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="startTime" th:value="${initDate}"
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                            <span style='color: black;'>-</span>
+                            <input type="text" class="time-input" id="endTime" th:value="${initDate}"
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.reportStatistics.statisticalMethod}]]：</label>
+                            <select class="form-control" name="statisticalMethod">
+                                <option value="1">[[#{ui.data.column.reportStatistics.everyDay}]]</option>
+                                <option value="2">[[#{ui.data.column.reportStatistics.summary}]]</option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cx:reportStatistics:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-table-reorder-columns-js"/>
+<th:block th:include="include :: bootstrap-table-resizable-js"/>
+<script th:inline="javascript">
+    var PROCEDURE_CODE = [[${@dict.getType('PROCEDURE_CODE')}]];
+    var prefix = ctx + "cx/reportStatistics";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.reportStatistics.modelName}]],
+            pagination: true,
+            pageSize: 10000,
+            pageList: [10000],
+            columns: [
+                [
+                    {
+                        title: [[#{ui.data.column.reportStatistics.title}]],
+                        align: 'center',
+                        colspan: 11
+                    }
+                ],
+                [
+                    {
+                        checkbox: true,
+                        visible: false
+                    },
+                    {
+                        field: 'scheduleDate',
+                        title: [[#{ui.data.column.scheduleResult.scheduleDate}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                    },
+                    {
+                        field: 'procedureCode',
+                        title: [[#{ui.data.column.reportStatistics.procedureCode}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        formatter: function (value, row, index) {
+                            return getDictLabel(PROCEDURE_CODE, value);
+                        },
+                    },
+                    {
+                        field: 'planProductionQty',
+                        title: [[#{ui.data.column.reportStatistics.planProductionQty}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'actualProductionQty',
+                        title: [[#{ui.data.column.reportStatistics.actualProductionQty}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'produceFinishRate',
+                        title: [[#{ui.data.column.reportStatistics.produceFinishRate}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        formatter: function (value, row, index) {
+                            if ($.common.isNotEmpty(value)) {
+                                return value + '%';
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'actualProFinishRateLow',
+                        title: [[#{ui.data.column.reportStatistics.actualProFinishRateLow}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'actualProFinishRateMid',
+                        title: [[#{ui.data.column.reportStatistics.actualProFinishRateMid}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'actualProFinishRateHigh',
+                        title: [[#{ui.data.column.reportStatistics.actualProFinishRateHigh}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'shiftPlanAccuracy',
+                        title: [[#{ui.data.column.reportStatistics.shiftPlanAccuracy}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                    {
+                        field: 'totalSpecifications',
+                        title: [[#{ui.data.column.reportStatistics.totalSpecifications}]],
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                    },
+                ]
+            ]
+        };
+        $.table.init(options, false);
+    });
+    
+    function getDictLabel(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        if (value == -1) {
+            return $.common.sprintf("<span>%s</span>", [[#{ui.data.column.reportStatistics.halfParts}]]);
+        }
+        $.each(datas, function(index, dict) {
+            if (dict.dictValue == ('' + value)) {
+                var listClass = $.common.equals("default", dict.listClass) || $.common.isEmpty(dict.listClass) ? "" : "badge badge-" + dict.listClass;
+                actions.push($.common.sprintf("<span class='%s'>%s</span>", listClass, dict.dictLabel));
+                return false;
+            }
+        });
+        if (actions.length === 0) {
+            actions.push($.common.sprintf("<span>%s</span>", [[#{ui.data.column.reportStatistics.halfParts}]]));
+        }
+        return actions.join('');
+    }
+</script>
+</body>
+<style>
+    .pagination-detail{margin-top: 0px !important;margin-bottom: 0px !important;}
+    .select-table{padding-bottom: 0px !important;}
+</style>
+</html>

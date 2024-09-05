@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.kettle.mapper.KettleBizLogMapper">
+
+    <resultMap type="JobRecord" id="JobRecordResult">
+        <id property="id" column="id"/>
+        <result property="recordJobId" column="record_job_id"/>
+        <result property="startTime" column="start_time"/>
+        <result property="stopTime" column="stop_time"/>
+        <result property="recordStatus" column="record_status"/>
+        <result property="logFilePath" column="log_file_path"/>
+        <result property="delFlag" column="del_flag"/>
+
+        <result property="taskName" column="task_name"/>
+        <result property="categoryId" column="category_id"/>
+
+    </resultMap>
+
+    <resultMap type="TransRecord" id="TransRecordResult">
+        <id property="id" column="id"/>
+        <result property="recordTransId" column="record_trans_id"/>
+        <result property="startTime" column="start_time"/>
+        <result property="stopTime" column="stop_time"/>
+        <result property="recordStatus" column="record_status"/>
+        <result property="logFilePath" column="log_file_path"/>
+        <result property="delFlag" column="del_flag"/>
+
+        <result property="taskName" column="task_name"/>
+        <result property="categoryId" column="category_id"/>
+    </resultMap>
+
+    <select id="getJobRecordList" parameterType="JobRecord" resultMap="JobRecordResult">
+        select i.task_name, i.category_id, t.*
+          from K_JOB_RECORD t
+          left join K_TASK_INFO i
+            on t.record_job_id = i.id
+           and i.task_type = '0'
+         where t.del_flag = 0
+           and i.del_flag = '0'
+           and rownum &lt; 1000
+    </select>
+
+    <select id="getTransRecordList" resultMap="TransRecordResult" parameterType="TransRecord">
+        select i.task_name, t.*
+          from K_TRANS_RECORD t
+          left join K_TASK_INFO i
+            on t.record_trans_id = i.id
+           and i.task_type = '1'
+         where t.del_flag = 0
+           and i.del_flag = '0'
+           and rownum &lt; 1000
+    </select>
+
+</mapper>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.mapper.MaintenanceLogMapper">
+
+    <select id="listMaintenanceLog" resultType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
+        SELECT ID, OPER_TYPE, PROCEDURE_CODE, OPER_STATUS, OPER_REASON, REMARK, CREATE_BY, CREATE_TIME
+        FROM T_MAINTENANCE_LOG
+        WHERE 1=1
+        <if test="operType != null and operType != ''">and OPER_TYPE = #{operType}</if>
+        <if test="procedureCode != null and procedureCode != ''">and PROCEDURE_CODE = #{procedureCode}</if>
+        <if test="createBy != null and createBy != ''"> and INSTR(CREATE_BY, #{createBy}) > 0</if>
+        <if test="startTime != null  and startTime != ''"> and CREATE_TIME &gt;= to_date(#{startTime},'yyyy-mm-dd')</if>
+        <if test="endTime != null  and endTime != ''"> and CREATE_TIME &lt;= to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')</if>
+
+        <if test="orderStr == null">order by CREATE_TIME desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <update id="deleteSchedulePublishRecord" parameterType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
+        update t_schedule_publish_record
+        set DEL_FLAG = '1'
+        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+        and PROCEDURE_CODE = #{procedureCode}
+    </update>
+
+    <update id="updateScheduleReleaseStatus" parameterType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
+        <if test="procedureCode == '0'.toString()">update t_lh_schedule_result </if>
+        <if test="procedureCode == '1'.toString()">update t_cx_schedule_result </if>
+        <if test="procedureCode == '2'.toString()">update t_tm_schedule_result </if>
+        <if test="procedureCode == '3'.toString()">update t_tc_schedule_result </if>
+        <if test="procedureCode == '4'.toString()">update t_nc_schedule_result </if>
+        <if test="procedureCode == '5'.toString()">update t_tq_schedule_result </if>
+        <if test="procedureCode == '6'.toString()">update t_gsq_schedule_result </if>
+        <if test="procedureCode == '7'.toString()">update t_cd15_schedule_result </if>
+        <if test="procedureCode == '8'.toString()">update t_cd90_schedule_result </if>
+        <if test="procedureCode == '9'.toString()">update t_gdyy_schedule_result </if>
+        <if test="procedureCode == '10'.toString()">update t_xwyy_schedule_result </if>
+        set IS_RELEASE = '0', PUBLISH_SUCCESS_COUNT = 0, NEWEST_PUBLISH_TIME = null
+        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+    </update>
+
+    <update id="deleteSchedule" parameterType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
+        <if test="procedureCode == '0'.toString()">update t_lh_schedule_result r </if>
+        <if test="procedureCode == '1'.toString()">update t_cx_schedule_result r </if>
+        <if test="procedureCode == '2'.toString()">update t_tm_schedule_result r </if>
+        <if test="procedureCode == '3'.toString()">update t_tc_schedule_result r </if>
+        <if test="procedureCode == '4'.toString()">update t_nc_schedule_result r </if>
+        <if test="procedureCode == '5'.toString()">update t_tq_schedule_result r </if>
+        <if test="procedureCode == '6'.toString()">update t_gsq_schedule_result r </if>
+        <if test="procedureCode == '7'.toString()">update t_cd15_schedule_result r </if>
+        <if test="procedureCode == '8'.toString()">update t_cd90_schedule_result r </if>
+        <if test="procedureCode == '9'.toString()">update t_gdyy_schedule_result r </if>
+        <if test="procedureCode == '10'.toString()">update t_xwyy_schedule_result r </if>
+        set DEL_FLAG = '1'
+        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+        <if test="procedureCode == '0'.toString()">
+            <if test="sapCode != null and sapCode != ''">and SAP_CODE = #{sapCode}</if>
+            <if test="machineId != null">and exists (select 1 from t_lh_machine_info m where m.MACHINE_CODE = r.LH_MACHINE_CODE and m.id=#{machineId})</if>
+        </if>
+        <if test="procedureCode == '1'.toString()">
+            <if test="sapCode != null and sapCode != ''">and EMBRYO_CODE = #{materialCode}</if>
+            <if test="materialCode != null and materialCode != ''">and SAP_CODE = #{sapCode}</if>
+            <if test="machineId != null">and exists (select 1 from t_cx_machine_info m where m.MACHINE_CODE = r.CX_MACHINE_CODE and m.id=#{machineId})</if>
+        </if>
+        <if test="procedureCode == '2'.toString()">
+            <if test="materialCode != null and materialCode != ''">and TREAD_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '3'.toString()">
+            <if test="materialCode != null and materialCode != ''">and SIDEWALL_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '4'.toString()">
+            <if test="materialCode != null and materialCode != ''">and LINING_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '5'.toString()">
+            <if test="materialCode != null and materialCode != ''">and BEAD_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '6'.toString()">
+            <if test="materialCode != null and materialCode != ''">and STEEL_RING_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '7'.toString()">
+            <if test="materialCode != null and materialCode != ''">and STEEL_STRIP_CODE1 = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '8'.toString()">
+            <if test="materialCode != null and materialCode != ''">and CLOTH_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+        <if test="procedureCode == '9'.toString()">
+            <if test="materialCode != null and materialCode != ''">and BIG_ROLL_CODE = #{materialCode}</if>
+        </if>
+        <if test="procedureCode == '10'.toString()">
+            <if test="materialCode != null and materialCode != ''">and BIG_ROLL_CODE = #{materialCode}</if>
+            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+        </if>
+    </update>
+
+    <select id="listMachineByProcedure" resultType="com.zlt.aps.tm.api.domain.dto.MachineDto">
+        <if test="procedureCode == '0'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_LH_MACHINE_INFO
+            where DEL_FLAG='0'
+                  <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '1'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_CX_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '2'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_TM_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '3'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_TC_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '4'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_NC_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '5'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_TQ_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '6'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_GSQ_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '7'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_CD15_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '8'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_CD90_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+
+        <if test="procedureCode == '10'.toString()">
+            select id,MACHINE_CODE,MACHINE_NAME,#{procedureCode} PROCEDURE_CODE from T_XWYY_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="machineId != null">and id = #{machineId}</if>
+            order by MACHINE_NAME
+        </if>
+    </select>
+</mapper>

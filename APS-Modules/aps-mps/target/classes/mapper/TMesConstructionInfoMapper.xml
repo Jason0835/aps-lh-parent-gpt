@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TMesConstructionInfoMapper">
+
+	<!-- 查询施工表字段映射配置列表 -->
+    <select id="selectTPlmBomConstructionMapping" resultType="com.zlt.aps.mps.domain.TMesConstructionMapping">
+		SELECT T.CONSTRUCTION_COLUMN COLUMN_NAME, 
+		       T.REGULAR_EXPRESSION, 
+		       T.ERROR_TIPS
+		  FROM T_PLM_BOM_CONSTRUCTION_MAPPING T
+		 WHERE IS_DELETE = '0'
+		   AND CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，因此需要过滤掉 -->
+		   'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不需要解析到施工表，而是在硫化施工表单独解析，因此需要过滤掉 -->
+		   'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+    </select>
+    
+    <select id="selectModifyPlmBomInfo" resultType="com.zlt.aps.mps.domain.TMesPlmBomInfo">
+		<!-- 根据使用的数据版本号到Bom表或者PLM表获取本次修改的胎胚ID列表 -->
+		 SELECT DISTINCT ID, REGEXP_SUBSTR(CURRENT_CHILD_CODE, '\w+') EMBRYO_CODE
+		    FROM (SELECT T.ID                       ID,
+		                 T.CHILD_CODE               CURRENT_CHILD_CODE,
+		                 T.CHILD_MATERIAL_VERSION,
+		                 T.CHILD_MATERIAL_NAME_CODE CURRENT_MATERIAL_NAME_CODE
+		            FROM T_BOM_INFO T
+		          /* 以待修改节点作为根节点，向上回溯，反过来找到胎胚 */
+       	<choose>
+       		<when test="bomDataVersion != null and bomDataVersion != ''">
+		           START WITH T.CHILD_MATERIAL_NAME_CODE IS NOT NULL
+		                  AND T.ID IN
+		                      (SELECT ID
+		                         FROM T_MES_BOM_INFO
+		                        WHERE DATA_VERSION = #{bomDataVersion})
+		  	</when>
+	        <otherwise>
+		           START WITH T.CHILD_MATERIAL_CODE IN
+		                      (SELECT SAP_CODE
+		                         FROM T_MES_PLM_CONSTRUCTION_INFO
+		                        WHERE DATA_VERSION = #{plmDataVersion})
+		  	</otherwise>
+	    </choose>
+		          CONNECT BY PRIOR T.PARENT_MATERIAL_CODE = T.CHILD_MATERIAL_CODE
+		             AND (PRIOR T.BOM_VERSION = T.CHILD_MATERIAL_VERSION
+		             AND T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		             OR T.CHILD_MATERIAL_NAME_CODE != 'EMBRYO'
+		             ))
+		   WHERE CURRENT_MATERIAL_NAME_CODE = 'EMBRYO' /* 仅保留胎胚层级 */
+		     AND CHILD_MATERIAL_VERSION IS NOT NULL
+    </select>
+
+	<!-- 解析bom表，关联plm参数表与施工表字段映射配置表，抓取本次同步需要更新施工表哪个胎胚号的数据 -->
+	<!-- 由于一条胎胚的更新数据有可能分成几个版本发送过来，如果胎胚层（第一层）延迟发送会导致先发送过来的栏位更新会被忽略掉
+		  因此每次更新都将该胎胚的所有字段刷新一边 -->
+    <select id="selectTMesConstructionInfo" resultType="com.zlt.aps.mps.domain.TMesConstructionInfo">
+		WITH TEMP_TAB AS
+		<!--=======================树解析start===================-->
+		<!-- 将bom表解析成树结构，每一个胎胚一棵树 -->
+		 (SELECT CONNECT_BY_ROOT REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		         CONNECT_BY_ROOT CHILD_MATERIAL_VERSION EMBRYO_VERSION,
+		         CONNECT_BY_ROOT T.SAP_VERSION SAP_VERSION,
+		         CONNECT_BY_ROOT T.PRODUCTION_STAGE_CODE PRODUCTION_STAGE_CODE,
+		         <!-- 父节点的物料名称编号，用于识别字段映射关系，通过解析树结构获取每一层的物料名称编号，通过截取获取上一层的编号 -->
+		         CASE
+		           WHEN CHILD_MATERIAL_NAME_CODE IS NULL THEN
+		            NULL
+		           ELSE
+		            SUBSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE, '/'),
+		                           '/' || CHILD_MATERIAL_NAME_CODE),
+		                   INSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE,
+		                                                     '/'),
+		                                 '/' || CHILD_MATERIAL_NAME_CODE),
+		                         '/',
+		                         -1) + 1)
+		         END PARENT_MATERIAL_NAME_CODE,
+		         <!-- 从根节点到当前节点的ID序列，用于确认最操作 -->
+		         SYS_CONNECT_BY_PATH(id, '/') ID_PATH,
+		         SYS_CONNECT_BY_PATH(NVL(status, '1'), '/') status_PATH,
+		         CHILD_MATERIAL_NAME_CODE,
+		         CHILD_MATERIAL_CODE,
+		         CHILD_CODE,
+		         BOM_VERSION,
+		         PARENT_MATERIAL_CODE,
+		         PARENT_CODE,
+		         <!-- 数据时间相关字段，用于去重 -->
+		         NVL(T.MES_UPDATE_DATE, T.MES_CREATE_DATE)        UPDATE_DATE,
+		         NVL(T.MES_CREATE_DATE, T.MES_UPDATE_DATE)        CREATE_DATE,
+		         T.CHILD_MATERIAL_VERSION,
+         		 NVL(STATUS, 1) STATUS,
+		         T.DOSAGE,
+		         T.ID
+		    FROM T_BOM_INFO T
+		    <!-- 仅解析正常状态的数据，bom信息要求Mes将重复数据处理掉再提供，modify by 20220107 -->
+		   WHERE NVL(T.STATUS, 0) != '3'
+		<!-- 树解析方式：
+				以修改节点为根节点
+				父节点的CHILD_MATERIAL_CODE = 子节点的PARENT_MATERIAL_CODE
+				父节点的CHILD_MATERIAL_VERSION = 子节点的BOM_VERSION
+				根节点的数据状态只要正常：不等于3的都是正常数据
+		  -->
+		   START WITH T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+                  AND NVL(T.STATUS, 0) != '3'
+                  AND T.CHILD_MATERIAL_VERSION IS NOT NULL
+		          AND T.ID IN 
+		       <foreach item="id" collection="ids" open="(" separator="," close=")">
+		           #{id}
+		       </foreach>
+		<!-- 胎胚层去重，先按sap版本号第一个字符排序，（字符顺序）较小的优先级更高（0 > C > Z）；
+				再按sap版本号第二个字符后的数字排序（可能有多位，要用数字比较大小），较大的优先级更高；
+				最后看更新时间，较晚的优先级更高
+		  -->
+		          AND NOT EXISTS
+		   (SELECT 1
+		                 FROM T_BOM_INFO TT
+		                WHERE T.CHILD_MATERIAL_CODE = TT.CHILD_MATERIAL_CODE
+		                  AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+				          AND TT.ID IN 
+				       <foreach item="id" collection="ids" open="(" separator="," close=")">
+				           #{id}
+				       </foreach>
+		                  AND T.CHILD_MATERIAL_VERSION = TT.CHILD_MATERIAL_VERSION
+			              AND ((SUBSTR(TT.SAP_VERSION, 0, 1) > SUBSTR(T.SAP_VERSION, 0, 1) OR
+			                  SUBSTR(TT.SAP_VERSION, 0, 1) = SUBSTR(T.SAP_VERSION, 0, 1) AND
+			                  TO_NUMBER(REGEXP_SUBSTR(SUBSTR(TT.SAP_VERSION, 2), '[0-9]+')) >
+			                  TO_NUMBER(REGEXP_SUBSTR(SUBSTR(T.SAP_VERSION, 2),
+			                                            '[0-9]+'))) OR
+			                  (TT.SAP_VERSION = T.SAP_VERSION AND
+			                  (TT.MES_UPDATE_DATE > T.MES_UPDATE_DATE OR
+			                  TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE > T.MES_CREATE_DATE OR
+			                  TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE = T.MES_CREATE_DATE AND TT.ID > T.ID)))
+		                  AND NVL(TT.STATUS, 0) != '3')
+		  <!-- 胎胚层与下一层需要通过版本关联，其余层不需要关联版本 -->
+		  CONNECT BY PRIOR T.CHILD_MATERIAL_CODE = T.PARENT_MATERIAL_CODE
+		         AND (PRIOR T.CHILD_MATERIAL_VERSION = T.BOM_VERSION
+		          AND PRIOR T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		           OR PRIOR T.CHILD_MATERIAL_NAME_CODE != 'EMBRYO'
+		         )
+		) 
+		<!--============================树解析end=========================-->
+		SELECT T1.EMBRYO_CODE, 		<!--胎号-->
+		       T1.EMBRYO_VERSION,	<!--胎胚版本-->
+		       T1.SAP_VERSION,		<!--sap版本 -->
+		       M.CONSTRUCTION_COLUMN COLUMN_NAME, <!--施工表字段名-->
+		<!--根据来源配置从不同的字段取字段值：
+		       1、取BOM表的CHILD_CODE，
+		       2、取BOM表的CHILD_MATERIAL_CODE，
+		       3、取BOM表的PARENT_CODE
+		       4、取PLM表的PARAM_VALUE
+		       5、取BOM表的DOSAGE
+		       6、取BOM表的BOM_VERSION
+		       7、取BOM表的PRODUCTION_STAGE_CODE
+		         -->
+		       DECODE(M.SOURCE_COLUMN,
+		              1,
+		              T1.CHILD_CODE,
+		              2,
+		              T1.CHILD_MATERIAL_CODE,
+		              3,
+		              T1.PARENT_CODE,
+		              4,
+		              DECODE(P.IS_DELETE, 0, P.PARAM_VALUE, null),  <!--从PLM取值，如果PLM参数状态为删除，也需要清空 -->
+		              5,
+		              to_char(T1.DOSAGE),
+		              6,
+		              T1.CHILD_MATERIAL_VERSION,
+		              7,
+		              T1.PRODUCTION_STAGE_CODE,
+		              NULL) COLUMN_VALUE,
+		       T1.CHILD_MATERIAL_CODE,
+		       T1.CHILD_MATERIAL_NAME_CODE,
+		       T1.PARENT_MATERIAL_CODE,
+		       <!-- 树ID序列，用于判断是否最新 -->
+		       ID_PATH ID,
+		       M.SORT_CODE,
+		       T1.UPDATE_DATE,
+		       T1.CREATE_DATE,
+		       <!-- 当数据不是从PLM获取时，PLM更新时间取BOM的更新时间，不要返回空值 -->
+		       NVL(p.UPDATE_DATE, NVL(p.CREATE_DATE, T1.UPDATE_DATE)) PLM_UPDATE_DATE,
+		       NVL(T1.DOSAGE, 0) DOSAGE,
+		       M.REMARK
+		  FROM TEMP_TAB T1
+		 INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
+		    ON T1.CHILD_MATERIAL_NAME_CODE || ':' || T1.PARENT_MATERIAL_NAME_CODE = 
+		       M.CHILD_MATERIAL_NAME_CODE || ':' || M.PARENT_MATERIAL_NAME_CODE
+		   AND M.CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，直接过滤掉 -->
+		   		'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不解析到施工表中，直接过滤掉 -->
+		   		'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+   		   AND M.IS_DELETE = 0
+		  LEFT JOIN T_PLM_CONSTRUCTION_INFO P
+		    ON P.SAP_CODE = T1.CHILD_MATERIAL_CODE
+		   AND P.PARAM_CODE = M.PARAM_CODE
+		   AND P.IS_DELETE = 0
+		   AND M.SOURCE_COLUMN = 4
+		<!-- 胎胚的PLM参数要关联版本 -->
+		   AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND
+		       T1.CHILD_MATERIAL_VERSION = P.VERSION OR
+		       T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+		<!-- 父节点有任意一个节点是删除状态的都要过滤掉 -->
+		 WHERE instr(T1.status_PATH, '3') = 0
+		   AND NOT EXISTS
+   		 (SELECT 0
+	            FROM T_PLM_CONSTRUCTION_INFO PP
+	           WHERE PP.SAP_CODE = P.SAP_CODE
+	             AND PP.PARAM_CODE = P.PARAM_CODE
+		         AND PP.IS_DELETE = 0
+	             AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND PP.VERSION = P.VERSION OR
+	                 T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+	             AND (NVL(PP.UPDATE_DATE, PP.CREATE_DATE) > NVL(P.UPDATE_DATE, P.CREATE_DATE) OR
+	                 NVL(PP.UPDATE_DATE, PP.CREATE_DATE) = NVL(P.UPDATE_DATE, P.CREATE_DATE) AND PP.ID > P.ID))
+    </select>
+    
+	<!-- 将合并好的数据更新至施工表中，由于更新语句的字段会根据配置表发生变化，因此字段部分不能使用预编译，只能使用字符串替换-->
+	<update id="mergeConstructionInfo">
+        MERGE INTO T_CONSTRUCTION_VERSION_INFO a USING (
+        <!-- 字段配置两层循环，外层一个胎胚+版本一次循环；内层一个字段一次循环 -->
+        <foreach collection="constructionList" item="item" separator=" union ">
+            SELECT id,
+            	   #{item.embryoCode} EMBRYO_CODE,
+            	   #{item.embryoVersion,jdbcType = VARCHAR} EMBRYO_VERSION,
+            	   #{item.currentDate} current_date,
+	        <foreach collection="item.columnList" item="column" separator=",">
+	        	<!-- 判断本胎号是否有修改该字段，有修改就用新值；没有修改就保留原值 -->
+	        	<choose>
+	        		<when test="column.isModify">
+	         	   #{column.columnValue,jdbcType = VARCHAR} ${column.columnName}
+	         		</when>
+	         		<otherwise>
+	         	   TO_CHAR(${column.columnName}) ${column.columnName}
+	         		</otherwise>
+	         	</choose>
+	        </foreach>
+	        <!-- 需要通过胎号关联原记录，不更新的字段需要取原记录的值 -->
+              FROM DUAL
+              LEFT JOIN T_CONSTRUCTION_VERSION_INFO t
+                ON EMBRYO_CODE = #{item.embryoCode}
+               AND EMBRYO_VERSION = #{item.embryoVersion,jdbcType = VARCHAR}
+			   AND T.DEL_FLAG = '0'
+        </foreach>
+        ) b ON (a.EMBRYO_CODE = b.EMBRYO_CODE AND a.EMBRYO_VERSION = b.EMBRYO_VERSION AND a.DEL_FLAG = '0')
+        WHEN MATCHED THEN
+        UPDATE SET
+            a.update_time = b.current_date,
+	    <foreach collection="columnList" item="column" separator=",">
+            a.${column} = b.${column}
+		</foreach>
+        WHEN NOT MATCHED THEN
+        INSERT (a.id,a.create_time,a.update_time,a.EMBRYO_CODE, a.EMBRYO_VERSION, 
+	    <foreach collection="columnList" item="column" separator=",">
+            a.${column}
+		</foreach>
+        ) values
+        (get_sequence_nextval('SEQ_CONSTRUCTION_INFO'),b.current_date,b.current_date,b.EMBRYO_CODE, b.EMBRYO_VERSION,
+	    <foreach collection="columnList" item="column" separator=",">
+            b.${column}
+		</foreach>
+		)
+	</update>
+	
+	<!-- 删除bom已废止的胎胚对应的施工版本记录，只有最新的一笔胎胚是废止状态才删除 -->
+	<update id="deleteConstructionVersionInfo">
+		UPDATE T_CONSTRUCTION_VERSION_INFO c
+		   SET c.del_flag = '1',
+		       c.UPDATE_TIME = sysdate
+		 WHERE c.del_flag = '0'
+		   AND (c.embryo_code, c.EMBRYO_VERSION) in
+		       (SELECT REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		               T.CHILD_MATERIAL_VERSION
+		          FROM T_BOM_INFO T
+		         WHERE T.Child_Material_Code in
+		               (SELECT TT.Child_Material_Code
+		                  FROM T_MES_BOM_INFO TT
+		                 WHERE TT.Status = '3'
+		                   AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		                   AND TT.DATA_VERSION = #{dataVersion})
+		           AND T.Status = '3'
+		           AND NOT EXISTS
+		         (SELECT 1
+		                  FROM T_BOM_INFO TT
+		                 WHERE T.CHILD_MATERIAL_CODE = TT.CHILD_MATERIAL_CODE
+		                   AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		                   AND T.CHILD_MATERIAL_VERSION = TT.CHILD_MATERIAL_VERSION 
+		                   AND TT.STATUS = '1'
+		         ))
+	</update>
+	
+	<!-- 查询本次更新需要处理的硫化施工记录 -->
+	<select id="selectLhConstructionInfo" resultType="com.zlt.aps.mps.domain.TMesConstructionInfo">
+		WITH BOM_TAB AS
+		 (SELECT *
+		    FROM T_BOM_INFO T
+		   WHERE T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		     AND T.Child_Material_Version IS NOT NULL
+		   <!-- 根据子物料号 + 父物料号去重 -->
+		     AND NOT EXISTS
+		   (SELECT 1
+		            FROM T_BOM_INFO TT
+		           WHERE TT.CHILD_MATERIAL_CODE = T.CHILD_MATERIAL_CODE
+		             AND TT.PARENT_MATERIAL_CODE = T.PARENT_MATERIAL_CODE
+		             AND TT.CHILD_MATERIAL_VERSION = T.CHILD_MATERIAL_VERSION
+		             AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		             AND ((SUBSTR(TT.SAP_VERSION, 0, 1) > SUBSTR(T.SAP_VERSION, 0, 1) OR
+		                 SUBSTR(TT.SAP_VERSION, 0, 1) = SUBSTR(T.SAP_VERSION, 0, 1) AND
+		                 TO_NUMBER(REGEXP_SUBSTR(SUBSTR(TT.SAP_VERSION, 2), '[0-9]+')) >
+		                 TO_NUMBER(REGEXP_SUBSTR(SUBSTR(T.SAP_VERSION, 2),
+		                                           '[0-9]+'))) OR
+		                 (TT.SAP_VERSION = T.SAP_VERSION AND
+		                 (TT.MES_UPDATE_DATE > T.MES_UPDATE_DATE OR
+		                 TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE > T.MES_CREATE_DATE OR
+		                 TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE = T.MES_CREATE_DATE AND TT.ID > T.ID))))
+       		<if test="bomDataVersion != null and bomDataVersion != ''">
+       		 /* 只查找本次bom数据版本更新到的记录*/
+		 	 AND T.ID IN
+		       (SELECT ID FROM T_MES_BOM_INFO WHERE DATA_VERSION = #{bomDataVersion})
+		    </if>
+		                 ),
+		PLM_TAB AS
+		 (SELECT P.*, M.CONSTRUCTION_COLUMN
+		    FROM T_PLM_CONSTRUCTION_INFO P
+		   INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
+		      ON P.PARAM_CODE = M.PARAM_CODE
+		     AND M.IS_DELETE = 0
+		     AND M.CONSTRUCTION_COLUMN IN ('CLAMPING_PRESSURE', 'CURING_TIME')
+		     AND M.SOURCE_COLUMN = 4
+		   WHERE NOT EXISTS
+		   (SELECT 0
+		            FROM T_PLM_CONSTRUCTION_INFO PP
+		           WHERE PP.SAP_CODE = P.SAP_CODE
+		             AND PP.PARAM_CODE = P.PARAM_CODE
+		             AND (NVL(PP.UPDATE_DATE, PP.CREATE_DATE) > NVL(P.UPDATE_DATE, P.CREATE_DATE) OR
+		                 NVL(PP.UPDATE_DATE, PP.CREATE_DATE) = NVL(P.UPDATE_DATE, PP.CREATE_DATE) AND PP.ID > P.ID)))
+		SELECT T.ID,
+		       T.PARENT_MATERIAL_CODE,
+		       REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		       P.CONSTRUCTION_COLUMN COLUMN_NAME,
+		       P.PARAM_VALUE COLUMN_VALUE,
+		       T.Child_Material_Version EMBRYO_VERSION,
+		       CASE
+		         WHEN NVL(T.STATUS, '1') = '3' THEN
+		          '1'
+		         ELSE
+		          '0'
+		       END STATUS,
+		       P.CREATE_DATE UPDATE_DATE
+		  FROM BOM_TAB T
+		 INNER JOIN PLM_TAB P
+		    ON P.SAP_CODE = T.CHILD_MATERIAL_CODE
+		 WHERE NVL(T.STATUS, '1') != '3'
+	        <if test="plmDataVersion != null and plmDataVersion != ''">
+       		 /* 只查找本次Plm数据版本更新到的记录*/
+		   AND P.ID IN
+		       (SELECT ID FROM T_MES_PLM_CONSTRUCTION_INFO WHERE DATA_VERSION = #{plmDataVersion})
+		    </if>
+       		<if test="bomDataVersion != null and bomDataVersion != ''">
+	    UNION
+		/* 单独查询规格描述信息 */
+	        SELECT T.ID,
+	           T.PARENT_MATERIAL_CODE,
+	           REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+	           M.CONSTRUCTION_COLUMN COLUMN_NAME,
+	           T.CHILD_CODE || '$$$' || T.PARENT_CODE COLUMN_VALUE,
+	           T.Child_Material_Version EMBRYO_VERSION,
+	           '0' STATUS,
+	           T.MES_UPDATE_DATE UPDATE_DATE
+	      FROM BOM_TAB T
+	     INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
+	        ON M.CHILD_MATERIAL_NAME_CODE = T.CHILD_MATERIAL_NAME_CODE
+	       AND M.CONSTRUCTION_COLUMN IN ('SPEC_DESC')
+	     WHERE NVL(T.STATUS, '1') != '3'
+		UNION
+		/* 查询是否整个胎胚废止了，废止的胎胚硫化施工表也要跟着删除*/
+		SELECT T.ID,
+		       T.PARENT_MATERIAL_CODE,
+		       REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		       'DEL_FLAG' COLUMN_NAME,
+		       decode(T.STATUS, '3', '1', '0') COLUMN_VALUE, /*删除字段数值，通过废止状态转换：3是废止，其他都是正常*/
+		       T.Child_Material_Version EMBRYO_VERSION,
+		       '0' STATUS,
+		       T.MES_UPDATE_DATE UPDATE_DATE
+		  FROM BOM_TAB T
+		    </if>
+		 ORDER BY EMBRYO_CODE, COLUMN_VALUE, UPDATE_DATE
+	</select>
+    
+	<!-- 更新硫化施工表-->
+	<update id="mergeLhConstructionInfo">
+        MERGE INTO T_LH_TIRE_CONSTRUCTION_INFO a
+        USING (
+        <foreach collection="constructionList" item="item" separator=" union ">
+        	SELECT #{item.sapCode, jdbcType=VARCHAR} SAP_CODE,
+        		   #{item.embryoCode, jdbcType=VARCHAR} EMBRYO_CODE,
+        		   #{item.embryoVersion, jdbcType=VARCHAR} EMBRYO_VERSION,
+        		   #{item.clampingPressure, jdbcType=DECIMAL} CLAMPING_PRESSURE,
+        		   #{item.curingTime, jdbcType=DECIMAL} CURING_TIME,
+        		   #{item.specDesc, jdbcType=VARCHAR} SPEC_DESC,
+        		   #{item.delFlag, jdbcType=VARCHAR} DEL_FLAG,
+        		   #{item.updateTime, jdbcType=DATE} UPDATE_TIME,
+        		   c.id
+        	  FROM dual
+        	  LEFT JOIN T_LH_TIRE_CONSTRUCTION_INFO c
+        	    ON c.SAP_CODE = #{item.sapCode, jdbcType=VARCHAR}
+        	   AND c.EMBRYO_CODE = #{item.embryoCode, jdbcType=VARCHAR}
+        	   AND c.EMBRYO_VERSION = #{item.embryoVersion, jdbcType=VARCHAR}
+        	   AND c.DEL_FLAG = '0'
+        </foreach>
+              ) b
+        ON (a.id = b.id)
+        WHEN MATCHED THEN
+	      UPDATE
+	         SET a.CLAMPING_PRESSURE = b.CLAMPING_PRESSURE,
+	             a.CURING_TIME = b.CURING_TIME,
+	             a.DEL_FLAG = CASE WHEN b.DEL_FLAG IS NOT NULL THEN b.DEL_FLAG ELSE a.DEL_FLAG END,
+	             a.SPEC_DESC = CASE WHEN b.SPEC_DESC IS NOT NULL THEN b.SPEC_DESC ELSE a.SPEC_DESC END,
+	             a.UPDATE_TIME = b.UPDATE_TIME
+        WHEN NOT MATCHED THEN
+          INSERT (a.ID, a.SAP_CODE, a.EMBRYO_CODE, a.EMBRYO_VERSION, a.SPEC_DESC, a.CLAMPING_PRESSURE, a.CURING_TIME, a.DEL_FLAG, a.CREATE_TIME)
+          VALUES (get_sequence_nextval('SEQ_CONSTRUCTION_INFO'), b.SAP_CODE, b.EMBRYO_CODE, b.EMBRYO_VERSION, b.SPEC_DESC, b.CLAMPING_PRESSURE, b.CURING_TIME, b.DEL_FLAG, b.UPDATE_TIME)
+	</update>
+    
+	<!-- 初始化投产施工表，更新逻辑：根据胎胚 + 施工版本匹配
+	如果有匹配记录，再判断更新时间大于投产施工的时间就更新，否则不处理
+	如果无匹配记录，则直接插入
+    -->
+    <update id="mergeProductConstructionInfo">
+	  MERGE INTO t_product_construction_info a
+		USING (
+	      SELECT *
+	        FROM T_CONSTRUCTION_VERSION_INFO T
+	       WHERE NOT EXISTS (SELECT 0
+	                FROM T_CONSTRUCTION_VERSION_INFO TT
+	               WHERE TT.EMBRYO_CODE = T.EMBRYO_CODE
+	                 AND TT.EMBRYO_VERSION = T.EMBRYO_VERSION
+	                 AND TT.DEL_FLAG = '0'
+	                 AND (NVL(TT.UPDATE_TIME, TT.CREATE_TIME) >
+	                     NVL(T.UPDATE_TIME, T.CREATE_TIME) OR
+	                     NVL(TT.UPDATE_TIME, TT.CREATE_TIME) =
+	                     NVL(T.UPDATE_TIME, T.CREATE_TIME) AND TT.ID > T.ID))
+	         AND NOT EXISTS (SELECT 0
+	                FROM T_PRODUCT_CONSTRUCTION_INFO TT
+	               WHERE TT.EMBRYO_CODE = T.EMBRYO_CODE
+	                 AND TT.EMBRYO_VERSION = T.EMBRYO_VERSION
+	                 AND TT.DEL_FLAG = '0'
+	                 AND NVL(TT.UPDATE_TIME, TT.CREATE_TIME) > NVL(T.UPDATE_TIME, T.CREATE_TIME))
+	         AND UPDATE_TIME >= #{currentDate}
+	         AND T.DEL_FLAG = '0'
+		   ) B ON (A.EMBRYO_CODE = B.EMBRYO_CODE AND A.EMBRYO_VERSION = B.EMBRYO_VERSION AND A.DEL_FLAG = '0') WHEN MATCHED THEN
+		    UPDATE
+		       SET A.CONS_TYPE                    = B.CONS_TYPE,
+		           A.DIMENSION                    = B.DIMENSION,
+		           A.SPEC_DESC                    = B.SPEC_DESC,
+		           A.NOSE_WIDTH                   = B.NOSE_WIDTH,
+		           A.FLIP_DISC_DIAMETER           = B.FLIP_DISC_DIAMETER,
+		           A.SECTION_WIDTH                = B.SECTION_WIDTH,
+		           A.FIT_DRUM_PERIMETER           = B.FIT_DRUM_PERIMETER,
+		           A.CHUCK_DIAMETER               = B.CHUCK_DIAMETER,
+		           A.STRETCH_WIDTH                = B.STRETCH_WIDTH,
+		           A.QUALITATIVE_WIDTH            = B.QUALITATIVE_WIDTH,
+		           A.EMBRYO_CIRCLE                = B.EMBRYO_CIRCLE,
+		           A.TIRE_FABRIC_CODE1            = B.TIRE_FABRIC_CODE1,
+		           A.TIRE_FABRIC_SAP1             = B.TIRE_FABRIC_SAP1,
+		           A.TIRE_FABRIC1_VERSION         = B.TIRE_FABRIC1_VERSION,
+		           A.TIRE_FABRIC_CRAFT1           = B.TIRE_FABRIC_CRAFT1,
+		           A.TIRE_FABRIC_CODE2            = B.TIRE_FABRIC_CODE2,
+		           A.TIRE_FABRIC_SAP2             = B.TIRE_FABRIC_SAP2,
+		           A.TIRE_FABRIC2_VERSION         = B.TIRE_FABRIC2_VERSION,
+		           A.TIRE_FABRIC_CRAFT2           = B.TIRE_FABRIC_CRAFT2,
+		           A.TIRE_FABRIC_CODE3            = B.TIRE_FABRIC_CODE3,
+		           A.TIRE_FABRIC_SAP3             = B.TIRE_FABRIC_SAP3,
+		           A.TIRE_FABRIC3_VERSION         = B.TIRE_FABRIC3_VERSION,
+		           A.TIRE_FABRIC_CRAFT3           = B.TIRE_FABRIC_CRAFT3,
+		           A.ORIGINAL_LINE_CODE           = B.ORIGINAL_LINE_CODE,
+		           A.CORD_SPEC                    = B.CORD_SPEC,
+		           A.CORD_SAP                     = B.CORD_SAP,
+		           A.CORD_VERSION                 = B.CORD_VERSION,
+		           A.REINFORCE_SEAL_GLUE          = B.REINFORCE_SEAL_GLUE,
+		           A.INSIDE_RUBBER                = B.INSIDE_RUBBER,
+		           A.INSIDE_CODE                  = B.INSIDE_CODE,
+		           A.INSIDE_SAP                   = B.INSIDE_SAP,
+		           A.INSIDE_VERSION               = B.INSIDE_VERSION,
+		           A.INSIDE_CRAFT                 = B.INSIDE_CRAFT,
+		           A.SIDEWALL_CODE                = B.SIDEWALL_CODE,
+		           A.SIDEWALL_SAP                 = B.SIDEWALL_SAP,
+		           A.SIDEWALL_VERSION             = B.SIDEWALL_VERSION,
+		           A.SIDEWALL_CRAFT               = B.SIDEWALL_CRAFT,
+		           A.SIDEWALL_MOUTH_PLATE         = B.SIDEWALL_MOUTH_PLATE,
+		           A.SIDEWALL_CENTER              = B.SIDEWALL_CENTER,
+		           A.SIDEWALL_LENGTH              = B.SIDEWALL_LENGTH,
+		           A.SIDEWALL_RUBBER              = B.SIDEWALL_RUBBER,
+		           A.SIDEWALL_WEIGHT              = B.SIDEWALL_WEIGHT,
+		           A.SIDEWALL_WEARP_RUBBER_WEIGHT = B.SIDEWALL_WEARP_RUBBER_WEIGHT,
+		           A.SUPPORT_CODE                 = B.SUPPORT_CODE,
+		           A.SUPPORT_RUBBER_CODE          = B.SUPPORT_RUBBER_CODE,
+		           A.SUPPORT_LENGTH               = B.SUPPORT_LENGTH,
+		           A.BEAD_CODE                    = B.BEAD_CODE,
+		           A.BEAD_SAP                     = B.BEAD_SAP,
+		           A.BEAD_VERSION                 = B.BEAD_VERSION,
+		           A.BEAD_ARRANGE                 = B.BEAD_ARRANGE,
+		           A.BEAD_TYPE                    = B.BEAD_TYPE,
+		           A.TIRE_RING_CODE               = B.TIRE_RING_CODE,
+		           A.TIRE_RING_SAP                = B.TIRE_RING_SAP,
+		           A.TIRE_RING_VERSION            = B.TIRE_RING_VERSION,
+		           A.APEX_CODE                    = B.APEX_CODE,
+		           A.HEXAGON_RUBBER_CODE          = B.HEXAGON_RUBBER_CODE,
+		           A.HEXAGON_MOUTH_PLATE          = B.HEXAGON_MOUTH_PLATE,
+		           A.HEXAGON_RUBBER_DIMENSION     = B.HEXAGON_RUBBER_DIMENSION,
+		           A.APEX_WEIGHT                  = B.APEX_WEIGHT,
+		           A.BELT_CODE1                   = B.BELT_CODE1,
+		           A.BELT_SAP1                    = B.BELT_SAP1,
+		           A.BELT1_VERSION                = B.BELT1_VERSION,
+		           A.BELT_CRAFT1                  = B.BELT_CRAFT1,
+		           A.BELT_SIDE_RUBBER1            = B.BELT_SIDE_RUBBER1,
+		           A.BELT_RUBBER1                 = B.BELT_RUBBER1,
+		           A.BELT_CODE2                   = B.BELT_CODE2,
+		           A.BELT_SAP2                    = B.BELT_SAP2,
+		           A.BELT2_VERSION                = B.BELT2_VERSION,
+		           A.BELT_CRAFT2                  = B.BELT_CRAFT2,
+		           A.BELT_SIDE_RUBBER2            = B.BELT_SIDE_RUBBER2,
+		           A.BELT_RUBBER2                 = B.BELT_RUBBER2,
+		           A.BELT_CUTTING_ANGLE           = B.BELT_CUTTING_ANGLE,
+		           A.ARTICLE_CROWN_SPEC           = B.ARTICLE_CROWN_SPEC,
+		           A.ARTICLE_CROWN_SAP            = B.ARTICLE_CROWN_SAP,
+		           A.ARTICLE_CROWN_VERSION        = B.ARTICLE_CROWN_VERSION,
+		           A.ARTICLE_CROWN_CODE           = B.ARTICLE_CROWN_CODE,
+		           A.TREAD_CODE                   = B.TREAD_CODE,
+		           A.TREAD_SAP                    = B.TREAD_SAP,
+		           A.TREAD_VERSION                = B.TREAD_VERSION,
+		           A.TREAD_SHOULDER_WIDTH         = B.TREAD_SHOULDER_WIDTH,
+		           A.TREAD_SHOULDER_JWIDTH        = B.TREAD_SHOULDER_JWIDTH,
+		           A.TREAD_SHOULDER_LENGTH        = B.TREAD_SHOULDER_LENGTH,
+		           A.TREAD_RUBBER_CATEGORY        = B.TREAD_RUBBER_CATEGORY,
+		           A.TIRE_CROWN_UP_WIDTH_WEIGHT   = B.TIRE_CROWN_UP_WIDTH_WEIGHT,
+		           A.TIRE_CROWN_DOWN_WIDTH_WEIGHT = B.TIRE_CROWN_DOWN_WIDTH_WEIGHT,
+		           A.TIRE_WING_WIDTH_WEIGHT       = B.TIRE_WING_WIDTH_WEIGHT,
+		           A.PRIMER_WEIGHT                = B.PRIMER_WEIGHT,
+		           A.CONDUCTING_RESIN_WEIGHT      = B.CONDUCTING_RESIN_WEIGHT,
+		           A.TREAD_MOUTH_PLATE            = B.TREAD_MOUTH_PLATE,
+		           A.UPDATE_BY                    = B.UPDATE_BY,
+		           A.UPDATE_TIME                  = B.UPDATE_TIME,
+		           A.REMARK                       = B.REMARK,
+		           A.PRODUCTION_STAGE             = B.PRODUCTION_STAGE,
+		           A.TIRE_FABRIC_SIDE_RUBBER      = B.TIRE_FABRIC_SIDE_RUBBER
+		  WHEN NOT MATCHED THEN
+		    INSERT
+		      (A.ID,
+		       A.SAP_CODE,
+		       A.EMBRYO_CODE,
+		       A.EMBRYO_VERSION,
+		       A.CONS_TYPE,
+		       A.DIMENSION,
+		       A.SPEC_DESC,
+		       A.NOSE_WIDTH,
+		       A.FLIP_DISC_DIAMETER,
+		       A.SECTION_WIDTH,
+		       A.FIT_DRUM_PERIMETER,
+		       A.CHUCK_DIAMETER,
+		       A.STRETCH_WIDTH,
+		       A.QUALITATIVE_WIDTH,
+		       A.EMBRYO_CIRCLE,
+		       A.TIRE_FABRIC_CODE1,
+		       A.TIRE_FABRIC_SAP1,
+		       A.TIRE_FABRIC1_VERSION,
+		       A.TIRE_FABRIC_CRAFT1,
+		       A.TIRE_FABRIC_CODE2,
+		       A.TIRE_FABRIC_SAP2,
+		       A.TIRE_FABRIC2_VERSION,
+		       A.TIRE_FABRIC_CRAFT2,
+		       A.TIRE_FABRIC_CODE3,
+		       A.TIRE_FABRIC_SAP3,
+		       A.TIRE_FABRIC3_VERSION,
+		       A.TIRE_FABRIC_CRAFT3,
+		       A.ORIGINAL_LINE_CODE,
+		       A.CORD_SPEC,
+		       A.CORD_SAP,
+		       A.CORD_VERSION,
+		       A.REINFORCE_SEAL_GLUE,
+		       A.INSIDE_RUBBER,
+		       A.INSIDE_CODE,
+		       A.INSIDE_SAP,
+		       A.INSIDE_VERSION,
+		       A.INSIDE_CRAFT,
+		       A.SIDEWALL_CODE,
+		       A.SIDEWALL_SAP,
+		       A.SIDEWALL_VERSION,
+		       A.SIDEWALL_CRAFT,
+		       A.SIDEWALL_MOUTH_PLATE,
+		       A.SIDEWALL_CENTER,
+		       A.SIDEWALL_LENGTH,
+		       A.SIDEWALL_RUBBER,
+		       A.SIDEWALL_WEIGHT,
+		       A.SIDEWALL_WEARP_RUBBER_WEIGHT,
+		       A.SUPPORT_CODE,
+		       A.SUPPORT_RUBBER_CODE,
+		       A.SUPPORT_LENGTH,
+		       A.BEAD_CODE,
+		       A.BEAD_SAP,
+		       A.BEAD_VERSION,
+		       A.BEAD_ARRANGE,
+		       A.BEAD_TYPE,
+		       A.TIRE_RING_CODE,
+		       A.TIRE_RING_SAP,
+		       A.TIRE_RING_VERSION,
+		       A.APEX_CODE,
+		       A.HEXAGON_RUBBER_CODE,
+		       A.HEXAGON_MOUTH_PLATE,
+		       A.HEXAGON_RUBBER_DIMENSION,
+		       A.APEX_WEIGHT,
+		       A.BELT_CODE1,
+		       A.BELT_SAP1,
+		       A.BELT1_VERSION,
+		       A.BELT_CRAFT1,
+		       A.BELT_SIDE_RUBBER1,
+		       A.BELT_RUBBER1,
+		       A.BELT_CODE2,
+		       A.BELT_SAP2,
+		       A.BELT2_VERSION,
+		       A.BELT_CRAFT2,
+		       A.BELT_SIDE_RUBBER2,
+		       A.BELT_RUBBER2,
+		       A.BELT_CUTTING_ANGLE,
+		       A.ARTICLE_CROWN_SPEC,
+		       A.ARTICLE_CROWN_SAP,
+		       A.ARTICLE_CROWN_VERSION,
+		       A.ARTICLE_CROWN_CODE,
+		       A.TREAD_CODE,
+		       A.TREAD_SAP,
+		       A.TREAD_VERSION,
+		       A.TREAD_SHOULDER_WIDTH,
+		       A.TREAD_SHOULDER_JWIDTH,
+		       A.TREAD_SHOULDER_LENGTH,
+		       A.TREAD_RUBBER_CATEGORY,
+		       A.TIRE_CROWN_UP_WIDTH_WEIGHT,
+		       A.TIRE_CROWN_DOWN_WIDTH_WEIGHT,
+		       A.TIRE_WING_WIDTH_WEIGHT,
+		       A.PRIMER_WEIGHT,
+		       A.CONDUCTING_RESIN_WEIGHT,
+		       A.TREAD_MOUTH_PLATE,
+		       A.CREATE_BY,
+		       A.CREATE_TIME,
+		       A.UPDATE_BY,
+		       A.DEL_FLAG,
+		       A.REMARK,
+		       A.PRODUCTION_STAGE,
+		       A.TIRE_FABRIC_SIDE_RUBBER)
+		    VALUES
+		      (get_sequence_nextval('SEQ_CONSTRUCTION_INFO'),
+		       B.SAP_CODE,
+		       B.EMBRYO_CODE,
+		       B.EMBRYO_VERSION,
+		       B.CONS_TYPE,
+		       B.DIMENSION,
+		       B.SPEC_DESC,
+		       B.NOSE_WIDTH,
+		       B.FLIP_DISC_DIAMETER,
+		       B.SECTION_WIDTH,
+		       B.FIT_DRUM_PERIMETER,
+		       B.CHUCK_DIAMETER,
+		       B.STRETCH_WIDTH,
+		       B.QUALITATIVE_WIDTH,
+		       B.EMBRYO_CIRCLE,
+		       B.TIRE_FABRIC_CODE1,
+		       B.TIRE_FABRIC_SAP1,
+		       B.TIRE_FABRIC1_VERSION,
+		       B.TIRE_FABRIC_CRAFT1,
+		       B.TIRE_FABRIC_CODE2,
+		       B.TIRE_FABRIC_SAP2,
+		       B.TIRE_FABRIC2_VERSION,
+		       B.TIRE_FABRIC_CRAFT2,
+		       B.TIRE_FABRIC_CODE3,
+		       B.TIRE_FABRIC_SAP3,
+		       B.TIRE_FABRIC3_VERSION,
+		       B.TIRE_FABRIC_CRAFT3,
+		       B.ORIGINAL_LINE_CODE,
+		       B.CORD_SPEC,
+		       B.CORD_SAP,
+		       B.CORD_VERSION,
+		       B.REINFORCE_SEAL_GLUE,
+		       B.INSIDE_RUBBER,
+		       B.INSIDE_CODE,
+		       B.INSIDE_SAP,
+		       B.INSIDE_VERSION,
+		       B.INSIDE_CRAFT,
+		       B.SIDEWALL_CODE,
+		       B.SIDEWALL_SAP,
+		       B.SIDEWALL_VERSION,
+		       B.SIDEWALL_CRAFT,
+		       B.SIDEWALL_MOUTH_PLATE,
+		       B.SIDEWALL_CENTER,
+		       B.SIDEWALL_LENGTH,
+		       B.SIDEWALL_RUBBER,
+		       B.SIDEWALL_WEIGHT,
+		       B.SIDEWALL_WEARP_RUBBER_WEIGHT,
+		       B.SUPPORT_CODE,
+		       B.SUPPORT_RUBBER_CODE,
+		       B.SUPPORT_LENGTH,
+		       B.BEAD_CODE,
+		       B.BEAD_SAP,
+		       B.BEAD_VERSION,
+		       B.BEAD_ARRANGE,
+		       B.BEAD_TYPE,
+		       B.TIRE_RING_CODE,
+		       B.TIRE_RING_SAP,
+		       B.TIRE_RING_VERSION,
+		       B.APEX_CODE,
+		       B.HEXAGON_RUBBER_CODE,
+		       B.HEXAGON_MOUTH_PLATE,
+		       B.HEXAGON_RUBBER_DIMENSION,
+		       B.APEX_WEIGHT,
+		       B.BELT_CODE1,
+		       B.BELT_SAP1,
+		       B.BELT1_VERSION,
+		       B.BELT_CRAFT1,
+		       B.BELT_SIDE_RUBBER1,
+		       B.BELT_RUBBER1,
+		       B.BELT_CODE2,
+		       B.BELT_SAP2,
+		       B.BELT2_VERSION,
+		       B.BELT_CRAFT2,
+		       B.BELT_SIDE_RUBBER2,
+		       B.BELT_RUBBER2,
+		       B.BELT_CUTTING_ANGLE,
+		       B.ARTICLE_CROWN_SPEC,
+		       B.ARTICLE_CROWN_SAP,
+		       B.ARTICLE_CROWN_VERSION,
+		       B.ARTICLE_CROWN_CODE,
+		       B.TREAD_CODE,
+		       B.TREAD_SAP,
+		       B.TREAD_VERSION,
+		       B.TREAD_SHOULDER_WIDTH,
+		       B.TREAD_SHOULDER_JWIDTH,
+		       B.TREAD_SHOULDER_LENGTH,
+		       B.TREAD_RUBBER_CATEGORY,
+		       B.TIRE_CROWN_UP_WIDTH_WEIGHT,
+		       B.TIRE_CROWN_DOWN_WIDTH_WEIGHT,
+		       B.TIRE_WING_WIDTH_WEIGHT,
+		       B.PRIMER_WEIGHT,
+		       B.CONDUCTING_RESIN_WEIGHT,
+		       B.TREAD_MOUTH_PLATE,
+		       B.CREATE_BY,
+		       B.CREATE_TIME,
+		       B.UPDATE_BY,
+		       B.DEL_FLAG,
+		       B.REMARK,
+		       B.PRODUCTION_STAGE,
+		       B.TIRE_FABRIC_SIDE_RUBBER)
+    </update>
+    
+    <!-- 清除掉已废止的投产施工记录 -->
+    <update id="cleanDisableConstructionInfo">
+		UPDATE T_PRODUCT_CONSTRUCTION_INFO T
+		   SET T.DEL_FLAG = '1',
+               T.Update_Time = SYSDATE
+		 WHERE T.EMBRYO_CODE IN (
+        <foreach collection="embryoCodeList" item="embryoCode" separator=" union ">
+		 SELECT #{embryoCode} EMBRYOCODE FROM DUAL
+		 </foreach>
+		 )
+		   AND NOT EXISTS (SELECT 0
+		          FROM T_CONSTRUCTION_VERSION_INFO TT
+		         WHERE TT.EMBRYO_CODE = T.EMBRYO_CODE
+		           AND TT.EMBRYO_VERSION = T.EMBRYO_VERSION
+		           AND TT.DEL_FLAG = '0')
+		   AND T.DEL_FLAG = '0'
+    </update>
+</mapper>

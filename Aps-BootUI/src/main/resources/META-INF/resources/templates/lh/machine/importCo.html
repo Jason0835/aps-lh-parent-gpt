@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('导入弹窗')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form enctype="multipart/form-data" class="mt20 mb10">
+                <div class="col-xs-offset-1">
+                    <input value="111111111111111"/>
+                    <div>11111111111</div>
+                    <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+                    <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+                    <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+                    <div class="mt10 pt5">
+                        <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                        &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+                    </div>
+                    <font color="red" class="pull-left mt10">
+                        [[#{ui.biz.alter.onlyExcel}]]
+                    </font>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+</body>
+</html>

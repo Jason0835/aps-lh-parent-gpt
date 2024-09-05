@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxCloseOutRangeMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange" id="CxCloseOutRangeResult">
+        <result property="id" column="id"/>
+        <result property="rangeName" column="range_name"/>
+        <result property="closeOutRangeMinimum" column="close_out_range_minimum"/>
+        <result property="closeOutRangeMaximum" column="close_out_range_maximum"/>
+        <result property="rangeValue" column="range_value"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectCxCloseOutRangeVo">
+        select id, range_name, close_out_range_minimum, close_out_range_maximum, range_value, create_by, create_time, update_by, update_time, del_flag, remark from t_cx_close_out_range
+    </sql>
+
+    <select id="selectCxCloseOutRangeList" parameterType="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange"
+            resultMap="CxCloseOutRangeResult">
+        <include refid="selectCxCloseOutRangeVo"/>
+        where del_flag = '0'
+        <if test="rangeName != null  and rangeName != ''">and range_name like concat(concat('%', #{rangeName}), '%')
+        </if>
+        <if test="closeOutRangeMinimum != null ">and close_out_range_minimum  <![CDATA[  <=  ]]> #{closeOutRangeMinimum}</if>
+        <if test="closeOutRangeMaximum != null ">and close_out_range_maximum  <![CDATA[  >=  ]]> #{closeOutRangeMaximum}</if>
+        <if test="rangeValue != null ">and INSTR(range_value, #{rangeValue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkCxCloseOutRangeUnique" parameterType="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange"
+            resultMap="CxCloseOutRangeResult">
+        <include refid="selectCxCloseOutRangeVo"/>
+        where del_flag = '0'
+        <if test="id != null">and id !=#{id}</if>
+        AND(
+          close_out_range_minimum BETWEEN #{closeOutRangeMinimum,jdbcType=DECIMAL} AND #{closeOutRangeMaximum,jdbcType=DECIMAL}
+          OR close_out_range_maximum BETWEEN #{closeOutRangeMinimum,jdbcType=DECIMAL} AND #{closeOutRangeMaximum,jdbcType=DECIMAL}
+          OR (close_out_range_minimum <![CDATA[ <= ]]> #{closeOutRangeMinimum,jdbcType=DECIMAL} AND close_out_range_maximum <![CDATA[ >= ]]>#{closeOutRangeMaximum,jdbcType=DECIMAL} )
+        )
+    </select>
+
+    <select id="selectCxCloseOutRangeById" parameterType="Long" resultMap="CxCloseOutRangeResult">
+        <include refid="selectCxCloseOutRangeVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertCxCloseOutRange" parameterType="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT seq_public.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cx_close_out_range
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="rangeName != null">range_name,</if>
+            <if test="closeOutRangeMinimum != null">close_out_range_minimum,</if>
+            <if test="closeOutRangeMaximum != null">close_out_range_maximum,</if>
+            <if test="rangeValue != null">range_value,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="rangeName != null">#{rangeName},</if>
+            <if test="closeOutRangeMinimum != null">#{closeOutRangeMinimum},</if>
+            <if test="closeOutRangeMaximum != null">#{closeOutRangeMaximum},</if>
+            <if test="rangeValue != null">#{rangeValue},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateCxCloseOutRange" parameterType="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange">
+        update t_cx_close_out_range
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="rangeName != null">range_name = #{rangeName},</if>
+            <if test="closeOutRangeMinimum != null">close_out_range_minimum = #{closeOutRangeMinimum},</if>
+            <if test="closeOutRangeMaximum != null">close_out_range_maximum = #{closeOutRangeMaximum},</if>
+            <if test="rangeValue != null">range_value = #{rangeValue},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxCloseOutRangeById" parameterType="Long">
+        update t_cx_close_out_range set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteCxCloseOutRangeByIds" parameterType="String">
+        update t_cx_close_out_range set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

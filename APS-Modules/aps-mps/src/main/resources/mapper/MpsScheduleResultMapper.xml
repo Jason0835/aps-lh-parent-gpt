@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.MpsScheduleResultMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleResult" id="CxScheduleResultResult">
+        <result property="id" column="id"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="taskType" column="task_type"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="cxMachineCode" column="cx_machine_code"/>
+        <result property="cxMachineName" column="cx_machine_name"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="lhMachineQty" column="lh_machine_qty"/>
+        <result property="minimumLhMachineReqQty" column="minimum_lh_machine_req_qty"/>
+        <result property="availableMoldQty" column="available_mold_qty"/>
+        <result property="maximumClassQty" column="maximum_class_qty"/>
+        <result property="workShifts" column="work_shifts"/>
+        <result property="storageLocation" column="storage_location"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="specDesc" column="spec_desc"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="lhMiddleNightFinishQty" column="lh_middle_night_finish_qty"/>
+        <result property="cxMonthFinishQty" column="cx_month_finish_qty"/>
+        <result property="planModifyQty" column="plan_modify_qty"/>
+        <result property="rejectQty" column="reject_qty"/>
+        <result property="newestPlanQty" column="newest_plan_qty"/>
+        <result property="class3PlannedQty" column="class3_planned_qty"/>
+        <result property="singleShiftLhQty" column="single_shift_lh_qty"/>
+        <result property="totalStock" column="total_stock"/>
+        <result property="extendedStock" column="extended_stock"/>
+        <result property="monthStock" column="month_stock"/>
+        <result property="actualOverProduction" column="actual_over_production"/>
+        <result property="expectedOverProduction" column="expected_over_production"/>
+        <result property="differenceOverProduction" column="difference_over_production"/>
+        <result property="class1AvailableLhShift" column="class1_available_lh_shift"/>
+        <result property="class1PlanQty" column="class1_plan_qty"/>
+        <result property="class1AnalysisInput" column="class1_analysis_input"/>
+        <result property="class1Analysis" column="class1_analysis"/>
+        <result property="class2AvailableLhShift" column="class2_available_lh_shift"/>
+        <result property="class2PlanQty" column="class2_plan_qty"/>
+        <result property="class2AnalysisInput" column="class2_analysis_input"/>
+        <result property="class2Analysis" column="class2_analysis"/>
+        <result property="class3AvailableLhShift" column="class3_available_lh_shift"/>
+        <result property="class3PlanQty" column="class3_plan_qty"/>
+        <result property="class3Analysis" column="class3_analysis"/>
+        <result property="class4AvailableLhShift" column="class4_available_lh_shift"/>
+        <result property="class4PlanQty" column="class4_plan_qty"/>
+        <result property="class4Analysis" column="class4_analysis"/>
+        <result property="class5AvailableLhShift" column="class5_available_lh_shift"/>
+        <result property="class5PlanQty" column="class5_plan_qty"/>
+        <result property="class5Analysis" column="class5_analysis"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="class3AnalysisInput" column="class3_analysis_input"/>
+        <result property="class4AnalysisInput" column="class4_analysis_input"/>
+        <result property="class5AnalysisInput" column="class5_analysis_input"/>
+        <result property="class1Sort" column="class1_sort"/>
+        <result property="class2Sort" column="class2_sort"/>
+        <result property="class3Sort" column="class3_sort"/>
+        <result property="class4Sort" column="class4_sort"/>
+        <result property="class5Sort" column="class5_sort"/>
+        <result property="lhMachineChangeMoldDesc" column="LH_MACHINE_CHANGE_MOLD_DESC"/>
+    </resultMap>
+
+    <sql id="selectCxScheduleResultVo">
+        select id, cx_batch_no, order_no, task_type, schedule_date, production_status, cx_machine_code, cx_machine_name,
+        lh_machine_code, lh_machine_name, lh_machine_qty, minimum_lh_machine_req_qty, available_mold_qty,
+        maximum_class_qty, work_shifts, storage_location, sap_code, spec_desc, embryo_code, lh_middle_night_finish_qty,
+        cx_month_finish_qty, plan_modify_qty, reject_qty, newest_plan_qty, class3_planned_qty, single_shift_lh_qty,
+        total_stock, extended_stock, month_stock, actual_over_production, expected_over_production,
+        difference_over_production, class1_available_lh_shift, class1_plan_qty, class1_analysis_input, class1_analysis,
+        class2_available_lh_shift, class2_plan_qty, class2_analysis_input, class2_analysis, class3_available_lh_shift,
+        class3_plan_qty, class3_analysis, class4_available_lh_shift, class4_plan_qty, class4_analysis,
+        class5_available_lh_shift, class5_plan_qty, class5_analysis, create_by, create_time, update_by, update_time,
+        del_flag, remark, mark_close_out_tip, spec_dimension, is_release, class3_analysis_input, class4_analysis_input,
+        class5_analysis_input, class1_sort, class2_sort, class3_sort, class4_sort, class5_sort,LH_MACHINE_CHANGE_MOLD_DESC from t_cx_schedule_result
+    </sql>
+
+    <select id="selectAllByOrderNoAndDelFlag" resultMap="CxScheduleResultResult">
+        <include refid="selectCxScheduleResultVo"/>
+        where
+        order_no = #{orderNo,jdbcType=VARCHAR}
+        AND del_flag = '0'
+    </select>
+    <select id="selectOneByOrderNoAndDelFlag" resultMap="CxScheduleResultResult">
+        <include refid="selectCxScheduleResultVo"/>
+        where
+        order_no = #{orderNo,jdbcType=VARCHAR}
+        AND del_flag = '0'
+    </select>
+    <update id="updateLhProductionStatusByOrderNo">
+        update T_LH_SCHEDULE_RESULT
+         set production_status = #{productionStatus,jdbcType=VARCHAR}
+        where
+        order_no = #{orderNo,jdbcType=VARCHAR}
+         AND del_flag = '0'
+    </update>
+    <!-- 根据工单号更新胎面排程的生产状态 -->
+    <update id="updateTmProductionStatusByOrderNo">
+	    MERGE INTO T_TM_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新胎侧排程的生产状态 -->
+    <update id="updateTcProductionStatusByOrderNo">
+	    MERGE INTO T_TC_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新内衬排程的生产状态 -->
+    <update id="updateNcProductionStatusByOrderNo">
+	    MERGE INTO T_NC_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新胎圈排程的生产状态 -->
+    <update id="updateTqProductionStatusByOrderNo">
+	    MERGE INTO T_TQ_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新钢丝圈排程的生产状态 -->
+    <update id="updateGsqProductionStatusByOrderNo">
+	    MERGE INTO T_GSQ_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新15度裁断排程的生产状态 -->
+    <update id="updateCd15ProductionStatusByOrderNo">
+	    MERGE INTO T_CD15_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新90度裁断排程的生产状态 -->
+    <update id="updateCd90ProductionStatusByOrderNo">
+	    MERGE INTO T_CD90_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 根据工单号更新纤维压延排程的生产状态 -->
+    <update id="updateXwyyProductionStatusByOrderNo">
+	    MERGE INTO T_XWYY_SCHEDULE_RESULT A
+		<include refid="updateProductionStatusByOrderNo"/>
+    </update>
+    <!-- 更新生产状态的sql片段，可用于所有工序 -->
+    <sql id="updateProductionStatusByOrderNo">
+    		USING (
+        <foreach collection="statusList" item="status" separator=" union ">
+        	<if test="status.isModify">
+			   SELECT #{status.productionStatus} PRODUCTION_STATUS, 
+			   		  #{status.markCloseOutTip} MARK_CLOSE_OUT_TIP,
+			   		  #{status.orderNo} ORDER_NO
+		         FROM DUAL
+		    </if>
+		</foreach>
+		         ) B
+		ON (A.ORDER_NO = B.ORDER_NO)
+		WHEN MATCHED THEN
+		  UPDATE
+		     SET A.PRODUCTION_STATUS  = B.PRODUCTION_STATUS,
+		         A.MARK_CLOSE_OUT_TIP = B.MARK_CLOSE_OUT_TIP
+    </sql>
+    <update id="updateTaskTypeBySapCodeAndLhMachineCodeAndScheduleDate">
+        update t_cx_schedule_result
+        set task_type = '3'
+        where sap_code = #{sapCode,jdbcType=VARCHAR}
+          AND instr(lh_machine_code, #{lhMachineCode,jdbcType=VARCHAR}) > 0
+          AND schedule_date = to_date(#{scheduleDate}, 'yyyy-MM-dd')
+          AND del_flag = '0'
+    </update>
+    <update id="updateProductionStatusByOrderNoIn">
+        update t_cx_schedule_result
+        set production_status = '1', UPDATE_TIME = sysdate
+        where
+        production_status = '0'
+        and
+        order_no in
+        <foreach collection="orderNoList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+    </update>
+    <update id="updateLhProductionStatusByOrderNoIn">
+        update T_LH_SCHEDULE_RESULT
+        set production_status = '3', UPDATE_TIME = SYSDATE
+        where
+        production_status = '2'
+        and
+        order_no in
+        <foreach collection="orderNoList" item="item" open="(" close=")" separator=",">
+            #{item,jdbcType=VARCHAR}
+        </foreach>
+    </update>
+</mapper>

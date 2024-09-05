@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.mapper.XwyyBigRollRemindMapper">
+
+    <resultMap type="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind" id="XwyyBigRollRemindResult">
+        <result property="id" column="id"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="remindFlag" column="remind_flag"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectXwyyBigRollRemindVo">
+        select id, big_roll_code, remind_flag, del_flag, create_by, create_time, update_by, update_time, remark from t_xwyy_big_roll_remind
+    </sql>
+
+    <select id="selectXwyyBigRollRemindList" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind"
+            resultMap="XwyyBigRollRemindResult">
+        <include refid="selectXwyyBigRollRemindVo"/>
+        where del_flag = '0'
+        <if test="bigRollCode != null  and bigRollCode != ''">and INSTR(big_roll_code, #{bigRollCode}) > 0</if>
+        <if test="remindFlag != null  and remindFlag != ''">and remind_flag = #{remindFlag}</if>
+        <if test="orderStr == null">order by CREATE_TIME desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <select id="selectXwyyBigRollRemindById" parameterType="Long" resultMap="XwyyBigRollRemindResult">
+        <include refid="selectXwyyBigRollRemindVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertXwyyBigRollRemind" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_xwyy_big_roll_remind
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="bigRollCode != null">big_roll_code,</if>
+            <if test="remindFlag != null">remind_flag,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="bigRollCode != null">#{bigRollCode},</if>
+            <if test="remindFlag != null">#{remindFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateXwyyBigRollRemind" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind">
+        update t_xwyy_big_roll_remind
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="bigRollCode != null">big_roll_code = #{bigRollCode},</if>
+            <if test="remindFlag != null">remind_flag = #{remindFlag},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteXwyyBigRollRemindById" parameterType="Long">
+        update t_xwyy_big_roll_remind
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteXwyyBigRollRemindByIds" parameterType="String">
+        update t_xwyy_big_roll_remind set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_xwyy_big_roll_remind a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.bigRollCode,jdbcType=VARCHAR} big_roll_code,
+            #{item.remindFlag,jdbcType=VARCHAR} remind_flag, #{item.delFlag,jdbcType=VARCHAR} del_flag,
+            #{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR} remark from dual
+        </foreach>
+        ) b ON (
+        a.big_roll_code = b.big_roll_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.remind_flag = b.remind_flag
+            , a.update_by = b.create_by
+            , a.update_time = sysdate
+            , a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.big_roll_code, a.remind_flag, a.del_flag, a.create_by, a.create_time,
+        a.remark
+        )
+        values (
+        SEQ_PUBLIC.NEXTVAL, b.big_roll_code, b.remind_flag, 0, b.create_by, sysdate,
+        b.remark
+        )
+    </update>
+
+    <select id="checkXwyyBigRollRemindUnique" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind"
+            resultType="int">
+        select count(id) from t_xwyy_big_roll_remind
+        where del_flag = 0
+        <if test="bigRollCode != null">and big_roll_code = #{bigRollCode}</if>
+        <if test="id != null">and id != #{id}</if>
+    </select>
+</mapper>

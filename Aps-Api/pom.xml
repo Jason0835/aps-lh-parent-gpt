@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <packaging>pom</packaging>
+    <modules>
+        <module>tm-api</module>
+        <module>lh-api</module>
+        <module>cx-api</module>
+        <module>mps-api</module>
+        <module>tc-api</module>
+        <module>nc-api</module>
+        <module>cd15-api</module>
+        <module>cd90-api</module>
+        <module>gdyy-api</module>
+        <module>xwyy-api</module>
+        <module>tq-api</module>
+        <module>gsq-api</module>
+        <module>aps-all-api</module>
+    </modules>
+    <parent>
+        <groupId>com.ruoyi</groupId>
+        <artifactId>ruoyi</artifactId>
+        <version>2.2.2-SNAPSHOT</version>
+    </parent>
+
+    <groupId>com.zlt.aps</groupId>
+    <artifactId>aps-api</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+
+</project>

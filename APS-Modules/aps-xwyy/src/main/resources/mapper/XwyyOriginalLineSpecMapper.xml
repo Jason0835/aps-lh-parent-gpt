@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.mapper.XwyyOriginalLineSpecMapper">
+
+    <select id="listOriginalLineSpec" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyOriginalLineSpec"
+            resultType="com.zlt.aps.xwyy.api.domain.entity.XwyyOriginalLineSpec">
+        select *
+        from t_xwyy_original_line_spec
+        where DEL_FLAG = 0
+        <if test="originalLineCode != null and originalLineCode != ''">
+            and INSTR(ORIGINAL_LINE_CODE, #{originalLineCode, jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="originalLineName != null and originalLineName != ''">
+            and INSTR(ORIGINAL_LINE_NAME, #{originalLineName, jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_xwyy_original_line_spec a USING (
+        <foreach collection="list" item="OriginalLineSpec" separator=" union ">
+            select
+            #{OriginalLineSpec.originalLineCode,jdbcType=VARCHAR} ORIGINAL_LINE_CODE,
+            #{OriginalLineSpec.originalLineName,jdbcType=VARCHAR} ORIGINAL_LINE_NAME,
+            #{OriginalLineSpec.originalLineLength,jdbcType=DOUBLE} ORIGINAL_LINE_LENGTH,
+            #{OriginalLineSpec.createBy,jdbcType=VARCHAR} create_by,
+            #{OriginalLineSpec.createTime,jdbcType=DATE} create_time,
+            #{OriginalLineSpec.updateBy,jdbcType=VARCHAR} update_by,
+            #{OriginalLineSpec.updateTime,jdbcType=DATE} update_time,
+            #{OriginalLineSpec.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.ORIGINAL_LINE_CODE = b.ORIGINAL_LINE_CODE
+        AND a.del_flag = '0'
+        )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.ORIGINAL_LINE_LENGTH = b.ORIGINAL_LINE_LENGTH,
+        a.ORIGINAL_LINE_NAME = b.ORIGINAL_LINE_NAME,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.ORIGINAL_LINE_CODE ,
+        a.ORIGINAL_LINE_NAME ,
+        a.ORIGINAL_LINE_LENGTH ,
+        a.create_by ,
+        a.create_time ,
+        a.remark, a.del_flag
+        ) values
+        (SEQ_PUBLIC.NEXTVAL,
+        b.ORIGINAL_LINE_CODE ,
+        b.ORIGINAL_LINE_NAME ,
+        b.ORIGINAL_LINE_LENGTH ,
+        b.create_by,
+        sysdate,
+        b.remark, '0'
+        )
+    </update>
+</mapper>

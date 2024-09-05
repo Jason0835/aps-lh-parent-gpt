@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改机台信息')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-info-edit" th:object="${machineInfo}">
+        <input id="machineId" name="id" th:field="*{id}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.machine.machineCode}]]：</label>
+            <div class="col-sm-8">
+                <input id="machineCode" name="machineCode" th:field="*{machineCode}" class="form-control" type="text"
+                       required="true" isCode="true" maxlength="30">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.machine.machineName}]]：</label>
+            <div class="col-sm-8">
+                <input id="machineName" name="machineName" th:field="*{machineName}" class="form-control" type="text" required="true" maxlength="20">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.widthMin}]]：</label>
+            <div class="col-sm-8">
+                <input id="widthMin" name="widthMin" th:field="*{widthMin}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.widthMax}]]：</label>
+            <div class="col-sm-8">
+                <input id="widthMax" name="widthMax" th:field="*{widthMax}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.thickMin}]]：</label>
+            <div class="col-sm-8">
+                <input id="thickMin" name="thickMin" th:field="*{thickMin}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.thickMax}]]：</label>
+            <div class="col-sm-8">
+                <input id="thickMax" name="thickMax" th:field="*{thickMax}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.quata}]]：</label>
+            <div class="col-sm-8">
+                <input name="quata" th:field="*{quata}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.classShift}]]：</label>
+            <div class="col-sm-8">
+                <div class="radio-box" th:each="dict : ${@dict.getType('CLASS_SHIFT')}">
+                    <input type="radio" th:id="${dict.dictCode}" name="classShift" th:value="${dict.dictValue}"
+                    th:checked="${machineInfo.id==null?dict.default:(machineInfo.classShift==dict.dictValue)}">
+                    <label th:for="${dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group bc_two">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.openMachineClass}]]：</label>
+            <div class="col-sm-8">
+                <div class="radio-box" th:each="dict : ${@dict.getType('CLASS_NUM')}">
+                    <input type="checkbox" th:id="${dict.dictCode}" name="openMachineClass" th:value="${dict.dictValue}"
+                           th:checked="${#arrays.contains(#strings.arraySplit(machineInfo.openMachineClass==null?'':machineInfo.openMachineClass,','),#strings.toString(dict.dictValue))}">
+                    <label th:for="${dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                </div>
+            </div>
+        </div>
+        <div class="form-group bc_three">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.openMachineClass}]]：</label>
+            <div class="col-sm-8">
+                <div class="radio-box" th:each="dict : ${@dict.getType('CLASS_NUM_THREE')}">
+                    <input type="checkbox" th:id="${dict.dictCode}" name="openMachineClassThree" th:value="${dict.dictValue}"
+                           th:checked="${#arrays.contains(#strings.arraySplit(machineInfo.openMachineClass==null?'':machineInfo.openMachineClass,','),#strings.toString(dict.dictValue))}">
+                    <label th:for="${dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.machine.status}]]：</label>
+            <div class="col-sm-8">
+                <label class="toggle-switch switch-solid">
+                    <input type="checkbox" id="status" th:checked="${machineInfo.status == '0' || machineInfo.status == null ? true : false}">
+                    <span></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "tc/machine";
+    var CLASS_SHIFT = [[${@dict.getType('CLASS_SHIFT')}]];  //班次键值对
+
+    $(function () {
+        var machineId = $("#machineId").val();
+        if(machineId !="") { //编辑页面
+            $('#machineCode').attr("disabled","disabled");
+            $("#span1").css("color","white");
+        }
+        var radios = $("input[name=classShift]");
+        if(radios[0].parentNode.className.indexOf("checked")!=-1){
+            //两班制
+            $(".bc_three").hide();
+            $("input[name=openMachineClassThree]").parent("div").removeClass("checked");
+        }else{
+            //三班制
+            $(".bc_two").hide();
+            $("input[name=openMachineClass]").parent("div").removeClass("checked");
+        }
+
+        $('input[name=classShift]').on('ifChecked', function(event){
+            if(event.target.value==CLASS_SHIFT[0].dictValue){
+                //两班制
+                $(".bc_three").hide();
+                $(".bc_two").show();
+            }else if(event.target.value==CLASS_SHIFT[1].dictValue){
+                //三班制
+                $(".bc_three").show();
+                $(".bc_two").hide();
+            }
+        });
+    });
+
+    $("#form-info-edit").validate({
+        onkeyup: false,
+        rules: {
+            machineCode: {
+                remote: {
+                    url: prefix + "/checkMachineCodeUnique",
+                    type: "post",
+                    dataType: "json",
+                    data: {
+                        "id": function () {
+                            return $("#machineId").val();
+                        },
+                        "machineCode": function () {
+                            return $.common.trim($("#machineCode").val());
+                        }
+                    },
+                    dataFilter: function (data, type) {
+                        return $.validate.unique(data);
+                    }
+                }
+            },
+            machineName: {
+                remote: {
+                    url: prefix + "/checkMachineCodeUnique",
+                    type: "post",
+                    dataType: "json",
+                    data: {
+                        "id": function () {
+                            return $("#machineId").val();
+                        },
+                        "machineName": function () {
+                            return $.common.trim($("#machineName").val());
+                        }
+                    },
+                    dataFilter: function (data, type) {
+                        return $.validate.unique(data);
+                    }
+                }
+            },
+        },
+        messages: {
+            "machineCode": {
+                remote: [[#{ui.data.column.cx.machine.message}]]
+            },
+            "machineName": {
+                remote: [[#{ui.data.column.cx.machineName.message}]]
+            }
+        },
+        focusCleanup: true
+    });
+
+    function submitHandler(){
+        if ($.validate.form()) {
+            var config = {
+                url: prefix + "/checkMachineCodeUnique",
+                type: "post",
+                dataType: "json",
+                data:{
+                    "id": $("#machineId").val(),
+                    "machineCode": $("#machineCode").val(),
+                },
+                success: function (result) {
+                    if('1'==result){
+                        $.modal.alertWarning([[#{ui.data.column.cx.machine.message}]]);
+                    }else if('0'==result){
+                        checkMachineName();
+                    }
+                }
+            };
+            $.ajax(config)
+        }
+    }
+
+    function checkMachineName(){
+        var config = {
+            url: prefix + "/checkMachineCodeUnique",
+            type: "post",
+            dataType: "json",
+            data:{
+                "id": $("#machineId").val(),
+                "machineName": $("#machineName").val(),
+            },
+            success: function (result) {
+                if('1'==result){
+                    $.modal.alertWarning([[#{ui.data.column.cx.machineName.message}]]);
+                }else if('0'==result){
+                    lastSubmit();
+                }
+            }
+        };
+        $.ajax(config)
+    }
+
+    function lastSubmit() {
+        var widthMin = $("#widthMin").val();
+        var widthMax = $("#widthMax").val();
+        var thickMin = $("#thickMin").val();
+        var thickMax = $("#thickMax").val();
+        if(Number(widthMin)>Number(widthMax) && $.common.isNotEmpty(widthMax)){
+            $.modal.alertWarning([[#{ui.data.column.machine.widthMaxBigThanWidthMin}]]);
+            return ;
+        }
+        if(Number(thickMin)>Number(thickMax)  && $.common.isNotEmpty(thickMax)){
+            $.modal.alertWarning([[#{ui.data.column.machine.thickMaxBigThanThickMin}]]);
+            return ;
+        }
+        if ($.validate.form()) {
+            var data = $("#form-info-edit").serializeArray();
+            var classShift = "2";
+            for(var i = 0;i<data.length;i++){
+                if(data[i].name=="classShift"&&data[i].value=="2"){
+                    //两班次
+                    classShift = "2";
+                }else if(data[i].name=="classShift"&&data[i].value=="3"){
+                    //三班次
+                    classShift = "3";
+                }
+            }
+            for(var i = 0;i<data.length;i++){
+                if(data[i].name=="openMachineClassThree"||data[i].name=="openMachineClass"){
+                    data.splice(i,1);
+                    i--;
+                }
+            }
+            var checkBoxs = $("input[name=openMachineClass]").parent("div");
+            if(classShift=="3"){
+                var checkBoxs = $("input[name=openMachineClassThree]").parent("div");
+            }
+            for(var i = 0;i<checkBoxs.length;i++){
+                if(checkBoxs[i].className.indexOf("checked")!=-1){
+                    data.push({name:"openMachineClass",value:checkBoxs[i].firstChild.value});
+                }
+            }
+            var status = $("input[id='status']").is(':checked') == true ? '0' : '1';
+            data.push({"name": "status", "value": status});
+            $.operate.save(prefix + "/edit", data);
+        }
+    }
+</script>
+</body>
+</html>

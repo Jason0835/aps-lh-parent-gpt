@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@192.168.2.101:1521/zlt
+    username: LL_APS
+    password: LL_APS
+    driverClassName: oracle.jdbc.driver.OracleDriver
+    hikari:
+      connectionTimeout: 120000
+      maximumPoolSize: 2500
+      maxLifetime: 60000
+      minimumIdle: 20
+      validationTimeout: 8000
+      idleTimeout: 50000
+  redis:
+    database: 1
+    host: 192.168.2.93
+    port: 6379
+    password:
+  #rabbitmq 配置
+  rabbitmq:
+    username: aps_mq
+    password: aps_mq
+    host: 192.168.2.93
+    port: 5672
+#引用包时，要加入的配置参数，否则找不到mapper
+mybatis:
+  # 配置mapper的扫描，找到所有的mapper.xml映射文件
+  mapperLocations: classpath:mapper/*.xml
+i18n_msg:
+  baseName: none
+mq:
+  scheduleLog:
+    queue: dev.cd90.schedule.log.queue
+    exchange: dev.cd90.schedule.log.exchange
+    rutekey: dev.cd90.schedule.log.rutekey

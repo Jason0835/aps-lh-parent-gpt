@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('甘特图')" />
+    <th:block th:include="include :: datetimepicker-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.mdmMonthProdPlan.mainPlanMonth}]]：</label>
+                            <input id="scheduleDate" name="scheduleDate" class="form-control" th:value="${scheduleDate}" th:placeholder="#{ui.data.column.cx.monthStock.stockMonth}" type="text">
+                        </li>
+
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onClick="gantSearch()"><i class="fa fa-search"></i>&nbsp;搜索</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <div class="mainPanl">
+                <div class="panl_li">
+                    <div class="machineTitle">规格</div>
+                </div>
+                <div class="dataPanl">
+                    <div id="machinePanl">
+
+                    </div>
+                    <div id="gantPanl"></div>
+                    <div style="clear: both;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<th:block th:include="include :: datetimepicker-js"/>
+<script>
+    var prefix = ctx + "lh/scheduleResult";
+    var dataJson = []
+    var startDay = 1;
+    var endDay = 31;
+
+    // 日期控件
+    $("input[name='scheduleDate']").datetimepicker({
+        format: "yyyy-mm",
+        startView: 3,//代表日期控件打开默认展示的是月
+        minView: 3,//代表日期控件展示的最低到月
+        maxView: 4,//代表日期控件展示的最高到年
+        autoclose: true,
+    });
+
+    $(function () {
+        initGant();
+        $(window).resize(function (){
+            // initGant();
+        })
+    });
+
+    function initGant(){
+        //初始化表头
+        initTitle({startDay:1,endDay:31});
+        //初始化数据
+        initDate();
+    }
+
+    function gantSearch() {
+        initGant();
+    }
+
+
+    //获取数据并渲染
+    function initDate() {
+        var scheduleDate=$("#scheduleDate").val();
+        var config = {
+            url: prefix + "/getGantData",
+            type: "post",
+            dataType: "json",
+            data: {"flag": 2,"scheduleDate":scheduleDate},
+            success: function (result) {
+                if (result.code == web_status.SUCCESS){
+                    dataJson = result.data;
+                    initGrid();
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+            }
+        };
+        $.ajax(config);
+    }
+
+    //initTitle
+    function initTitle(params){
+
+        $('#gantPanl').children().remove();
+        $('.panl_li').children().remove();
+
+        var width = ($(document).width()-290)/params.endDay;
+        if(width<40){
+            width=40;
+        }
+        oneDayWidth = width;
+        var str = "<div class=\"machineTitle\">规格</div>";
+
+        for(var i = parseInt(params.startDay);i<=parseInt(params.endDay);i++){
+            str+='<div class="title_all bg_blue"><div class="title_day">'+i+'号</div></div>'
+        }
+        $('.mainPanl').css('width',width*params.endDay+250+"px");
+        $('.panl_li').css('width',width*params.endDay+250+"px");
+        $('#gantPanl').css('width',width*params.endDay+24+"px");
+        $('.panl_li').append(str);
+        $('#gantPanl').append("<div class='linePnal'></div><div style='clear:both'></div>");
+        $('.title_all').css('width',width+"px")
+    }
+
+
+    function initGrid(){
+        //数据分组及排序
+        var data = getGroupData(dataJson);
+        $('.machineTitleItem').remove()
+        for(var i = 0;i<data.length;i++){
+            var stopTimes = 0;
+            var str = "";
+            var height = 60
+            if(data[i].data.length>0){
+                height = 60*data[i].data.length
+            }
+            str+='<div class="machineTitleItem" style="height:'+height+'px;line-height:20px">'+data[i].machineCode+'</div>';
+            $('#machinePanl').append(str)
+            var dataItem = data[i].data;
+            dataItem.sort((a,b) => a.startDay-b.startDay);//按开始日期排序
+            var strItem = "";
+            for(var j = 0;j<dataItem.length;j++){
+                var marginLeft = 0;
+                var width = 0;
+                var itemStartDay = parseInt(dataItem[j].startDay);
+                var itemEndDay = parseInt(dataItem[j].endDay);
+                width = (itemEndDay-itemStartDay+1)*(oneDayWidth+1);
+                marginLeft = (itemStartDay-startDay)*(oneDayWidth+1);
+                var colorClass = "bg_item_yellow";
+                if(i%2!=0){
+                    colorClass = "bg_item_green";
+                }
+                var tooltipClass = "lineItemBottom";
+                if((data.length-i)<=4&&(dataItem.length-j)<=4){
+                    tooltipClass = "lineItemTop";
+                }
+                if(i==1&&j<4){
+                    tooltipClass = "lineItemBottom";
+                }
+                if(24-itemStartDay<=8){
+                    tooltipClass+=" lineItemLeft"
+                }
+
+                var strItem="<div class='lineItem'>";
+                if (j==dataItem.length-1) {
+                    strItem="<div class='lineItem' style='border-bottom: 1px solid black;'>";
+                }
+                strItem+="<div class='"+tooltipClass+" "+colorClass+"' style='margin-left:"+marginLeft+"px;width:"+width+"px'>" +
+                    "<span>计划量"+dataItem[j].ydl+"、完成量"+dataItem[j].ywcl+"</span>"+
+                    "<span class='tooltiptext'>" +
+                    "<div style='border-bottom: 1px solid;text-overflow: ellipsis;white-space: nowrap; overflow: hidden;'>" +
+                    "<span class='tooltipLab3'>规格：</span><span class='tooltipVal'>"+dataItem[j].innerMsg+"</span></div>" +
+                    "<span class='tooltipLab'>SAP品号：</span><span class='tooltipVal'>"+dataItem[j].cpdh+"</span>"+
+                    "<span class='tooltipLab'>胎胚代号：</span><span class='tooltipVal'>"+dataItem[j].specdh+"</span><br>"+
+                    "<span class='tooltipLab'>计划量：</span><span class='tooltipVal'>"+dataItem[j].ydl+"</span>"+
+                    "<span class='tooltipLab'>已完成量：</span><span class='tooltipVal'>"+dataItem[j].ywcl+"</span><br>"+
+                    "</span></div></div>";
+
+                $('.linePnal').append(strItem);
+            }
+
+        }
+    }
+
+    function getGroupData(data){
+        var markData = []
+        for(var i = 0;i<data.length;i++){
+            if(markData.length==0){
+                markData.push({
+                    machineCode:data[i].codeId,
+                    data:[data[i]]
+                })
+            }else{
+                for(var j=0;j<markData.length;j++){
+                    if(data[i].codeId==markData[j].machineCode){
+                        markData[j].data.push(data[i]);
+                        break;
+                    }else if(j==(markData.length-1)){
+                        markData.push({
+                            machineCode:data[i].codeId,
+                            data:[]
+                        })
+                    }
+                }
+            }
+        }
+        return markData;
+    }
+
+    function linkToPage(){
+        window.location="machine4.html"
+    }
+
+
+</script>
+</body>
+<style>
+    body{
+        margin: 0;
+        font-size: 12px;
+    }
+    .mainPanl{
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: calc(100vh - 150px) !important;
+        width: 1640px;
+    }
+    .machineTitle{
+        width: 210px;
+        height: 30px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 30px;
+        background-color: #fff;
+        float: left;
+    }
+    .machineTitleDom{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+    }
+    .machineTitleItem{
+        width: 210px;
+        height: 60px;
+        border: 1px solid;
+        border-top: 0;
+        text-align: left;
+        line-height: 20px;
+        word-break: break-all;
+        overflow: hidden;
+    }
+    #machinePanl{
+        float: left;
+        font-size: 14px;
+    }
+    .panl_li{
+        width: 1640px;
+        position: absolute;
+        z-index: 99;
+    }
+    .bg_blue{
+        background-color: #ddebf7;
+    }
+    .bg_pink{
+        background-color: #fce4d6;
+    }
+    .title_hour{
+        width: 25px;
+        height: 30px;
+        float: left;
+    }
+    .title_all_items{
+        height: 63px;
+        float: left;
+    }
+    .title_all_dom{
+        height: 65px;
+        width: 100%;
+    }
+    .title_all {
+        text-align: center;
+        float: left;
+        border: 1px solid;
+        border-left: 0;
+        line-height: 30px;
+        font-size: 14px;
+    }
+    .title_day{
+        font-size: 17px;
+        font-weight: bold;
+    }
+    .title_hours{
+        clear: both;
+        width: 600px;
+        height: 30px;
+    }
+    .linePnal{
+        float: left;
+        width: 100%;
+        position: relative;
+    }
+    .lineItem{
+        height: 60px;
+    }
+    .bg_item_blue{
+        background-color: #7b859f;
+    }
+    .bg_item_green{
+        background-color: #a5d4c2;
+    }
+    .bg_item_yellow{
+        background-color: #e9d276;
+    }
+    .bg_item_rin{
+        background-color: #89d1d8;
+    }
+    .bg_item_black{
+        background-color: #e6e7ec;
+    }
+    .lineItemBottom,.lineItemTop{
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black; /* 悬停元素上显示点线 */
+        height: 35px;
+        line-height: 35px;
+        border-radius: 20px;
+        white-space: nowrap;
+        cursor: pointer;
+        margin-top: 11px;
+        text-align: center;
+    }
+    .lineItemBottom .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        height: 117px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 2px;
+        border-radius: 6px;
+        position: absolute;
+        z-index: 1;
+        bottom: -117px;
+        left: 35%;
+        margin-left: -2px;
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+    /* Tooltip 文本 */
+    .lineItemTop .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        height: 117px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 2px;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: -117px;
+        left: 30%;
+        margin-left: -200px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+        overflow: hidden;
+    }
+
+    /* Tooltip 文本 */
+    .lineItemLeft .tooltiptext {
+        margin-left: -450px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+    }
+
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemBottom:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemTop:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+
+    /*tooltip样式*/
+    .tooltipLab{
+        width: 75px;
+        display: inline-block;
+        text-align: left;
+    }
+    .tooltipLab2{
+        width: 75px;
+        display: inline-block;
+        text-align: left;
+        margin-left: -44%;
+    }
+    .tooltipLab3{
+        width: 75px;
+        display: inline-block;
+        text-align: right;
+        margin-left: -58%;
+    }
+    .tooltipVal{
+        width: 120px;
+        display: inline-block;
+        text-align: left;
+    }
+    .itemIndex{
+        width: 20px;
+        height: 20px;
+        margin-top: 2px;
+        margin-left: 5px;
+        display: inline-block;
+        line-height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        color: #fff;
+        background-color: #d15686;
+        margin-right: 5px;
+    }
+    /* *{
+        box-sizing: content-box;
+    } */
+    #gantPanl{
+        width: 1530px;
+        float: left;
+    }
+    .table-striped {
+        overflow-x: scroll;
+        position: relative;
+        overflow-y: auto;
+        height: calc(100vh - 120px) !important;
+    }
+    .dataPanl{
+        padding-top: 32px;
+    }
+    .dataPanl div{
+        box-sizing: content-box;
+    }
+    .panl_li div{
+        box-sizing: content-box;
+    }
+    hr{
+        margin-bottom: 0;
+        margin-top: 0;;
+    }
+</style>
+</html>

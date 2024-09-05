@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd15.mapper.Cd15LineSideStockMapper">
+	
+    <select id="selectStockList" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15LineSideStock">
+        select id, 
+               stock_date, 
+               s.machine_code,
+               m.machine_name,
+               material_code, 
+               bar_code,
+               stock_num, 
+               remark, 
+               del_flag, 
+               create_by, 
+               create_time, 
+               update_by, 
+               update_time 
+          from t_cd15_line_side_stock s
+          left join (
+            SELECT m.machine_code, max(m.machine_name) machine_name
+              FROM t_cd15_machine_info m
+             WHERE m.del_flag = '0'
+             GROUP BY m.machine_code
+          ) m ON m.machine_code = s.machine_code
+         where del_flag='0'
+        <if test="startTime != null and startTime !='' ">
+            and stock_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !='' ">
+            and stock_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+        </if>
+        <if test="materialCode != null  and materialCode != ''">
+            and INSTR(material_code, #{materialCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by stock_date desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+    
+    <!-- 删除15度裁断库存数据 -->
+    <update id="deleteCd15LineSideStock">
+    	UPDATE t_cd15_line_side_stock
+    	   SET del_flag = '1',
+    	       update_by = #{userName, jdbcType=VARCHAR},
+    	       update_time = sysdate
+    	 WHERE stock_date = (
+		       SELECT max(STOCK_DATE)
+		  	      FROM MES_CD15_LINESIDE_STOCK@sync_data
+		  	     WHERE DATA_VERSION = #{dataVersion}
+    	     )
+    	   AND del_flag = '0'
+    </update>
+    
+    <!-- 更新15度裁断线边库 -->
+    <update id="insertCd15LineSideStock">
+        INSERT INTO t_cd15_line_side_stock (
+          id, 
+          stock_date,
+          BAR_CODE,
+          material_code,
+          machine_code, 
+          stock_num, 
+          create_by,
+          create_time, 
+          update_by,
+          update_time, 
+          del_flag
+        ) 
+        SELECT SEQ_cd15_line_side_stock.NEXTVAL,
+               STOCK_DATE,
+  	           BAR_CODE,
+  	           MATERIAL_CODE,
+  	           MACHINE_CODE,
+  	           AVAILABLE_STOCK,
+  	           #{userName, jdbcType=VARCHAR},
+  	           sysdate,
+  	           #{userName, jdbcType=VARCHAR},
+  	           sysdate,
+  	           '0'
+  	      FROM MES_CD15_LINESIDE_STOCK@sync_data
+  	     WHERE DATA_VERSION = #{dataVersion}
+    </update>
+</mapper>

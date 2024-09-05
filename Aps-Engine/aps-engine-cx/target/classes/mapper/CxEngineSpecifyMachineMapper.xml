@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineSpecifyMachineMapper">
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineSpecifyMachine" id="CxEngineSpecifyMachineResult">
+                    <result property="cxMachineCode"    column="machine_code"    />
+                    <result property="cxMachineName"    column="machine_name"    />
+                    <result property="sapCode"    column="SAP"    />
+                    <result property="embryoCode"    column="EMBRYO_CODE"    />
+                    <result property="jobType"    column="JOB_TYPE"    />
+            </resultMap>
+
+    <sql id="selectCxEngineSpecifyMachineVo">
+       select distinct tsm.SAP,tsm.EMBRYO_CODE,tsm.JOB_TYPE,tsml.Machine_code,cmi.machine_name
+       from T_SPECIFY_MACHINE tsm
+        left join T_SPECIFY_MACHINE_LIST tsml
+          on tsm.ID=tsml.SPECIFY_MACHINE_ID
+        left join t_cx_machine_info cmi
+            on tsml.machine_code=cmi.machine_code
+    </sql>
+
+    <select id="selectCxEngineSpecifyMachineList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineSpecifyMachine" resultMap="CxEngineSpecifyMachineResult">
+        select distinct t.SAP ,t.EMBRYO_CODE,t.JOB_TYPE,t.Machine_code,t.machine_name  from
+        (<include refid="selectCxEngineSpecifyMachineVo"/>
+        <where>
+            tsm.DEL_FLAG='0'  and tsml.PROCEDURE_CODE='1' and tsml.del_flag='0' and cmi.del_flag='0'
+            <if test="cxMachineCode != null  and cxMachineCode != ''"> and tsml.machine_code = #{cxMachineCode}</if>
+            <if test="sapCode != null  and sapCode != ''"> and tsm.SAP = #{sapCode}</if>
+            <if test="embryoCode != null  and embryoCode != ''"> and tsm.EMBRYO_CODE = #{embryoCode}</if>
+            <if test="jobType != null  and jobType != ''"> and tsm.job_type = #{jobType}</if>
+        </where>
+        union all
+        select distinct tcsm.SAP_CODE SAP,tcsm.EMBRYO_CODE,tcsm.JOB_TYPE,tcsm.Machine_code,cmi.machine_name  from  T_CX_SPECIFY_MACHINE tcsm
+        left join t_cx_machine_info cmi
+          on tcsm.machine_code=cmi.machine_code
+        <where>
+            tcsm.DEL_FLAG='0' and cmi.DEL_FLAG='0'
+            <if test="cxMachineCode != null  and cxMachineCode != ''"> and tcsm.machine_code = #{cxMachineCode}</if>
+            <if test="sapCode != null  and sapCode != ''"> and tcsm.SAP_CODE = #{sapCode}</if>
+            <if test="embryoCode != null  and embryoCode != ''"> and tcsm.EMBRYO_CODE = #{embryoCode}</if>
+            <if test="jobType != null  and jobType != ''"> and tcsm.job_type = #{jobType}</if>
+        </where>
+        )t
+    </select>
+</mapper>

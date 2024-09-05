@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('BOM信息列表')" />
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                [[#{ui.data.column.cx.bom.childMaterialCode}]]：
+                                <input type="text" name="childMaterialCode"/>
+                            </li>
+                            <li>
+                                [[#{ui.data.column.cx.bom.childMaterialName}]]：
+                                <input type="text" name="childMaterialName"/>
+                            </li>
+                            <li>
+                                [[#{ui.data.column.cx.bom.childCode}]]：
+                                <input type="text" name="childCode"/>
+                            </li>
+                            <li>
+                                [[#{ui.data.column.cx.bom.status}]]：
+                                <select name="status" th:with="type=${@dict.getType('BOM_STATUS')}">
+                                    <option value="">[[#{ui.frame.btn.all}]]</option>
+                                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+                                </select>
+                            </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.treeTable.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+                <a class="btn btn-info" id="expandAllBtn">
+                    <i class="fa fa-exchange"></i>[[#{ui.frame.btn.unfold}]]/[[#{ui.frame.btn.fold}]]
+                </a>
+            </div>
+
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-tree-table"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+     <script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+     <th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+     <th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "cx/bom";
+        var statusDatas = [[${@dict.getType('BOM_STATUS')}]];
+
+        $(function() {
+            var options = {
+                code: "childMaterialCode",
+                parentCode: "parentMaterialCode",
+                uniqueId: "id",
+                expandAll: false,
+                expandFirst: false,
+                url: prefix + "/list",
+                createUrl: prefix + "/add/{id}",
+                updateUrl: prefix + "/edit/{id}",
+                removeUrl: prefix + "/remove/{id}",
+                exportUrl: prefix + "/export",
+                modalName: [[#{ui.data.column.cx.bom.modelName}]],
+                fixedColumns: true,
+                columns: [
+                    {
+                        field: 'selectItem',
+                        radio: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'ID',
+                        width: '50',
+                        align: 'center',
+                    },
+                    {
+                        field: 'childMaterialCode',
+                        title: [[#{ui.data.column.cx.bom.childMaterialCode}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'childMaterialName',
+                        title: [[#{ui.data.column.cx.bom.childMaterialName}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'childMaterialNameCode',
+                        title: [[#{ui.data.column.cx.bom.childMaterialNameCode}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'childCode',
+                        title: [[#{ui.data.column.cx.bom.childCode}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'parentMaterialCode',
+                        title: [[#{ui.data.column.cx.bom.parentMaterialCode}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'parentMaterialName',
+                        title: [[#{ui.data.column.cx.bom.parentMaterialName}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'parentCode',
+                        title: [[#{ui.data.column.cx.bom.parentCode}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'unit',
+                        title: [[#{ui.data.column.cx.bom.unit}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'dosage',
+                        title: [[#{ui.data.column.cx.bom.dosage}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'dosageForm',
+                        title: [[#{ui.data.column.cx.bom.dosageForm}]],
+                        width: '150',
+                        align: 'center',
+                    },
+                    {
+                        field: 'productionStage',
+                        title: [[#{ui.data.column.cx.bom.productionStage}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'sapVersion',
+                        title: [[#{ui.data.column.cx.bom.sapVersion}]],
+                        width: '200',
+                        align: 'center',
+                    },
+                    {
+                        field: 'bomVersion',
+                        title: [[#{ui.data.column.cx.bom.bomVersion}]],
+                        width: '200',
+                        align: 'center',
+                    },
+                    {
+                        field: 'childMaterialVersion',
+                        title: [[#{ui.data.column.cx.bom.childMaterialVersion}]],
+                        width: '200',
+                        align: 'center',
+                    },
+                    {
+                        field: 'bomType',
+                        title: [[#{ui.data.column.cx.bom.bomType}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'status',
+                        title: [[#{ui.data.column.cx.bom.status}]],
+                        formatter: function(value, row, index) {
+                            return $.table.selectDictLabel(statusDatas, value);
+                        },
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'mesCreateDate',
+                        title: [[#{ui.data.column.cx.bom.mesCreateDate}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'mesUpdateDate',
+                        title: [[#{ui.data.column.cx.bom.mesUpdateDate}]],
+                        width: '100',
+                        align: 'center',
+                    },
+                    {
+                        field: 'remark',
+                        title: [[#{ui.data.column.cx.bom.remark}]],
+                        formatter:function (value, row, index) {
+                            return $.table.tooltip(value);
+                        },
+                        width: '200',
+                        align: 'center',
+                    },
+                ]
+            };
+            $.treeTable.init(options);
+        });
+    </script>
+</body>
+<style>
+    .bootstrap-tree-table .treetable-table {
+        overflow-x: scroll;
+        overflow-y: scroll;
+        width: 100%;
+    }
+    .table-striped .table>thead>tr>th, .table-striped .table>tbody>tr>th {
+        font-weight: normal;
+        font-size: 13px;
+        text-align: center;
+    }
+</style>
+</html>

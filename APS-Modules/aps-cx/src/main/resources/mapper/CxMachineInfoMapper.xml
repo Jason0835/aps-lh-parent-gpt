@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxMachineInfoMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxMachineInfo" id="CxMachineInfoResult">
+        <result property="id" column="id"/>
+        <result property="machineCode" column="machine_code"/>
+        <result property="machineName" column="machine_name"/>
+        <result property="type" column="TYPE"/>
+        <result property="machineType" column="MACHINE_TYPE"/>
+        <result property="dimensionMiniMum" column="dimension_minimum"/>
+        <result property="dimensionMaxiMum" column="dimension_maximum"/>
+        <result property="quata" column="quata"/>
+        <result property="quotaRatio" column="quota_ratio"/>
+        <result property="classShift" column="class_shift"/>
+        <result property="operatorQty" column="operator_qty"/>
+        <result property="openMachineClass1" column="open_machine_class1"/>
+        <result property="openMachineClass2" column="open_machine_class2"/>
+        <result property="openMachineClass3" column="open_machine_class3"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectCxMachineInfoVo">
+        select id, machine_code, machine_name, type,MACHINE_TYPE, dimension_minimum, dimension_maximum, quata,quota_ratio,
+        class_shift,operator_qty, open_machine_class1, open_machine_class2, open_machine_class3, status, remark,
+        del_flag, create_by, create_time, update_by, update_time from t_cx_machine_info
+    </sql>
+
+    <select id="selectCxMachineInfoList" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null and machineCode != ''">
+                AND INSTR(machine_code, #{machineCode}) > 0
+            </if>
+            <if test="machineName != null and machineName != ''">
+                AND instr(machine_name, #{machineName} )>0
+            </if>
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            <if test="type != null  and type != ''">and type = #{type}</if>
+            <if test="machineType != null  and machineType != ''">and machine_type = #{machineType}</if>
+        </where>
+        <if test="orderStr == null">
+            order by machine_name
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="listOrderByName" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null and machineCode != ''">
+                AND  machine_code = #{machineCode}
+            </if>
+            <if test="machineName != null and machineName != ''">
+                AND instr(machine_name, #{machineName} )>0
+            </if>
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            <if test="type != null  and type != ''">and type = #{type}</if>
+            <if test="machineType != null  and machineType != ''">and machine_type = #{machineType}</if>
+        </where>
+    </select>
+
+    <select id="checkMachineCodeUnique" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="id != null  and id != ''">and id != #{id}</if>
+            <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+        </where>
+    </select>
+
+    <select id="checkMachineNameUnique" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null  and machineCode != ''">and machine_code != #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+        </where>
+    </select>
+
+
+    <select id="selectCxMachineInfoById" parameterType="Long" resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertCxMachineInfo" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cx_machine_info
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="machineCode != null">machine_code,</if>
+            <if test="machineName != null">machine_name,</if>
+            <if test="type != null">type,</if>
+            <if test="dimensionMiniMum != null">dimension_minimum,</if>
+            <if test="dimensionMaxiMum != null">dimension_maximum,</if>
+            <if test="quata != null">quata,</if>
+            <if test="classShift != null">class_shift,</if>
+            <if test="openMachineClass1 != null">open_machine_class1,</if>
+            <if test="openMachineClass2 != null">open_machine_class2,</if>
+            <if test="openMachineClass3 != null">open_machine_class3,</if>
+            <if test="operatorQty != null">operator_qty,</if>
+            <if test="status != null">status,</if>
+            <if test="machineType != null">MACHINE_TYPE,</if>
+            <if test="quotaRatio != null">quota_ratio,</if>
+
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="machineCode != null">#{machineCode},</if>
+            <if test="machineName != null">#{machineName},</if>
+            <if test="type != null">#{type},</if>
+            <if test="dimensionMiniMum != null">#{dimensionMiniMum},</if>
+            <if test="dimensionMaxiMum != null">#{dimensionMaxiMum},</if>
+            <if test="quata != null">#{quata},</if>
+            <if test="classShift != null">#{classShift},</if>
+            <if test="openMachineClass1 != null">#{openMachineClass1},</if>
+            <if test="openMachineClass2 != null">#{openMachineClass2},</if>
+            <if test="openMachineClass3 != null">#{openMachineClass3},</if>
+            <if test="operatorQty != null">#{operatorQty},</if>
+            <if test="status != null">#{status},</if>
+            <if test="machineType != null">#{machineType},</if>
+            <if test="quotaRatio != null">#{quotaRatio},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateCxMachineInfo" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo">
+        update t_cx_machine_info
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="machineName != null">machine_name = #{machineName},</if>
+            <if test="type != null">type = #{type},</if>
+            dimension_minimum = #{dimensionMiniMum,jdbcType=DECIMAL},
+            dimension_maximum = #{dimensionMaxiMum,jdbcType=DECIMAL},
+            <if test="quata != null">quata = #{quata},</if>
+            <if test="quotaRatio != null">quota_ratio = #{quotaRatio},</if>
+            <if test="classShift != null">class_shift = #{classShift},</if>
+            <if test="openMachineClass1 != null">open_machine_class1 = #{openMachineClass1},</if>
+            <if test="openMachineClass2 != null">open_machine_class2 = #{openMachineClass2},</if>
+            <if test="openMachineClass3 != null">open_machine_class3 = #{openMachineClass3},</if>
+            operator_qty = #{operatorQty,jdbcType=DECIMAL},
+            <if test="status != null">status = #{status},</if>
+            remark = #{remark,jdbcType=VARCHAR},
+            <if test="machineType != null">MACHINE_TYPE = #{machineType},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteTCxMachineInfoById" parameterType="Long">
+        UPDATE t_cx_machine_info SET del_flag ='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteCxMachineInfoByIds" parameterType="String">
+        UPDATE t_cx_machine_info SET del_flag ='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectCxMachineInfoList2" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+
+        <if test="id == 1">
+            select a.MACHINE_CODE,b.MACHINE_NAME from T_cx_SPECIFY_MACHINE a
+            inner JOIN T_CX_MACHINE_INFO b on a.MACHINE_CODE=b.MACHINE_CODE and b.STATUS = '0'
+            where a.DEL_FLAG='0' and a.JOB_TYPE='0' and a.EMBRYO_CODE=#{machineCode,jdbcType=VARCHAR}
+            and a.SAP_CODE=#{machineName,jdbcType=VARCHAR}
+            order by a.MACHINE_CODE,a.create_time desc
+        </if>
+
+        <if test="id == 3">
+            select a.MACHINE_CODE,a.MACHINE_NAME from T_CX_MACHINE_INFO a
+            where a.DEL_FLAG='0' and a.STATUS='0'
+            and a.MACHINE_CODE not in (
+            select MACHINE_CODE from T_cx_SPECIFY_MACHINE where DEL_FLAG='0' and JOB_TYPE='0'
+            and EMBRYO_CODE=#{machineCode,jdbcType=VARCHAR}
+            and SAP_CODE=#{machineName,jdbcType=VARCHAR}
+            )
+            <if test="machineType != null">and a.machine_type = #{machineType}</if>
+            order by a.MACHINE_NAME,a.create_time desc
+        </if>
+
+        <if test="id == 4">
+            select a.MACHINE_CODE,b.MACHINE_NAME from T_lh_SPECIFY_MACHINE a
+            inner JOIN T_lh_MACHINE_INFO b on a.MACHINE_CODE=b.MACHINE_CODE and b.STATUS = '0'
+            where a.DEL_FLAG='0' and a.JOB_TYPE='0' and a.SAP_CODE=#{machineCode,jdbcType=VARCHAR}
+            order by a.MACHINE_CODE,a.create_time desc
+        </if>
+
+        <if test="id == 5">
+            select a.MACHINE_CODE,a.MACHINE_NAME from T_lh_MACHINE_INFO a
+            where a.DEL_FLAG='0' and a.STATUS='0'
+            <if test="machineCode != null  and machineCode != ''">
+                and a.MACHINE_CODE not in
+                  (
+                    select MACHINE_CODE from T_lh_SPECIFY_MACHINE where DEL_FLAG='0' and JOB_TYPE='0' and
+                    SAP_CODE=#{machineCode,jdbcType=VARCHAR}
+                  )
+            </if>
+            order by a.MACHINE_CODE,a.create_time desc
+        </if>
+
+        <if test="id == 6">
+            select a.MACHINE_CODE,a.MACHINE_NAME from T_lh_MACHINE_INFO a
+            where a.DEL_FLAG='0'
+            <if test="status != null  and status != ''">and a.status = #{status}</if>
+            order by a.MACHINE_CODE,a.create_time desc
+        </if>
+
+    </select>
+
+    <select id="getOrtherMachineInfo" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo" resultMap="CxMachineInfoResult">
+
+        <if test="id == 1">
+            select id,MACHINE_CODE,MACHINE_NAME from T_TM_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 2">
+            select id,MACHINE_CODE,MACHINE_NAME from T_TC_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 3">
+            select id,MACHINE_CODE,MACHINE_NAME from T_NC_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 4">
+            select id,MACHINE_CODE,MACHINE_NAME from T_CD15_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 5">
+            select id,MACHINE_CODE,MACHINE_NAME from T_CD90_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 6">
+            select id,MACHINE_CODE,MACHINE_NAME from T_TQ_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 7">
+            select id,MACHINE_CODE,MACHINE_NAME from T_GSQ_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+
+        <if test="id == 8">
+            select id,MACHINE_CODE,MACHINE_NAME from T_XWYY_MACHINE_INFO
+            where DEL_FLAG='0'
+            <if test="status != null  and status != ''">and status = #{status}</if>
+            order by MACHINE_CODE,create_time desc
+        </if>
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_cx_machine_info a USING (
+        <foreach collection="list" item="MACHINE" separator=" union ">
+            select
+            #{MACHINE.machineCode,jdbcType=VARCHAR} machine_code,
+            #{MACHINE.machineName,jdbcType=VARCHAR} machine_name,
+            #{MACHINE.type,jdbcType=VARCHAR} type,
+            #{MACHINE.dimensionMiniMum,jdbcType=DECIMAL} dimension_minimum,
+            #{MACHINE.dimensionMaxiMum,jdbcType=DECIMAL} dimension_maximum,
+            #{MACHINE.quata,jdbcType=DECIMAL} quata,
+            #{MACHINE.quotaRatio,jdbcType=DECIMAL} quota_ratio,
+            #{MACHINE.classShift,jdbcType=VARCHAR} class_shift,
+            #{MACHINE.openMachineClass1,jdbcType=VARCHAR} open_machine_class1,
+            #{MACHINE.openMachineClass2,jdbcType=VARCHAR} open_machine_class2,
+            #{MACHINE.openMachineClass3,jdbcType=VARCHAR} open_machine_class3,
+            #{MACHINE.operatorQty,jdbcType=DECIMAL} operator_qty,
+            #{MACHINE.status,jdbcType=VARCHAR} status,
+            #{MACHINE.machineType,jdbcType=VARCHAR} MACHINE_TYPE,
+
+            #{MACHINE.createBy,jdbcType=VARCHAR} create_by,
+            #{MACHINE.createTime,jdbcType=DATE} create_time,
+            #{MACHINE.updateBy,jdbcType=VARCHAR} update_by,
+            #{MACHINE.updateTime,jdbcType=DATE} update_time,
+            #{MACHINE.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (a.machine_code = b.machine_code and a.del_flag = '0')
+        WHEN MATCHED THEN
+        UPDATE SET
+
+        a.machine_name = b.machine_name,
+        a.type = b.type,
+        a.dimension_minimum = b.dimension_minimum,
+        a.dimension_maximum = b.dimension_maximum,
+        a.quata = b.quata,
+        a.quota_ratio=b.quota_ratio,
+        a.class_shift = b.class_shift,
+        a.open_machine_class1 = b.open_machine_class1,
+        a.open_machine_class2 = b.open_machine_class2,
+        a.open_machine_class3 = b.open_machine_class3,
+        a.operator_qty = b.operator_qty,
+        a.status = b.status,
+        a.MACHINE_TYPE = b.MACHINE_TYPE,
+
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.machine_code,
+        a.machine_name,
+        a.type ,
+        a.dimension_minimum ,
+        a.dimension_maximum ,
+        a.quata ,
+        a.quota_ratio,
+        a.class_shift ,
+        a.open_machine_class1 ,
+        a.open_machine_class2 ,
+        a.open_machine_class3 ,
+        a.operator_qty ,
+        a.status ,
+        a.MACHINE_TYPE ,
+
+        a.create_by ,
+        a.create_time ,
+        a.remark,
+        a.del_flag
+        ) values
+        (SEQ_PUBLIC.NEXTVAL,
+        b.machine_code,
+        b.machine_name,
+        b.type ,
+        b.dimension_minimum ,
+        b.dimension_maximum ,
+        b.quata ,
+        b.quota_ratio,
+        b.class_shift ,
+        b.open_machine_class1 ,
+        b.open_machine_class2 ,
+        b.open_machine_class3 ,
+        b.operator_qty ,
+        b.status ,
+        b.MACHINE_TYPE ,
+
+        b.create_by,
+        sysdate,
+        b.remark,
+        '0'
+        )
+    </update>
+
+    <select id="getMaxMoldsByLhMachineCode" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+       select MACHINE_CODE,MACHINE_NAME,max_mold_num as quata from T_lh_MACHINE_INFO
+       where  STATUS = '0' and DEL_FLAG='0' and MACHINE_CODE=#{machineCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getLhSpecimalMachine" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo"
+            resultMap="CxMachineInfoResult">
+       select sm.MACHINE_CODE,mi.MACHINE_NAME,sm.JOB_TYPE as type from T_LH_SPECIFY_MACHINE sm,T_LH_MACHINE_INFO mi
+       where  sm.MACHINE_CODE=mi.MACHINE_CODE and sm.DEL_FLAG='0' and  mi.STATUS = '0' and mi.DEL_FLAG='0'
+        <if test="machineName != null  and machineName != ''">and sm.SAP_CODE = #{machineName}</if>
+        <if test="machineCode != null  and machineCode != ''">and sm.MACHINE_CODE = #{machineCode}</if>
+        <if test="type != null  and type != ''">and sm.JOB_TYPE = #{type}</if>
+    </select>
+
+</mapper>

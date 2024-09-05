@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('kettle列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="config-form">
+                <div class="select-list">
+                    <ul>
+
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.name.search}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var typeDatas = [[${@dict.getType('sys_kettle_log_status')}]];
+    var prefix = ctx + "kettle";
+
+    $(function () {
+        var options = {
+            url: prefix + "/transLogList",
+            modalName: [[#{ui.data.column.kettle.trans}]],
+            columns: [{
+                checkbox: false
+            },
+                {
+                    field: 'id',
+                    title: [[#{ui.data.column.kettle.trans}]] + 'Id'
+                },
+                {
+                    field: 'taskName',
+                    title: [[#{ui.data.column.kettle.taskname}]]
+                },
+                {
+                    field: 'transDescription',
+                    title: [[#{ui.data.column.kettle.transDescription}]]
+                },
+                {
+                    field: 'categoryName',
+                    title: [[#{ui.data.column.kettle.categoryId}]]
+                },
+                {
+                    field: 'startTime',
+                    title: [[#{ui.data.column.time.start}]]
+                },
+                {
+                    field: 'stopTime',
+                    title: [[#{ui.data.column.time.end}]]
+                },
+                {
+                    field: 'recordStatus',
+                    title: [[#{ui.data.column.jobLog.status}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(typeDatas, value);
+                    }
+                },
+                {
+                    field: 'logFilePath',
+                    title: [[#{ui.data.column.kettle.logFilePath}]]
+                }]
+        };
+        $.table.init(options);
+    });
+</script>
+</body>
+</html>

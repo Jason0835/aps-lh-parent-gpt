@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxImportErrorLogManagementMapper">
+
+    <!-- 通用查询映射结果 -->
+    <select id="listImportErrorLogManagement" parameterType="com.zlt.aps.cx.api.domain.dto.CxImportErrorLogManagementDto" resultType="com.zlt.aps.cx.api.domain.dto.CxImportErrorLogManagementDto">
+        select *
+        from T_IMPORT_ERROR_LOG
+        where DEL_FLAG = 0
+            and IMPORT_LOG_ID = #{importLogId}
+        <if test="errorRow != null and errorRow != ''">
+            and ERROR_ROW = #{errorRow}
+        </if>
+        <if test="errorDetail != null and errorDetail != ''">
+            and error_Detail  like concat(concat('%', #{errorDetail}), '%')
+        </if>
+        <if test="orderStr == null">
+            order by ERROR_ROW
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+</mapper>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.engine.mapper.NcEngineMachineMapper">
+
+    <select id="listNcSpecifyMachine" resultType="com.zlt.aps.nc.engine.vo.NcSpecifyMachineVo" >
+        select LINING_CODE,
+               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+        from T_NC_SPECIFY_MACHINE sm
+        inner join T_NC_MACHINE_INFO m on sm.machine_id = m.id
+        where sm.DEL_FLAG = '0'
+        <if test="jobType != null and jobType != ''">
+            and sm.JOB_TYPE = #{jobType}  /*限制作业 类型*/
+        </if>
+        and m.STATUS = '0'
+        and m.DEL_FLAG = '0'
+        group by LINING_CODE
+    </select>
+</mapper>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('班次完成统计报表列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.reportClassAccuracy.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cx:reportClassAccuracy:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "cx/reportClassAccuracy";
+    var procedureCodeDatas = [[${@dict.getType('PROCEDURE_CODE')}]];
+    var firstTitle = '';
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.reportClassAccuracy.modelName}]],
+            pagination: true,
+            pageSize: 10000,
+            pageList: [10000],
+            onLoadSuccess: onLoadSuccess,
+            rowStyle: function (row, index) {
+                //标记汇总
+                if (row.isSummary === 1) {
+                    return {css: {'background-color': '#ffff00'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {
+                        title: $.common.sprintf([[#{ui.data.column.reportClassAccuracy.firstTitle}]], '', '', '', ''),
+                        align: 'center',
+                        colspan: 13
+                    },
+                ],
+                [
+                    {
+                        rowspan: 2,
+                        field: 'procedureCode',
+                        title: [[#{ui.data.column.reportClassAccuracy.procedureCode}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        formatter: function (value, row, index) {
+                            if (value === "-1") {
+                                return [[#{ui.data.column.reportClassAccuracy.procedureCodeDefault}]];
+                            }
+                            return getDictLabel(procedureCodeDatas, value, row.isSummary);
+                        }
+                    },
+                    {
+                        title: [[#{ui.data.column.reportClassAccuracy.class1Title}]],
+                        align: 'center',
+                        colspan: 4
+                    },
+                    {
+                        title: [[#{ui.data.column.reportClassAccuracy.class2Title}]],
+                        align: 'center',
+                        colspan: 4
+                    },
+                    {
+                        title: [[#{ui.data.column.reportClassAccuracy.class3Title}]],
+                        align: 'center',
+                        colspan: 4
+                    },
+                ],
+                [
+                    {
+                        field: 'class3PlanMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.planMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'planClass3',
+                        title: [[#{ui.data.column.reportClassAccuracy.plan}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'class3ActualMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.actualMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'actualClass3',
+                        title: [[#{ui.data.column.reportClassAccuracy.actual}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'class1PlanMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.planMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'planClass1',
+                        title: [[#{ui.data.column.reportClassAccuracy.plan}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'class1ActualMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.actualMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'actualClass1',
+                        title: [[#{ui.data.column.reportClassAccuracy.actual}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'class2PlanMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.planMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'planClass2',
+                        title: [[#{ui.data.column.reportClassAccuracy.plan}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'class2ActualMaterial',
+                        title: [[#{ui.data.column.reportClassAccuracy.actualMaterial}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                    {
+                        field: 'actualClass2',
+                        title: [[#{ui.data.column.reportClassAccuracy.actual}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                    },
+                ],
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    function onLoadSuccess(data) {
+        if (data.rows.length > 0) {
+            var first = data.rows[0];
+            firstTitle = $.common.sprintf([[#{ui.data.column.reportClassAccuracy.firstTitle}]], first.planSpecNum, first.planTotalNum, first.actualSpecNum, first.actualTotalNum);
+            setTimeout(function () {
+                document.getElementsByClassName('th-inner')[0].innerHTML = firstTitle;
+            }, 300);
+        }
+    }
+
+    function getDictLabel(datas, value, isSummary) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        $.each(datas, function(index, dict) {
+            if (dict.dictValue == ('' + value)) {
+                var listClass = $.common.equals("default", dict.listClass) || $.common.isEmpty(dict.listClass) ? "" : "badge badge-" + dict.listClass;
+                if (isSummary === 1) {
+                    actions.push($.common.sprintf("<span class='%s'>%s</span>", listClass, dict.dictLabel + [[#{ui.data.column.reportStatistics.summary}]]));
+                }else {
+                    actions.push($.common.sprintf("<span class='%s'>%s</span>", listClass, dict.dictLabel));
+                }
+                return false;
+            }
+        });
+        return actions.join('');
+    }
+
+    $(window).resize(function() {
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML = firstTitle;
+        },1500);
+    });
+</script>
+</body>
+</html>

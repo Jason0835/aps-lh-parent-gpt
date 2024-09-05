@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+	<th:block th:include="include :: header('用户分配角色')" />
+</head>
+<body>
+    <div class="main-content">
+        <form id="form-user-add" class="form-horizontal">
+            <input type="hidden" id="userId" name="userId" th:value="${user.userId}">
+            <h4 class="form-header h4">[[#{ui.biz.user.base.info}]]</h4>
+            <div class="row">
+            	<div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label is-required">[[#{ui.data.column.user.name}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="nickName" class="form-control" type="text" disabled th:value="${user.nickName}">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label is-required">[[#{ui.data.column.user.loginname}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="userName" class="form-control" type="text" disabled th:value="${user.userName}">
+                        </div>
+                    </div>
+                </div> 
+            </div>
+           
+            <h4 class="form-header h4">[[#{ui.frame.btn.name.giverole}]]</h4>
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="col-sm-12 select-table table-striped">
+					    <table id="bootstrap-table"></table>
+					</div>
+                </div>
+            </div>
+        </form>
+    </div>
+      
+    <div class="row">
+        <div class="col-sm-offset-5 col-sm-10">
+            <button type="button" class="btn btn-sm btn-primary" onclick="submitHandler()"><i class="fa fa-check"></i>[[#{ui.frame.btn.name.save}]]</button>&nbsp;
+            <button type="button" class="btn btn-sm btn-danger" onclick="closeItem()"><i class="fa fa-reply-all"></i>[[#{ui.frame.btn.name.close}]] </button>
+        </div>
+    </div>
+	<th:block th:include="include :: footer" />
+	<script th:inline="javascript">
+	    var prefix = ctx + "system/user/authRole";
+	    var roles = [[${roles}]]
+	    
+	    $(function() {
+		    var options = {
+		        data: roles,
+		        sidePagination: "client",
+		        sortName: "roleSort",
+		        showSearch: false,
+                showRefresh: false,
+                showToggle: false,
+                showColumns: false,
+                clickToSelect: true,
+                maintainSelected: true,
+		        columns: [{
+		            checkbox: true,
+		            formatter:function (value, row, index) {
+		            	if($.common.isEmpty(value)) {
+		            		return { checked: row.flag };
+		            	} else {
+		            		return { checked: value }
+		            	}
+		            }
+		        },
+		        {
+		            field: 'roleId',
+		            title: [[#{ui.data.column.user.roles}]]+'ID'
+		        },
+		        {
+		            field: 'roleSort',
+		            title: [[#{ui.data.column.show.index}]],
+		            sortable: true,
+		            visible: false
+		        },
+		        {
+		            field: 'roleName',
+		            title: [[#{ui.data.column.auth.code}]]
+		        },
+		        {
+		            field: 'roleKey',
+		            title: [[#{ui.data.column.auth.code}]],
+		            sortable: true
+		        },
+		        {
+		            field: 'createTime',
+		            title: [[#{ui.data.column.createtime}]],
+		            sortable: true
+		        }]
+		    };
+		    $.table.init(options);
+		});
+	    
+	    /* 添加角色-提交 */
+        function submitHandler(index, layero){
+        	var rows = $.table.selectFirstColumns();
+        	var data = { "userId": $("#userId").val(), "roleIds": rows.join() };
+			$.operate.saveTab(prefix + "/insertAuthRole", data);
+        }
+    </script>
+</body>
+</html>

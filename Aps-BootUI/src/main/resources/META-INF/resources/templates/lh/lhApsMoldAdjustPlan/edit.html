@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改硫化工序模具变动单APS')" />
+    <th:block th:include="include :: datetimepicker-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-lhApsMoldAdjustPlan-edit" th:object="${lhApsMoldAdjustPlan}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.lhApsMoldAdjustPlan.lhMachineCode}]]：</label>
+                <div class="col-sm-8">
+                    <select name="lhMachineCode" class="form-control" th:with="type=${@lh.getMachineInfo('0')}">
+                        <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                        <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}" th:field="*{lhMachineCode}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.lhApsMoldAdjustPlan.planDate}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="planDate" th:value="${#dates.format(lhApsMoldAdjustPlan.planDate, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text" required>
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label id="changeMoldTimeLabel" class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.changeMoldTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input id="changeMoldTime" name="changeMoldTime" th:value="${#dates.format(lhApsMoldAdjustPlan.changeMoldTime, 'yyyy-MM-dd HH:mm')}" class="form-control" placeholder="yyyy-MM-dd HH:mm" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.changeType}]]：</label>
+                <div class="col-sm-8">
+                    <select id="changeType" name="changeType" class="form-control" th:with="type=${@dict.getType('MOLD_CHANGE_TYPE')}" onchange="updateChangeType()">
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{changeType}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.beforeSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="beforeSapCode" name="beforeSapCode" th:field="*{beforeSapCode}" class="form-control" type="text" onchange="getBeforeSpecDesc()">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.beforeEmbryoCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="beforeEmbryoCode" name="beforeEmbryoCode" th:field="*{beforeEmbryoCode}" class="form-control" type="text" onchange="getBeforeSpecDesc()">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.beforeSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input id="beforeSpecDesc" name="beforeSpecDesc" th:field="*{beforeSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label id="tireRoughStockLabel" class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.tireRoughStock}]]：</label>
+                <div class="col-sm-8">
+                    <input id="tireRoughStock" name="tireRoughStock" th:field="*{tireRoughStock}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label id="useMoldNumberLabel" class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.useMoldNumber}]]：</label>
+                <div class="col-sm-8">
+                    <input id="useMoldNumber" name="useMoldNumber" th:field="*{useMoldNumber}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.leftRightMold}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftRightMold" th:field="*{leftRightMold}" class="form-control" type="text">
+                </div>
+            </div>
+           <!-- <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.leftMoldCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftMoldCode" th:field="*{leftMoldCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.rightMoldCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightMoldCode" th:field="*{rightMoldCode}" class="form-control" type="text">
+                </div>
+            </div>-->
+
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.afterSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="afterSapCode" name="afterSapCode" th:field="*{afterSapCode}" class="form-control" type="text" onchange="getAfterSpecDesc()">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.afterEmbryoCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="afterEmbryoCode" name="afterEmbryoCode" th:field="*{afterEmbryoCode}" class="form-control" type="text" onchange="getAfterSpecDesc()">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.lhApsMoldAdjustPlan.afterSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input id="afterSpecDesc" name="afterSpecDesc" th:field="*{afterSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <input name="remark" th:field="*{remark}" class="form-control" type="text">
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: datetimepicker-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "lh/lhApsMoldAdjustPlan";
+        $("#form-lhApsMoldAdjustPlan-edit").validate({
+            focusCleanup: true
+        });
+
+        $(function () {
+            updateChangeType();
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                let beforeSapCode = $("#beforeSapCode").val();
+                let beforeEmbryoCode = $("#beforeEmbryoCode").val();
+                let afterSapCode = $("#afterSapCode").val();
+                let afterEmbryoCode = $("#afterEmbryoCode").val();
+                if ($.common.isEmpty(beforeSapCode) && $.common.isEmpty(beforeEmbryoCode)
+                    && $.common.isEmpty(afterSapCode) && $.common.isEmpty(afterEmbryoCode)) {
+                    let message = String([[#{ui.data.message.lhApsMoldAdjustPlan.sapAndEmbryoCodeCannotEmptyAtTheSameTime}]]);
+                    $.modal.alertWarning(message.split(",")[2]);
+                    return ;
+                }
+                $.operate.save(prefix + "/edit", $('#form-lhApsMoldAdjustPlan-edit').serialize());
+            }
+        }
+
+        // 根据前sap品号、前胎胚代码查询对应前规格回显
+        function getBeforeSpecDesc() {
+            var beforeSapCode = $("#beforeSapCode").val();
+            var beforeEmbryoCode = $("#beforeEmbryoCode").val();
+            var config = {
+                url: prefix + "/getBeforeSpecDesc",
+                type: "post",
+                dataType: "json",
+                data: { "beforeSapCode": beforeSapCode, "beforeEmbryoCode": beforeEmbryoCode},
+                success: function (result) {
+                    if (result.code === web_status.SUCCESS){
+                        $("#beforeSpecDesc").val(result.data.beforeSpecDesc);
+                    }
+                }
+            };
+            $.ajax(config)
+        }
+
+        // 根据后sap品号、后胎胚代码查询对应后规格回显
+        function getAfterSpecDesc() {
+            var afterSapCode = $("#afterSapCode").val();
+            var afterEmbryoCode = $("#afterEmbryoCode").val();
+            var config = {
+                url: prefix + "/getAfterSpecDesc",
+                type: "post",
+                dataType: "json",
+                data: { "afterSapCode": afterSapCode, "afterEmbryoCode": afterEmbryoCode},
+                success: function (result) {
+                    if (result.code === web_status.SUCCESS){
+                        $("#afterSpecDesc").val(result.data.afterSpecDesc);
+                    }
+                }
+            };
+            $.ajax(config)
+        }
+
+        function updateChangeType() {
+            var changeType = $("#changeType option:selected").val();
+            let $useMoldNumber = $("#useMoldNumber");
+            $useMoldNumber.removeAttr("required");
+            let $useMoldNumberLabel = $("#useMoldNumberLabel");
+            $useMoldNumberLabel.removeClass("is-required");
+            // 库存数必填
+            if (changeType === "1" || changeType === "2" || changeType === "3" || changeType === "4" || changeType === "7"
+                || changeType === "9" || changeType === "11") {
+                $("#changeMoldTime").removeAttr("required");
+                $("#changeMoldTimeLabel").removeClass("is-required");
+                $("#tireRoughStock")[0].setAttribute("required", "true");
+                $("#tireRoughStockLabel").addClass("is-required");
+            }
+            // 更换时间必填
+            if (changeType === "5" || changeType === "6" || changeType === "8" || changeType === "12") {
+                $("#tireRoughStock").removeAttr("required");
+                $("#tireRoughStockLabel").removeClass("is-required");
+                $("#changeMoldTime")[0].setAttribute("required", "true");
+                $("#changeMoldTimeLabel").addClass("is-required");
+            }
+            if (!(changeType === "7" || changeType === "8" || changeType === "9" || changeType === "10")) {
+                $useMoldNumber[0].setAttribute("required", "true");
+                $useMoldNumberLabel.addClass("is-required");
+            }
+            if (changeType === "10") {
+                $("#changeMoldTime").removeAttr("required");
+                $("#changeMoldTimeLabel").removeClass("is-required");
+                $("#tireRoughStock").removeAttr("required");
+                $("#tireRoughStockLabel").removeClass("is-required");
+            }
+        }
+
+        $("input[name='planDate']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='changeMoldTime']").datetimepicker({
+            format: "yyyy-mm-dd hh:ii:00",
+            minView: "hour",
+            autoclose: true
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改钢带大卷与机台的映射表')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg" style="overflow-y: scroll">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-order-edit" th:object="${machineRollMapping}">
+            <input id="rollId" name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.common.column.gy.bigRollCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="bigRollCode" name="bigRollCode" th:field="*{bigRollCode}" class="form-control" type="text" required="true" isCode="true" maxlength="30">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label  is-required">[[#{ui.data.column.loss.line}]]：</label>
+                <div class="col-sm-8">
+                    <select name="machineId" class="form-control"  th:with="type=${@cd15.getMachineInfo()}" required="true">
+                        <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea id="remark" name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+
+        var prefix = ctx + "cd15/machineRollMapping";
+        $("#form-order-edit").validate({
+            focusCleanup: true
+        });
+
+        // var glueId = $("#glueId").val();
+        // if(glueId != '') {
+        //     $('#remark').attr("readonly","readonly");
+        // }
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/save", $('#form-order-edit').serialize());
+            }
+        }
+    </script>
+</body>
+</html>

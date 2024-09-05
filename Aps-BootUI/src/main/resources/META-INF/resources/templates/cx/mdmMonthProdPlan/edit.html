@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改主计划月度生产计划')" />
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-mdmMonthProdPlan-edit" th:object="${mdmMonthProdPlan}">
+            <input name="id" th:field="*{id}" type="hidden">
+
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.materialCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="materialCode" th:field="*{materialCode}" class="form-control" type="text" th:readonly="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.embryoCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="embryoCode" th:field="*{embryoCode}" class="form-control" type="text" th:readonly="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.qualityGrade}]]：</label>
+                <div class="col-sm-8">
+                    <input name="qualityGrade" th:field="*{qualityGrade}" class="form-control" type="text" th:readonly="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.cxScheduleResult.cxMachineCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="cxMachineCode" th:field="*{cxMachineCode}" type="hidden">
+                    <select name="cxMachineCode" class="form-control" th:with="type=${@cx.getMachineInfo('0')}" th:data-none-selected-text="#{ui.data.column.scheduleResult.chooseMachine}" disabled>
+                        <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                        <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"th:value="${machineInfo.machineCode}" th:field="*{cxMachineCode}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.stockLocationSort.stockLocation}]]：</label>
+                <div class="col-sm-8">
+                    <input name="storageLocation" th:field="*{storageLocation}" type="hidden">
+                    <select  name="storageLocation" class="form-control" th:with="type=${@dict.getType('STORAGE_LOCATION')}" disabled>
+                        <option value="">[[#{ui.frame.select.stockLocation}]]</option>
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{storageLocation}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.specDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input name="specDesc" th:field="*{specDesc}" class="form-control" type="text"  th:readonly="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.specDimension}]]：</label>
+                <div class="col-sm-8">
+                    <input name="specDimension" th:field="*{specDimension}" class="form-control"  type="number"  th:readonly="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.theoryProductionPlan}]]：</label>
+                <div class="col-sm-8">
+                    <input name="theoryProductionPlan" th:field="*{theoryProductionPlan}" class="form-control"  type="number" min="0" max="9999999" digits="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.actualArrangement}]]：</label>
+                <div class="col-sm-8">
+                    <input name="actualArrangement" th:field="*{actualArrangement}" class="form-control"  type="number" min="0" max="9999999" digits="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.expectedExcessArrears}]]：</label>
+                <div class="col-sm-8">
+                    <input name="expectedExcessArrears" th:field="*{expectedExcessArrears}" class="form-control"  type="number"  min="-9999999" max="9999999" isInteger="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.actualOverProduction}]]：</label>
+                <div class="col-sm-8">
+                    <input name="actualOverProduction" th:field="*{actualOverProduction}" class="form-control"  type="number"  min="-9999999" max="9999999" isInteger="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.balance}]]：</label>
+                <div class="col-sm-8">
+                    <input name="balance" th:field="*{balance}" class="form-control"  type="number"  min="-9999999" max="9999999" isInteger="true">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.beginDate}]]：</label>
+                <div class="col-sm-8">
+                    <input id="beginDate" name="beginDate" type="text" class="time-input form-control" th:value="*{#dates.format({beginDate}, 'yyyy-MM-dd')}" placeholder="yyyy-MM-dd">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.endDate}]]：</label>
+                <div class="col-sm-8">
+                    <input id="endDate" name="endDate" type="text" class="time-input form-control" th:value="*{#dates.format({endDate}, 'yyyy-MM-dd')}" placeholder="yyyy-MM-dd">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.specialRequirements}]]：</label>
+                <div class="col-sm-8">
+                    <input name="specialRequirements" th:field="*{specialRequirements}" class="form-control" type="text" maxlength="66">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.mdmMonthProdPlan.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js" />
+    <th:block th:include="include :: bootstrap-select-js" />
+    <script th:inline="javascript">
+
+        var prefix = ctx + "cx/mdmMonthProdPlan";
+
+        $("#form-mdmMonthProdPlan-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var beginDate=$("#beginDate").val();
+                var endDate=$("#endDate").val();
+                if($.common.isNotEmpty(beginDate) && $.common.isNotEmpty(endDate)){
+                    var bd=new Date(beginDate);
+                    var ed=new Date(endDate);
+                    if(bd>ed){
+                        $.modal.alertWarning([[#{ui.data.column.beginDateCanNotGreatThanEndDate}]]);
+                        return;
+                    }
+                }
+                $.operate.save(prefix + "/edit", $('#form-mdmMonthProdPlan-edit').serialize());
+            }
+        }
+
+    </script>
+</body>
+</html>

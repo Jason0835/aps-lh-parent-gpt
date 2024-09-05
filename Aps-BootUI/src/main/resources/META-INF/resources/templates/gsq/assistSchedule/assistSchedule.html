@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('钢丝圈外协排程结果列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.steelType}]]：</label>
+                            <input type="text" name="steelType"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.gsq.scheduleResult.steelRingCode}]]：
+                            <input type="text" name="steelRingCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="gsq:assistSchedule:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "gsq/assistSchedule";
+    var baseInfo = "";
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.gsq.assistSchedule.modelName}]],
+            // 不分页，指定默认页面显示条数和可选择的显示条数
+            pageSize: 10000,
+            pageList: [10000],
+            // height:$(window).height() -143,
+            fixedColumns: true,
+            fixedNumber: 1,
+            rowStyle: function (row, index) {
+                //标记收尾背景色
+                if (row.markCloseOutTip == '0') {
+                    return {css: {'background-color': '#FFFFBF'}};
+                }
+                //插单背景色
+                if (row.dataSource == '1') {
+                    return {css: {'background-color': '#BFE0F7'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {
+                        title: [[#{ui.data.column.scheduleResult.baseInfo}]],
+                        align: 'center',
+                        colspan: 12
+                    },
+                    {
+                        title: [[#{ui.data.column.scheduleResult.midPlanEightHour}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{ui.data.column.scheduleResult.nightPlanEightHour}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{ui.data.column.scheduleResult.dayPlanEightHour}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{ui.data.column.scheduleResult.gsqPlan2}]],
+                        align: 'center',
+                        colspan: 5
+                    },
+                ],
+                [
+                    {
+                        checkbox: true,
+                        valign: 'middle',
+                        align: 'center',
+                    },
+                    {
+                        field: 'id',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'cxBatchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'batchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'orderNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'steelType',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.steelType}]],
+                        formatter: function (value, row, index) {
+                            if (row.colorType == '0') {
+                                return '<font color ="' + row.colorCode + ' ">' + value + '</font>';
+                            }
+                            return value;
+                        },
+                        cellStyle: function (value, row, index) {
+                            if (row.colorType == '1') {
+                                return {css: {"background": row.colorCode}};
+                            }
+                            if (row.markCloseOutTip == '0') {
+                                return {css: {'background-color': "#FFFFBF"}};
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'steelRingCode',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.gsq.scheduleResult.br.steelRingCode}]],
+                    },
+                    {
+                        field: 'dimension',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.gsq.scheduleResult.dimension}]],
+                    },
+                    {
+                        field: 'rank',
+                        valign: 'middle',
+                        align: 'left',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.gsq.scheduleResult.rank}]],
+                    },
+                    {
+                        field: 'monthPlanOs',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.monthPlanOs}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'stockQty',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.stockQty.num}]],
+                    },
+                    {
+                        field: 'dailyTotalQty',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.dailyTotalQty}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'midPlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '<br>' + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'midHandAnalysis',
+                        valign: 'middle',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var HandAnaly = row.midSysAnalysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (HandAnaly != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + HandAnaly;
+                                } else {
+                                    reasion = HandAnaly;
+                                }
+                            }
+                            return $.table.tooltip(reasion, 10);
+
+                        },
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '<br>' + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'nightHandAnalysis',
+                        valign: 'middle',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var HandAnaly = row.nightSysAnalysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (HandAnaly != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + HandAnaly;
+                                } else {
+                                    reasion = HandAnaly;
+                                }
+                            }
+                            return $.table.tooltip(reasion, 10);
+                        }
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '<br>' + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'dayHandAnalysis',
+                        valign: 'middle',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var HandAnaly = row.daySysAnalysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (HandAnaly != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + HandAnaly;
+                                } else {
+                                    reasion = HandAnaly;
+                                }
+                            }
+                            return $.table.tooltip(reasion, 10);
+                        }
+                    },
+                    {
+                        field: 'cxClass1Plan',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.class1Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'cxClass2Plan',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.class2Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'cxClass3Plan',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.class3Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'cxClass4Plan',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass4Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                    {
+                        field: 'cxClass5Plan',
+                        valign: 'middle',
+                        align: 'right',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass5Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.individual}]] + ')',
+                    },
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh - (fixTop - 50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH / oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if (total == contentRow + 1) {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh + 1.5 * oneTr});
+                } else if (total == contentRow + 2) {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh + 2.5 * oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+                }
+                /*固定表头end*/
+                //设置表头基本信息
+                setNewTitle(data.rows);
+            },
+            onColumnSwitch:function(field, checked){
+                setTimeout(function () {
+                    document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+                },300);
+            }
+        };
+        $.table.init(options, true);
+
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function () {
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh - (fixTop - 50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+            }, 1000)
+        });
+        //添加监听
+        addColumnsClick()
+    });
+
+    //重置表头基本信息
+    function setNewTitle(dataAll) {
+        var year = document.getElementById("scheduleDate").value.split("-")[0];
+        var month = document.getElementById("scheduleDate").value.split("-")[1];
+        var day = document.getElementById("scheduleDate").value.split("-")[2];
+        if (ui_locale === "zh") {
+            baseInfo = month + "月" + day + "日" + [[#{ui.data.column.scheduleResult.gsq.baseInfo}]];
+        } else {
+            var textDate = year + "-" + month + "-" + day;
+            let chinaDateArray = new Date(textDate.replace(/-/g, '/')).toDateString().split(' ');
+            baseInfo = `${chinaDateArray[1]} ${chinaDateArray[2]}` + " " + [[#{ui.data.column.scheduleResult.gsq.baseInfo}]];
+        }
+        if (dataAll.length >= 1) {
+            var class1PlanQty = 0;
+            var class2PlanQty = 0;
+            var class3PlanQty = 0;
+            var totalPlan = 0;
+            for (let i = 0; i < dataAll.length; i++) {
+                class1PlanQty = class1PlanQty + Number(dataAll[i]['midPlanQty']);
+                class2PlanQty = class2PlanQty + Number(dataAll[i]['nightPlanQty']);
+                class3PlanQty = class3PlanQty + Number(dataAll[i]['dayPlanQty']);
+            }
+            totalPlan = class1PlanQty + class2PlanQty + class3PlanQty;
+            var class1Plan = [[#{ui.data.column.scheduleResult.heji.zhongban}]];
+            var class2Plan = [[#{ui.data.column.scheduleResult.heji.yeban}]];
+            var class3Plan = [[#{ui.data.column.scheduleResult.heji.baiban}]];
+            var totalQty = [[#{ui.data.column.scheduleResult.totalQty}]];
+            var planInfo = '：' + class1Plan + '：' + class1PlanQty.toFixed(0) + '，' + class2Plan + '：' + class2PlanQty.toFixed(0) + '，' + class3Plan + '：' + class3PlanQty.toFixed(0) + '，' + totalQty + '：' + totalPlan.toFixed(0);
+            baseInfo = baseInfo + planInfo;
+        }
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML = baseInfo;
+        }, 300);
+    }
+
+    $(window).resize(function () {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh - (fixTop - 50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML = baseInfo;
+        }, 300);
+    });
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+    }
+
+    .select-table {
+        padding-bottom: 0px !important;
+    }
+    button.btn.btn-default.btn-sm.editable-cancel {display: none}
+</style>
+</html>

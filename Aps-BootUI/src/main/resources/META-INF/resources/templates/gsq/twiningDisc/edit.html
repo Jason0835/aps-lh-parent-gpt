@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改缠绕盘信息维护')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-roll-edit" th:object="${twiningDisc}">
+            <input id="twiningDiscId" name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.twiningDisc.column.serialNumber}]]：</label>
+                <div class="col-sm-8">
+                    <input id="serialNumber" name="serialNumber" th:field="*{serialNumber}" class="form-control" type="text" required="true" isCode="true" maxlength="20">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.twiningDisc.column.name}]]：</label>
+                <div class="col-sm-8">
+                    <input name="name" th:field="*{name}" class="form-control" type="text" required="true" maxlength="16">
+                </div>
+            </div>
+<!--            <div class="form-group">-->
+<!--                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.seq}]]：</label>-->
+<!--                <div class="col-sm-8">-->
+<!--                    <input name="seq" th:field="*{seq}" class="form-control" type="number"  max="9999">-->
+<!--                </div>-->
+<!--            </div>-->
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.twiningDisc.column.spec}]]：</label>
+                <div class="col-sm-8">
+                    <input name="spec" th:field="*{spec}" class="form-control" type="text" required="true" min="1" digits="true" maxlength="10">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.twiningDisc.column.orderWay}]]：</label>
+                <div class="col-sm-8">
+                    <input name="orderWay" th:field="*{orderWay}" class="form-control" type="text" required="true" isCode="true" maxlength="20">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.purpose}]]：</label>
+                <div class="col-sm-8">
+                    <input name="purpose" th:field="*{purpose}" class="form-control" type="text"  maxlength="40">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.twiningNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="twiningNum" th:field="*{twiningNum}" class="form-control" digits="true" type="number"  max="9999">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.inTime}]]：</label>
+                <div class="col-sm-8">
+                    <input type="text"  class="time-input form-control" name="inTime" th:value="*{#dates.format({inTime}, 'yyyy-MM-dd')}"
+                           th:placeholder="#{ui.twiningDisc.column.inTime}" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.scrapTime}]]：</label>
+                <div class="col-sm-8">
+                    <input type="text"  class="time-input form-control" name="scrapTime"  th:value="*{#dates.format({scrapTime}, 'yyyy-MM-dd')}"
+                           th:placeholder="#{ui.twiningDisc.column.scrapTime}" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.twiningDisc.column.scrapReason}]]：</label>
+                <div class="col-sm-8">
+                    <input name="scrapReason" th:field="*{scrapReason}" class="form-control" type="text"  maxlength="50">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label  is-required">[[#{ui.twiningDisc.column.machine}]]：</label>
+                <div class="col-sm-8">
+                    <select name="machineId" class="form-control"  th:with="type=${@gsq.getMachineInfo()}" required="true">
+                        <option value="">[[#{ui.frame.btn.choose}]]</option>
+                        <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+        var prefix = ctx + "gsq/twiningDisc";
+
+        $("#form-roll-edit").validate({
+            onkeyup: false,
+            rules: {
+                serialNumber: {
+                    remote: {
+                        url: prefix + "/checkSerialNumberUnique",
+                        type: "post",
+                        dataType: "json",
+                        data: {
+                            "id": function () {
+                                return $("#twiningDiscId").val();
+                            },
+                            "serialNumber": function () {
+                                return $.common.trim($("#serialNumber").val());
+                            }
+                        },
+                        dataFilter: function (data, type) {
+                            return $.validate.unique(data);
+                        }
+                    }
+                },
+            },
+            messages: {
+                "serialNumber": {
+                    remote: [[#{ui.twiningDisc.alter.isSerialNumberExist}]]
+                }
+            },
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/save", $('#form-roll-edit').serialize());
+            }
+        }
+    </script>
+</body>
+</html>

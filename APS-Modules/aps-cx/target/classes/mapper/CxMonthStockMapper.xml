@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxMonthStockMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.dto.CxMonthStockDto" id="CxMonthStockResult">
+        <result property="id" column="id"/>
+        <result property="stockMonth" column="stock_month"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="stockNum" column="stock_num"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="bomDataVersion" column="bom_Data_Version"/>
+    </resultMap>
+
+    <resultMap type="com.zlt.aps.cx.entity.CxMonthStock" id="CxMonthStockResult2">
+        <result property="id" column="id"/>
+        <result property="stockMonth" column="stock_month"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="stockNum" column="stock_num"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="bomDataVersion" column="bom_Data_Version"/>
+    </resultMap>
+
+
+    <sql id="selectCxMonthStockVo">
+        select id, stock_month, embryo_code,bom_Data_Version, stock_num, remark, del_flag, create_by, create_time, update_by, update_time
+        from t_cx_month_stock
+    </sql>
+
+    <select id="selectCxMonthStockList" parameterType="com.zlt.aps.cx.api.domain.dto.CxMonthStockDto"
+            resultMap="CxMonthStockResult">
+        <include refid="selectCxMonthStockVo"/>
+        where del_flag = '0'
+        <if test="beginStockMonth != null and beginStockMonth !='' ">
+            and stock_month  <![CDATA[  >=  ]]> to_date(#{beginStockMonth},'yyyy-MM')
+        </if>
+        <if test="endStockMonth != null and endStockMonth !='' ">
+            and stock_month  <![CDATA[   <  ]]> to_date(#{endStockMonth},'yyyy-MM')
+        </if>
+        <if test="embryoCode != null  and embryoCode != ''">and INSTR(embryo_code, #{embryoCode}) > 0</if>
+        <if test="stockNum != null and stockNum != ''">and INSTR(stock_num, #{stockNum}) > 0</if>
+        <if test="bomDataVersion != null and bomDataVersion != ''">and INSTR(bom_Data_Version, #{bomDataVersion}) > 0</if>
+        <if test="orderStr == null">
+            order by STOCK_MONTH desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkCxMonthStockUnique" parameterType="com.zlt.aps.cx.entity.CxMonthStock"
+            resultMap="CxMonthStockResult2">
+        <include refid="selectCxMonthStockVo"/>
+        where del_flag = '0'
+        <if test="id != null ">and id != #{id}</if>
+        <if test="stockMonth != null">
+            and stock_month = #{stockMonth}
+        </if>
+        <if test="embryoCode != null  and embryoCode != ''">and embryo_code = #{embryoCode}</if>
+        <if test="bomDataVersion != null and bomDataVersion != ''">and bom_Data_Version = #{bomDataVersion}</if>
+
+    </select>
+
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_cx_month_stock a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.stockMonth,jdbcType=VARCHAR} stock_month,
+            #{ITEM.embryoCode,jdbcType=VARCHAR} embryo_code,
+            #{ITEM.stockNum,jdbcType=DOUBLE} stock_num,
+            #{ITEM.bomDataVersion,jdbcType=DOUBLE} bom_Data_Version,
+
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (a.stock_month = b.stock_month
+        and a.embryo_code = b.embryo_code
+        and a.bom_Data_Version = b.bom_Data_Version
+        and a.del_flag = '0')
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.stock_num = b.stock_num,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.stock_month,
+        a.embryo_code,
+        a.bom_Data_Version,
+        a.stock_num ,
+        a.create_by ,
+        a.create_time ,
+        a.remark, a.del_flag
+        ) values
+        (SEQ_CX_MONTHSTOCK.NEXTVAL,
+        b.stock_month,
+        b.embryo_code,
+        b.bom_Data_Version,
+        b.stock_num,
+        b.create_by,
+        sysdate,
+        b.remark, '0'
+        )
+    </update>
+
+
+</mapper>

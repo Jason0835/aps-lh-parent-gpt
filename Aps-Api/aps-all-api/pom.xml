@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>aps-api</artifactId>
+        <groupId>com.zlt.aps</groupId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.zlt.aps</groupId>
+    <artifactId>aps-all-api</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>aps-all-api</name>
+    <description>全工序api合集</description>
+
+    <properties>
+        <aps-api.version>0.0.1-SNAPSHOT</aps-api.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.zlt.aps.lh</groupId>
+            <artifactId>aps-lh-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.cx</groupId>
+            <artifactId>aps-cx-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.tm</groupId>
+            <artifactId>aps-tm-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.tc</groupId>
+            <artifactId>aps-tc-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.nc</groupId>
+            <artifactId>aps-nc-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.cd15</groupId>
+            <artifactId>aps-cd15-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.cd90</groupId>
+            <artifactId>aps-cd90-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.tq</groupId>
+            <artifactId>aps-tq-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.gsq</groupId>
+            <artifactId>aps-gsq-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.gdyy</groupId>
+            <artifactId>aps-gdyy-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.xwyy</groupId>
+            <artifactId>aps-xwyy-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+<!--        <dependency>-->
+<!--            <groupId>com.zlt.aps.mps</groupId>-->
+<!--            <artifactId>aps-mps-api</artifactId>-->
+<!--            <version>${aps-api.version}</version>-->
+<!--        </dependency>-->
+    </dependencies>
+</project>

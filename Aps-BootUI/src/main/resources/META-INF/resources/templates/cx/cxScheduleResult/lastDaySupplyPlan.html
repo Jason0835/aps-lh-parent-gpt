@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('前日增补计划')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: bootstrap-editable-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.sapCode}]]：</label>
+                            <input type="text" name="sapCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cxScheduleResult.specDimension}]]：</label>
+                            <input type="number" name="specDimension"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cxScheduleResult.embryoCode}]]：</label>
+                            <input type="text" name="embryoCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.cxScheduleResult.cxMachineCode}]]：
+                            <select id="cxMachineCode" name="cxMachineCode" th:with="type=${@cx.getMachineInfo()}" class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="generateSupplyPlan()"
+               shiro:hasPermission="cx:lastDaySupplyPlan:generate">
+                <i class="fa fa-bug"></i> [[#{ui.data.column.cx.lastDaySupplyPlan.generate}]]
+            </a>
+            <a class="btn btn-success" onclick="regenerateSupplyPlan()"
+               shiro:hasPermission="cx:lastDaySupplyPlan:regenerate">
+                <i class="fa fa-bug"></i> [[#{ui.data.column.cx.lastDaySupplyPlan.regenerate}]]
+            </a>
+            <a class="btn btn-success" onclick="$.operate.add()"
+               shiro:hasPermission="cx:lastDaySupplyPlan:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.name.add}]]
+            </a>
+            <a class="btn btn-primary single disabled zjtSingle" onclick="changeMachine()"
+               shiro:hasPermission="cx:lastDaySupplyPlan:changeMachine">
+                <i class="fa fa-arrows-h"></i> [[#{ui.data.column.scheduleResult.changeMachine}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="cx:lastDaySupplyPlan:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js"/>
+<script th:inline="javascript">
+
+    var STORAGE_LOCATION = [[${@dict.getType('STORAGE_LOCATION')}]];
+    var cxMachineNameList = [[${@cx.getMachineInfo()}]];
+    var statusDatas = [[${@dict.getType('supply_plan_status')}]];
+    var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+    var TASK_TYPE = [[${@dict.getType('TASK_TYPE')}]];
+    var CLASS_SHIFT = [[${@dict.getType('CLASS_SHIFT')}]];
+    var PRODUCTION_STATUS = [[${@dict.getType('PRODUCTION_STATUS')}]];
+    var lhMachineNameList = [[${@cx.getMachineInfo2(undefined,5)}]];
+    var prefix = ctx + "cx/lastDaySupplyPlan";
+    var baseInfo="";
+    var tableData = [];
+    $(function () {
+        var minimumLhMachine=Number($("#minimumLhMachine").val());
+        var monthPlanSurplusTip=Number($("#monthPlanSurplusTip").val());
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            generatePlanUrl: prefix + "/generateSupplyPlan",
+            regeneratePlanUrl: prefix + "/regenerateSupplyPlan",
+            confirmUrl: prefix + "/confirmSupplyPlan",
+            modifySupplyPlanQtyUrl: prefix + "/edit",
+            changeMachineUrl: prefix + "/changeMachine/{id}",
+            removeUrl: prefix + "/remove",
+            modifyLhMachineQty: prefix + "/modifyLhMachineQty/{id}",
+            uniqueId: 'id',
+            pageSize: 10000,
+            pageList: [10000],
+            modalName: [[#{ui.data.column.cx.lastDaySupplyPlan.modalName}]],
+            clickToSelect: true,
+            fixedColumns: true,
+            fixedNumber: 3,
+            onEditableSave: onEditableSave,
+            onEditableShown:function(){
+                setTimeout(function (){
+                    $(".form-control.input-sm").select();
+                },100)
+            },
+            onEditableHidden:function () {
+                $(".editable-submit").click()
+            },
+            rowStyle: function(row, index) {
+                //标记收尾背景色
+                if(row.markCloseOutTip =='0' ){
+                    return {css: {'background-color': '#FFFFBF'}};
+                }
+                //插单背景色
+                if(row.dataSource=='1'){
+                    return {css: {'background-color': '#BFE0F7'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {title: [[#{ui.data.column.scheduleResult.baseInfo}]], align: 'center', colspan: 33},
+                    {title: [[#{ui.data.column.scheduleResult.class1}]], align: 'center', colspan: 4, visible: false},
+                    {title: [[#{ui.data.column.scheduleResult.class2}]], align: 'center', colspan: 4, visible: false},
+                    {title: [[#{ui.data.column.scheduleResult.class3}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class4}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class5}]], align: 'center', colspan: 4}
+                ],
+                [
+                    {
+                        checkbox: true,
+                        valign: 'middle',
+                        align: 'center',
+                    },
+                    {
+                        field: 'id',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'suppleBatchNo',
+                        title: [[#{ui.data.column.cx.lastDaySupplyPlan.suppleBatchNo}]],
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'status',
+                        title: [[#{ui.data.column.status}]],
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(statusDatas, value);
+                        },
+                    },
+                    {
+                        field: 'taskType',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.taskType}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(TASK_TYPE, value);
+                        }
+                    },
+                    {
+                        field: 'confirmSuppleStatus',
+                        title: [[#{ui.data.column.cx.lastDaySupplyPlan.confirmSuppleStatus}]],
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            return statusTools(row);
+                        },
+                    },
+                    {
+                        field: 'productionStatus',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.productionStatus}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(PRODUCTION_STATUS, value);
+                        }
+                    },
+                    {
+                        field: 'isRelease',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.isRelease}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(isReleaseDatas, value);
+                        }
+                    },
+                    {
+                        field: 'lhMachineCode',
+                        valign: 'middle',
+                        align: 'left',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.lhMachineCode}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '';
+                            }
+                            return selectMachineName(lhMachineNameList, value);
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.colorForLhMachine >1){
+                                return { css: { "background": "#40EE67"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'remark',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.remark}]],
+                        formatter: function (value, row, index) {
+                            var remark = "";
+                            var specialRequirements = row.specialRequirements;
+                            if (value != null) {
+                                remark = value;
+                            }
+                            if (specialRequirements != null) {
+                                if (remark != "") {
+                                    remark = remark + "," + specialRequirements;
+                                } else {
+                                    remark = specialRequirements;
+                                }
+                            }
+                            return $.table.tooltip(remark);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'lhMachineQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.lhMachineQty.br}]],
+                        formatter:function (value, row, index) {
+                            if($.common.isEmpty(value)){
+                                value=0;
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="modifyLhMachineQty(\'' +row.id+'\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                        cellStyle: function(value, row, index) {
+                            var usedModels= Number(value);
+                            var minLhMachines= Number(row.minimumLhMachineComQty)*2*minimumLhMachine;
+                            if ( usedModels>minLhMachines){
+                                return { css: { "background": "#40EE67"} };
+                            }else if(usedModels<minLhMachines){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'minimumLhMachineComQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.minimumLhMachineReqQty}]],
+                    },
+                    {
+                        field: 'availableMoldQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.availableMoldQty}]],
+                    },
+                    {
+                        field: 'specDimension',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.specDimension}]],
+                    },
+                    {
+                        field: 'cxMachineCode',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.cxMachineCode.br}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '';
+                            }
+                            return selectMachineName(cxMachineNameList, value);
+                        }
+                    },
+                    {
+                        field: 'workShifts',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.workShifts}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(CLASS_SHIFT, value);
+                        },
+                    },
+                    {
+                        field: 'maximumClassQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.maximumClassQty.br}]],
+                    },
+                    {
+                        field: 'sapCode',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.sapCode}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.colorForSapCode >1){
+                                return { css: { "background": "#40EE67"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'storageLocation',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.storageLocation}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(STORAGE_LOCATION, value);
+                        },
+                        cellStyle: function(value, row, index) {
+                            if ((value=='T6' || value=='T2')&& row.dataSource!='1'){
+                                return { css: { "font-weight": "bold"} };
+                            }else if((value=='T6' || value=='T2')&& row.dataSource=='1'){
+                                return { css: { "font-weight": "bold",'background-color': '#BFE0F7'}};
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'specDesc',
+                        valign: 'middle',
+                        align: 'left',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.specDesc}]],
+                        formatter: function (value, row, index) {
+                            var colorCode="";
+                            if (row.colorType == '0') {
+                                colorCode=row.colorCode;
+                            }
+                            return $.table.hoverValue(value,value,colorCode);
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.colorType == '1'){
+                                return { css: { "background": row.colorCode} };
+                            }
+                            if (row.markCloseOutTip == '0') {
+                                return {css: {'background-color': "#FFFFBF"}};
+                            }
+                            return {};
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'embryoCode',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.embryoCode}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(row.shareMoldInfoStr)) {
+                                return value;
+                            }
+                            return $.table.hoverValue(row.shareMoldInfoStr, value, '#ff0000', 0, '1');
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.colorForEmbryoCode >1){
+                                return { css: { "background": "#40EE67"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'bomDataVersion',
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        title: [[#{ui.data.column.productStatus.bomDataVersion.br}]],
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            if($.common.isEmpty(value)){
+                                value=[[#{ui.data.column.productConstruction.noVersion}]];
+                            }
+                            return value;
+                        }
+                    },
+                    {
+                        field: 'monthPlan',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.br.monthPlan}]],
+                    },
+                    {
+                        field: 'planModifyQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.planModifyQty}]],
+                    },
+                    {
+                        field: 'monthPlanOs',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.br.monthPlanOs}]],
+                        cellStyle: function(value, row, index) {
+                            var monthPlanOs= Number(value);
+                            if (monthPlanOs<=monthPlanSurplusTip){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'totalStock',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.totalStock}]],
+                        formatter: function (value, row, index) {
+                            var overNum=Number(row.overTimeStock);
+                            if(overNum>0){
+                                return $.table.hoverValue([[#{ui.data.column.cxScheduleResult.extendedStock}]]+"："+row.overTimeStock,value,'#337ab7',0,'1')
+                            }
+                            return value;
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'lhMiddleNightFinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.lhMiddleNightFinishQty}]],
+                    },
+                    {
+                        field: 'supplePlanQty',
+                        title: [[#{ui.data.column.cx.lastDaySupplyPlan.supplePlanQty}]],
+                        valign: 'middle',
+                        align: 'center',
+                    },
+                    {
+                        field: 'class3PlannedQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        //2023-09-27 需求的将白班计划量改叫法"前日白班计划量" title: [[#{ui.data.column.cxScheduleResult.br.dayPlanQty.br}]],
+                        title: [[#{ui.data.column.cx.lastDaySupplyPlan.beforeYesterdayPlan.br}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return 0;
+                            }
+                            return value;
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.midPlanQty}]],
+                            emptytext: '0',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if (!regu.test(value)) {
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 99999999) {
+                                    layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9")
+                                    return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9";
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'planSort',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cx.lastDaySupplyPlan.planSort}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.glueGroup.column.orderNum}]],
+                            emptytext: '0',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if (!regu.test(value)) {
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 99999) {
+                                    layer.msg(String([[#{ui.data.column.mdmMonthProdPlan.greatThan}]]).replace('9999999','99999'))
+                                    return String([[#{ui.data.column.mdmMonthProdPlan.greatThan}]]).replace('9999999','99999');
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'singleShiftLhQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.singleShiftLhQty}]],
+                    },
+                    {
+                        field: 'cxMonthFinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.cxMonthFinishQty}]],
+                    },
+                    {
+                        field: 'rejectQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.rejectQty}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class1AvailableLhShift',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.classAvailableLhShift}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class1PlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class1FinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class1AnalysisInput',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class1Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'class2AvailableLhShift',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.classAvailableLhShift}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class2PlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class2FinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'class2AnalysisInput',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class2Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'class3AvailableLhShift',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.classAvailableLhShift}]],
+                    },
+                    {
+                        field: 'class3PlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class3FinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class3AnalysisInput',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class3Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'class4AvailableLhShift',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.classAvailableLhShift}]],
+                    },
+                    {
+                        field: 'class4PlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                        //20230912 红玉提出:增补计划页面次日1班修改功能注释掉 Nick +
+                        /*editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.plan}]],
+                            emptytext: '0',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if (!regu.test(value)) {
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 99999999) {
+                                    layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9")
+                                    return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9";
+                                }
+                            }
+                        }*/
+                    },
+                    {
+                        field: 'class4FinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class4AnalysisInput',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class4Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'class5AvailableLhShift',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.cxScheduleResult.br.classAvailableLhShift}]],
+                    },
+                    {
+                        field: 'class5PlanQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                        //20230912 红玉提出:增补计划页面次日2班修改功能注释掉 Nick +
+                        /*editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.plan}]],
+                            emptytext: '0',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if (!regu.test(value)) {
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 99999999) {
+                                    layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9")
+                                    return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]] + "9";
+                                }
+                            }
+                        }*/
+                    },
+                    {
+                        field: 'class5FinishQty',
+                        valign: 'middle',
+                        align: 'right',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class5AnalysisInput',
+                        valign: 'middle',
+                        halign:'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class5Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width:50,
+                    },
+                    {
+                        field: 'cxBatchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'orderNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    }
+                ],
+            ],
+            onLoadSuccess: function (data) {
+                tableData = data;
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH/oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if(total == contentRow +1) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 1.5*oneTr});
+                } else if(total == contentRow +2) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 2.5*oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+                }
+                /*固定表头end*/
+                mergeCells(data, "cxMachineCode", "", $("#bootstrap-table"));
+                //mergeCells(data, "maximumClassQty", "cxMachineCode", $("#bootstrap-table"));
+                mergeCells(data, "workShifts", "cxMachineCode", $("#bootstrap-table"));
+                //设置表头基本信息
+                setNewTitle(data);
+            }
+        };
+        $.table.init(options, true);
+
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function(){
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+            },1000)
+        });
+
+        //添加监听
+        addColumnsClick()
+    });
+
+    //重置表头基本信息
+    function setNewTitle(dataAll) {
+        var year = document.getElementById("scheduleDate").value.split("-")[0];
+        var month = document.getElementById("scheduleDate").value.split("-")[1];
+        var day = document.getElementById("scheduleDate").value.split("-")[2];
+        if (ui_locale === "zh") {
+            baseInfo = month + "月" + day + "日"+ [[#{ui.data.column.scheduleResult.cx.baseInfo}]];
+        } else {
+            var textDate = year + "-" + month + "-" + day;
+            let chinaDateArray = new Date(textDate.replace(/-/g,'/')).toDateString().split(' ');
+            baseInfo = `${chinaDateArray[1]} ${chinaDateArray[2]}` + " "+ [[#{ui.data.column.scheduleResult.cx.baseInfo}]];
+        }
+        if (dataAll.rows.length >= 1) {
+            var class1PlanQty=0;
+            var class2PlanQty=0;
+            var class3PlanQty=0;
+            var class4PlanQty=0;
+            var class5PlanQty=0;
+            for (let i = 0; i < dataAll.rows.length; i++) {
+                class1PlanQty=class1PlanQty+Number(dataAll.rows[i]['class1PlanQty']);
+                class2PlanQty=class2PlanQty+Number(dataAll.rows[i]['class2PlanQty']);
+                class3PlanQty=class3PlanQty+Number(dataAll.rows[i]['class3PlanQty']);
+                class4PlanQty=class4PlanQty+Number(dataAll.rows[i]['class4PlanQty']);
+                class5PlanQty=class5PlanQty+Number(dataAll.rows[i]['class5PlanQty']);
+            }
+            var totalPlan=class1PlanQty+class2PlanQty+class3PlanQty;
+            var class1Plan=[[#{ui.data.column.scheduleResult.class1Plan}]];
+            var class2Plan=[[#{ui.data.column.scheduleResult.class2Plan}]];
+            var class3Plan=[[#{ui.data.column.scheduleResult.class3Plan}]];
+            var class4Plan=[[#{ui.data.column.scheduleResult.class4Plan}]];
+            var class5Plan=[[#{ui.data.column.scheduleResult.class5Plan}]];
+            var totalQty=[[#{ui.data.column.scheduleResult.total3Qty}]];
+            var planInfo = '：'+class1Plan+'：'+class1PlanQty.toFixed(0)+'，'+class2Plan+'：'+class2PlanQty.toFixed(0)+'，'+class3Plan+'：'+class3PlanQty.toFixed(0)+'，'+class4Plan+'：'+class4PlanQty.toFixed(0)+'，'+class5Plan+'：'+class5PlanQty.toFixed(0)+'，'+totalQty+'：'+totalPlan.toFixed(0);
+            baseInfo=baseInfo+planInfo;
+        }
+
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+        },1000);
+    }
+
+    /**
+      * 合并相同行
+      * @param data 原始数据（在服务端完成排序）
+      * @param fieldName 合并属性数组
+     * @param condition 合并添加（符合前一个condition和当前condition相等才合并）
+      * @param target 目标表格对象
+      */
+    function mergeCells(dataAll, fieldName,condition, target) {
+        var data = dataAll;
+        setTimeout(function () {
+            if (data.rows.length == 0) {
+                return;
+            }
+            var numArr = [];
+            var number = 0;
+            if (data.rows.length > 1) {
+                for (let i = 0; i < data.rows.length; i++) {
+                    if (data.rows[i][fieldName] != '' && data.rows[i][fieldName] != '-') {
+                        if (data.rows[i - 1]) {
+                            if (data.rows[i - 1][fieldName] != '' && data.rows[i - 1][fieldName] != '-') {
+                                if (data.rows[i - 1][fieldName] == data.rows[i][fieldName] && data.rows[i - 1][condition] == data.rows[i][condition]) {
+                                    number++
+                                } else {
+                                    number = number + 1
+                                    numArr.push({index: i - number, number: number, pan: '1'})
+                                    number = 0
+                                }
+                            }
+                        }
+                        if (!data.rows[i + 1]) {
+                            number = number
+                            numArr.push({index: i - number, number: number + 1, pan: '2'})
+                            number = 0
+                        } else {
+                            if (data.rows[i + 1][fieldName] == '' || data.rows[i + 1][fieldName] == '-') {
+                                number = number
+                                numArr.push({index: i - number, number: number + 1, pan: '3'})
+                                number = 0
+                            }
+                        }
+                    } else {
+                        numArr.push({index: i, number: 1, pan: '4'})
+                    }
+                }
+            } else {
+                numArr.push({index: 0, number: 1, pan: '5'})
+            }
+            // console.log(numArr);
+            for (let x = 0; x < numArr.length; x++) {
+                if (x % 2) {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        //  $(target).children('tbody').children('tr').eq(numArr[x]['index']+y).css('background','yellow')
+                    }
+                } else {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        $(target).children('tbody').children('tr').eq(numArr[x]['index'] + y).css('background', '#fff')
+                    }
+                }
+                $(target).bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: fieldName,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+            }
+        }, 0)
+    }
+
+    function onEditableSave(field, row, rowIndex, oldValue, $el) {
+        // if (row.status === "1") {
+        //     $.modal.alertError([[#{cx.lastDaySupplePlan.message.confirmed}]]);
+        //     $("#" + table.options.id).bootstrapTable('updateCell', {
+        //         index: rowIndex,
+        //         field: "supplePlanQty",
+        //         value: oldValue
+        //     });
+        // }else {
+            $.operate.updateRow(table.options.modifySupplyPlanQtyUrl, "post", row, rowIndex,function () {
+                tableData.rows[rowIndex] = row;
+                /*固定表头end*/
+                mergeCells(tableData, "cxMachineCode", "", $("#bootstrap-table"));
+                //mergeCells(data, "maximumClassQty", "cxMachineCode", $("#bootstrap-table"));
+                mergeCells(tableData, "workShifts", "cxMachineCode", $("#bootstrap-table"));
+            });
+        // }
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode == (item)) {
+                    var machineName = $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    //生成计划增补数据
+    function generateSupplyPlan() {
+        table.set();
+        var scheduleDate = $("#scheduleDate").val();
+        $.modal.confirm([[#{ui.biz.alter.createSupplePlanTask}]], function () {
+            $.operate.post(table.options.generatePlanUrl, {"scheduleDate": scheduleDate},refreshSupplyPlan);
+        });
+    }
+
+    //生成计划增补数据
+    function regenerateSupplyPlan() {
+        table.set();
+        var scheduleDate = $("#scheduleDate").val();
+        $.modal.confirm([[#{ui.biz.alter.regenerateSupplyPlan}]], function () {
+            $.operate.post(table.options.regeneratePlanUrl, {"scheduleDate": scheduleDate},refreshSupplyPlan);
+        });
+    }
+
+    function refreshSupplyPlan(){
+        $.table.refresh();
+    }
+
+    //确认增补计划
+    function confirm() {
+        table.set();
+        var scheduleDate = $("#scheduleDate").val();
+        $.modal.confirm([[#{ui.biz.alter.confirmSupplePlanTask}]], function () {
+            $.operate.post(table.options.confirmUrl, {"scheduleDate": scheduleDate});
+        });
+    }
+
+    //转机台
+    function changeMachine(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        url = table.options.changeMachineUrl.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.cx.lastDaySupplyPlan.modalName}]], url, 500, 500);
+    }
+
+    /* 状态显示 */
+    function statusTools(row) {
+        var datas = JSON.stringify(row);
+        if (row.confirmSuppleStatus == '0') {
+            return "<i class=\"fa fa-toggle-off text-info fa-2x\" onclick='enable("+ datas + ")'></i> ";
+        } else {
+            return "<i class=\"fa fa-toggle-on text-info fa-2x\" onclick='disable("+ datas + ")'></i> ";
+        }
+    }
+
+    /*停用 */
+    function disable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isStop}]], function() {
+            $.operate.post(prefix + "/edit", {'id': datas.id, 'confirmSuppleStatus': 0, 'status': datas.status});
+        })
+    }
+
+    /*启用 */
+    function enable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isOpen}]], function() {
+            $.operate.post(prefix + "/edit", {'id': datas.id, 'confirmSuppleStatus': 1, 'status': datas.status});
+        })
+    }
+
+    //修改硫化机台数
+    function modifyLhMachineQty(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        url = table.options.modifyLhMachineQty.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.cxScheduleResult.lhMachineChangeMoldDesc}]], url,870,600);
+    };
+
+    $(window).resize(function() {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh-(fixTop-50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+        },1000);
+    });
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+</style>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改原线规格管理')" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-roll-edit" th:object="${originalLineSpec}">
+            <input id="originalLineSpecId" name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.xwyy.spec.originalLineSpec}]]：</label>
+                <div class="col-sm-8">
+                    <input id="originalLineCode" name="originalLineCode" th:field="*{originalLineCode}" class="form-control" type="text" required="true" isCode="true" maxlength="30">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.xwyy.spec.originalLineName}]]：</label>
+                <div class="col-sm-8">
+                    <input id="originalLineName" name="originalLineName" th:field="*{originalLineName}" class="form-control" type="text" maxlength="100" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.xwyy.spec.originalLineLength}]]：</label>
+                <div class="col-sm-8">
+                    <input id="originalLineLength" name="originalLineLength" th:field="*{originalLineLength}" class="form-control" type="number" digits="true" min="0" max="9999999" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.xwyy.spec.breakRollNum}]]：</label>
+                <div class="col-sm-8">
+                    <input id="breakRollNum" name="breakRollNum" th:value="*{breakRollNum}" class="form-control" type="number" digits="true" min="0" max="9999999">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = ctx + "xwyy/originalLineSpec";
+
+        $("#form-roll-edit").validate({
+            onkeyup: false,
+            rules: {
+                originalLineSpec: {
+                    remote: {
+                        url: prefix + "/checkOriginalLineSpecCodeUnique",
+                        type: "post",
+                        dataType: "json",
+                        data: {
+                            "id": function () {
+                                return $("#originalLineSpecId").val();
+                            },
+                            "originalLineCode": function () {
+                                return $.common.trim($("#originalLineCode").val());
+                            }
+                        },
+                        dataFilter: function (data, type) {
+                            return $.validate.unique(data);
+                        }
+                    }
+                },
+            },
+            messages: {
+                "originalLineSpec": {
+                    remote: [[#{ui.xwyy.originalLineSpec.alter.isAssistSpecExist}]]
+                }
+            },
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/save", $('#form-roll-edit').serialize());
+            }
+        }
+    </script>
+</body>
+</html>

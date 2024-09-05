@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('模具变动单列表')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldChange.lhMachineName}]]：</label>
+                            <select name="lhMachineCode" th:with="type=${@lh.getMachineInfo()}" class="form-control">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldChange.changeType}]]：</label>
+                            <select name="changeType" th:with="type=${@dict.getType('CHANGE_TYPE')}" class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="lh:moldChange:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit()"
+               shiro:hasPermission="lh:moldChange:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="lh:moldChange:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-warning" onclick="publish()" shiro:hasPermission="lh:moldChange:publish">
+                <i class="iconfont icon-yidaorurizhi"></i> [[#{ui.lh.moldChange.publish}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="lh:moldChange:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-select-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('lh:moldChange:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('lh:moldChange:remove')}]];
+    var changeTypeDatas = [[${@dict.getType('CHANGE_TYPE')}]];
+    var STORAGE_LOCATION = [[${@dict.getType('STORAGE_LOCATION')}]];
+
+    var prefix = ctx + "lh/moldChange";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.moldChange.modalName}]],
+            columns: [{
+                checkbox: true
+                },
+                {
+                    field: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'scheduleDate',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.scheduleDate}]],
+                    sortable: true,
+                },
+                {
+                    field: 'lhMachineCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.lhMachineCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'lhMachineName',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.lhMachineName}]],
+                    sortable: true,
+                },
+                {
+                    field: 'beforeSapCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.beforeSapCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'beforeSpecDesc',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.beforeSpecDesc}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    field: 'tireRoughStock',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.tireRoughStock}]],
+                    sortable: true,
+                },
+                {
+                    field: 'changeType',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.changeType}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabels(changeTypeDatas, row.changeType);
+                    }
+                },
+                {
+                    field: 'afterSapCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.afterSapCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'afterSpecDesc',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.afterSpecDesc}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    field: 'stockArea',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.cxScheduleResult.storageLocation}]],
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(STORAGE_LOCATION, value);
+                    }
+                },
+                {
+                    field: 'changeTime',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.moldChange.changeTime}]],
+                    sortable: true,
+                },
+                {
+                    field: 'remark',
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>'+[[#{ui.frame.btn.update}]]+'</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>'+[[#{ui.frame.btn.delete}]]+'</a>');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+    // 发布
+    function publish() {
+        var chooseScheduleDate = $("#scheduleDate").val();
+        $.modal.confirm([[#{ui.biz.alter.publish.modeChange}]], function () {
+            $.operate.post(prefix + "/publish", {"scheduleDate": chooseScheduleDate});
+        })
+    }
+</script>
+</body>
+</html>

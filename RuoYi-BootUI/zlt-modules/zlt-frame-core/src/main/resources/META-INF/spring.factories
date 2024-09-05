@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.zlt.framework.config.I18nConfig,\
+com.zlt.framework.GlobalSetting

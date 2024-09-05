@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('15度裁断排程结果列表')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-editable-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cd15ScheduleResult.bigRollCode}]]：</label>
+                            <input type="text" name="bigRollCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cd15ScheduleResult.steelStripCode1}]]：</label>
+                            <input type="text" name="steelStripCode1"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cd15ScheduleResult.steelStripCode2}]]：</label>
+                            <input type="text" name="steelStripCode2"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.isRelease}]]：</label>
+                            <select id="isRelease" name="isRelease" th:with="type=${@dict.getType('IS_RELEASE')}"  class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.produceLine}]]：</label>
+                            <select name="machineId"  th:with="type=${@cd15.getMachineInfo()}" class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option  th:each="machineInfo : ${type}" th:value="${machineInfo.id}" th:text="${machineInfo.machineName}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="autoPlan()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:autoPlan">
+                <i class="iconfont icon-yanse"></i> [[#{ui.data.column.scheduleResult.autoPlan}]]
+            </a>
+            <a class="btn btn-success" onclick="$.operate.add('',800,500)" shiro:hasPermission="cd15:cd15ScheduleResult:add">
+                <i class="fa fa-plus"></i> [[#{ui.data.column.scheduleResult.insertOrder}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',1050,480)"
+               shiro:hasPermission="cd15:cd15ScheduleResult:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAllByDate()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-primary multiple disabled zjtSingle" onclick="batchChangeMachine()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:changeMachine">
+                <i class="fa fa-arrows-h"></i> [[#{ui.data.column.scheduleResult.changeMachine}]]
+            </a>
+            <a class="btn btn-primary single disabled tlSingle" onclick="changePlan()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:changePlan">
+                <i class="iconfont icon-canshushezhi"></i> [[#{ui.data.column.scheduleResult.changePlan}]]
+            </a>
+            <a class="btn btn-primary" onclick="balance()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:balance">
+                <i class="fa fa-balance-scale"></i> [[#{ui.data.column.scheduleResult.balance}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="combinationMiddleAndNight()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:combinationMiddleAndNight">
+                <i class="fa fa-ambulance"></i> [[#{ui.data.column.combinationMiddleAndNight}]]
+            </a>
+            <a class="btn btn-warning multiple disabled" onclick="publish()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:publish">
+                <i class="iconfont icon-yidaorurizhi"></i> [[#{ui.data.column.scheduleResult.publish}]]
+            </a>
+            <a class="btn btnPutAway btn-info" onclick="$.operate.importScheduleData()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:import">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]
+            </a>
+            <a class="btn btnPutAway btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btnPutAway btn-info" onclick="$.operate.importScheduleData2()"
+               shiro:hasPermission="cd15:cd15ScheduleResult:import2">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import2}]]
+            </a>
+            <a class="btn btnPutAway btn-primary" onclick="changeReleaseStatus()" shiro:hasRole="admin">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.scheduleResult.changeReleaseStatus}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js" />
+<script th:inline="javascript">
+    var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+    var machineNameList = [[${@cd15.getMachineInfo()}]];
+    var prefix = ctx + "cd15/cd15ScheduleResult";
+    var baseInfo="";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            changeMachine: prefix + "/changeMachine/{id}",
+            batchChangeMachine: prefix + "/batchChangeMachine/{ids}",
+            changePlan: prefix + "/changePlan/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            importUrl2: prefix + "/importData2",
+            chooseMachineUrl: prefix + "/chooseMachine/{id}",
+            changeReleaseStatusUrl: prefix + "/toChangeReleaseStatus",
+            combinationMiddleAndNightUrl: prefix + "/toCombinationMiddleAndNight",
+            pageSize: 10000,
+            pageList: [10000],
+            uniqueId: 'id',
+            modalName: [[#{ui.data.column.cd15ScheduleResult.modalName}]],
+            // height:$(window).height() -143,
+            fixedColumns: true,
+            fixedNumber: 1,
+            onEditableSave: onEditableSave,
+            onEditableShown:function(){
+                setTimeout(function (){
+                    $(".form-control.input-sm").select();
+                },100)
+            },
+            onEditableHidden:function () {
+                $(".editable-submit").click()
+            },
+            rowStyle: function(row, index) {
+                //标记收尾背景色
+                if(row.markCloseOutTip =='0' ){
+                    return {css: {'background-color': '#FFFFBF'}};
+                }
+                //插单背景色
+                if(row.dataSource=='1'){
+                    return {css: {'background-color': '#BFE0F7'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {title: [[#{ui.data.column.scheduleResult.baseInfo}]], align: 'center', colspan: 18},
+                    {title: [[#{ui.data.column.scheduleResult.dayPlan}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.data.column.scheduleResult.nightPlan}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.data.column.scheduleResult.cd15Plan2}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.biz.user.other.info}]], align: 'center', colspan: 1},
+                ],
+                [
+                    {
+                        checkbox: true,
+                        valign: 'middle',
+                        align: 'center',
+                    },
+                    {
+                        field: 'id',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'isRelease',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.isRelease}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '';
+                            }
+                            return $.table.selectDictLabels(isReleaseDatas, row.isRelease);
+                        },
+                    },
+                    {
+                        field: 'bigRollCode',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.bigRollCode}]],
+                    },
+                    {
+                        field: 'cuttingAngle',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.cuttingAngle.br}]],
+                    },
+                    {
+                        field: 'machineId',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.produceLine}]],
+                        formatter: function (value, row, index) {
+                            var actions = [];
+                            if ($.common.isEmpty(value)) {
+                                actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\',\'' + index + '\')">' +[[#{ui.data.column.selectMachineName}]]+ '</a> ');
+                                return actions.join('');
+                            }
+                            let machineName = selectMachineName(machineNameList, value);
+                            if (value.indexOf(',') > 0) {
+                                actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' +row.id+ '\',\'' + index + '\')">' + machineName + '</a> ');
+                                return actions.join('');
+                            }
+                            return machineName;
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.changeMachine == 1){
+                                return { css: { "background": "#ef6776"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'steelStripCode1',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.steelStripCode1}]],
+                        formatter: function (value, row, index) {
+                            if (value != null && row.closeOutSpecFlag == '0') {
+                            	return "*" + value;
+                            }
+                            return value;
+                        }
+                    },
+                    {
+                        field: 'craft1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.steelStripCode1}]]+'<br>'+[[#{ui.data.column.scheduleResult.craft}]],
+                    },
+                    {
+                        field: 'edgeGlue',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.edgeGlue.br}]],
+                    },
+                    {
+                        field: 'steelStripCode2',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.steelStripCode2}]],
+                    },
+                    {
+                        field: 'craft2',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.steelStripCode2}]]+'<br>'+[[#{ui.data.column.scheduleResult.craft}]],
+                    },
+                    {
+                        field: 'stock1Qty1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.stock1Qty1}]],
+                    },
+                    {
+                        field: 'stock1Qty2',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.cd15ScheduleResult.stock1Qty2}]],
+                    },
+                    {
+                        field: 'monthPlanOs',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.monthPlanOs.meter}]],
+                    },
+                    {
+                        field: 'supplyTime1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.supplyTime.hour}]],
+                    },
+                    {
+                        field: 'dailyTotalQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.dailyTotalQty.meter}]],
+                    },
+                    {
+                        field: 'totalFinishQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.totalFinishQty.meter}]],
+                    },
+                    {
+                        field: 'dailyFinishRate',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.dailyFinishRate.meter}]],
+                        formatter: function (value, row, index) {
+                            if (value == 0 || value == null) {
+                                return '0%';
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        }
+                    },
+                    {
+                        field: 'dayPlanQty1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.plan.meter}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.plan}]]+'('+[[#{ui.data.column.scheduleResult.unit.meter}]]+')',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if(!regu.test(value)){
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 9999999) {
+                                    layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]])
+                                    return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                                }
+                            }
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.changeDayPlan == 1){
+                                return { css: { "background": "#ef6776"} };
+                            }
+                            if(row.dayPlanQty1 > 0 && row.nightPlanQty1 > 0) {
+                                return { css: { "background": "yellow"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'dayFinishQty1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.finish.meter}]],
+                    },
+                    {
+                        field: 'dayProduceOrder1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.produceOrder}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.produceOrder}]],
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if(!regu.test(value)){
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 999999) {
+                                    var str = [[#{ui.data.column.mdmMonthProdPlan.greatThan}]]
+                                    layer.msg(String(str).substring(0,str.length - 1));
+                                    return String(str).substring(0,str.length - 1);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'dayFinishRate1',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.finishRate}]],
+                        formatter: function (value, row, index) {
+                            if (value == 0 || value == null) {
+                                return '0%';
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        }
+                    },
+                    {
+                        field: 'dayHandAnalysis1',
+                        valign: 'middle',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.daySysAnalysis1;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'nightPlanQty1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.plan.meter}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.plan}]]+'('+[[#{ui.data.column.scheduleResult.unit.meter}]]+')',
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if(!regu.test(value)){
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 9999999) {
+                                    layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]])
+                                    return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                                }
+                            }
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.changeNightPlan == 1){
+                                return { css: { "background": "#ef6776"} };
+                            }
+                            if(row.dayPlanQty1 > 0 && row.nightPlanQty1 > 0) {
+                                return { css: { "background": "yellow"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'nightFinishQty1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.finish.meter}]],
+                    },
+                    {
+                        field: 'nightProduceOrder1',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.produceOrder}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{ui.data.column.scheduleResult.produceOrder}]],
+                            validate: function (value) {
+                                var regu = /^[0-9]+?$/;
+                                if(!regu.test(value)){
+                                    layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                    return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                                }
+                                if (value > 999999) {
+                                    var str = [[#{ui.data.column.mdmMonthProdPlan.greatThan}]]
+                                    layer.msg(String(str).substring(0,str.length - 1));
+                                    return String(str).substring(0,str.length - 1);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'nightFinishRate1',
+                        valign: 'middle',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.finishRate}]],
+                        formatter: function (value, row, index) {
+                            if (value == 0 || value == null) {
+                                return '0%';
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        }
+                    },
+                    {
+                        field: 'nightHandAnalysis1',
+                        valign: 'middle',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.nightSysAnalysis1;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'cxClass1Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class1Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass2Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class2Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass3Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class3Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass4Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass4Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass5Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass5Plan.meter}]],
+                    },
+                    {
+                        field: 'remark',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.common.column.remark}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value);
+                        },
+                    },
+                    {
+                        field: 'markCloseOutTip',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'cxBatchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'batchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'orderNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    }
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                //历史的排程记录，不允许修改计划量和顺序
+                var scheduleDate = $("#scheduleDate").val();
+                if(scheduleDate != null && scheduleDate != '') {
+                    scheduleDate = scheduleDate.replace(/-/g, "/");
+                    let two1PlanTime = new Date(scheduleDate)
+                    let two2PlanTime = new Date(scheduleDate + " 12:00:00")
+                    let now = new Date()
+                    //如果超过一班
+                    if (now > two1PlanTime) {
+                        $("a[data-name='dayPlanQty1']").editable('disable');
+                        $("a[data-name='dayProduceOrder1']").editable('disable');
+                    } else {
+                        $("a[data-name='dayPlanQty1']").editable('enable');
+                        $("a[data-name='dayProduceOrder1']").editable('enable');
+                    }
+                    //如果超过二班
+                    if (now > two2PlanTime) {
+                        $("a[data-name='nightPlanQty1']").editable('disable');
+                        $("a[data-name='nightProduceOrder1']").editable('disable');
+                    } else {
+                        $("a[data-name='nightPlanQty1']").editable('enable');
+                        $("a[data-name='nightProduceOrder1']").editable('enable');
+                    }
+                }
+
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH/oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if(total == contentRow +1) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 1.5*oneTr});
+                } else if(total == contentRow +2) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 2.5*oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+                }
+                /*固定表头end*/
+
+                //设置表头基本信息
+                setNewTitle(data.rows);
+            },
+            onColumnSwitch:function(field, checked){
+                setTimeout(function () {
+                    document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+                },300);
+            }
+        };
+        $.table.init(options,true);
+
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function(){
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+            },1000)
+        });
+        showTableBtn();
+        //添加监听
+        addColumnsClick()
+    });
+
+    //重置表头基本信息
+    function setNewTitle(dataAll) {
+        var year = document.getElementById("scheduleDate").value.split("-")[0];
+        var month = document.getElementById("scheduleDate").value.split("-")[1];
+        var day = document.getElementById("scheduleDate").value.split("-")[2];
+        if (ui_locale === "zh") {
+            baseInfo = month + "月" + day + "日"+ [[#{ui.data.column.scheduleResult.cd15.baseInfo}]];
+        } else {
+            var textDate = year + "-" + month + "-" + day;
+            let chinaDateArray = new Date(textDate.replace(/-/g,'/')).toDateString().split(' ');
+            baseInfo = `${chinaDateArray[1]} ${chinaDateArray[2]}` + " "+ [[#{ui.data.column.scheduleResult.cd15.baseInfo}]];
+        }
+        if (dataAll.length >= 1) {
+            var class1PlanQty=0;
+            var class2PlanQty=0;
+            for (let i = 0; i < dataAll.length; i++) {
+                class1PlanQty=class1PlanQty+Number(dataAll[i]['dayPlanQty1']);
+                class2PlanQty=class2PlanQty+Number(dataAll[i]['nightPlanQty1']);
+            }
+            var totalPlan=class1PlanQty+class2PlanQty;
+            var class1Plan=[[#{ui.data.column.scheduleResult.heji.zhongban}]];
+            var class2Plan=[[#{ui.data.column.scheduleResult.heji.yeban}]];
+            var totalQty=[[#{ui.data.column.scheduleResult.totalQty}]];
+            var planInfo = '：'+class1Plan+'：'+class1PlanQty.toFixed(0)+'，'+class2Plan+'：'+class2PlanQty.toFixed(0)+'，'+totalQty+'：'+totalPlan.toFixed(0);
+            baseInfo=baseInfo+planInfo;
+        }
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+        },300);
+    }
+
+    //自动排程
+    function autoPlan() {
+        url = prefix + "/toAutoPlan";
+        $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 400, 500);
+    }
+
+    //排程发布
+    function publish() {
+        table.set();
+        var scheduleDate = $("#scheduleDate").val();
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        $.modal.confirm([[#{ui.biz.alter.makeSurePublish}]], function () {
+            $.operate.post(prefix + "/publish", {"scheduleDate": scheduleDate, "ids": rows.join()}, function (result) {
+                if (result.code == web_status.FAIL) {
+                    $.table.refresh();
+                }
+            });
+        })
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.id + '' == (item)) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    //转机台
+    function changeMachine(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        var row = $("#" + table.options.id).bootstrapTable('getRowByUniqueId', id);
+        if ($.common.isEmpty(row.machineId) || row.machineId.indexOf(',') > 0) {
+            $.modal.alertWarning([[#{ui.data.column.scheduleResult.changeMachineId}]]);
+        }else {
+            url = table.options.changeMachine.replace("{id}", id);
+            $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 500, 500);
+        }
+    };
+
+    //批量转机台
+    function batchChangeMachine() {
+        table.set();
+        var selectList = $("#bootstrap-table").bootstrapTable('getSelections');
+        if (selectList.length == 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var flag = true;
+        var ids = "";
+        for (let i = 0; i < selectList.length; i++) {
+            if (ids == "") {
+                ids = selectList[i].id;
+            } else {
+                ids = ids + "," + selectList[i].id;
+            }
+           if ($.common.isEmpty(selectList[i].machineId) || selectList[i].machineId.indexOf(',') > 0) {
+                flag = false;
+                break;
+            }
+        }
+        if (flag) {
+            url = table.options.batchChangeMachine.replace("{ids}", ids);
+            $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 500, 500);
+        } else {
+            $.modal.alertWarning([[#{ui.data.column.scheduleResult.changeMachineId}]]);
+        }
+
+    };
+
+    //调整计划量
+    function changePlan(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        url = table.options.changePlan.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url,1050,500);
+    };
+
+    // 均衡
+    function balance() {
+        url = prefix + "/toBalance";
+        $.modal.open([[#{ui.data.column.scheduleResult.balance}]] + [[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 400, 500);
+    }
+
+    // 更改发布状态
+    function changeReleaseStatus(){
+        var scheduleDate = $("#scheduleDate").val();
+        url = table.options.changeReleaseStatusUrl + "?scheduleDate=" + scheduleDate;
+        $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 350, 200);
+    }
+
+    // 中夜班归并
+    function combinationMiddleAndNight(){
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        var title = [[#{ui.data.column.cd15ScheduleResult.modalName}]] + [[#{ui.data.column.combinationMiddleAndNight}]];
+        var scheduleDate = $("#scheduleDate").val();
+        var url = table.options.combinationMiddleAndNightUrl + "?ids=" + rows.join() + "&scheduleDate=" + scheduleDate;
+        $.modal.open(title, url, 360, 290);
+    }
+
+    function chooseMachine(id, index) {
+        var row = $("#" + table.options.id).bootstrapTable('getRowByUniqueId', id);
+        const url = table.options.chooseMachineUrl.replace("{id}", id + "," + index + "," + row.publishSuccessCount);
+        if ($.common.isEmpty(row.machineId) || row.machineId.indexOf(',') > 0) {
+            $.modal.open([[#{ui.data.column.cd15ScheduleResult.modalName}]], url, 500, 500, function(index, layero) {
+                var iframeWin = layero.find('iframe')[0];
+                iframeWin.contentWindow.submitHandler(index, layero);
+                setTimeout(function () {
+                    document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+                },300);
+            });
+        }
+    }
+
+    function onEditableSave (field, row, rowIndex, oldValue, $el) {
+        if (row.isRelease != '3' && row.isRelease != '4') {
+            row['isRelease'] = row.publishSuccessCount == 0 ? '0' : '5';
+            row['dailyTotalQty'] = Number(row.dayPlanQty1) + Number(row.nightPlanQty1);
+        }
+        $.operate.updateRow(prefix + "/changeQty", "post", row, rowIndex, function (result) {
+            if (result.code == web_status.FAIL) {
+                $("#" + table.options.id).bootstrapTable('updateCell', {
+                    index: rowIndex,
+                    field: field,
+                    value: oldValue
+                });
+            }
+        });
+        var dataAll = $('#bootstrap-table').bootstrapTable("getData");
+        //设置表头基本信息
+        setNewTitle(dataAll);
+
+        //解决调量后，固定列会往回滚的问题（start）
+        setTimeout(function () {
+            var left = $(".fixed-table-body")[0].scrollLeft;
+            if(left==0){
+                $(".fixed-table-body")[0].scrollLeft = left+1;
+            }else{
+                $(".fixed-table-body")[0].scrollLeft = left-1;
+            }
+        },400);
+        //解决调量后，固定列会往回滚的问题（end）
+    }
+
+    $(window).resize(function() {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh-(fixTop-50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML=baseInfo;
+        },300);
+    });
+
+
+    //隐藏多余按钮
+    var showTableBtn = function () {
+        var btns = $(".btnPutAway");
+        var btnName = [[#{ui.data.column.common.moreBtns}]];
+        var content = "<div id='moreBtnDiv' style='display: inline-block;font-size: 12px;'><a class=\"btn btn-success\" style='font-size: 12px;' onclick=\"moreBtns()\"\n>"+btnName+"</a></div>"
+        var moreBtnPanl = '<ul id = "moreBtnPanl" role="menu"></ul>';
+        $("#toolbar").append(content);
+        $("#moreBtnDiv").append(moreBtnPanl);
+        $("#moreBtnPanl").hide();
+        for(var i = 0;i<btns.length;i++){
+            $("#moreBtnPanl").append("<li id=btnItem"+i+"></li>");
+            $("#btnItem"+i).append($(btns[i]).clone().removeClass("btnPutAway"));
+        }
+        $("body").click(function(event) {
+            var obj = event.srcElement || event.target;
+            if (!$(obj).is(".btn")) {
+                $("#moreBtnPanl").hide();
+            }
+        });
+    }
+
+    //点击显示更多按钮
+    var moreBtns = function () {
+        $("#moreBtnPanl").show();
+    }
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+    .pagination-detail{margin-top: 0px !important;margin-bottom: 0px !important;}
+    .select-table{padding-bottom: 0px !important;}
+    button.btn.btn-default.btn-sm.editable-cancel {display: none}
+</style>
+</html>

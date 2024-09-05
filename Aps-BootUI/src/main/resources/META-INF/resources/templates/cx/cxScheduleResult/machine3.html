@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+    <title>成型2</title>
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="ECharts/echarts.min.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+    <!-- <link href="css/bootstrap.min.css" rel="stylesheet">
+     <link href="css/font-awesome.min.css" rel="stylesheet">
+     &lt;!&ndash; bootstrap-table 表格插件样式 &ndash;&gt;
+     <link href="css/bootstrap-table.min.css?v=20200727" rel="stylesheet">
+     <link href="css/animate.css" rel="stylesheet">
+     <link href="css/style.css?v=20200903" rel="stylesheet">
+     <link href="css/ry-ui.css?v=4.5.1" rel="stylesheet">
+
+
+ <link rel="stylesheet" href="css/layer.css?v=3.1.1" id="layuicss-layer">
+ <link rel="stylesheet" href="css/style-layer.css" id="layuicss-thememoonstylecss">
+ <link id="layuicss-laydate" rel="stylesheet" href="css/laydate.css?v=5.0.9" media="all">-->
+    <th:block th:include="include :: header('甘特图')" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>工序选择：</label>
+                            <select name=" ">
+                                <option>成型</option>
+                                <!--<option>硫化</option>-->
+                            </select>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <div class="mainPanl">
+                <div class="panl_li">
+                    <div class="machineTitle">规格</div>
+                </div>
+                <div class="dataPanl">
+                    <div id="machinePanl">
+
+                    </div>
+                    <div id="gantPanl"></div>
+                    <div style="clear: both;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<th:block th:include="include :: echarts-js" />
+<!-- <script type="text/javascript" src="js/jquery.min.js"></script>
+ <script type="text/javascript" src="js/bootstrap.min.js"></script>
+ &lt;!&ndash; bootstrap-table 表格插件 &ndash;&gt;
+ <script type="text/javascript" src="js/bootstrap-table.min.js?v=20200727"></script>
+
+ <script type="text/javascript" src="js/bootstrap-table-zh_CN.js?v=20200727"></script>
+&lt;!&ndash;	<script th:src="@{/ajax/libs/bootstrap-table/locale/bootstrap-table-zh-CN.min.js?v=20210202}"></script>&ndash;&gt;
+ <script type="text/javascript" src="js/bootstrap-table-mobile.js?v=20200727"></script>
+ &lt;!&ndash; jquery-validate 表单验证插件 &ndash;&gt;
+ <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+ <script type="text/javascript" src="js/validate_messages_zh_CN.min.js"></script>
+ <script type="text/javascript" src="js/jquery.validate.extend.js"></script>
+ <script type="text/javascript" src="js/jquery.validate.extend_zh_CN.js"></script>
+ &lt;!&ndash; jquery-validate 表单树插件 &ndash;&gt;
+ <script type="text/javascript" src="js/bootstrap-treetable.js"></script>
+ <script type="text/javascript" src="js/bootstrap-treetable-zh_CN.js"></script>
+
+ <script type="text/javascript" src="js/locale_zh_CN.js"></script>
+
+ &lt;!&ndash; 遮罩层 &ndash;&gt;
+ <script type="text/javascript" src="js/jquery.blockUI.js"></script>
+ <script type="text/javascript" src="js/jquery.blockUI_zh_CN.js"></script>
+ <script type="text/javascript" src="js/icheck.min.js"></script>
+ <script type="text/javascript" src="js/layer.js"></script>
+ <script type="text/javascript" src="js/layui.js"></script>
+
+ <script type="text/javascript" src="js/laydate_zh_CN.js"></script>
+
+ <script type="text/javascript" src="js/common.js?v=4.5.1"></script>
+ <script type="text/javascript" src="js/ry-ui.js?v=4.5.1"></script>
+
+
+
+ <script> var ctx = "\/"; </script>
+
+<script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
+
+ <script type="text/javascript" src="js/jquery.dragtable.js"></script>
+ <script type="text/javascript" src="js/bootstrap-table-reorder.js?v=20210202"></script>-->
+<script>
+    var dataJson = []
+    var startDay = 1;
+    var endDay = 31;
+
+    $(function () {
+        initGant();
+        $(window).resize(function (){
+            // initGant();
+        })
+    });
+
+    function initGant(){
+        //初始化表头
+        initTitle({startDay:1,endDay:31});
+        //初始化数据
+        dataJson = initData();
+        //初始化甘特图
+        initGrid();
+    }
+
+    //initTitle
+    function initTitle(params){
+        var width = ($(document).width()-290)/params.endDay;
+        if(width<40){
+            width=40;
+        }
+        oneDayWidth = width;
+        var str = ""
+        for(var i = parseInt(params.startDay);i<=parseInt(params.endDay);i++){
+            str+='<div class="title_all bg_blue"><div class="title_day">'+i+'号</div></div>'
+        }
+        $('.mainPanl').css('width',width*params.endDay+234+"px");
+        $('.panl_li').css('width',width*params.endDay+234+"px");
+        $('#gantPanl').css('width',width*params.endDay+24+"px");
+        $('.panl_li').append(str);
+        $('#gantPanl').append("<div class='linePnal'></div><div style='clear:both'></div>");
+        $('.title_all').css('width',width+"px")
+    }
+
+    function initData(){
+        var dataJson = [{
+            codeId:'145/70R12 GREEN',
+            startDay:'02',
+            endDay:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KCA651/AT651/F27 AF',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'2000',
+            ywcl:'2000',
+        },
+            {
+                codeId:'175/70R14 G-M',
+                startDay:'02',
+                endDay:'06',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2500',
+                ywcl:'2500',
+            },
+            {
+                codeId:'185/60R14 ECOFOUR',
+                startDay:'05',
+                endDay:'09',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'3000',
+                ywcl:'3000',
+            },
+            {
+                codeId:'215/70R15C',
+                startDay:'7',
+                endDay:'10',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'2400',
+            },
+            {
+                codeId:'165/55R15 GREEN',
+                startDay:'04',
+                endDay:'07',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'2400',
+            },
+            {
+                codeId:'185/65R15 NOVA',
+                startDay:'05',
+                endDay:'10',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'3000',
+            },
+            {
+                codeId:'175/55R15 NOVA',
+                startDay:'06',
+                endDay:'011',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'3000',
+            },
+            {
+                codeId:'185/60R15 ZT1000',
+                startDay:'07',
+                endDay:'16',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'6000',
+                ywcl:'5000',
+            },
+            {
+                codeId:'195/60R15 GREEN',
+                startDay:'07',
+                endDay:'13',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'1200',
+                ywcl:'1200',
+            },
+            {
+                codeId:'7.50R20A08',
+                startDay:'02',
+                endDay:'05',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2000',
+                ywcl:'2000',
+            },
+            {
+                codeId:'7.50R20F26/BL209',
+                startDay:'02',
+                endDay:'06',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2500',
+                ywcl:'2500',
+            },
+            {
+                codeId:'7.50R20F26/BL309',
+                startDay:'05',
+                endDay:'09',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'3000',
+                ywcl:'3000',
+            },
+            {
+                codeId:'7.50R20F868',
+                startDay:'07',
+                endDay:'10',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'2400',
+            },
+            {
+                codeId:'7.50R20FW705/KWD601',
+                startDay:'04',
+                endDay:'07',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'2400',
+            },
+            {
+                codeId:'185/65R16 NOVA',
+                startDay:'05',
+                endDay:'10',
+                msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+                innerMsg:'7.50R16KCA651/AT651/F27 AF',
+                type:'1',
+                cpdh:'TP183119000',
+                specdh:'1000001H',
+                jd:'TP183119000',
+                bc:'1000001H',
+                ydl:'2400',
+                ywcl:'3000',
+            },
+
+        ]
+        return dataJson
+    }
+
+    function initGrid(){
+        //数据分组及排序
+        var data = getGroupData(dataJson);
+        $('.machineTitleItem').remove()
+        for(var i = 0;i<data.length;i++){
+            var stopTimes = 0;
+            var str = "";
+            var height = 44
+            if(data[i].data.length>0){
+                height = 45*data[i].data.length-1
+            }
+            str+='<div class="machineTitleItem" style="height:'+height+'px;line-height:'+height+'px">'+data[i].machineCode+'</div>';
+            $('#machinePanl').append(str)
+            var dataItem = data[i].data;
+            var strItem = "";
+            for(var j = 0;j<dataItem.length;j++){
+                var marginLeft = 0;
+                var width = 0;
+                var itemStartDay = parseInt(dataItem[j].startDay);
+                var itemEndDay = parseInt(dataItem[j].endDay);
+                width = (itemEndDay-itemStartDay+1)*(oneDayWidth+1);
+                marginLeft = (itemStartDay-startDay)*(oneDayWidth+1);
+                var colorClass = "bg_item_yellow";
+                if(i%2!=0){
+                    colorClass = "bg_item_green";
+                }
+                var tooltipClass = "lineItemBottom";
+                if((data.length-i)<=4&&(dataItem.length-j)<=4){
+                    tooltipClass = "lineItemTop";
+                }
+                if(i==1&&j<4){
+                    tooltipClass = "lineItemBottom";
+                }
+                if(24-itemStartDay<=8){
+                    tooltipClass+=" lineItemLeft"
+                }
+                if(dataItem[j].type=="0"){
+                    //停工
+                    colorClass = "bg_item_black";
+                    stopTimes++;
+                    strItem+="<div class='lineItem' style='margin-left:"+marginLeft+"px;'><div class='"+tooltipClass+" "+colorClass+"' style='width:"+width+"px'><span class='itemIndex'>停</span>"+"待料中"+
+                        "</span></div></div>"
+                }else{
+                    strItem+="<div class='lineItem' style='margin-left:"+marginLeft+"px;'><div class='"+tooltipClass+" "+colorClass+"' style='width:"+width+"px'>预定量"+dataItem[j].ydl+"、完成量"+dataItem[j].ywcl+
+                        "<span class='tooltiptext'><span class='tooltipLab'>规格明细：</span>"+dataItem[j].innerMsg+"<hr><span class='tooltipLab'>成品代号：</span><span class='tooltipVal'>"+dataItem[j].cpdh+"</span>"+
+                        "<span class='tooltipLab'>SPEC代号：</span><span class='tooltipVal'>"+dataItem[j].specdh+"</span><br>"+
+                        "<span class='tooltipLab'>阶段：</span><span class='tooltipVal'>"+dataItem[j].jd+"</span>"+
+                        "<span class='tooltipLab'>版次：</span><span class='tooltipVal'>"+dataItem[j].bc+"</span><br>"+
+                        "<span class='tooltipLab'>预定量：</span><span class='tooltipVal'>"+dataItem[j].ydl+"</span>"+
+                        "<span class='tooltipLab'>已完成量：</span><span class='tooltipVal'>"+dataItem[j].ywcl+"</span>"+
+                        "</span></div></div>"
+                }
+
+            }
+            $('.linePnal').append(strItem)
+            $('.linePnal').append("<div style='width:100%;position:absolute;height:1px;background-color:#666;margin-top: -1px;'></div>")
+        }
+    }
+
+    function getGroupData(data){
+        var markData = []
+        for(var i = 0;i<data.length;i++){
+            if(markData.length==0){
+                markData.push({
+                    machineCode:data[i].codeId,
+                    data:[data[i]]
+                })
+            }else{
+                for(var j=0;j<markData.length;j++){
+                    if(data[i].codeId==markData[j].machineCode){
+                        markData[j].data.push(data[i]);
+                        break;
+                    }else if(j==(markData.length-1)){
+                        markData.push({
+                            machineCode:data[i].codeId,
+                            data:[data[i]]
+                        })
+                    }
+                }
+            }
+        }
+        return markData;
+    }
+
+    function linkToPage(){
+        window.location="machine4.html"
+    }
+
+</script>
+</body>
+<style>
+    body{
+        margin: 0;
+        font-size: 12px;
+    }
+    .mainPanl{
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: calc(100vh - 150px) !important;
+        width: 1640px;
+    }
+    .machineTitle{
+        width: 198px;
+        height: 30px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 30px;
+        background-color: #fff;
+        float: left;
+    }
+    .machineTitleDom{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+    }
+    .machineTitleItem{
+        width: 198px;
+        height: 63px;
+        border: 1px solid;
+        border-top: 0;
+        text-align: center;
+        line-height: 63px;
+    }
+    #machinePanl{
+        float: left;
+        font-size: 14px;
+    }
+    .panl_li{
+        width: 1640px;
+        position: absolute;
+        z-index: 99;
+    }
+    .bg_blue{
+        background-color: #ddebf7;
+    }
+    .bg_pink{
+        background-color: #fce4d6;
+    }
+    .title_hour{
+        width: 25px;
+        height: 30px;
+        float: left;
+    }
+    .title_all_items{
+        height: 63px;
+        float: left;
+    }
+    .title_all_dom{
+        height: 65px;
+        width: 100%;
+    }
+    .title_all {
+        text-align: center;
+        float: left;
+        border: 1px solid;
+        border-left: 0;
+        line-height: 30px;
+        font-size: 14px;
+    }
+    .title_day{
+        font-size: 17px;
+        font-weight: bold;
+    }
+    .title_hours{
+        clear: both;
+        width: 600px;
+        height: 30px;
+    }
+    .linePnal{
+        float: left;
+        width: 100%;
+        position: relative;
+    }
+    .lineItem{
+        height: 45px;
+    }
+    .bg_item_blue{
+        background-color: #7b859f;
+    }
+    .bg_item_green{
+        background-color: #a5d4c2;
+    }
+    .bg_item_yellow{
+        background-color: #e9d276;
+    }
+    .bg_item_rin{
+        background-color: #89d1d8;
+    }
+    .bg_item_black{
+        background-color: #e6e7ec;
+    }
+    .lineItemBottom,.lineItemTop{
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black; /* 悬停元素上显示点线 */
+        height: 30px;
+        line-height: 30px;
+        border-radius: 20px;
+        white-space: nowrap;
+        cursor: pointer;
+        margin-top: 5px;
+        text-align: center;
+    }
+    /* Tooltip 文本 */
+    .lineItemBottom .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: -135px;
+        left: 0%;
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+    /* Tooltip 文本 */
+    .lineItemTop .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: 30px;
+        left: 0%;
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+
+    /* Tooltip 文本 */
+    .lineItemLeft .tooltiptext {
+        margin-left: -450px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+    }
+
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemBottom:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemTop:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+
+    /*tooltip样式*/
+    .tooltipLab{
+        width: 75px;
+        display: inline-block;
+        text-align: right;
+    }
+    .tooltipVal{
+        width: 120px;
+        display: inline-block;
+        text-align: left;
+    }
+    .itemIndex{
+        width: 20px;
+        height: 20px;
+        margin-top: 2px;
+        margin-left: 5px;
+        display: inline-block;
+        line-height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        color: #fff;
+        background-color: #d15686;
+        margin-right: 5px;
+    }
+    /* *{
+        box-sizing: content-box;
+    } */
+    #gantPanl{
+        width: 1530px;
+        float: left;
+    }
+    .table-striped {
+        overflow-x: scroll;
+        position: relative;
+        overflow-y: auto;
+        height: calc(100vh - 120px) !important;
+    }
+    .dataPanl{
+        padding-top: 32px;
+    }
+    .dataPanl div{
+        box-sizing: content-box;
+    }
+    .panl_li div{
+        box-sizing: content-box;
+    }
+    hr{
+        margin-bottom: 0;
+        margin-top: 0;;
+    }
+</style>
+</html>

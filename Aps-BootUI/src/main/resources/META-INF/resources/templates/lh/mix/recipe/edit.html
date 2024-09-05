@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改机台和配方对应及下车重量')" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-recipe-edit" th:object="${mixMachineRecipeInfo}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.factoryCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="factoryCode" th:field="*{factoryCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.recipeCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="recipeCode" th:field="*{recipeCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.recipeTime}]]：</label>
+                <div class="col-sm-8">
+                    <input name="recipeTime" th:field="*{recipeTime}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.issueWeight}]]：</label>
+                <div class="col-sm-8">
+                    <input name="issueWeight" th:field="*{issueWeight}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.machineCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="machineCode" th:field="*{machineCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.stopTime}]]：</label>
+                <div class="col-sm-8">
+                    <input name="stopTime" th:field="*{stopTime}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.finalStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="finalStockNum" th:field="*{finalStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.masterStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="masterStockNum" th:field="*{masterStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.returnStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="returnStockNum" th:field="*{returnStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.badStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="badStockNum" th:field="*{badStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.finalMaterialStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="finalMaterialStockNum" th:field="*{finalMaterialStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.masterMaterialStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="masterMaterialStockNum" th:field="*{masterMaterialStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.safetyStockNum}]]：</label>
+                <div class="col-sm-8">
+                    <input name="safetyStockNum" th:field="*{safetyStockNum}" class="form-control" type="number">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.recipe.productName}]]：</label>
+                <div class="col-sm-8">
+                    <input name="productName" th:field="*{productName}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <input name="remark" th:field="*{remark}" class="form-control" type="text">
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = ctx + "lh/mix/recipe";
+        $("#form-recipe-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/edit", $('#form-recipe-edit').serialize());
+            }
+        }
+    </script>
+</body>
+</html>

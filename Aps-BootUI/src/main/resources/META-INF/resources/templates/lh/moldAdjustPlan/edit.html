@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改硫化模具调整计划')" />
+    <th:block th:include="include :: datetimepicker-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-moldAdjustPlan-edit" th:object="${lhMoldAdjustPlan}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.orderNo}]]：</label>
+                <div class="col-sm-8">
+                    <input name="orderNo" th:field="*{orderNo}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.type}]]：</label>
+                <div class="col-sm-8">
+                    <select name="type" class="form-control" th:with="type=${@dict.getType('execution_status')}">
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{type}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.lhMachineCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="lhMachineCode" th:field="*{lhMachineCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.planDate}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="planDate" th:value="${#dates.format(lhMoldAdjustPlan.planDate, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.changeMoldTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="changeMoldTime" th:value="${#dates.format(lhMoldAdjustPlan.changeMoldTime, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.moldStatus}]]：</label>
+                <div class="col-sm-8">
+                    <div class="radio-box" th:each="dict : ${@dict.getType('mold_status')}">
+                        <input type="radio" th:id="${'moldStatus_' + dict.dictCode}" name="moldStatus" th:value="${dict.dictValue}" th:field="*{moldStatus}">
+                        <label th:for="${'moldStatus_' + dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.auditStatus}]]：</label>
+                <div class="col-sm-8">
+                    <div class="radio-box" th:each="dict : ${@dict.getType('audit_status')}">
+                        <input type="radio" th:id="${'auditStatus_' + dict.dictCode}" name="auditStatus" th:value="${dict.dictValue}" th:field="*{auditStatus}">
+                        <label th:for="${'auditStatus_' + dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.process}]]：</label>
+                <div class="col-sm-8">
+                    <input name="process" th:field="*{process}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.executionStatus}]]：</label>
+                <div class="col-sm-8">
+                    <div class="radio-box" th:each="dict : ${@dict.getType('execution_status')}">
+                        <input type="radio" th:id="${'executionStatus_' + dict.dictCode}" name="executionStatus" th:value="${dict.dictValue}" th:field="*{executionStatus}">
+                        <label th:for="${'executionStatus_' + dict.dictCode}" th:text="${dict.dictLabel}"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.beginTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="beginTime" th:value="${#dates.format(lhMoldAdjustPlan.beginTime, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.finishTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="finishTime" th:value="${#dates.format(lhMoldAdjustPlan.finishTime, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftSapCode" th:field="*{leftSapCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightSapCode" th:field="*{rightSapCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftEmbryoSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftEmbryoSapCode" th:field="*{leftEmbryoSapCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightEmbryoSapCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightEmbryoSapCode" th:field="*{rightEmbryoSapCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftSpecDesc" th:field="*{leftSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightSpecDesc" th:field="*{rightSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftBeforeSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftBeforeSpecDesc" th:field="*{leftBeforeSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightBeforeSpecDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightBeforeSpecDesc" th:field="*{rightBeforeSpecDesc}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftEmbryoCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftEmbryoCode" th:field="*{leftEmbryoCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightEmbryoCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightEmbryoCode" th:field="*{rightEmbryoCode}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftStream}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftStream" th:field="*{leftStream}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightStream}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightStream" th:field="*{rightStream}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.leftMoldInfo}]]：</label>
+                <div class="col-sm-8">
+                    <input name="leftMoldInfo" th:field="*{leftMoldInfo}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.rightMoldInfo}]]：</label>
+                <div class="col-sm-8">
+                    <input name="rightMoldInfo" th:field="*{rightMoldInfo}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.moldAssembler}]]：</label>
+                <div class="col-sm-8">
+                    <input name="moldAssembler" th:field="*{moldAssembler}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.moldAssembleTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="moldAssembleTime" th:value="${#dates.format(lhMoldAdjustPlan.moldAssembleTime, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.auditor}]]：</label>
+                <div class="col-sm-8">
+                    <input name="auditor" th:field="*{auditor}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.auditTime}]]：</label>
+                <div class="col-sm-8">
+                    <div class="input-group date">
+                        <input name="auditTime" th:value="${#dates.format(lhMoldAdjustPlan.auditTime, 'yyyy-MM-dd')}" class="form-control" placeholder="yyyy-MM-dd" type="text">
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.auditSuggest}]]：</label>
+                <div class="col-sm-8">
+                    <input name="auditSuggest" th:field="*{auditSuggest}" class="form-control" type="text">
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.moldAdjustPlan.remark}]]：</label>
+                <div class="col-sm-8">
+                    <input name="remark" th:field="*{remark}" class="form-control" type="text">
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: datetimepicker-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "lh/moldAdjustPlan";
+        $("#form-moldAdjustPlan-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/edit", $('#form-moldAdjustPlan-edit').serialize());
+            }
+        }
+
+        $("input[name='planDate']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='changeMoldTime']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='beginTime']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='finishTime']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='moldAssembleTime']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+
+        $("input[name='auditTime']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+    </script>
+</body>
+</html>

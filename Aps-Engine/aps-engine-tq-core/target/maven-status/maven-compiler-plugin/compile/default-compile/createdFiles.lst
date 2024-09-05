@@ -1,0 +1,15 @@
+com\zlt\aps\tq\engine\vo\TqTotalPlanQtyVo.class
+com\zlt\aps\tq\engine\mapper\TqEngineMonthSurplusMapper.class
+com\zlt\aps\tq\engine\vo\TqStockConsumeVo.class
+com\zlt\aps\tq\engine\vo\TqScheduleBaseInfoVo.class
+com\zlt\aps\tq\engine\vo\TqLossVo.class
+com\zlt\aps\tq\engine\vo\TqMonthSurplusVo.class
+com\zlt\aps\tq\engine\mapper\TqEngineMapper.class
+com\zlt\aps\tq\engine\vo\TqStockVo.class
+com\zlt\aps\tq\engine\vo\TqMouthPlateMachineVo.class
+com\zlt\aps\tq\engine\vo\TqSpecifyMachineVo.class
+com\zlt\aps\tq\engine\vo\TqParamsVo.class
+com\zlt\aps\tq\engine\vo\TqScheduleResultVo.class
+com\zlt\aps\tq\engine\mapper\TqEngineMachineMapper.class
+com\zlt\aps\tq\engine\mapper\TqEngineStockMapper.class
+com\zlt\aps\tq\engine\mapper\TqEngineLossMapper.class

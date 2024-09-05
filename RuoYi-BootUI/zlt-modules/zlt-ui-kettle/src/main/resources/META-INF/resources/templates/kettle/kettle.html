@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('kettle列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="config-form">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.kettle.taskname}]]：<input type="text" name="taskName"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.kettle.tasktype}]]：
+                            <select name="taskType" th:with="type=${@dict.getType('sys_kettle_type')}">-->
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.name.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.name.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="tansLog()">
+            <!--				   shiro:hasPermission="system:config:add"-->
+
+            <i class="fa fa-calendar"></i> [[#{ui.frame.btn.name.kettle.transLog}]]
+            </a>
+            <a class="btn btn-primary" onclick="jobLog()" >
+            <!--				   shiro:hasPermission="system:config:edit"-->
+
+            <i class="fa fa-calendar"></i> [[#{ui.frame.btn.name.kettle.jobLog}]]
+            </a>
+
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var runFlag = [[${@permission.hasPermi('system:config:edit')}]];
+    var typeDatas = [[${@dict.getType('sys_kettle_type')}]];
+    var prefix = ctx + "kettle";
+    var jobLogUrl = prefix + "/jobLogList";
+    var transLogUrl = prefix + "/transLogList";
+    var runTaskUrl = prefix + "/start/";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            modalName: [[#{ui.data.column.kettle.task}]],
+            columns: [{
+                checkbox: false
+            },
+                {
+                    field: 'id',
+                    title: [[#{ui.data.column.kettle.task}]] + 'Id'
+                },
+                {
+                    field: 'taskName',
+                    title: [[#{ui.data.column.kettle.taskname}]]
+                },
+                {
+                    field: 'taskType',
+                    title: [[#{ui.data.column.kettle.tasktype}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(typeDatas, value);
+                    }
+                },
+                {
+                    field: 'categoryId',
+                    title: [[#{ui.data.column.kettle.categoryId}]]
+                },
+                {
+                    field: 'remoteUrl',
+                    title: [[#{ui.data.column.kettle.remoteUrl}]],
+                    align: 'left'
+                },
+                {
+                    field: 'recordCount',
+                    title: [[#{ui.data.column.kettle.recordCount}]]
+                },
+                {
+                    field: 'lastRuntime',
+                    title: [[#{ui.data.column.kettle.lastRuntime}]]
+                },
+                {
+                    title: [[#{ui.frame.btn.name.oper}]],
+                    align: 'center',
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + runFlag + '" href="javascript:void(0)" ' +
+                            'onclick="start(\'' + row.id + '\', \'' + row.taskType + '\')"  shiro:hasPermission="kettle:list:runOnce">' +
+                            '<i class="fa fa-edit"></i>' + [[#{ui.frame.btn.name.runOnce}]] + '</a> ');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+    /* 调度任务-立即执行 */
+    function start(taskId, taskType) {
+        $.modal.confirm([[#{ui.biz.alter.isRunOnceJob}]], function () {
+            $.operate.get(runTaskUrl + taskType + "/" + taskId);
+        })
+    }
+
+    function tansLog() {
+        var url = transLogUrl;
+        $.modal.openTab([[#{ui.frame.btn.name.kettle.transLog}]], url);
+    }
+    function jobLog() {
+        var url = jobLogUrl;
+        $.modal.openTab([[#{ui.frame.btn.name.kettle.jobLog}]], url);
+    }
+
+</script>
+</body>
+</html>

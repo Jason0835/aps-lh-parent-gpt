@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.ConstructionParseMapper">
+
+	<!-- 查询施工表字段映射配置列表 -->
+    <select id="selectTPlmBomConstructionMapping" resultType="com.zlt.aps.common.engine.domain.TMesConstructionMapping">
+		SELECT T.CONSTRUCTION_COLUMN COLUMN_NAME, 
+		       T.REGULAR_EXPRESSION, 
+		       T.ERROR_TIPS
+		  FROM T_PLM_BOM_CONSTRUCTION_MAPPING T
+		 WHERE IS_DELETE = '0'
+		   AND CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，因此需要过滤掉 -->
+		   'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不需要解析到施工表，而是在硫化施工表单独解析，因此需要过滤掉 -->
+		   'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+    </select>
+    
+	<!-- 解析bom表，关联plm参数表与施工表字段映射配置表，抓取本次同步需要更新施工表哪个胎胚号的数据 -->
+	<!-- 由于一条胎胚的更新数据有可能分成几个版本发送过来，如果胎胚层（第一层）延迟发送会导致先发送过来的栏位更新会被忽略掉
+		  因此每次更新都将该胎胚的所有字段刷新一边 -->
+    <select id="selectTMesConstructionInfo" resultType="com.zlt.aps.common.engine.domain.TMesConstructionInfo">
+		WITH TEMP_TAB AS
+		<!--=======================树解析start===================-->
+		<!-- 将bom表解析成树结构，每一个胎胚一棵树 -->
+		 (SELECT CONNECT_BY_ROOT REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		         CONNECT_BY_ROOT CHILD_MATERIAL_VERSION EMBRYO_VERSION,
+		         CONNECT_BY_ROOT T.SAP_VERSION SAP_VERSION,
+		         <!-- 从根节点到当前节点的状态，用于判断上层节点是否有废止的，从废止节点开始的子树节点都要视为废止 -->
+		         SYS_CONNECT_BY_PATH(NVL(STATUS, 1), '/') STATUS_PATH,
+		         <!-- 父节点的物料名称编号，用于识别字段映射关系，通过解析树结构获取每一层的物料名称编号，通过截取获取上一层的编号 -->
+		         CASE
+		           WHEN CHILD_MATERIAL_NAME_CODE IS NULL THEN
+		            NULL
+		           ELSE
+		            SUBSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE, '/'),
+		                           '/' || CHILD_MATERIAL_NAME_CODE),
+		                   INSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE,
+		                                                     '/'),
+		                                 '/' || CHILD_MATERIAL_NAME_CODE),
+		                         '/',
+		                         -1) + 1)
+		         END PARENT_MATERIAL_NAME_CODE,
+		         <!-- 从根节点到当前节点的ID序列，用于确认最操作 -->
+		         SYS_CONNECT_BY_PATH(id, '/') ID_PATH,
+		         CHILD_MATERIAL_NAME_CODE,
+		         CHILD_MATERIAL_CODE,
+		         CHILD_CODE,
+		         BOM_VERSION,
+		         PARENT_MATERIAL_CODE,
+		         PARENT_CODE,
+		         <!-- 数据时间相关字段，用于去重 -->
+		         NVL(T.MES_UPDATE_DATE, T.MES_CREATE_DATE)        UPDATE_DATE,
+		         NVL(T.MES_CREATE_DATE, T.MES_UPDATE_DATE)        CREATE_DATE,
+		         T.CHILD_MATERIAL_VERSION,
+         		 NVL(STATUS, 1) STATUS,
+		         T.DOSAGE,
+		         T.ID
+		    FROM T_BOM_INFO T
+        <if test="enable">
+           WHERE NVL(STATUS, 1) != '3'
+        </if>
+		<!-- 树解析方式：
+				以修改节点为根节点
+				父节点的CHILD_MATERIAL_CODE = 子节点的PARENT_MATERIAL_CODE
+				父节点的CHILD_MATERIAL_VERSION = 子节点的BOM_VERSION
+		  -->
+		   START WITH T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+          		  AND T.CHILD_CODE LIKE #{embryoCode} || '%'
+          		  AND T.CHILD_MATERIAL_VERSION = #{embryoVersion}
+          		  <if test="enable">
+          		  AND NVL(STATUS, 1) != '3'
+          		  </if>
+		<!-- 胎胚层去重看更新时间，较晚的优先级更高
+		  -->
+		          AND NOT EXISTS
+		   (SELECT 1
+		                 FROM T_BOM_INFO TT
+		                WHERE T.CHILD_MATERIAL_CODE = TT.CHILD_MATERIAL_CODE
+		                  AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		                  AND T.CHILD_MATERIAL_VERSION = TT.CHILD_MATERIAL_VERSION
+		                  AND (TT.MES_UPDATE_DATE > T.MES_UPDATE_DATE OR
+		                      TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE > T.MES_CREATE_DATE OR
+			                  TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE = T.MES_CREATE_DATE AND
+		                      TT.ID > T.ID)
+          		  <if test="enable">
+		                  AND NVL(TT.STATUS, 1) != '3')
+          		  </if>
+		  <!-- 胎胚层与下一层需要通过版本关联，其余层不需要关联版本 -->
+		  CONNECT BY PRIOR T.CHILD_MATERIAL_CODE = T.PARENT_MATERIAL_CODE
+		         AND (PRIOR T.CHILD_MATERIAL_VERSION = T.BOM_VERSION
+		          AND PRIOR T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		           OR PRIOR T.CHILD_MATERIAL_NAME_CODE != 'EMBRYO'
+		         )
+		) 
+		<!--============================树解析end=========================-->
+		SELECT T1.EMBRYO_CODE, 		<!--胎号-->
+		       T1.EMBRYO_VERSION,	<!--胎胚版本-->
+		       T1.SAP_VERSION,		<!--sap版本 -->
+		       M.CONSTRUCTION_COLUMN COLUMN_NAME, <!--施工表字段名-->
+		<!--根据来源配置从不同的字段取字段值：
+		       1、取BOM表的CHILD_CODE，
+		       2、取BOM表的CHILD_MATERIAL_CODE，
+		       3、取BOM表的PARENT_CODE
+		       4、取PLM表的PARAM_VALUE
+		       5、取BOM表的DOSAGE
+		       5、取BOM表的BOM_VERSION
+		         另外，如果bom状态为已废止，则直接清空-->
+        <if test="enable">
+		       CASE
+		         WHEN T1.STATUS_PATH like '%3%' THEN
+		          null
+		         ELSE
+        </if>
+				       DECODE(M.SOURCE_COLUMN,
+				              1,
+				              T1.CHILD_CODE,
+				              2,
+				              T1.CHILD_MATERIAL_CODE,
+				              3,
+				              T1.PARENT_CODE,
+				              4,
+				              DECODE(P.IS_DELETE, 0, P.PARAM_VALUE, null),  <!--从PLM取值，如果PLM参数状态为删除，也需要清空 -->
+				              5,
+				              to_char(T1.DOSAGE),
+				              6,
+				              T1.CHILD_MATERIAL_VERSION,
+				              NULL)
+        <if test="enable">
+		       END 
+        </if>
+		       COLUMN_VALUE,
+		       T1.CHILD_MATERIAL_CODE,
+		       T1.CHILD_MATERIAL_NAME_CODE,
+		       T1.PARENT_MATERIAL_CODE,
+		       <!-- 树ID序列，用于判断是否最新 -->
+		       ID_PATH ID,
+		       M.SORT_CODE,
+		       T1.UPDATE_DATE,
+		       T1.CREATE_DATE,
+		       <!-- 当数据不是从PLM获取时，PLM更新时间取BOM的更新时间，不要返回空值 -->
+		       NVL(p.UPDATE_DATE, NVL(p.CREATE_DATE, T1.UPDATE_DATE)) PLM_UPDATE_DATE,
+		       nvl(T1.DOSAGE, 0) DOSAGE,
+		       M.REMARK,
+		       M.MATERIAL_TYPE
+		  FROM TEMP_TAB T1
+		 INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
+		    ON T1.CHILD_MATERIAL_NAME_CODE || ':' || T1.PARENT_MATERIAL_NAME_CODE = 
+		       M.CHILD_MATERIAL_NAME_CODE || ':' || M.PARENT_MATERIAL_NAME_CODE
+		   AND M.CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，直接过滤掉 -->
+		   		'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不解析到施工表中，直接过滤掉 -->
+		   		'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+   		   AND M.IS_DELETE = 0
+   		   AND M.Material_Type = #{materialType}
+		  LEFT JOIN T_PLM_CONSTRUCTION_INFO P
+		    ON P.SAP_CODE = T1.CHILD_MATERIAL_CODE
+		   AND P.PARAM_CODE = M.PARAM_CODE
+		   AND M.SOURCE_COLUMN = 4
+		<!-- 胎胚的PLM参数要关联版本 -->
+		   AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND
+		       T1.CHILD_MATERIAL_VERSION = P.VERSION OR
+		       T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+		 WHERE NOT EXISTS
+   		 (SELECT 0
+	            FROM T_PLM_CONSTRUCTION_INFO PP
+	           WHERE PP.SAP_CODE = P.SAP_CODE
+	             AND PP.PARAM_CODE = P.PARAM_CODE
+	             AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND PP.VERSION = P.VERSION OR
+	                 T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+	             AND (NVL(PP.UPDATE_DATE, PP.CREATE_DATE) > NVL(P.UPDATE_DATE, P.CREATE_DATE) OR
+	                 NVL(PP.UPDATE_DATE, PP.CREATE_DATE) = NVL(P.UPDATE_DATE, P.CREATE_DATE) AND PP.ID > P.ID))
+    </select>
+    
+    <!-- 获取月计划中的版本对应的施工信息 -->
+    <select id="listEmbryoVersion" resultType="com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo">
+	    WITH TEMP AS
+		 (
+        <foreach collection="prodList" item="prod" separator=" union ">
+		 SELECT #{prod.embryoCode} EMBRYO_CODE,
+		        #{prod.bomDataVersion} EMBRYO_VERSION
+		   FROM DUAL
+        </foreach>
+		 )
+		SELECT T.EMBRYO_CODE,
+		       T.EMBRYO_VERSION
+		  FROM TEMP T
+		 INNER JOIN T_CONSTRUCTION_VERSION_INFO C
+		    ON C.EMBRYO_CODE = T.EMBRYO_CODE
+		   AND C.EMBRYO_VERSION = T.EMBRYO_VERSION
+		   AND C.DEL_FLAG = '0'
+		 GROUP BY T.EMBRYO_CODE, T.EMBRYO_VERSION
+    </select>
+    
+    <!-- 获取指定胎胚的单版本的投产施工信息版本信息，如果有多个版本，则不要返回 -->
+    <select id="selectSingleVersionConstruction" resultType="com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo">
+	    WITH TEMP AS
+		 (
+        <foreach collection="embryoCodeList" item="embryoCode" separator=" union ">
+		 SELECT #{embryoCode} EMBRYO_CODE FROM DUAL
+        </foreach>
+		 )
+		SELECT T.EMBRYO_CODE, MAX(T.EMBRYO_VERSION) EMBRYO_VERSION
+		  FROM T_CONSTRUCTION_VERSION_INFO T
+		 WHERE T.DEL_FLAG = '0'
+		   AND T.EMBRYO_CODE IN (SELECT EMBRYO_CODE FROM TEMP)
+		 GROUP BY T.EMBRYO_CODE
+		HAVING COUNT(1) = 1
+    </select>
+    
+    <!-- 初始化投产施工表
+    	更新逻辑：投产施工有相同版本相同胎胚的施工则跳过，没有则新增，不会更新已有记录
+    -->
+    <update id="initProductConstructionInfo">
+	  INSERT INTO t_product_construction_info a
+	    (a.id,
+	     a.sap_code,
+	     a.embryo_code,
+	     a.embryo_version,
+	     a.cons_type,
+	     a.dimension,
+	     a.spec_desc,
+	     a.nose_width,
+	     a.flip_disc_diameter,
+	     a.section_width,
+	     a.fit_drum_perimeter,
+	     a.chuck_diameter,
+	     a.stretch_width,
+	     a.qualitative_width,
+	     a.embryo_circle,
+	     a.tire_fabric_code1,
+	     a.tire_fabric_sap1,
+	     a.tire_fabric1_version,
+	     a.tire_fabric_craft1,
+	     a.tire_fabric_code2,
+	     a.tire_fabric_sap2,
+	     a.tire_fabric2_version,
+	     a.tire_fabric_craft2,
+	     a.tire_fabric_code3,
+	     a.tire_fabric_sap3,
+	     a.tire_fabric3_version,
+	     a.tire_fabric_craft3,
+	     a.original_line_code,
+	     a.cord_spec,
+	     a.cord_sap,
+	     a.cord_version,
+	     a.reinforce_seal_glue,
+	     a.inside_rubber,
+	     a.inside_code,
+	     a.inside_sap,
+	     a.inside_version,
+	     a.inside_craft,
+	     a.sidewall_code,
+	     a.sidewall_sap,
+	     a.sidewall_version,
+	     a.sidewall_craft,
+	     a.sidewall_mouth_plate,
+	     a.sidewall_center,
+	     a.sidewall_length,
+	     a.sidewall_rubber,
+	     a.sidewall_weight,
+	     a.sidewall_wearp_rubber_weight,
+	     a.support_code,
+	     a.support_rubber_code,
+	     a.support_length,
+	     a.bead_code,
+	     a.bead_sap,
+	     a.bead_version,
+	     a.bead_arrange,
+	     a.bead_type,
+	     a.tire_ring_code,
+	     a.tire_ring_sap,
+	     a.tire_ring_version,
+	     a.apex_code,
+	     a.hexagon_rubber_code,
+	     a.hexagon_mouth_plate,
+	     a.hexagon_rubber_dimension,
+	     a.apex_weight,
+	     a.belt_code1,
+	     a.belt_sap1,
+	     a.belt1_version,
+	     a.belt_craft1,
+	     a.belt_side_rubber1,
+	     a.belt_rubber1,
+	     a.belt_code2,
+	     a.belt_sap2,
+	     a.belt2_version,
+	     a.belt_craft2,
+	     a.belt_side_rubber2,
+	     a.belt_rubber2,
+	     a.belt_cutting_angle,
+	     a.article_crown_spec,
+	     a.article_crown_sap,
+	     a.article_crown_version,
+	     a.article_crown_code,
+	     a.tread_code,
+	     a.tread_sap,
+	     a.tread_version,
+	     a.tread_shoulder_width,
+	     a.tread_shoulder_jwidth,
+	     a.tread_shoulder_length,
+	     a.tread_rubber_category,
+	     a.tire_crown_up_width_weight,
+	     a.tire_crown_down_width_weight,
+	     a.tire_wing_width_weight,
+	     a.primer_weight,
+	     a.conducting_resin_weight,
+	     a.tread_mouth_plate,
+	     a.create_by,
+	     a.create_time,
+	     a.update_by,
+	     a.update_time,
+	     a.del_flag,
+	     a.remark,
+	     a.production_stage,
+	     a.TIRE_FABRIC_SIDE_RUBBER)
+       	WITH temp_code AS (
+       <foreach collection="embryoCodeList" item="embryoCode" separator=" union ">
+       	  SELECT #{embryoCode} embryoCode FROM dual
+       </foreach>
+       	)
+		   SELECT SEQ_CONSTRUCTION_INFO.NEXTVAL,
+	              sap_code,
+	              embryo_code,
+	              embryo_version,
+	              cons_type,
+	              dimension,
+	              spec_desc,
+	              nose_width,
+	              flip_disc_diameter,
+	              section_width,
+	              fit_drum_perimeter,
+	              chuck_diameter,
+	              stretch_width,
+	              qualitative_width,
+	              embryo_circle,
+	              tire_fabric_code1,
+	              tire_fabric_sap1,
+	              tire_fabric1_version,
+	              tire_fabric_craft1,
+	              tire_fabric_code2,
+	              tire_fabric_sap2,
+	              tire_fabric2_version,
+	              tire_fabric_craft2,
+	              tire_fabric_code3,
+	              tire_fabric_sap3,
+	              tire_fabric3_version,
+	              tire_fabric_craft3,
+	              original_line_code,
+	              cord_spec,
+	              cord_sap,
+	              cord_version,
+	              reinforce_seal_glue,
+	              inside_rubber,
+	              inside_code,
+	              inside_sap,
+	              inside_version,
+	              inside_craft,
+	              sidewall_code,
+	              sidewall_sap,
+	              sidewall_version,
+	              sidewall_craft,
+	              sidewall_mouth_plate,
+	              sidewall_center,
+	              sidewall_length,
+	              sidewall_rubber,
+	              sidewall_weight,
+	              sidewall_wearp_rubber_weight,
+	              support_code,
+	              support_rubber_code,
+	              support_length,
+	              bead_code,
+	              bead_sap,
+	              bead_version,
+	              bead_arrange,
+	              bead_type,
+	              tire_ring_code,
+	              tire_ring_sap,
+	              tire_ring_version,
+	              apex_code,
+	              hexagon_rubber_code,
+	              hexagon_mouth_plate,
+	              hexagon_rubber_dimension,
+	              apex_weight,
+	              belt_code1,
+	              belt_sap1,
+	              belt1_version,
+	              belt_craft1,
+	              belt_side_rubber1,
+	              belt_rubber1,
+	              belt_code2,
+	              belt_sap2,
+	              belt2_version,
+	              belt_craft2,
+	              belt_side_rubber2,
+	              belt_rubber2,
+	              belt_cutting_angle,
+	              article_crown_spec,
+	              article_crown_sap,
+	              article_crown_version,
+	              article_crown_code,
+	              tread_code,
+	              tread_sap,
+	              tread_version,
+	              tread_shoulder_width,
+	              tread_shoulder_jwidth,
+	              tread_shoulder_length,
+	              tread_rubber_category,
+	              tire_crown_up_width_weight,
+	              tire_crown_down_width_weight,
+	              tire_wing_width_weight,
+	              primer_weight,
+	              conducting_resin_weight,
+	              tread_mouth_plate,
+	              create_by,
+	              sysdate create_time,
+	              update_by,
+	              sysdate update_time,
+	              del_flag,
+	              remark,
+	              production_stage,
+	              TIRE_FABRIC_SIDE_RUBBER
+	         FROM t_construction_version_info t
+	        WHERE t.embryo_code IN (SELECT embryoCode FROM temp_code)
+	          AND not exists
+	        (SELECT 0
+	                 FROM t_construction_version_info tt
+	                WHERE tt.embryo_code = t.embryo_code
+	                  AND tt.embryo_version = t.embryo_version
+	                  AND tt.del_flag = '0'
+	                  AND (nvl(tt.update_time, tt.create_time) > nvl(t.update_time, t.create_time) or
+	                      nvl(tt.update_time, tt.create_time) = nvl(t.update_time, t.create_time) and tt.id > t.id))
+	          AND NOT EXISTS 
+	        (SELECT 1 
+	                 FROM t_product_construction_info tt
+			        WHERE tt.embryo_code = t.embryo_code
+			          AND tt.embryo_version = t.embryo_version
+			          AND tt.del_flag = '0'
+			      )
+	          AND t.del_flag = '0'  
+    </update>
+    
+    <!-- 获取最近一次月度计划版本中选择的版本信息，但是如果该版本已经废止则依然要过滤掉 -->
+    <select id="selectLatestProdPlanBomDataVersionList" resultType="com.zlt.aps.common.engine.domain.MdmMonthProdPlan">
+	    <![CDATA[
+		SELECT P.EMBRYO_CODE,
+		       P.MATERIAL_CODE,
+		       P.STORAGE_LOCATION,
+		       MAX(P.BOM_DATA_VERSION) BOM_DATA_VERSION
+		  FROM T_MDM_MONTH_PLAN_MAIN M
+		 INNER JOIN T_MDM_MONTH_PROD_PLAN P
+		    ON P.MONTH_PLAN_APS_VERSION = M.MONTH_PLAN_APS_VERSION
+		 INNER JOIN T_CONSTRUCTION_VERSION_INFO C
+		    ON C.EMBRYO_CODE = P.EMBRYO_CODE
+		   AND C.EMBRYO_VERSION = P.BOM_DATA_VERSION
+		   AND C.DEL_FLAG = '0'
+		 WHERE P.BOM_DATA_VERSION IS NOT NULL
+		   AND NOT EXISTS
+		 (SELECT 0
+		          FROM T_MDM_MONTH_PLAN_MAIN MM
+		         WHERE MM.ID > M.ID
+		           AND MM.ID < (SELECT MAX(ID) FROM T_MDM_MONTH_PLAN_MAIN))
+		   AND M.ID < (SELECT MAX(ID) FROM T_MDM_MONTH_PLAN_MAIN)
+		 GROUP BY P.EMBRYO_CODE, P.MATERIAL_CODE, P.STORAGE_LOCATION
+	     ]]>
+    </select>
+</mapper>

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.LhEngineTireConstructionInfoMapper">
+
+    <resultMap type="com.zlt.aps.common.engine.domain.LhEngineTireConstructionInfo" id="LhEngineTireConstructionInfoResult">
+                    <result property="id" column="id"/>
+                    <result property="sapCode" column="sap_code"/>
+                    <result property="embryoCode" column="embryo_code"/>
+                    <result property="embryoVersion" column="embryo_version"/>
+                    <result property="specDesc" column="spec_desc"/>
+                    <result property="clampingPressure" column="clamping_pressure"/>
+                    <result property="curingTime" column="curing_time"/>
+                    <result property="createBy" column="create_by"/>
+                    <result property="createTime" column="create_time"/>
+                    <result property="updateBy" column="update_by"/>
+                    <result property="updateTime" column="update_time"/>
+                    <result property="delFlag" column="del_flag"/>
+                    <result property="remark" column="remark"/>
+            </resultMap>
+    
+    <sql id="selectLhTireConstructionInfoVo">
+        select id, sap_code, embryo_code,embryo_version,spec_desc, clamping_pressure, curing_time, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_tire_construction_info
+    </sql>
+
+    <select id="selectLhTireConstructionInfoList" parameterType="com.zlt.aps.common.engine.domain.LhEngineTireConstructionInfo" resultMap="LhEngineTireConstructionInfoResult">
+        <include refid="selectLhTireConstructionInfoVo"/>
+        <where>
+            del_flag = '0'
+         <if test="sapCode != null  and sapCode != ''"> and sap_code = #{sapCode}</if>
+         <if test="embryoCode != null  and embryoCode != ''"> and embryo_code = #{embryoCode}</if>
+         <if test="embryoVersion!= null  and embryoVersion != ''"> and embryo_version = #{embryoVersion}</if>
+         <if test="clampingPressure != null "> and clamping_pressure = #{clampingPressure}</if>
+         <if test="curingTime != null "> and curing_time = #{curingTime}</if>
+         <if test="sapCodeList!=null and sapCodeList.size()>0 ">
+             and sap_code in
+             <foreach collection="sapCodeList" item="item" open="(" close=")" separator="," >
+                 #{item}
+             </foreach>
+         </if>
+        </where>
+    </select>
+
+    <select id="selectLhTireConstructionInfoById" parameterType="Long" resultMap="LhEngineTireConstructionInfoResult">
+                    <include refid="selectLhTireConstructionInfoVo"/>
+            where id = #{id}
+            </select>
+
+    <insert id="insertLhTireConstructionInfo" parameterType="com.zlt.aps.common.engine.domain.LhEngineTireConstructionInfo">
+                    <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT seq_lh_tire_construction_info.NEXTVAL as id FROM DUAL
+            </selectKey>
+                insert into t_lh_tire_construction_info
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                            <if test="id != null">id,</if>
+                            <if test="sapCode != null">sap_code,</if>
+                            <if test="embryoCode != null">embryo_code,</if>
+                            <if test="embryoVersion != null">embryo_version,</if>
+                            <if test="specDesc != null">spec_desc,</if>
+                            <if test="clampingPressure != null">clamping_pressure,</if>
+                            <if test="curingTime != null">curing_time,</if>
+                            <if test="createBy != null">create_by,</if>
+                            <if test="createTime != null">create_time,</if>
+                            <if test="updateBy != null">update_by,</if>
+                            <if test="updateTime != null">update_time,</if>
+                            <if test="delFlag != null">del_flag,</if>
+                            <if test="remark != null">remark,</if>
+                    </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                            <if test="id != null">#{id},</if>
+                            <if test="sapCode != null">#{sapCode},</if>
+                            <if test="embryoCode != null">#{embryoCode},</if>
+                            <if test="embryoVersion != null">#{embryoVersion},</if>
+                            <if test="specDesc != null">#{specDesc},</if>
+                            <if test="clampingPressure != null">#{clampingPressure},</if>
+                            <if test="curingTime != null">#{curingTime},</if>
+                            <if test="createBy != null">#{createBy},</if>
+                            <if test="createTime != null">#{createTime},</if>
+                            <if test="updateBy != null">#{updateBy},</if>
+                            <if test="updateTime != null">#{updateTime},</if>
+                            <if test="delFlag != null">#{delFlag},</if>
+                            <if test="remark != null">#{remark},</if>
+                    </trim>
+    </insert>
+
+    <update id="updateLhTireConstructionInfo" parameterType="com.zlt.aps.common.engine.domain.LhEngineTireConstructionInfo">
+        update t_lh_tire_construction_info
+        <trim prefix="SET" suffixOverrides=",">
+          <if test="sapCode != null">sap_code = #{sapCode},</if>
+          <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+          <if test="embryoVersion != null">embryo_version = #{embryoVersion},</if>
+          <if test="specDesc != null">spec_desc = #{specDesc},</if>
+          <if test="clampingPressure != null">clamping_pressure = #{clampingPressure},</if>
+          <if test="curingTime != null">curing_time = #{curingTime},</if>
+          <if test="createBy != null">create_by = #{createBy},</if>
+          <if test="createTime != null">create_time = #{createTime},</if>
+          <if test="updateBy != null">update_by = #{updateBy},</if>
+          <if test="updateTime != null">update_time = #{updateTime},</if>
+          <if test="delFlag != null">del_flag = #{delFlag},</if>
+          <if test="remark != null">remark = #{remark},</if>
+         </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhTireConstructionInfoById" parameterType="Long">
+        update t_lh_tire_construction_info set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteLhTireConstructionInfoByIds" parameterType="String">
+        update t_lh_tire_construction_info set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

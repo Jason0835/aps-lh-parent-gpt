@@ -1,0 +1,28 @@
+# Tomcat
+server:
+  port: 9100
+
+# Spring
+#系统标识
+system-tag: aps
+# Spring
+spring:
+  application:
+    # 应用名称
+    name: ruoyi-monitor
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 192.168.2.93:8848
+      config:
+        # 配置中心地址
+        server-addr: 192.168.2.93:8848
+        # 配置文件格式
+        file-extension: yml
+        # 共享配置
+        shared-configs:
+          - application-${system-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}

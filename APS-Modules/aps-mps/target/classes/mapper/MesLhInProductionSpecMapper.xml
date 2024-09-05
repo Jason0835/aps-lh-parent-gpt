@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.MesLhInProductionSpecMapper">
+	<!-- 判断是否有数据 -->
+    <select id="checkHasData" resultType="int">
+    	SELECT COUNT(1)
+    	  FROM T_MES_LH_IN_PRODUCTION_SPEC
+         WHERE DATA_VERSION = #{dataVersion}
+    </select>
+    
+    <!-- 删除无效数据 -->
+    <update id="deleteData">
+		UPDATE T_LH_IN_PRODUCTION_SPEC A
+		   SET DEL_FLAG = '1', UPDATE_TIME = SYSDATE, UPDATE_BY = NULL
+		 WHERE EXISTS (SELECT 1
+		          FROM T_MES_LH_IN_PRODUCTION_SPEC B
+		         WHERE B.DATA_VERSION = #{dataVersion}
+		           AND B.IS_DELETE = 1
+		           AND B.PRODUCT_DATE = A.PRODUCT_DATE
+		           AND B.LH_MACHINE_CODE = A.LH_MACHINE_CODE)
+    </update>
+    
+	<!-- 合并有效数据 -->
+    <update id="mergeData">
+	    MERGE INTO T_LH_IN_PRODUCTION_SPEC A
+		USING (SELECT *
+		        FROM T_MES_LH_IN_PRODUCTION_SPEC
+		       WHERE DATA_VERSION = #{dataVersion}
+		         AND IS_DELETE = 0) B
+		ON (A.PRODUCT_DATE = B.PRODUCT_DATE AND A.LH_MACHINE_CODE = B.LH_MACHINE_CODE AND A.DEL_FLAG = '0')
+		WHEN MATCHED THEN
+		 UPDATE
+		    SET A.LH_STREAM_CODE  = B.LH_STREAM_CODE,
+		        A.SAP_CODE        = B.SAP_CODE,
+		        A.LEFT_RIGHT_MOLD = B.LEFT_RIGHT_MOLD,
+		        A.REMARK          = B.REMARK,
+		        A.UPDATE_TIME     = SYSDATE
+		WHEN NOT MATCHED THEN
+		 INSERT
+		   (A.ID,
+		    A.PRODUCT_DATE,
+		    A.LH_MACHINE_CODE,
+		    A.LH_STREAM_CODE,
+		    A.SAP_CODE,
+		    A.LEFT_RIGHT_MOLD,
+		    A.CREATE_TIME,
+		    A.DEL_FLAG,
+		    A.REMARK)
+		 VALUES
+		   (SEQ_LH_IN_PRODUCTION_SPEC.NEXTVAL,
+		    B.PRODUCT_DATE,
+		    B.LH_MACHINE_CODE,
+		    B.LH_STREAM_CODE,
+		    B.SAP_CODE,
+		    B.LEFT_RIGHT_MOLD,
+		    SYSDATE,
+		    '0',
+		    B.REMARK)
+    </update>
+
+</mapper>

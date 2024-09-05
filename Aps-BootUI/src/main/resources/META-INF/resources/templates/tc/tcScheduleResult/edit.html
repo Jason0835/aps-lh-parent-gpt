@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改胎侧排程结果')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-tcScheduleResult-edit" th:object="${tcScheduleResult}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <input name="publishSuccessCount" th:field="*{publishSuccessCount}" type="hidden">
+
+        <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.baseInfo}]]</h4>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                    <div class="col-sm-8">
+                        <input  name="scheduleDate" th:value="*{#dates.format({scheduleDate}, 'yyyy-MM-dd')}" type="hidden">
+                        <input id="scheduleDate" name="scheduleDate" type="text" class="time-input form-control" th:value="${#dates.format(tcScheduleResult.scheduleDate, 'yyyy-MM-dd')}"
+                               placeholder="yyyy-MM-dd" th:readonly="true" disabled="disabled">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.tcScheduleResult.sidewallCode}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="sidewallCode" th:field="*{sidewallCode}" class="form-control" type="text" isCode="true" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.glueCode}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="wholeGlueCode" th:field="*{wholeGlueCode}" class="form-control" type="text" isCode="true" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.stockQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="stockQty" th:value="*{@nf.stripZeros(stockQty)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.glueSeq}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="glueSeq" th:field="*{glueSeq}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.supplyTime}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="supplyTime" th:field="*{supplyTime}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.mouthPlateCode}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="mouthPlateCode" th:field="*{mouthPlateCode}" class="form-control" type="text" isCode="true" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.monthPlanOs}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="monthPlanOs" th:value="*{@nf.stripZeros(monthPlanOs)}" class="form-control" type="text" isCode="true" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label ">[[#{ui.data.column.scheduleResult.isRelease}]]：</label>
+                    <div class="col-sm-8">
+                        <select name="isRelease" class="form-control" th:with="type=${@dict.getType('IS_RELEASE')}"disabled>
+                            <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{isRelease}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.produceLine}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="machineId" th:field="*{machineId}" type="hidden">
+                        <select name="machineId" class="form-control noselect2 selectpicker" th:data-none-selected-text="#{ui.data.column.scheduleResult.chooseMachine}" multiple disabled>
+                            <optgroup th:label="#{ui.data.column.scheduleResult.specialMachine}" th:with="type=${@tc.getMachineInfo2(tcScheduleResult,1)}">
+                                <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:selected="${#arrays.contains(#strings.arraySplit(tcScheduleResult.machineId==null?'':tcScheduleResult.machineId,','),#strings.toString(machineInfo.id))}" ></option>
+                            </optgroup>
+                            <optgroup th:label="#{ui.data.column.scheduleResult.mouthPlateMachine}" th:with="type=${@tc.getMachineInfo2(tcScheduleResult,2)}">
+                                <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:selected="${#arrays.contains(#strings.arraySplit(tcScheduleResult.machineId==null?'':tcScheduleResult.machineId,','),#strings.toString(machineInfo.id))}"></option>
+                            </optgroup>
+                            <optgroup th:label="#{ui.data.column.scheduleResult.otherMachine}" th:with="type=${@tc.getMachineInfo2(tcScheduleResult,3)}" >
+                                <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:selected="${#arrays.contains(#strings.arraySplit(tcScheduleResult.machineId==null?'':tcScheduleResult.machineId,','),#strings.toString(machineInfo.id))}"></option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                    <div class="col-sm-8">
+                        <textarea name="remark"  class="form-control" style="width: 800px;" rows="3" th:field="*{remark}" maxlength="300"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+            </div>
+        </div>
+
+        <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.dayPlan}]]</h4>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="dayPlanQty" th:value="*{@nf.stripZeros(dayPlanQty)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayFinishQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="dayFinishQty" th:value="*{@nf.stripZeros(dayFinishQty)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayFinishRate}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="dayFinishRate" name="dayFinishRate" th:field="*{dayFinishRate}" class="form-control" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayProduceOrder}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="dayProduceOrder" th:field="*{dayProduceOrder}" class="form-control" type="number" min="0" max="999999" digits="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayHandAnalysis}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="dayHandAnalysis" th:field="*{dayHandAnalysis}" class="form-control" type="text" maxlength="100">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.daySysAnalysis}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="daySysAnalysis" th:field="*{daySysAnalysis}" class="form-control" type="text" maxlength="100" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.nightPlan}]]</h4>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="nightPlanQty" th:value="*{@nf.stripZeros(nightPlanQty)}" class="form-control" type="number" th:readonly="true" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightFinishQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="nightFinishQty" th:value="*{@nf.stripZeros(nightFinishQty)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightFinishRate}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="nightFinishRate" name="nightFinishRate" th:field="*{nightFinishRate}" class="form-control" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightProduceOrder}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="nightProduceOrder" th:field="*{nightProduceOrder}" class="form-control" type="number" min="0" max="999999" digits="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightHandAnalysis}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="nightHandAnalysis" th:field="*{nightHandAnalysis}" class="form-control" type="text" maxlength="100">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightSysAnalysis}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="nightSysAnalysis" th:field="*{nightSysAnalysis}" class="form-control" type="text" maxlength="100" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.prePlanQty}]]</h4>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.plan}]]([[#{ui.data.column.scheduleResult.unit.meter}]])：</label>
+                    <div class="col-sm-8">
+                        <input name="prePlanQty" th:value="*{@nf.stripZeros(prePlanQty)}" class="form-control" type="number" min="0"  th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.tcPlan2}]]</h4>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.cxClass1Plan}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="cxClass1Plan" th:value="*{@nf.stripZeros(cxClass1Plan)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.cxClass4Plan}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="cxClass4Plan" th:value="*{@nf.stripZeros(cxClass4Plan)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.class2Plan2}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="cxClass2Plan" th:value="*{@nf.stripZeros(cxClass2Plan)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.cxClass5Plan}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="cxClass5Plan" th:value="*{@nf.stripZeros(cxClass5Plan)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.class3Plan2}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="cxClass3Plan" th:value="*{@nf.stripZeros(cxClass3Plan)}" class="form-control" type="number" min="0" th:readonly="true">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+            </div>
+        </div>
+
+        <input name="cxBatchNo" th:field="*{cxBatchNo}" class="form-control" type="hidden">
+        <input name="batchNo" th:field="*{batchNo}" class="form-control" type="hidden">
+        <input name="orderNo" th:field="*{orderNo}" class="form-control" type="hidden">
+
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-select-js" />
+<script th:inline="javascript">
+
+    var prefix = ctx + "tc/tcScheduleResult";
+    $("#form-tcScheduleResult-edit").validate({
+        focusCleanup: true
+    });
+
+    $("input").change(function(){
+        $(this).val($(this).val().trim());
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            $.operate.save(prefix + "/edit", $('#form-tcScheduleResult-edit').serialize());
+        }
+    }
+
+
+    $(function () {
+        var dayFinishRate=$("#dayFinishRate").val();
+        var str = Number(dayFinishRate * 100).toFixed(2)+"%";;
+        $("#dayFinishRate").val(str);
+
+        var nightFinishRate=$("#nightFinishRate").val();
+        var str = Number(nightFinishRate * 100).toFixed(2)+"%";;
+        $("#nightFinishRate").val(str);
+
+        //历史的排程记录，不允许修改计划量和顺序
+        var scheduleDate = $("#scheduleDate").val();
+        scheduleDate = scheduleDate.replace(/-/g, "/");
+        let two1PlanTime = new Date(scheduleDate)
+        let two2PlanTime = new Date(scheduleDate + " 12:00:00")
+        let now = new Date()
+        //如果超过一班
+        if (now > two1PlanTime) {
+            $("input[name='dayProduceOrder']").attr("readonly", true);
+        }
+        //如果超过二班
+        if (now > two2PlanTime) {
+            $("input[name='nightProduceOrder']").attr("readonly", true);
+        }
+    });
+
+</script>
+</body>
+</html>

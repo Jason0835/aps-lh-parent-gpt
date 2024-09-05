@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.zlt.aps.common.engine.config.EngineCommonConfig

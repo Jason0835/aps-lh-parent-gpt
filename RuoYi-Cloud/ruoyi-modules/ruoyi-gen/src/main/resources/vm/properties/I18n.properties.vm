@@ -1,0 +1,16 @@
+
+#===========国际化配置zh_CN.properties===============
+
+ui.data.column.${businessName}.modelName=${functionName}
+#foreach ($column in $columns)
+ui.data.column.${businessName}.${column.javaField}=$column.columnComment
+#end
+
+
+#===========国际化配置en_US.properties===============
+
+ui.data.column.${businessName}.modelName=en${functionName}
+#foreach ($column in $columns)
+ui.data.column.${businessName}.${column.javaField}=en$column.columnComment
+#end
+

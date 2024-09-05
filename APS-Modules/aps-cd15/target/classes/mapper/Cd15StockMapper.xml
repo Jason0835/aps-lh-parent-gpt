@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd15.mapper.Cd15StockMapper">
+
+    <resultMap type="com.zlt.aps.cd15.api.domain.entity.Cd15Stock" id="StockResult">
+        <result property="id" column="id"/>
+        <result property="stockDate" column="stock_date"/>
+        <result property="materialCode" column="material_code"/>
+        <result property="stockNum" column="stock_num"/>
+        <result property="modifyNum" column="modify_num"/>
+        <result property="badNum" column="bad_num"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectStockVo">
+        select id, stock_date, material_code, stock_num, modify_num, bad_num, remark, del_flag, create_by, create_time, update_by, update_time from t_cd15_stock
+    </sql>
+
+    <select id="selectStockList" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15Stock" resultMap="StockResult">
+        <include refid="selectStockVo"/>
+        where del_flag='0'
+        <if test="startTime != null and startTime !='' ">
+            and stock_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !='' ">
+            and stock_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+        </if>
+        <if test="materialCode != null  and materialCode != ''">
+            and INSTR(material_code, #{materialCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by stock_date desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkStockListUnic" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15Stock"
+            resultMap="StockResult">
+        <include refid="selectStockVo"/>
+        where del_flag='0'
+        <if test="id != null and id !='' ">
+            and id != #{id}
+        </if>
+        <if test="stockDate != null ">
+            and stock_date =#{stockDate}
+        </if>
+        <if test="materialCode != null  and materialCode != ''">
+            and material_code = #{materialCode}
+        </if>
+    </select>
+
+
+    <select id="selectStockById" parameterType="Long" resultMap="StockResult">
+        <include refid="selectStockVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertStock" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15Stock">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_cd15_stock.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cd15_stock
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="stockDate != null">stock_date,</if>
+            <if test="materialCode != null">material_code,</if>
+            <if test="stockNum != null">stock_num,</if>
+            <if test="modifyNum != null">modify_num,</if>
+            <if test="badNum != null">bad_num,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="stockDate != null">#{stockDate},</if>
+            <if test="materialCode != null">#{materialCode},</if>
+            <if test="stockNum != null">#{stockNum},</if>
+            <if test="modifyNum != null">#{modifyNum},</if>
+            <if test="badNum != null">#{badNum},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateStock" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15Stock">
+        update t_cd15_stock
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="stockDate != null">stock_date = #{stockDate},</if>
+            <if test="materialCode != null">material_code = #{materialCode},</if>
+            <if test="stockNum != null">stock_num = #{stockNum},</if>
+            modify_num = #{modifyNum,jdbcType=DECIMAL},
+            bad_num = #{badNum,jdbcType=DECIMAL},
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteStockByIds" parameterType="String">
+        update t_cd15_stock set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_cd15_stock a USING (
+        <foreach collection="list" item="STOCK" separator=" union ">
+            select
+            #{STOCK.stockDate,jdbcType=DATE} stock_date,
+            #{STOCK.materialCode,jdbcType=VARCHAR} material_code,
+            #{STOCK.stockNum,jdbcType=DOUBLE} stock_num,
+            #{STOCK.modifyNum,jdbcType=DOUBLE} modify_num,
+            #{STOCK.badNum,jdbcType=DOUBLE} bad_num,
+            #{STOCK.createBy,jdbcType=VARCHAR} create_by,
+            #{STOCK.createTime,jdbcType=DATE} create_time,
+            #{STOCK.updateBy,jdbcType=VARCHAR} update_by,
+            #{STOCK.updateTime,jdbcType=DATE} update_time,
+            #{STOCK.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.stock_date = b.stock_date
+        and b.material_code = a.material_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.stock_num = b.stock_num,
+        a.modify_num = b.modify_num,
+        a.bad_num = b.bad_num,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_cd15_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        b.remark, '0')
+    </update>
+</mapper>

@@ -1,0 +1,133 @@
+package ${packageName}.controller;
+
+import java.util.List;
+import java.io.IOException;
+import javax.servlet.http.HttpServletResponse;
+
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import com.ruoyi.common.security.annotation.PreAuthorize;
+import ${packageName}.${moduleName}.api.domain.entity.${ClassName};
+import ${packageName}.${moduleName}.service.${ClassName}Service;
+import com.ruoyi.common.core.web.controller.BaseController;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import io.swagger.annotations.ApiOperation;
+#if($table.crud || $table.sub)
+import com.ruoyi.common.core.web.page.TableDataInfo;
+#elseif($table.tree)
+#end
+import org.springframework.util.CollectionUtils;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+
+/**
+ * ${functionName}Controller
+ *
+ * @author ${author}
+ * @date ${datetime}
+ */
+@RestController
+@RequestMapping("/${businessName}")
+public class ${ClassName}Controller extends BaseController
+{
+    @Autowired
+    private ${ClassName}Service ${className}Service;
+
+    /**
+     * 查询${functionName}列表
+     */
+    @ApiOperation("查询${functionName}列表")
+    @PostMapping("/list")
+#if($table.crud || $table.sub)
+    public TableDataInfo list(@RequestBody ${ClassName} ${className})
+    {
+        startPage("create_time desc");
+        List<${ClassName}> list = ${className}Service.select${ClassName}List(${className});
+        return getDataTable(list);
+    }
+#elseif($table.tree)
+    public AjaxResult list(${ClassName} ${className}){
+        startPage("create_time desc");
+        List<${ClassName}> list = ${className}Service.select${ClassName}List(${className});
+        return AjaxResult.success(list);
+    }
+#end
+
+    /**
+     * 获取${functionName}详细信息
+     */
+    @ApiOperation("获取${functionName}详细信息")
+    @GetMapping(value = "/{${pkColumn.javaField}}")
+    public ${ClassName} getInfo(@PathVariable("${pkColumn.javaField}") ${pkColumn.javaType} ${pkColumn.javaField}){
+        return ${className}Service.select${ClassName}ById(${pkColumn.javaField});
+    }
+
+    /**
+     * 新增${functionName}
+     */
+    @Log(title = "ui.data.column.${businessName}.modelName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增${functionName}")
+    @PostMapping("/add")
+    public AjaxResult add(@RequestBody ${ClassName} ${className}){
+        return toAjax(${className}Service.insert${ClassName}(${className}));
+    }
+
+    /**
+     * 修改${functionName}
+     */
+    @Log(title = "ui.data.column.${businessName}.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("修改${functionName}")
+    @PostMapping("/edit")
+    public AjaxResult edit(@RequestBody ${ClassName} ${className}){
+        return toAjax(${className}Service.update${ClassName}(${className}));
+    }
+
+    /**
+     * 删除${functionName}
+     */
+    @Log(title = "ui.data.column.${businessName}.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除${functionName}")
+	@DeleteMapping("/{${pkColumn.javaField}s}")
+    public AjaxResult remove(@PathVariable ${pkColumn.javaType}[] ${pkColumn.javaField}s){
+        return toAjax(${className}Service.delete${ClassName}ByIds(${pkColumn.javaField}s));
+    }
+
+    /**
+     * 导出${functionName}列表
+     */
+    @Log(title = "ui.data.column.${businessName}.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出${functionName}列表")
+    @PostMapping("/getList")
+    public List<${ClassName}> getList(@RequestBody ${ClassName} ${className}){
+        startPage("create_time desc");
+        return  ${className}Service.select${ClassName}List(${className});
+    }
+
+    /**
+     * 校验${functionName}唯一性
+     */
+    @ApiOperation("校验${functionName}唯一性")
+    @PostMapping("/check${ClassName}Unique")
+    public String check${ClassName}Unique(@RequestBody ${ClassName} ${className}){
+        return ${className}Service.check${ClassName}Unique(${className});
+    }
+
+    /**
+     * 根据集合导入${functionName}数据
+     * @param list 集合
+     * @param updateSupport 已存在记录是否更新
+     * @param importLogId 导入日志id
+     * @return 结果
+     */
+    @Log(title = "ui.data.column.${businessName}.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入${functionName}数据")
+    @PostMapping("/importData")
+    public AjaxResult importData(@RequestBody List<${ClassName}> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return ${className}Service.importData(list, updateSupport, importLogId);
+    }
+}

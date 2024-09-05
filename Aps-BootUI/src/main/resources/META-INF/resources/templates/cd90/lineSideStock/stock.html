@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('线边库存信息列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.stock.stockDate}]]：</label>
+                            <input type="text" class="time-input"
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                            <span  style='color: black;'>-</span>
+                            <input type="text" class="time-input" id="endTime"
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.badStock.materialCode}]]：</label>
+                            <input type="text" name="materialCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary" onclick="syncStock()" shiro:hasPermission="cd90:lineSideStock:syncStock">
+                <i class="fa fa-refresh"></i> [[#{ui.data.column.stock.sync}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cd90:lineSideStock:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var prefix = ctx + "cd90/lineSideStock";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            syncStockUrl: prefix + "/syncStock",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.frame.page.stock.title}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.stock.id}]],
+                    visible: false
+                },
+                {
+                    field: 'startTime',
+                    visible: false
+                },
+                {
+                    field: 'endTime',
+                    visible: false
+                },
+                {
+                    field: 'stockDate',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.stock.stockDate}]],
+                },
+                {
+                    field: 'machineName',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.machine.machineName}]],
+                },
+                {
+                    field: 'materialCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.badStock.materialCode}]],
+                },
+                {
+                    field: 'barCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.badStock.roll.barcode}]],
+                },
+                {
+                    field: 'stockNum',
+                    sortable: true,
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.stock.stockNum}]],
+
+                },
+                {
+                    field: 'updateTime',
+                    sortable: true,
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.stock.syncTime}]],
+
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value);
+                    },
+
+                }]
+        };
+        $.table.init(options);
+    });
+
+	/** 到MES同步库存数据*/
+    function syncStock() {
+        $.modal.loading(frame.alter.doingWaiting);
+        $.modal.disable();
+    	var config = {
+            url: table.options.syncStockUrl,
+            type: "post",
+            dataType: "json",
+            data: {},
+            error: function (result) {
+                $.modal.alertWarning(result);
+                $.table.refresh();
+                $.modal.closeLoading();
+                $.modal.enable();
+            },
+            success: function (result) {
+                if (result.code == web_status.SUCCESS) {
+                    $.modal.closeAll();
+                    $.modal.alertSuccess(result.msg);
+                } else if (result.code == web_status.WARNING) {
+                    $.modal.alertWarning(result.msg)
+                } else {
+                    $.modal.alertError(result.msg);
+                }
+                $.table.refresh();
+                $.modal.closeLoading();
+                $.modal.enable();
+            }
+        };
+        $.ajax(config)
+    };
+    
+    // 下载模板
+    function importTemplate() {
+        window.location.href=prefix + "/importTemplate";
+    }
+</script>
+</body>
+<!-- 导入区域 -->
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

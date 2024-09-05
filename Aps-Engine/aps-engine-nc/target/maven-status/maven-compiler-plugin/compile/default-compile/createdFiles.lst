@@ -1,0 +1,15 @@
+com\zlt\aps\nc\engine\service\impl\NcEngineMonthSurplusServiceImpl.class
+com\zlt\aps\nc\engine\service\NcEngineGlueService.class
+com\zlt\aps\nc\engine\service\NcEngineLossService.class
+com\zlt\aps\nc\engine\service\NcEngineCurlRollService.class
+com\zlt\aps\nc\engine\service\impl\NcEngineGlueServiceImpl.class
+com\zlt\aps\nc\engine\service\impl\NcEngineServiceImpl.class
+com\zlt\aps\nc\engine\service\impl\NcEngineStockServiceImpl.class
+com\zlt\aps\nc\engine\service\NcEngineStockService.class
+com\zlt\aps\nc\engine\service\impl\NcEngineMachineServiceImpl.class
+com\zlt\aps\nc\engine\service\impl\NcEngineLossServiceImpl.class
+com\zlt\aps\nc\engine\service\NcEngineMachineService.class
+com\zlt\aps\nc\engine\service\NcEngineMonthSurplusService.class
+com\zlt\aps\nc\engine\ApsEngineNcApplication.class
+com\zlt\aps\nc\engine\service\NcEngineService.class
+com\zlt\aps\nc\engine\service\impl\NcEngineCurlRollServiceImpl.class

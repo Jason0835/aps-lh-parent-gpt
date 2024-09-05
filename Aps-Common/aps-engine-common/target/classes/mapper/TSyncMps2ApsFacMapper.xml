@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.TSyncMps2ApsFacMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.common.engine.domain.TSyncMps2ApsFac">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="planSeq" column="PLAN_SEQ" jdbcType="DECIMAL"/>
+            <result property="companyCode" column="COMPANY_CODE" jdbcType="VARCHAR"/>
+            <result property="factoryCode" column="FACTORY_CODE" jdbcType="VARCHAR"/>
+            <result property="year" column="YEAR" jdbcType="DECIMAL"/>
+            <result property="month" column="MONTH" jdbcType="DECIMAL"/>
+            <result property="productionVersion" column="PRODUCTION_VERSION" jdbcType="VARCHAR"/>
+            <result property="monthPlanId" column="MONTH_PLAN_ID" jdbcType="DECIMAL"/>
+            <result property="productCode" column="PRODUCT_CODE" jdbcType="VARCHAR"/>
+            <result property="productDescription" column="PRODUCT_DESCRIPTION" jdbcType="VARCHAR"/>
+            <result property="levelCode" column="LEVEL_CODE" jdbcType="VARCHAR"/>
+            <result property="levelName" column="LEVEL_NAME" jdbcType="VARCHAR"/>
+            <result property="storType" column="STOR_TYPE" jdbcType="VARCHAR"/>
+            <result property="proSize" column="PRO_SIZE" jdbcType="DECIMAL"/>
+            <result property="productName" column="PRODUCT_NAME" jdbcType="VARCHAR"/>
+            <result property="processCode" column="PROCESS_CODE" jdbcType="VARCHAR"/>
+            <result property="theoryProdReqQty" column="THEORY_PROD_REQ_QTY" jdbcType="DECIMAL"/>
+            <result property="totalQty" column="TOTAL_QTY" jdbcType="DECIMAL"/>
+            <result property="estimateShortQty" column="ESTIMATE_SHORT_QTY" jdbcType="DECIMAL"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+            <result property="moldingMachineCode" column="MOLDING_MACHINE_CODE" jdbcType="VARCHAR"/>
+            <result property="differenceQty" column="DIFFERENCE_QTY" jdbcType="DECIMAL"/>
+            <result property="reason" column="REASON" jdbcType="VARCHAR"/>
+            <result property="beginDate" column="BEGIN_DATE" jdbcType="TIMESTAMP"/>
+            <result property="endDate" column="END_DATE" jdbcType="TIMESTAMP"/>
+            <result property="day1" column="DAY_1" jdbcType="DECIMAL"/>
+            <result property="day2" column="DAY_2" jdbcType="DECIMAL"/>
+            <result property="day3" column="DAY_3" jdbcType="DECIMAL"/>
+            <result property="day4" column="DAY_4" jdbcType="DECIMAL"/>
+            <result property="day5" column="DAY_5" jdbcType="DECIMAL"/>
+            <result property="day6" column="DAY_6" jdbcType="DECIMAL"/>
+            <result property="day7" column="DAY_7" jdbcType="DECIMAL"/>
+            <result property="day8" column="DAY_8" jdbcType="DECIMAL"/>
+            <result property="day9" column="DAY_9" jdbcType="DECIMAL"/>
+            <result property="day10" column="DAY_10" jdbcType="DECIMAL"/>
+            <result property="day11" column="DAY_11" jdbcType="DECIMAL"/>
+            <result property="day12" column="DAY_12" jdbcType="DECIMAL"/>
+            <result property="day13" column="DAY_13" jdbcType="DECIMAL"/>
+            <result property="day14" column="DAY_14" jdbcType="DECIMAL"/>
+            <result property="day15" column="DAY_15" jdbcType="DECIMAL"/>
+            <result property="day16" column="DAY_16" jdbcType="DECIMAL"/>
+            <result property="day17" column="DAY_17" jdbcType="DECIMAL"/>
+            <result property="day18" column="DAY_18" jdbcType="DECIMAL"/>
+            <result property="day19" column="DAY_19" jdbcType="DECIMAL"/>
+            <result property="day20" column="DAY_20" jdbcType="DECIMAL"/>
+            <result property="day21" column="DAY_21" jdbcType="DECIMAL"/>
+            <result property="day22" column="DAY_22" jdbcType="DECIMAL"/>
+            <result property="day23" column="DAY_23" jdbcType="DECIMAL"/>
+            <result property="day24" column="DAY_24" jdbcType="DECIMAL"/>
+            <result property="day25" column="DAY_25" jdbcType="DECIMAL"/>
+            <result property="day26" column="DAY_26" jdbcType="DECIMAL"/>
+            <result property="day27" column="DAY_27" jdbcType="DECIMAL"/>
+            <result property="day28" column="DAY_28" jdbcType="DECIMAL"/>
+            <result property="day29" column="DAY_29" jdbcType="DECIMAL"/>
+            <result property="day30" column="DAY_30" jdbcType="DECIMAL"/>
+            <result property="day31" column="DAY_31" jdbcType="DECIMAL"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,PLAN_SEQ,COMPANY_CODE,FACTORY_CODE,
+        YEAR,MONTH,PRODUCTION_VERSION,
+        MONTH_PLAN_ID,PRODUCT_CODE,PRODUCT_DESCRIPTION,
+        LEVEL_CODE,LEVEL_NAME,STOR_TYPE,
+        PRO_SIZE,PRODUCT_NAME,PROCESS_CODE,
+        THEORY_PROD_REQ_QTY,TOTAL_QTY,ESTIMATE_SHORT_QTY,
+        REMARK,MOLDING_MACHINE_CODE,DIFFERENCE_QTY,
+        REASON,BEGIN_DATE,END_DATE,
+        DAY_1,DAY_2,DAY_3,
+        DAY_4,DAY_5,DAY_6,
+        DAY_7,DAY_8,DAY_9,
+        DAY_10,DAY_11,DAY_12,
+        DAY_13,DAY_14,DAY_15,
+        DAY_16,DAY_17,DAY_18,
+        DAY_19,DAY_20,DAY_21,
+        DAY_22,DAY_23,DAY_24,
+        DAY_25,DAY_26,DAY_27,
+        DAY_28,DAY_29,DAY_30,
+        DAY_31,IS_DELETE,CREATE_TIME,
+        UPDATE_TIME,CREATE_BY,UPDATE_BY
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_SYNC_MPS_2_APS_FAC
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_SYNC_MPS_2_APS_FAC
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TSyncMps2ApsFac" useGeneratedKeys="true">
+        insert into T_SYNC_MPS_2_APS_FAC
+        ( ID,COMPANY_CODE,FACTORY_CODE
+        ,YEAR,MONTH,PRODUCTION_VERSION
+        ,MONTH_PLAN_ID,PRODUCT_CODE,PRODUCT_DESCRIPTION
+        ,LEVEL_CODE,LEVEL_NAME,STOR_TYPE
+        ,PRO_SIZE,PRODUCT_NAME,PROCESS_CODE
+        ,THEORY_PROD_REQ_QTY,TOTAL_QTY,ESTIMATE_SHORT_QTY
+        ,REMARK,MOLDING_MACHINE_CODE,DIFFERENCE_QTY
+        ,REASON,BEGIN_DATE,END_DATE
+        ,DAY_1,DAY_2,DAY_3
+        ,DAY_4,DAY_5,DAY_6
+        ,DAY_7,DAY_8,DAY_9
+        ,DAY_10,DAY_11,DAY_12
+        ,DAY_13,DAY_14,DAY_15
+        ,DAY_16,DAY_17,DAY_18
+        ,DAY_19,DAY_20,DAY_21
+        ,DAY_22,DAY_23,DAY_24
+        ,DAY_25,DAY_26,DAY_27
+        ,DAY_28,DAY_29,DAY_30
+        ,DAY_31,IS_DELETE,CREATE_TIME
+        ,UPDATE_TIME,CREATE_BY,UPDATE_BY
+        )
+        values (#{id,jdbcType=DECIMAL},#{companyCode,jdbcType=VARCHAR},#{factoryCode,jdbcType=VARCHAR}
+        ,#{year,jdbcType=DECIMAL},#{month,jdbcType=DECIMAL},#{productionVersion,jdbcType=VARCHAR}
+        ,#{monthPlanId,jdbcType=DECIMAL},#{productCode,jdbcType=VARCHAR},#{productDescription,jdbcType=VARCHAR}
+        ,#{levelCode,jdbcType=VARCHAR},#{levelName,jdbcType=VARCHAR},#{storType,jdbcType=VARCHAR}
+        ,#{proSize,jdbcType=DECIMAL},#{productName,jdbcType=VARCHAR},#{processCode,jdbcType=VARCHAR}
+        ,#{theoryProdReqQty,jdbcType=DECIMAL},#{totalQty,jdbcType=DECIMAL},#{estimateShortQty,jdbcType=DECIMAL}
+        ,#{remark,jdbcType=VARCHAR},#{moldingMachineCode,jdbcType=VARCHAR},#{differenceQty,jdbcType=DECIMAL}
+        ,#{reason,jdbcType=VARCHAR},#{beginDate,jdbcType=TIMESTAMP},#{endDate,jdbcType=TIMESTAMP}
+        ,#{day1,jdbcType=DECIMAL},#{day2,jdbcType=DECIMAL},#{day3,jdbcType=DECIMAL}
+        ,#{day4,jdbcType=DECIMAL},#{day5,jdbcType=DECIMAL},#{day6,jdbcType=DECIMAL}
+        ,#{day7,jdbcType=DECIMAL},#{day8,jdbcType=DECIMAL},#{day9,jdbcType=DECIMAL}
+        ,#{day10,jdbcType=DECIMAL},#{day11,jdbcType=DECIMAL},#{day12,jdbcType=DECIMAL}
+        ,#{day13,jdbcType=DECIMAL},#{day14,jdbcType=DECIMAL},#{day15,jdbcType=DECIMAL}
+        ,#{day16,jdbcType=DECIMAL},#{day17,jdbcType=DECIMAL},#{day18,jdbcType=DECIMAL}
+        ,#{day19,jdbcType=DECIMAL},#{day20,jdbcType=DECIMAL},#{day21,jdbcType=DECIMAL}
+        ,#{day22,jdbcType=DECIMAL},#{day23,jdbcType=DECIMAL},#{day24,jdbcType=DECIMAL}
+        ,#{day25,jdbcType=DECIMAL},#{day26,jdbcType=DECIMAL},#{day27,jdbcType=DECIMAL}
+        ,#{day28,jdbcType=DECIMAL},#{day29,jdbcType=DECIMAL},#{day30,jdbcType=DECIMAL}
+        ,#{day31,jdbcType=DECIMAL},#{isDelete,jdbcType=DECIMAL},#{createTime,jdbcType=TIMESTAMP}
+        ,#{updateTime,jdbcType=TIMESTAMP},#{createBy,jdbcType=VARCHAR},#{updateBy,jdbcType=VARCHAR}
+        )
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TSyncMps2ApsFac" useGeneratedKeys="true">
+        insert into T_SYNC_MPS_2_APS_FAC
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="companyCode != null">companyCode,</if>
+                <if test="factoryCode != null">factoryCode,</if>
+                <if test="year != null">year,</if>
+                <if test="month != null">month,</if>
+                <if test="productionVersion != null">productionVersion,</if>
+                <if test="monthPlanId != null">monthPlanId,</if>
+                <if test="productCode != null">productCode,</if>
+                <if test="productDescription != null">productDescription,</if>
+                <if test="levelCode != null">levelCode,</if>
+                <if test="levelName != null">levelName,</if>
+                <if test="storType != null">storType,</if>
+                <if test="proSize != null">proSize,</if>
+                <if test="productName != null">productName,</if>
+                <if test="processCode != null">processCode,</if>
+                <if test="theoryProdReqQty != null">theoryProdReqQty,</if>
+                <if test="totalQty != null">totalQty,</if>
+                <if test="estimateShortQty != null">estimateShortQty,</if>
+                <if test="remark != null">remark,</if>
+                <if test="moldingMachineCode != null">moldingMachineCode,</if>
+                <if test="differenceQty != null">differenceQty,</if>
+                <if test="reason != null">reason,</if>
+                <if test="beginDate != null">beginDate,</if>
+                <if test="endDate != null">endDate,</if>
+                <if test="day1 != null">day1,</if>
+                <if test="day2 != null">day2,</if>
+                <if test="day3 != null">day3,</if>
+                <if test="day4 != null">day4,</if>
+                <if test="day5 != null">day5,</if>
+                <if test="day6 != null">day6,</if>
+                <if test="day7 != null">day7,</if>
+                <if test="day8 != null">day8,</if>
+                <if test="day9 != null">day9,</if>
+                <if test="day10 != null">day10,</if>
+                <if test="day11 != null">day11,</if>
+                <if test="day12 != null">day12,</if>
+                <if test="day13 != null">day13,</if>
+                <if test="day14 != null">day14,</if>
+                <if test="day15 != null">day15,</if>
+                <if test="day16 != null">day16,</if>
+                <if test="day17 != null">day17,</if>
+                <if test="day18 != null">day18,</if>
+                <if test="day19 != null">day19,</if>
+                <if test="day20 != null">day20,</if>
+                <if test="day21 != null">day21,</if>
+                <if test="day22 != null">day22,</if>
+                <if test="day23 != null">day23,</if>
+                <if test="day24 != null">day24,</if>
+                <if test="day25 != null">day25,</if>
+                <if test="day26 != null">day26,</if>
+                <if test="day27 != null">day27,</if>
+                <if test="day28 != null">day28,</if>
+                <if test="day29 != null">day29,</if>
+                <if test="day30 != null">day30,</if>
+                <if test="day31 != null">day31,</if>
+                <if test="isDelete != null">isDelete,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateTime != null">updateTime,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="updateBy != null">updateBy,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="companyCode != null">COMPANY_CODE = #{companyCode,jdbcType=VARCHAR},</if>
+                <if test="factoryCode != null">FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR},</if>
+                <if test="year != null">YEAR = #{year,jdbcType=DECIMAL},</if>
+                <if test="month != null">MONTH = #{month,jdbcType=DECIMAL},</if>
+                <if test="productionVersion != null">PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR},</if>
+                <if test="monthPlanId != null">MONTH_PLAN_ID = #{monthPlanId,jdbcType=DECIMAL},</if>
+                <if test="productCode != null">PRODUCT_CODE = #{productCode,jdbcType=VARCHAR},</if>
+                <if test="productDescription != null">PRODUCT_DESCRIPTION = #{productDescription,jdbcType=VARCHAR},</if>
+                <if test="levelCode != null">LEVEL_CODE = #{levelCode,jdbcType=VARCHAR},</if>
+                <if test="levelName != null">LEVEL_NAME = #{levelName,jdbcType=VARCHAR},</if>
+                <if test="storType != null">STOR_TYPE = #{storType,jdbcType=VARCHAR},</if>
+                <if test="proSize != null">PRO_SIZE = #{proSize,jdbcType=DECIMAL},</if>
+                <if test="productName != null">PRODUCT_NAME = #{productName,jdbcType=VARCHAR},</if>
+                <if test="processCode != null">PROCESS_CODE = #{processCode,jdbcType=VARCHAR},</if>
+                <if test="theoryProdReqQty != null">THEORY_PROD_REQ_QTY = #{theoryProdReqQty,jdbcType=DECIMAL},</if>
+                <if test="totalQty != null">TOTAL_QTY = #{totalQty,jdbcType=DECIMAL},</if>
+                <if test="estimateShortQty != null">ESTIMATE_SHORT_QTY = #{estimateShortQty,jdbcType=DECIMAL},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+                <if test="moldingMachineCode != null">MOLDING_MACHINE_CODE = #{moldingMachineCode,jdbcType=VARCHAR},</if>
+                <if test="differenceQty != null">DIFFERENCE_QTY = #{differenceQty,jdbcType=DECIMAL},</if>
+                <if test="reason != null">REASON = #{reason,jdbcType=VARCHAR},</if>
+                <if test="beginDate != null">BEGIN_DATE = #{beginDate,jdbcType=TIMESTAMP},</if>
+                <if test="endDate != null">END_DATE = #{endDate,jdbcType=TIMESTAMP},</if>
+                <if test="day1 != null">DAY_1 = #{day1,jdbcType=DECIMAL},</if>
+                <if test="day2 != null">DAY_2 = #{day2,jdbcType=DECIMAL},</if>
+                <if test="day3 != null">DAY_3 = #{day3,jdbcType=DECIMAL},</if>
+                <if test="day4 != null">DAY_4 = #{day4,jdbcType=DECIMAL},</if>
+                <if test="day5 != null">DAY_5 = #{day5,jdbcType=DECIMAL},</if>
+                <if test="day6 != null">DAY_6 = #{day6,jdbcType=DECIMAL},</if>
+                <if test="day7 != null">DAY_7 = #{day7,jdbcType=DECIMAL},</if>
+                <if test="day8 != null">DAY_8 = #{day8,jdbcType=DECIMAL},</if>
+                <if test="day9 != null">DAY_9 = #{day9,jdbcType=DECIMAL},</if>
+                <if test="day10 != null">DAY_10 = #{day10,jdbcType=DECIMAL},</if>
+                <if test="day11 != null">DAY_11 = #{day11,jdbcType=DECIMAL},</if>
+                <if test="day12 != null">DAY_12 = #{day12,jdbcType=DECIMAL},</if>
+                <if test="day13 != null">DAY_13 = #{day13,jdbcType=DECIMAL},</if>
+                <if test="day14 != null">DAY_14 = #{day14,jdbcType=DECIMAL},</if>
+                <if test="day15 != null">DAY_15 = #{day15,jdbcType=DECIMAL},</if>
+                <if test="day16 != null">DAY_16 = #{day16,jdbcType=DECIMAL},</if>
+                <if test="day17 != null">DAY_17 = #{day17,jdbcType=DECIMAL},</if>
+                <if test="day18 != null">DAY_18 = #{day18,jdbcType=DECIMAL},</if>
+                <if test="day19 != null">DAY_19 = #{day19,jdbcType=DECIMAL},</if>
+                <if test="day20 != null">DAY_20 = #{day20,jdbcType=DECIMAL},</if>
+                <if test="day21 != null">DAY_21 = #{day21,jdbcType=DECIMAL},</if>
+                <if test="day22 != null">DAY_22 = #{day22,jdbcType=DECIMAL},</if>
+                <if test="day23 != null">DAY_23 = #{day23,jdbcType=DECIMAL},</if>
+                <if test="day24 != null">DAY_24 = #{day24,jdbcType=DECIMAL},</if>
+                <if test="day25 != null">DAY_25 = #{day25,jdbcType=DECIMAL},</if>
+                <if test="day26 != null">DAY_26 = #{day26,jdbcType=DECIMAL},</if>
+                <if test="day27 != null">DAY_27 = #{day27,jdbcType=DECIMAL},</if>
+                <if test="day28 != null">DAY_28 = #{day28,jdbcType=DECIMAL},</if>
+                <if test="day29 != null">DAY_29 = #{day29,jdbcType=DECIMAL},</if>
+                <if test="day30 != null">DAY_30 = #{day30,jdbcType=DECIMAL},</if>
+                <if test="day31 != null">DAY_31 = #{day31,jdbcType=DECIMAL},</if>
+                <if test="isDelete != null">IS_DELETE = #{isDelete,jdbcType=DECIMAL},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.common.engine.domain.TSyncMps2ApsFac">
+        update T_SYNC_MPS_2_APS_FAC
+        <set>
+                <if test="companyCode != null">
+                    COMPANY_CODE = #{companyCode,jdbcType=VARCHAR},
+                </if>
+                <if test="factoryCode != null">
+                    FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR},
+                </if>
+                <if test="year != null">
+                    YEAR = #{year,jdbcType=DECIMAL},
+                </if>
+                <if test="month != null">
+                    MONTH = #{month,jdbcType=DECIMAL},
+                </if>
+                <if test="productionVersion != null">
+                    PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="monthPlanId != null">
+                    MONTH_PLAN_ID = #{monthPlanId,jdbcType=DECIMAL},
+                </if>
+                <if test="productCode != null">
+                    PRODUCT_CODE = #{productCode,jdbcType=VARCHAR},
+                </if>
+                <if test="productDescription != null">
+                    PRODUCT_DESCRIPTION = #{productDescription,jdbcType=VARCHAR},
+                </if>
+                <if test="levelCode != null">
+                    LEVEL_CODE = #{levelCode,jdbcType=VARCHAR},
+                </if>
+                <if test="levelName != null">
+                    LEVEL_NAME = #{levelName,jdbcType=VARCHAR},
+                </if>
+                <if test="storType != null">
+                    STOR_TYPE = #{storType,jdbcType=VARCHAR},
+                </if>
+                <if test="proSize != null">
+                    PRO_SIZE = #{proSize,jdbcType=DECIMAL},
+                </if>
+                <if test="productName != null">
+                    PRODUCT_NAME = #{productName,jdbcType=VARCHAR},
+                </if>
+                <if test="processCode != null">
+                    PROCESS_CODE = #{processCode,jdbcType=VARCHAR},
+                </if>
+                <if test="theoryProdReqQty != null">
+                    THEORY_PROD_REQ_QTY = #{theoryProdReqQty,jdbcType=DECIMAL},
+                </if>
+                <if test="totalQty != null">
+                    TOTAL_QTY = #{totalQty,jdbcType=DECIMAL},
+                </if>
+                <if test="estimateShortQty != null">
+                    ESTIMATE_SHORT_QTY = #{estimateShortQty,jdbcType=DECIMAL},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+                <if test="moldingMachineCode != null">
+                    MOLDING_MACHINE_CODE = #{moldingMachineCode,jdbcType=VARCHAR},
+                </if>
+                <if test="differenceQty != null">
+                    DIFFERENCE_QTY = #{differenceQty,jdbcType=DECIMAL},
+                </if>
+                <if test="reason != null">
+                    REASON = #{reason,jdbcType=VARCHAR},
+                </if>
+                <if test="beginDate != null">
+                    BEGIN_DATE = #{beginDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="endDate != null">
+                    END_DATE = #{endDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="day1 != null">
+                    DAY_1 = #{day1,jdbcType=DECIMAL},
+                </if>
+                <if test="day2 != null">
+                    DAY_2 = #{day2,jdbcType=DECIMAL},
+                </if>
+                <if test="day3 != null">
+                    DAY_3 = #{day3,jdbcType=DECIMAL},
+                </if>
+                <if test="day4 != null">
+                    DAY_4 = #{day4,jdbcType=DECIMAL},
+                </if>
+                <if test="day5 != null">
+                    DAY_5 = #{day5,jdbcType=DECIMAL},
+                </if>
+                <if test="day6 != null">
+                    DAY_6 = #{day6,jdbcType=DECIMAL},
+                </if>
+                <if test="day7 != null">
+                    DAY_7 = #{day7,jdbcType=DECIMAL},
+                </if>
+                <if test="day8 != null">
+                    DAY_8 = #{day8,jdbcType=DECIMAL},
+                </if>
+                <if test="day9 != null">
+                    DAY_9 = #{day9,jdbcType=DECIMAL},
+                </if>
+                <if test="day10 != null">
+                    DAY_10 = #{day10,jdbcType=DECIMAL},
+                </if>
+                <if test="day11 != null">
+                    DAY_11 = #{day11,jdbcType=DECIMAL},
+                </if>
+                <if test="day12 != null">
+                    DAY_12 = #{day12,jdbcType=DECIMAL},
+                </if>
+                <if test="day13 != null">
+                    DAY_13 = #{day13,jdbcType=DECIMAL},
+                </if>
+                <if test="day14 != null">
+                    DAY_14 = #{day14,jdbcType=DECIMAL},
+                </if>
+                <if test="day15 != null">
+                    DAY_15 = #{day15,jdbcType=DECIMAL},
+                </if>
+                <if test="day16 != null">
+                    DAY_16 = #{day16,jdbcType=DECIMAL},
+                </if>
+                <if test="day17 != null">
+                    DAY_17 = #{day17,jdbcType=DECIMAL},
+                </if>
+                <if test="day18 != null">
+                    DAY_18 = #{day18,jdbcType=DECIMAL},
+                </if>
+                <if test="day19 != null">
+                    DAY_19 = #{day19,jdbcType=DECIMAL},
+                </if>
+                <if test="day20 != null">
+                    DAY_20 = #{day20,jdbcType=DECIMAL},
+                </if>
+                <if test="day21 != null">
+                    DAY_21 = #{day21,jdbcType=DECIMAL},
+                </if>
+                <if test="day22 != null">
+                    DAY_22 = #{day22,jdbcType=DECIMAL},
+                </if>
+                <if test="day23 != null">
+                    DAY_23 = #{day23,jdbcType=DECIMAL},
+                </if>
+                <if test="day24 != null">
+                    DAY_24 = #{day24,jdbcType=DECIMAL},
+                </if>
+                <if test="day25 != null">
+                    DAY_25 = #{day25,jdbcType=DECIMAL},
+                </if>
+                <if test="day26 != null">
+                    DAY_26 = #{day26,jdbcType=DECIMAL},
+                </if>
+                <if test="day27 != null">
+                    DAY_27 = #{day27,jdbcType=DECIMAL},
+                </if>
+                <if test="day28 != null">
+                    DAY_28 = #{day28,jdbcType=DECIMAL},
+                </if>
+                <if test="day29 != null">
+                    DAY_29 = #{day29,jdbcType=DECIMAL},
+                </if>
+                <if test="day30 != null">
+                    DAY_30 = #{day30,jdbcType=DECIMAL},
+                </if>
+                <if test="day31 != null">
+                    DAY_31 = #{day31,jdbcType=DECIMAL},
+                </if>
+                <if test="isDelete != null">
+                    IS_DELETE = #{isDelete,jdbcType=DECIMAL},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.TSyncMps2ApsFac">
+        update T_SYNC_MPS_2_APS_FAC
+        set 
+            COMPANY_CODE =  #{companyCode,jdbcType=VARCHAR},
+            FACTORY_CODE =  #{factoryCode,jdbcType=VARCHAR},
+            YEAR =  #{year,jdbcType=DECIMAL},
+            MONTH =  #{month,jdbcType=DECIMAL},
+            PRODUCTION_VERSION =  #{productionVersion,jdbcType=VARCHAR},
+            MONTH_PLAN_ID =  #{monthPlanId,jdbcType=DECIMAL},
+            PRODUCT_CODE =  #{productCode,jdbcType=VARCHAR},
+            PRODUCT_DESCRIPTION =  #{productDescription,jdbcType=VARCHAR},
+            LEVEL_CODE =  #{levelCode,jdbcType=VARCHAR},
+            LEVEL_NAME =  #{levelName,jdbcType=VARCHAR},
+            STOR_TYPE =  #{storType,jdbcType=VARCHAR},
+            PRO_SIZE =  #{proSize,jdbcType=DECIMAL},
+            PRODUCT_NAME =  #{productName,jdbcType=VARCHAR},
+            PROCESS_CODE =  #{processCode,jdbcType=VARCHAR},
+            THEORY_PROD_REQ_QTY =  #{theoryProdReqQty,jdbcType=DECIMAL},
+            TOTAL_QTY =  #{totalQty,jdbcType=DECIMAL},
+            ESTIMATE_SHORT_QTY =  #{estimateShortQty,jdbcType=DECIMAL},
+            REMARK =  #{remark,jdbcType=VARCHAR},
+            MOLDING_MACHINE_CODE =  #{moldingMachineCode,jdbcType=VARCHAR},
+            DIFFERENCE_QTY =  #{differenceQty,jdbcType=DECIMAL},
+            REASON =  #{reason,jdbcType=VARCHAR},
+            BEGIN_DATE =  #{beginDate,jdbcType=TIMESTAMP},
+            END_DATE =  #{endDate,jdbcType=TIMESTAMP},
+            DAY_1 =  #{day1,jdbcType=DECIMAL},
+            DAY_2 =  #{day2,jdbcType=DECIMAL},
+            DAY_3 =  #{day3,jdbcType=DECIMAL},
+            DAY_4 =  #{day4,jdbcType=DECIMAL},
+            DAY_5 =  #{day5,jdbcType=DECIMAL},
+            DAY_6 =  #{day6,jdbcType=DECIMAL},
+            DAY_7 =  #{day7,jdbcType=DECIMAL},
+            DAY_8 =  #{day8,jdbcType=DECIMAL},
+            DAY_9 =  #{day9,jdbcType=DECIMAL},
+            DAY_10 =  #{day10,jdbcType=DECIMAL},
+            DAY_11 =  #{day11,jdbcType=DECIMAL},
+            DAY_12 =  #{day12,jdbcType=DECIMAL},
+            DAY_13 =  #{day13,jdbcType=DECIMAL},
+            DAY_14 =  #{day14,jdbcType=DECIMAL},
+            DAY_15 =  #{day15,jdbcType=DECIMAL},
+            DAY_16 =  #{day16,jdbcType=DECIMAL},
+            DAY_17 =  #{day17,jdbcType=DECIMAL},
+            DAY_18 =  #{day18,jdbcType=DECIMAL},
+            DAY_19 =  #{day19,jdbcType=DECIMAL},
+            DAY_20 =  #{day20,jdbcType=DECIMAL},
+            DAY_21 =  #{day21,jdbcType=DECIMAL},
+            DAY_22 =  #{day22,jdbcType=DECIMAL},
+            DAY_23 =  #{day23,jdbcType=DECIMAL},
+            DAY_24 =  #{day24,jdbcType=DECIMAL},
+            DAY_25 =  #{day25,jdbcType=DECIMAL},
+            DAY_26 =  #{day26,jdbcType=DECIMAL},
+            DAY_27 =  #{day27,jdbcType=DECIMAL},
+            DAY_28 =  #{day28,jdbcType=DECIMAL},
+            DAY_29 =  #{day29,jdbcType=DECIMAL},
+            DAY_30 =  #{day30,jdbcType=DECIMAL},
+            DAY_31 =  #{day31,jdbcType=DECIMAL},
+            IS_DELETE =  #{isDelete,jdbcType=DECIMAL},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <select id="selectOneByYearAndMonthAndIsDelete" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_SYNC_MPS_2_APS_FAC
+        where
+        year = #{year,jdbcType=NUMERIC}
+        AND month = #{month,jdbcType=NUMERIC}
+        AND is_delete = 0
+    </select>
+    <select id="selectAllByProductionVersionAndIsDelete" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_SYNC_MPS_2_APS_FAC
+        where
+        production_version = #{productionVersion,jdbcType=VARCHAR}
+        AND LENGTH(PROCESS_CODE) > 0
+        AND is_delete = 0
+        AND factory_code = 'L6'
+    </select>
+    <select id="selectOneByYearAndMonthAndProductionVersion" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_SYNC_MPS_2_APS_FAC
+        where
+        year = #{year,jdbcType=NUMERIC}
+        AND month = #{month,jdbcType=NUMERIC}
+        AND production_version = #{productionVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="selectAllByYearAndMonthAndProductionVersion" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_SYNC_MPS_2_APS_FAC
+        where
+        year = #{year,jdbcType=NUMERIC}
+        AND month = #{month,jdbcType=NUMERIC}
+        AND production_version = #{productionVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+        AND factory_code = 'L6'
+    </select>
+    <select id="selectCxMachineInfoList" resultType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo">
+        select MACHINE_CODE, MACHINE_NAME from T_CX_MACHINE_INFO
+    </select>
+
+</mapper>

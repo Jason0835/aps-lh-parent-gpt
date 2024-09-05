@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineGroupMachineListMapper">
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineMachineGroupList" id="CxEngineGroupMachineListResult">
+                    <result property="id" column="id"/>
+                    <result property="groupId" column="group_id"/>
+                    <result property="groupName" column="group_name"/>
+                    <result property="productShift" column="product_shift"/>
+                    <result property="cxMachineCode" column="cx_machine_code"/>
+                    <result property="remark" column="remark"/>
+                    <result property="delFlag" column="del_flag"/>
+                    <result property="createBy" column="create_by"/>
+                    <result property="createTime" column="create_time"/>
+                    <result property="updateBy" column="update_by"/>
+                    <result property="updateTime" column="update_time"/>
+            </resultMap>
+    
+    <sql id="selectCxGroupMachineListVo">
+          select cmg.group_name,cmg.product_shift,cgml.*  from t_cx_machine_group cmg
+          left join t_cx_group_machine_list cgml
+          on cmg.id=cgml.group_id and cgml.del_flag='0'
+    </sql>
+
+    <select id="selectCxEngineGroupMachineListList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineMachineGroupList" resultMap="CxEngineGroupMachineListResult">
+        <include refid="selectCxGroupMachineListVo"/>
+        <where>
+            cmg.del_flag = '0'
+        </where>
+  </select>
+
+    <select id="selectCxEngineGroupMachineListById" parameterType="Long" resultMap="CxEngineGroupMachineListResult">
+                    <include refid="selectCxGroupMachineListVo"/>
+            where id = #{id}
+    </select>
+
+</mapper>

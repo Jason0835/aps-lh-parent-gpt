@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('成型收尾范围系数列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.closeOutRange.rangeName}]]：</label>
+                            <input type="text" name="rangeName"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.closeOutRange.closeOutRangeMinimum}]]：</label>
+                            <input type="text" name="closeOutRangeMinimum"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.closeOutRange.closeOutRangeMaximum}]]：</label>
+                            <input type="text" name="closeOutRangeMaximum"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.closeOutRange.rangeValue}]]：</label>
+                            <input type="text" name="rangeValue"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="cx:closeOutRange:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit()"
+               shiro:hasPermission="cx:closeOutRange:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="cx:closeOutRange:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('cx:closeOutRange:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('cx:closeOutRange:remove')}]];
+    var prefix = ctx + "cx/closeOutRange";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.closeOutRange.modelName}]],
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'rangeName',
+                    halign:'center',
+                    title: [[#{ui.data.column.closeOutRange.rangeName}]],
+                    sortable: true,
+                },
+                {
+                    field: 'closeOutRangeMinimum',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.closeOutRange.closeOutRangeMinimum}]],
+                    sortable: true,
+                },
+                {
+                    field: 'closeOutRangeMaximum',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.closeOutRange.closeOutRangeMaximum}]],
+                    sortable: true,
+                },
+                {
+                    field: 'rangeValue',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.closeOutRange.rangeValue}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        if ($.common.isEmpty(value)){
+                            return '0%'
+                        } else{
+                            return value+'%'
+                        }
+                    },
+                },
+                {
+                    field: 'remark',
+                    halign:'center',
+                    widthUnit: '%',
+                    width: 25,
+                    title: [[#{ui.data.column.remark}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value,25);
+                    },
+                },
+                {
+                    align: 'center',
+                    halign:'center',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>' + [[#{ui.frame.btn.delete}]] + '</a>');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+</script>
+</body>
+</html>

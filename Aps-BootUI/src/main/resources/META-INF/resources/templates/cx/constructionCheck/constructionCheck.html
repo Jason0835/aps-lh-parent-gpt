@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('施工信息检测记录')" />
+    <th:block th:include="include :: datetimepicker-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label style="width: 40px;margin-right: 10px;">[[#{ui.data.column.construction.check.month1}]]：</label>
+                            <input id="planMonth" name="planMonth" class="form-control" th:value="${initDate}" th:placeholder="#{ui.data.column.construction.check.month1}" type="text">
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+<!--                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>-->
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="checkConstruction()" shiro:hasPermission="cx:checkConstuction:checkConstuction">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.construction.check.modelName}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<th:block th:include="include :: datetimepicker-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "cx/checkConstruction";
+    var yesNo = [[${@dict.getType('ISORNOT')}]];
+
+    $(function() {
+        var options = {
+            url: prefix + "/list",
+            modalName: [[#{ui.data.column.construction.check.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: '主键ID',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'planMonth',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.construction.check.month2}]],
+                    sortable: true,
+                },
+                {
+                    field: 'isComplete',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.construction.check.isComplete}]],
+                    sortable: true,
+                    formatter: function(value, row, index) {
+                        return $.table.selectDictLabel(yesNo, value);
+                    }
+                },
+                {
+                    field: 'exportParams',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.export.exportParams}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'fileName',
+                    halign:'center',
+                    title: [[#{ui.data.column.construction.check.file}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                    	if (value) {
+	                        var actions = [];
+	                        actions.push('<a href="javascript:void(0)" onclick="downloadFile(\'' +value+'\',\'' +row.filePath+'\')">' + value + '</a> ');
+	                        return actions.join('');
+                    	}
+                    },
+                },
+                {
+                    field: 'filePath',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.export.fileUrl}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'createTime',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.construction.check.time}]],
+                    sortable: true,
+                },
+            ]
+        };
+        $.table.init(options);
+    });
+
+    function checkConstruction() {
+        var planMonth = $("#planMonth").val();
+        $.modal.confirm([[#{ui.data.column.construction.check.message1}]]+" "+planMonth+" "+[[#{ui.data.column.construction.check.message2}]]+" ?", function () {
+            $.operate.post(prefix + "/checkConstruction",
+                {
+                    "planMonth": planMonth
+                });
+        })
+    }
+
+    // 日期控件
+    $("input[name='planMonth']").datetimepicker({
+        format: "yyyy-mm",
+        startView: 3,//代表日期控件打开默认展示的是月
+        minView: 3,//代表日期控件展示的最低到月
+        maxView: 4,//代表日期控件展示的最高到年
+        autoclose: true,
+    });
+
+    // 文件下载
+    function downloadFile(name,url){
+        window.location.href = prefix + "/download?name="+name+"&&url="+url;
+    }
+</script>
+</body>
+</html>

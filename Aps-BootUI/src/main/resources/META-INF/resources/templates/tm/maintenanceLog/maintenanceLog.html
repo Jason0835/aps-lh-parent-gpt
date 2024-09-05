@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('运维功能')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.maintenance.log.operType}]]：</label>
+                            <select name="operType" th:with="type=${@dict.getType('MAINTENANCE_OPER_TYPE')}" class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.maintenance.log.procedureCode}]]：</label>
+                            <select name="procedureCode" th:with="type=${@dict.getType('PROCEDURE_CODE')}" class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.maintenance.log.createBy}]]：</label><input type="text" name="createBy"/>
+                        </li>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.maintenance.log.createTime}]]：</label>
+                            <input type="text" class="time-input" th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                            <span  style='color: black;'>-</span>
+                            <input type="text" class="time-input" id="endTime" th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                        </li>
+
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="resetScheduleRelease()" shiro:hasPermission="maintenanceLog:resetScheduleRelease">
+                <i class="fa fa-plus"></i> [[#{ui.maintenance.log.reset.schedule.release}]]
+            </a>
+            <a class="btn btn-danger" onclick="deleteSchedule()" shiro:hasPermission="maintenanceLog:deleteSchedule">
+                <i class="fa fa-edit"></i> [[#{ui.maintenance.log.schedule.delete}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js"/>
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-select-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var prefix = ctx + "maintenanceLog";
+    var MAINTENANCE_OPER_TYPE = [[${@dict.getType('MAINTENANCE_OPER_TYPE')}]];
+    var PROCEDURE_CODE = [[${@dict.getType('PROCEDURE_CODE')}]];
+    var status_datas = [[${@dict.getType('sys_runtime_status')}]];
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            detailUrl: prefix + "/detail/{id}",
+            resetReleaseUrl: prefix + "/toResetScheduleRelease",
+            deleteScheduleUrl: prefix + "/toDeleteSchedule",
+            modalName: [[#{ui.data.column.maintenance.log.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: 'ID',
+                    halign:'center',
+                    align: 'left',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'operType',
+                    sortable: true,
+                    title: [[#{ui.data.column.maintenance.log.operType}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(MAINTENANCE_OPER_TYPE, row.operType);
+                    },
+                    halign:'center',
+                    align: 'center',
+                },
+                {
+                    field: 'procedureCode',
+                    title: [[#{ui.data.column.maintenance.log.procedureCode}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(PROCEDURE_CODE, row.procedureCode);
+                    },
+                    sortable: true,
+                    halign:'center',
+                    align: 'center',
+                },
+                {
+                    field: 'createBy',
+                    sortable: true,
+                    title: [[#{ui.data.column.maintenance.log.createBy}]],
+                    halign:'center',
+                    align: 'center',
+                },
+                {
+                    field: 'createTime',
+                    sortable: true,
+                    title: [[#{ui.data.column.maintenance.log.createTime}]],
+                    halign:'center',
+                    align: 'center',
+                },
+                {
+                    field: 'operStatus',
+                    sortable: true,
+                    title: [[#{ui.data.column.maintenance.log.operStatus}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(status_datas, row.operStatus);
+                    },
+                    halign:'center',
+                    align: 'center',
+                },
+                {
+                    field: 'operReason',
+                    sortable: true,
+                    title: [[#{ui.data.column.maintenance.log.operReason}]],
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value);
+                    },
+                    halign:'center',
+                    align: 'left',
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    halign:'center',
+                    align: 'center',
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-warning btn-xs" href="javascript:void(0)" onclick="$.operate.detail(' + row.id + ')"><i class="fa fa-search"></i>' + [[#{ui.frame.btn.name.detail}]] + '</a> ');
+                        return actions.join('');
+                    },
+                }]
+        };
+        $.table.init(options);
+    });
+
+    // 排程发布重置
+    function resetScheduleRelease() {
+        url = prefix + "/toResetScheduleRelease";
+        $.modal.open([[#{ui.maintenance.log.reset.schedule.release}]], url, 800,430);
+    }
+
+    // 排程删除
+    function deleteSchedule() {
+        url = prefix + "/toDeleteSchedule";
+        $.modal.open([[#{ui.maintenance.log.schedule.delete}]], url, 800,500);
+    }
+</script>
+</body>
+</html>

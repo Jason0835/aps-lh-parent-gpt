@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="cc967d0d-6e1e-46cf-934e-e89dedf84f24" name="Default" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/jarRepositories.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_baomidou_mybatis_plus_3_2_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_baomidou_mybatis_plus_annotation_3_2_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_baomidou_mybatis_plus_boot_starter_3_2_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_baomidou_mybatis_plus_core_3_2_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_baomidou_mybatis_plus_extension_3_2_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__com_zlt_aps_tm_aps_tm_api_1_0.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__javax_annotation_javax_annotation_api_1_3_2.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/libraries/Maven__org_mybatis_mybatis_spring_2_0_2.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/aps-modules.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/APS-Modules.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-cd15/aps-cd15.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-cd15/aps-cd15.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-cd90/aps-cd90.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-cd90/aps-cd90.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-cx/aps-cx.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-cx/aps-cx.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-gdyy/aps-gdyy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-gdyy/aps-gdyy.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-gsq/aps-gsq.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-gsq/aps-gsq.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-jl/aps-jl.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-jl/aps-jl.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-nc/aps-nc.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-nc/aps-nc.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-tc/aps-tc.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-tc/aps-tc.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-tm/aps-tm.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-tm/aps-tm.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-tq/aps-tq.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-tq/aps-tq.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aps-xwyy/aps-xwyy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/aps-xwyy/aps-xwyy.iml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Interface" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectId" id="1t3P2kfXDnESgR3MfER42pJmNEB" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RequestMappingsPanelOrder0" value="0" />
+    <property name="RequestMappingsPanelOrder1" value="1" />
+    <property name="RequestMappingsPanelOrder2" value="2" />
+    <property name="RequestMappingsPanelWidth0" value="75" />
+    <property name="RequestMappingsPanelWidth1" value="75" />
+    <property name="RequestMappingsPanelWidth2" value="75" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="aspect.path.notification.shown" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="settings.editor.selected.configurable" value="reference.projectsettings.compiler.annotationProcessors" />
+  </component>
+  <component name="ReactorSettings">
+    <option name="notificationShown" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.zlt.aps.tm.entity" />
+      <recent name="com.zlt.aps.tm.controller" />
+      <recent name="com.zlt.aps.tm.service.impl" />
+      <recent name="com.zlt.aps.tm.service" />
+      <recent name="com.zlt.aps.tm.mapper" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules\aps-tm\src\main\java\com\zlt\aps\tm\controller" />
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules\aps-tm\src\main\resources\mapper" />
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules\aps-tm\src\main\resources" />
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules\aps-xwyy\src\main\resources" />
+      <recent name="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules\aps-tq\src\main\resources" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Spring Boot.ApsTmApplication">
+    <configuration default="true" type="Applet" factoryName="Applet">
+      <option name="HTML_USED" value="false" />
+      <option name="WIDTH" value="400" />
+      <option name="HEIGHT" value="300" />
+      <option name="POLICY_FILE" value="$APPLICATION_HOME_DIR$/bin/appletviewer.policy" />
+      <module />
+    </configuration>
+    <configuration default="true" type="Application" factoryName="Application">
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JUnit" factoryName="JUnit">
+      <option name="TEST_OBJECT" value="class" />
+      <option name="VM_PARAMETERS" />
+      <option name="WORKING_DIRECTORY" value="%MODULE_WORKING_DIR%" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsCd15Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-cd15" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.cd15.ApsCd15Application" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsCd90Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" temporary="true" nameIsGenerated="true">
+      <module name="aps-cd90" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.zlt.aps.cd90.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.cd90.ApsCd90Application" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsCxApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-cx" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.cx.ApsCxApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsGdyyApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" temporary="true" nameIsGenerated="true">
+      <module name="aps-gdyy" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.zlt.aps.gdyy.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.gdyy.ApsGdyyApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsGsqApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" temporary="true" nameIsGenerated="true">
+      <module name="aps-gsq" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.zlt.aps.gsq.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.gsq.ApsGsqApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsJlApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-jl" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.jl.ApsJlApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsNcApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-nc" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.nc.ApsNcApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsTcApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-tc" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.tc.ApsTcApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsTmApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="aps-tm" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.tm.ApsTmApplication" />
+      <option name="ALTERNATIVE_JRE_PATH" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsTqApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" temporary="true" nameIsGenerated="true">
+      <module name="aps-tq" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.zlt.aps.tq.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.tq.ApsTqApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApsXwyyApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" temporary="true" nameIsGenerated="true">
+      <module name="aps-xwyy" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.zlt.aps.xwyy.apsxwyy.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.zlt.aps.xwyy.apsxwyy.ApsXwyyApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="TestNG">
+      <option name="TEST_OBJECT" value="CLASS" />
+      <option name="VM_PARAMETERS" />
+      <option name="WORKING_DIRECTORY" value="%MODULE_WORKING_DIR%" />
+      <properties />
+      <listeners />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="#org.jetbrains.idea.devkit.run.PluginConfigurationType">
+      <module name="" />
+      <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -XX:MaxPermSize=250m -ea" />
+      <option name="PROGRAM_PARAMETERS" />
+      <predefined_log_file enabled="true" id="idea.log" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Spring Boot.ApsTmApplication" />
+      <item itemvalue="Spring Boot.ApsJlApplication" />
+      <item itemvalue="Spring Boot.ApsCxApplication" />
+      <item itemvalue="Spring Boot.ApsTcApplication" />
+      <item itemvalue="Spring Boot.ApsNcApplication" />
+      <item itemvalue="Spring Boot.ApsCd15Application" />
+      <item itemvalue="Spring Boot.ApsCd90Application" />
+      <item itemvalue="Spring Boot.ApsTqApplication" />
+      <item itemvalue="Spring Boot.ApsGsqApplication" />
+      <item itemvalue="Spring Boot.ApsXwyyApplication" />
+      <item itemvalue="Spring Boot.ApsGdyyApplication" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Spring Boot.ApsGsqApplication" />
+        <item itemvalue="Spring Boot.ApsGdyyApplication" />
+        <item itemvalue="Spring Boot.ApsXwyyApplication" />
+        <item itemvalue="Spring Boot.ApsTqApplication" />
+        <item itemvalue="Spring Boot.ApsCd90Application" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration" cleanupOnStartRun="true">
+    <configuration>C:\Users\zhangbinglin\AppData\Roaming\Subversion</configuration>
+    <supportedVersion>125</supportedVersion>
+  </component>
+  <component name="SvnFileUrlMappingImpl">
+    <option name="myMappingRoots">
+      <list>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules" />
+        </SvnCopyRootSimple>
+      </list>
+    </option>
+    <option name="myMoreRealMappingRoots">
+      <list>
+        <SvnCopyRootSimple>
+          <option name="myVcsRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules" />
+          <option name="myCopyRoot" value="E:\idea_workspace\LL_APS\00-SourceCode\trunk\APS-Modules" />
+        </SvnCopyRootSimple>
+      </list>
+    </option>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="cc967d0d-6e1e-46cf-934e-e89dedf84f24" name="Default" comment="" />
+      <created>1621842255229</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1621842255229</updated>
+      <workItem from="1621842257511" duration="12358000" />
+      <workItem from="1621856153651" duration="1248000" />
+      <workItem from="1621903618962" duration="7308000" />
+      <workItem from="1621932300097" duration="6123000" />
+      <workItem from="1621989671242" duration="3982000" />
+      <workItem from="1621994596973" duration="16000" />
+      <workItem from="1621994631509" duration="611000" />
+      <workItem from="1621995335119" duration="24330000" />
+      <workItem from="1622081377957" duration="222000" />
+    </task>
+    <task id="LOCAL-00001" summary="nacos配置增加自动刷新">
+      <created>1621908407901</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1621908407901</updated>
+    </task>
+    <task id="LOCAL-00002" summary="nacos配置增加自动刷新">
+      <created>1621920688274</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1621920688274</updated>
+    </task>
+    <task id="LOCAL-00003" summary="胎面胶料组功能">
+      <created>1621940351366</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1621940351366</updated>
+    </task>
+    <task id="LOCAL-00004" summary="maven依赖修改">
+      <created>1621998596178</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1621998596178</updated>
+    </task>
+    <task id="LOCAL-00005" summary="更新">
+      <created>1622005546566</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1622005546566</updated>
+    </task>
+    <task id="LOCAL-00006" summary="胶料组别提交">
+      <created>1622008610727</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1622008610727</updated>
+    </task>
+    <task id="LOCAL-00007" summary="胶料组别提交">
+      <created>1622010061293</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1622010061293</updated>
+    </task>
+    <task id="LOCAL-00008" summary="胶料组别提交">
+      <created>1622017315475</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1622017315475</updated>
+    </task>
+    <task id="LOCAL-00009" summary="胶料组别提交">
+      <created>1622017347045</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1622017347045</updated>
+    </task>
+    <task id="LOCAL-00010" summary="胶料组别提交">
+      <created>1622030108340</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1622030108340</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="2" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="nacos配置增加自动刷新" />
+    <MESSAGE value="胎面胶料组功能" />
+    <MESSAGE value="maven依赖修改" />
+    <MESSAGE value="更新" />
+    <MESSAGE value="胶料组别提交" />
+    <option name="LAST_COMMIT_MESSAGE" value="胶料组别提交" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="499" y="162" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog" timestamp="1622002868991">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="499" y="162" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog/0.0.1536.824@0.0.1536.824" timestamp="1622002868991" />
+    <state x="524" y="122" key="#xdebugger.evaluate" timestamp="1622017221726">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="524" y="122" key="#xdebugger.evaluate/0.0.1536.824@0.0.1536.824" timestamp="1622017221726" />
+    <state x="175" y="4" key="CommitChangelistDialog2" timestamp="1622030107042">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="175" y="4" key="CommitChangelistDialog2/0.0.1536.824@0.0.1536.824" timestamp="1622030107042" />
+    <state width="446" height="466" key="DebuggerActiveHint" timestamp="1622028284730">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="446" height="466" key="DebuggerActiveHint/0.0.1536.824@0.0.1536.824" timestamp="1622028284730" />
+    <state x="542" y="170" key="FileChooserDialogImpl" timestamp="1622081392464">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="542" y="170" key="FileChooserDialogImpl/0.0.1536.824@0.0.1536.824" timestamp="1622081392464" />
+    <state width="1480" height="258" key="GridCell.Tab.0.bottom" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.0.bottom/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.0.center" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.0.center/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.0.left" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.0.left/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.0.right" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.0.right/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.1.bottom" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.1.bottom/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.1.center" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.1.center/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.1.left" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.1.left/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.1.right" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.1.right/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.2.bottom" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.2.bottom/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.2.center" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.2.center/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.2.left" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.2.left/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state width="1480" height="258" key="GridCell.Tab.2.right" timestamp="1622030249456">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="1480" height="258" key="GridCell.Tab.2.right/0.0.1536.824@0.0.1536.824" timestamp="1622030249456" />
+    <state x="270" y="144" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1622024636616">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="270" y="144" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1536.824@0.0.1536.824" timestamp="1622024636616" />
+    <state x="459" y="170" width="643" height="484" key="find.popup" timestamp="1622024921313">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="459" y="170" width="643" height="484" key="find.popup/0.0.1536.824@0.0.1536.824" timestamp="1622024921313" />
+    <state x="425" y="69" width="670" height="676" key="search.everywhere.popup" timestamp="1622017009801">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="425" y="69" width="670" height="676" key="search.everywhere.popup/0.0.1536.824@0.0.1536.824" timestamp="1622017009801" />
+    <state x="546" y="180" key="svn.repositoryBrowser" timestamp="1622008592107">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="546" y="180" key="svn.repositoryBrowser/0.0.1536.824@0.0.1536.824" timestamp="1622008592107" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/aps-tm/src/main/java/com/zlt/aps/tm/service/impl/GlueGroupOrderServiceImpl.java</url>
+          <line>43</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

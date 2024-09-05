@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+	<th:block th:include="include :: header('修改成型机组')" />
+	<th:block th:include="include :: bootstrap-duallistbox-css" />
+</head>
+<body class="gray-bg">
+	<div class="wrapper wrapper-content animated fadeInRight">
+        <form id="form-machineGroup-edit" action="#" class="wizard-big" th:object="${cxMachineGroup}">
+
+            <input name="id" id="id" th:field="*{id}" type="hidden">
+            <input id="selectedDataStr" name="selectedDataStr" th:value="${selectedDataStr}" type="hidden">
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label is-required">[[#{ui.data.column.machineGroup.groupName}]]：</label>
+                        <div class="col-sm-8">
+                            <input id="groupName" name="groupName" th:field="*{groupName}" class="form-control" type="text" required maxlength="100">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label is-required">[[#{ui.data.column.machineGroup.productShift}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="productShift" th:field="*{productShift}" class="form-control" type="number" required isInteger="true" min="0" max="99999" >
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                        <div class="col-sm-8">
+                            <textarea name="remark"  class="form-control" style="width: 609px;margin-top: 10px;margin-left: 15px;" rows="3" th:field="*{remark}" maxlength="300"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+
+            <select id="machineCodes" name="machineCodes" th:with="type=${@cx.getMachineInfoOrderByName()}" class="form-control dual_select" multiple>
+                <option  th:each="machineInfo : ${type}"th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}"></option>
+            </select>
+
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: bootstrap-duallistbox-js" />
+
+    <script type="text/javascript">
+
+        var prefix = ctx + "cx/machineGroup";
+
+        $(function(){
+            var selectedDataStr=$("#selectedDataStr").val();
+            var selector = $('#machineCodes')[0].options;
+            $.each(selector, function(key, val) {
+                if ("undefined" != typeof (selectedDataStr) && selectedDataStr != "") {
+                    var selectedDataArray = selectedDataStr.split(',');
+                    $.each(selectedDataArray, function (i, selectVal) {
+                        if (val.value == selectVal) {
+                            val.selected = true;
+                        }
+                    });
+                }
+
+            });
+            $('#machineCodes').bootstrapDualListbox({
+                nonSelectedListLabel: '所有机台',
+                selectedListLabel: '已选机台',
+                preserveSelectionOnMove: 'moved',
+                moveOnSelect: false,           // 出现一个剪头，表示可以一次选择一个
+                filterTextClear: '展示所有',
+                moveSelectedLabel: "添加",
+                moveAllLabel: '添加所有',
+                removeSelectedLabel: "移除",
+                removeAllLabel: '移除所有',
+                infoText: '共{0}个',
+                showFilterInputs: true,       // 是否带搜索
+                selectorMinimalHeight: 160,
+                filterPlaceHolder:"",
+                infoTextEmpty:'无机台数据',
+            });
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+               var datas= $('#form-machineGroup-edit').serializeArray();
+                var config = {
+                    url: prefix + "/checkUnique",
+                    type: "post",
+                    dataType: "json",
+                    data:datas,
+                    success: function (result) {
+                        if (result.code == web_status.SUCCESS){
+                            $.operate.save(prefix + "/edit", datas);
+                        } else {
+                            $.modal.alertWarning(result.msg);
+                        }
+                    }
+                };
+                $.ajax(config)
+            }
+        }
+
+
+    </script>
+</body>
+<style>
+    .col-md-6 {
+        width: 46%;
+        padding-left: 27px;
+        padding-right: 10px;
+        margin-top: 10px;
+        display: inline-block;
+    }
+    .col-sm-4 {
+        width: 32%;
+    }
+
+    label {
+        display: inline-block;
+        max-width: 100%;
+        margin-bottom: 5px;
+        font-weight: 700;
+        margin-right: -30px;
+    }
+    .col-sm-3 {
+        width: 32%;
+        margin-right: -47px;
+    }
+
+</style>
+</html>

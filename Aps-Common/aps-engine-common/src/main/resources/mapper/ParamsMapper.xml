@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.ParamsMapper">
+	<!-- 各工序系统参数查询 -->
+    <select id="listCxParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_CX_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listLhParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_LH_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listNcParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_NC_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listTqParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_TQ_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listTcParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_TC_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listGsqParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_GSQ_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listTmParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_TM_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listCd15Params" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_CD15_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listCd90Params" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_CD90_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listGdyyParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_GDYY_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listXwyyParams" resultType="com.zlt.aps.common.engine.domain.ParamsVo">
+        select param_code, param_value
+        from T_XWYY_PARAMS
+        where DEL_FLAG = '0'
+    </select>
+
+    <select id="listCloseRangeParams" resultType="com.zlt.aps.cx.api.domain.entity.CxCloseOutRange">
+        select CLOSE_OUT_RANGE_MINIMUM, CLOSE_OUT_RANGE_MAXIMUM,RANGE_VALUE
+        from t_cx_close_out_range
+        where DEL_FLAG = '0'
+    </select>
+</mapper>

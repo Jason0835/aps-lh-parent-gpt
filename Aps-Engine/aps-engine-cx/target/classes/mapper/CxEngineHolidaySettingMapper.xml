@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineHolidaySettingMapper">
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineHolidaySetting" id="CxEngineHolidaySettingResult">
+                    <result property="id"    column="id"    />
+                    <result property="holidayDay"    column="holiday_day"    />
+                    <result property="createBy"    column="create_by"    />
+                    <result property="createTime"    column="create_time"    />
+                    <result property="updateBy"    column="update_by"    />
+                    <result property="updateTime"    column="update_time"    />
+                    <result property="delFlag"    column="del_flag"    />
+                    <result property="remark"    column="remark"    />
+            </resultMap>
+    
+    <sql id="selectCxEngineHolidaySettingVo">
+        select id, holiday_day, create_by, create_time, update_by, update_time, del_flag, remark from t_cx_holiday_setting
+    </sql>
+
+    <select id="selectCxEngineHolidaySettingList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineHolidaySetting" resultMap="CxEngineHolidaySettingResult">
+        <include refid="selectCxEngineHolidaySettingVo"/>
+        <where>
+            del_flag='0'
+            <if test="holidayStartDate != null "> and holiday_day <![CDATA[ >= ]]>  #{holidayStartDate}</if>
+            <if test="holidayEndDate != null "> and holiday_day <![CDATA[ <= ]]>  #{holidayEndDate}</if>
+        </where>
+     </select>
+
+    <select id="countOfHolidaySetting" parameterType="com.zlt.aps.cx.engine.domain.CxEngineHolidaySetting" resultType="int">
+        select count(1) from t_cx_holiday_setting
+        <where>
+            del_flag='0'
+            <if test="holidayStartDate != null "> and holiday_day <![CDATA[ >= ]]>  #{holidayStartDate}</if>
+            <if test="holidayEndDate != null "> and holiday_day <![CDATA[ <= ]]>  #{holidayEndDate}</if>
+        </where>
+    </select>
+
+</mapper>

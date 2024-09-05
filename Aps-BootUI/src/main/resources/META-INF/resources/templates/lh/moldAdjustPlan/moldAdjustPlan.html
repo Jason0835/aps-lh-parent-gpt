@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('硫化模具调整计划列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.moldAdjustPlan.planDate}]]：</label>
+                            <input type="text" class="time-input" id="planDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="planDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.leftSapCode}]]：</label>
+                            <input type="text" name="leftSapCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.rightSapCode}]]：</label>
+                            <input type="text" name="rightSapCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.moldStatus}]]：</label>
+                            <select class="form-control" name="moldStatus"
+                                    th:with="type=${@dict.getType('mold_status')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.auditStatus}]]：</label>
+                            <select class="form-control" name="auditStatus"
+                                    th:with="type=${@dict.getType('audit_status')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.process}]]：</label>
+                            <select class="form-control" name="process" th:with="type=${@dict.getType('process')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.moldAdjustPlan.executionStatus}]]：</label>
+                            <select class="form-control" name="executionStatus"
+                                    th:with="type=${@dict.getType('execution_status')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <!--            <a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="lh:moldAdjustPlan:add">-->
+            <!--                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]-->
+            <!--            </a>-->
+            <!--            <a class="btn btn-primary single disabled" onclick="$.operate.edit()"-->
+            <!--               shiro:hasPermission="lh:moldAdjustPlan:edit">-->
+            <!--                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]-->
+            <!--            </a>-->
+            <!--            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"-->
+            <!--               shiro:hasPermission="lh:moldAdjustPlan:remove">-->
+            <!--                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]-->
+            <!--            </a>-->
+            <!--            <a class="btn btn-info" onclick="$.table.importExcel()" shiro:hasPermission="lh:moldAdjustPlan:import">-->
+            <!--                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]-->
+            <!--            </a>-->
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="lh:moldAdjustPlan:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('lh:moldAdjustPlan:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('lh:moldAdjustPlan:remove')}]];
+    var moldStatusDatas = [[${@dict.getType('mold_status')}]];
+    var auditStatusDatas = [[${@dict.getType('audit_status')}]];
+    var processDatas = [[${@dict.getType('process')}]];
+    var executionStatusDatas = [[${@dict.getType('execution_status')}]];
+    var lhMachineNameList = [[${@lh.getMachineInfo()}]];
+    var prefix = ctx + "lh/moldAdjustPlan";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.moldAdjustPlan.modelName}]],
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'orderNo',
+                    title: [[#{ui.data.column.moldAdjustPlan.orderNo}]],
+                },
+                {
+                    field: 'type',
+                    title: [[#{ui.data.column.moldAdjustPlan.type}]],
+                },
+                {
+                    field: 'lhMachineCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.lhMachineCode}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            return '';
+                        }
+                        return selectMachineName(lhMachineNameList, value);
+                    }
+                },
+                {
+                    field: 'planDate',
+                    title: [[#{ui.data.column.moldAdjustPlan.planDate}]],
+                },
+                {
+                    field: 'changeMoldTime',
+                    title: [[#{ui.data.column.moldAdjustPlan.changeMoldTime}]],
+                },
+                {
+                    field: 'moldStatus',
+                    title: [[#{ui.data.column.moldAdjustPlan.moldStatus}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(moldStatusDatas, value);
+                    }
+                },
+                {
+                    field: 'auditStatus',
+                    title: [[#{ui.data.column.moldAdjustPlan.auditStatus}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(auditStatusDatas, value);
+                    }
+                },
+                {
+                    field: 'process',
+                    title: [[#{ui.data.column.moldAdjustPlan.process}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(processDatas, value);
+                    }
+                },
+                {
+                    field: 'executionStatus',
+                    title: [[#{ui.data.column.moldAdjustPlan.executionStatus}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(executionStatusDatas, value);
+                    }
+                },
+                {
+                    field: 'beginTime',
+                    title: [[#{ui.data.column.moldAdjustPlan.beginTime}]],
+                },
+                {
+                    field: 'finishTime',
+                    title: [[#{ui.data.column.moldAdjustPlan.finishTime}]],
+                },
+                {
+                    field: 'leftSapCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftSapCode}]],
+                },
+                {
+                    field: 'rightSapCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightSapCode}]],
+                },
+                {
+                    field: 'leftEmbryoSapCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftEmbryoSapCode}]],
+                },
+                {
+                    field: 'rightEmbryoSapCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightEmbryoSapCode}]],
+                },
+                {
+                    field: 'leftSpecDesc',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftSpecDesc}]],
+                    visible: false,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'rightSpecDesc',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightSpecDesc}]],
+                    visible: false,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'leftBeforeSpecDesc',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftBeforeSpecDesc}]],
+                    visible: false,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'rightBeforeSpecDesc',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightBeforeSpecDesc}]],
+                    visible: false,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'leftEmbryoCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftEmbryoCode}]],
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'rightEmbryoCode',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightEmbryoCode}]],
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+                {
+                    field: 'leftStream',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftStream}]],
+                },
+                {
+                    field: 'rightStream',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightStream}]],
+                },
+                {
+                    field: 'leftMoldInfo',
+                    title: [[#{ui.data.column.moldAdjustPlan.leftMoldInfo}]],
+                },
+                {
+                    field: 'rightMoldInfo',
+                    title: [[#{ui.data.column.moldAdjustPlan.rightMoldInfo}]],
+                },
+                {
+                    field: 'moldAssembler',
+                    title: [[#{ui.data.column.moldAdjustPlan.moldAssembler}]],
+                },
+                {
+                    field: 'moldAssembleTime',
+                    title: [[#{ui.data.column.moldAdjustPlan.moldAssembleTime}]],
+                },
+                {
+                    field: 'auditor',
+                    title: [[#{ui.data.column.moldAdjustPlan.auditor}]],
+                },
+                {
+                    field: 'auditTime',
+                    title: [[#{ui.data.column.moldAdjustPlan.auditTime}]],
+                },
+                {
+                    field: 'auditSuggest',
+                    title: [[#{ui.data.column.moldAdjustPlan.auditSuggest}]],
+                },
+                {
+                    field: 'remark',
+                    title: [[#{ui.data.column.remark}]],
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value, 25);
+                    },
+                },
+            ]
+        };
+        $.table.init(options);
+    });
+
+    //回显机台名称
+    function selectMachineName(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode + '' == (item)) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+</script>
+</body>
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <!--调整文件上传支持国际化-->
+            <input type="button" th:value="#{ui.file.btn.text}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;"
+                   onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport"> [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp; <a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i>
+                [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

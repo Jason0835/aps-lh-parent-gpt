@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd15.engine.mapper.Cd15EngineLossMapper">
+	<!-- 查询损耗率配置信息 -->
+    <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.cd15.engine.vo.Cd15LossSettingVo">
+        SELECT nvl(machine_id,'') || '#' || nvl(steel_strip_code,'') LOSS_KEY, /*组合key，机台id + 帘布编号*/
+               LOSS_RATE
+          FROM T_CD15_LOSS_SETTING
+         WHERE DEL_FLAG = 0
+    </select>
+
+</mapper>

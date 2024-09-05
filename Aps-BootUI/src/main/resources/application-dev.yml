@@ -1,0 +1,25 @@
+nacos:
+#  server-addr: 192.168.2.93:8848
+  server-addr: 127.0.0.1:8848
+spring:
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+#        group: APS_DEV_GROUP
+shiro:
+  #使用单点登录时，sso = true
+  sso:
+    #是否需要走单点
+    enable: false
+    cas: http://localhost:8899/cas
+    clientName: casClient
+    currentCas: http://localhost
+
+#网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
+gateway:
+#  url: http://192.168.2.94:8080/
+  url: http://127.0.0.1:8080/
+#  casUrl: http://192.168.2.93:8899/cas
+  casUrl: http://127.0.0.1:8899/cas
+

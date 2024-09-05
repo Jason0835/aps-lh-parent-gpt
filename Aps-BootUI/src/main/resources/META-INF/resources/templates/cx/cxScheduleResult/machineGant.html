@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('甘特图')" />
+</head>
+<body class="gray-bg">
+    <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li class="select-time">
+                                <label>排程日期：</label>
+                                <input type="text" class="time-input"  id="scheduleDate" th:value="${scheduleDate}" name="scheduleDate"/>
+                            </li>
+
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onClick="gantSearch()"><i class="fa fa-search"></i>&nbsp;搜索</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <div class="mainPanl">
+                    <div class="panl_li">
+                        <div class="machineTitle">成型机</div>
+                    </div>
+                    <div class="dataPanl">
+                        <div id="machinePanl">
+                            
+                        </div>
+                        <div id="gantPanl"></div>
+                        <div style="clear: both;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+<script>
+
+    var prefix = ctx + "cx/cxScheduleResult";
+    var dataJson = []
+
+      
+    $(function () {
+        var startDay=$("#scheduleDate").val();
+        var endDay=$("#scheduleDate").val();
+        initGant(startDay,endDay);
+
+        $(window).resize(function (){
+            // initGant();
+        })
+    });
+
+    function gantSearch() {
+        var startDay=$("#scheduleDate").val();
+        var endDay=$("#scheduleDate").val();
+        initGant(startDay,endDay);
+    }
+
+
+   function initGant(startDay,endDay){
+        //初始化表头
+       initTitle({startDay:startDay.substr(8),endDay:endDay.substr(8)});
+       initDate(startDay);
+
+   }
+
+   //获取数据并渲染
+   function initDate(scheduleDate) {
+       var config = {
+           url: prefix + "/getGantData",
+           type: "post",
+           dataType: "json",
+           data: {"flag": 1, "scheduleDate": scheduleDate},
+           success: function (result) {
+               if (result.code == web_status.SUCCESS){
+                   dataJson = result.data;
+                   initGridOneLine();
+               } else {
+                   $.modal.alertWarning(result.msg);
+               }
+           }
+       };
+       $.ajax(config);
+   }
+
+   //initTitle
+   function initTitle(params){
+       $('#machinePanl').children().remove();
+       $('#gantPanl').children().remove();
+       $('.panl_li').children().remove();
+       var dayLength = parseInt(params.endDay)-parseInt(params.startDay)+3;
+        var width = 703*dayLength;
+        var str = "<div class=\"machineTitle\">成型机</div>";
+
+        //加前一天表头
+        str+='<div class="title_all bg_pink"><div class="title_day">前一天</div><div class="title_hours">';
+        var prehourStr = "";
+        for(var j = 1;j<=24;j++){
+            prehourStr+='<div class="title_hour">'+j+'</div>'
+        }
+        str+=prehourStr;
+        str+='</div></div>'
+
+       //查询范围表头
+        for(var i = parseInt(params.startDay);i<=parseInt(params.endDay);i++){
+            if(i%2!=0){
+                str+='<div class="title_all bg_blue"><div class="title_day">'+i+'号</div><div class="title_hours">';
+            }else{
+                str+='<div class="title_all bg_pink"><div class="title_day">'+i+'号</div><div class="title_hours">';
+            }
+            var hourStr = "";
+            for(var j = 1;j<=24;j++){
+                hourStr+='<div class="title_hour">'+j+'</div>'
+            }
+            str+=hourStr;
+            str+='</div></div>'
+        }
+
+        //加后一天表头
+        str+='<div class="title_all bg_pink"><div class="title_day">后一天</div><div class="title_hours">';
+        var afterhourStr = "";
+        for(var j = 1;j<=24;j++){
+           afterhourStr+='<div class="title_hour">'+j+'</div>'
+        }
+        str+=afterhourStr;
+        str+='</div></div>'
+
+        $('.mainPanl').css('width',width+100+"px");
+        $('.panl_li').css('width',width+100+"px");
+        $('#gantPanl').css('width',width-10+"px");
+        $('.panl_li').append(str);
+        $('#gantPanl').append("<div class='linePnal'></div><div style='clear:both'></div>");
+   }
+
+
+   function initGridOneLine(){
+     //按机台编码分组
+     var data = getGroupData(dataJson);
+     $('.machineTitleItem').remove();
+     for(var i = 0;i<data.length;i++){  //按开始机台遍历
+        var linDatas = data[i].data;
+        var maxLength = data[i].data.length; //取该机台下的最大高度
+        var stopTimes = 0;
+        var str = "";
+        var height = 34;
+        if(maxLength>0){
+            height = 34*maxLength
+        }
+        //拼接第一列
+        str+='<div class="machineTitleItem" style="height:'+height+'px;line-height:'+height+'px">'+data[i].machineCode+'</div>';
+        $('#machinePanl').append(str);
+
+        //拼接第二列
+         for(var m = 0;m<maxLength;m++){
+
+            var marginLeft = 0;
+            var width = 0;
+            var lineItemHeight=34;
+            var strItem="<div class='lineItem lineItem"+data[i].machineCode+m+"' style='height: 34px;'>";
+            if (m==maxLength-1) {
+                strItem="<div class='lineItem lineItem"+data[i].machineCode+m+"' style='height: 34px;border-bottom: 1px solid black;'>";
+            }
+
+            //整个跨度3天72小时的长度,计算以下三个值，用户画甘特图
+            //算起点位置：后端给72小时制的起始时刻
+            //算长条宽度：小时差*25：(endHour-startHour+1)*25，后端给时差;
+            //算margin-left宽度：固定值*天数，不用后端给
+
+            var hourInterval = parseInt(linDatas[m].hourInterval);
+            var hourStart = parseInt(linDatas[m].hourStart);
+            width = hourInterval*25;
+            marginLeft = hourStart*25;
+
+            var colorClass = "bg_item_blue";
+            var type=m+1;
+            if(type==2){
+                colorClass = "bg_item_green";
+            }else if(type==3){
+                colorClass = "bg_item_yellow";
+            }else if(type==4){
+                colorClass = "bg_item_rin";
+            }
+            var tooltipClass = "lineItemBottom";
+            let msgLength = $.common.getLength(linDatas[m].innerMsg) * 7.5;
+            if (msgLength < 325){
+                msgLength = 325;
+            }
+
+            strItem+="<div class='itemDataDom "+tooltipClass+" "+colorClass+"' style='width:"+width+"px;left:"+marginLeft+";margin-left:"+marginLeft+"px;margin-top:2px;margin-bottom:3px;height: 26px'><span class='itemIndex'>"+(parseInt(m)+1)+"</span>"+$.table.tooltip(linDatas[m].innerMsg)+
+            "<span class='tooltiptext' style='width:"+ msgLength +"px'>"+linDatas[m].innerMsg+"<hr>" +
+                "<span class='tooltipLab'>SAP品号：</span><span class='tooltipVal'>"+linDatas[m].cpdh+"</span>"+
+                "<span class='tooltipLab'>胎胚代号：</span><span class='tooltipVal'>"+linDatas[m].specdh+"</span><br>"+
+                "<span class='tooltipLab'>计划量：</span><span class='tooltipVal'>"+linDatas[m].ydl+"</span>"+
+                "<span class='tooltipLab'>已完成量：</span><span class='tooltipVal'>"+linDatas[m].ywcl+"</span><br>"+
+                "<span class='tooltipLab'>机台：</span><span class='tooltipVal'>"+linDatas[m].codeId+"</span>"+
+                "<span class='tooltipLab'>阶段：</span><span class='tooltipVal'>"+linDatas[m].jd+"</span>"+
+                "</span></div></div>";
+
+            $('.linePnal').append(strItem);
+         }
+     }
+   }
+
+
+   function getGroupData(data){
+    var markData = []
+    for(var i = 0;i<data.length;i++){
+        if(markData.length==0){
+            markData.push({
+                machineCode:data[i].codeId,
+                data:[data[i]]
+            })
+        }else{
+            for(var j=0;j<markData.length;j++){
+                if(data[i].codeId==markData[j].machineCode){
+                    markData[j].data.push(data[i]);
+                    break;
+                }else if(j==(markData.length-1)){
+                    markData.push({
+                        machineCode:data[i].codeId,
+                        data:[]
+                    })
+                }
+            }
+        }
+    }
+    return markData;
+   }
+
+   function linkToPage(){
+    window.location="machine2.html"
+   }
+
+   function getDayGroupData(data){
+    var markData = []
+    for(var i = 0;i<data.length;i++){
+        if(markData.length==0){
+            markData.push({
+                day:data[i].startDay,
+                data:[data[i]]
+            })
+        }else{
+            for(var j=0;j<markData.length;j++){
+                if(data[i].startDay==markData[j].day){
+                    markData[j].data.push(data[i]);
+                    break;
+                }else if(j==(markData.length-1)){
+                    markData.push({
+                        day:data[i].startDay,
+                        data:[]
+                    })
+                }
+            }
+        }
+    }
+    return markData;
+   }
+
+    </script>
+</body>
+<style>
+    body{
+        margin: 0;
+        font-size: 12px;
+    }
+    .mainPanl{
+       overflow-y: auto;
+        overflow-x: hidden;
+        height: calc(100vh - 150px) !important;
+        width: 1640px;
+    }
+    .machineTitle{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+        background-color: #fff;
+        float: left;
+    }
+    .machineTitleDom{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+    }
+    .machineTitleItem{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        border-top: 0;
+        text-align: center;
+        line-height: 63px;
+    }
+    #machinePanl{
+        float: left;
+        font-size: 14px;
+        width: 100px;
+    }
+    .panl_li{
+        width: 1640px;
+        position: absolute;
+        z-index: 99;
+    }
+    .bg_blue{
+        background-color: #ddebf7;
+    }
+    .bg_pink{
+        background-color: #fce4d6;
+    }
+    .title_hour{
+        width: 25px;
+        height: 30px;
+        float: left;
+    }
+    .title_all_items{
+        height: 63px;
+        float: left;
+    }
+    .title_all_dom{
+        height: 65px;
+        width: 100%;
+    }
+    .title_all{
+        text-align: center;
+        float: left;
+        border: 1px solid;
+        border-left: 0;
+        line-height: 30px;
+        width: 602px;
+        height: 63px;
+        font-size: 14px;
+    }
+    .title_day{
+        border-bottom: 1px solid;
+        font-size: 17px;
+        font-weight: bold;
+    }
+    .title_hours{
+        clear: both;
+        width: 600px;
+        height: 30px;
+    }
+    .linePnal{
+        float: left;
+        width: 100%;
+        position: relative;
+    }
+    .lineItem{
+        height: 34px;
+        position: relative;
+    }
+    .bg_item_blue{
+        background-color: #a5d4c2;
+    }
+    .bg_item_green{
+        background-color: #e6bfbf;
+    }
+    .bg_item_yellow{
+        background-color: #e9d276;
+    }
+    .bg_item_rin{
+        background-color: #89d1d8;
+    }
+    .bg_item_black{
+        background-color: #e6e7ec;
+    }
+    .lineItemBottom,.lineItemTop{
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black; /* 悬停元素上显示点线 */
+        height: 31px;
+        line-height: 28px;
+        border-radius: 20px;
+        white-space: nowrap;
+        cursor: pointer;
+        margin-top: 0px;
+
+        float: left;
+    }
+    /* Tooltip 文本 */
+    .lineItemBottom .tooltiptext {
+        visibility: hidden;
+        width: 500px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: -135px;
+        left: 0%; 
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+    /* Tooltip 文本 */
+    .lineItemTop .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        line-height: normal;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: 30px;
+        left: 0%; 
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+
+    /* Tooltip 文本 */
+    .lineItemLeft .tooltiptext {
+        margin-left: -450px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+    }
+    
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemBottom:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+     /* 鼠标移动上去后显示提示框 */
+     .lineItemTop:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+    
+    /*tooltip样式*/
+    .tooltipLab{
+        width: 50px;
+        display: inline-block;
+        text-align: center;
+    }
+    .tooltipVal{
+        width: 120px;
+        display: inline-block;
+        text-align: center;
+    }
+    .itemIndex{
+        width: 20px;
+        height: 20px;
+        margin-top: 0px;
+        margin-left: 3px;
+        display: inline-block;
+        line-height: 22px;
+        border-radius: 50%;
+        text-align: center;
+        color: #fff;
+        background-color: #d15686;
+        margin-right: 5px;
+    }
+    /* *{
+        box-sizing: content-box;
+    } */
+    #gantPanl{
+        width: 1530px;
+        float: left;
+    }
+    .table-striped {
+        overflow-x: scroll;
+        position: relative;
+        overflow-y: auto;
+        height: calc(100vh - 120px) !important;
+    }
+    .dataPanl{
+        padding-top: 65px;
+    }
+    .dataPanl div{
+        box-sizing: content-box;
+    }
+    .panl_li div{
+        box-sizing: content-box;
+    }
+    hr{
+        margin-bottom: 0;
+        margin-top: 0;;
+    }
+    .itemDataDom {
+        position: absolute;
+    }
+</style>
+</html>

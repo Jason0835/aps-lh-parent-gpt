@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('导入排程结果')"/>
+    <th:block th:include="include :: datetimepicker-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" enctype="multipart/form-data" id="form-import">
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.mdmMonthProdPlan.mainPlanMonth}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <input id="mainPlanMonth" name="mainPlanMonth"  class="form-control" th:placeholder="#{ui.data.column.mdmMonthProdPlan.mainPlanMonth}" type="text" required autocomplete="off">
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.mdmMonthProdPlan.isFinamized}]]：</label>
+            <div class="col-sm-8">
+                <input id="isFinamized" name="isFinamized" type="hidden" th:value="0">
+                <select name="isFinamized" class="form-control" th:with="type=${@dict.getType('ISORNOT')}" disabled>
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="0"></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.frame.btn.chooseFile}]]：</label>
+            <div class="col-sm-8">
+                <input id="fileName" name="fileName" class="form-control" required readonly
+                       th:placeholder="#{ui.frame.btn.clickChoose}"
+                       onclick="javascript:$('input[name=\'file\']').click();">
+                <input type="file" id="file" name="file" style="display: none;"
+                       onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-8">
+                <a onclick="importTemplate()" class="btn btn-default btn-xs" style="font-size: 13px"><i
+                        class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+        </div>
+        <font color="red" class="pull-left mt10">[[#{ui.biz.alter.onlyExcel}]]</font>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: datetimepicker-js"/>
+<script th:inline="javascript">
+
+    var prefix = ctx + "cx/mdmMonthProdPlan";
+    $(function () {
+        // 日期控件
+        $("input[name='mainPlanMonth']").datetimepicker({
+            format: "yyyy-mm",
+            startView: 3,//代表日期控件打开默认展示的是月
+            minView: 3,//代表日期控件展示的最低到月
+            maxView: 4,//代表日期控件展示的最高到年
+            autoclose: true,
+        });
+    })
+
+    // 下载模板
+    function importTemplate() {
+        var mainPlanMonth = $("#mainPlanMonth").val();
+        if($.common.isEmpty(mainPlanMonth)){
+           var nowDate= new Date();
+           mainPlanMonth=nowDate.getFullYear()+"-"+Number(nowDate.getMonth()+1);
+        }
+        window.location.href = prefix + "/importTemplate/"+mainPlanMonth;
+    }
+
+
+
+    $("#form-scheduleResult-autoPlan").validate({
+        focusCleanup: true,
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var fileName = $("#fileName").val();
+            if (fileName == '' || (!$.common.endWith(fileName, '.xls') && !$.common.endWith(fileName, '.xlsx')&& !$.common.endWith(fileName, '.XLS') && !$.common.endWith(fileName, '.XLSX'))) {
+                $.modal.msgWarning(frame.alter.importExcel);
+                return false;
+            }
+            $.modal.loading(frame.alter.doingWaiting);
+            var formData = new FormData();
+            var file = document.querySelector('[type=file]');
+            var mainPlanMonth = $("#mainPlanMonth").val();
+            var isFinamized = $("#isFinamized").val();
+            formData.append("file", file.files[0]);
+            formData.append("mainPlanMonth", mainPlanMonth);
+            formData.append("isFinamized", isFinamized);
+            $.ajax({
+                url: prefix + "/importData",
+                data: formData,
+                cache: false,
+                contentType: false,
+                processData: false,
+                type: 'POST',
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        $.modal.closeAll();
+                        $.modal.alertSuccess(result.msg);
+                    } else if (result.code == web_status.WARNING) {
+                        $.modal.enable();
+                        $.modal.alertWarning(result.msg)
+                    } else {
+                        $.modal.enable();
+                        $.modal.alertError(result.msg);
+                    }
+                    $.table.refresh();
+                    $.modal.closeLoading();
+                }
+            });
+        }
+    }
+
+
+</script>
+</body>
+</html>

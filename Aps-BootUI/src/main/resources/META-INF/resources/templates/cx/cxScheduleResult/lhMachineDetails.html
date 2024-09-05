@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('机台信息列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <input id="index" th:value="*{index}" type="hidden">
+                <input id="pid" th:value="*{pid}" type="hidden">
+                <input id="scheduleDate" th:value="*{scheduleDate}" type="hidden">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.machine.machineName}]]：
+                            <input type="text" name="machineName"/>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+
+    var prefix = ctx + "cx/cxScheduleResult";
+    var TASK_TYPE = [[${@dict.getType('TASK_TYPE')}]];
+    var PRODUCTION_STATUS = [[${@dict.getType('PRODUCTION_STATUS')}]];
+
+    $(function () {
+        var options = {
+            url: prefix + "/lhMachineList",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.machine.info}]],
+            showSearch: true,
+            showRefresh: true,
+            showColumns:false,
+            clickToSelect: true,
+            singleSelect:true,
+            pageSize: 15,
+            rowStyle: function(row, index) {
+                if(row.embryoNum >1 ){
+                    return {css: {'background-color': '#40EE67'}};
+                }
+                return {};
+            },
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: [[#{ui.data.column.machine.id}]],
+                    visible: false
+                },
+                {
+                    field: 'lhProductionStatus',
+                    valign: 'middle',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.cxScheduleResult.taskType}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(TASK_TYPE, value);
+                    }
+                },
+                {
+                    field: 'cxProductionStatus',
+                    valign: 'middle',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.cxScheduleResult.productionStatus}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(PRODUCTION_STATUS, value);
+                    }
+                },
+                {
+                    field: 'machineName',
+                    sortable: true,
+                    title: [[#{ui.data.column.machine.machineName}]],
+                },
+                {
+                    field: 'specDimension',
+                    valign: 'middle',
+                    align: 'center',
+                    sortable: true,
+                    title: [[#{ui.data.column.cxScheduleResult.specDimension}]],
+                },
+                {
+                    field: 'embryoCode',
+                    sortable: true,
+                    title: [[#{ui.data.column.lhMachine.embryoCode}]],
+                },
+                {
+                    field: 'embyroStock',
+                    sortable: true,
+                    title: [[#{ui.data.column.moldChange.tireRoughStock}]],
+                },
+                {
+                    field: 'monthPlanOs',
+                    sortable: true,
+                    title: [[#{ui.data.column.lhMachine.monthPlanOs}]],
+                },
+                {
+                    field: 'classAvailableLhShift',
+                    sortable: true,
+                    title: [[#{ui.data.column.lhMachine.classAvailableLhShift}]],
+                }
+            ]
+        };
+        $.table.init(options);
+    });
+
+    function submitHandler() {
+        var index=$("#index").val();
+        var rows=$("#bootstrap-table").bootstrapTable('getSelections');
+        if (rows.length == 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var datas=rows[0];
+
+        // 父页面机台信息
+        var machineCode=datas.machineCode;
+        var machineName=datas.machineName;
+        // var codeEle='lhMachineChangeTpyeList['+index+'].machineCode';
+        // var nameEle='lhMachineChangeTpyeList['+index+'].machineName';
+        // $(parent.document.getElementById(codeEle)).val(machineCode);
+        // $(parent.document.getElementById(nameEle)).val(machineName);
+        var parent = window.parent;
+        parent.$("#" + parent.table.options.id).bootstrapTable('updateCell', {
+            index: index,
+            field: "machineCode",
+            value: machineCode
+        });
+        parent.$("#" + parent.table.options.id).bootstrapTable('updateCell', {
+            index: index,
+            field: "machineName",
+            value: machineName
+        });
+
+        //设置父页面默认模数
+        var pid=$("#pid").val();
+        var scheduleDate=$("#scheduleDate").val();
+        var config = {
+            url: prefix + "/getMolds",
+            type: "post",
+            dataType: "json",
+            data: {"id": pid,"scheduleDate":scheduleDate,"lhMachineCode":machineCode},
+            success: function (result) {
+                // var moldsEle='lhMachineChangeTpyeList['+index+'].molds';
+                // $(parent.document.getElementById(moldsEle)).val(result.availableMoldQty);
+                parent.$("#" + parent.table.options.id).bootstrapTable('updateCell', {
+                    index: index,
+                    field: "molds",
+                    value: result.availableMoldQty
+                });
+                $.modal.close();
+            }
+        };
+        $.ajax(config)
+
+    }
+
+</script>
+</body>
+</html>

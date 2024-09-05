@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.mapper.NcQuotaSettingMapper">
+
+    <resultMap type="com.zlt.aps.nc.api.domain.entity.NcQuotaSetting" id="NcQuotaSettingResult">
+        <result property="id" column="id"/>
+        <result property="liningCode" column="lining_code"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="quota" column="quota"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectNcQuotaSettingVo">
+        select id, lining_code, machine_id, quota, create_by, create_time, update_by, update_time, del_flag, remark from t_nc_quota_setting
+    </sql>
+
+    <select id="selectNcQuotaSettingList" parameterType="com.zlt.aps.nc.api.domain.entity.NcQuotaSetting"
+            resultMap="NcQuotaSettingResult">
+        select * from (
+            select A.*,M.MACHINE_NAME from t_nc_quota_setting A LEFT JOIN T_NC_MACHINE_INFO M
+            ON A.machine_id=M.ID
+            WHERE A.del_flag='0'
+            <if test="liningCode != null  and liningCode != ''">and A.lining_code = #{liningCode}</if>
+            <if test="machineId != null ">and A.machine_id = #{machineId}</if>
+            <if test="orderStr == null">
+                ORDER BY A.create_time desc
+            </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectNcQuotaSettingById" parameterType="Long" resultMap="NcQuotaSettingResult">
+        <include refid="selectNcQuotaSettingVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertNcQuotaSetting" parameterType="com.zlt.aps.nc.api.domain.entity.NcQuotaSetting">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_QUOTA_SETTING.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_nc_quota_setting
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="liningCode != null">lining_code,</if>
+            <if test="machineId != null">machine_id,</if>
+            <if test="quota != null">quota,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="liningCode != null">#{liningCode},</if>
+            <if test="machineId != null">#{machineId},</if>
+            <if test="quota != null">#{quota},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateNcQuotaSetting" parameterType="com.zlt.aps.nc.api.domain.entity.NcQuotaSetting">
+        update t_nc_quota_setting
+        <trim prefix="SET" suffixOverrides=",">
+            lining_code = #{liningCode,jdbcType=VARCHAR},
+            machine_id = #{machineId,jdbcType=DECIMAL},
+            quota = #{quota,jdbcType=DECIMAL},
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            remark = #{remark,jdbcType=VARCHAR},
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteNcQuotaSettingById" parameterType="Long">
+        update t_nc_quota_setting set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteNcQuotaSettingByIds" parameterType="String">
+        update t_nc_quota_setting set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="checkNcQuotaSettingUnique" parameterType="com.zlt.aps.nc.api.domain.entity.NcQuotaSetting"
+            resultMap="NcQuotaSettingResult">
+        <include refid="selectNcQuotaSettingVo"/>
+        where del_flag='0'
+        <if test="id != null and id !='' ">and id != #{id}</if>
+        <if test="machineId == null or machineId ==''">and machine_id is null</if>
+        <if test="machineId != null and machineId !=''">and machine_id = #{machineId,jdbcType=DECIMAL}</if>
+        <if test="liningCode == null or liningCode ==''">and lining_code is null</if>
+        <if test="liningCode != null and liningCode !='' ">and lining_code = #{liningCode,jdbcType=VARCHAR}</if>
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_nc_quota_setting a USING (
+        <foreach collection="list" item="QuotaSetting" separator=" union ">
+            select
+            #{QuotaSetting.liningCode,jdbcType=VARCHAR} lining_code,
+            #{QuotaSetting.machineId,jdbcType=DOUBLE} machine_id,
+            #{QuotaSetting.quota,jdbcType=DOUBLE} quota,
+            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
+            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
+            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
+            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        ((b.lining_code is null and a.lining_code is null) or (a.lining_code = b.lining_code))
+        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.quota = b.quota,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.lining_code, a.machine_id, a.quota, a.create_by, a.create_time, a.remark, a.del_flag) values
+        (SEQ_QUOTA_SETTING.NEXTVAL, b.lining_code, b.machine_id, b.quota, b.create_by, sysdate, b.remark, '0')
+    </update>
+</mapper>

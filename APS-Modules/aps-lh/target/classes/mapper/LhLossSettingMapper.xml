@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhLossSettingMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.dto.LhLossSettingDto" id="LhLossSettingResult">
+        <result property="id" column="id"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="machineCode" column="machine_code"/>
+        <result property="machineName" column="machine_name"/>
+        <result property="lossRate" column="loss_rate"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectLhLossSettingVo">
+        select id, sap_code, machine_code, loss_rate, create_by, create_time, update_by, update_time, del_flag, remark
+        from t_lh_loss_setting
+    </sql>
+
+    <select id="selectLhLossSettingList" parameterType="com.zlt.aps.lh.entity.LhLossSetting"
+            resultMap="LhLossSettingResult">
+        select * from (
+            select a.*,b.machine_name
+            from t_lh_loss_setting a
+            left join T_LH_MACHINE_INFO b
+            on a.machine_code = b.machine_code and b.del_flag = '0'
+            where a.del_flag = '0'
+            <if test="sapCode != null  and sapCode != ''">and INSTR(a.sap_code, #{sapCode}) > 0</if>
+            <if test="machineCode != null  and machineCode != ''">and a.machine_code = #{machineCode}</if>
+            <if test="orderStr == null">
+                order by a.create_time desc
+            </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectLhLossSettingById" parameterType="Long" resultMap="LhLossSettingResult">
+        <include refid="selectLhLossSettingVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkLhLossSettingUnique" parameterType="com.zlt.aps.lh.entity.LhLossSetting"
+            resultType="int">
+        select count(1)
+        from t_lh_loss_setting
+        where del_flag = '0'
+        <if test="sapCode != null  and sapCode != ''">and sap_code = #{sapCode}</if>
+        <if test="sapCode == null  or sapCode == ''">and sap_code is null</if>
+        <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
+        <if test="machineCode == null  or machineCode == ''">and machine_code is null</if>
+        <if test="id != null and id != ''">and id != #{id}</if>
+    </select>
+
+    <insert id="insertLhLossSetting" parameterType="com.zlt.aps.lh.entity.LhLossSetting">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_LOSS_SETTING.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_lh_loss_setting
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="machineCode != null">machine_code,</if>
+            <if test="lossRate != null">loss_rate,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="machineCode != null">#{machineCode},</if>
+            <if test="lossRate != null">#{lossRate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateLhLossSetting" parameterType="com.zlt.aps.lh.entity.LhLossSetting">
+        update t_lh_loss_setting
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="machineCode != null">machine_code = #{machineCode},</if>
+            <if test="lossRate != null">loss_rate = #{lossRate},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhLossSettingById" parameterType="Long">
+        update t_lh_loss_setting
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteLhLossSettingByIds" parameterType="String">
+        update t_lh_loss_setting set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lh_loss_setting a USING (
+        <foreach collection="list" item="LossSetting" separator=" union ">
+            select
+            #{LossSetting.sapCode,jdbcType=VARCHAR} sap_code,
+            #{LossSetting.machineCode,jdbcType=VARCHAR} machine_code,
+            #{LossSetting.lossRate,jdbcType=DECIMAL} loss_rate,
+
+            #{LossSetting.createBy,jdbcType=VARCHAR} create_by,
+            #{LossSetting.createTime,jdbcType=DATE} create_time,
+            #{LossSetting.updateBy,jdbcType=VARCHAR} update_by,
+            #{LossSetting.updateTime,jdbcType=DATE} update_time,
+            #{LossSetting.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        ((b.sap_code is null and a.sap_code is null) or (a.sap_code = b.sap_code))
+        and ((b.machine_code is null and a.machine_code is null) or (a.machine_code = b.machine_code))
+        AND a.del_flag = '0'
+        )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.loss_rate = b.loss_rate,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.sap_code ,
+        a.machine_code ,
+        a.loss_rate ,
+        a.create_by ,
+        a.create_time ,
+        a.remark, a.del_flag
+        ) values
+        (SEQ_LOSS_SETTING.NEXTVAL,
+        b.sap_code,
+        b.machine_code,
+        b.loss_rate,
+        b.create_by,
+        sysdate,
+        b.remark, '0'
+        )
+    </update>
+
+</mapper>

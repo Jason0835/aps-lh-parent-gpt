@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('硫化工序模具变动单APS列表')" />
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+
+                            <li class="select-time">
+                                <label>[[#{ui.data.column.lhApsMoldAdjustPlan.planDate}]]：</label>
+                                <input type="text" class="time-input" id="planDate" th:value="${initDate}"
+                                       th:placeholder="yyyy-mm-dd" name="planDate"/>
+                            </li>
+                            <li>
+                                <label>[[#{ui.data.column.lhApsMoldAdjustPlan.lhMachineName}]]：</label>
+                                <input type="text" name="lhMachineName"/>
+                            </li>
+
+                            <li>
+                                <label>[[#{ui.data.column.lhApsMoldAdjustPlan.changeType}]]：</label>
+                                <select name="changeType" th:with="type=${@dict.getType('MOLD_CHANGE_TYPE')}">
+                                    <option value="">[[#{ui.frame.btn.all}]]</option>
+                                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+                                </select>
+                            </li>
+                            <li>
+                                <label>[[#{ui.data.column.scheduleResult.isRelease}]]：</label>
+                                <select id="isRelease" name="isRelease" th:with="type=${@dict.getType('IS_RELEASE')}"
+                                        class="form-control">
+                                    <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                            th:value="${dict.dictValue}"></option>
+                                </select>
+                            </li>
+
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+<!--                <a class="btn btn-success" onclick="$.operate.add()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:add">-->
+<!--                    <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]-->
+<!--                </a>-->
+                <a class="btn btn-success" onclick="add()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:add">
+                    <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+                </a>
+                <a class="btn btn-primary single disabled" onclick="$.operate.edit()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:edit">
+                    <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+                </a>
+                <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:remove">
+                    <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+                </a>
+                <a class="btn btn-warning multiple disabled" onclick="publish()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:publish">
+                    <i class="iconfont icon-yidaorurizhi"></i> [[#{ui.data.column.scheduleResult.publish}]]
+                </a>
+                <a class="btn btn-info" onclick="importExcel()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:import">
+                    <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+                </a>
+                <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:export">
+                    <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+                </a>
+                <a class="btn btn-success multiple disabled" onclick="changeExecute()" shiro:hasPermission="lh:lhApsMoldAdjustPlan:changeExecute">
+                    <i class="fa fa-download"></i> [[#{ui.btn.lhApsMoldAdjustPlan.changeExecute}]]
+                </a>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var editFlag = [[${@permission.hasPermi('lh:lhApsMoldAdjustPlan:edit')}]];
+        var removeFlag = [[${@permission.hasPermi('lh:lhApsMoldAdjustPlan:remove')}]];
+        var changeTypeDatas = [[${@dict.getType('MOLD_CHANGE_TYPE')}]];
+        var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+        var isExecuteDatas = [[${@dict.getType('IS_HAVE')}]];
+
+        var prefix = ctx + "lh/lhApsMoldAdjustPlan";
+
+        $(function() {
+            var options = {
+                uniqueId: 'id',
+                url: prefix + "/list",
+                createUrl: prefix + "/add",
+                updateUrl: prefix + "/edit/{id}",
+                removeUrl: prefix + "/remove",
+                exportUrl: prefix + "/export",
+                importUrl: prefix + "/toImport",
+                changeExecuteUrl: prefix + "/changeExecute/{ids}",
+                modalName: [[#{ui.data.column.lhApsMoldAdjustPlan.modelName}]],
+                onLoadSuccess: function (data) {
+                    mergeCells(data, "lhMachineName", "", $("#bootstrap-table"));
+                    mergeCells(data, "changeMoldTime", "lhMachineName", $("#bootstrap-table"));
+                },
+                columns: [{
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+              /*  {
+                    field: 'moldOrderNo',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.moldOrderNo}]],
+                },*/
+
+                {
+                    widthUnit: '%',
+                    width: 5,
+                    align:"center",
+                    field: 'planDate',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.planDate}]],
+                },
+                {
+                    widthUnit: '%',
+                    width: 5,
+                    align:"center",
+                    field: 'lhMachineName',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.lhMachineName}]],
+                },
+               {
+                   field: 'isRelease',
+                   valign: 'middle',
+                   align: 'center',
+                   halign: 'center',
+                   title: [[#{ui.data.column.scheduleResult.isRelease}]],
+                   formatter: function (value, row, index) {
+                       return $.table.selectDictLabel(isReleaseDatas, value);
+                   }
+               },
+                {
+                    align:"center",
+                    field: 'beforeSapCode',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.beforeSapCode}]],
+                },
+                {
+                    align:"center",
+                    field: 'beforeSpecDesc',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.beforeSpecDesc}]],
+                    formatter: function(value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                 {
+                    align:"center",
+                    field: 'beforeEmbryoCode',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.beforeEmbryoCode}]],
+                 },
+                {
+                    halign:'center',
+                    align: 'right',
+                    field: 'tireRoughStock',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.tireRoughStock}]],
+                },
+                {
+                    halign:'center',
+                    align: 'right',
+                    field: 'useMoldNumber',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.useMoldNumber}]],
+                },
+                {
+                    align:"center",
+                    field: 'leftRightMold',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.leftRightMold}]],
+                },
+                {
+                    widthUnit: '%',
+                    width: 5,
+                    align:"center",
+                    field: 'changeType',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.changeType}]],
+                    formatter: function(value, row, index) {
+                       return $.table.selectDictLabel(changeTypeDatas, value);
+                    }
+                },
+                {
+                    widthUnit: '%',
+                    width: 5,
+                    align:"center",
+                    field: 'afterSapCode',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.afterSapCode}]],
+                },
+                {
+                    widthUnit: '%',
+                    width: 15,
+                    align:"center",
+                    field: 'afterSpecDesc',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.afterSpecDesc}]],
+                    formatter: function(value, row, index) {
+                       return $.table.tooltip(value);
+                    }
+                },
+                 {
+                     widthUnit: '%',
+                     width: 5,
+                     align:"center",
+                     field: 'afterEmbryoCode',
+                     title: [[#{ui.data.column.lhApsMoldAdjustPlan.afterEmbryoCode}]],
+                 },
+                {
+                    widthUnit: '%',
+                    width: 5,
+                    align:"center",
+                    field: 'changeMoldTime',
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.changeMoldTime}]],
+
+                },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    title: [[#{ui.common.column.remark}]],
+                    formatter: function(value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    field: 'isExecute',
+                    align: "center",
+                    title: [[#{ui.data.column.lhApsMoldAdjustPlan.isExecute}]],
+                    formatter: function(value, row, index) {
+                        return $.table.selectDictLabel(isExecuteDatas, value);
+                    }
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>'+[[#{ui.frame.btn.update}]]+'</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>'+[[#{ui.frame.btn.delete}]]+'</a>');
+                        return actions.join('');
+                    }
+                }]
+            };
+            $.table.init(options);
+        });
+
+        // 下载模板
+        function importTemplate() {
+            window.location.href=prefix + "/importTemplate";
+        }
+
+        // 发布排程
+        function publish() {
+            table.set();
+            var planDate = $("#planDate").val();
+            var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            $.modal.confirm([[#{ui.biz.alter.makeSurePublish}]], function () {
+                $.operate.post(prefix + "/publish", {"planDate": planDate, "ids": rows.join()}, function (result) {
+                    if (result.code == web_status.FAIL) {
+                        $.table.refresh();
+                    }
+                });
+            })
+        }
+
+        /**
+          * 合并相同行
+          * @param data 原始数据（在服务端完成排序）
+          * @param fieldName 合并属性数组
+         * @param condition 合并添加（符合前一个condition和当前condition相等才合并）
+          * @param target 目标表格对象
+          */
+        function mergeCells(dataAll, fieldName,condition, target) {
+            var data = dataAll;
+            setTimeout(function () {
+                if (data.rows.length == 0) {
+                    return;
+                }
+                var numArr = [];
+                var number = 0;
+                if (data.rows.length > 1) {
+                    for (let i = 0; i < data.rows.length; i++) {
+                        if (data.rows[i][fieldName] != '' && data.rows[i][fieldName] != '-') {
+                            if (data.rows[i - 1]) {
+                                if (data.rows[i - 1][fieldName] != '' && data.rows[i - 1][fieldName] != '-') {
+                                    if (data.rows[i - 1][fieldName] == data.rows[i][fieldName] && data.rows[i - 1][condition] == data.rows[i][condition]) {
+                                        number++
+                                    } else {
+                                        number = number + 1
+                                        numArr.push({index: i - number, number: number, pan: '1'})
+                                        number = 0
+                                    }
+                                }
+                            }
+                            if (!data.rows[i + 1]) {
+                                number = number
+                                numArr.push({index: i - number, number: number + 1, pan: '2'})
+                                number = 0
+                            } else {
+                                if (data.rows[i + 1][fieldName] == '' || data.rows[i + 1][fieldName] == '-') {
+                                    number = number
+                                    numArr.push({index: i - number, number: number + 1, pan: '3'})
+                                    number = 0
+                                }
+                            }
+                        } else {
+                            numArr.push({index: i, number: 1, pan: '4'})
+                        }
+                    }
+                } else {
+                    numArr.push({index: 0, number: 1, pan: '5'})
+                }
+                // console.log(numArr);
+                for (let x = 0; x < numArr.length; x++) {
+                    if (x % 2) {
+                        for (let y = 0; y < numArr[x]['number']; y++) {
+                            //  $(target).children('tbody').children('tr').eq(numArr[x]['index']+y).css('background','yellow')
+                        }
+                    } else {
+                        for (let y = 0; y < numArr[x]['number']; y++) {
+                            $(target).children('tbody').children('tr').eq(numArr[x]['index'] + y).css('background', '#fff')
+                        }
+                    }
+                    $(target).bootstrapTable('mergeCells', {
+                        index: numArr[x]['index'],
+                        field: fieldName,
+                        colspan: 1,
+                        rowspan: numArr[x]['number']
+                    });
+                    $(".fixed-columns").find("#bootstrap-table").bootstrapTable('mergeCells', {
+                        index: numArr[x]['index'],
+                        field: fieldName,
+                        colspan: 1,
+                        rowspan: numArr[x]['number']
+                    });
+                }
+            })
+        }
+
+        function changeExecute() {
+            table.set();
+            var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            url = table.options.changeExecuteUrl.replace("{ids}", rows.join(','));
+            $.modal.open(table.options.modalName + [[#{ui.btn.lhApsMoldAdjustPlan.changeExecute}]], url, 350, 200);
+        }
+
+        function importExcel() {
+            table.set();
+            var url = table.options.importUrl;
+            $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 450, '', true);
+        }
+
+        function add() {
+            table.set();
+            url = prefix + "/toSubDataEdit";
+            $.modal.open(frame.btn.add + table.options.modalName, url, window.innerWidth, 432);
+        }
+    </script>
+</body>
+</html>

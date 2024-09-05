@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('施工信息导出日志列表')" />
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                [[#{ui.data.column.constructionExportLog.fileType}]]：
+                                <select name="fileType" th:with="type=${@dict.getType('PROCEDURE_CODE')}">
+                                    <option value="">[[#{ui.frame.btn.all}]]</option>
+                                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+                                </select>
+                                [[#{ui.data.column.constructionExportLog.fileName}]]：
+                                <input type="text" name="fileName"/>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+                <a class="btn btn-success" onclick="$.operate.add(null,430,430)">
+                    <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+                </a>
+                <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()">
+                    <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+                </a>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table" data-resizable="true"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+     <th:block th:include="include :: bootstrap-table-resizable-js" />
+    <script th:inline="javascript">
+        var fileTypeDatas = [[${@dict.getType('PROCEDURE_CODE')}]];
+        var prefix = ctx + "cx/constructionExportLog";
+
+        $(function() {
+            var options = {
+                url: prefix + "/list",
+                createUrl: prefix + "/add",
+                updateUrl: prefix + "/edit/{id}",
+                removeUrl: prefix + "/remove",
+                exportUrl: prefix + "/export",
+                importUrl: prefix + "/importData",
+                modalName: [[#{ui.data.column.constructionExportLog.modelName}]],
+                columns: [{
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'fileType',
+                    title: [[#{ui.data.column.constructionExportLog.fileType}]],
+                    sortable: true,
+                    formatter: function(value, row, index) {
+                       return $.table.selectDictLabel(fileTypeDatas, value);
+                    }
+                },
+                {
+                    field: 'fileName',
+                    title: [[#{ui.data.column.constructionExportLog.fileName}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a href="javascript:void(0)" onclick="downloadFile(\'' +value+'\',\'' +row.filePath+'\')">' + value + '</a> ');
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'createTime',
+                    title: [[#{ui.data.column.export.createTime}]],
+                    sortable: true,
+                },
+                {
+                    field: 'filePath',
+                    title: [[#{ui.data.column.constructionExportLog.filePath}]],
+                    sortable: true,
+                    visible: false
+                }]
+            };
+            $.table.init(options);
+        });
+
+        function downloadFile(name,url){
+            window.location.href = ctx + "cx/exportLogManagement/download?name="+name+"&&url="+url;
+        }
+
+    </script>
+</body>
+</html>

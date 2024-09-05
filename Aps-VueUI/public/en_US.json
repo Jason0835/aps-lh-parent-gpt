@@ -1,0 +1,917 @@
+{
+  "book": {
+    "inquirySheetUpdate": "海运费询价单--修改",
+    "orderNo": "订舱单号",
+    "deliveryOrderNo": "交货单号",
+    "deliveryOrderStatus": "交货单状态",
+    "billLadingNo": "提单号",
+    "destinationPort": "目的港",
+    "departurePort": "启运港",
+    "receiptPort": "Port of receipt",
+    "planNum": "计划数量",
+    "boxNum": "箱数",
+    "flightNameVoyage": "航名航次",
+    "cargoValue": "货值",
+    "confirm": {
+      "bookNo": "订舱编号",
+      "contractNo": "销售合同编号",
+      "salesman": "销售业务员",
+      "dealMethods": "成交方式",
+      "bookDate": "预定船期",
+      "terms": "运输条款",
+      "shipper": "发货人",
+      "consignee": "收货人",
+      "subpackage": "可否分装",
+      "transport": "可否转运",
+      "notifier": "notifier",
+      "transhipmentPort": "Port of transhipment",
+      "shippingCompany": "Shipping company",
+      "cargoDesc": "Cargo description",
+      "num": "Commodity quantity",
+      "packMethod": "Packing method",
+      "boxNum": "箱量",
+      "boxUnitPrice": "单箱海运价",
+      "totalPrice": "海运费合计",
+      "status": "状态",
+      "shipowner": "shipowner",
+      "transportMode": "Mode of transport",
+      "customerPremium": "Customer premium",
+      "customerSeaFreight": "Customer sea freight",
+      "certificate": "certificate",
+      "deliveryMethod": "U9 Delivery Method",
+      "lcl": "是否与轮钢拼箱",
+      "booker": "Booker",
+      "prepaymentMethod": "Prepayment method",
+      "freightForwarderTelephone": "Freight forwarder telephone",
+      "createdTime": "制单时间",
+      "dealMethods2": "实际成交方式",
+      "freightForwarderCompany": "Freight forwarding company",
+      "freightForwarderContact": "Freight forwarder contact",
+      "freightForwarderEmail": "Freight forwarder email",
+      "shippingMark": "Shipping mark",
+      "instruction": "booking instructions",
+      "deliveryNoticeTime": "Delivery notification time",
+      "station": "场站",
+      "shippingDate": "船期",
+      "boxDate": "放箱日期",
+      "catOffDate": "截单日期",
+      "placeOriginNum": "产地证号",
+      "portCatOffDate": "截港日期",
+      "oceanFreightInquirySheet": "Ocean freight inquiry sheet",
+      "freightForwardSeaFreight": "Freight forwarding sea freight",
+      "invoice1": "商检发票号",
+      "signingMethod": "Signing method",
+      "lock": "锁定"
+    },
+    "cost": {
+      "oceanFreight": "Ocean freight",
+      "premium": "Premium",
+      "testingFree": "Testing fee",
+      "name": "财务组织",
+      "payAmount": "付款金额",
+      "payBank": "付款银行",
+      "priceNo": "询价编号"
+    },
+    "sheet": {
+      "no": "询价单号",
+      "createdTime": "询价日期",
+      "endTime": "价格有效期",
+      "box1": "箱型40HC",
+      "box2": "箱型40H",
+      "box3": "箱型20GP",
+      "routeDays": "Route days",
+      "frequency": "frequency"
+    }
+  },
+  "common": {
+    "button": {
+      "add": "add",
+      "delete": "delete",
+      "edit": "edit",
+      "modify": "modify",
+      "history": "历史记录",
+      "historyQuery": "历史查询",
+      "import": "导入",
+      "export": "导出",
+      "exportData": "导出数据",
+      "query": "查询",
+      "view": "查看",
+      "print": "打印",
+      "save": "保存",
+      "saveData": "保存数据",
+      "refresh": "刷新"
+    },
+    "startTime": "startTime",
+    "endTime": "endTime",
+    "materialNo": "商品编码",
+    "materialDesc": "商品描述",
+    "status": "状态",
+    "option": "操作",
+    "factory": "工厂",
+    "area": "区域",
+    "salesman": "业务员",
+    "country": "国家",
+    "countryArea": "国家地区",
+    "yes": "是",
+    "no": "否",
+    "companyAccount": "Company account",
+    "num": "数量",
+    "supplier": "供应商",
+    "saleOrderNo": "销售订单号",
+    "row": "行",
+    "remark": "备注",
+    "bank": "银行",
+    "bankAccount": "银行账号",
+    "file": {
+      "error": {
+        "file": {
+          "upload": {
+            "invoke": {
+              "fail": "en_us文件服务调用失败:{}"
+            },
+            "fail": "en_us上传文件失败:",
+            "image": {
+              "fail": "en_us上传图片异常，请联系管理员"
+            }
+          }
+        },
+        "service": {
+          "fail": "en_us文件服务异常，请联系管理员"
+        }
+      }
+    },
+    "user": {
+      "email": {
+        "message": "The mailbox format is incorrect"
+      }
+    },
+    "ui": {
+      "data": {
+        "column": {
+          "announceList": {
+            "systemCode": "所属系统",
+            "deptId": "所属部门",
+            "announceTitle": "公告主题",
+            "announceTypeCode": "公告类型",
+            "sendBy": "发布人",
+            "sendTime": "发布时间",
+            "sendStatus": "发布状态",
+            "announceContent": "公告内容",
+            "modelName": "公告详情",
+            "remark": "备注"
+          },
+          "announcementReceived": {
+            "modelName": "接收人员",
+            "parentId": "父ID",
+            "deptId": "部门",
+            "roleId": "角色",
+            "userName": "用户",
+            "sendStatus": "发送状态",
+            "readStatus": "阅读状态",
+            "remark": "备注"
+          },
+          "billTemplateRef": {
+            "billTypeCode": "单据类型",
+            "msgChannel": "消息渠道"
+          },
+          "import": {
+            "nodata": "no data"
+          }
+        },
+        "btn": {
+          "announceList": {
+            "detail": "详情",
+            "receivedStatus": "接收情况"
+          },
+          "announcementReceived": {
+            "dept": "增加部门",
+            "role": "增加角色",
+            "user": "增加用户"
+          }
+        }
+      }
+    },
+    "api": {
+      "dept": {
+        "error": {
+          "name": {
+            "overlength": "The length of department name cannot exceed 30 characters"
+          },
+          "order": {
+            "isnull": "Display order cannot be empty"
+          },
+          "telephone": {
+            "overlength": "The contact number cannot be longer than 11 characters"
+          },
+          "email": {
+            "incorrect": "The mailbox format is incorrect",
+            "overlength": "The length of the mailbox cannot exceed 50 characters"
+          }
+        },
+        "columnname": {
+          "telephone": "telephone",
+          "sort": "sort",
+          "parentId": "Parent department ID",
+          "id": "Department ID",
+          "email": "Email",
+          "status": "status",
+          "langJson": "langJson",
+          "deptCode": "Department code",
+          "isFactory": "Is factory",
+          "deptType": "Department of type"
+        }
+      },
+      "log": {
+        "columnname": {
+          "operation": {
+            "orderno": "Operation serial number",
+            "module": "Operation module",
+            "type": "Operation category",
+            "time": "Operation time"
+          },
+          "bussiness": {
+            "type": "Business type"
+          },
+          "request": {
+            "method": "Request method",
+            "type": "Request method"
+          },
+          "operator": "operator",
+          "deptname": "Department name",
+          "requesturl": "request address",
+          "operationurl": "operation address",
+          "requestparameter": "request parameter",
+          "responseparameter": "return parameter",
+          "status": "status",
+          "errormsg": "error message"
+        }
+      },
+      "role": {
+        "order": {
+          "no": "role sequence number"
+        },
+        "columnname": {
+          "name": "role name",
+          "auth": "role permission",
+          "sort": "role sort",
+          "datarange": "data range",
+          "status": "role status"
+        },
+        "error": {
+          "name": {
+            "isnull": "Role name cannot be empty",
+            "overlength": "The length of the role name cannot exceed 30 characters"
+          },
+          "auth": {
+            "isnull": "Permission character cannot be empty",
+            "overlength": "The length of permission character cannot exceed 100 characters"
+          },
+          "sort": {
+            "isnull": "Display order cannot be empty"
+          }
+        }
+      },
+      "user": {
+        "columnname": {
+          "orderno": "user sequence number",
+          "usercode": "user number",
+          "deptno": "department number",
+          "accountname": "login name",
+          "username": "user name",
+          "email": "user email",
+          "telphone": "mobile phone number",
+          "sex": "user gender",
+          "status": "account status",
+          "login": {
+            "lasttime": "Last login time"
+          },
+          "deptname": "Department name",
+          "parentName": "Parent Department name",
+          "dept": {
+            "manager": {
+              "name": "Department head"
+            }
+          },
+          "grpName": "GroupName",
+          "comName": "CompanyName",
+          "facName": "FactoryName"
+        },
+        "error": {
+          "name": {
+            "overlength": "The length of a user's nickname cannot exceed 30 characters"
+          },
+          "account": {
+            "isnull": "User account cannot be empty",
+            "overlength": "The length of user account cannot exceed 30 characters"
+          },
+          "email": {
+            "incorrect": "The mailbox format is incorrect",
+            "overlength": "The length of the mailbox cannot exceed 50 characters"
+          },
+          "telephone": {
+            "overlength": "The length of mobile phone number cannot exceed 11 characters"
+          }
+        }
+      },
+      "use": {
+        "columnname": {
+          "login": {
+            "lastip": "Finally log in IP",
+            "workNo": "WorkNo"
+          }
+        }
+      },
+      "factory": {
+        "error": {
+          "log": {
+            "server": {
+              "fail": "Log service call failed"
+            }
+          },
+          "user": {
+            "server": {
+              "fail": "User service call failed: {}"
+            }
+          },
+          "get": {
+            "user": {
+              "fail": "Failed to get user: {}",
+              "roleDeptL1": {
+                "fail": "en获取用户角色的部门信息失败"
+              }
+            }
+          },
+          "cleancache": {
+            "user": {
+              "fail": "Failed to clear user cache:{}"
+            }
+          }
+        }
+      },
+      "config": {
+        "columnname": {
+          "orderNo": "parameter primary key",
+          "name": "parameter name",
+          "keyName": "parameter key name",
+          "value": "parameter key value",
+          "configType": "system built in"
+        },
+        "error": {
+          "name": {
+            "isnull": "Parameter name cannot be empty",
+            "overlength": "Parameter name cannot exceed 100 characters"
+          },
+          "keyName": {
+            "isnull": "Parameter key name length cannot be empty",
+            "overlength": "The length of parameter key name cannot exceed 100 characters"
+          },
+          "value": {
+            "isnull": "Parameter key value cannot be empty",
+            "overlength": "The length of key value cannot exceed 500 characters"
+          }
+        }
+      },
+      "dictData": {
+        "columnname": {
+          "code": "dictionary code",
+          "sort": "dictionary sort",
+          "label": "dictionary label",
+          "value": "dictionary key value",
+          "dictType": "dictionary type",
+          "isDefault": "default or not",
+          "status": "status",
+          "lang": "language pack"
+        },
+        "error": {
+          "lablel": {
+            "isnull": "Dictionary label cannot be empty",
+            "overlength": "Dictionary label length cannot exceed 100 characters"
+          },
+          "value": {
+            "isnull": "Dictionary key value cannot be empty",
+            "overlength": "The length of dictionary key value cannot exceed 100 characters"
+          },
+          "dictType": {
+            "isnull": "Dictionary type cannot be empty",
+            "overlength": "Dictionary type length cannot exceed 100 characters"
+          },
+          "cssClass": {
+            "overlength": "The length of style property cannot exceed 100 characters"
+          }
+        }
+      },
+      "dictType": {
+        "columnname": {
+          "orderno": "dictionary primary key",
+          "name": "dictionary name",
+          "dictType": "dictionary type",
+          "status": "status"
+        },
+        "error": {
+          "name": {
+            "isnull": "Dictionary name cannot be empty",
+            "overlength": "The length of dictionary type name cannot exceed 100 characters"
+          },
+          "dictType": {
+            "isnull": "Dictionary type cannot be empty",
+            "overlength": "Dictionary type type type length cannot exceed 100 characters"
+          }
+        }
+      },
+      "logininfo": {
+        "model": "Login info",
+        "columnname": {
+          "orderno": "sequence number",
+          "loginName": "user account",
+          "status": "status",
+          "addr": "address",
+          "detail": "description",
+          "accessTime": "access time"
+        }
+      },
+      "sysmenu": {
+        "error": {
+          "name": {
+            "isnull": "Menu name cannot be empty",
+            "overlength": "The length of menu name cannot exceed 50 characters"
+          },
+          "sort": {
+            "isnull": "Display order cannot be empty"
+          },
+          "path": {
+            "overlength": "The routing address cannot exceed 200 characters"
+          },
+          "component": {
+            "overlength": "The component path cannot exceed 255 characters"
+          },
+          "menuType": {
+            "isnull": "Menu type cannot be empty"
+          },
+          "perms": {
+            "overlength": "The length of permission ID cannot exceed 100 characters"
+          }
+        }
+      },
+      "sysNotice": {
+        "error": {
+          "noticeTitle": {
+            "isnull": "Announcement Title cannot be empty",
+            "overlength": "The title of the announcement cannot exceed 50 characters"
+          }
+        }
+      },
+      "syspost": {
+        "columnname": {
+          "orderno": "position serial number",
+          "code": "position code",
+          "name": "position name",
+          "sort": "sort",
+          "status": "status"
+        },
+        "error": {
+          "code": {
+            "isnull": "Position code cannot be empty",
+            "overlength": "The length of position code cannot exceed 64 characters"
+          },
+          "name": {
+            "isnull": "Position name cannot be blank",
+            "overlength": "The length of position name cannot exceed 50 characters"
+          },
+          "sort": {
+            "isnull": "Display order cannot be empty"
+          }
+        }
+      }
+    },
+    "auth": {
+      "msg": {
+        "startup": "[start end] authentication and authorization module started successfully",
+        "login": {
+          "success": "login succeeded"
+        },
+        "logout": {
+          "success": "exit successful"
+        },
+        "changelang": {
+          "log": "token: {}, change language",
+          "operator": "change language"
+        }
+      },
+      "error": {
+        "login": {
+          "username": {
+            "password": {
+              "require": "User or password required"
+            }
+          },
+          "input": {
+            "outrange": "The user password is not in the specified range"
+          },
+          "notexist": {
+            "user": {
+              "account": "The login user does not exist",
+              "username": "Login user: {} does not exist"
+            },
+            "token": {
+              "info": "��ǰ����û�е�¼���û�����"
+            }
+          }
+        },
+        "account": {
+          "deleted": "sorry, your account has been deleted"
+        },
+        "user": {
+          "disabled": "the user has been disabled, please contact the administrator",
+          "wrongpassword": "wrong user password",
+          "lock": "the account is locked {} times after the password is entered incorrectly, and will be unlocked automatically after {} minutes",
+          "noexistorpassword": "user does not exist / password error"
+        }
+      }
+    },
+    "##############telecom auth sub module configuration#################common": {
+      "error": {
+        "global": {
+          "no": {
+            "auth": "No permission, please contact administrator for authorization"
+          }
+        }
+      }
+    },
+    "common": {
+      "error": {
+        "global": {
+          "demo": {
+            "mode": {
+              "undo": "Demo mode, operation not allowed"
+            }
+          }
+        },
+        "feign": {
+          "invoke": {
+            "fail": "Feign interface server invoke exception:{}"
+          }
+        },
+        "sql": {
+          "running": {
+            "fail": "SQL execute exception:{}"
+          }
+        },
+        "aspect": {
+          "before": {
+            "notice": {
+              "exception": "Pre notification exception"
+            }
+          },
+          "exception": {
+            "info": "Exception information: {}"
+          }
+        },
+        "convert": {
+          "unknown": "unknown"
+        },
+        "util": {
+          "file": {
+            "sheet": {
+              "noexist": "The file sheet does not exist"
+            }
+          },
+          "export": {
+            "excel": {
+              "exception": "Export excel exception {}",
+              "fail": "Failed to export excel {}"
+            }
+          },
+          "no": {
+            "find": {
+              "field": {
+                "exception": "the {} field was not found in {}"
+              },
+              "method": {
+                "exception": "method {} not found in {}"
+              }
+            }
+          },
+          "impossible": {
+            "exception": "Exception {} that cannot be thrown"
+          },
+          "parameter": {
+            "noconform": "The parameter does not conform to the specification and cannot be queried"
+          }
+        },
+        "i18n": {
+          "locale": {
+            "cache": {
+              "token": {
+                "nolocale": "没找到缓存TOKEN中的语言包设置:{}",
+                "notimezone": "没找到缓存TOKEN中的语言包时区设置:{}"
+              }
+            }
+          }
+        }
+      },
+      "user": {
+        "status": {
+          "normal": "normal",
+          "disabled": "disabled",
+          "deleted": "deleted"
+        }
+      },
+      "util": {
+        "remark": "Note:",
+        "time": {
+          "desc": "{} days {}hours {}minutes"
+        },
+        "milli": {
+          "time": {
+            "desc": "{}hours{}minutes{}seconds{}milliseconds"
+          }
+        }
+      },
+      "msg": {
+        "base": {
+          "query": {
+            "success": "query was successful"
+          }
+        },
+        "ajax": {
+          "operation": {
+            "success": "The operation was successful",
+            "fail": "operation failed"
+          }
+        }
+      }
+    },
+    "job": {
+      "title": {
+        "joblog": "任务调度日志"
+      },
+      "msg": {
+        "log": {
+          "run": {
+            "mulitparam": "执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}",
+            "param": "执行有参方法：",
+            "noparam": "执行无参方法"
+          },
+          "usetime": "{} 总共耗时：{}毫秒"
+        },
+        "startup": "【启动结束】定时任务模块启动成功"
+      },
+      "error": {
+        "log": {
+          "run": {
+            "exception": "任务执行异常  - ："
+          },
+          "schedule": {
+            "fail": "The task misfire policy '{}' cannot be used in cron schedule tasks {}"
+          }
+        },
+        "add": {
+          "cron": {
+            "wrong": "en_US新增任务'{0}'失败,cron表达式不正确"
+          },
+          "https": {
+            "wrong": "en_US新增任务'{0}'失败,目标字符串不允许'http(s)//'调用"
+          },
+          "rmi": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'rmi://'调用"
+          }
+        },
+        "edit": {
+          "cron": {
+            "wrong": "新增任务'{0}'失败,cron表达式不正确"
+          },
+          "https": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'http(s)//'调用"
+          },
+          "rmi": {
+            "wrong": "新增任务'{0}'失败,目标字符串不允许'rmi://'调用"
+          }
+        },
+        "cron": {
+          "wrong": "cron表达式不正确"
+        }
+      }
+    },
+    "monitor": {
+      "msg": {
+        "startup": "【启动结束】监控中心启动成功"
+      }
+    },
+    "activiti": {
+      "msg": {
+        "startup": "[start end] the actitivi module started successfully"
+      }
+    },
+    "msg": {
+      "message": {
+        "startup": "[start end] the message module started successfully"
+      }
+    },
+    "system": {
+      "title": {
+        "configmanage": "Parameter management",
+        "configdate": "Parameter data",
+        "deptmanage": "Department management",
+        "dictdata": "Dictionary data",
+        "dicttype": "Dictionary type",
+        "logininfo": "Log in",
+        "menumanage": "Menu management",
+        "sysnotice": "Notice notice",
+        "operlog": "Operation log",
+        "postmanage": "Job data",
+        "postdata": "Post management",
+        "personalprofile": "personal information",
+        "rolemanage": "Role management",
+        "roledata": "Role data",
+        "usermanage": "user management",
+        "userdata": "user data",
+        "onlineuser": "Online users"
+      },
+      "error": {
+        "conf": {
+          "add": {
+            "exist": "Failed to add parameter '{}', parameter key name already exists"
+          },
+          "update": {
+            "exist": "Failed to modify parameter '{}', parameter key name already exists"
+          },
+          "cannotdelete": "the built-in parameter [%1$s] cannot be deleted"
+        },
+        "dept": {
+          "exist": {
+            "noadd": "Failed to add department '{}', department name already exists",
+            "noupdatename": "Failed to modify department '{}', department name already exists"
+          },
+          "change": {
+            "parentisown": "Failed to modify department '{}'. The superior department cannot be its own"
+          },
+          "childdept": {
+            "inused": "This department contains not deactivated sub departments!",
+            "nonone": "There are subordinate departments, which cannot be deleted"
+          },
+          "haveuser": "there are users in the Department and cannot be deleted",
+          "repeatingRecord": "Duplicate record! (Unique key: department ID)",
+          "number": {
+            "exist": {
+              "noadd": "Failed to add department , department ID already exists"
+            }
+          }
+        },
+        "dict": {
+          "exist": {
+            "noadd": "Failed to add Dictionary '{}', dictionary type already exists",
+            "noupdate": "Failed to modify Dictionary '{}', dictionary type already exists"
+          },
+          "inused": "%1$s is allocated and cannot be deleted"
+        },
+        "menu": {
+          "childmenu": {
+            "nonone": "Submenu exists, cannot be deleted",
+            "inused": "Menu is assigned and cannot be deleted"
+          },
+          "exist": {
+            "noadd": "Failed to add menu '{}', menu name already exists",
+            "noupdate": "Failed to modify menu '{}', menu name already exists"
+          },
+          "urlhttp": {
+            "noadd": "Failed to add menu '{}', address must start with HTTP (s): / / instead",
+            "noupdate": "Failed to modify menu '{}', address must start with HTTP (s): / / instead"
+          },
+          "change": {
+            "parentisown": "Failed to modify menu '{}'. The superior menu cannot select itself"
+          }
+        },
+        "post": {
+          "exist": {
+            "noadd": "Failed to add position '{}', position name already exists",
+            "code": {
+              "noadd": "Failed to add position '{}', position code already exists",
+              "noupdate": "Failed to modify position '{}', position code already exists"
+            },
+            "noupdate": "Failed to modify position '{}', position name already exists"
+          },
+          "inused": "%1$s is allocated and cannot be deleted"
+        },
+        "user": {
+          "update": {
+            "fail": "Abnormal modification of personal information, please contact the administrator"
+          },
+          "pwd": {
+            "oldpwdwrong": "Failed to change password. Old password is wrong",
+            "mustdiff": "The new password cannot be the same as the old password",
+            "update": {
+              "fail": "Abnormal password modification, please contact the administrator"
+            }
+          },
+          "nofound": "wrong user name or password",
+          "exist": {
+            "noadd": "Failed to add user '{}', login account already exists"
+          },
+          "telephone": {
+            "exist": {
+              "noadd": "Failed to add user '{}', mobile number already exists",
+              "noupdate": "Failed to modify user '{}', mobile phone number already exists"
+            }
+          },
+          "email": {
+            "exist": {
+              "noadd": "Failed to add user '{}', email account already exists",
+              "noupdate": "Failed to modify user '{}', email account already exists"
+            }
+          },
+          "superadmin": {
+            "nochange": "Super administrator users are not allowed to operate"
+          },
+          "import": {
+            "nodata": "Import user data cannot be empty",
+            "account": {
+              "exist": "< br / > {}, account {} already exists",
+              "fail": "< br / > {}, account {} import failed:",
+              "requireName": "<br/>{}, NickNameRequire",
+              "requireDeptId": "<br/>{}、DeptId require when update"
+            },
+            "fail": "Sorry, import failed! The format of {} data is incorrect. The error is as follows:",
+            "nickNameRequired": "NickName Required",
+            "userNameRequired": "UserName Required",
+            "userIdRequired": "DeptId require when update",
+            "haveAccount": "account {} already exists",
+            "fild": "account {} import failed",
+            "alreadyExist": "The imported file has the same user name. Modify the file",
+            "deptNoExist": "The imported DeptName no exists"
+          },
+          "getUserAuth": {
+            "fail": "Get user auth fail"
+          }
+        },
+        "role": {
+          "exist": {
+            "noadd": "Failed to add role '{}', role name already exists",
+            "code": {
+              "noadd": "Failed to add role '{}', role permission already exists",
+              "noupdate": "Failed to modify role '{}', role permission already exists"
+            },
+            "noupdate": "Failed to modify role '{}', role name already exists"
+          },
+          "superadmin": {
+            "nochange": "The super administrator role is not allowed to operate"
+          },
+          "inused": "%1$s is allocated and cannot be deleted"
+        },
+        "login": {
+          "input": {
+            "verification": "The password shall be composed of numbers, letters and special characters, and the length of the password shall not be less than {} digits"
+          }
+        }
+      },
+      "msg": {
+        "user": {
+          "import": {
+            "account": {
+              "success": "< br / > {}, account {} imported successfully"
+            },
+            "success": "Congratulations, all the data have been imported successfully! The data are as follows:"
+          },
+          "update": {
+            "account": {
+              "success": "< br / > {}, account {} updated successfully"
+            }
+          }
+        },
+        "rowcount": "The%sline"
+      }
+    }
+  },
+  "dispatchSheet": {},
+  "document": {},
+  "login": {
+    "title": "Login Form",
+    "logIn": "Log in",
+    "logIning": "Log in ...",
+    "register": "register",
+    "username": "Username",
+    "password": "Password",
+    "code": "verification code",
+    "inputUsername": "Please enter your username",
+    "inputPassword": "Please enter your password",
+    "inputCode": "Please enter a verification code",
+    "remember": "remember"
+  },
+  "page1": {
+    "title": "Page1",
+    "name": "Page1",
+    "desc": "This is page1"
+  },
+  "settings": {
+    "title": "Page style setting",
+    "theme": "Theme Color",
+    "tagsView": "Open Tags-View",
+    "fixedHeader": "Fixed Header",
+    "sidebarLogo": "Sidebar Logo"
+  },
+  "tagsView": {
+    "refresh": "Refresh",
+    "close": "Close",
+    "closeOthers": "Close Others",
+    "closeAll": "Close All"
+  }
+}

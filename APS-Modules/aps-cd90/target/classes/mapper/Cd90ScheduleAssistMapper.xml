@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd90.mapper.Cd90ScheduleAssistMapper">
+
+    <resultMap type="com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleAssist" id="Cd90ScheduleAssistResult">
+        <result property="id" column="id"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="clothCode" column="cloth_code"/>
+        <result property="unitConsume" column="unit_consume"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="stockQty" column="stock_qty"/>
+        <result property="supplyTime" column="supply_time"/>
+        <result property="dayPlanQty" column="day_plan_qty"/>
+        <result property="dayFinishQty" column="day_finish_qty"/>
+        <result property="dayProduceOrder" column="day_produce_order"/>
+        <result property="dayFinishRate" column="day_finish_rate"/>
+        <result property="daySysAnalysis" column="day_sys_analysis"/>
+        <result property="dayHandAnalysis" column="day_hand_analysis"/>
+        <result property="nightPlanQty" column="night_plan_qty"/>
+        <result property="nightFinishQty" column="night_finish_qty"/>
+        <result property="nightProduceOrder" column="night_produce_order"/>
+        <result property="nightFinishRate" column="night_finish_rate"/>
+        <result property="nightSysAnalysis" column="night_sys_analysis"/>
+        <result property="nightHandAnalysis" column="night_hand_analysis"/>
+        <result property="cxClass1Plan" column="cx_class1_plan"/>
+        <result property="cxClass2Plan" column="cx_class2_plan"/>
+        <result property="cxClass3Plan" column="cx_class3_plan"/>
+        <result property="cxClass4Plan" column="cx_class4_plan"/>
+        <result property="cxClass5Plan" column="cx_class5_plan"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="dataSource" column="data_source"/>
+    </resultMap>
+
+    <sql id="selectCd90ScheduleAssistVo">
+        select id, schedule_date, cx_batch_no, batch_no, order_no, big_roll_code, cloth_code, unit_consume, machine_id, stock_qty, supply_time, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_cd90_assist_schedule
+    </sql>
+
+    <sql id="column">
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.cloth_code, a.unit_consume, a.machine_id, a.stock_qty, a.supply_time, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time, a.mark_close_out_tip, a.production_status,a.data_source,
+    </sql>
+
+    <select id="selectCd90ScheduleAssistList" parameterType="com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleAssist"
+            resultType="com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleAssist">
+        select * from (
+            select
+                <include refid="column"/>
+                (NVL(day_plan_qty, 0) + NVL(night_plan_qty, 0)) as daily_total_qty,
+                b.MONTH_PLAN_QTY as month_plan,
+                CEIL(b.MONTH_REMAIN_QTY) as month_plan_os
+            from t_cd90_assist_schedule a
+            LEFT JOIN (
+                SELECT MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY
+                FROM T_CD90_MONTH_PLAN_SURPLUS
+                WHERE del_flag='0'
+                and YEAR=#{year,jdbcType=VARCHAR}
+                and MONTH=#{month,jdbcType=VARCHAR}
+            ) b on a.CLOTH_CODE=b.MATERIAL_CODE
+            where a.del_flag='0'
+            <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate,jdbcType=DATE}</if>
+            <if test="bigRollCode != null  and bigRollCode != ''">
+                and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="clothCode != null  and clothCode != ''">
+                and INSTR(a.cloth_code, #{clothCode,jdbcType=VARCHAR}) > 0
+            </if>
+            <if test="machineId != null  and machineId != ''">and instr(','||a.machine_id||',', ','||#{machineId}||',')>0</if>
+            <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
+            order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,
+            a.big_roll_code,a.cloth_code asc
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+</mapper>

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.mapper.XwyyBigRollRubberCarRelationMapper">
+
+    <sql id="selectXwyyBigRollRubberCarRelationVo">
+        select id, big_roll_code, rubber_code,car_number, del_flag, create_by, create_time, update_by, update_time, remark from T_XWYY_BG_RUB_CAR_RELATION
+    </sql>
+
+    <resultMap type="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation" id="XwyyBigRollRubberCarRelationResult">
+        <result property="id" column="id"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="rubberCode" column="rubber_code"/>
+        <result property="carNumber" column="car_number"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectXwyyBigRollRubberCarRelationList" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation"
+            resultMap="XwyyBigRollRubberCarRelationResult">
+
+        <include refid="selectXwyyBigRollRubberCarRelationVo"/>
+        <where>
+         DEL_FLAG = 0
+        <if test="bigRollCode != null and bigRollCode != ''">
+            and INSTR(big_roll_code, #{bigRollCode, jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="rubberCode != null and rubberCode != ''">
+            and INSTR(rubber_code, #{rubberCode, jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+        </where>
+
+    </select>
+
+    <select id="selectXwyyBigRollRubberCarRelationById" parameterType="Long" resultMap="XwyyBigRollRubberCarRelationResult">
+        <include refid="selectXwyyBigRollRubberCarRelationVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertXwyyBigRollRubberCarRelation" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_XWYY_BG_RUB_CAR_RELATION.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into T_XWYY_BG_RUB_CAR_RELATION
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="bigRollCode != null">big_roll_code,</if>
+            <if test="rubberCode != null">rubber_code,</if>
+            <if test="carNumber != null">car_number,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="bigRollCode != null">#{bigRollCode},</if>
+            <if test="rubberCode != null">#{rubberCode},</if>
+            <if test="carNumber != null">#{carNumber},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateXwyyBigRollRubberCarRelation" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation">
+        update T_XWYY_BG_RUB_CAR_RELATION
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="bigRollCode != null">big_roll_code = #{bigRollCode},</if>
+            <if test="rubberCode != null">rubber_code = #{rubberCode},</if>
+            <if test="carNumber != null">car_number = #{carNumber},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteXwyyBigRollRubberCarRelationById" parameterType="Long">
+        update T_XWYY_BG_RUB_CAR_RELATION
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <select id="checkXwyyBigRollRubberCarRelationUnique" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation"
+            resultType="int">
+        select count(1) from T_XWYY_BG_RUB_CAR_RELATION
+        where del_flag = 0
+        <if test="id != null and id != ''">and id != #{id}</if>
+        <if test="bigRollCode != null  and bigRollCode != ''">and big_roll_code = #{bigRollCode}</if>
+    </select>
+
+
+    <delete id="deleteXwyyBigRollRubberCarRelationByIds" parameterType="String">
+        update T_XWYY_BG_RUB_CAR_RELATION set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_XWYY_BG_RUB_CAR_RELATION a USING (
+        <foreach collection="list" item="bigRollRubberCarRelation" separator=" union ">
+            select
+            #{bigRollRubberCarRelation.bigRollCode,jdbcType=VARCHAR} big_roll_code,
+            #{bigRollRubberCarRelation.rubberCode,jdbcType=VARCHAR} rubber_code,
+            #{bigRollRubberCarRelation.carNumber,jdbcType=VARCHAR} car_number,
+            #{bigRollRubberCarRelation.createBy,jdbcType=VARCHAR} create_by,
+            #{bigRollRubberCarRelation.createTime,jdbcType=DATE} create_time,
+            #{bigRollRubberCarRelation.updateBy,jdbcType=VARCHAR} update_by,
+            #{bigRollRubberCarRelation.updateTime,jdbcType=DATE} update_time,
+            #{bigRollRubberCarRelation.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.big_roll_code = b.big_roll_code
+        AND a.del_flag = '0'
+        )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.rubber_code = b.rubber_code,
+        a.car_number = b.car_number,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.big_roll_code ,
+        a.rubber_code,
+        a.car_number,
+        a.create_by ,
+        a.create_time ,
+        a.remark, a.del_flag
+        ) values
+        (SEQ_XWYY_BG_RUB_CAR_RELATION.NEXTVAL,
+        b.big_roll_code ,
+        b.rubber_code,
+        b.car_number,
+        b.create_by,
+        sysdate,
+        b.remark, '0'
+        )
+    </update>
+
+    <select id="selectByBigRollCode" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation"
+            resultMap="XwyyBigRollRubberCarRelationResult">
+        <include refid="selectXwyyBigRollRubberCarRelationVo"/>
+        where DEL_FLAG = 0
+        <if test="bigRollCode != null and bigRollCode != ''">
+            and big_roll_code = #{bigRollCode, jdbcType=VARCHAR}
+        </if>
+    </select>
+</mapper>

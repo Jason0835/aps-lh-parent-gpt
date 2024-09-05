@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('工序导出日志管理')" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.export.functionName}]]：
+                            <input type="text" name="functionName"/>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.export.fileName}]]：
+                            <input type="text" name="fileName"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var prefix = ctx + "tc/exportLogManagement";
+    var PROCEDURE_CODE = [[${@dict.getType('PROCEDURE_CODE')}]];
+
+    $(function() {
+        var options = {
+            url: prefix + "/list",
+            modalName: [[#{ui.data.column.tc.export.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: '主键ID',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'procedureCode',
+                    title: [[#{ui.data.column.export.procedureCode}]],
+                    halign:'center',
+                    align: 'center',
+                    sortable: true,
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(PROCEDURE_CODE, row.procedureCode);
+                    },
+                },
+                {
+                    field: 'functionCode',
+                    halign:'center',
+                    align: 'center',
+                    title: [[#{ui.data.column.export.functionCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'functionName',
+                    halign:'center',
+                    align: 'center',
+                    title: [[#{ui.data.column.export.functionName}]],
+                    sortable: true,
+                },
+                {
+                    field: 'exportParams',
+                    title: [[#{ui.data.column.export.exportParams}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'fileName',
+                    halign:'center',
+                    align: 'left',
+                    title: [[#{ui.data.column.export.fileName}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a href="javascript:void(0)" onclick="downloadFile(\'' +value+'\',\'' +row.fileUrl+'\')">' + value + '</a> ');
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'fileUrl',
+                    title: [[#{ui.data.column.export.fileUrl}]],
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'createBy',
+                    halign:'center',
+                    align: 'center',
+                    title: [[#{ui.data.column.export.createBy}]],
+                    sortable: true,
+                },
+                {
+                    field: 'createTime',
+                    halign:'center',
+                    align: 'center',
+                    title: [[#{ui.data.column.export.createTime}]],
+                    sortable: true,
+                },
+                // {
+                //     field: 'remark',
+                //     title: [[#{ui.common.column.remark}]],
+                //     formatter:function (value, row, index) {
+                //         return $.table.tooltip(value);
+                //     },
+                // }
+            ]
+        };
+        $.table.init(options);
+    });
+    function downloadFile(name,url){
+        window.location.href = prefix + "/download?name="+name+"&&url="+url;
+    }
+</script>
+</body>
+</html>

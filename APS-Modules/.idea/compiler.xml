@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="aps-tq" />
+        <module name="aps-cd15" />
+        <module name="aps-gdyy" />
+        <module name="aps-tc" />
+        <module name="aps-tm" />
+        <module name="aps-jl" />
+        <module name="aps-cx" />
+        <module name="aps-gsq" />
+        <module name="aps-xwyy" />
+        <module name="aps-cd90" />
+        <module name="aps-nc" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="aps-cd15" target="1.8" />
+      <module name="aps-cd90" target="1.8" />
+      <module name="aps-cx" target="1.8" />
+      <module name="aps-gdyy" target="1.8" />
+      <module name="aps-gsq" target="1.8" />
+      <module name="aps-jl" target="1.8" />
+      <module name="APS-Modules" target="1.8" />
+      <module name="aps-nc" target="1.8" />
+      <module name="aps-tc" target="1.8" />
+      <module name="aps-tm" target="1.8" />
+      <module name="aps-tq" target="1.8" />
+      <module name="aps-xwyy" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

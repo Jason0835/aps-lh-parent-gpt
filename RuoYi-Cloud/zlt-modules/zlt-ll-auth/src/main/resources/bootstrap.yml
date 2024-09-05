@@ -1,0 +1,69 @@
+# Tomcat
+server: 
+  port: 9200
+
+nacos:
+  server-addr: 127.0.0.1:8848
+#  server-addr: 192.168.2.93:8848
+  run-group: DEFAULT_GROUP
+  cfg-group: DEFAULT_GROUP
+  run-namespace: ""
+  cfg-namespace: ""
+
+#系统标识
+project:
+  project-tag: aps
+  system-tag: llauth_aps
+
+#需要的语言包
+i18n_msg:
+  baseName: i18n/messages,i18n/ValidationMessages,i18n/authMessages,i18n/apiMessages,i18n/commonMessages,i18n/llAuthMsg
+
+#域登录接口ip和端口
+dc:
+  switch: false #ad域登录的开关（开关为true，增登录验证通过ad域接口在客户系统那校验是否登录成功。如果开关为false，则不进行ad域接口校验，默认都登录成功，fasel主要用来开发和测试环境）
+  head: zlt
+  tail: com
+  domain:
+    service:
+      ip: 192.168.2.104
+      port: 389
+
+# Spring
+spring:
+  application:
+    # 应用名称
+    name: ruoyi-auth
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.run-group}
+        namespace: ${nacos.run-namespace}
+      config:
+        # 配置中心地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.cfg-group}
+        namespace: ${nacos.cfg-namespace}
+        # 配置文件格式
+        file-extension: yml
+
+        # 共享配置
+        shared-configs:
+          - data-id: application-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: druid_${project.system-tag}_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-frame-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: zipkin-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: seata-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+        refresh-enabled: true

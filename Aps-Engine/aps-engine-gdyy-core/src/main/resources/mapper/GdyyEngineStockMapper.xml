@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineStockMapper">
+	<!-- 查询计算钢带压延库存量 -->
+    <select id="selectGdyyStockQty" resultType="com.zlt.aps.gdyy.engine.vo.GdyyStockVo">
+	    SELECT MATERIAL_CODE BIG_ROLL_CODE /*钢压大卷编号*/,
+		       CASE
+		         WHEN (nvl(STOCK_NUM, 0) + nvl(MODIFY_NUM, 0) - nvl(BAD_NUM, 0)) * #{stockLossRate} > 0 THEN
+		          (nvl(STOCK_NUM, 0) + nvl(MODIFY_NUM, 0) - nvl(BAD_NUM, 0)) * #{stockLossRate}
+		         ELSE
+		          0
+		       END STOCK_QTY /*库存量，不能小于0*/,
+		       NVL(STOCK_ROLL_NUM, 0) STOCK_ROLL_QTY /*大卷库存量*/
+		  FROM T_GDYY_STOCK S
+		 WHERE STOCK_DATE = #{scheduleDate} - 1	/*库存要取排产日上一天的*/
+		   AND S.DEL_FLAG = '0'
+    </select>
+    
+    <!-- 查询计算15度裁断预计库存的相关信息 -->
+    <select id="selectCd15Stock" resultType="com.zlt.aps.gdyy.engine.vo.GdyyStockVo">
+    	SELECT CI.ARTICLE_CROWN_SPEC BIG_ROLL_CODE,
+    	       nvl(SUM(S.STOCK_QTY * CI.BELT_CRAFT), 0) STOCK_QTY
+    	  FROM (
+				SELECT S.MATERIAL_CODE,
+				       CASE
+				         WHEN (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) +
+				              NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} > NVL(T.USE_NUM, 0) THEN
+				          (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) + NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} -
+				          NVL(T.USE_NUM, 0)
+				         ELSE
+				          0
+				       END STOCK_QTY /*16点半部件库存量 公式：(库存量 - 不良数 + 修正数) - 预计消耗量，不能小于0*/
+				  FROM T_CD15_STOCK S
+				  LEFT JOIN (
+				  		SELECT BELT_CODE BELT_CODE,
+				               SCHEDULE_DATE,
+				               SUM(CLASS3_PLANNED_QTY * UNIT_CONSUME) USE_NUM /*12点后半部件预计消耗量， 公式：（前日成型三班计划量 - 12点成型完成量) * 单耗*/
+				          FROM (SELECT CI.BELT_CODE1 BELT_CODE, /*1#钢带编号*/
+				                       R.EMBRYO_CODE,
+		                               CASE
+		                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
+		                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+		                                 ELSE
+		                                   0
+		                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
+				                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) UNIT_CONSUME,	/*单耗*/
+				                       R.SCHEDULE_DATE
+				                  FROM (
+					                  	SELECT r.SCHEDULE_DATE, 
+					                  	       r.EMBRYO_CODE, 
+					                  	       r.BOM_DATA_VERSION,
+					                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+					                  	  FROM T_CX_SCHEDULE_RESULT r
+					                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
+					                  	   AND r.DEL_FLAG = '0'
+					                  	 GROUP BY r.SCHEDULE_DATE, 
+					                  	          r.EMBRYO_CODE,
+					                  	          r.BOM_DATA_VERSION
+					                  ) R
+				                  LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
+				                    ON R.EMBRYO_CODE = CI.EMBRYO_CODE
+				                   AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+							   <if test="isProductStage">
+								   /* 仅对投产阶段的规格排产 */
+								   AND CI.PRODUCTION_STAGE = '0'
+							   </if>
+				                  LEFT JOIN T_CX_PART_FINISH_QTY F
+				                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
+				                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
+				                   AND F.DEL_FLAG = '0'
+				                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
+				                 WHERE CI.DEL_FLAG = '0'
+				                 UNION
+				                SELECT CI.BELT_CODE2 BELT_CODE, /*1#钢带编号*/
+				                       R.EMBRYO_CODE,
+		                               CASE
+		                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
+		                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+		                                 ELSE
+		                                   0
+		                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
+				                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) UNIT_CONSUME,	/*单耗*/
+				                       R.SCHEDULE_DATE
+				                  FROM (
+					                  	SELECT r.SCHEDULE_DATE, 
+					                  	       r.EMBRYO_CODE, 
+					                  	       r.BOM_DATA_VERSION,
+					                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+					                  	  FROM T_CX_SCHEDULE_RESULT r
+					                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
+					                  	   AND r.DEL_FLAG = '0'
+					                  	 GROUP BY r.SCHEDULE_DATE, 
+					                  	          r.EMBRYO_CODE,
+					                  	          r.BOM_DATA_VERSION
+					                  ) R
+				                  LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
+				                    ON R.EMBRYO_CODE = CI.EMBRYO_CODE
+				                   AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+							   <if test="isProductStage">
+								   /* 仅对投产阶段的规格排产 */
+								   AND CI.PRODUCTION_STAGE = '0'
+							   </if>
+				                  LEFT JOIN T_CX_PART_FINISH_QTY F
+				                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
+				                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
+				                   AND F.DEL_FLAG = '0'
+				                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
+				                 WHERE CI.DEL_FLAG = '0'
+				                 )
+				         GROUP BY BELT_CODE,
+				                  SCHEDULE_DATE) T
+				    ON S.MATERIAL_CODE = T.BELT_CODE
+				 WHERE S.DEL_FLAG = '0'
+				   AND S.STOCK_DATE = #{scheduleDate} - 1
+				    ) S
+				  LEFT JOIN (
+				  		SELECT CI.BELT_CODE1,
+						       AVG(nvl(CI.belt_craft1, 0)) / 1000 / #{breadth} BELT_CRAFT,
+						       MAX(ARTICLE_CROWN_SPEC) ARTICLE_CROWN_SPEC
+						  FROM T_PRODUCT_CONSTRUCTION_INFO CI
+						 WHERE CI.DEL_FLAG = '0'
+						 GROUP BY BELT_CODE1
+						 UNION
+				  		SELECT CI.BELT_CODE2,
+						       AVG(nvl(CI.belt_craft2, 0)) / 1000 / #{breadth} BELT_CRAFT,
+						       MAX(ARTICLE_CROWN_SPEC) ARTICLE_CROWN_SPEC
+						  FROM T_PRODUCT_CONSTRUCTION_INFO CI
+						 WHERE CI.DEL_FLAG = '0'
+						 GROUP BY BELT_CODE2
+						 ) CI
+		    ON CI.BELT_CODE1 = S.MATERIAL_CODE
+		 GROUP BY CI.ARTICLE_CROWN_SPEC
+    </select>
+    
+	<!-- 查询15度裁断的参数配置，用于处理15度裁断的库存 -->
+    <select id="listCd15Params" resultType="com.zlt.aps.gdyy.engine.vo.GdyyParamsVo">
+        select param_code, param_value
+        from T_CD15_PARAMS
+        where DEL_FLAG = '0'
+          and param_code = #{paramCode}
+    </select>
+    
+    <!-- 查询当天的收尾规格 -->
+    <select id="listCloseOutSpec" resultType="String">
+	    SELECT CI.ARTICLE_CROWN_SPEC BIG_ROLL_CODE /*帘线规格*/
+	      FROM T_CX_SCHEDULE_RESULT R
+	     INNER JOIN T_PRODUCT_CONSTRUCTION_INFO CI
+	        ON R.EMBRYO_CODE = CI.EMBRYO_CODE
+	       AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+	     INNER JOIN T_GDYY_PARAMS P
+	        ON P.PARAM_CODE = 'CLOSE_OUT_SPEC_REMARK'
+	       AND P.DEL_FLAG = '0'
+	       AND P.PARAM_VALUE IS NOT NULL
+	     WHERE R.SCHEDULE_DATE = #{scheduleDate}
+	       AND R.DEL_FLAG = '0'
+	       AND CI.DEL_FLAG = '0'
+		<if test="isProductStage">
+	          /* 仅对投产阶段的规格排产 */
+	       AND CI.PRODUCTION_STAGE = '0'
+		</if>
+	       AND NOT EXISTS
+	     (SELECT 1
+	              FROM T_CX_SCHEDULE_RESULT R2
+	              LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI2
+	                ON R2.EMBRYO_CODE = CI2.EMBRYO_CODE
+	               AND R2.BOM_DATA_VERSION = CI2.EMBRYO_VERSION
+	             WHERE R2.SCHEDULE_DATE = R.SCHEDULE_DATE
+	               AND CI2.ARTICLE_CROWN_SPEC = CI.ARTICLE_CROWN_SPEC
+	               AND R2.DEL_FLAG = '0'
+	               AND CI2.DEL_FLAG = '0'
+		<if test="isProductStage">
+	                  /* 仅对投产阶段的规格排产 */
+	               AND CI2.PRODUCTION_STAGE = '0'
+		</if>
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
+	         GROUP BY CI.ARTICLE_CROWN_SPEC
+    </select>
+</mapper>

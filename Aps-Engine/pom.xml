@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>ruoyi</artifactId>
+        <groupId>com.ruoyi</groupId>
+        <version>2.2.2-SNAPSHOT</version>
+    </parent>
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.zlt.aps</groupId>
+    <artifactId>aps-engine</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>aps-engine-tm-core</module>
+        <module>aps-engine-cd15-core</module>
+        <module>aps-engine-cd90-core</module>
+        <module>aps-engine-cx-core</module>
+        <module>aps-engine-gdyy-core</module>
+        <module>aps-engine-gsq-core</module>
+        <module>aps-engine-lh-core</module>
+        <module>aps-engine-nc-core</module>
+        <module>aps-engine-tc-core</module>
+        <module>aps-engine-tq-core</module>
+        <module>aps-engine-xwyy-core</module>
+        <module>aps-engine-tm</module>
+        <module>aps-engine-lh</module>
+        <module>aps-engine-cx</module>
+        <module>aps-engine-tc</module>
+        <module>aps-engine-nc</module>
+        <module>aps-engine-cd15</module>
+        <module>aps-engine-cd90</module>
+        <module>aps-engine-gdyy</module>
+        <module>aps-engine-xwyy</module>
+        <module>aps-engine-tq</module>
+        <module>aps-engine-gsq</module>
+    </modules>
+</project>

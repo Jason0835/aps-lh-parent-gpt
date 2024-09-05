@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper">
+
+    <select id="listTwiningDisc" parameterType="com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto" resultType="com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto">
+        select * from (
+        select sm.*, m.machine_code, m.machine_name
+        from T_GSQ_TWINING_DISC sm
+        left join T_GSQ_MACHINE_INFO m on sm.machine_id = m.id
+        where sm.DEL_FLAG = 0
+        and m.DEL_FLAG = 0
+        <if test="serialNumber != null and serialNumber != ''">
+            and INSTR(SERIAL_NUMBER, #{serialNumber}) > 0
+        </if>
+        <if test="orderWay != null and orderWay != ''">
+            and INSTR(order_way, #{orderWay}) > 0
+        </if>
+        <if test="name != null and name != ''">
+            AND instr(name, #{name} )>0
+        </if>
+        <if test="machineId != null">
+            AND MACHINE_ID = #{machineId}
+        </if>
+        <if test="orderStr == null">
+            order by sm.create_time desc
+        </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+
+    </select>
+
+    <update id="updateTGsqTwiningDisc" parameterType="com.zlt.aps.gsq.entity.GsqTwiningDisc">
+        update t_gsq_twining_disc
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serialNumber != null">serial_number = #{serialNumber},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="seq != null">seq = #{seq},</if>
+            <if test="purpose != null">purpose = #{purpose},</if>
+            <if test="spec != null">spec = #{spec},</if>
+            <if test="orderWay != null">order_way = #{orderWay},</if>
+            twining_num = #{twiningNum,jdbcType=DECIMAL},
+            in_time = #{inTime,jdbcType=DATE},
+            scrap_time = #{scrapTime,jdbcType=DATE},
+            <if test="scrapReason != null">scrap_reason = #{scrapReason},</if>
+            <if test="machineId != null">machine_id = #{machineId},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_GSQ_TWINING_DISC a USING (
+        <foreach collection="list" item="twiningDisc" separator=" union ">
+            select
+            #{twiningDisc.serialNumber,jdbcType=VARCHAR} serial_number,
+            #{twiningDisc.name,jdbcType=VARCHAR} name,
+            #{twiningDisc.seq,jdbcType=DOUBLE} seq,
+            #{twiningDisc.purpose,jdbcType=VARCHAR} purpose,
+            #{twiningDisc.spec,jdbcType=VARCHAR} spec,
+            #{twiningDisc.orderWay,jdbcType=VARCHAR} order_way,
+            #{twiningDisc.twiningNum,jdbcType=DOUBLE} twining_num,
+            #{twiningDisc.inTime,jdbcType=DATE} in_time,
+            #{twiningDisc.scrapTime,jdbcType=DATE} scrap_time,
+            #{twiningDisc.scrapReason,jdbcType=VARCHAR} scrap_reason,
+            #{twiningDisc.machineId,jdbcType=DOUBLE} machine_id,
+            #{twiningDisc.createBy,jdbcType=VARCHAR} create_by,
+            #{twiningDisc.createTime,jdbcType=DATE} create_time,
+            #{twiningDisc.updateBy,jdbcType=VARCHAR} update_by,
+            #{twiningDisc.updateTime,jdbcType=DATE} update_time,
+            #{twiningDisc.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.serial_number = b.serial_number
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.name = b.name,
+        a.seq = b.seq,
+        a.purpose = b.purpose,
+        a.spec = b.spec,
+        a.order_way = b.order_way,
+        a.twining_num = b.twining_num,
+        a.in_time = b.in_time,
+        a.scrap_time = b.scrap_time,
+        a.scrap_reason = b.scrap_reason,
+        a.machine_id = b.machine_id,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id,
+        a.name,
+        a.seq,
+        a.purpose,
+        a.spec,
+        a.order_way,
+        a.twining_num,
+        a.in_time,
+        a.scrap_time,
+        a.scrap_reason,
+        a.machine_id,
+        a.update_by,
+        a.update_time,
+        a.remark,
+        a.del_flag
+        ) values
+        (SEQ_PUBLIC.NEXTVAL,
+        b.name,
+        b.seq,
+        b.purpose,
+        b.spec,
+        b.order_way,
+        b.twining_num,
+        b.in_time,
+        b.scrap_time,
+        b.scrap_reason,
+        b.machine_id,
+        b.create_by,
+        sysdate,
+        b.remark,
+        '0'
+        )
+    </update>
+
+
+    <update id="deleteAll">
+        update t_gsq_twining_disc set del_flag = '1' where del_flag = '0'
+    </update>
+</mapper>

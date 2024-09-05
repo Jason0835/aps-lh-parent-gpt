@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.mapper.GdyyQuotaSettingMapper">
+
+    <resultMap type="com.zlt.aps.gdyy.api.domain.dto.GdyyQuotaSettingDto" id="quotaSettingResult">
+        <result property="id" column="id"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="quota" column="quota"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectGdyyQuotaSettingVo">
+        select id, big_roll_code, quota, create_by, create_time, update_by, update_time, del_flag, remark from t_gdyy_quota_setting
+    </sql>
+
+    <select id="selectQuotaSettingList" parameterType="com.zlt.aps.gdyy.entity.GdyyQuotaSetting"
+            resultMap="quotaSettingResult">
+        <include refid="selectGdyyQuotaSettingVo"/>
+        WHERE del_flag = '0'
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0</if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectQuotaSettingById" parameterType="Long" resultMap="quotaSettingResult">
+        <include refid="selectGdyyQuotaSettingVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.gdyy.entity.GdyyQuotaSetting" resultMap="quotaSettingResult">
+        <include refid="selectGdyyQuotaSettingVo"/>
+        where del_flag = '0'
+        <if test="id != null and id != ''">and id != #{id}</if>
+        <if test="bigRollCode == null or bigRollCode == ''">and big_roll_code is null</if>
+        <if test="bigRollCode != null  and bigRollCode != ''">and big_roll_code = #{bigRollCode}</if>
+    </select>
+
+    <delete id="deleteQuotaSettingByIds" parameterType="long">
+        update t_gdyy_quota_setting set del_flag = 1 where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_gdyy_quota_setting a USING (
+        <foreach collection="list" item="QuotaSetting" separator=" union ">
+            select
+            #{QuotaSetting.bigRollCode,jdbcType=VARCHAR} big_roll_code,
+            #{QuotaSetting.quota,jdbcType=DOUBLE} quota,
+            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
+            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
+            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
+            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        ((b.big_roll_code is null and a.big_roll_code is null) or (a.big_roll_code = b.big_roll_code))
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.quota = b.quota,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.big_roll_code, a.quota, a.create_by, a.create_time, a.remark, a.del_flag) values
+        (SEQ_QUOTA_SETTING.NEXTVAL, b.big_roll_code, b.quota, b.create_by, sysdate, b.remark, '0')
+    </update>
+</mapper>

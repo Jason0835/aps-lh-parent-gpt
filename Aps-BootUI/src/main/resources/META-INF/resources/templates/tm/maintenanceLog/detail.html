@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+	<th:block th:include="include :: header('操作日志详细')" />
+</head>
+<body class="white-bg">
+	<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+	<form class="form-horizontal m-t" id="signupForm" >
+		<input type="hidden" id="hidProcedure" th:value="${logDetail.procedureCode}" />
+		<h4 class="form-header h4" style="font-size: 13px;margin-bottom: 10px;margin-top: 0px;">[[#{ui.data.column.maintenance.log.baseInfo}]]</h4>
+		<div class="form-group">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.operType}]]：</label>
+			<div class="form-control-static" th:text="${@dict.getLabel('MAINTENANCE_OPER_TYPE',logDetail.operType)}"></div>
+
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.createBy}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.createBy}"></div>
+
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.createTime}]]：</label>
+			<div class="form-control-static" th:text="${#dates.format(logDetail.createTime,'yyyy-MM-dd HH:mm:ss')}"></div>
+
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.operStatus}]]：</label>
+			<div class="form-control-static" th:text="${@dict.getLabel('sys_runtime_status',logDetail.operStatus)}"></div>
+		</div>
+
+		<h4 class="form-header h4" style="font-size: 13px;margin-bottom: 10px;margin-top: 0px;">[[#{ui.data.column.maintenance.log.params}]]</h4>
+		<span th:if="${not #strings.isEmpty(logDetail.procedureCode)}">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.procedureCode}]]：</label>
+			<div class="form-control-static" th:text="${@dict.getLabel('PROCEDURE_CODE',logDetail.procedureCode)}"></div>
+		</span>
+
+		<span th:if="${not #strings.isEmpty(logDetail.scheduleDate)}">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.scheduleDate}"></div>
+		</span>
+
+		<span th:if="${not #strings.isEmpty(logDetail.sapCode)}">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.sap}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.sapCode}"></div>
+		</span>
+
+		<span th:if="${not #strings.isEmpty(logDetail.materialCode)}">
+			<label id="materialLabel" class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.material}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.materialCode}"></div>
+		</span>
+
+		<span th:if="${not #strings.isEmpty(logDetail.machineName)}">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.machine}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.machineName}"></div>
+		</span>
+
+		<span th:if="${not #strings.isEmpty(logDetail.operReason)}">
+			<label class="col-sm-2 control-label">[[#{ui.data.column.maintenance.log.operReason}]]：</label>
+			<div class="form-control-static" th:text="${logDetail.operReason}"></div>
+		</span>
+
+	</form>
+    </div>
+    <th:block th:include="include :: footer" />
+
+<script>
+	$(function () {
+		var procedureCode = $("#hidProcedure").val();
+		if(procedureCode == "0" || procedureCode == "1") {
+			$("#materialLabel").text("胎胚代码：");
+		} else if(procedureCode == "2") {
+			$("#materialLabel").text("胎面代码：");
+		} else if(procedureCode == "3") {
+			$("#materialLabel").text("胎侧代码：");
+		} else if(procedureCode == "4") {
+			$("#materialLabel").text("内衬代码：");
+		} else if(procedureCode == "5") {
+			$("#materialLabel").text("胎圈代码：");
+		} else if(procedureCode == "6") {
+			$("#materialLabel").text("钢丝圈代码：");
+		} else if(procedureCode == "7") {
+			$("#materialLabel").text("1#钢带代码：");
+		} else if(procedureCode == "8") {
+			$("#materialLabel").text("帘布代码：");
+		} else if(procedureCode == "9") {
+			$("#materialLabel").text("钢压大卷代码：");
+		} else if(procedureCode == "10") {
+			$("#materialLabel").text("帘布大卷代码：");
+		}
+	});
+</script>
+</body>
+</html>

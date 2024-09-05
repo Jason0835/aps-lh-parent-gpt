@@ -1,0 +1,63 @@
+# Tomcat
+server:
+  port: 9066
+
+# 项目相关配置
+ruoyi:
+  # 实例演示开关
+  demoEnabled: false
+  # 获取ip地址开关
+  addressEnabled: true
+
+nacos:
+  server-addr: 192.168.3.112:9917,192.168.3.115:9917,192.168.3.122:9917
+#  server-addr: 127.0.0.1:8848
+
+spring:
+  redis:
+    sentinel:
+      master: zyaps_master
+      nodes: 192.168.3.112:28001,192.168.3.122:28001,192.168.3.115:28001
+    password: 0234kz9*l
+    database: 1
+  zipkin:
+    baseUrl: "http://192.168.3.111:9411/"
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        namespace: prod
+        group: APS_PROD_GROUP
+      config:
+        shared-configs[0]:
+          data-id: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          group: PROD_GROUP
+        shared-configs[1]:
+          data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          group: PROD_GROUP
+        refresh-enabled: true
+        namespace: prod
+        group: PROD_GROUP
+shiro:
+  #使用单点登录时，sso = true
+  sso:
+    #是否需要走单点
+    enable: false
+    cas: http://192.168.2.93:8899/cas  #接入cas后，需要修改
+    clientName: casClient
+    currentCas: apsl6.linglong.cn
+
+#网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
+gateway:
+  url: http://192.168.3.139:9588/
+  casUrl: http://192.168.2.93:8899/cas   #接入cas后，需要修改
+#导入文件是否需要解密
+fileEncrypt:
+  ll:
+    enabled: true
+#文件上传路径
+uploadFilePath:
+  exportFile: /app/aps/uploadFile/exportFile
+  importFile: /app/aps/uploadFile/importFile
+  imageFile: /app/aps/uploadFile/imageFile
+

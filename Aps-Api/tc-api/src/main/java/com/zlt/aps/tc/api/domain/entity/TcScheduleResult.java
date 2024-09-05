@@ -1,0 +1,322 @@
+package com.zlt.aps.tc.api.domain.entity;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.util.Date;
+import java.util.List;
+
+/**
+ * 胎侧排程结果对象 tc_schedule_result
+ *
+ * @author zlt
+ * @date 2021-06-21
+ */
+@ApiModel(value = "胎侧排程结果对象", description = "胎侧排程结果对象 ")
+@Data
+public class TcScheduleResult extends ApsBaseEntity {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键ID，对应自增序列为：SEQ_TC_SCHEDULE
+     */
+    @ApiModelProperty(value = "主键ID")
+    private Long id;
+
+    /**
+     * 排程日期
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd",timezone = "GMT+8")
+    @Excel(name = "ui.data.column.scheduleResult.scheduleDate", dateFormat = "yyyy-MM-dd")
+    @ImportValidated(required = true, date = true)
+    @ApiModelProperty(value = "排程日期")
+    private Date scheduleDate;
+
+    /**
+     * 对应的成型批次号
+     */
+    //@Excel(name = "对应的成型批次号")
+    @ApiModelProperty(value = "对应的成型批次号")
+    private String cxBatchNo;
+
+    /**
+     * 批次号，每重新生成一次排程结果，批次号就递增。规则：工序+年月日+3位定长自增序号
+     */
+    //@Excel(name = "批次号，每重新生成一次排程结果，批次号就递增。规则：工序+年月日+3位定长自增序号")
+    @ApiModelProperty(value = "批次号")
+    private String batchNo;
+
+    /**
+     * 工单号，自动生成（批次号+4位定长自增序号）
+     */
+    //@Excel(name = "工单号，自动生成", readConverterExp = "批=次号+4位定长自增序号")
+    @ApiModelProperty(value = "工单号")
+    private String orderNo;
+
+    /**
+     * 胎侧代码
+     */
+    @ImportValidated(required = true, maxLength = 20, isCode = true)
+    @Excel(name = "ui.data.column.quota.sidewallCode")
+    @ApiModelProperty(value = "胎侧代码")
+    private String sidewallCode;
+
+    /**
+     * 胶料代码
+     */
+    //@Excel(name = "胶料代码")
+    @ApiModelProperty(value = "胶料代码")
+    private String glueCode;
+
+    @ApiModelProperty(value = "胶料代码(完整没有截取的)")
+    private String wholeGlueCode;
+
+    /**
+     * 胶料序号
+     */
+    //@Excel(name = "胶料序号")
+    @ApiModelProperty(value = "胶料序号")
+    private String glueSeq;
+
+    /**
+     * 口型板代码
+     */
+    //@Excel(name = "口型板代码")
+    @ApiModelProperty(value = "口型板代码")
+    private String mouthPlateCode;
+
+    /**
+     * 单耗
+     */
+    //@Excel(name = "单耗")
+    @ApiModelProperty(value = "单耗")
+    private Double unitConsume;
+
+    /**
+     * 生产线(机台名称)
+     */
+    @ImportValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.scheduleResult.produceLine")
+    @ApiModelProperty(value = "生产线")
+    private String machineId;
+
+    /**
+     * 库存数量
+     */
+    //@Excel(name = "库存数量")
+    @ApiModelProperty(value = "库存数量")
+    private Double stockQty;
+
+    /**
+     * 库存供应成型时长，单位：小时
+     */
+    //@Excel(name = "库存供应成型时长，单位：小时")
+    @ApiModelProperty(value = "库存供应成型时长")
+    private Double supplyTime;
+
+    /**
+     * 当日日计划量合计
+     */
+    @Excel(name = "ui.data.column.scheduleResult.dailyTotalQty")
+    @ApiModelProperty(value = "当日日计划量合计")
+    private Double dailyTotalQty;
+
+    /**
+     * 中班(12点-24点)计划量
+     */
+    @ImportValidated(number = true, max = 9999999, min = 0, digits = true)
+    @Excel(name = "ui.data.column.scheduleResult.dayPlanQty.meter")
+    @ApiModelProperty(value = "中班(12点-24点)计划量")
+    private Double dayPlanQty;
+
+    /**
+     * 中班(12点-24点)完成量
+     */
+    //@Excel(name = "中班(12点-24点)完成量")
+    @ApiModelProperty(value = "中班(12点-24点)完成量")
+    private Double dayFinishQty;
+
+    /**
+     * 中班(12点-24点)生产顺序
+     */
+    //@Excel(name = "中班(12点-24点)生产顺序")
+    @ImportValidated(number = true,min = 0,max = 999999,isInteger = true)
+    @Excel(name = "ui.data.column.scheduleResult.dayProduceOrder")
+    @ApiModelProperty(value = "中班(12点-24点)生产顺序")
+    private Long dayProduceOrder;
+
+    /**
+     * 中班(12点-24点)完成率
+     */
+    //@Excel(name = "中班(12点-24点)完成率")
+    @ApiModelProperty(value = "中班(12点-24点)完成率")
+    private Double dayFinishRate;
+
+    /**
+     * 中班(12点-24点)系统原因分析
+     */
+    //@Excel(name = "中班(12点-24点)系统原因分析")
+    @ApiModelProperty(value = "中班(12点-24点)系统原因分析")
+    private String daySysAnalysis;
+
+    /**
+     * 中班(12点-24点)手动输入原因分析
+     */
+    @ImportValidated(maxLength = 100)
+    @Excel(name = "ui.data.column.scheduleResult.dayAnalysis")
+    @ApiModelProperty(value = "中班(12点-24点)手动输入原因分析")
+    private String dayHandAnalysis;
+
+    /**
+     * 夜班(0点-12点)计划量
+     */
+    @ImportValidated(number = true, min = 0, max = 9999999, digits = true)
+    @Excel(name = "ui.data.column.scheduleResult.nightPlanQty.meter")
+    @ApiModelProperty(value = "夜班(0点-12点)计划量")
+    private Double nightPlanQty;
+
+    /**
+     * 夜班(0点-12点)完成量
+     */
+    //@Excel(name = "夜班(0点-12点)完成量")
+    @ApiModelProperty(value = "夜班(0点-12点)完成量")
+    private Double nightFinishQty;
+
+    /**
+     * 夜班(0点-12点)生产顺序
+     */
+    @ImportValidated(number = true,min = 0,max = 999999,isInteger = true)
+    @Excel(name = "ui.data.column.scheduleResult.nightProduceOrder")
+    @ApiModelProperty(value = "夜班(0点-12点)生产顺序")
+    private Long nightProduceOrder;
+
+    /**
+     * 夜班(0点-12点)完成率
+     */
+    //@Excel(name = "夜班(0点-12点)完成率")
+    @ApiModelProperty(value = "夜班(0点-12点)完成率")
+    private Double nightFinishRate;
+
+    /**
+     * 夜班(0点-12点)系统原因分析
+     */
+    //@Excel(name = "夜班(0点-12点)系统原因分析")
+    @ApiModelProperty(value = "夜班(0点-12点)系统原因分析")
+    private String nightSysAnalysis;
+
+    /**
+     * 夜班(0点-12点)手动输入原因分析
+     */
+    @ImportValidated(maxLength = 100)
+    @Excel(name = "ui.data.column.scheduleResult.nightAnalysis")
+    @ApiModelProperty(value = "夜班(0点-12点)手动输入原因分析")
+    private String nightHandAnalysis;
+
+    @ApiModelProperty(value = "预计划", position = 44)
+    private Double prePlanQty;
+
+    /**
+     * 对应成型一班的计划量
+     */
+    //@Excel(name = "对应成型一班的计划量")
+    @ApiModelProperty(value = "对应成型一班的计划量")
+    private Double cxClass1Plan;
+
+    /**
+     * 对应成型二班的计划量
+     */
+    //@Excel(name = "对应成型二班的计划量")
+    @ApiModelProperty(value = "对应成型二班的计划量")
+    private Double cxClass2Plan;
+
+    /**
+     * 对应成型三班的计划量
+     */
+    //@Excel(name = "对应成型三班的计划量")
+    @ApiModelProperty(value = "对应成型三班的计划量")
+    private Double cxClass3Plan;
+
+    /**
+     * 对应成型次一班的计划量
+     */
+    @ApiModelProperty(value = "对应成型次一班的计划量")
+    private Double cxClass4Plan;
+
+    /**
+     * 对应成型次二班的计划量
+     */
+    @ApiModelProperty(value = "对应成型次二班的计划量")
+    private Double cxClass5Plan;
+
+    /**
+     * 删除标识：0--正常，1-删除
+     */
+    @ApiModelProperty(value = "对应成型次二班的计划量")
+    private String delFlag;
+
+    @ApiModelProperty(value = "月计划需求量")
+    private Double monthPlan;
+
+    @ApiModelProperty(value = "月计划剩余量")
+    private Double monthPlanOs;
+
+    private String year;
+
+    private String month;
+
+    private Long[] ids;
+
+    private String isRelease;
+
+    /**
+     * 供应时长查询条件
+     */
+    private transient Double supplyStartTime;
+    private transient Double supplyEndTime;
+
+    @Excel(name = "ui.data.column.stock.remark")
+    @ImportValidated(name = "ui.data.column.stock.remark", maxLength = 300)
+    private String remark;
+
+    @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
+    private String markCloseOutTip;
+
+    @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
+    private String dataSource;
+
+    @ApiModelProperty(value = "生产状态")
+    private String productionStatus;
+
+    @ApiModelProperty(value = "色值")
+    private String colorCode;
+
+    @ApiModelProperty(value = "颜色类型")
+    private String colorType;
+
+    @ApiModelProperty(value = "调度员是否修改了生产线，0：否，1：是")
+    private Integer changeMachine;
+
+    @ApiModelProperty(value = "调度员是否修改了中班计划量，0：否，1：是")
+    private Integer changeDayPlan;
+
+    @ApiModelProperty(value = "调度员是否修改了夜班计划量，0：否，1：是")
+    private Integer changeNightPlan;
+
+    @ApiModelProperty(value = "发布成功计数器，每点击一次发布并成功的话，计数器累加")
+    private Integer publishSuccessCount;
+
+    /**
+     * 最新发布时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "最新发布时间")
+    private Date newestPublishTime;
+
+    private transient List<Long> ids2;
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <th:block th:include="include :: header('日产量曲线图')" />
+</head>
+<body style="height: 100%; margin: 0">
+
+  <div id="container" style="height: 100%"></div>
+
+  <th:block th:include="include :: footer" />
+  <script type="text/javascript" src="/js/echarts.min.js"></script>
+  <script th:inline="javascript">
+
+      //获取渲染元素
+      var dom = document.getElementById('container');
+      const colors = ['#5470C6', '#91CC75', '#EE6666'];
+
+      //初始化echarts插件
+      var myChart = echarts.init(dom, null, {
+          renderer: 'canvas',
+          useDirtyRect: false
+      });
+
+      //初始化控件
+    $(function () {
+        //获取数据
+        var category = [[${date}]];
+        var lineData = [[${production}]];
+        var barData = [[${molds}]];
+        let lineDataMax = Math.max(lineData)+50;
+        let barDataMax = Math.max(barData)+10;
+
+        option = {
+            backgroundColor: "#0f375f",
+            tooltip: {
+                trigger: "axis",
+                axisPointer: {
+                    type: "shadow",
+                    label: {
+                        show: true,
+                        backgroundColor: "#fff",
+                    },
+                },
+            },
+            grid: {
+                right: '20%'
+            },
+            toolbox: {
+                feature: {
+                    dataView: { show: true, readOnly: false },
+                    restore: { show: true },
+                    saveAsImage: { show: true }
+                }
+            },
+            legend: {
+                data: ['日产量', '模具数量'],
+                textStyle: {
+                    color: "#ccc",
+                },
+            },
+            xAxis: [
+                {
+                    type: 'category',
+                    axisTick: {
+                        alignWithLabel: true
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: "#ccc",
+                        },
+                    },
+                    data: category
+                }
+            ],
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '日产量',
+                    position: 'left',
+                    alignTicks: true,
+                    splitLine: { show: false },
+                    axisLine: {
+                        lineStyle: {
+                            color: "#5470C6",
+                        },
+                    },
+                },
+                {
+                    type: 'value',
+                    name: '模具数量',
+                    position: 'right',
+                    alignTicks: true,
+                    splitLine: { show: false },
+                    axisLine: {
+                        lineStyle: {
+                            color: "#43eec6",
+                        },
+                    },
+                }
+            ],
+            series: [
+                {
+                    name: '日产量',
+                    type: 'line',
+                    smooth: true,
+                    showAllSymbol: true,
+                    symbol: "emptyCircle",
+                    symbolSize: 15,
+                    data: lineData,
+                },
+                {
+                    name: '模具数量',
+                    type: 'bar',
+                    yAxisIndex: 1,
+                    barWidth: 10,
+                    itemStyle: {
+                        normal: {
+                            barBorderRadius: 5,
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: "#14c8d4" },
+                                { offset: 1, color: "#43eec6" },
+                            ]),
+                        },
+                    },
+                    data: barData,
+                },
+                {
+                    name: "日产量",
+                    type: "bar",
+                    barGap: "-100%",
+                    barWidth: 10,
+                    itemStyle: {
+                        normal: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: "rgba(20,200,212,0.5)" },
+                                { offset: 0.2, color: "rgba(20,200,212,0.2)" },
+                                { offset: 1, color: "rgba(20,200,212,0)" },
+                            ]),
+                        },
+                    },
+                    z: -12,
+                    data: lineData,
+                    tooltip: {
+                        trigger: 'item'
+                    },
+                },
+                {
+                    name: "日产量",
+                    type: "pictorialBar",
+                    symbol: "rect",
+                    itemStyle: {
+                        normal: {
+                            color: "#0f375f",
+                        },
+                    },
+                    symbolRepeat: true,
+                    symbolSize: [12, 4],
+                    symbolMargin: 1,
+                    z: -10,
+                    data: lineData,
+                    tooltip: {
+                        trigger: 'item'
+                    },
+                },
+            ]
+        };
+
+        //设置myChart配置
+        if (option && typeof option === 'object') {
+            myChart.setOption(option);
+        }
+
+    });
+
+
+    window.addEventListener('resize', myChart.resize);
+
+  </script>
+</body>
+</html>

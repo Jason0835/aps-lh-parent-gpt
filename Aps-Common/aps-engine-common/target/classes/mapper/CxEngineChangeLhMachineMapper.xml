@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.CxEngineChangeLhMachineMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine" id="cxChangeLhMachineResult">
+        <result property="id"    column="id"    />
+        <result property="cxOrderNo"    column="CX_ORDER_NO"    />
+        <result property="scheduleDate"    column="SCHEDULE_DATE"    />
+        <result property="lhMachineCode"    column="LH_MACHINE_CODE"    />
+        <result property="changeType"    column="CHANGE_TYPE"    />
+        <result property="embryoStock"    column="EMBRYO_STOCK"    />
+        <result property="changeMoldTime"    column="CHANGE_MOLD_TIME"    />
+        <result property="useMoldNum"    column="USE_MOLD_NUM"    />
+        <result property="dataSource"    column="DATA_SOURCE"    />
+        <result property="remark"    column="remark"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine" id="cxChangeLhMachineNamesResult">
+        <result property="cxOrderNo"    column="CX_ORDER_NO"    />
+        <result property="lhMachineNames"    column="lh_MachineNames"    />
+    </resultMap>
+
+    <sql id="selectChangeLhMachineVO">
+        select id, CX_ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, CHANGE_TYPE, EMBRYO_STOCK,CHANGE_MOLD_TIME,USE_MOLD_NUM,DATA_SOURCE, remark, del_flag, create_by, create_time, update_by, update_time
+        from T_CX_CHANGE_LH_MACHINE
+    </sql>
+
+    <select id="listChangeLhMachineList" parameterType="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine" resultMap="cxChangeLhMachineResult">
+        <include refid="selectChangeLhMachineVO"/>
+        <where>
+             del_flag = 0
+            <if test="cxOrderNo != null  and cxOrderNo != ''">and CX_ORDER_NO = #{cxOrderNo}</if>
+            <if test="scheduleDate != null "> and  schedule_date = #{scheduleDate}</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="dataSource != null and dataSource!='' "> and  data_source = #{dataSource}</if>
+        </where>
+    </select>
+
+    <select id="splitCxOrderMachineList" parameterType="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine" resultMap="cxChangeLhMachineNamesResult">
+        select clm.cx_order_no,
+        regexp_replace(
+                        LISTAGG(lmi.machine_name, ',') WITHIN GROUP (ORDER BY lmi.machine_name),
+                        '([^,]+)(,\1)+','\1'
+                      ) lh_MachineNames
+        from t_cx_change_lh_machine clm
+          left join t_lh_machine_info lmi
+            on clm.lh_machine_code=lmi.machine_code
+        <where>
+            clm.del_flag='0'
+            and lmi.del_flag='0'
+            <if test="cxOrderNo != null  and cxOrderNo != ''">and clm.CX_ORDER_NO = #{cxOrderNo}</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  clm.schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="dataSource != null and dataSource!='' "> and  clm.data_source = #{dataSource}</if>
+        </where>
+        group by clm.cx_order_no
+    </select>
+
+    <!--Joran 2022-04-14 进行原有数据删除start-->
+    <delete id="deleteChangeLhMachineByScheduleDate">
+        update t_cx_change_lh_machine set del_flag='1'
+        <where>
+            del_flag='0'
+            <if test="cxOrderNo != null  and cxOrderNo != ''">and CX_ORDER_NO = #{cxOrderNo}</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="dataSource != null and dataSource!='' "> and  data_source = #{dataSource}</if>
+        </where>
+    </delete>
+    <!--Joran 2022-04-14 进行原有数据删除end-->
+
+    <insert id="batchInsertCxChangeLhMachine" parameterType="list">
+        insert into t_cx_change_lh_machine (id,cx_order_no, schedule_date, lh_machine_code, change_type,embryo_stock, change_mold_time, use_mold_num, data_source,
+        create_by,  update_by, update_time,  remark)
+        select seq_cx_change_lh_machine.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="cxChangeLhMachineList" item="cxChangeLhMachine" separator=" union ">
+            select
+            #{cxChangeLhMachine.cxOrderNo,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.scheduleDate},
+            #{cxChangeLhMachine.lhMachineCode,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.changeType,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.embryoStock,jdbcType=INTEGER},
+            #{cxChangeLhMachine.changeMoldTime,jdbcType=DATE},
+            #{cxChangeLhMachine.useMoldNum,jdbcType=INTEGER},
+            #{cxChangeLhMachine.dataSource,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.createBy,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.updateBy,jdbcType=VARCHAR},
+            #{cxChangeLhMachine.updateTime,jdbcType=DATE},
+            #{cxChangeLhMachine.remark,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+
+</mapper>

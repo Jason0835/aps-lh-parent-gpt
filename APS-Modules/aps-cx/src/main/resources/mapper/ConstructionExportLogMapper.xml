@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.ConstructionExportLogMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.ConstructionExportLog" id="ConstructionExportLogResult">
+        <result property="id" column="id"/>
+        <result property="fileType" column="file_type"/>
+        <result property="fileName" column="file_name"/>
+        <result property="filePath" column="file_path"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectConstructionExportLogVo">
+        select id, file_type, file_name, file_path, create_by, create_time, update_by, update_time, del_flag, remark from t_construction_export_log
+    </sql>
+
+    <select id="selectConstructionExportLogList" parameterType="com.zlt.aps.cx.api.domain.entity.ConstructionExportLog"
+            resultMap="ConstructionExportLogResult">
+        <include refid="selectConstructionExportLogVo"/>
+        where del_flag = '0'
+        <if test="fileType != null  and fileType != ''">and file_type = #{fileType}</if>
+        <if test="fileName != null  and fileName != ''">and file_name like concat(concat('%', #{fileName}), '%')</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectConstructionExportLogById" parameterType="Long" resultMap="ConstructionExportLogResult">
+        <include refid="selectConstructionExportLogVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertConstructionExportLog" parameterType="com.zlt.aps.cx.api.domain.entity.ConstructionExportLog">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT seq_public.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_construction_export_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="fileType != null and fileType != ''">file_type,</if>
+            <if test="fileName != null">file_name,</if>
+            <if test="filePath != null">file_path,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="fileType != null and fileType != ''">#{fileType},</if>
+            <if test="fileName != null">#{fileName},</if>
+            <if test="filePath != null">#{filePath},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateConstructionExportLog" parameterType="com.zlt.aps.cx.api.domain.entity.ConstructionExportLog">
+        update t_construction_export_log
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="fileType != null and fileType != ''">file_type = #{fileType},</if>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteConstructionExportLogById" parameterType="Long">
+        update t_construction_export_log set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteConstructionExportLogByIds" parameterType="String">
+        update t_construction_export_log set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

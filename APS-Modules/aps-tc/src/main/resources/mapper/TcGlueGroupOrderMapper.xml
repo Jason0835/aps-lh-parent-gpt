@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tc.mapper.TcGlueGroupOrderMapper">
+
+    <select id="listGlueGroupOrder" parameterType="com.zlt.aps.tc.api.domain.dto.TcGlueGroupOrderDto"
+            resultType="com.zlt.aps.tc.api.domain.dto.TcGlueGroupOrderDto">
+        select *
+        from T_TC_GLUE_GROUP_ORDER
+        where DEL_FLAG = 0
+        <if test="glueGroupCode != null and glueGroupCode != ''">
+            and INSTR(GLUE_GROUP_CODE, #{glueGroupCode}) > 0
+        </if>
+        <if test="glueGroupName != null and glueGroupName != ''">
+            and INSTR(GLUE_GROUP_NAME, #{glueGroupName}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by ORDER_NUM
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="listUserdGlueGroup" parameterType="list" resultType="string">
+        SELECT g.glue_group_name
+        FROM T_TC_GLUE_GROUP_ORDER g, T_TC_GLUE_ORDER o
+        WHERE g.id = o.glue_group_id
+        AND o.DEL_FLAG = '0'
+        AND GLUE_GROUP_ID in
+        <foreach collection="glueGroupIds" item="glueGroupId" separator="," open="(" close=")">#{glueGroupId}</foreach>
+        group by g.id, g.glue_group_name
+    </select>
+
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_TC_GLUE_GROUP_ORDER a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.glueGroupCode,jdbcType=VARCHAR} GLUE_GROUP_CODE,
+            #{item.glueGroupName,jdbcType=VARCHAR} GLUE_GROUP_NAME,
+            #{item.orderNum,jdbcType=DOUBLE} ORDER_NUM,
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime,jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime,jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.GLUE_GROUP_CODE = b.GLUE_GROUP_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.GLUE_GROUP_NAME = b.GLUE_GROUP_NAME,
+        a.ORDER_NUM = b.ORDER_NUM,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.GLUE_GROUP_CODE, a.GLUE_GROUP_NAME, a.ORDER_NUM, a.create_by, a.create_time,
+        a.remark,a.del_flag) values
+        (SEQ_PUBLIC.NEXTVAL, b.GLUE_GROUP_CODE, b.GLUE_GROUP_NAME, b.ORDER_NUM, b.create_by, sysdate, b.remark,'0')
+    </update>
+
+
+</mapper>

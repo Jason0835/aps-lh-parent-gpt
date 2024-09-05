@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxLhEngineCommonMapper">
+
+    <!--Joran.Zhang 2021-09-07 自动排程进行模具变动单临时表数据删除-->
+    <!--同步模具变动单记录到日志表-->
+    <insert id="syncMoldChagePlanToLog">
+        insert into t_lh_mold_change_plan_temp_log
+        SELECT t.* from t_lh_mold_change_plan_temp T
+        <where>
+            <if test="sourceCxOrder!=null and sourceCxOrder!=''">
+                AND instr(source_cx_order,#{sourceCxOrder}) > 0
+            </if>
+            <if test="scheduleDate != null">and schedule_date = to_date(#{scheduleDate},'yyyyMMdd')</if>
+        </where>
+    </insert>
+
+    <delete id="deleteLhEngineMoldChangePlanByScheduleDate" >
+        delete from t_lh_mold_change_plan_temp
+        <where>
+            <if test="sourceCxOrder!=null and sourceCxOrder!=''">
+                AND instr(source_cx_order,#{sourceCxOrder}) > 0
+            </if>
+            <if test="scheduleDate != null">and schedule_date = to_date(#{scheduleDate},'yyyyMMdd')</if>
+        </where>
+    </delete>
+
+    <!--Joran 2022-01-14 临时处理方式废次品获取临时从导入数据中获取到成型排程start-->
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineSapImportBadNumber" id="SapImportBadNumberResult">
+        <result property="id" column="id"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="badNum" column="bad_num"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectSapImportBadNumberVo">
+        select id, sap_code, bad_num, create_by, create_time, update_by, update_time, del_flag, remark from t_sap_import_bad_number
+    </sql>
+
+    <select id="selectSapImportBadNumberList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineSapImportBadNumber" resultMap="SapImportBadNumberResult">
+        <include refid="selectSapImportBadNumberVo"/>
+        <where>
+            del_flag = '0'
+            <if test="sapCode != null  and sapCode != ''"> and instr(sap_code ,#{sapCode}) > 0 </if>
+        </where>
+    </select>
+    <!--Joran 2022-01-18 进行月度不良数据删除 start-->
+    <update id="removeBadNumberByMonth">
+        update T_SAP_EMBRYO_BAD_NUMBER set del_flag='1'
+        <where>
+            del_flag = '0'
+            <if test="month != null and month!=''">and to_char(bad_date,'yyyyMM') = #{month}</if>
+        </where>
+    </update>
+    <!--Joran 2022-01-18 进行月度不良数据删除 end-->
+
+    <!--Joran 2022-01-14 临时处理方式废次品获取临时从导入数据中获取到成型排程end-->
+
+    <!--2022-02-24 获取到所有机台的在产规格start -->
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxInProductionSpec" id="CxInProductionSpecResult">
+        <result property="id" column="id"/>
+        <result property="productDate" column="PRODUCT_DATE"/>
+        <result property="cxMachineCode" column="CX_MACHINE_CODE"/>
+        <result property="sapCode" column="SAP_CODE"/>
+        <result property="embryoCode" column="EMBRYO_CODE"/>
+        <result property="bomDataVersion" column="BOM_DATA_VERSION"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    <sql id="selectInProductionSpecVo">
+        select id, PRODUCT_DATE, CX_MACHINE_CODE,SAP_CODE,EMBRYO_CODE,BOM_DATA_VERSION, create_by, create_time, update_by, update_time, del_flag, remark from T_IN_PRODUCTION_SPEC
+    </sql>
+    <select id="selectInProductionSpecByDate" resultMap="CxInProductionSpecResult">
+        <include refid="selectInProductionSpecVo"/>
+        <where>
+            del_flag = '0'
+            <if test="productDate != null  and productDate != ''"> and PRODUCT_DATE=to_date(#{productDate},'yyyyMMdd') </if>
+        </where>
+    </select>
+    <!--2022-02-24 获取到所有机台的在产规格end -->
+
+
+    <!--Joran 2022-05-20 根据日期获取mes系统前日的模具变更计划start -->
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineMesMoldAdjustPlan" id="CxEngineMesMoldAdjustPlanResult">
+        <result property="id" column="id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="type" column="type"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="planDate" column="plan_date"/>
+        <result property="changeMoldTime" column="changeMoldTime"/>
+        <result property="moldStatus" column="mold_status"/>
+        <result property="auditStatus" column="audit_status"/>
+        <result property="process" column="process"/>
+        <result property="executionStatus" column="execution_status"/>
+        <result property="beginTime" column="begin_time"/>
+        <result property="finishTime" column="finish_time"/>
+        <result property="leftSapCode" column="left_sap_code"/>
+        <result property="rightSapCode" column="right_sap_code"/>
+        <result property="leftEmbryoSapCode" column="left_embryo_sap_code"/>
+        <result property="rightEmbryoSapCode" column="right_embryo_sap_code"/>
+        <result property="leftSpecDesc" column="left_spec_desc"/>
+        <result property="rightSpecDesc" column="right_spec_desc"/>
+        <result property="leftBeforeSpecDesc" column="left_before_spec_desc"/>
+        <result property="rightBeforeSpecDesc" column="right_before_spec_desc"/>
+        <result property="leftEmbryoCode" column="left_embryo_code"/>
+        <result property="rightEmbryoCode" column="right_embryo_code"/>
+        <result property="leftStream" column="left_stream"/>
+        <result property="rightStream" column="right_stream"/>
+        <result property="leftMoldInfo" column="left_mold_info"/>
+        <result property="rightMoldInfo" column="right_mold_info"/>
+        <result property="moldAssembler" column="mold_assembler"/>
+        <result property="moldAssembleTime" column="mold_assemble_time"/>
+        <result property="auditor" column="auditor"/>
+        <result property="auditTime" column="audit_time"/>
+        <result property="auditSuggest" column="audit_suggest"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectMesMoldAdjustPlanVo">
+       SELECT
+            t.id,
+            t.order_no,
+            t.TYPE,
+            t.lh_machine_code,
+            t.plan_date,
+            t.change_mold_time,
+            t.mold_status,
+            t.audit_status,
+            t.process,
+            t.execution_status,
+            t.begin_time,
+            t.finish_time,
+            t.left_sap_code,
+            t.right_sap_code,
+            t.left_embryo_sap_code,
+            t.right_embryo_sap_code,
+            t.left_spec_desc,
+            t.right_spec_desc,
+            t.left_before_spec_desc,
+            t.right_before_spec_desc,
+            t.left_embryo_code,
+            t.right_embryo_code,
+            t.left_stream,
+            t.right_stream,
+            t.left_mold_info,
+            t.right_mold_info,
+            t.mold_assembler,
+            t.mold_assemble_time,
+            t.auditor,
+            t.audit_time,
+            t.audit_suggest,
+            t.create_by,
+            t.create_time,
+            t.update_by,
+            t.update_time,
+            t.remark
+        FROM
+            t_lh_mold_adjust_plan t
+    </sql>
+
+    <select id="selectMesMoldAdjustPlanList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineMesMoldAdjustPlan" resultMap="CxEngineMesMoldAdjustPlanResult">
+        <include refid="selectMesMoldAdjustPlanVo"/>
+        <where>
+            t.del_flag = '0'
+            <if test="planDateStr != null  and planDateStr != ''"> and t.plan_date=to_date(#{planDateStr},'yyyyMMdd') </if>
+        </where>
+    </select>
+
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.MesLhProductionSpec" id="MesInProductionSpecResult">
+        <result property="id" column="id"/>
+        <result property="productDate" column="PRODUCT_DATE"/>
+        <result property="lhMachineCode" column="LH_MACHINE_CODE"/>
+        <result property="lhStreamCode" column="LH_STREAM_CODE"/>
+        <result property="sapCode" column="SAP_CODE"/>
+        <result property="leftRightMold" column="LEFT_RIGHT_MOLD"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    <sql id="selectLhInProductionSpecVo">
+        select id, PRODUCT_DATE, lh_MACHINE_CODE,SAP_CODE,LH_STREAM_CODE,LEFT_RIGHT_MOLD, create_by, create_time, update_by, update_time, del_flag, remark from T_LH_IN_PRODUCTION_SPEC
+    </sql>
+    <select id="selectLhInProductionSpecByDate" resultMap="MesInProductionSpecResult">
+        <include refid="selectLhInProductionSpecVo"/>
+        <where>
+            del_flag = '0'
+            <if test="productDate != null  and productDate != ''"> and PRODUCT_DATE=to_date(#{productDate},'yyyyMMdd') </if>
+        </where>
+    </select>
+
+    <!--Joran 2022-05-20 根据日期获取mes系统前日的模具变更计划end -->
+
+
+</mapper>

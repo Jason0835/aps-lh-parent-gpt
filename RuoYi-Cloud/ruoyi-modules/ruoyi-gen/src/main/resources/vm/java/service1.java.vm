@@ -1,0 +1,77 @@
+package ${packageName}.${moduleName}.api.service;
+
+import com.ruoyi.common.constant.ServiceNameConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import io.swagger.annotations.ApiOperation;
+
+import ${packageName}.${moduleName}.api.domain.entity.${ClassName};
+
+
+/**
+ * ${functionName}Service接口
+ * @author ${author}
+ * @date ${datetime}
+ */
+@FeignClient(contextId = "I${ClassName}Service", value =ServiceNameConstants.GATEWAY_SERVICE, path = "$"{api.path.${moduleName}:${moduleName}}")
+public interface I${ClassName}Service {
+
+    /**
+     * 查询${functionName}列表
+     */
+    @ApiOperation("查询${functionName}列表")
+    @PostMapping("/${businessName}/list")
+    TableDataInfo list(@RequestBody ${ClassName} ${className});
+
+    /**
+    * 新增${functionName}
+    */
+    @ApiOperation("新增${functionName}")
+    @PostMapping("/${businessName}/add")
+    AjaxResult add(@RequestBody ${ClassName} ${className});
+
+    /**
+     * 修改${functionName}
+     */
+    @ApiOperation("修改${functionName}")
+    @PostMapping("/${businessName}/edit")
+    AjaxResult edit(@RequestBody ${ClassName} ${className});
+
+    /**
+     * 删除${functionName}
+     */
+    @ApiOperation("删除${functionName}")
+    @DeleteMapping("/${businessName}/{ids}")
+    AjaxResult remove(@PathVariable("ids") Long[] ids);
+
+    /**
+     * 根据ID获取详细信息
+     */
+    @ApiOperation("根据ID获取详细信息")
+    @GetMapping(value = "/${businessName}/{id}")
+    ${ClassName} getInfo(@PathVariable("id") Long id);
+
+    /**
+     * 校验${functionName}唯一性
+     */
+    @ApiOperation("校验${functionName}唯一性")
+    @PostMapping("/${businessName}/check${ClassName}Unique")
+    String check${ClassName}Unique(@RequestBody ${ClassName} ${className});
+
+    /**
+     * 导出${functionName}列表
+     */
+    @ApiOperation("导出${functionName}列表")
+    @PostMapping("/${businessName}/getList")
+    List<${ClassName}> getList(@RequestBody ${ClassName} ${className});
+
+    /**
+     * 导入${functionName}数据
+     */
+    @ApiOperation("导入${functionName}")
+    @PostMapping("/${businessName}/importData")
+    public AjaxResult importData(@RequestBody List<${ClassName}> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
+}

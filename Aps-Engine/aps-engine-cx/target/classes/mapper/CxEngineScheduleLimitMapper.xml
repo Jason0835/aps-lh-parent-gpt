@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineScheduleLimitMapper">
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineScheduleLimit" id="CxEngineScheduleLimitResult">
+        <result property="id" column="id"/>
+        <result property="machineType" column="machine_type"/>
+        <result property="machineCode" column="machine_code"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="tireAvgLhStockMinimun" column="tire_avg_lh_stock_minimun"/>
+        <result property="tireAveLhStockMaximun" column="tire_ave_lh_stock_maximun"/>
+        <result property="maxLhClass" column="max_lh_class"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectCxEngineScheduleLimit">
+        select id, machine_type, spec_dimension, tire_avg_lh_stock_minimun, tire_ave_lh_stock_maximun, max_lh_class, create_by, create_time, update_by, update_time, del_flag, remark
+        from t_cx_schedule_limit
+    </sql>
+
+    <select id="selectCxEngineScheduleLimitList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineScheduleLimit" resultMap="CxEngineScheduleLimitResult">
+        <include refid="selectCxEngineScheduleLimit"/>
+        where del_flag = '0'
+        <if test="machineType != null  and machineType != ''">and machine_type = #{machineType}</if>
+        <if test="specDimension != null ">and spec_dimension = #{specDimension}</if>
+        <if test="tireAvgLhStockMinimun != null ">and tire_avg_lh_stock_minimun = #{tireAvgLhStockMinimun}</if>
+        <if test="tireAveLhStockMaximun != null ">and tire_ave_lh_stock_maximun = #{tireAveLhStockMaximun}</if>
+        <if test="maxLhClass != null ">and max_lh_class = #{maxLhClass}</if>
+    </select>
+
+    <select id="selectCxEngineScheduleLimitByMachineCodeList" resultMap="CxEngineScheduleLimitResult">
+        SELECT
+            cmi.machine_code,
+            cmi.machine_type,
+            csl.spec_dimension,
+            csl.tire_avg_lh_stock_minimun,
+            csl.tire_ave_lh_stock_maximun,
+            csl.max_lh_class
+        FROM
+            t_cx_machine_info cmi
+            LEFT JOIN t_cx_schedule_limit csl ON cmi.machine_type = csl.machine_type
+            where cmi.del_flag='0' and cmi.status='0' and csl.del_flag='0'
+    </select>
+
+
+
+
+</mapper>

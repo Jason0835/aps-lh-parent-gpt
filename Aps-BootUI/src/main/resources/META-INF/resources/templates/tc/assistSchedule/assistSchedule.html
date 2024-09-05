@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('胎侧外协排程结果列表')"/>
+    <th:block th:include="include :: select2-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.tcScheduleResult.sidewallCode}]]：</label>
+                            <input type="text" name="sidewallCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.glueCode}]]：</label>
+                            <input type="text" name="glueCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.scheduleResult.mouthPlateCode}]]：</label>
+                            <input type="text" name="mouthPlateCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="tc:assistSchedule:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "tc/assistSchedule";
+    var baseInfo = "";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            pageSize: 10000,
+            pageList: [10000],
+            fixedColumns: true,
+            fixedNumber: 1,
+            modalName: [[#{ui.data.column.tc.assistSchedule.modelName}]],
+            uniqueId: 'id',
+            rowStyle: function (row, index) {
+                //标记收尾背景色
+                if (row.markCloseOutTip == '0') {
+                    return {css: {'background-color': '#FFFFBF'}};
+                }
+                //插单背景色
+                if (row.dataSource == '1') {
+                    return {css: {'background-color': '#BFE0F7'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {title: [[#{ui.data.column.scheduleResult.baseInfo}]], align: 'center', colspan: 9},
+                    {title: [[#{ui.data.column.scheduleResult.dayPlan}]], align: 'center', colspan: 2},
+                    {title: [[#{ui.data.column.scheduleResult.nightPlan}]], align: 'center', colspan: 2},
+                    {title: [[#{ui.data.column.scheduleResult.prePlanQty}]], align: 'center', colspan: 1},
+                    {title: [[#{ui.data.column.scheduleResult.tcPlan2}]], align: 'center', colspan: 8}
+                ],
+                [
+                    {
+                        checkbox: true,
+                        valign: 'middle',
+                        align: 'center',
+                    },
+                    {
+                        field: 'id',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'sidewallCode',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.tcScheduleResult.sidewallCode}]],
+                        cellStyle: function (value, row, index) {
+                            if ($.common.isNotEmpty(row.colorCode) && $.common.isNotEmpty(row.colorType)) {
+                                if (row.colorType == '0') {
+                                    return {css: {"color": row.colorCode}};
+                                } else if (row.colorType == '1') {
+                                    return {css: {"background": row.colorCode}};
+                                }
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'glueCode',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.glueCode}]],
+                    },
+                    {
+                        field: 'glueSeq',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.glueSeq}]],
+                    },
+                    {
+                        field: 'mouthPlateCode',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.mouthPlateCode}]],
+                    },
+                    {
+                        field: 'monthPlanOs',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.monthPlanOs}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'stockQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.stockQty.meter2}]],
+                    },
+                    {
+                        field: 'dailyTotalQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.dailyTotalQty}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '<br>' + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'dayHandAnalysis',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'left',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.daySysAnalysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width: 50,
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '<br>' + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'nightHandAnalysis',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'left',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.nightSysAnalysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        },
+                        width: 50,
+                    },
+                    {
+                        field: 'prePlanQty',
+                        valign: 'middle',
+                        halign:'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.plan}]]+'<br>'+'('+[[#{ui.data.column.scheduleResult.unit.meter}]]+')',
+                    },
+                    {
+                        field: 'cxClass1Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class1Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'cxClass2Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class2Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass3Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.class3Plan.meter}]],
+                    },
+                    {
+                        field: 'cxClass4Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass4Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'cxClass5Plan',
+                        valign: 'middle',
+                        halign: 'center',
+                        align: 'right',
+                        sortable: true,
+                        title: [[#{ui.data.column.scheduleResult.br.cxClass5Plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                    },
+                    {
+                        field: 'cxBatchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'batchNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    },
+                    {
+                        field: 'orderNo',
+                        valign: 'middle',
+                        align: 'center',
+                        visible: false
+                    }
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh - (fixTop - 50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH / oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if (total == contentRow + 1) {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh + 1.5 * oneTr});
+                } else if (total == contentRow + 2) {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh + 2.5 * oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+                }
+                /*固定表头end*/
+
+                //设置表头基本信息
+                setNewTitle(data.rows);
+            },
+            onColumnSwitch: function (field, checked) {
+                setTimeout(function () {
+                    document.getElementsByClassName('th-inner')[0].innerHTML = baseInfo;
+                }, 300);
+            }
+        };
+        $.table.init(options, true);
+
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function () {
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh - (fixTop - 50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+            }, 1000)
+        });
+        //添加监听
+        addColumnsClick()
+    });
+
+    //重置表头基本信息
+    function setNewTitle(dataAll) {
+        var year = document.getElementById("scheduleDate").value.split("-")[0];
+        var month = document.getElementById("scheduleDate").value.split("-")[1];
+        var day = document.getElementById("scheduleDate").value.split("-")[2];
+        if (ui_locale === "zh") {
+            baseInfo = month + "月" + day + "日" + [[#{ui.data.column.scheduleResult.tc.baseInfo}]];
+        } else {
+            var textDate = year + "-" + month + "-" + day;
+            let chinaDateArray = new Date(textDate.replace(/-/g, '/')).toDateString().split(' ');
+            baseInfo = `${chinaDateArray[1]} ${chinaDateArray[2]}` + " " + [[#{ui.data.column.scheduleResult.tc.baseInfo}]];
+        }
+        if (dataAll.length >= 1) {
+            var class1PlanQty = 0;
+            var class2PlanQty = 0;
+            for (let i = 0; i < dataAll.length; i++) {
+                class1PlanQty = class1PlanQty + Number(dataAll[i]['dayPlanQty']);
+                class2PlanQty = class2PlanQty + Number(dataAll[i]['nightPlanQty']);
+            }
+            var totalPlan = class1PlanQty + class2PlanQty;
+            var class1Plan = [[#{ui.data.column.scheduleResult.heji.zhongban}]];
+            var class2Plan = [[#{ui.data.column.scheduleResult.heji.yeban}]];
+            var totalQty = [[#{ui.data.column.scheduleResult.totalQty}]];
+            var planInfo = '：' + class1Plan + '：' + class1PlanQty.toFixed(0) + '，' + class2Plan + '：' + class2PlanQty.toFixed(0) + '，' + totalQty + '：' + totalPlan.toFixed(0);
+            baseInfo = baseInfo + planInfo;
+        }
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML = baseInfo;
+        }, 300);
+    }
+
+    $(window).resize(function () {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh - (fixTop - 50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView", {height: bh});
+
+        setTimeout(function () {
+            document.getElementsByClassName('th-inner')[0].innerHTML = baseInfo;
+        }, 300);
+    });
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+    }
+
+    .select-table {
+        padding-bottom: 0px !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+</style>
+</html>

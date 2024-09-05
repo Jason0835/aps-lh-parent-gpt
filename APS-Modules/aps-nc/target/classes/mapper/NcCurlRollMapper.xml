@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.mapper.NcCurlRollMapper">
+
+    <select id="listCurlRoll" parameterType="com.zlt.aps.nc.api.domain.entity.NcCurlRoll"
+            resultType="com.zlt.aps.nc.api.domain.entity.NcCurlRoll">
+        select *
+        from T_NC_CURL_ROLL
+        where DEL_FLAG = 0
+        <if test="liningCode != null and liningCode != ''">
+            and INSTR(LINING_CODE, #{liningCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_NC_CURL_ROLL a USING (
+        <foreach collection="list" item="ncCurlRoll" separator=" union ">
+            select
+                #{ncCurlRoll.liningCode,jdbcType=VARCHAR} LINING_CODE,
+                #{ncCurlRoll.curlLength,jdbcType=DECIMAL} CURL_LENGTH,
+
+                #{ncCurlRoll.createBy,jdbcType=VARCHAR} create_by,
+                #{ncCurlRoll.createTime,jdbcType=DATE} create_time,
+                #{ncCurlRoll.updateBy,jdbcType=VARCHAR} update_by,
+                #{ncCurlRoll.updateTime,jdbcType=DATE} update_time,
+                #{ncCurlRoll.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+            a.LINING_CODE = b.LINING_CODE
+            AND a.del_flag = '0'
+        )WHEN MATCHED THEN
+            UPDATE SET
+                a.CURL_LENGTH   = b.CURL_LENGTH,
+
+                a.update_by   = b.create_by,
+                a.update_time = sysdate,
+                a.remark      = b.remark
+        WHEN NOT MATCHED THEN
+            INSERT (
+                a.id          ,
+                a.LINING_CODE  ,
+                a.CURL_LENGTH  ,
+                a.create_by   ,
+                a.create_time ,
+                a.remark,
+                a.del_flag
+            ) values(
+                SEQ_PUBLIC.NEXTVAL,
+                b.LINING_CODE  ,
+                b.CURL_LENGTH  ,
+                b.create_by,
+                sysdate,
+                b.remark,
+                '0'
+            )
+    </update>
+
+</mapper>

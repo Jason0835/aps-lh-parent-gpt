@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineLastDaySupplePlanMapper">
+
+    <resultMap type="com.zlt.aps.cx.engine.domain.CxEngineLastDaySupplePlan" id="CxEngineLastDaySupplePlanResult">
+        <result property="id" column="id"/>
+        <result property="suppleBatchNo" column="supple_batch_no"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="taskType" column="task_type"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="cxMachineCode" column="cx_machine_code"/>
+        <result property="cxMachineName" column="cx_machine_name"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineQty" column="lh_machine_qty"/>
+        <result property="minimumLhMachineReqQty" column="minimum_lh_machine_req_qty"/>
+        <result property="minimumLhMachineComQty" column="minimum_lh_machine_com_qty"/>
+        <result property="availableMoldQty" column="available_mold_qty"/>
+        <result property="maximumClassQty" column="maximum_class_qty"/>
+        <result property="workShifts" column="work_shifts"/>
+        <result property="storageLocation" column="storage_location"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="specDesc" column="spec_desc"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="lhMiddleNightFinishQty" column="lh_middle_night_finish_qty"/>
+        <result property="cxMonthFinishQty" column="cx_month_finish_qty"/>
+        <result property="planModifyQty" column="plan_modify_qty"/>
+        <result property="rejectQty" column="reject_qty"/>
+        <result property="class3PlannedQty" column="class3_planned_qty"/>
+        <result property="singleShiftLhQty" column="single_shift_lh_qty"/>
+        <result property="totalStock" column="total_stock"/>
+        <result property="monthStock" column="month_stock"/>
+        <result property="class1AvailableLhShift" column="class1_available_lh_shift"/>
+        <result property="class1PlanQty" column="class1_plan_qty"/>
+        <result property="class1AnalysisInput" column="class1_analysis_input"/>
+        <result property="class1Analysis" column="class1_analysis"/>
+        <result property="class2AvailableLhShift" column="class2_available_lh_shift"/>
+        <result property="class2PlanQty" column="class2_plan_qty"/>
+        <result property="class2AnalysisInput" column="class2_analysis_input"/>
+        <result property="class2Analysis" column="class2_analysis"/>
+        <result property="supplePlanQty" column="supple_plan_qty"/>
+        <result property="class3AvailableLhShift" column="class3_available_lh_shift"/>
+        <result property="class3PlanQty" column="class3_plan_qty"/>
+        <result property="class3Analysis" column="class3_analysis"/>
+        <result property="class4AvailableLhShift" column="class4_available_lh_shift"/>
+        <result property="class4PlanQty" column="class4_plan_qty"/>
+        <result property="class4Analysis" column="class4_analysis"/>
+        <result property="class5AvailableLhShift" column="class5_available_lh_shift"/>
+        <result property="class5PlanQty" column="class5_plan_qty"/>
+        <result property="class5Analysis" column="class5_analysis"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="class3AnalysisInput" column="class3_analysis_input"/>
+        <result property="class4AnalysisInput" column="class4_analysis_input"/>
+        <result property="class5AnalysisInput" column="class5_analysis_input"/>
+        <result property="class1Sort" column="class1_sort"/>
+        <result property="class2Sort" column="class2_sort"/>
+        <result property="class3Sort" column="class3_sort"/>
+        <result property="class4Sort" column="class4_sort"/>
+        <result property="class5Sort" column="class5_sort"/>
+        <result property="lhMachineChangeMoldDesc" column="lh_machine_change_mold_desc"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="bomDataVersion" column="bom_Data_Version"/>
+        <result property="cxMachineType" column="cx_machine_type"/>
+        <result property="specialRequirements" column="special_requirements"/>
+        <result property="toProduct" column="to_product"/>
+    </resultMap>
+    
+    <sql id="selectCxEngineLastDaySupplePlanVo">
+        select * from t_cx_last_day_supple_plan
+    </sql>
+
+    <select id="selectCxEngineLastDaySupplePlanList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineLastDaySupplePlan" resultMap="CxEngineLastDaySupplePlanResult">
+        <include refid="selectCxEngineLastDaySupplePlanVo"/>
+        <where>
+            del_flag = '0'
+            <if test="suppleBatchNo != null  and suppleBatchNo != ''"> and supple_batch_no = #{suppleBatchNo}</if>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="scheduleDate != null "> and schedule_date = #{scheduleDate}</if>
+            <if test="cxMachineCode != null  and cxMachineCode != ''"> and cx_machine_code = #{cxMachineCode}</if>
+            <if test="sapCode != null  and sapCode != ''"> and sap_code = #{sapCode}</if>
+            <if test="specDimension != null "> and spec_dimension = #{specDimension}</if>
+            <if test="embryoCode != null  and embryoCode != ''"> and embryo_code = #{embryoCode}</if>
+            <if test="bomDataVersion != null  and bomDataVersion != ''"> and bom_data_version = #{bomDataVersion}</if>
+        </where>
+    </select>
+
+    <select id="selectCxEngineLastDaySupplePlanById" parameterType="Long" resultMap="CxEngineLastDaySupplePlanResult">
+                    <include refid="selectCxEngineLastDaySupplePlanVo"/>
+            where id = #{id}
+            </select>
+
+    <insert id="insertCxEngineLastDaySupplePlan" parameterType="com.zlt.aps.cx.engine.domain.CxEngineLastDaySupplePlan">
+                    <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT SEQ_CX_LAST_DAY_SUPPLE_PLAN.NEXTVAL as id FROM DUAL
+            </selectKey>
+                insert into t_cx_last_day_supple_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                            <if test="id != null">id,</if>
+                            <if test="suppleBatchNo != null">supple_batch_no,</if>
+                            <if test="orderNo != null">order_no,</if>
+                            <if test="scheduleDate != null">schedule_date,</if>
+                            <if test="cxMachineCode != null">cx_machine_code,</if>
+                            <if test="storageLocation != null">storage_location,</if>
+                            <if test="sapCode != null">sap_code,</if>
+                            <if test="specDesc != null">spec_desc,</if>
+                            <if test="specDimension != null">spec_dimension,</if>
+                            <if test="embryoCode != null">embryo_code,</if>
+                            <if test="supplePlanQty != null">supple_plan_qty,</if>
+                            <if test="bomDataVersion != null">bom_data_version,</if>
+                            <if test="createBy != null">create_by,</if>
+                            <if test="createTime != null">create_time,</if>
+                            <if test="updateBy != null">update_by,</if>
+                            <if test="updateTime != null">update_time,</if>
+                            <if test="delFlag != null">del_flag,</if>
+                            <if test="remark != null">remark,</if>
+                    </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                            <if test="id != null">#{id},</if>
+                            <if test="suppleBatchNo != null">#{suppleBatchNo},</if>
+                            <if test="orderNo != null">#{orderNo},</if>
+                            <if test="scheduleDate != null">#{scheduleDate},</if>
+                            <if test="cxMachineCode != null">#{cxMachineCode},</if>
+                            <if test="storageLocation != null">#{storageLocation},</if>
+                            <if test="sapCode != null">#{sapCode},</if>
+                            <if test="specDesc != null">#{specDesc},</if>
+                            <if test="specDimension != null">#{specDimension},</if>
+                            <if test="embryoCode != null">#{embryoCode},</if>
+                            <if test="supplePlanQty != null">#{supplePlanQty},</if>
+                            <if test="bomDataVersion != null">#{bomDataVersion},</if>
+                            <if test="createBy != null">#{createBy},</if>
+                            <if test="createTime != null">#{createTime},</if>
+                            <if test="updateBy != null">#{updateBy},</if>
+                            <if test="updateTime != null">#{updateTime},</if>
+                            <if test="delFlag != null">#{delFlag},</if>
+                            <if test="remark != null">#{remark},</if>
+                    </trim>
+    </insert>
+
+    <insert id="batchInsertLastDaySupplePlan" parameterType="list">
+        insert into t_cx_last_day_supple_plan (id,supple_batch_no,order_no, schedule_date, cx_machine_code,
+        storage_location,spec_dimension, sap_code, spec_desc,embryo_code, bom_data_version,supple_plan_qty,create_by,  update_by, update_time,  remark,
+        cx_batch_no,task_type,production_status,cx_machine_type,lh_machine_code,lh_machine_qty,minimum_lh_machine_req_qty, available_mold_qty, maximum_class_qty, work_shifts,
+        lh_middle_night_finish_qty, cx_month_finish_qty,reject_qty,single_shift_lh_qty, total_stock,class3_planned_qty,
+        class1_available_lh_shift, class1_plan_qty, class1_analysis_input, class1_analysis,  class2_available_lh_shift,
+        class2_plan_qty, class2_analysis_input, class2_analysis,  class3_available_lh_shift, class3_plan_qty, class3_analysis,class3_analysis_input,
+        class4_available_lh_shift, class4_plan_qty, class4_analysis,class4_analysis_input,  class5_available_lh_shift,
+        class1_sort,class2_sort,class3_sort,class4_sort,class5_sort,is_release,data_source,lh_machine_change_mold_desc,lh_single_tire_time,
+        class5_plan_qty, class5_analysis,class5_analysis_input, mark_close_out_tip,to_product,expected_over_production,plan_sort
+        )
+        select SEQ_CX_LAST_DAY_SUPPLE_PLAN.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="list" item="supplePlan" separator=" union ">
+            select #{supplePlan.suppleBatchNo,jdbcType=VARCHAR},#{supplePlan.orderNo,jdbcType=VARCHAR},#{supplePlan.scheduleDate},#{supplePlan.cxMachineCode,jdbcType=VARCHAR},
+            #{supplePlan.storageLocation,jdbcType=VARCHAR},#{supplePlan.specDimension,jdbcType=DOUBLE},#{supplePlan.sapCode},#{supplePlan.specDesc,jdbcType=VARCHAR},#{supplePlan.embryoCode},#{supplePlan.bomDataVersion,jdbcType=VARCHAR},#{supplePlan.supplePlanQty,jdbcType=INTEGER},
+            #{supplePlan.createBy,jdbcType=VARCHAR},#{supplePlan.updateBy,jdbcType=VARCHAR},#{supplePlan.updateTime,jdbcType=DATE},#{supplePlan.remark,jdbcType=VARCHAR},
+            #{supplePlan.cxBatchNo,jdbcType=VARCHAR},#{supplePlan.taskType,jdbcType=VARCHAR},#{supplePlan.productionStatus,jdbcType=VARCHAR},#{supplePlan.cxMachineType,jdbcType=VARCHAR},#{supplePlan.lhMachineCode,jdbcType=VARCHAR},#{supplePlan.lhMachineQty,jdbcType=DOUBLE},#{supplePlan.minimumLhMachineReqQty,jdbcType=INTEGER},#{supplePlan.availableMoldQty,jdbcType=INTEGER},#{supplePlan.maximumClassQty,jdbcType=DOUBLE},#{supplePlan.workShifts,jdbcType=INTEGER},
+            #{supplePlan.lhMiddleNightFinishQty,jdbcType=INTEGER},#{supplePlan.cxMonthFinishQty,jdbcType=INTEGER},#{supplePlan.rejectQty,jdbcType=INTEGER},#{supplePlan.singleShiftLhQty,jdbcType=INTEGER},#{supplePlan.totalStock,jdbcType=INTEGER},#{supplePlan.class3PlannedQty,jdbcType=INTEGER},
+            #{supplePlan.class1AvailableLhShift,jdbcType=DOUBLE},#{supplePlan.class1PlanQty,jdbcType=INTEGER},#{supplePlan.class1AnalysisInput,jdbcType=VARCHAR},#{supplePlan.class1Analysis,jdbcType=VARCHAR},#{supplePlan.class2AvailableLhShift,jdbcType=DOUBLE},
+            #{supplePlan.class2PlanQty,jdbcType=INTEGER},#{supplePlan.class2AnalysisInput,jdbcType=VARCHAR},#{supplePlan.class2Analysis,jdbcType=VARCHAR},#{supplePlan.class3AvailableLhShift,jdbcType=DOUBLE},#{supplePlan.class3PlanQty,jdbcType=INTEGER},#{supplePlan.class3Analysis,jdbcType=VARCHAR},#{supplePlan.class3AnalysisInput,jdbcType=VARCHAR},
+            #{supplePlan.class4AvailableLhShift,jdbcType=DOUBLE},#{supplePlan.class4PlanQty,jdbcType=INTEGER},#{supplePlan.class4Analysis,jdbcType=VARCHAR},#{supplePlan.class4AnalysisInput,jdbcType=VARCHAR},#{supplePlan.class5AvailableLhShift,jdbcType=DOUBLE},
+            #{supplePlan.class1Sort,jdbcType=INTEGER},#{supplePlan.class2Sort,jdbcType=INTEGER},#{supplePlan.class3Sort,jdbcType=INTEGER},#{supplePlan.class4Sort,jdbcType=INTEGER},#{supplePlan.class5Sort,jdbcType=INTEGER},#{supplePlan.isRelease,jdbcType=VARCHAR},#{supplePlan.dataSource,jdbcType=VARCHAR},#{supplePlan.lhMachineChangeMoldDesc,jdbcType=VARCHAR},#{supplePlan.lhSingleTireTime,jdbcType=INTEGER},
+            #{supplePlan.class5PlanQty,jdbcType=INTEGER},#{supplePlan.class5Analysis,jdbcType=VARCHAR},#{supplePlan.class5AnalysisInput,jdbcType=VARCHAR},#{supplePlan.markCloseOutTip,jdbcType=VARCHAR},#{supplePlan.toProduct,jdbcType=VARCHAR},#{supplePlan.expectedOverProduction,jdbcType=INTEGER},#{supplePlan.planSort,jdbcType=INTEGER}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="updateCxEngineLastDaySupplePlan" parameterType="com.zlt.aps.cx.engine.domain.CxEngineLastDaySupplePlan">
+        update t_cx_last_day_supple_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="suppleBatchNo != null">supple_batch_no = #{suppleBatchNo},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="cxMachineCode != null">cx_machine_code = #{cxMachineCode},</if>
+            <if test="storageLocation != null">storage_location = #{storageLocation},</if>
+            <if test="storageLocationDesc != null">storage_location_desc = #{storageLocationDesc},</if>
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="specDesc != null">spec_desc = #{specDesc},</if>
+            <if test="specDimension != null">spec_dimension = #{specDimension},</if>
+            <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+            <if test="supplePlanQty != null">supple_plan_qty = #{supplePlanQty},</if>
+            <if test="bomDataVersion != null">bom_data_version = #{bomDataVersion},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxEngineLastDaySupplePlanById" parameterType="Long">
+        update t_cx_last_day_supple_plan set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteCxEngineLastDaySupplePlanByIds" parameterType="String">
+        update t_cx_last_day_supple_plan set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectSupplePlanListByCondition" parameterType="com.zlt.aps.cx.engine.domain.CxEngineLastDaySupplePlan" resultMap="CxEngineLastDaySupplePlanResult">
+        SELECT
+        cmi.machine_name cx_machine_name,
+        nvl(finish_qty.lh_middle_night_finish_qty,0) lh_middle_night_finish_qty,
+        nvl(lh_machine_qty,0) lh_machine_qty,
+        cldsp.*
+        FROM
+          t_cx_supple_batch_record csbr
+            LEFT JOIN t_cx_last_day_supple_plan cldsp
+              ON csbr.SUPPLE_BATCH_NO=cldsp.SUPPLE_BATCH_NO
+            LEFT JOIN  t_cx_machine_info cmi
+              ON cldsp.cx_machine_code=cmi.machine_code
+            LEFT JOIN (
+                select sap_code,sum(nvl(class1_finish_qty,0)) + sum(nvl(class2_finish_qty,0)) lh_middle_night_finish_qty from t_lh_class_shift_finish_qty where del_flag='0'
+                <if test="suppleDateStr != null and suppleDateStr!=''"> and  schedule_date = to_date(#{suppleDateStr},'yyyyMMdd')</if>
+                  group by sap_code
+              )finish_qty
+              ON cldsp.sap_code=finish_qty.sap_code
+            <where>
+                csbr.del_flag = '0'
+                AND cldsp.del_flag='0'
+                AND csbr.status='0'
+                AND cmi.del_flag='0'
+                <if test="suppleDateStr != null  and suppleDateStr != ''">
+                    AND csbr.supple_date = to_date(#{suppleDateStr},'yyyyMMdd')
+                </if>
+                <if test="cxMachineCode != null  and cxMachineCode != ''">
+                    AND cldsp.cx_machine_code =#{cxMachineCode}
+                </if>
+            </where>
+    </select>
+
+    <!--根据工单号执行批量更新 三班及之后的班次班次计划量-->
+    <update id="batchUpdateLastScheduleTask"  parameterType="java.util.List">
+        update T_CX_SCHEDULE_RESULT
+        <trim prefix="set" suffixOverrides=",">
+            IS_RELEASE='0',<!--成型发布状态调整为：未发布-->
+            <trim prefix="class3_plan_qty =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class3PlanQty!=null">
+                        when  id=#{item.id}
+                        then #{item.class3PlanQty}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class3_available_lh_shift =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class3AvailableLhShift!=null">
+                        when  id=#{item.id}
+                        then #{item.class3AvailableLhShift}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class3_analysis =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class3Analysis!=null">
+                        when  id=#{item.id}
+                        then #{item.class3Analysis}
+                    </if>
+                </foreach>
+            </trim>
+
+            <trim prefix="class4_plan_qty =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class4PlanQty!=null">
+                        when  id=#{item.id}
+                        then #{item.class4PlanQty}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class4_available_lh_shift =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class4AvailableLhShift!=null">
+                        when  id=#{item.id}
+                        then #{item.class4AvailableLhShift}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class4_analysis =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class4Analysis!=null">
+                        when  id=#{item.id}
+                        then #{item.class4Analysis}
+                    </if>
+                </foreach>
+            </trim>
+
+            <trim prefix="class5_plan_qty =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class5PlanQty!=null">
+                        when  id=#{item.id}
+                        then #{item.class5PlanQty}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class5_available_lh_shift =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class5AvailableLhShift!=null">
+                        when  id=#{item.id}
+                        then #{item.class5AvailableLhShift}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="class5_analysis =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.class5Analysis!=null">
+                        when  id=#{item.id}
+                        then #{item.class5Analysis}
+                    </if>
+                </foreach>
+            </trim>
+
+        </trim>
+
+        <where>
+            del_flag='0'
+            AND order_no in(
+            WITH temp_table AS (
+            <foreach collection="list" item="item" index="index" separator=" union ">
+                SELECT  #{item.orderNo} order_no FROM dual
+            </foreach>
+            )
+            select order_no from temp_table)
+        </where>
+
+    </update>
+
+    <insert id="batchInsertCxScheduleResultVersion" parameterType="list">
+        insert into T_CX_SCHEDULE_RESULT_VERSION (id,supple_batch_no,cx_batch_no,order_no, schedule_date, cx_machine_code, cx_machine_type,
+        lh_machine_code,storage_location,spec_dimension, sap_code, spec_desc,embryo_code, bom_data_version,total_stock,
+        class3_available_lh_shift, class3_plan_qty, class3_analysis,
+        class4_available_lh_shift, class4_plan_qty, class4_analysis,
+        class5_available_lh_shift, class5_plan_qty, class5_analysis,
+        is_release,create_by,  update_by, update_time,  remark)
+        select SEQ_CX_SCHEDULE_RESULT_VERSION.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="scheduleResultVersionList" item="schedule" separator=" union ">
+            select #{schedule.suppleBatchNo,jdbcType=VARCHAR},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.orderNo,jdbcType=VARCHAR},#{schedule.scheduleDate},#{schedule.cxMachineCode,jdbcType=VARCHAR},#{schedule.cxMachineType,jdbcType=VARCHAR},
+            #{schedule.lhMachineCode,jdbcType=VARCHAR},#{schedule.storageLocation,jdbcType=VARCHAR},#{schedule.specDimension,jdbcType=DOUBLE},#{schedule.sapCode},#{schedule.specDesc,jdbcType=VARCHAR},#{schedule.embryoCode},#{schedule.bomDataVersion,jdbcType=VARCHAR},#{schedule.totalStock,jdbcType=INTEGER},
+            #{schedule.class3AvailableLhShift,jdbcType=DOUBLE},#{schedule.class3PlanQty,jdbcType=INTEGER},#{schedule.class3Analysis,jdbcType=VARCHAR},
+            #{schedule.class4AvailableLhShift,jdbcType=DOUBLE},#{schedule.class4PlanQty,jdbcType=INTEGER},#{schedule.class4Analysis,jdbcType=VARCHAR},
+            #{schedule.class5AvailableLhShift,jdbcType=DOUBLE},#{schedule.class5PlanQty,jdbcType=INTEGER},#{schedule.class5Analysis,jdbcType=VARCHAR},
+            #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.updateBy,jdbcType=VARCHAR},#{schedule.updateTime,jdbcType=DATE},#{schedule.remark,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <!--Joran 2022-03-03 根据增补计划日期进行增补计划删除 start -->
+    <delete id="deleteCxEngineLastDaySupplePlanBySuppleDate" parameterType="String">
+        update t_cx_last_day_supple_plan set del_flag='1',update_time = sysdate
+        <where>
+            del_flag='0'
+            <if test="suppleDate != null  and suppleDate != ''">
+                AND schedule_date = to_date(#{suppleDate},'yyyyMMdd')
+            </if>
+        </where>
+    </delete>
+    <!--Joran 2022-03-03 根据增补计划日期进行增补计划删除 end -->
+
+    <!--Joran 2022-03-31批量更新单班硫化量 start -->
+    <update id="updateSingleLhQtyBatch"  parameterType="java.util.List">
+        update t_cx_last_day_supple_plan
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="single_shift_lh_qty =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                    <if test="item.singleShiftLhQty!=null">
+                        when  id=#{item.id}
+                        then #{item.singleShiftLhQty}
+                    </if>
+                </foreach>
+            </trim>
+        </trim>
+        where id in
+        <foreach collection="list" item="item" index="index" separator="," open="(" close=")">
+            #{item.id}
+        </foreach>
+    </update>
+    <!--Joran 2022-03-31批量更新单班硫化量 end -->
+
+    <select id="selectAllCloseMachine" resultType="String" parameterType="String">
+		select  distinct t1.cx_machine_name from t_cx_schedule_result t1
+        where t1.cx_machine_code not in (select  distinct cx_machine_code from t_cx_last_day_supple_plan where del_flag = '0'
+        <if test="suppleDate != null  and suppleDate != ''">
+            and schedule_date = to_date(#{suppleDate},'yyyyMMdd')
+        </if>
+        ) and t1.del_flag = '0'
+            <if test="suppleDate != null  and suppleDate != ''">
+                and t1.schedule_date = to_date(#{suppleDate},'yyyyMMdd')
+            </if>
+	</select>
+</mapper>

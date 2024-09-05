@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxShareMoldInfoMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxShareMoldInfo" id="CxShareMoldInfoResult">
+        <result property="id" column="id"/>
+        <result property="groupName" column="group_name"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="shareMoldNum" column="share_mold_num"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectCxShareMoldInfoVo">
+        select id, group_name, embryo_code, sap_code, share_mold_num, remark, del_flag, create_by, create_time, update_by, update_time from t_cx_share_mold_info
+    </sql>
+
+    <select id="selectCxShareMoldInfoList" parameterType="com.zlt.aps.cx.api.domain.entity.CxShareMoldInfo"
+            resultMap="CxShareMoldInfoResult">
+        <include refid="selectCxShareMoldInfoVo"/>
+        where del_flag = '0'
+        <if test="groupName != null  and groupName != ''">and INSTR(group_name, #{groupName}) > 0</if>
+        <if test="embryoCode != null  and embryoCode != ''">and INSTR(embryo_code, #{embryoCode}) > 0</if>
+        <if test="sapCode != null and sapCode != ''">and INSTR(sap_code, #{sapCode}) > 0</if>
+        <if test="orderStr == null">order by create_time desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <select id="selectCxShareMoldInfoById" parameterType="Long" resultMap="CxShareMoldInfoResult">
+        <include refid="selectCxShareMoldInfoVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertCxShareMoldInfo" parameterType="com.zlt.aps.cx.api.domain.entity.CxShareMoldInfo">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_CX_SHARE_MOLD_INFO.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_cx_share_mold_info
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="groupName != null">group_name,</if>
+            <if test="embryoCode != null">embryo_code,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="shareMoldNum != null">share_mold_num,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="groupName != null">#{groupName},</if>
+            <if test="embryoCode != null">#{embryoCode},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="shareMoldNum != null">#{shareMoldNum},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateCxShareMoldInfo" parameterType="com.zlt.aps.cx.api.domain.entity.CxShareMoldInfo">
+        update t_cx_share_mold_info
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="groupName != null">group_name = #{groupName},</if>
+            <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="shareMoldNum != null">share_mold_num = #{shareMoldNum},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxShareMoldInfoById" parameterType="Long">
+        update t_cx_share_mold_info
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteCxShareMoldInfoByIds" parameterType="String">
+        update t_cx_share_mold_info set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_cx_share_mold_info a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.groupName,jdbcType=VARCHAR} group_name,
+            #{item.embryoCode,jdbcType=VARCHAR} embryo_code, #{item.sapCode,jdbcType=VARCHAR} sap_code,
+            #{item.shareMoldNum, jdbcType=DOUBLE} share_mold_num,
+            #{item.remark,jdbcType=VARCHAR} remark, #{item.delFlag,jdbcType=VARCHAR} del_flag,
+            #{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=DATE} update_time from dual
+        </foreach>
+        ) b ON (
+        a.group_name = b.group_name
+        AND a.sap_code = b.sap_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.share_mold_num = b.share_mold_num
+            , a.remark = b.remark
+            , a.update_by = b.create_by
+            , a.update_time = sysdate
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.group_name, a.sap_code, a.share_mold_num, a.remark, a.del_flag, a.create_by, a.create_time
+        )
+        values (
+        SEQ_CX_SHARE_MOLD_INFO.NEXTVAL, b.group_name, b.sap_code, b.share_mold_num, b.remark, 0, b.create_by, sysdate
+        )
+    </update>
+
+    <select id="checkUnique" resultType="int">
+        select count(1) from t_cx_share_mold_info
+        where del_flag = 0
+        <if test="id != null and id != ''">and id != #{id}</if>
+        <if test="groupName != null  and groupName != ''">and group_name = #{groupName}</if>
+        <if test="sapCode != null  and sapCode != ''">and sap_code = #{sapCode}</if>
+    </select>
+
+    <select id="selectShareMoldInfoListByEmbryoCode" parameterType="string" resultMap="CxShareMoldInfoResult">
+        <include refid="selectCxShareMoldInfoVo"/>
+        WHERE DEL_FLAG = 0 AND EMBRYO_CODE != #{embryoCode} AND GROUP_NAME IN(
+            SELECT
+                GROUP_NAME
+            FROM
+                T_CX_SHARE_MOLD_INFO
+            WHERE EMBRYO_CODE = #{embryoCode} AND DEL_FLAG = 0
+        )
+    </select>
+
+    <select id="selectShareMoldInfoListBySapCode" parameterType="string" resultMap="CxShareMoldInfoResult">
+        <include refid="selectCxShareMoldInfoVo"/>
+        WHERE DEL_FLAG = 0 AND SAP_CODE != #{sapCode} AND GROUP_NAME IN(
+            SELECT
+                GROUP_NAME
+            FROM
+                T_CX_SHARE_MOLD_INFO
+            WHERE SAP_CODE = #{sapCode} AND DEL_FLAG = 0
+        )
+    </select>
+
+    <select id="selectShareMoldInfoList" resultType="com.zlt.aps.cx.api.domain.entity.CxShareMoldInfo">
+        SELECT DISTINCT
+            csmi.id, csmi.group_name, csmi.sap_code, csmi.share_mold_num, csmi.remark, csmi.del_flag, csmi.create_by, csmi.create_time, csmi.update_by, csmi.update_time,
+            ltci.SPEC_DESC specDesc,
+            ltci.EMBRYO_CODE embryoCode
+        FROM
+            T_CX_SHARE_MOLD_INFO csmi
+        LEFT JOIN T_LH_TIRE_CONSTRUCTION_INFO ltci ON csmi.SAP_CODE = ltci.SAP_CODE
+        WHERE
+            csmi.DEL_FLAG = 0 AND ltci.DEL_FLAG = 0
+    </select>
+</mapper>

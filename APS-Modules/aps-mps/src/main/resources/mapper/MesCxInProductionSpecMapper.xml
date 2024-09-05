@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.MesCxInProductionSpecMapper">
+	<!-- 统计需同步数据量 -->
+    <select id="countSyncData" resultType="int">
+    	SELECT COUNT(1)
+    	  FROM T_MES_IN_PRODUCTION_SPEC
+         WHERE IS_DELETE = 0
+           AND DATA_VERSION = #{dataVersion}
+    </select>
+    
+	<!-- 同步生产规格 -->
+    <update id="mergeSpec">
+        MERGE INTO T_IN_PRODUCTION_SPEC a USING (
+            SELECT PRODUCT_DATE,
+                   CX_MACHINE_CODE,
+                   SAP_CODE,
+                   EMBRYO_CODE,
+                   BOM_DATA_VERSION,
+                   REMARK,
+                   nvl(UPDATE_DATE, CREATE_DATE) CREATE_TIME
+             FROM T_MES_IN_PRODUCTION_SPEC
+            WHERE data_version = #{dataVersion}
+        ) b ON (
+          a.PRODUCT_DATE = b.PRODUCT_DATE
+          AND b.CX_MACHINE_CODE = a.CX_MACHINE_CODE
+          AND a.DEL_FLAG = '0' )
+        WHEN MATCHED THEN
+          UPDATE SET
+            a.EMBRYO_CODE = b.EMBRYO_CODE,
+            a.SAP_CODE = b.SAP_CODE,
+            a.BOM_DATA_VERSION = b.BOM_DATA_VERSION,
+            a.REMARK = b.REMARK,
+            a.UPDATE_TIME = b.CREATE_TIME
+        WHEN NOT MATCHED THEN
+          INSERT 
+            (a.id, a.PRODUCT_DATE, a.CX_MACHINE_CODE, a.SAP_CODE,a.embryo_code, a.bom_data_version, a.remark, a.create_time, a.del_flag)
+          VALUES
+            (SEQ_IN_PRODUCTION_SPEC.NEXTVAL, b.PRODUCT_DATE, b.CX_MACHINE_CODE, b.SAP_CODE, b.embryo_code, b.bom_data_version, b.remark, b.create_time, '0')
+    </update>
+
+</mapper>

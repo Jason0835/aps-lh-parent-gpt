@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('新增纤维压延排程结果')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-scheduleResult-add" th:object="${scheduleResult}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <input name="batchNo" th:field="*{batchNo}" class="form-control" type="hidden">
+        <input name="cd90BatchNo" th:field="*{cd90BatchNo}" class="form-control" type="hidden">
+        <input id="actClothLength" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <div class="select-time">
+                        <input id="endTime" name="scheduleDate" type="text" class="time-input form-control" th:value="${initDate}" th:min="${minDate}" placeholder="yyyy-MM-dd" required>
+                    </div>
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.xwyy.scheduleResult.bigRollCode}]]：</label>
+            <div class="col-sm-8">
+                <input id="bigRollCode" name="bigRollCode" th:field="*{bigRollCode}" class="form-control" type="text" isCode="true" maxlength="20" onblur="getActClothLength()" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.scheduleResult.produceLine}]]：</label>
+            <div class="col-sm-8">
+                <select name="machineId"  th:with="type=${@xwyy.getMachineInfo('0')}" class="form-control" th:data-none-selected-text="#{ui.data.column.scheduleResult.chooseMachine}" required>
+                    <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                    <option  th:each="machineInfo : ${type}" th:value="${machineInfo.id}" th:text="${machineInfo.machineName}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayPlanQty}]]：</label>
+            <div class="col-sm-8">
+                <input id="dayPlanQty" name="dayPlanQty" th:field="*{dayPlanQty}" class="form-control" type="number" min="0" max="9999999"  isInteger="true" onchange="changePlanNum()">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayPlanQty.individual}]]：</label>
+            <div class="col-sm-8">
+                <input id="dayPlanQtyNum" name="dayPlanQtyNum" th:field="*{dayPlanQtyNum}" class="form-control" type="number" min="0" max="9999999.999" onchange="changePlan()">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.dayHandAnalysis}]]：</label>
+            <div class="col-sm-8">
+                <input name="dayHandAnalysis" th:field="*{dayHandAnalysis}" class="form-control" type="text" maxlength="100">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightPlanQty}]]：</label>
+            <div class="col-sm-8">
+                <input id="nightPlanQty" name="nightPlanQty" th:field="*{nightPlanQty}" class="form-control" type="number" min="0" max="9999999" isInteger="true" onchange="changePlanNum()">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightPlanQty.individual}]]：</label>
+            <div class="col-sm-8">
+                <input id="nightPlanQtyNum" name="nightPlanQtyNum" th:field="*{nightPlanQtyNum}" class="form-control" type="number" min="0" max="9999999.999" onchange="changePlan()">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.nightHandAnalysis}]]：</label>
+            <div class="col-sm-8">
+                <input name="nightHandAnalysis" th:field="*{nightHandAnalysis}" class="form-control" type="text" maxlength="100">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea name="remark" class="form-control" rows="3" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "xwyy/scheduleResult"
+    $("#form-scheduleResult-add").validate({
+        focusCleanup: true
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var scheduleDate = $('#endTime').val();
+            var config = {
+                url: prefix + "/validateAdd",
+                type: "post",
+                dataType: "json",
+                data:{"scheduleDate":scheduleDate},
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS){
+                        if(result.msg=='0'){
+                            $.modal.confirm([[#{ui.data.column.scheduleResult.isContinueAdd}]], function () {
+                                $.operate.save(prefix + "/edit", $('#form-scheduleResult-add').serialize(),reloadMachineName());
+                            })
+                        }else{
+                            $.operate.save(prefix + "/edit", $('#form-scheduleResult-add').serialize(),reloadMachineName());
+                        }
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            };
+            $.ajax(config)
+        }
+    }
+
+    function reloadMachineName(){
+        parent.$('#scheduleDate').val($('#endTime').val());
+    }
+
+    function getActClothLength() {
+        let $bigRollCode = $("#bigRollCode");
+        var toUpperCase = $bigRollCode.val().toUpperCase();
+        $bigRollCode.val(toUpperCase);
+        var config = {
+            url: prefix + "/getActClothLength",
+            type: "post",
+            dataType: "json",
+            data: {"bigRollCode": toUpperCase},
+            success: function(result) {
+                if (result.code === web_status.SUCCESS) {
+                    $("#actClothLength").val(result.data);
+                }
+            }
+        };
+        $.ajax(config);
+    }
+
+    function changePlanNum() {
+        var actClothLength = $("#actClothLength").val();
+        $("#dayPlanQtyNum").val(getBit($("#dayPlanQty").val() / actClothLength));
+        $("#nightPlanQtyNum").val(getBit($("#nightPlanQty").val() / actClothLength));
+    }
+    function changePlan() {
+        var actClothLength = $("#actClothLength").val();
+        $("#dayPlanQty").val($("#dayPlanQtyNum").val() * actClothLength);
+        $("#nightPlanQty").val($("#nightPlanQtyNum").val() * actClothLength);
+    }
+
+    function getBit(obj) {
+        return Math.ceil(obj * 10) / 10;
+    }
+</script>
+</body>
+<style>
+    .select2-container--bootstrap .select2-results__group {
+        color: #777;
+        display: block;
+        padding: 6px 12px;
+        font-size: 13px;
+        line-height: 1.42857143;
+        white-space: nowrap;
+    }
+</style>
+</html>

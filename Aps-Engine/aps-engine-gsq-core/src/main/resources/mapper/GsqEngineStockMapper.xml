@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.engine.mapper.GsqEngineStockMapper">
+
+    <select id="listCxPlanAndConsume" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqStockConsumeVo">
+        select cxr.BEAD_CODE STEEL_RING_CODE,   /*钢丝圈代码*/
+               nvl(sum(cxr.CLASS3_PLANNED_QTY*2),0) CX_CLASS3_PLAN_CONSUME,  /*半制品对应成型(8点-16点)计划量的消耗量(1条胎对应2个钢丝圈)*/
+               nvl(sum(cf.FINISH_QTY*2), 0) CX_FINISH_CONSUME  /*半制品对应成型(8点-12点)完成量的消耗量(1条胎对应2个钢丝圈)*/
+        from (
+               SELECT r.EMBRYO_CODE,
+                      r.BOM_DATA_VERSION,
+                      max(ci.BEAD_CODE) BEAD_CODE, /*钢丝圈代码*/
+                      sum(CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY /*8点-16点成型计划量*/
+               FROM T_CX_SCHEDULE_RESULT r
+               inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
+               where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+               and r.DEL_FLAG = 0
+               GROUP BY r.EMBRYO_CODE,r.BOM_DATA_VERSION
+              ) cxr /*成型排程结果表*/
+        left join T_CX_PART_FINISH_QTY cf on cf.stat_date = to_date(#{scheduleDate},'yyyy-mm-dd')-1 /*排程日期 要减1天，才是对应8-12点完成量日期*/ and cf.DEL_FLAG = 0 and cf.embryo_code = cxr.embryo_code and cf.BOM_DATA_VERSION = cxr.BOM_DATA_VERSION
+        group by cxr.BEAD_CODE
+    </select>
+
+    <select id="listGsqStock" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqStockVo">
+        select MATERIAL_CODE steelRingCode, (nvl(STOCK_NUM,0)+nvl(MODIFY_NUM,0)-nvl(BAD_NUM,0)) STOCK_NUM
+        from T_GSQ_STOCK
+        where STOCK_DATE = to_date(#{stockDate},'yyyy-mm-dd') - 1 /*排程日期 要减1天，才是对应库存日期*/
+        and DEL_FLAG = '0'
+    </select>
+</mapper>

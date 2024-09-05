@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.engine.mapper.CxEngineEmbryoMonthPlanSurplusMapper">
+
+    <resultMap id="CxEngineEmbryoMonthPlanSurplus" type="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus">
+            <id property="id" column="ID"/>
+            <result property="monthPlanApsVersion" column="MONTH_PLAN_APS_VERSION" />
+            <result property="monthPlanVersion" column="MONTH_PLAN_VERSION" />
+            <result property="year" column="YEAR" />
+            <result property="month" column="MONTH" />
+            <result property="embryoCode" column="MATERIAL_CODE" />
+            <result property="monthPlanQty" column="MONTH_PLAN_QTY" />
+            <result property="monthPlanModifyQty" column="MONTH_PLAN_MODIFY_QTY" />
+            <result property="monthFinishQty" column="MONTH_FINISH_QTY" />
+            <result property="monthRemainQty" column="MONTH_REMAIN_QTY" />
+            <result property="dataSource" column="DATA_SOURCE" />
+            <result property="lastMonthStock" column="last_month_stock" />
+            <result property="embryoBadQty" column="embryo_bad_qty" />
+            <result property="createBy" column="CREATE_BY" />
+            <result property="createTime" column="CREATE_TIME"/>
+            <result property="updateBy" column="UPDATE_BY" />
+            <result property="updateTime" column="UPDATE_TIME"/>
+            <result property="delFlag" column="DEL_FLAG" />
+            <result property="remark" column="REMARK" />
+    </resultMap>
+
+    <sql id="selectCxEmbryoMonthPlanSurplusVo">
+        select id, month_plan_aps_version, month_plan_version, year, month, material_code,
+                nvl(month_plan_qty,0) month_plan_qty,
+                nvl(month_plan_modify_qty,0) month_plan_modify_qty,
+                nvl(month_finish_qty,0) month_finish_qty,
+                nvl(month_remain_qty,0) month_remain_qty,
+                data_source,
+                nvl(last_month_stock,0) last_month_stock,
+                nvl(embryo_bad_qty,0) embryo_bad_qty,
+                create_by, create_time, update_by, update_time, del_flag, remark from t_cx_embryo_month_plan_surplus
+    </sql>
+
+    <select id="selectCxEmbryoMonthPlanSurplusList" parameterType="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus" resultMap="CxEngineEmbryoMonthPlanSurplus">
+        <include refid="selectCxEmbryoMonthPlanSurplusVo"/>
+        <where>
+            del_flag='0'
+            <if test="monthPlanApsVersion != null  and monthPlanApsVersion != ''"> and month_plan_aps_version = #{monthPlanApsVersion}</if>
+            <if test="year != null  and year != ''"> and year = #{year}</if>
+            <if test="month != null  and month != ''"> and month = #{month}</if>
+            <if test="embryoCode != null  and embryoCode != ''"> and material_code = #{embryoCode}</if>
+        </where>
+    </select>
+
+    <insert id="insertCxEmbryoMonthPlanSurplus" parameterType="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT CX_EMBRYO_SURPLUS_SEQ.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cx_embryo_month_plan_surplus
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="monthPlanApsVersion != null">month_plan_aps_version,</if>
+            <if test="monthPlanVersion != null">month_plan_version,</if>
+            <if test="year != null">year,</if>
+            <if test="month != null">month,</if>
+            <if test="embryoCode != null">material_code,</if>
+            <if test="monthPlanQty != null">month_plan_qty,</if>
+            <if test="monthPlanModifyQty != null">month_plan_modify_qty,</if>
+            <if test="monthFinishQty != null">month_finish_qty,</if>
+            <if test="monthRemainQty != null">month_remain_qty,</if>
+            <if test="dataSource != null">data_source,</if>
+            <if test="lastMonthStock != null">last_month_stock,</if>
+            <if test="embryoBadQty != null">embryo_bad_qty,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="monthPlanApsVersion != null">#{monthPlanApsVersion},</if>
+            <if test="monthPlanVersion != null">#{monthPlanVersion},</if>
+            <if test="year != null">#{year},</if>
+            <if test="month != null">#{month},</if>
+            <if test="embryoCode != null">#{embryoCode},</if>
+            <if test="monthPlanQty != null">#{monthPlanQty},</if>
+            <if test="monthPlanModifyQty != null">#{monthPlanModifyQty},</if>
+            <if test="monthFinishQty != null">#{monthFinishQty},</if>
+            <if test="monthRemainQty != null">#{monthRemainQty},</if>
+            <if test="dataSource != null">#{dataSource},</if>
+            <if test="lastMonthStock != null">#{lastMonthStock},</if>
+            <if test="embryoBadQty != null">#{embryoBadQty},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateCxEmbryoMonthPlanSurplus" parameterType="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus">
+        update t_cx_embryo_month_plan_surplus
+        <trim prefix="SET" suffixOverrides=",">
+            <!--Joran 2021-07-28 更新计划调整量-->
+            <if test="monthPlanModifyQty != null">month_plan_modify_qty=nvl(month_plan_modify_qty,0) + #{monthPlanModifyQty},</if>
+            <if test="monthRemainQty != null">month_remain_qty=nvl(month_remain_qty,0) + #{monthRemainQty},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!--自动排程删除当天插单胎胚数据-->
+    <update id="deleteEmbryoMonthPlanSurplusByDataSource" parameterType="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus">
+        update t_cx_embryo_month_plan_surplus set del_flag='1'
+        <where>
+            data_source='1'
+            and create_time between to_date(#{startTime},'yyyy-MM-dd hh24:mi:ss') and to_date(#{endTime},'yyyy-MM-dd hh24:mi:ss')
+            <if test="embryoCode != null and embryoCode!=''">
+                and material_code=#{embryoCode}
+            </if>
+        </where>
+    </update>
+
+    <!---Joran 2021-09-19 插单数据调量兼容更新start -->
+    <update id="updateMonthPlanSurplusByEmbryoCodeVersion" parameterType="com.zlt.aps.cx.engine.domain.CxEngineEmbryoMonthPlanSurplus">
+        update t_cx_embryo_month_plan_surplus
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="updateInsertQty != null">
+                month_plan_modify_qty=nvl(month_plan_modify_qty,0) + #{updateInsertQty},
+                month_remain_qty=nvl(month_remain_qty,0) + #{updateInsertQty},
+            </if>
+        </trim>
+        <where>
+            del_flag='0'
+            <if test="monthPlanApsVersion != null  and monthPlanApsVersion != ''"> and month_plan_aps_version = #{monthPlanApsVersion}</if>
+            <if test="embryoCode != null  and embryoCode != ''"> and material_code = #{embryoCode}</if>
+        </where>
+    </update>
+    <!---Joran 2021-09-19 插单数据调量兼容更新end -->
+</mapper>

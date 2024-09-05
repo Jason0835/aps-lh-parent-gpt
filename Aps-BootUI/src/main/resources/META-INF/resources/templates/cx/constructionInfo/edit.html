@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改施工信息')" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-info-edit" th:object="${constructionInfo}">
+            <input id="id" name="id" th:field="*{id}" type="hidden">
+            <h4 class="form-header h4">[[#{ui.construction.baseInfo}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.embryoCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input id="embryoCode" name="embryoCode" th:field="*{embryoCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.embryoVersion}]]：</label>
+                        <div class="col-sm-8">
+                            <input id="embryoVersion" name="embryoVersion" th:field="*{embryoVersion}" class="form-control" type="text" maxlength="30" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.data.column.scheduleResult.sapCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input id="sapCode" name="sapCode" th:field="*{sapCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.dimension}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="dimension" th:field="*{dimension}" class="form-control" type="text" number="true" min="0" maxlength="10" max="99999999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.spec}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="specDesc" th:field="*{specDesc}" class="form-control" type="text" maxlength="200">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.noseWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="noseWidth" th:field="*{noseWidth}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.flipDiscDiameter}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="flipDiscDiameter" th:field="*{flipDiscDiameter}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.fitDrumPerimeter}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="fitDrumPerimeter" th:field="*{fitDrumPerimeter}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.chuckDiameter}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="chuckDiameter" th:field="*{chuckDiameter}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.stretchWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="stretchWidth" th:field="*{stretchWidth}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.qualitativeWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="qualitativeWidth" th:field="*{qualitativeWidth}" class="form-control" type="text" number="true" min="0" maxlength="8" max="99999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.embryoCircle}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="embryoCircle" th:field="*{embryoCircle}" class="form-control" type="text" number="true" min="0" maxlength="7" max="99999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sectionWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sectionWidth" th:field="*{sectionWidth}" class="form-control" type="text" digits="true" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6"></div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.carcassCloth}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.tireFabricSap1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricSap1" th:field="*{tireFabricSap1}" class="form-control" type="text" isCode="true" maxlength="20"  required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.tireFabricCode1}]]:</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCode1" th:field="*{tireFabricCode1}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricCraft1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCraft1" th:field="*{tireFabricCraft1}" class="form-control" type="text" number="true" min="0" max="99999" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricSap2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricSap2" th:field="*{tireFabricSap2}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricCode2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCode2" th:field="*{tireFabricCode2}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricCraft2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCraft2" th:field="*{tireFabricCraft2}" class="form-control" type="text" number="true" max="99999" min="0"  maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricSap3}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricSap3" th:field="*{tireFabricSap3}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricCode3}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCode3" th:field="*{tireFabricCode3}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireFabricCraft3}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireFabricCraft3" th:field="*{tireFabricCraft3}" class="form-control" type="text" number="true" max="99999" min="0"  maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.cordSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="cordSap" th:field="*{cordSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.cordSpec}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="cordSpec" th:field="*{cordSpec}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.reinforceSealGlue}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="reinforceSealGlue" th:field="*{reinforceSealGlue}" class="form-control" type="text" isCode="true" maxlength="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.lining}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.insideSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="insideSap" th:field="*{insideSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.insideCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="insideCode" th:field="*{insideCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.insideRubber}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="insideRubber" th:field="*{insideRubber}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.insideCraft}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="insideCraft" th:field="*{insideCraft}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.sidewall}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.sidewallSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallSap" th:field="*{sidewallSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.sidewallCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallCode" th:field="*{sidewallCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallCraft}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallCraft" th:field="*{sidewallCraft}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="7">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallMouthPlate}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallMouthPlate" type="text" th:field="*{sidewallMouthPlate}" class="form-control" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallCenter}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallCenter" th:field="*{sidewallCenter}" class="form-control" type="text" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallLength}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallLength" th:field="*{sidewallLength}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallRubber}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallRubber" th:field="*{sidewallRubber}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallWeight" th:field="*{sidewallWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.sidewallWearpRubberWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="sidewallWearpRubberWeight" th:field="*{sidewallWearpRubberWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.supportingGlue}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.supportCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="supportCode" th:field="*{supportCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.supportRubberCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="supportRubberCode" th:field="*{supportRubberCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.supportLength}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="supportLength" th:field="*{supportLength}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.steelRing}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beadSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beadSap" th:field="*{beadSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beadCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beadCode" th:field="*{beadCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beadArrange}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beadArrange" th:field="*{beadArrange}" class="form-control" type="text" isCode="true" maxlength="50">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beadType}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beadType" th:field="*{beadType}" class="form-control" type="text"  maxlength="16">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.hexagonRing}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.tireRingSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireRingSap" th:field="*{tireRingSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.tireRingCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireRingCode" th:field="*{tireRingCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.apexCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="apexCode" th:field="*{apexCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.hexagonRubberCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="hexagonRubberCode" th:field="*{hexagonRubberCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.hexagonMouthPlate}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="hexagonMouthPlate" th:field="*{hexagonMouthPlate}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.hexagonRubberDimension}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="hexagonRubberDimension" th:field="*{hexagonRubberDimension}" class="form-control" type="text" maxlength="16">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.apexWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="apexWeight" th:field="*{apexWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.steelStrip}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beltSap1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltSap1" th:field="*{beltSap1}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beltCode1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltCode1" th:field="*{beltCode1}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltCraft1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltCraft1" th:field="*{beltCraft1}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltSideRubber1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltSideRubber1" th:field="*{beltSideRubber1}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltRubber1}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltRubber1" th:field="*{beltRubber1}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beltSap2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltSap2" th:field="*{beltSap2}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.beltCode2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltCode2" th:field="*{beltCode2}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltCraft2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltCraft2" th:field="*{beltCraft2}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltSideRubber2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltSideRubber2" th:field="*{beltSideRubber2}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltRubber2}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltRubber2" th:field="*{beltRubber2}" class="form-control" type="text" isCode="true" maxlength="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.beltCuttingAngle}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="beltCuttingAngle" th:field="*{beltCuttingAngle}" class="form-control" type="text" maxlength="10">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.articleCrownSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="articleCrownSap" th:field="*{articleCrownSap}" class="form-control" type="text" isCode="true" maxlength="20"  required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.articleCrownSpec}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="articleCrownSpec" th:field="*{articleCrownSpec}" class="form-control" type="text" isCode="true" maxlength="20"  required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.crownBand}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.articleCrownCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="articleCrownCode" th:field="*{articleCrownCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.construction.tread}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.treadSap}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadSap" th:field="*{treadSap}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label is-required">[[#{ui.construction.treadCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadCode" th:field="*{treadCode}" class="form-control" type="text" isCode="true" maxlength="20" required="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.treadShoulderWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadShoulderWidth" th:field="*{treadShoulderWidth}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.treadShoulderJWidth}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadCode" th:field="*{treadShoulderJWidth}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.treadShoulderLength}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadShoulderWidth" th:field="*{treadShoulderLength}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.treadRubberCategory}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadRubberCategory" th:field="*{treadRubberCategory}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireCrownUpWidthWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireCrownUpWidthWeight" th:field="*{tireCrownUpWidthWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireCrownDownWidthWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireCrownDownWidthWeight" th:field="*{tireCrownDownWidthWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.tireWingWidthWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="tireWingWidthWeight" th:field="*{tireWingWidthWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.primerWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="primerWeight" th:field="*{primerWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.conductingResinWeight}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="conductingResinWeight" th:field="*{conductingResinWeight}" class="form-control" type="text" number="true" max="99999" min="0" maxlength="8">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.construction.treadMouthPlate}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="treadMouthPlate" th:field="*{treadMouthPlate}" class="form-control" type="text" isCode="true" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = ctx + "cx/constructionInfo";
+
+
+        $("#form-info-edit").validate({
+            focusCleanup: true,
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var embryoCode = $("#embryoCode").val();
+                var embryoVersion = $("#embryoVersion").val();
+                var config = {
+                    url: prefix + "/checkEmbryoCodeUnique",
+                    type: "post",
+                    dataType: "json",
+                    data: {embryoCode: embryoCode,embryoVersion: embryoVersion},
+                    success: function (result) {
+                        if (result.code == web_status.SUCCESS){
+                            $.operate.save(prefix + "/save", $('#form-info-edit').serialize());
+                        } else {
+                            $.modal.alertWarning(result.msg);
+                        }
+                    }
+                };
+                $.ajax(config)
+            }
+        }
+    </script>
+</body>
+</html>

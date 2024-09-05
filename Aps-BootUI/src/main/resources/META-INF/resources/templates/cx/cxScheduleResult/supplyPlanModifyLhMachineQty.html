@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改使用模数')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal" id="form-cxScheduleResult-edit" th:object="${cxScheduleResult}">
+
+        <input id="pid" name="id" th:field="*{id}" type="hidden">
+        <input id="lhMachineChangeMoldDesc" name="lhMachineChangeMoldDesc" th:field="*{lhMachineChangeMoldDesc}"
+               type="hidden">
+        <input id="scheduleDate" name="scheduleDate" th:value="*{#dates.format({scheduleDate}, 'yyyy-MM-dd')}"
+               type="hidden">
+
+        <div class="row">
+            <div class="col-sm-12">
+                <button type="button" class="btn btn-white btn-sm" onclick="addColumn()"><i class="fa fa-plus">
+                    [[#{ui.frame.btn.add}]]</i></button>
+                <button type="button" class="btn btn-white btn-sm" onclick="sub.delColumn()"><i class="fa fa-minus">
+                    [[#{ui.frame.btn.delete}]]</i></button>
+                <div class="col-sm-8 select-table table-striped">
+                    <table id="bootstrap-table"></table>
+                </div>
+            </div>
+        </div>
+
+
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery.tmpl.js}"></script>
+<script th:inline="javascript">
+
+    var prefix = ctx + "cx/lastDaySupplyPlan";
+    var CHANGE_TYPE = [[${@dict.getType('CHANGE_TYPE')}]];
+    var lhMachineNameList = [[${@cx.getMachineInfo2(undefined,5)}]];
+
+    $(function () {
+        var options = {
+            id: 'bootstrap-table',
+            uniqueId: 'index',
+            pagination: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            sidePagination: "client",
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'index',
+                    align: 'center',
+                    title: [[#{ui.data.column.scheduleResult.no}]],
+                    formatter: function (value, row, index) {
+                        var columnIndex = $.common.sprintf("<input type='hidden' name='index' value='%s'>", $.table.serialNumber(index));
+                        return columnIndex + $.table.serialNumber(index);
+                    }
+                },
+                // {
+                //     field: 'machineCode',
+                //     align: 'center',
+                //     title: [[#{ui.data.column.cxScheduleResult.lhMachineCode1}]],
+                //     formatter: function(value, row, index) {
+                //         var html=getMachineCodeHtml(index,value);
+                //         return html;
+                //     },
+                // },
+                {
+                    field: 'machineName',
+                    align: 'center',
+                    title: [[#{ui.data.column.cxScheduleResult.lhMachineCode}]],
+                    formatter: function (value, row, index) {
+                        var html = getMachineNameHtml(value, row, index);
+                        return html;
+                    },
+                },
+                {
+                    field: 'changeType',
+                    align: 'center',
+                    title: [[#{ui.data.column.moldChange.changeType}]],
+                    formatter: function (value, row, index) {
+                        var html = getDictHtml(index, value, CHANGE_TYPE);
+                        return html;
+                    },
+                },
+                {
+                    field: 'molds',
+                    align: 'center',
+                    title: [[#{ui.data.column.cxScheduleResult.lhMachineQty}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            value = 0;
+                        }
+                        var html = $.common.sprintf("<div class='col-sm-12'><input id='lhMachineChangeTpyeList[%s].molds' class='form-control' type='number' name='lhMachineChangeTpyeList[%s].molds' value='%s' digits='true' min='0' max='99999'></div>", index, index, value);
+                        return html;
+                    },
+                }
+            ]
+        };
+        $.table.init(options);
+        initColumn();
+    });
+
+    $("#form-cxScheduleResult-edit").validate({
+        focusCleanup: true
+    });
+
+    //初始化列表
+    function initColumn() {
+        //示例： lhcode212:2:1;lhcode1:1:2;
+        var lhMachineChangeMoldDesc = $('#lhMachineChangeMoldDesc').val();
+        if ($.common.isNotEmpty(lhMachineChangeMoldDesc)) {
+            var arr = lhMachineChangeMoldDesc.split(";");
+            $.each(arr, function (index, item) {
+                var arr2 = item.split(':');
+                if ($.common.isNotEmpty(arr2[0]) && $.common.isNotEmpty(arr2[1])) {
+                    var row = {
+                        machineName: getMachineName(arr2[0], lhMachineNameList),
+                        machineCode: arr2[0],
+                        changeType: arr2[1] == null ? "0" : arr2[1],
+                        molds: arr2[2] == null ? "0" : arr2[2],
+                    }
+                    sub.addColumn(row);
+                }
+            });
+        }
+    }
+
+    //添加行
+    function addColumn() {
+        var row = {
+            machineName: "",
+            changeType: "0",
+            molds: "",
+        }
+        sub.addColumn(row);
+    }
+
+    //获取机台名称
+    function getMachineName(value, datas) {
+        $.each(datas, function (index, dict) {
+            if (dict.machineCode == (value)) {
+                var machineName = $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                return machineName;
+            }
+        });
+    }
+
+    //拼接硫化机台页面
+    function getMachineNameHtml(value, row, index) {
+        var actions = [];
+        var machineName = "";
+        var machineCode = "";
+        $.each(lhMachineNameList, function (index, dict) {
+            if (dict.machineCode == (row.machineCode)) {
+                machineName = $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                machineCode = dict.machineCode
+            }
+        });
+        var html2 = $.common.sprintf("<div  class='col-sm-12'><input id='lhMachineChangeTpyeList[%s].machineCode' name='lhMachineChangeTpyeList[%s].machineCode'  class='form-control' value='%s'  type='hidden' readonly></div>", index, index, machineCode);
+
+        var html1 = $.common.sprintf("<div  class='col-sm-12'><input id='lhMachineChangeTpyeList[%s].machineName' name='lhMachineChangeTpyeList[%s].machineName' class='form-control'  onclick=selectLhMachineCode('%s') value='%s'  type='text' placeholder='%s' autocomplete='off'></div>", index, index, index, machineName, [[#{ui.data.column.scheduleResult.chooseMachine}]]);
+        actions.push(html1);
+        actions.push(html2);
+        return actions.join('');
+    }
+
+    //拼接硫化机台页面
+    function getMachineCodeHtml(index, value) {
+        var actions = [];
+        var html1 = $.common.sprintf("<div  class='col-sm-12'><input id='lhMachineChangeTpyeList[%s].machineCode' name='lhMachineChangeTpyeList[%s].machineCode'  class='form-control' value='%s'  type='text' readonly></div>", index, index, value);
+        actions.push(html1);
+        return actions.join('');
+    }
+
+    //硫化机台详情页面
+    function selectLhMachineCode(index) {
+        var pid = $("#pid").val();
+        var scheduleDate = $("#scheduleDate").val();
+        var url = "/cx/cxScheduleResult/lhMachineListPage/" + index + "&" + pid + "&" + scheduleDate;
+        $.modal.open([[#{ui.data.column.cxScheduleResult.lhMachineCodeDetail}]], url, 820, 500);
+    }
+
+    //拼接变更类型页面
+    function getDictHtml(index, value, datas) {
+        var actions = [];
+        var html1 = $.common.sprintf("<div class='col-sm-12'><select name='lhMachineChangeTpyeList[%s].changeType' class='form-control'>", index);
+        actions.push(html1);
+        $.each(datas, function (index, dict) {
+            if (dict.dictValue == (value)) {
+                var dictLabel = $.common.isEmpty(dict.dictLabel) ? "" : dict.dictLabel;
+                var html2 = $.common.sprintf("<option value='%s' selected=%s>%s</option>", dict.dictValue, "selected", dictLabel);
+                actions.push(html2);
+            } else {
+                var dictLabel = $.common.isEmpty(dict.dictLabel) ? "" : dict.dictLabel;
+                var html2 = $.common.sprintf("<option value='%s' >%s</option>", dict.dictValue, dictLabel);
+                actions.push(html2);
+            }
+        });
+        var html3 = "</select></div>";
+        actions.push(html3);
+        return actions.join('');
+    }
+
+    //提交
+    function submitHandler() {
+        if ($.validate.form()) {
+            var datas = $('#form-cxScheduleResult-edit').serializeArray();
+            var config = {
+                url: prefix + "/modifyMoldsValidate",
+                type: "post",
+                dataType: "json",
+                data: datas,
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        if ($.common.isNotEmpty(result.msg)) {
+                            $.modal.confirm(result.msg, function () {
+                                $.operate.save(prefix + "/modifyMolds", datas);
+                            });
+                        } else {
+                            $.operate.save(prefix + "/modifyMolds", datas);
+                        }
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            };
+            $.ajax(config)
+
+        }
+    }
+</script>
+</body>
+<style>
+    label.error {
+        position: absolute;
+        right: 18px;
+        top: 6px;
+        color: #ef392b;
+        font-size: 12px;
+        z-index: 99;
+        margin-top: 24px;
+    }
+</style>
+</html>

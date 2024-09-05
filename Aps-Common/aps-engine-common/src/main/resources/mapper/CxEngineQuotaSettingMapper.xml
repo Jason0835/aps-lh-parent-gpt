@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.CxEngineQuotaSettingMapper">
+
+    <resultMap type="com.zlt.aps.common.engine.domain.CxEngineQuotaSetting" id="CxQuotaSettingResult">
+        <result property="cxMachineCode" column="machine_code"/>
+        <result property="finalQuota" column="final_quota"/>
+        <result property="quotaRatio" column="quota_ratio"/>
+        <result property="type" column="type"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="carcassBothLayer" column="carcass_both_layer"/>
+        <result property="reinforce" column="reinforce"/>
+        <result property="tireType" column="tire_type"/>
+        <result property="sectionWidthMinimum" column="section_width_minimum"/>
+        <result property="sectionWidthMaximum" column="section_width_maximum"/>
+        <result property="twoPersonQuota" column="two_person_quota"/>
+        <result property="onePersonQuota" column="one_person_quota"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectCxQuotaSettingVo">
+        SELECT
+        cmi.machine_code,
+        cmi.quota_ratio，
+        (
+            CASE
+
+                    WHEN cmi.OPERATOR_QTY IS NULL THEN
+                    cqs.ONE_PERSON_QUOTA
+                    WHEN cmi.OPERATOR_QTY = 1 THEN
+                    cqs.ONE_PERSON_QUOTA ELSE cqs.TWO_PERSON_QUOTA
+                END
+            ) final_quota,
+            cqs.*
+        FROM
+            T_CX_MACHINE_INFO cmi
+            LEFT JOIN t_cx_quota_setting cqs ON cqs.TYPE = cmi.TYPE
+    </sql>
+
+    <select id="selectCxEngineQuotaSettingList" parameterType="com.zlt.aps.common.engine.domain.CxEngineQuotaSetting"
+            resultMap="CxQuotaSettingResult">
+        <include refid="selectCxQuotaSettingVo"/>
+        WHERE cmi.DEL_FLAG = '0'
+        AND cmi.status = '0'
+        AND cqs.DEL_FLAG = '0'
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and cmi.machine_code = #{cxMachineCode}</if>
+        <if test="type != null  and type != ''">and cqs.type = #{type}</if>
+        <if test="tireType != null  and tireType != ''">and cqs.tire_type = #{tireType}</if>
+        order by cmi.machine_code asc
+    </select>
+</mapper>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+	<th:block th:include="include :: header('操作日志列表')" />
+	<th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+	<div class="container-div">
+		<div class="row">
+			<div class="col-sm-12 search-collapse">
+				<form id="operlog-form">
+					<div class="select-list">
+						<ul>
+							<li>
+								<label>[[#{ui.data.column.operlog.title}]]： </label><input type="text" name="title"/>
+							</li>
+							<li>
+								<label>[[#{ui.data.column.operlog.operName}]]： </label><input type="text" name="operName"/>
+							</li>
+							<li class="select-selectpicker">
+								<label>[[#{ui.data.column.operlog.businessType}]]： </label><select id="businessTypes" th:with="type=${@dict.getType('sys_oper_type')}" class="selectpicker" th:data-none-selected-text="#{ui.frame.combox.all}" multiple>
+									<option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+								</select>
+							</li>
+							<li>
+								<label>[[#{ui.data.column.operlog.status}]]：</label><select name="status" th:with="type=${@dict.getType('sys_common_status')}">
+									<option value="">[[#{ui.frame.select.select.all}]]</option>
+									<option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+								</select>
+							</li>
+							<li class="select-time">
+								<label>[[#{ui.data.column.operlog.operTime}]]： </label>
+								<input type="text" class="time-input" id="startTime" th:placeholder="#{ui.data.column.time.start}" name="beginTime"/>
+								<span>-</span>
+								<input type="text" class="time-input" id="endTime" th:placeholder="#{ui.data.column.time.end}" name="endTime"/>
+							</li>
+							<li>
+								<a class="btn btn-primary btn-rounded btn-sm" onclick="searchPre()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.name.search}]]</a>
+								<a class="btn btn-warning btn-rounded btn-sm" onclick="resetPre()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.name.reset}]]</a>
+							</li>
+						</ul>
+					</div>
+				</form>
+			</div>
+			
+			<div class="btn-group-sm" id="toolbar" role="group">
+				<a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="monitor:operlog:remove">
+		            <i class="fa fa-remove"></i> [[#{ui.frame.btn.name.del}]]
+		        </a>
+		        <a class="btn btn-danger" onclick="$.operate.clean()" shiro:hasPermission="monitor:operlog:remove">
+	                <i class="fa fa-trash"></i>  [[#{ui.frame.btn.name.clear}]]
+	            </a>
+	            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="monitor:operlog:export">
+		            <i class="fa fa-download"></i> [[#{ui.frame.btn.name.export}]]
+		        </a>
+	        </div>
+	        
+			<div class="col-sm-12 select-table table-striped">
+				<table id="bootstrap-table"></table>
+			</div>
+		</div>
+	</div>
+	
+	<th:block th:include="include :: footer" />
+	<th:block th:include="include :: bootstrap-select-js" />
+	<script th:inline="javascript">
+		var detailFlag = [[${@permission.hasPermi('monitor:operlog:detail')}]];
+		var datas = [[${@dict.getType('sys_oper_type')}]];
+		var prefix = ctx + "monitor/operlog";
+
+		var status_datas = [[${@dict.getType('sys_runtime_status')}]];
+
+		$(function() {
+		    var options = {
+		        url: prefix + "/list",
+		        cleanUrl: prefix + "/clean",
+		        detailUrl: prefix + "/detail/{id}",
+		        removeUrl: prefix + "/remove",
+		        exportUrl: prefix + "/export",
+		        queryParams: queryParams,
+		        sortName: "operTime",
+		        sortOrder: "desc",
+		        modalName: [[#{ui.biz.page.operlog.title}]],
+		        escape: true,
+		        showPageGo: true,
+		        rememberSelected: true,
+		        columns: [{
+		        	field: 'state',
+		            checkbox: true
+		        },
+		        {
+		            field: 'operId',
+		            title: [[#{ui.data.column.operlog.operId}]]
+		        },
+		        {
+		            field: 'title',
+		            title: [[#{ui.data.column.operlog.title}]]
+		        },
+		        {
+		            field: 'businessType',
+		            title: [[#{ui.data.column.operlog.businessType}]],
+		            align: 'center',
+		            formatter: function(value, row, index) {
+		            	return $.table.selectDictLabel(datas, value);
+		            }
+		        },
+		        {
+		            field: 'operName',
+		            title: [[#{ui.data.column.operlog.operName}]],
+		            sortable: true
+		        },
+		        {
+		            field: 'deptName',
+		            title: [[#{ui.data.column.user.dept}]]
+		        },
+		        {
+		            field: 'operIp',
+		            title: [[#{ui.data.column.online.ipaddr}]]
+		        },
+		        {
+		            field: 'status',
+		            title: [[#{ui.data.column.operlog.status}]],
+		            align: 'center',
+					formatter: function(value, row, index) {
+						return $.table.selectDictLabel(status_datas, value);
+					}
+		        },
+		        {
+		            field: 'operTime',
+		            title: [[#{ui.data.column.operlog.operTime}]],
+		            sortable: true
+		        },
+		        {
+		            title: [[#{ui.frame.btn.name.oper}]],
+		            align: 'center',
+		            formatter: function(value, row, index) {
+		                var actions = [];
+		                actions.push('<a class="btn btn-warning btn-xs ' + detailFlag + '" href="javascript:void(0)" onclick="$.operate.detail(\'' + row.operId + '\')"><i class="fa fa-search"></i>'+[[#{ui.frame.btn.name.detail}]]+'</a> ');
+		                return actions.join('');
+		            }
+		        }]
+		    };
+		    $.table.init(options);
+		});
+		
+		function queryParams(params) {
+			var search = $.table.queryParams(params);
+			search.businessTypes = $.common.join($('#businessTypes').selectpicker('val'));
+			return search;
+		}
+		
+		function searchPre() {
+		    $.table.search('operlog-form', 'bootstrap-table');
+		}
+		
+		function resetPre() {
+			$("#operlog-form")[0].reset();
+			$("#businessTypes").selectpicker('refresh');
+			$.table.search('operlog-form', 'bootstrap-table');
+		}
+	</script>
+</body>
+</html>

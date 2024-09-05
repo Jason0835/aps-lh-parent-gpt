@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>[[#{ui.system.tittle}]]</title>
+    <meta name="description" th:content="#{ui.system.tittle}">
+    <link href="../static/css/bootstrap.min.css" th:href="@{/css/bootstrap.min.css}" rel="stylesheet"/>
+    <link href="../static/css/font-awesome.min.css" th:href="@{/css/font-awesome.min.css}" rel="stylesheet"/>
+    <link href="../static/css/style.css" th:href="@{/css/style.css}" rel="stylesheet"/>
+    <link href="../static/css/login.min.css" th:href="@{/css/login.min.css}" rel="stylesheet"/>
+    <link href="../static/ruoyi/css/ry-ui.css" th:href="@{/ruoyi/css/ry-ui.css?v=4.5.1}" rel="stylesheet"/>
+    <!-- 360浏览器急速模式 -->
+    <meta name="renderer" content="webkit">
+    <!-- 避免IE使用兼容模式 -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="shortcut icon" href="../static/favicon.ico" th:href="@{favicon.ico}"/>
+    <style type="text/css">label.error {
+        position: inherit;
+    }</style>
+    <script>
+        if (window.top !== window.self) {
+            alert('[[#{ui.login.nologin.alert}]]');
+            window.top.location = window.location
+        }
+        ;
+    </script>
+</head>
+<body class="signin">
+<div class="login_logo"><img src="img/logo_login.png"></div>
+<div class = "login-minPanl">
+    <table></table>
+    <div class="signinpanel">
+        <div class="row">
+            <div class="col-sm-7" style="margin-left: 30px;float: none;margin-top: 8%;">
+                <div class="signin-info">
+                    <div class="logopanel m-b">
+                        <h1><img alt="[ 特力通 ]" src="../static/ruoyi.png" th:src="@{/img/title_login.png}"></h1>
+                    </div>
+
+                    <!--                    <strong th:if="${@ryConfig.getKey('sys.account.registerUser')}">还没有账号？ <a th:href="@{/register}">立即注册&raquo;</a></strong>-->
+                </div>
+            </div>
+            <div class="col-sm-5" style="float:none;">
+                <form id="signupForm" autocomplete="off">
+
+                    <h4  class="no-margins" name="u_lang" th:with="type=${@dict.getType('sys_locale_type')}">
+                        <a th:each="dict : ${type}"  th:href="@{'?lang='+${dict.dictValue}}">  [[${dict.dictLabel}]]     </a>
+                    </h4><br>
+
+                    <!--<p class="m-t-md">你若不离不弃，我必生死相依</p>-->
+                    <input type="text" id="username" name="username" autocomplete="off" class="form-control uname" th:placeholder="#{ui.login.username}" value="123"/>
+                    <input type="password" id="password" name="password" autocomplete="off" class="form-control pword" th:placeholder="#{ui.login.pwd}" />
+                    <div class="row m-t" th:if="${captchaEnabled}">
+                        <div class="col-xs-6 imgItem1">
+                            <input type="text" name="validateCode" class="form-control code"
+                                   th:placeholder="#{ui.login.vaildcode}" maxlength="5"/>
+                        </div>
+                        <div class="col-xs-6 imgItem2">
+                            <a href="javascript:void(0);" th:title="#{ui.login.check.changecode}">
+                                <img th:src="@{captcha/captchaImage(type=${captchaType})}" class="imgcode" width="85%"/>
+                            </a>
+                        </div>
+                    </div>
+<!--                    <span class="checkbox-custom" th:classappend="${captchaEnabled==false} ? 'm-t'">-->
+<!--                        <input type="checkbox" id="rememberme" name="rememberme"> <label for="rememberme">[[#{ui.login.rememberme}]]</label>-->
+<!--                    </span>-->
+                    <span class="checkbox-custom" th:style="${captchaEnabled} ? '' : 'margin-top:20px'">
+                        <input type="checkbox" id="remembermeAccount" > <label for="remembermeAccount">[[#{ui.login.rememberme.user}]]</label>
+                    </span>
+                    <span class="checkbox-custom" th:style="${captchaEnabled} ? '' : 'margin-top:20px'">
+                        <input type="checkbox" id="remembermeAll" > <label for="remembermeAll">[[#{ui.login.rememberme.userAndPassword}]]</label>
+                    </span>
+                    <button class="btn btn-success btn-block" id="btnSubmit" th:data-loading="#{ui.login.btn.logining}">
+                        [[#{ui.login.btn.login.name}]]
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<p>&nbsp;</p>
+<script th:inline="javascript"> var ctx = [[@{
+    /}]]; var captchaType = [[${captchaType}]]; </script>
+<!-- 全局js -->
+<script src="../static/js/jquery.min.js" th:src="@{/js/jquery.min.js}"></script>
+<script src="../static/js/jquery.cookie.js" th:src="@{/js/jquery.cookie.js}"></script>
+<script src="../static/js/bootstrap.min.js" th:src="@{/js/bootstrap.min.js}"></script>
+<!-- 验证插件 -->
+<script src="../static/ajax/libs/validate/jquery.validate.min.js"
+        th:src="@{/ajax/libs/validate/jquery.validate.min.js}"></script>
+<script th:src="@{'/locales/validate_messages_'+${#locale}+'.min.js'}"></script>
+<script src="../static/ajax/libs/layer/layer.min.js" th:src="@{/ajax/libs/layer/layer.min.js}"></script>
+<script src="../static/ajax/libs/blockUI/jquery.blockUI.js" th:src="@{/ajax/libs/blockUI/jquery.blockUI.js}"></script>
+<script src="../static/ruoyi/js/ry-ui.js" th:src="@{/ruoyi/js/ry-ui.js?v=4.5.1}"></script>
+<script src="../static/ruoyi/login.js" th:src="@{/ruoyi/login.js}"></script>
+<script th:src="@{'/locales/locale_'+${#locale}+'.js'}"></script>
+<script th:inline="javascript">
+    $(document).ready(function(){
+        if ($.cookie("remembermeAll") == "true") {
+            //如果以前选择了记住密码和账号，则设置复选框的值，将密码和用户名取出来。
+            $("#remembermeAll").attr("checked", true);
+            $("#username").val($.cookie("username"));
+            $("#password").val($.cookie("password"));
+        } else if($.cookie("remembermeAccount") == "true" && !$.cookie("remembermeAll")){
+            //如果以前选择了记住账号，则设置复选框的值，将用户名取出来。
+            $("#remembermeAccount").attr("checked", true);
+            $("#username").val($.cookie("username"));
+            $("#password").val("");
+        } else {
+            $("#remembermeAll").attr("checked", false);
+            $("#remembermeAll").attr("checked", false);
+            $("#username").val("");
+            $("#password").val("");
+        }
+
+        $("#btnSubmit").click(function(){
+            if ($("#remembermeAll").prop("checked")) {
+                //选了记住账号和密码，登录的时候把账号和密码设置到cookie
+                var username = $("#username").val();
+                var password = $("#password").val();
+                $.cookie("remembermeAll", "true", { expires: 30 }); //存储一个带30天期限的cookie
+                $.cookie("username", username, { expires: 30 });
+                $.cookie("password", password, { expires: 30 });
+            } else if($("#remembermeAccount").prop("checked") && !$("#remembermeAll").prop("checked")) {
+                //只选了记住账号，登录的时候把账号到cookie
+                var username = $("#username").val();
+                $.cookie("remembermeAccount", "true", { expires: 30 }); //存储一个带30天期限的cookie
+                $.cookie("username", username, { expires: 30 });
+                $.removeCookie("remembermeAll");
+                $.removeCookie("password");
+            } else {
+                //登录的时候没有选择记住账号 或账号密码，则把cookie清空
+                $.removeCookie("remembermeAll");
+                $.removeCookie("remembermeAccount");
+                $.removeCookie("username");
+                $.removeCookie("password");
+            }
+        });
+    });
+
+
+</script>
+</body>
+</html>

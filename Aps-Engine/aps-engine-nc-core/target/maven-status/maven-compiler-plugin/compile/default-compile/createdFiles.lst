@@ -1,0 +1,17 @@
+com\zlt\aps\nc\engine\mapper\NcEngineMapper.class
+com\zlt\aps\nc\engine\vo\NcSpecifyMachineVo.class
+com\zlt\aps\nc\engine\vo\NcLossVo.class
+com\zlt\aps\nc\engine\mapper\NcEngineGlueMapper.class
+com\zlt\aps\nc\engine\vo\NcStockVo.class
+com\zlt\aps\nc\engine\mapper\NcEngineCurlRollMapper.class
+com\zlt\aps\nc\engine\vo\NcStockConsumeVo.class
+com\zlt\aps\nc\engine\mapper\NcEngineMachineMapper.class
+com\zlt\aps\nc\engine\mapper\NcEngineStockMapper.class
+com\zlt\aps\nc\engine\vo\NcMonthSurplusVo.class
+com\zlt\aps\nc\engine\vo\NcTotalPlanQtyVo.class
+com\zlt\aps\nc\engine\mapper\NcEngineLossMapper.class
+com\zlt\aps\nc\engine\vo\NcGlueOrderVo.class
+com\zlt\aps\nc\engine\vo\NcScheduleResultVo.class
+com\zlt\aps\nc\engine\mapper\NcEngineMonthSurplusMapper.class
+com\zlt\aps\nc\engine\vo\NcParamsVo.class
+com\zlt\aps\nc\engine\vo\NcScheduleBaseInfoVo.class

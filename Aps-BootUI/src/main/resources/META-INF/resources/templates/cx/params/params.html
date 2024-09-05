@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('成型参数信息列表')" />
+</head>
+
+<body class="gray-bg">
+<div class="ui-layout-center">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                <label>[[#{ui.data.column.paramsCode}]]：</label>
+                                <input type="text" name="paramCode"/>
+                            </li>
+                            <li>
+                                <label>[[#{ui.data.column.paramsName}]]：</label>
+                                <input type="text" name="paramName"/>
+                            </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+                <a class="btn btn-primary single disabled" onclick="$.operate.edit('',350)" shiro:hasPermission="cx:params:edit">
+                    <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+                </a>
+                <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cx:params:export">
+                    <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+                </a>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+            </div>
+        </div>
+    </div>
+</div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: bootstrap-table-export-js" />
+    <script th:src="@{/ajax/libs/highlight/highlight.min.js}"></script>
+    <script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+    <th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+    <script th:inline="javascript">
+        var editFlag = [[${@permission.hasPermi('cx:params:edit')}]];
+        var prefix = ctx + "cx/params";
+
+        $(function() {
+            var options = {
+                url: prefix + "/list",
+                updateUrl: prefix + "/{id}",
+                exportUrl: prefix + "/export",
+                modalName: [[#{ui.data.column.cx.params.modelName}]],
+                columns: [{
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: '主键ID',
+                    sortable: true,
+                    visible: false,
+                    widthUnit: '%',
+                    width: 5,
+                },
+                {
+                    field: 'paramCode',
+                    halign:'center',
+                    title: [[#{ui.data.column.paramsCode}]],
+                    sortable: true,
+                    widthUnit: '%',
+                    width: 20,
+                },
+                {
+                    field: 'paramName',
+                    halign:'center',
+                    title: [[#{ui.data.column.paramsName}]],
+                    sortable: true,
+                    widthUnit: '%',
+                    width: 20,
+                },
+                {
+                    field: 'paramValue',
+                    halign:'center',
+                    title: [[#{ui.data.column.paramsValue}]],
+                    sortable: true,
+                    widthUnit: '%',
+                    width: 15,
+                },
+                {
+                    field: 'remark',
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    sortable: true,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value,30);
+                    },
+                    widthUnit: '%',
+                    width: 30,
+                },
+                {
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit('+row.id+','+'350'+')"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        return actions.join('');
+                    },
+                    widthUnit: '%',
+                    width: 10,
+                }]
+            };
+            $.table.init(options);
+        });
+    </script>
+</body>
+</html>

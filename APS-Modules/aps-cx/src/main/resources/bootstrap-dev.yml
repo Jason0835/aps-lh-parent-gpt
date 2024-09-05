@@ -1,0 +1,15 @@
+nacos:
+#  server-addr: 192.168.2.93:8848
+  server-addr: 127.0.0.1:8848
+## Spring
+spring:
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+#        group: APS_DEV_GROUP
+mq:
+  scheduleLog:
+    queue: dev.schedule.log.queue
+    exchange: dev.schedule.log.exchange
+    rutekey: dev.schedule.log.rutekey

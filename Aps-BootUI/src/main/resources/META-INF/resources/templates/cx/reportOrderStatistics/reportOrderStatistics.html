@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('工单完成统计报表列表')"/>
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="startTime" th:value="${initDate}"
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                            <span style='color: black;'>-</span>
+                            <input type="text" class="time-input" id="endTime" th:value="${initDate}"
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.reportStatistics.statisticalMethod}]]：</label>
+                            <select class="form-control" name="statisticalMethod">
+                                <option value="1">[[#{ui.data.column.reportStatistics.everyDay}]]</option>
+                                <option value="2">[[#{ui.data.column.reportStatistics.summary}]]</option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cx:reportOrderStatistics:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: select2-js" />
+<th:block th:include="include :: bootstrap-table-reorder-columns-js"/>
+<th:block th:include="include :: bootstrap-table-resizable-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "cx/reportOrderStatistics";
+    var procedureCodeDatas = [[${@dict.getType('PROCEDURE_CODE')}]];
+    var firstTitle = '';
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.reportOrderStatistics.modelName}]],
+            pagination: true,
+            pageSize: 10000,
+            pageList: [10000],
+            rowStyle: function (row, index) {
+                //标记汇总
+                if (row.dataType === "2") {
+                    return {css: {'background-color': '#ffff00'}};
+                }
+                return {};
+            },
+            columns: [
+                [
+                    {
+                        title: [[#{ui.data.column.reportOrderStatistics.modelName}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        colspan: 7,
+                    },
+                ],
+                [
+                    {
+                        field: 'scheduleDate',
+                        title: [[#{ui.data.column.reportOrderStatistics.scheduleDate}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                    {
+                        field: 'procedureCode',
+                        title: [[#{ui.data.column.reportOrderStatistics.procedureCode}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 10,
+                        widthUnit: '%',
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return value;
+                            }
+                            return getDictLabel(procedureCodeDatas, value, row.dataType);
+                        },
+                    },
+                    {
+                        field: 'orderNo',
+                        title: [[#{ui.data.column.reportOrderStatistics.orderNo}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                    {
+                        field: 'specCode',
+                        title: [[#{ui.data.column.reportOrderStatistics.specCode}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                    {
+                        field: 'planProductionQty',
+                        title: [[#{ui.data.column.reportOrderStatistics.planProductionQty}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                    {
+                        field: 'actualFinishQty',
+                        title: [[#{ui.data.column.reportOrderStatistics.actualFinishQty}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                    {
+                        field: 'finishRate',
+                        title: [[#{ui.data.column.reportOrderStatistics.finishRate}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign: 'center',
+                        width: 15,
+                        widthUnit: '%',
+                    },
+                ],
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    function getDictLabel(datas, value, dataType) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        $.each(datas, function (index, dict) {
+            if (dict.dictValue == ('' + value)) {
+                var listClass = $.common.equals("default", dict.listClass) || $.common.isEmpty(dict.listClass) ? "" : "badge badge-" + dict.listClass;
+                if (dataType === "2") {
+                    // 汇总数据拼接汇总
+                    actions.push($.common.sprintf("<span class='%s'>%s</span>", listClass, dict.dictLabel + [[#{ui.data.column.reportOrderStatistics.summary}]]));
+                } else {
+                    actions.push($.common.sprintf("<span class='%s'>%s</span>", listClass, dict.dictLabel));
+                }
+                return false;
+            }
+        });
+        return actions.join('');
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('导入错误日志记录列表')" />
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <input id="importLogId" name="importLogId" th:value="${importLogId}" type="hidden">
+                    <input id="listUrl" th:value="${listUrl}" type="hidden">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                [[#{ui.data.column.import.errorRow}]]：
+                                <input type="text" name="errorRow"/>
+                            </li>
+                            <li>
+                                [[#{ui.data.column.errorList.detail}]]：
+                                <input type="text" name="errorDetail"/>
+                            </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+
+        var listUrl = ctx + $("#listUrl").val();
+
+        $(function() {
+            var options = {
+                url: listUrl,
+                modalName: [[#{ui.data.frame.import.title}]],
+                columns: [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'errorRow',
+                        title: [[#{ui.data.column.import.errorRow}]],
+                    },
+                    {
+                        field: 'errorDetail',
+                        title: [[#{ui.data.column.errorList.detail}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value,80);
+                        },
+                    },
+                    {
+                        field: 'createTime',
+                        title: [[#{ui.data.column.import.createTime}]],
+                    }
+                    ]
+            };
+            $.table.init(options);
+        });
+
+    </script>
+</body>
+</html>

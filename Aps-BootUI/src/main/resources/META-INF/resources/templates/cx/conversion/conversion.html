@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('半部件规格换算列表')"/>
+    <th:block th:include="include :: bootstrap-editable-css" />
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.conversion.embryoCode}]]：
+                            <input id="embryoCode" name="embryoCode" type="text" onchange="getEmbryoVersions()">
+                        </li>
+                        <li>
+                            [[#{ui.data.column.conversion.bomDataVersion}]]：
+                            <select id="embryoVersions" name="bomDataVersion" th:with="type=${embryoVersions}">
+                                <option value="">[[#{ui.frame.btn.choose}]]</option>
+                                <option th:each="item : ${type}" th:text="${item.embryoVersion}" th:value="${item.embryoVersion}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            [[#{ui.data.column.conversion.queryPlan}]]：
+                            <input type="number" name="queryPlan"/>
+                        </li>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.data.column.conversion.count}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success multiple disabled" onclick="batchSave()" shiro:hasPermission="cx:conversion:save">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.name.save}]]
+            </a>
+            <a class="btn btn-primary multiple disabled" onclick="batchPublish()" shiro:hasPermission="cx:conversion:publish">
+                <i class="fa fa-edit"></i> [[#{ui.lh.moldChange.publish}]]
+            </a>
+        </div>
+
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<th:block th:include="include :: bootstrap-table-editable-js" />
+<script th:inline="javascript">
+    var halfPartTypeDatas = [[${@dict.getType('half_part_type')}]];
+    var unitDatas = [[${@dict.getType('unit')}]];
+    var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+    var machineNameList = [[${@cx.viewList()}]];
+    var prefix = ctx + "cx/conversion";
+
+    $(function () {
+        var options = {
+            uniqueId: 'halfPartType',
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            chooseMachineUrl: prefix + "/toChooseMachine",
+            pageSize: 10000,
+            pageList: [10000],
+            modalName: [[#{ui.data.column.conversion.modelName}]],
+            onEditableShown:function(){
+                setTimeout(function (){
+                    $(".form-control.input-sm").select();
+                },100)
+            },
+            onEditableHidden:function () {
+                $(".editable-submit").click()
+            },
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'halfPartType',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.conversion.halfPartType}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(halfPartTypeDatas, value);
+                    }
+                },
+                {
+                    field: 'halfPartCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.conversion.halfPartCode}]],
+                },
+                {
+                    field: 'plan',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.conversion.plan}]],
+
+                },
+                {
+                    field: 'unit',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.conversion.unit}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(unitDatas, value);
+                    }
+                },
+                {
+                    field: 'machineId',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.produceLine}]],
+                    formatter: function (value, row, index) {
+                        if (row.halfPartType == '8') {
+                            return value;
+                        }
+                        var actions = [];
+                        if ($.common.isEmpty(value)) {
+                            actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' + row.halfPartType + '\',\'' + index + '\')">' +[[#{ui.data.column.selectMachineName}]]+ '</a> ');
+                            return actions.join('');
+                        }
+                        let machineName = selectMachineName(machineNameList, value, row.halfPartType);
+                        actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' +row.halfPartType+ '\',\'' + index + '\')">' + machineName + '</a> ');
+                        return actions.join('');
+                    }
+                },
+                {
+                    field: 'class1Plan',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.dayPlanQty}]],
+                    editable: {
+                        type: 'text',
+                        title: [[#{ui.data.column.scheduleResult.plan}]]+'('+[[#{ui.data.column.scheduleResult.unit.meter}]]+')',
+                        emptytext: '-',
+                        validate: function (value) {
+                            var regu = /^[0-9]+?$/;
+                            if(!regu.test(value)){
+                                layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                            }
+                            if (value > 9999999) {
+                                layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]]);
+                                return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                            }
+                        }
+                    },
+                },
+                {
+                    field: 'class2Plan',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.nightPlanQty}]],
+                    editable: {
+                        type: 'text',
+                        title: [[#{ui.data.column.scheduleResult.plan}]]+'('+[[#{ui.data.column.scheduleResult.unit.meter}]]+')',
+                        emptytext: '-',
+                        validate: function (value) {
+                            var regu = /^[0-9]+?$/;
+                            if(!regu.test(value)){
+                                layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                            }
+                            if (value > 9999999) {
+                                layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]])
+                                return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                            }
+                        }
+                    },
+                },
+                {
+                    field: 'class3Plan',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.midPlanQty}]],
+                    editable: {
+                        type: 'text',
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                        emptytext: '-',
+                        validate: function (value) {
+                            var regu = /^[0-9]+?$/;
+                            if (!regu.test(value)) {
+                                layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                            }
+                            if (value > 9999999) {
+                                layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]])
+                                return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                            }
+                        }
+                    },
+                },
+                {
+                    field: 'class4Plan',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.nextMidPlanQty}]],
+                    editable: {
+                        type: 'text',
+                        title: [[#{ui.data.column.scheduleResult.plan}]] + '(' + [[#{ui.data.column.scheduleResult.unit.meter}]] + ')',
+                        emptytext: '-',
+                        validate: function (value) {
+                            var regu = /^[0-9]+?$/;
+                            if (!regu.test(value)) {
+                                layer.msg([[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]]);
+                                return [[#{ui.data.column.scheduleResult.msg.nonNegativeInteger}]];
+                            }
+                            if (value > 9999999) {
+                                layer.msg([[#{ui.data.column.mdmMonthProdPlan.greatThan}]])
+                                return [[#{ui.data.column.mdmMonthProdPlan.greatThan}]];
+                            }
+                        }
+                    },
+                },
+                {
+                    field: 'status',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.operlog.status}]],
+                    widthUnit: '%',
+                    width: 15,
+                    formatter:function (value, row, index) {
+                        return $.table.tooltip(value);
+                    }
+                },
+                {
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    widthUnit: '%',
+                    width: 10,
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs" href="javascript:void(0)" onclick="save(\'' + index + '\')"><i class="fa fa-save"></i>' + [[#{ui.frame.btn.name.save}]] + '</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs" href="javascript:void(0)" onclick="publish(\'' + index + '\')"><i class="iconfont icon-yidaorurizhi"></i>' + [[#{ui.lh.moldChange.publish}]] + '</a>');
+                        return actions.join('');
+                    },
+                }
+            ]
+        };
+        $.table.init(options);
+    });
+
+    //获取胎胚版本下拉框
+    function getEmbryoVersions(){
+        var embryoCode=$("#embryoCode").val();
+        if($.common.isEmpty(embryoCode)){
+            return;
+        }
+        var config = {
+            url: "/cx/productConstruction/getVersionsByEmbryoCode",
+            type: "post",
+            dataType: "json",
+            data:{"embryoCode":embryoCode},
+            success: function (result) {
+                if (result.code == web_status.SUCCESS){
+                    var embryoVersions=result.data;
+                    var rSelect = '';
+                    for(var i = 0; i < embryoVersions.length; i++){
+                        rSelect += ("<option value = '"+embryoVersions[i].embryoVersion+"'>"+embryoVersions[i].embryoVersion+"</option>");
+                    }
+                    $("#embryoVersions").empty();
+                    $("#embryoVersions").append(rSelect);
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+            }
+        };
+        $.ajax(config)
+    }
+
+    // 保存
+    function save(index) {
+        var rowData = $("#bootstrap-table").bootstrapTable('getData')[index];
+        if ($.common.isEmpty(rowData.machineId) && rowData.halfPartType != '8') {
+            $.modal.alertWarning([[#{mes.error.message.cxHalfPartConversion.machineIdIsNull}]]);
+            return ;
+        }
+        rowData.scheduleDate = $("#scheduleDate").val();
+        $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.frame.btn.name.save}]] + "?", function () {
+            $.operate.postNotRefresh(prefix + "/save", rowData, function (result) {
+                var dateFormat = $.common.dateFormat(new Date(), 'HH:mm:ss ');
+                var row = $("#bootstrap-table").bootstrapTable('getData')[index];
+                var msg;
+                var saveMsg = [[#{ui.frame.btn.name.save}]];
+                if (result.code == web_status.SUCCESS) {
+                    msg = dateFormat + saveMsg + [[#{ui.biz.oper.succ}]];
+                } else if (result.code == web_status.FAIL) {
+                    msg = dateFormat + saveMsg + [[#{ui.biz.oper.fail}]] + ":" + result.msg;
+                }
+                if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') >= 0) {
+                    msg = msg + "<br>" + $.common.split(row.status,'<br>')[1];
+                }else if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') < 0) {
+                    if (row.status.indexOf(saveMsg) < 0) {
+                        msg = msg + "<br>" + row.status;
+                    }
+                }
+                row['status'] = msg;
+                row['id'] = result.data;
+                $("#" + table.options.id).bootstrapTable('updateByUniqueId', {
+                    id: row.halfPartType,
+                    row: row
+                });
+            });
+        })
+    }
+
+    // 发布
+    function publish(index) {
+        var rowData = $("#bootstrap-table").bootstrapTable('getData')[index];
+        if ($.common.isEmpty(rowData.machineId) && rowData.halfPartType != '8') {
+            $.modal.alertWarning([[#{mes.error.message.cxHalfPartConversion.machineIdIsNull}]]);
+            return ;
+        }
+        let scheduleDate = $("#scheduleDate").val();
+        rowData.scheduleDate = scheduleDate;
+        $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.lh.moldChange.publish}]] + "?", function () {
+            $.operate.postNotRefresh(prefix + "/publish", rowData, function (result) {
+                var dateFormat = $.common.dateFormat(new Date(), 'HH:mm:ss ');
+                var row = $("#bootstrap-table").bootstrapTable('getData')[index];
+                var msg;
+                var publishMsg = [[#{ui.lh.moldChange.publish}]];
+                if (result.code == web_status.SUCCESS) {
+                    msg = dateFormat + publishMsg + [[#{ui.biz.oper.succ}]];
+                } else if (result.code == web_status.FAIL) {
+                    msg = dateFormat + publishMsg + [[#{ui.biz.oper.fail}]] + ":" + result.msg;
+                }
+                if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') >= 0) {
+                    msg = $.common.split(row.status,'<br>')[0] + "<br>" + msg;
+                }else if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') < 0) {
+                    if (row.status.indexOf(publishMsg) < 0) {
+                        msg = row.status + "<br>" + msg;
+                    }
+                }
+                let $table = $("#" + table.options.id);
+                $table.bootstrapTable('updateCell', {
+                    index: index,
+                    field: 'status',
+                    value: msg
+                });
+                $table.bootstrapTable('updateCell', {
+                    index: index,
+                    field: 'id',
+                    value: result.data
+                });
+            });
+        })
+    }
+
+    // 批量保存
+    function batchSave() {
+        var rowData = $("#bootstrap-table").bootstrapTable('getSelections');
+        for (var i = 0; i < rowData.length; i++) {
+            if ($.common.isEmpty(rowData[i].machineId) && rowData[i].halfPartType != '8') {
+                $.modal.alertWarning([[#{mes.error.message.cxHalfPartConversion.machineIdIsNull}]]);
+                return ;
+            }
+        }
+        var data = {'listStr': JSON.stringify(rowData), 'scheduleDate': $("#scheduleDate").val()}
+        $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.frame.btn.name.save}]] + "?", function () {
+            $.operate.postNotRefresh(prefix + "/batchSave", data, function (result) {
+                var dateFormat = $.common.dateFormat(new Date(), 'HH:mm:ss ');
+                $.each(result.data, function(index, item) {
+                    var halfPartType = item.halfPartType;
+                    var row = $("#bootstrap-table").bootstrapTable('getRowByUniqueId', halfPartType);
+                    var msg;
+                    var saveMsg = [[#{ui.frame.btn.name.save}]];
+                    if (item.code == web_status.SUCCESS) {
+                        msg = dateFormat + saveMsg + [[#{ui.biz.oper.succ}]];
+                    } else if (item.code == web_status.FAIL) {
+                        msg = dateFormat + saveMsg + [[#{ui.biz.oper.fail}]] + ":" + item.msg;
+                    }
+                    if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') >= 0) {
+                        msg = msg + "<br>" + $.common.split(row.status,'<br>')[1];
+                    }else if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') < 0) {
+                        if (row.status.indexOf(saveMsg) < 0) {
+                            msg = msg + "<br>" + row.status;
+                        }
+                    }
+                    row['status'] = msg;
+                    row['id'] = item.id;
+                    $("#" + table.options.id).bootstrapTable('updateByUniqueId', {
+                        id: halfPartType,
+                        row: row
+                    });
+                });
+            });
+        })
+    }
+
+    // 批量发布
+    function batchPublish() {
+        var rowData = $("#bootstrap-table").bootstrapTable('getSelections');
+        for (var i = 0; i < rowData.length; i++) {
+            if ($.common.isEmpty(rowData[i].machineId) && rowData[i].halfPartType != '8') {
+                $.modal.alertWarning([[#{mes.error.message.cxHalfPartConversion.machineIdIsNull}]]);
+                return ;
+            }
+        }
+        var scheduleDate = $("#scheduleDate").val();
+        var data = {'listStr': JSON.stringify(rowData), 'scheduleDate': scheduleDate}
+        $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.lh.moldChange.publish}]] + "?", function () {
+            $.operate.postNotRefresh(prefix + "/batchPublish", data, function (result) {
+                var dateFormat = $.common.dateFormat(new Date(), 'HH:mm:ss ');
+                $.each(result.data, function(index, item) {
+                    var halfPartType = item.halfPartType;
+                    var row = $("#bootstrap-table").bootstrapTable('getRowByUniqueId', halfPartType);
+                    var msg;
+                    var publishMsg = [[#{ui.lh.moldChange.publish}]];
+                    if (item.code == web_status.SUCCESS) {
+                        msg = dateFormat + publishMsg + [[#{ui.biz.oper.succ}]];
+                    } else if (item.code == web_status.FAIL) {
+                        msg = dateFormat + publishMsg + [[#{ui.biz.oper.fail}]] + ":" + item.msg;
+                    }
+                    if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') >= 0) {
+                        msg = $.common.split(row.status,'<br>')[0] + "<br>" + msg;
+                    }else if (!$.common.isEmpty(row.status) && row.status.indexOf('<br>') < 0) {
+                        if (row.status.indexOf(publishMsg) < 0) {
+                            msg = row.status + "<br>" + msg;
+                        }
+                    }
+                    $("#" + table.options.id).bootstrapTable('updateCellByUniqueId', {
+                        id: halfPartType,
+                        field: 'status',
+                        value: msg
+                    });
+                });
+            });
+        })
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, value, halfPartType) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var procedureCode = transProcedureCode(halfPartType);
+        let newDatas = datas.filter(item => item.procedureCode == procedureCode);
+        var actions = [];
+        var arr = value.split(",");
+        $.each(newDatas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineId + '' == (item)) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    //选择机台
+    function chooseMachine(halfPartType, index) {
+        var data = $("#" + table.options.id).bootstrapTable('getRowByUniqueId', halfPartType);
+        url = table.options.chooseMachineUrl + "?halfPartType=" + halfPartType + "&machineId=" + data.machineId;
+        $.modal.open([[#{ui.data.column.conversion.modelName}]], url, 500, 500);
+    }
+
+    /**
+     * 将半部件类型转为工序code
+     * @param halfPartType 半部件类型
+     */
+    function transProcedureCode(halfPartType) {
+        var procedureCode;
+        switch (halfPartType) {
+            case "1":
+                procedureCode = '2'
+                break;
+            case "2":
+                procedureCode = '3'
+                break;
+            case "3":
+                procedureCode = '4'
+                break;
+            case "4":
+                procedureCode = '5'
+                break;
+            case "5":
+                procedureCode = '6'
+                break;
+            case "6":
+            case "7":
+                procedureCode = '7'
+                break;
+            case "8":
+                procedureCode = '9'
+                break;
+            case "9":
+            case "10":
+            case "11":
+                procedureCode = '8'
+                break;
+            case "12":
+                procedureCode = '10'
+                break;
+        }
+        return procedureCode;
+    }
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+    .pagination-detail{margin-top: 0 !important;margin-bottom: 0 !important;}
+    .select-table{padding-bottom: 0 !important;}
+    button.btn.btn-default.btn-sm.editable-cancel {display: none}
+</style>
+</html>

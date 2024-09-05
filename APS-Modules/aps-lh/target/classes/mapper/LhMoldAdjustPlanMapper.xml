@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhMoldAdjustPlanMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhMoldAdjustPlan" id="LhMoldAdjustPlanResult">
+        <result property="id" column="id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="type" column="type"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="planDate" column="plan_date"/>
+        <result property="changeMoldTime" column="change_mold_time"/>
+        <result property="moldStatus" column="mold_status"/>
+        <result property="auditStatus" column="audit_status"/>
+        <result property="process" column="process"/>
+        <result property="executionStatus" column="execution_status"/>
+        <result property="beginTime" column="begin_time"/>
+        <result property="finishTime" column="finish_time"/>
+        <result property="leftSapCode" column="left_sap_code"/>
+        <result property="rightSapCode" column="right_sap_code"/>
+        <result property="leftEmbryoSapCode" column="left_embryo_sap_code"/>
+        <result property="rightEmbryoSapCode" column="right_embryo_sap_code"/>
+        <result property="leftSpecDesc" column="left_spec_desc"/>
+        <result property="rightSpecDesc" column="right_spec_desc"/>
+        <result property="leftBeforeSpecDesc" column="left_before_spec_desc"/>
+        <result property="rightBeforeSpecDesc" column="right_before_spec_desc"/>
+        <result property="leftEmbryoCode" column="left_embryo_code"/>
+        <result property="rightEmbryoCode" column="right_embryo_code"/>
+        <result property="leftStream" column="left_stream"/>
+        <result property="rightStream" column="right_stream"/>
+        <result property="leftMoldInfo" column="left_mold_info"/>
+        <result property="rightMoldInfo" column="right_mold_info"/>
+        <result property="moldAssembler" column="mold_assembler"/>
+        <result property="moldAssembleTime" column="mold_assemble_time"/>
+        <result property="auditor" column="auditor"/>
+        <result property="auditTime" column="audit_time"/>
+        <result property="auditSuggest" column="audit_suggest"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectLhMoldAdjustPlanVo">
+        select id, order_no, type, lh_machine_code, plan_date, change_mold_time, mold_status, audit_status, process, execution_status, begin_time, finish_time, left_sap_code, right_sap_code, left_embryo_sap_code, right_embryo_sap_code, left_spec_desc, right_spec_desc, left_before_spec_desc, right_before_spec_desc, left_embryo_code, right_embryo_code, left_stream, right_stream, left_mold_info, right_mold_info, mold_assembler, mold_assemble_time, auditor, audit_time, audit_suggest, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_mold_adjust_plan
+    </sql>
+
+    <select id="selectLhMoldAdjustPlanList" parameterType="com.zlt.aps.lh.api.domain.entity.LhMoldAdjustPlan"
+            resultMap="LhMoldAdjustPlanResult">
+        <include refid="selectLhMoldAdjustPlanVo"/>
+        where del_flag = '0'
+        <if test="planDate != null">and PLAN_DATE BETWEEN #{planDate} AND #{planDate} + 1 - 1/24/60/60</if>
+        <if test="moldStatus != null  and moldStatus != ''">and mold_status = #{moldStatus}</if>
+        <if test="auditStatus != null  and auditStatus != ''">and audit_status = #{auditStatus}</if>
+        <if test="process != null ">and process = #{process}</if>
+        <if test="executionStatus != null  and executionStatus != ''">and execution_status = #{executionStatus}</if>
+        <if test="leftSapCode != null  and leftSapCode != ''">and INSTR(left_sap_code, #{leftSapCode}) > 0</if>
+        <if test="rightSapCode != null  and rightSapCode != ''">and INSTR(right_sap_code, #{rightSapCode}) > 0</if>
+    </select>
+
+    <select id="selectLhMoldAdjustPlanById" parameterType="Long" resultMap="LhMoldAdjustPlanResult">
+        <include refid="selectLhMoldAdjustPlanVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertLhMoldAdjustPlan" parameterType="com.zlt.aps.lh.api.domain.entity.LhMoldAdjustPlan">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_LH_MOLD_ADJUST_PLAN.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_lh_mold_adjust_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="type != null">type,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="planDate != null">plan_date,</if>
+            <if test="changeMoldTime != null">change_mold_time,</if>
+            <if test="moldStatus != null">mold_status,</if>
+            <if test="auditStatus != null">audit_status,</if>
+            <if test="process != null">process,</if>
+            <if test="executionStatus != null">execution_status,</if>
+            <if test="beginTime != null">begin_time,</if>
+            <if test="finishTime != null">finish_time,</if>
+            <if test="leftSapCode != null">left_sap_code,</if>
+            <if test="rightSapCode != null">right_sap_code,</if>
+            <if test="leftEmbryoSapCode != null">left_embryo_sap_code,</if>
+            <if test="rightEmbryoSapCode != null">right_embryo_sap_code,</if>
+            <if test="leftSpecDesc != null">left_spec_desc,</if>
+            <if test="rightSpecDesc != null">right_spec_desc,</if>
+            <if test="leftBeforeSpecDesc != null">left_before_spec_desc,</if>
+            <if test="rightBeforeSpecDesc != null">right_before_spec_desc,</if>
+            <if test="leftEmbryoCode != null">left_embryo_code,</if>
+            <if test="rightEmbryoCode != null">right_embryo_code,</if>
+            <if test="leftStream != null">left_stream,</if>
+            <if test="rightStream != null">right_stream,</if>
+            <if test="leftMoldInfo != null">left_mold_info,</if>
+            <if test="rightMoldInfo != null">right_mold_info,</if>
+            <if test="moldAssembler != null">mold_assembler,</if>
+            <if test="moldAssembleTime != null">mold_assemble_time,</if>
+            <if test="auditor != null">auditor,</if>
+            <if test="auditTime != null">audit_time,</if>
+            <if test="auditSuggest != null">audit_suggest,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="type != null">#{type},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="planDate != null">#{planDate},</if>
+            <if test="changeMoldTime != null">#{changeMoldTime},</if>
+            <if test="moldStatus != null">#{moldStatus},</if>
+            <if test="auditStatus != null">#{auditStatus},</if>
+            <if test="process != null">#{process},</if>
+            <if test="executionStatus != null">#{executionStatus},</if>
+            <if test="beginTime != null">#{beginTime},</if>
+            <if test="finishTime != null">#{finishTime},</if>
+            <if test="leftSapCode != null">#{leftSapCode},</if>
+            <if test="rightSapCode != null">#{rightSapCode},</if>
+            <if test="leftEmbryoSapCode != null">#{leftEmbryoSapCode},</if>
+            <if test="rightEmbryoSapCode != null">#{rightEmbryoSapCode},</if>
+            <if test="leftSpecDesc != null">#{leftSpecDesc},</if>
+            <if test="rightSpecDesc != null">#{rightSpecDesc},</if>
+            <if test="leftBeforeSpecDesc != null">#{leftBeforeSpecDesc},</if>
+            <if test="rightBeforeSpecDesc != null">#{rightBeforeSpecDesc},</if>
+            <if test="leftEmbryoCode != null">#{leftEmbryoCode},</if>
+            <if test="rightEmbryoCode != null">#{rightEmbryoCode},</if>
+            <if test="leftStream != null">#{leftStream},</if>
+            <if test="rightStream != null">#{rightStream},</if>
+            <if test="leftMoldInfo != null">#{leftMoldInfo},</if>
+            <if test="rightMoldInfo != null">#{rightMoldInfo},</if>
+            <if test="moldAssembler != null">#{moldAssembler},</if>
+            <if test="moldAssembleTime != null">#{moldAssembleTime},</if>
+            <if test="auditor != null">#{auditor},</if>
+            <if test="auditTime != null">#{auditTime},</if>
+            <if test="auditSuggest != null">#{auditSuggest},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateLhMoldAdjustPlan" parameterType="com.zlt.aps.lh.api.domain.entity.LhMoldAdjustPlan">
+        update t_lh_mold_adjust_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="type != null">type = #{type},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="planDate != null">plan_date = #{planDate},</if>
+            <if test="changeMoldTime != null">change_mold_time = #{changeMoldTime},</if>
+            <if test="moldStatus != null">mold_status = #{moldStatus},</if>
+            <if test="auditStatus != null">audit_status = #{auditStatus},</if>
+            <if test="process != null">process = #{process},</if>
+            <if test="executionStatus != null">execution_status = #{executionStatus},</if>
+            <if test="beginTime != null">begin_time = #{beginTime},</if>
+            <if test="finishTime != null">finish_time = #{finishTime},</if>
+            <if test="leftSapCode != null">left_sap_code = #{leftSapCode},</if>
+            <if test="rightSapCode != null">right_sap_code = #{rightSapCode},</if>
+            <if test="leftEmbryoSapCode != null">left_embryo_sap_code = #{leftEmbryoSapCode},</if>
+            <if test="rightEmbryoSapCode != null">right_embryo_sap_code = #{rightEmbryoSapCode},</if>
+            <if test="leftSpecDesc != null">left_spec_desc = #{leftSpecDesc},</if>
+            <if test="rightSpecDesc != null">right_spec_desc = #{rightSpecDesc},</if>
+            <if test="leftBeforeSpecDesc != null">left_before_spec_desc = #{leftBeforeSpecDesc},</if>
+            <if test="rightBeforeSpecDesc != null">right_before_spec_desc = #{rightBeforeSpecDesc},</if>
+            <if test="leftEmbryoCode != null">left_embryo_code = #{leftEmbryoCode},</if>
+            <if test="rightEmbryoCode != null">right_embryo_code = #{rightEmbryoCode},</if>
+            <if test="leftStream != null">left_stream = #{leftStream},</if>
+            <if test="rightStream != null">right_stream = #{rightStream},</if>
+            <if test="leftMoldInfo != null">left_mold_info = #{leftMoldInfo},</if>
+            <if test="rightMoldInfo != null">right_mold_info = #{rightMoldInfo},</if>
+            <if test="moldAssembler != null">mold_assembler = #{moldAssembler},</if>
+            <if test="moldAssembleTime != null">mold_assemble_time = #{moldAssembleTime},</if>
+            <if test="auditor != null">auditor = #{auditor},</if>
+            <if test="auditTime != null">audit_time = #{auditTime},</if>
+            <if test="auditSuggest != null">audit_suggest = #{auditSuggest},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhMoldAdjustPlanById" parameterType="Long">
+        update t_lh_mold_adjust_plan
+        set del_flag = '1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteLhMoldAdjustPlanByIds" parameterType="String">
+        update t_lh_mold_adjust_plan set del_flag = '1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lh_mold_adjust_plan a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.orderNo,jdbcType=VARCHAR} order_no, #{item.type,jdbcType=VARCHAR}
+            type, #{item.lhMachineCode,jdbcType=VARCHAR} lh_machine_code, #{item.planDate, jdbcType=DATE} plan_date,
+            #{item.changeMoldTime, jdbcType=DATE} change_mold_time, #{item.moldStatus,jdbcType=VARCHAR} mold_status,
+            #{item.auditStatus,jdbcType=VARCHAR} audit_status, #{item.process, jdbcType=DOUBLE} process,
+            #{item.executionStatus,jdbcType=VARCHAR} execution_status, #{item.beginTime, jdbcType=DATE} begin_time,
+            #{item.finishTime, jdbcType=DATE} finish_time, #{item.leftSapCode,jdbcType=VARCHAR} left_sap_code,
+            #{item.rightSapCode,jdbcType=VARCHAR} right_sap_code, #{item.leftEmbryoSapCode,jdbcType=VARCHAR}
+            left_embryo_sap_code, #{item.rightEmbryoSapCode,jdbcType=VARCHAR} right_embryo_sap_code,
+            #{item.leftSpecDesc,jdbcType=VARCHAR} left_spec_desc, #{item.rightSpecDesc,jdbcType=VARCHAR}
+            right_spec_desc, #{item.leftBeforeSpecDesc,jdbcType=VARCHAR} left_before_spec_desc,
+            #{item.rightBeforeSpecDesc,jdbcType=VARCHAR} right_before_spec_desc, #{item.leftEmbryoCode,jdbcType=VARCHAR}
+            left_embryo_code, #{item.rightEmbryoCode,jdbcType=VARCHAR} right_embryo_code,
+            #{item.leftStream, jdbcType=DOUBLE} left_stream, #{item.rightStream, jdbcType=DOUBLE} right_stream,
+            #{item.leftMoldInfo,jdbcType=VARCHAR} left_mold_info, #{item.rightMoldInfo,jdbcType=VARCHAR}
+            right_mold_info, #{item.moldAssembler,jdbcType=VARCHAR} mold_assembler,
+            #{item.moldAssembleTime, jdbcType=DATE} mold_assemble_time, #{item.auditor,jdbcType=VARCHAR} auditor,
+            #{item.auditTime, jdbcType=DATE} audit_time, #{item.auditSuggest,jdbcType=VARCHAR} audit_suggest,
+            #{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.remark,jdbcType=VARCHAR} remark from dual
+        </foreach>
+        ) b ON (
+        此处需要手动关联唯一性条件
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.order_no = b.order_no
+            , a.type = b.type
+            , a.lh_machine_code = b.lh_machine_code
+            , a.plan_date = b.plan_date
+            , a.change_mold_time = b.change_mold_time
+            , a.mold_status = b.mold_status
+            , a.audit_status = b.audit_status
+            , a.process = b.process
+            , a.execution_status = b.execution_status
+            , a.begin_time = b.begin_time
+            , a.finish_time = b.finish_time
+            , a.left_sap_code = b.left_sap_code
+            , a.right_sap_code = b.right_sap_code
+            , a.left_embryo_sap_code = b.left_embryo_sap_code
+            , a.right_embryo_sap_code = b.right_embryo_sap_code
+            , a.left_spec_desc = b.left_spec_desc
+            , a.right_spec_desc = b.right_spec_desc
+            , a.left_before_spec_desc = b.left_before_spec_desc
+            , a.right_before_spec_desc = b.right_before_spec_desc
+            , a.left_embryo_code = b.left_embryo_code
+            , a.right_embryo_code = b.right_embryo_code
+            , a.left_stream = b.left_stream
+            , a.right_stream = b.right_stream
+            , a.left_mold_info = b.left_mold_info
+            , a.right_mold_info = b.right_mold_info
+            , a.mold_assembler = b.mold_assembler
+            , a.mold_assemble_time = b.mold_assemble_time
+            , a.auditor = b.auditor
+            , a.audit_time = b.audit_time
+            , a.audit_suggest = b.audit_suggest
+            , a.update_by = b.create_by
+            , a.update_time = sysdate
+            , a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.order_no, a.type, a.lh_machine_code, a.plan_date, a.change_mold_time, a.mold_status, a.audit_status,
+        a.process, a.execution_status, a.begin_time, a.finish_time, a.left_sap_code, a.right_sap_code,
+        a.left_embryo_sap_code, a.right_embryo_sap_code, a.left_spec_desc, a.right_spec_desc, a.left_before_spec_desc,
+        a.right_before_spec_desc, a.left_embryo_code, a.right_embryo_code, a.left_stream, a.right_stream,
+        a.left_mold_info, a.right_mold_info, a.mold_assembler, a.mold_assemble_time, a.auditor, a.audit_time,
+        a.audit_suggest, a.create_by, a.create_time, a.del_flag, a.remark
+        )
+        values (
+        SEQ_LH_MOLD_ADJUST_PLAN.NEXTVAL, b.order_no, b.type, b.lh_machine_code, b.plan_date, b.change_mold_time, b.mold_status,
+        b.audit_status, b.process, b.execution_status, b.begin_time, b.finish_time, b.left_sap_code, b.right_sap_code,
+        b.left_embryo_sap_code, b.right_embryo_sap_code, b.left_spec_desc, b.right_spec_desc, b.left_before_spec_desc,
+        b.right_before_spec_desc, b.left_embryo_code, b.right_embryo_code, b.left_stream, b.right_stream,
+        b.left_mold_info, b.right_mold_info, b.mold_assembler, b.mold_assemble_time, b.auditor, b.audit_time,
+        b.audit_suggest, b.create_by, sysdate, 0, b.remark
+        )
+    </update>
+</mapper>

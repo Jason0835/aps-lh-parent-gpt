@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('施工信息列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.construction.embryoCode}]]：
+                            <input type="text" name="embryoCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.construction.dimension}]]：
+                            <input type="number" name="dimension"/>
+                        </li>
+                        <li>
+                            [[#{ui.construction.spec}]]：
+                            <input type="text" name="specDesc"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.construction.embryoVersion}]]：</label>
+                            <input type="text" name="embryoVersion"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.productionStage}]]：</label>
+                            <select name="productionStage" th:with="type=${@dict.getType('PRODUCTION_STAGE')}"
+                                    class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.halfPartsQueryType}]]：</label>
+                            <select name="halfPartsQueryType" th:with="type=${@dict.getType('HALF_PARTS_CODE')}"
+                                    class="form-control">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+
+                        <li>
+                            <label>[[#{ui.data.column.productConstruction.halfPartsQueryCode}]]：</label>
+                            <input type="text" name="halfPartsQueryCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+
+<script th:inline="javascript">
+    var PRODUCTION_STAGE = [[${@dict.getType('PRODUCTION_STAGE')}]];
+    var prefix = ctx + "cx/constructionInfo";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.construction.modalName}]],
+            uniqueId: 'id',
+            fixedColumns: true,
+            fixedNumber: 3,
+            columns: [
+                [
+                    {title: [[#{ui.construction.baseInfo}]], align: 'center', colspan: 16},
+                    {title: [[#{ui.construction.carcassCloth}]], align: 'center', colspan: 19},
+                    {title: [[#{ui.construction.lining}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.construction.sidewall}]], align: 'center', colspan: 10},
+                    {title: [[#{ui.construction.supportingGlue}]], align: 'center', colspan: 3},
+                    {title: [[#{ui.construction.steelRing}]], align: 'center', colspan: 5},
+                    {title: [[#{ui.construction.hexagonRing}]], align: 'center', colspan: 8},
+                    {title: [[#{ui.construction.steelStrip}]], align: 'center', colspan: 16},
+                    {title: [[#{ui.construction.crownBand}]], align: 'center', colspan: 1},
+                    {title: [[#{ui.construction.tread}]], align: 'center', colspan: 13}
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.common.column.id}]],
+                        visible: false
+                    },
+                    {
+                        field: 'sapCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.sapCode}]]
+                    },
+                    {
+                        field: 'embryoCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.embryoCode}]]
+                    },
+                    {
+                        field: 'embryoVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.embryoVersion}]]
+                    },
+                    {
+                        field: 'productionStage',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.productionStage}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(PRODUCTION_STAGE, value);
+                        },
+                    },
+                    {
+                        field: 'dimension',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.dimension}]]
+                    },
+                    {
+                        field: 'specDesc',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.construction.spec}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value);
+                        },
+                        width: 50,
+                    },
+                    {
+                        field: 'noseWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.noseWidth}]]
+                    },
+                    {
+                        field: 'flipDiscDiameter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.flipDiscDiameter}]]
+                    },
+                    {
+                        field: 'fitDrumPerimeter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.fitDrumPerimeter}]]
+                    },
+                    {
+                        field: 'chuckDiameter',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.chuckDiameter}]]
+                    },
+                    {
+                        field: 'stretchWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.stretchWidth}]]
+                    },
+                    {
+                        field: 'qualitativeWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.qualitativeWidth}]]
+                    },
+                    {
+                        field: 'embryoCircle',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.embryoCircle}]]
+                    },
+                    {
+                        field: 'sectionWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.sectionWidth}]]
+                    },
+
+
+                    {
+                        field: 'tireFabric1Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric1Version}]]
+                    },
+                    {
+                        field: 'tireFabricSap1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricSap1}]]
+                    },
+                    {
+                        field: 'tireFabricCode1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCode1}]]
+                    },
+                    {
+                        field: 'tireFabric1Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric1Version}]],
+                    },
+                    {
+                        field: 'tireFabricCraft1',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCraft1}]]
+                    },
+                    {
+                        field: 'tireFabricSideRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabricSideRubber}]]
+                    },
+                    {
+                        field: 'tireFabric2Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric2Version}]]
+                    },
+                    {
+                        field: 'tireFabricSap2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricSap2}]]
+                    },
+                    {
+                        field: 'tireFabricCode2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCode2}]]
+                    },
+                    {
+                        field: 'tireFabricCraft2',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCraft2}]]
+                    },
+                    {
+                        field: 'tireFabric3Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireFabric3Version}]]
+                    },
+                    {
+                        field: 'tireFabricSap3',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricSap3}]]
+                    },
+                    {
+                        field: 'tireFabricCode3',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCode3}]]
+                    },
+                    {
+                        field: 'tireFabricCraft3',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireFabricCraft3}]]
+                    },
+                    {
+                        field: 'originalLineCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.originalLineCode}]]
+                    },
+                    {
+                        field: 'cordVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.cordVersion}]]
+                    },
+                    {
+                        field: 'cordSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.cordSap}]]
+                    },
+                    {
+                        field: 'cordSpec',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.cordSpec}]]
+                    },
+                    {
+                        field: 'reinforceSealGlue',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.reinforceSealGlue}]]
+                    },
+
+
+                    {
+                        field: 'insideVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.insideVersion}]]
+                    },
+                    {
+                        field: 'insideRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.insideRubber}]]
+                    },
+                    {
+                        field: 'insideSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.insideSap}]]
+                    },
+                    {
+                        field: 'insideCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.insideCode}]]
+                    },
+                    {
+                        field: 'insideCraft',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.insideCraft}]]
+                    },
+
+
+                    {
+                        field: 'sidewallVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.sidewallVersion}]]
+                    },
+                    {
+                        field: 'sidewallSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallSap}]]
+                    },
+                    {
+                        field: 'sidewallCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallCode}]]
+                    },
+                    {
+                        field: 'sidewallCraft',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallCraft}]]
+                    },
+                    {
+                        field: 'sidewallMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallMouthPlate}]]
+                    },
+                    {
+                        field: 'sidewallCenter',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallCenter}]]
+                    },
+                    {
+                        field: 'sidewallLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallLength}]]
+                    },
+                    {
+                        field: 'sidewallRubber',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallRubber}]]
+
+                    },
+                    {
+                        field: 'sidewallWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallWeight}]]
+                    },
+                    {
+                        field: 'sidewallWearpRubberWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.sidewallWearpRubberWeight}]]
+                    },
+
+
+                    {
+                        field: 'supportCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.supportCode}]]
+                    },
+                    {
+                        field: 'supportRubberCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.supportRubberCode}]]
+                    },
+                    {
+                        field: 'supportLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.supportLength}]]
+                    },
+
+
+                    {
+                        field: 'beadVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.beadVersion}]]
+                    },
+                    {
+                        field: 'beadSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beadSap}]]
+                    },
+                    {
+                        field: 'beadCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beadCode}]]
+                    },
+                    {
+                        field: 'beadArrange',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.construction.beadArrange}]]
+                    },
+                    {
+                        field: 'beadType',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beadType}]]
+                    },
+
+                    {
+                        field: 'tireRingVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.tireRingVersion}]]
+                    },
+                    {
+                        field: 'tireRingSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireRingSap}]]
+                    },
+                    {
+                        field: 'tireRingCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireRingCode}]]
+                    },
+
+
+                    {
+                        field: 'apexCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.apexCode}]]
+                    },
+                    {
+                        field: 'hexagonRubberCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.hexagonRubberCode}]]
+                    },
+                    {
+                        field: 'hexagonMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.hexagonMouthPlate}]]
+                    },
+                    {
+                        field: 'hexagonRubberDimension',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.construction.hexagonRubberDimension}]]
+                    },
+                    {
+                        field: 'apexWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.apexWeight}]]
+                    },
+
+
+                    {
+                        field: 'belt1Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.belt1Version}]]
+                    },
+                    {
+                        field: 'beltSap1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltSap1}]]
+                    },
+                    {
+                        field: 'beltCode1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltCode1}]]
+                    },
+                    {
+                        field: 'beltCraft1',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltCraft1}]]
+                    },
+                    {
+                        field: 'beltSideRubber1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltSideRubber1}]]
+                    },
+                    {
+                        field: 'beltRubber1',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltRubber1}]]
+                    },
+
+                    {
+                        field: 'belt2Version',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.belt2Version}]]
+                    },
+                    {
+                        field: 'beltSap2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltSap2}]]
+                    },
+                    {
+                        field: 'beltCode2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltCode2}]]
+                    },
+                    {
+                        field: 'beltCraft2',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltCraft2}]]
+                    },
+                    {
+                        field: 'beltSideRubber2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltSideRubber2}]]
+                    },
+                    {
+                        field: 'beltRubber2',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltRubber2}]]
+                    },
+                    {
+                        field: 'beltCuttingAngle',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.beltCuttingAngle}]]
+                    },
+                    {
+                        field: 'articleCrownVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.articleCrownVersion}]]
+                    },
+                    {
+                        field: 'articleCrownSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.articleCrownSap}]]
+                    },
+                    {
+                        field: 'articleCrownSpec',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.articleCrownSpec}]]
+                    },
+
+
+                    {
+                        field: 'articleCrownCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.articleCrownCode}]]
+                    },
+
+
+                    {
+                        field: 'treadVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productConstruction.treadVersion}]]
+                    },
+                    {
+                        field: 'treadSap',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadSap}]]
+                    },
+                    {
+                        field: 'treadCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadCode}]]
+                    },
+                    {
+                        field: 'treadShoulderWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadShoulderWidth}]]
+                    },
+                    {
+                        field: 'treadShoulderJWidth',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadShoulderJWidth}]]
+                    },
+                    {
+                        field: 'treadShoulderLength',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadShoulderLength}]]
+                    },
+                    {
+                        field: 'treadRubberCategory',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadRubberCategory}]]
+                    },
+                    {
+                        field: 'tireCrownUpWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireCrownUpWidthWeight}]]
+                    },
+                    {
+                        field: 'tireCrownDownWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireCrownDownWidthWeight}]]
+                    },
+                    {
+                        field: 'tireWingWidthWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.tireWingWidthWeight}]]
+                    },
+                    {
+                        field: 'primerWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.primerWeight}]]
+                    },
+                    {
+                        field: 'conductingResinWeight',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.construction.conductingResinWeight}]]
+                    },
+                    {
+                        field: 'treadMouthPlate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.construction.treadMouthPlate}]]
+                    }
+                ]
+            ]
+        };
+        $.table.init(options, true);
+
+        //设置隐藏按钮点击事件重写
+        // var fnc = $("button[name='search']").click;
+        // $("button[name='search']").click(function(){
+        //     fnc;
+        //     //重置表格高度设置
+        //     setTimeout(function () {
+        //         /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        //         var wh = $(window).height();//ifram容器高度
+        //         var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        //         var bh = wh-(fixTop-50);//基础默认表格高度
+        //         $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+        //     },1000)
+        // });
+
+
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+
+    // $(window).resize(function() {
+    //     /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+    //     var wh = $(window).height();//ifram容器高度
+    //     var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+    //     var bh = wh-(fixTop-50);//基础默认表格高度
+    //     $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+    // });
+</script>
+</body>
+<!-- 导入区域 -->
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <input type="button" th:value="#{ui.file.btn.text}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;"
+                   onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport"> [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp; <a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i>
+                [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+<style>
+    .pagination-detail {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+    }
+
+    .select-table {
+        padding-bottom: 5px !important;
+    }
+</style>
+</html>

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="aps-plat-engine-tq-core" />
+        <module name="zlt-frame-starter" />
+        <module name="zlt-common" />
+        <module name="ruoyi-common-redis" />
+        <module name="aps-engine-xwyy" />
+        <module name="ruoyi-api-system" />
+        <module name="aps-plat-engine-cd15-core" />
+        <module name="aps-plat-engine-xwyy-core" />
+        <module name="aps-cx-api" />
+        <module name="ruoyi-framework" />
+        <module name="ruoyi-api-job" />
+        <module name="aps-xwyy" />
+        <module name="aps-engine-cd15" />
+        <module name="aps-gsq" />
+        <module name="ruoyi-api-gateway-system" />
+        <module name="aps-xwyy-api" />
+        <module name="aps-nc" />
+        <module name="aps-cd15-api" />
+        <module name="ruoyi-modules-file" />
+        <module name="ruoyi-admin" />
+        <module name="aps-lh" />
+        <module name="aps-bootui" />
+        <module name="zlt-mdm-auth" />
+        <module name="common-constants" />
+        <module name="aps-tq" />
+        <module name="ruoyi-api-gen" />
+        <module name="ruoyi-common-datascope" />
+        <module name="aps-tm" />
+        <module name="aps-common-core" />
+        <module name="zlt-module-starter" />
+        <module name="ruoyi-common-swagger" />
+        <module name="ruoyi-common-core" />
+        <module name="ruoyi-api-file" />
+        <module name="aps-engine-tq" />
+        <module name="aps-cd90" />
+        <module name="aps-engine-lh" />
+        <module name="aps-plat-engine-nc-core" />
+        <module name="ruoyi-demo" />
+        <module name="ruoyi-common-i18n" />
+        <module name="aps-engine-tm" />
+        <module name="aps-gdyy" />
+        <module name="aps-engine-common" />
+        <module name="aps-gdyy-api" />
+        <module name="aps-tq-api" />
+        <module name="aps-engine-cx" />
+        <module name="zlt-mdm-auth-api" />
+        <module name="aps-plat-engine-cd90-core" />
+        <module name="ruoyi-visual-monitor" />
+        <module name="aps-engine-tc" />
+        <module name="aps-cd15" />
+        <module name="ruoyi-api-auth" />
+        <module name="aps-mps" />
+        <module name="zlt-ui-kettle" />
+        <module name="zlt-kettle" />
+        <module name="ruoyi-modules-job" />
+        <module name="ruoyi-modules-system" />
+        <module name="ruoyi-common-security" />
+        <module name="aps-plat-engine-tc-core" />
+        <module name="ruoyi-common-datasource" />
+        <module name="zlt-frame-demo-show" />
+        <module name="ruoyi-modules-gen" />
+        <module name="ruoyi-gateway" />
+        <module name="aps-tc-api" />
+        <module name="aps-cx" />
+        <module name="aps-plat-engine-tm-core" />
+        <module name="zlt-cas-client" />
+        <module name="aps-tc" />
+        <module name="ruoyi-common-log" />
+        <module name="aps-engine-gdyy" />
+        <module name="aps-gsq-api" />
+        <module name="aps-plat-engine-cx-core" />
+        <module name="aps-engine-gsq" />
+        <module name="aps-tm-api" />
+        <module name="aps-engine-cd90" />
+        <module name="aps-nc-api" />
+        <module name="zlt-frame-core" />
+        <module name="aps-cd90-api" />
+        <module name="aps-lh-api" />
+        <module name="aps-all-api" />
+        <module name="aps-plat-engine-gdyy-core" />
+        <module name="zlt-rabbitMQ" />
+        <module name="aps-plat-engine-gsq-core" />
+        <module name="ruoyi-common4ui" />
+        <module name="aps-plat-engine-lh-core" />
+        <module name="aps-engine-nc" />
+        <module name="aps-mps-api" />
+        <module name="zlt-kettle-log-api" />
+        <module name="ruoyi-auth" />
+        <module name="zlt-plan-schedule" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="aps-all-api" target="1.8" />
+      <module name="aps-api" target="1.8" />
+      <module name="aps-bootui" target="1.8" />
+      <module name="aps-cd15" target="1.8" />
+      <module name="aps-cd15-api" target="1.8" />
+      <module name="aps-cd90" target="1.8" />
+      <module name="aps-cd90-api" target="1.8" />
+      <module name="Aps-Common" target="1.8" />
+      <module name="aps-common-core" target="1.8" />
+      <module name="aps-cx" target="1.8" />
+      <module name="aps-cx-api" target="1.8" />
+      <module name="aps-engine" target="1.8" />
+      <module name="aps-engine-cd15" target="1.8" />
+      <module name="aps-engine-cd90" target="1.8" />
+      <module name="aps-engine-common" target="1.8" />
+      <module name="aps-engine-cx" target="1.8" />
+      <module name="aps-engine-gdyy" target="1.8" />
+      <module name="aps-engine-gsq" target="1.8" />
+      <module name="aps-engine-lh" target="1.8" />
+      <module name="aps-engine-nc" target="1.8" />
+      <module name="aps-engine-tc" target="1.8" />
+      <module name="aps-engine-tm" target="1.8" />
+      <module name="aps-engine-tq" target="1.8" />
+      <module name="aps-engine-xwyy" target="1.8" />
+      <module name="aps-gdyy" target="1.8" />
+      <module name="aps-gdyy-api" target="1.8" />
+      <module name="aps-gsq" target="1.8" />
+      <module name="aps-gsq-api" target="1.8" />
+      <module name="aps-lh" target="1.8" />
+      <module name="aps-lh-api" target="1.8" />
+      <module name="aps-modules" target="1.8" />
+      <module name="aps-mps" target="1.8" />
+      <module name="aps-mps-api" target="1.8" />
+      <module name="aps-nc" target="1.8" />
+      <module name="aps-nc-api" target="1.8" />
+      <module name="aps-plat-engine-cd15-core" target="1.8" />
+      <module name="aps-plat-engine-cd90-core" target="1.8" />
+      <module name="aps-plat-engine-cx-core" target="1.8" />
+      <module name="aps-plat-engine-gdyy-core" target="1.8" />
+      <module name="aps-plat-engine-gsq-core" target="1.8" />
+      <module name="aps-plat-engine-lh-core" target="1.8" />
+      <module name="aps-plat-engine-nc-core" target="1.8" />
+      <module name="aps-plat-engine-tc-core" target="1.8" />
+      <module name="aps-plat-engine-tm-core" target="1.8" />
+      <module name="aps-plat-engine-tq-core" target="1.8" />
+      <module name="aps-plat-engine-xwyy-core" target="1.8" />
+      <module name="aps-tc" target="1.8" />
+      <module name="aps-tc-api" target="1.8" />
+      <module name="aps-tm" target="1.8" />
+      <module name="aps-tm-api" target="1.8" />
+      <module name="aps-tq" target="1.8" />
+      <module name="aps-tq-api" target="1.8" />
+      <module name="aps-xwyy" target="1.8" />
+      <module name="aps-xwyy-api" target="1.8" />
+      <module name="common-constants" target="1.8" />
+      <module name="JY_APS" target="1.8" />
+      <module name="ruoyi" target="1.8" />
+      <module name="ruoyi-admin" target="1.8" />
+      <module name="ruoyi-api" target="1.8" />
+      <module name="ruoyi-api-auth" target="1.8" />
+      <module name="ruoyi-api-file" target="1.8" />
+      <module name="ruoyi-api-gateway-system" target="1.8" />
+      <module name="ruoyi-api-gen" target="1.8" />
+      <module name="ruoyi-api-job" target="1.8" />
+      <module name="ruoyi-api-system" target="1.8" />
+      <module name="ruoyi-auth" target="1.8" />
+      <module name="ruoyi-bootui" target="1.8" />
+      <module name="ruoyi-common" target="1.8" />
+      <module name="ruoyi-common-core" target="1.8" />
+      <module name="ruoyi-common-datascope" target="1.8" />
+      <module name="ruoyi-common-datasource" target="1.8" />
+      <module name="ruoyi-common-i18n" target="1.8" />
+      <module name="ruoyi-common-log" target="1.8" />
+      <module name="ruoyi-common-redis" target="1.8" />
+      <module name="ruoyi-common-security" target="1.8" />
+      <module name="ruoyi-common-swagger" target="1.8" />
+      <module name="ruoyi-common4ui" target="1.8" />
+      <module name="ruoyi-demo" target="1.8" />
+      <module name="ruoyi-framework" target="1.8" />
+      <module name="ruoyi-gateway" target="1.8" />
+      <module name="ruoyi-modules" target="1.8" />
+      <module name="ruoyi-modules-file" target="1.8" />
+      <module name="ruoyi-modules-gen" target="1.8" />
+      <module name="ruoyi-modules-job" target="1.8" />
+      <module name="ruoyi-modules-system" target="1.8" />
+      <module name="ruoyi-visual" target="1.8" />
+      <module name="ruoyi-visual-monitor" target="1.8" />
+      <module name="zlt-api" target="1.8" />
+      <module name="zlt-cas-client" target="1.8" />
+      <module name="zlt-common" target="1.8" />
+      <module name="zlt-frame-core" target="1.8" />
+      <module name="zlt-frame-demo-show" target="1.8" />
+      <module name="zlt-frame-starter" target="1.8" />
+      <module name="zlt-kettle" target="1.8" />
+      <module name="zlt-kettle-log-api" target="1.8" />
+      <module name="zlt-mdm-auth" target="1.8" />
+      <module name="zlt-mdm-auth-api" target="1.8" />
+      <module name="zlt-module-starter" target="1.8" />
+      <module name="zlt-modules (1)" target="1.8" />
+      <module name="zlt-modules (2)" target="1.8" />
+      <module name="zlt-plan-schedule" target="1.8" />
+      <module name="zlt-rabbitMQ" target="1.8" />
+      <module name="zlt-ui-kettle" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

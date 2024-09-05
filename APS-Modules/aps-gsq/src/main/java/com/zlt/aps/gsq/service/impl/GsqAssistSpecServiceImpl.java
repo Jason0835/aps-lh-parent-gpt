@@ -1,0 +1,186 @@
+package com.zlt.aps.gsq.service.impl;
+
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.gsq.api.domain.entity.GsqAssistSpec;
+import com.zlt.aps.gsq.mapper.GsqAssistSpecMapper;
+import com.zlt.aps.gsq.service.GsqAssistSpecService;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.ImportUtil;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+/**
+ * <p>
+ * 钢丝圈外协规格管理表 服务实现类
+ * </p>
+ *
+ * @author zhangbinglin
+ * @since 2021-06-04
+ */
+@Service
+public class GsqAssistSpecServiceImpl extends ServiceImpl<GsqAssistSpecMapper, GsqAssistSpec> implements GsqAssistSpecService {
+
+    @Resource
+    private GsqAssistSpecMapper gsqAssistSpecMapper;
+
+    /**
+     * 根据条件查询外协规格管理列表
+     *
+     * @return
+     */
+    public List<GsqAssistSpec> listAssistSpec(GsqAssistSpec dto) {
+        return gsqAssistSpecMapper.listAssistSpec(dto);
+    }
+
+    /**
+     * 保存外协规格管理信息（id为空则新增，id不为空则修改）
+     *
+     * @param entity
+     */
+    public void saveAssistSpec(GsqAssistSpec entity) {
+        entity.setBaseVale(entity.getId());  //根据id是否为空给创建时间，创建人，更新时间，更新人赋值
+        this.saveOrUpdate(entity);
+    }
+
+    /**
+     * 批量删除(逻辑删)
+     *
+     * @param ids 多个id逗号分割
+     */
+    public void deleteAssistSpec(Long[] ids) {
+        for (int i = 0; i < ids.length; i++) {
+            GsqAssistSpec entity = new GsqAssistSpec();
+            entity.setId(ids[i]);
+            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
+            entity.setUpdateTime(new Date());
+            this.updateById(entity);
+        }
+    }
+
+    /**
+     * 根据code判断是否已经存在
+     */
+    public String checkAssistSpecCodeUnique(GsqAssistSpec dto) {
+        if (dto == null || StringUtils.isBlank(dto.getMaterialCode())) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        QueryWrapper<GsqAssistSpec> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("MATERIAL_CODE", dto.getMaterialCode());
+        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
+        if (dto.getId() != null) {
+            queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
+        }
+        List<GsqAssistSpec> list = gsqAssistSpecMapper.selectList(queryWrapper);
+        if (list.size() > 0) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param updateSupport 已存在是否更新
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importData(List<GsqAssistSpec> list, boolean updateSupport, Long importLogId) {
+        int successNum = 0;
+        int failureNum = 0;
+        // 校验
+        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<GsqAssistSpec> importList = new ArrayList<>();
+
+        //按业务主键分组
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(GsqAssistSpec::getMaterialCode, Collectors.counting()));
+
+        for (int i = 0; i < list.size(); i++) {
+            GsqAssistSpec bigRoll = list.get(i);
+
+            //重复记录校验
+            Long hasValue = groupMap.get(bigRoll.getMaterialCode());
+            if (hasValue > 1) {
+                failureNum++;
+                bigRoll.setId(-999L);
+                String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
+                String columnName = I18nUtil.getMessage("ui.common.column.assist.gsq.materialCode");
+                message=String.format(message,columnName);
+                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
+                continue;
+            }
+
+            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, bigRoll);
+            if (CollectionUtils.isEmpty(validated)) {
+                bigRoll.setBaseVale(null);
+                importList.add(bigRoll);
+            } else {
+                failureNum++;
+                // 添加错误标识
+                bigRoll.setId(-999L);
+                importErrorLogs.addAll(validated);
+            }
+        }
+        if (CollectionUtils.isNotEmpty(list)) {
+            try {
+                //勾选更新记录，调用merge即可
+                if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
+                    successNum = importList.size();
+                    gsqAssistSpecMapper.mergeSql(importList);
+                } else {
+                    //查询数据库已存在对象
+                    for (int i = 0; i < list.size(); i++) {
+                        GsqAssistSpec excelItem = list.get(i);
+                        if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
+                            continue;
+                        }
+                        // 唯一性校验
+                        String unique = checkAssistSpecCodeUnique(excelItem);
+                        if (UserConstants.UNIQUE.equals(unique)) {
+                            //不存在插入
+                            successNum++;
+                            GsqAssistSpec gsqAssistSpec = new GsqAssistSpec();
+                            BeanUtils.copyProperties(excelItem, gsqAssistSpec);
+                            gsqAssistSpecMapper.insert(gsqAssistSpec);
+                        } else {
+                            // 存在，插入错误详细日志
+                            failureNum++;
+                            addImportErrorLog(importLogId, i + 2,
+                                    I18nUtil.getMessage("ui.gsq.assistSpec.alter.isAssistSpecExist"), importErrorLogs);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                // 执行sql失败，插入导入失败记录
+                successNum = 0;
+                failureNum = list.size();
+                importErrorLogs.clear();
+                addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+            }
+        }
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+        }
+    }
+}

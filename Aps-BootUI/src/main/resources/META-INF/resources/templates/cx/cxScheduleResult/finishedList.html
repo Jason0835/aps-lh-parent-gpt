@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('成型排程结果列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" th:value="${startTime}"
+                                   th:placeholder="#{ui.data.column.stock.startTime}" name="startTime"/>
+                            <span style='color: black;'>-</span>
+                            <input type="text" class="time-input" th:value="${endTime}"
+                                   th:placeholder="#{ui.data.column.stock.endTime}" name="endTime"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cxScheduleResult.taskType}]]：</label>
+                            <select name="taskType" th:with="type=${@dict.getType('TASK_TYPE')}" class="form-control">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.cxScheduleResult.embryoCode}]]：</label>
+                            <input type="text" name="embryoCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.productStatus.bomDataVersion}]]：</label>
+                            <input type="text" name="bomDataVersion"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary single disabled" onclick="production()"
+               shiro:hasPermission="cx:productStatus:production">
+                <i class="fa fa-edit"></i> [[#{ui.data.column.scheduleResult.production}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="cx:cxScheduleResult:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<script th:inline="javascript">
+
+    var isReleaseDatas = [[${@dict.getType('IS_RELEASE')}]];
+    var productionStatusDatas = [[${@dict.getType('PRODUCTION_STATUS')}]];
+    var TASK_TYPE = [[${@dict.getType('TASK_TYPE')}]];
+    var CLASS_SHIFT = [[${@dict.getType('CLASS_SHIFT')}]];
+    var STORAGE_LOCATION = [[${@dict.getType('STORAGE_LOCATION')}]];
+    var cxMachineNameList = [[${@cx.getMachineInfo()}]];
+    var lhMachineNameList = [[${@cx.getMachineInfo2(null,5)}]];
+    var prefix = ctx + "cx/cxScheduleResult";
+
+    $(function () {
+        var options = {
+            url: prefix + "/finished/list",
+            production: prefix + "/production/{id}",
+            modifyLhMachineQty: prefix + "/modifyLhMachineQty/{id}",
+            exportUrl: prefix + "/exportFinishedList",
+            pageSize: 10000,
+            pageList: [10000],
+            uniqueId: 'id',
+            modalName: [[#{ui.data.column.cxScheduleResult.modalName}]],
+            fixedColumns: true,
+            fixedNumber: 2,
+            columns: [
+                [
+                    {title: [[#{ui.data.column.scheduleResult.baseInfo}]], align: 'center', colspan: 34},
+                    {title: [[#{ui.data.column.scheduleResult.class1}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class2}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class3}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class4}]], align: 'center', colspan: 4},
+                    {title: [[#{ui.data.column.scheduleResult.class5}]], align: 'center', colspan: 6}
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'taskType',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.taskType}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(TASK_TYPE, value);
+                        }
+                    },
+                    {
+                        field: 'scheduleDate',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.scheduleDate}]],
+                    },
+                    {
+                        field: 'productionStatus',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.productionStatus}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(productionStatusDatas, value);
+                        }
+                    },
+                    {
+                        field: 'isRelease',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.isRelease}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(isReleaseDatas, value);
+                        }
+                    },
+                    {
+                        field: 'lhMachineCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.lhMachineCode}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '';
+                            }
+                            return selectMachineName(lhMachineNameList, value);
+                        }
+                    },
+                    {
+                        field: 'remark',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.remark}]],
+                    },
+                    {
+                        field: 'lhMachineQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.lhMachineQty}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = 0;
+                            }
+                            var actions = [];
+                            if (row.productionStatus == '2') {
+                                actions.push(value);
+                            } else {
+                                actions.push('<a href="javascript:void(0)" onclick="modifyLhMachineQty(\'' + row.id + '\')">' + value + '</a> ');
+                            }
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'minimumLhMachineComQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.minimumLhMachineReqQty}]],
+                    },
+                    {
+                        field: 'availableMoldQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.availableMoldQty}]],
+                    },
+                    {
+                        field: 'specDimension',
+                        valign: 'middle',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.specDimension}]],
+                    },
+                    {
+                        field: 'cxMachineCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.cxMachineCode}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '';
+                            }
+                            return selectMachineName(cxMachineNameList, value);
+                        }
+                    },
+                    {
+                        field: 'workShifts',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.workShifts}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(CLASS_SHIFT, value);
+                        },
+                    },
+                    {
+                        field: 'maximumClassQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.maximumClassQty}]],
+                    },
+                    {
+                        field: 'sapCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.sapCode}]],
+                    },
+                    {
+                        field: 'storageLocation',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.storageLocation}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(STORAGE_LOCATION, value);
+                        },
+                    },
+                    {
+                        field: 'specDesc',
+                        align: 'left',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.specDesc}]],
+                    },
+                    {
+                        field: 'embryoCode',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.embryoCode}]],
+                    },
+                    {
+                        field: 'bomDataVersion',
+                        align: 'center',
+                        halign: 'center',
+                        title: [[#{ui.data.column.productStatus.bomDataVersion}]],
+                    },
+                    {
+                        field: 'totalStock',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.totalStock}]],
+                    },
+                    {
+                        field: 'lhMiddleNightFinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.lhMiddleNightFinishQty}]],
+                    },
+                    {
+                        field: 'class3PlannedQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class3PlannedQty}]],
+                    },
+                    {
+                        field: 'singleShiftLhQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.singleShiftLhQty}]],
+                    },
+                    {
+                        field: 'cxMonthFinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.cxMonthFinishQty}]],
+                    },
+                    {
+                        field: 'monthPlan',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.monthPlan}]],
+                    },
+                    {
+                        field: 'planModifyQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.planModifyQty}]],
+                    },
+                    {
+                        field: 'monthPlanOs',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.monthPlanOs}]],
+                    },
+                    {
+                        field: 'monthStock',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.monthStock}]],
+                    },
+                    {
+                        field: 'rejectQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.rejectQty}]],
+                    },
+                    {
+                        field: 'newestPlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.newestPlanQty}]],
+                    },
+                    {
+                        field: 'actualOverProduction',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.actualOverProduction}]],
+                    },
+                    {
+                        field: 'expectedOverProduction',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.expectedOverProduction}]],
+                    },
+                    {
+                        field: 'differenceOverProduction',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.differenceOverProduction}]],
+                    },
+                    {
+                        field: 'class1AvailableLhShift',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class1AvailableLhShift}]],
+                    },
+                    {
+                        field: 'class1PlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class1FinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class1AnalysisInput',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class1Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'class2AvailableLhShift',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class2AvailableLhShift}]],
+                    },
+                    {
+                        field: 'class2PlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class2FinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class2AnalysisInput',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class2Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'class3AvailableLhShift',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class3AvailableLhShift}]],
+                    },
+                    {
+                        field: 'class3PlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class3FinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class3AnalysisInput',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class3Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'class4AvailableLhShift',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class4AvailableLhShift}]],
+                    },
+                    {
+                        field: 'class4PlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class4FinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class4AnalysisInput',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class4Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'class5AvailableLhShift',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.cxScheduleResult.class5AvailableLhShift}]],
+                    },
+                    {
+                        field: 'class5PlanQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.plan}]],
+                    },
+                    {
+                        field: 'class5FinishQty',
+                        align: 'right',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.finish}]],
+                    },
+                    {
+                        field: 'class5AnalysisInput',
+                        halign: 'center',
+                        title: [[#{ui.data.column.scheduleResult.analysis}]],
+                        formatter: function (value, row, index) {
+                            var reasion = "";
+                            var SysAnalysis = row.class5Analysis;
+                            if (value != null) {
+                                reasion = reasion + value;
+                            }
+                            if (SysAnalysis != null) {
+                                if (reasion != "") {
+                                    reasion = reasion + "," + SysAnalysis;
+                                } else {
+                                    reasion = SysAnalysis;
+                                }
+                            }
+                            return $.table.tooltip(reasion);
+                        }
+                    },
+                    {
+                        field: 'cxBatchNo',
+                        visible: false
+                    },
+                    {
+                        field: 'orderNo',
+                        visible: false
+                    }
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                mergeCells(data, "cxMachineCode", "", $("#bootstrap-table"));
+                mergeCells(data, "workShifts", "cxMachineCode", $("#bootstrap-table"));
+            }
+        };
+        $.table.init(options);
+
+    });
+
+
+    /**
+      * 合并相同行
+      */
+    function mergeCells(dataAll, fieldName, condition, target) {
+        var data = dataAll;
+        setTimeout(function () {
+            if (data.rows.length == 0) {
+                return;
+            }
+            var numArr = [];
+            var number = 0;
+            if (data.rows.length > 1) {
+                for (let i = 0; i < data.rows.length; i++) {
+                    if (data.rows[i][fieldName] != '' && data.rows[i][fieldName] != '-') {
+                        if (data.rows[i - 1]) {
+                            if (data.rows[i - 1][fieldName] != '' && data.rows[i - 1][fieldName] != '-') {
+                                if (data.rows[i - 1][fieldName] == data.rows[i][fieldName] && data.rows[i - 1][condition] == data.rows[i][condition]) {
+                                    number++
+                                } else {
+                                    number = number + 1
+                                    numArr.push({index: i - number, number: number, pan: '1'})
+                                    number = 0
+                                }
+                            }
+                        }
+                        if (!data.rows[i + 1]) {
+                            number = number
+                            numArr.push({index: i - number, number: number + 1, pan: '2'})
+                            number = 0
+                        } else {
+                            if (data.rows[i + 1][fieldName] == '' || data.rows[i + 1][fieldName] == '-') {
+                                number = number
+                                numArr.push({index: i - number, number: number + 1, pan: '3'})
+                                number = 0
+                            }
+                        }
+                    } else {
+                        numArr.push({index: i, number: 1, pan: '4'})
+                    }
+                }
+            } else {
+                numArr.push({index: 0, number: 1, pan: '5'})
+            }
+            // console.log(numArr);
+            for (let x = 0; x < numArr.length; x++) {
+                if (x % 2) {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        //  $(target).children('tbody').children('tr').eq(numArr[x]['index']+y).css('background','yellow')
+                    }
+                } else {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        $(target).children('tbody').children('tr').eq(numArr[x]['index'] + y).css('background', '#fff')
+                    }
+                }
+                $(target).bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: fieldName,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+            }
+        }, 0)
+    }
+
+
+    //回显机台名称
+    function selectMachineName(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode == (item)) {
+                    var machineName = $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+
+    //修改硫化机台数
+    function modifyLhMachineQty(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        url = table.options.modifyLhMachineQty.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.cxScheduleResult.lhMachineChangeMoldDesc}]], url);
+    };
+
+    //投产
+    function production() {
+        table.set();
+        var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        if (id.length == 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        url = table.options.production.replace("{id}", id);
+        $.modal.open([[#{ui.data.column.productStatus.modalName}]], url);
+    };
+
+</script>
+</body>
+</html>

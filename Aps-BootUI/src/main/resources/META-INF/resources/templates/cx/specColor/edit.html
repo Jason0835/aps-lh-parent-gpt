@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改规格字体颜色设置')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-specColor-edit" th:object="${cxSpecColor}">
+            <input id="id" name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.specColor.specDesc}]]：</label>
+                <div class="col-sm-8">
+                    <input id="specDesc" name="specDesc" th:field="*{specDesc}" class="form-control" type="text" maxlength="300" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.specColor.colorCode}]]：</label>
+                <div class="col-sm-8">
+                    <div class="form-control">
+                        <input id="colorCode" th:placeholder="#{ui.bigRollColor.color.placeholder}" name="colorCode" th:field="*{colorCode}" class="layui-input form-control colorpicker-input" type="text" maxlength="15" readonly>
+                        <div id="colorpicker"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.specColor.colorType}]]：</label>
+                <div class="col-sm-8">
+                    <select name="colorType" class="form-control" th:with="type=${@dict.getType('BIG_ROLL_COLOR')}">
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{colorType}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.status}]]：</label>
+                <div class="col-sm-8">
+                    <label class="toggle-switch switch-solid">
+                        <input type="checkbox" id="status" th:checked="${cxSpecColor.status == '0' ? true : false}">
+                        <span></span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: colorpicker" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+        var prefix = ctx + "cx/specColor";
+
+        layui.use(['colorpicker', 'layer'], function(){
+            var colorpicker = layui.colorpicker;
+            colorpicker.render({
+                elem: '#colorpicker'
+                ,predefine: true //开启预定义颜色
+                ,colors: '#000'
+                ,change: function(color){
+                    layui.$("#colorCode").val(color);
+                }
+                ,done: function(color){
+                    layui.$('#colorCode').val(color);
+                }
+            });
+            try{
+                layui.$(".layui-colorpicker-trigger-span")[0].style.background=layui.$("#colorCode").val();
+            }catch (e) {
+
+            }
+        })
+
+        $("#form-specColor-edit").validate({
+            onkeyup: false,
+            rules: {
+                specDesc: {
+                    remote: {
+                        url: prefix + "/checkSpecCodeUnique",
+                        type: "post",
+                        dataType: "json",
+                        data: {
+                            "id": function () {
+                                return $("#id").val();
+                            },
+                            "specDesc": function () {
+                                return $.common.trim($("#specDesc").val());
+                            }
+                        },
+                        dataFilter: function (data, type) {
+                            return $.validate.unique(data);
+                        }
+                    }
+                },
+            },
+            messages: {
+                "specDesc": {
+                    remote: [[#{ui.data.alert.specDescExist}]]
+                }
+            },
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var data = $("#form-specColor-edit").serializeArray();
+                var status = $("input[id='status']").is(':checked') == true ? '0' : '1';
+                data.push({"name": "status", "value": status});
+                $.operate.save(prefix + "/edit", data);
+            }
+        }
+    </script>
+</body>
+</html>

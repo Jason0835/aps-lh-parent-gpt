@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.TCxMonthPlanAdjustMapper">
+
+    <resultMap type="com.zlt.aps.common.engine.domain.TCxMonthPlanAdjust" id="TCxMonthPlanAdjustResult">
+                    <result property="id" column="id"/>
+                    <result property="monthPlanApsVersion" column="month_plan_aps_version"/>
+                    <result property="sapCode" column="sap_code"/>
+                    <result property="embryoCode" column="embryo_code"/>
+                    <result property="planModifyQty" column="plan_modify_qty"/>
+                    <result property="adjustSource" column="adjust_source"/>
+                    <result property="createBy" column="create_by"/>
+                    <result property="createTime" column="create_time"/>
+                    <result property="updateBy" column="update_by"/>
+                    <result property="updateTime" column="update_time"/>
+                    <result property="delFlag" column="del_flag"/>
+                    <result property="remark" column="remark"/>
+                    <result property="bomDataVersion" column="bom_data_version"/>
+            </resultMap>
+    
+    <sql id="selectTCxMonthPlanAdjustVo">
+        select id, month_plan_aps_version, sap_code, embryo_code, plan_modify_qty, adjust_source, create_by, create_time, update_by, update_time, del_flag, remark, BOM_DATA_VERSION from t_cx_month_plan_adjust
+    </sql>
+
+    <select id="selectTCxMonthPlanAdjustList" parameterType="com.zlt.aps.common.engine.domain.TCxMonthPlanAdjust" resultMap="TCxMonthPlanAdjustResult">
+        <include refid="selectTCxMonthPlanAdjustVo"/>
+        where del_flag = '0'
+        <if test="monthPlanApsVersion != null  and monthPlanApsVersion != ''"> and month_plan_aps_version = #{monthPlanApsVersion}</if>
+                <if test="sapCode != null  and sapCode != ''"> and sap_code = #{sapCode}</if>
+                <if test="embryoCode != null  and embryoCode != ''"> and embryo_code = #{embryoCode}</if>
+                <if test="planModifyQty != null "> and plan_modify_qty = #{planModifyQty}</if>
+                <if test="adjustSource != null  and adjustSource != ''"> and adjust_source = #{adjustSource}</if>
+                <if test="bomDataVersion != null  and bomDataVersion != ''"> and bom_data_version = #{bomDataVersion}</if>
+   </select>
+
+    <select id="selectByEmbryoVersionList" resultMap="TCxMonthPlanAdjustResult">
+        WITH temp_table AS (
+        <foreach collection="list" item="item" separator=" union ">
+            SELECT #{item.embryoCode,jdbcType=VARCHAR} embryo_code, #{item.bomDataVersion,jdbcType=VARCHAR} bom_data_version FROM dual
+        </foreach>
+        )
+        select sum(NVL(plan_modify_qty, 0 )) as plan_modify_qty, embryo_code, BOM_DATA_VERSION from t_cx_month_plan_adjust
+        where  (embryo_code, bom_data_version) IN ( select embryo_code, bom_data_version from temp_table) and del_flag = '0'
+        AND month_plan_aps_version = #{apsVersion,jdbcType=VARCHAR}
+        GROUP BY EMBRYO_CODE, BOM_DATA_VERSION
+   </select>
+
+    <select id="selectTCxMonthPlanAdjustById" parameterType="Long" resultMap="TCxMonthPlanAdjustResult">
+                    <include refid="selectTCxMonthPlanAdjustVo"/>
+            where id = #{id}
+            </select>
+
+    <insert id="insertTCxMonthPlanAdjust" parameterType="com.zlt.aps.common.engine.domain.TCxMonthPlanAdjust">
+                    <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT seq_public.NEXTVAL as id FROM DUAL
+            </selectKey>
+                insert into t_cx_month_plan_adjust
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                            <if test="id != null">id,</if>
+                            <if test="monthPlanApsVersion != null">month_plan_aps_version,</if>
+                            <if test="sapCode != null">sap_code,</if>
+                            <if test="embryoCode != null">embryo_code,</if>
+                            <if test="planModifyQty != null">plan_modify_qty,</if>
+                            <if test="adjustSource != null">adjust_source,</if>
+                            <if test="createBy != null">create_by,</if>
+                            <if test="createTime != null">create_time,</if>
+                            <if test="updateBy != null">update_by,</if>
+                            <if test="updateTime != null">update_time,</if>
+                            <if test="delFlag != null">del_flag,</if>
+                            <if test="remark != null">remark,</if>
+                    </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                            <if test="id != null">#{id},</if>
+                            <if test="monthPlanApsVersion != null">#{monthPlanApsVersion},</if>
+                            <if test="sapCode != null">#{sapCode},</if>
+                            <if test="embryoCode != null">#{embryoCode},</if>
+                            <if test="planModifyQty != null">#{planModifyQty},</if>
+                            <if test="adjustSource != null">#{adjustSource},</if>
+                            <if test="createBy != null">#{createBy},</if>
+                            <if test="createTime != null">#{createTime},</if>
+                            <if test="updateBy != null">#{updateBy},</if>
+                            <if test="updateTime != null">#{updateTime},</if>
+                            <if test="delFlag != null">#{delFlag},</if>
+                            <if test="remark != null">#{remark},</if>
+                    </trim>
+    </insert>
+
+    <update id="updateTCxMonthPlanAdjust" parameterType="com.zlt.aps.common.engine.domain.TCxMonthPlanAdjust">
+        update t_cx_month_plan_adjust
+        <trim prefix="SET" suffixOverrides=",">
+                                                                            <if test="monthPlanApsVersion != null">month_plan_aps_version = #{monthPlanApsVersion},</if>
+                                                                <if test="sapCode != null">sap_code = #{sapCode},</if>
+                                                                <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+                                                                <if test="planModifyQty != null">plan_modify_qty = #{planModifyQty},</if>
+                                                                <if test="adjustSource != null">adjust_source = #{adjustSource},</if>
+                                                                <if test="createBy != null">create_by = #{createBy},</if>
+                                                                <if test="createTime != null">create_time = #{createTime},</if>
+                                                                <if test="updateBy != null">update_by = #{updateBy},</if>
+                                                                <if test="updateTime != null">update_time = #{updateTime},</if>
+                                                                <if test="delFlag != null">del_flag = #{delFlag},</if>
+                                                                <if test="remark != null">remark = #{remark},</if>
+                                    </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteTCxMonthPlanAdjustById" parameterType="Long">
+        update t_cx_month_plan_adjust set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteTCxMonthPlanAdjustByIds" parameterType="String">
+        update t_cx_month_plan_adjust set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <update id="mergeSql" parameterType="list">
+        merge into t_cx_month_plan_adjust a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+                   #{item.id, jdbcType=DOUBLE} id,
+                   #{item.monthPlanApsVersion,jdbcType=VARCHAR} month_plan_aps_version,
+                   #{item.sapCode,jdbcType=VARCHAR} sap_code,
+                   #{item.embryoCode,jdbcType=VARCHAR} embryo_code,
+                   #{item.planModifyQty, jdbcType=DOUBLE} plan_modify_qty,
+                   #{item.adjustSource,jdbcType=VARCHAR} adjust_source,
+                   #{item.createBy,jdbcType=VARCHAR} create_by,
+                   #{item.createTime, jdbcType=DATE} create_time,
+                   #{item.updateBy,jdbcType=VARCHAR} update_by,
+                   #{item.updateTime, jdbcType=DATE} update_time,
+                   #{item.delFlag,jdbcType=VARCHAR} del_flag,
+                   #{item.remark,jdbcType=VARCHAR} remark,
+                   #{item.bomDataVersion,jdbcType=VARCHAR} bom_data_version
+            from dual
+        </foreach>
+        ) b ON (
+        a.sap_code = b.sap_code
+            and a.embryo_code = b.embryo_code
+            and a.month_plan_aps_version = b.month_plan_aps_version
+            and a.adjust_source = b.adjust_source
+            and a.bom_data_version = b.bom_data_version
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.plan_modify_qty = b.plan_modify_qty,
+            a.update_by = b.create_by,
+            a.update_time = sysdate,
+            a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+             a.id, a.month_plan_aps_version, a.sap_code, a.embryo_code, a.plan_modify_qty, a.adjust_source, a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag, a.remark, a.bom_data_version
+        )
+        values (
+             SEQ_PUBLIC.NEXTVAL ,b.month_plan_aps_version, b.sap_code,  b.embryo_code,  b.plan_modify_qty, b.adjust_source,  b.create_by,   sysdate,  b.update_by,  sysdate,  '0',  b.remark,  b.bom_data_version
+        )
+    </update>
+    <select id="selectAllByMonthPlanApsVersion" resultMap="TCxMonthPlanAdjustResult">
+        <include refid="selectTCxMonthPlanAdjustVo"/>
+        where
+        month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
+        AND del_flag = '0'
+    </select>
+</mapper>

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhInProductionSpecMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec" id="LhInProductionSpecResult">
+        <result property="id" column="id"/>
+        <result property="productDate" column="product_date"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="machine_name"/>
+        <result property="lhStreamCode" column="lh_stream_code"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="leftRightMold" column="left_right_mold"/>
+        <result property="isEmptyMold" column="is_empty_mold"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectLhInProductionSpecVo">
+        select id, product_date, lh_machine_code, lh_stream_code, sap_code, left_right_mold, is_empty_mold, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_in_production_spec
+    </sql>
+
+    <select id="selectLhInProductionSpecList" parameterType="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec"
+            resultMap="LhInProductionSpecResult">
+        select  * from (
+        select lips.id, lips.product_date, lips.lh_machine_code, lips.lh_stream_code, lips.sap_code,
+        lips.left_right_mold, lips.is_empty_mold, lips.create_by, lips.create_time, lips.update_by, lips.update_time, lips.del_flag, lips.remark,
+        lmi.machine_name
+        from t_lh_in_production_spec lips
+        left join T_LH_MACHINE_INFO lmi
+        on lips.lh_machine_code = lmi.machine_code and lmi.del_flag = 0
+        where lips.del_flag = '0'
+        <if test="productDate != null ">and lips.product_date = #{productDate}</if>
+        <if test="lhMachineCode != null  and lhMachineCode != ''">and lips.lh_machine_code = #{lhMachineCode}</if>
+        <if test="lhStreamCode != null  and lhStreamCode != ''">and lips.lh_stream_code = #{lhStreamCode}</if>
+        <if test="sapCode != null  and sapCode != ''">and lips.sap_code = #{sapCode}</if>
+        <if test="leftRightMold != null  and leftRightMold != ''">and lips.left_right_mold = #{leftRightMold}</if>
+        <if test="isEmptyMold != null  and isEmptyMold != ''">and lips.is_empty_mold = #{isEmptyMold}</if>
+        ) t
+        <if test="orderStr == null">order by create_time desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <select id="selectLhInProductionSpecById" parameterType="Long" resultMap="LhInProductionSpecResult">
+        <include refid="selectLhInProductionSpecVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertLhInProductionSpec" parameterType="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_LH_IN_PRODUCTION_SPEC.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_lh_in_production_spec
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="productDate != null">product_date,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="lhStreamCode != null">lh_stream_code,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="leftRightMold != null">left_right_mold,</if>
+            <if test="isEmptyMold != null">is_empty_mold,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="productDate != null">#{productDate},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="lhStreamCode != null">#{lhStreamCode},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="leftRightMold != null">#{leftRightMold},</if>
+            <if test="isEmptyMold != null">#{isEmptyMold},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateLhInProductionSpec" parameterType="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec">
+        update t_lh_in_production_spec
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="productDate != null">product_date = #{productDate},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="lhStreamCode != null">lh_stream_code = #{lhStreamCode},</if>
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="leftRightMold != null">left_right_mold = #{leftRightMold},</if>
+            <if test="isEmptyMold != null">is_empty_mold = #{isEmptyMold},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhInProductionSpecById" parameterType="Long">
+        update t_lh_in_production_spec
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteLhInProductionSpecByIds" parameterType="String">
+        update t_lh_in_production_spec set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lh_in_production_spec a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.productDate, jdbcType=DATE} product_date,
+            #{item.lhMachineCode,jdbcType=VARCHAR} lh_machine_code, #{item.lhStreamCode,jdbcType=VARCHAR}
+            lh_stream_code, #{item.sapCode,jdbcType=VARCHAR} sap_code, #{item.leftRightMold,jdbcType=VARCHAR}
+            left_right_mold, #{item.isEmptyMold,jdbcType=VARCHAR} is_empty_mold,#{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.remark,jdbcType=VARCHAR} remark from dual
+        </foreach>
+        ) b ON (
+        此处需要手动关联唯一性条件
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.product_date = b.product_date
+            , a.lh_machine_code = b.lh_machine_code
+            , a.lh_stream_code = b.lh_stream_code
+            , a.sap_code = b.sap_code
+            , a.left_right_mold = b.left_right_mold
+            , a.is_empty_mold = b.is_empty_mold
+            , a.update_by = b.create_by
+            , a.update_time = sysdate
+            , a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.product_date, a.lh_machine_code, a.lh_stream_code, a.sap_code, a.left_right_mold, a.is_empty_mold, a.create_by,
+        a.create_time, a.del_flag, a.remark
+        )
+        values (
+        SEQ_LH_IN_PRODUCTION_SPEC.NEXTVAL, b.product_date, b.lh_machine_code, b.lh_stream_code, b.sap_code, b.left_right_mold,b.is_empty_mold,
+        b.create_by, sysdate, 0, b.remark
+        )
+    </update>
+</mapper>

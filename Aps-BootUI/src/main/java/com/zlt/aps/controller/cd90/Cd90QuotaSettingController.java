@@ -1,0 +1,188 @@
+package com.zlt.aps.controller.cd90;
+
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.controller.BaseController;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.text.Convert;
+import com.zlt.aps.cd90.api.domain.dto.Cd90QuotaSettingDto;
+import com.zlt.aps.cd90.api.service.ICd90QuotaSettingService;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.utils.ImportUtil;
+import com.zlt.aps.template.cd90.Cd90QuotaSettingTemp;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+
+/**
+ * 90度裁断定额设定Controller
+ *
+ * @author chen
+ * @date 2021-06-29
+ */
+@Api(tags = "90度裁断定额设定")
+@Controller
+@RequestMapping("/cd90/quota")
+public class Cd90QuotaSettingController extends BaseController {
+
+    @Autowired
+    private ICd90QuotaSettingService iCd90QuotaSettingService;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    @Autowired
+    private IExportLogService iExportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
+
+
+    private String prefix = "cd90/quota";
+
+    /**
+     * 跳转至主页面
+     */
+    @ApiOperation("跳转到90度裁断定额设定信息首页")
+    @RequiresPermissions("cd90:quota:view")
+    @GetMapping()
+    public String toIndex() {
+        return prefix + "/quota";
+    }
+
+    /**
+     * 跳转至新增页面
+     */
+    @RequiresPermissions("cd90:quota:add")
+    @ApiOperation("跳转到90度裁断定额设定信息新增页")
+    @GetMapping("/add")
+    public String add(ModelMap mmap) {
+        mmap.put("quotaSetting", new Cd90QuotaSettingDto());
+        return prefix + "/edit";
+    }
+
+    /**
+     * 跳转至修改页面
+     */
+    @RequiresPermissions("cd90:quota:edit")
+    @ApiOperation("跳转到90度裁断定额设定信息编辑页")
+    @GetMapping("/edit/{id}")
+    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
+        mmap.put("quotaSetting", iCd90QuotaSettingService.getInfo(id));
+        return prefix + "/edit";
+    }
+
+    /**
+     * 根据条件查询90度裁断定额设定列表
+     */
+    @ApiOperation("根据条件查询90度裁断定额设定列表")
+    @RequiresPermissions("cd90:quota:list")
+    @PostMapping("/list")
+    @ResponseBody
+    public TableDataInfo list(Cd90QuotaSettingDto entity) {
+        return iCd90QuotaSettingService.list(entity);
+    }
+
+    /**
+     * 修改或新增90度裁断定额设定
+     */
+    @ApiOperation("修改或新增90度裁断定额设定")
+    @RequiresPermissions("cd90:quota:edit")
+    @PostMapping("/edit")
+    @ResponseBody
+    public AjaxResult editSave(Cd90QuotaSettingDto dto) {
+        return iCd90QuotaSettingService.edit(dto);
+    }
+
+    /**
+     * 删除90度裁断定额设定
+     */
+    @ApiOperation("删除90度裁断定额设定（id不为空）")
+    @RequiresPermissions("cd90:quota:remove")
+    @PostMapping("/remove")
+    @ResponseBody
+    public AjaxResult remove(String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return iCd90QuotaSettingService.remove(arr);
+    }
+
+    /**
+     * 导出90度裁断定额设定
+     */
+    @ApiOperation("导出90度裁断定额设定")
+    @RequiresPermissions("cd90:quota:export")
+    @GetMapping("/export")
+    @ResponseBody
+    public void export(HttpServletResponse response, Cd90QuotaSettingDto dto) throws IOException {
+        List<Cd90QuotaSettingDto> list = iCd90QuotaSettingService.exportData(dto);
+        ExcelUtil<Cd90QuotaSettingDto> util = new ExcelUtil<>(Cd90QuotaSettingDto.class);
+        String fileName = I18nUtil.getMessage("ui.data.column.cd90.quota.modelName");
+        Workbook workbook = util.exportExcel2(response, list, fileName);
+        ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, dto.toString(), ApsConstant.PROCEDURE_CODE_CD90);
+        iExportLogService.add(exportLog);
+    }
+
+    /**
+     * 下载模板
+     *
+     * @param response
+     * @throws IOException
+     */
+    @GetMapping("/importTemplate")
+    @ResponseBody
+    public void importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.cd90.quota.modelName");
+        ExcelUtil<Cd90QuotaSettingTemp> util = new ExcelUtil<>(Cd90QuotaSettingTemp.class);
+        util.exportExcel(response, null, fileName, fileName);
+    }
+
+    /**
+     * 数据导入
+     *
+     * @param file
+     * @param updateSupport
+     * @return
+     * @throws Exception
+     */
+    @RequiresPermissions("cd90:quota:import")
+    @PostMapping("/importData")
+    @ResponseBody
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
+
+        //文件解密
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        InputStream in = new ByteArrayInputStream(data);
+
+        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ApsConstant.PROCEDURE_CODE_CD90, I18nUtil.getMessage("ui.data.column.cd90.quota.modelName"), file.getOriginalFilename());
+        importLog = iImportLogService.add(importLog);
+        ExcelUtil<Cd90QuotaSettingDto> util = new ExcelUtil<>(Cd90QuotaSettingDto.class);
+        List<Cd90QuotaSettingDto> list = util.importExcel(in);
+        AjaxResult ajaxResult = iCd90QuotaSettingService.importData(list, updateSupport, importLog.getId());
+        // 更新日志记录成功数，失败数
+        ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
+        ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
+        return ajaxResult;
+    }
+
+
+}

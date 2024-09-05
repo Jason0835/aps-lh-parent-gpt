@@ -1,0 +1,195 @@
+package ${packageName}.${ClassName}Controller;
+
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.controller.BaseController;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.text.Convert;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.*;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Value;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import org.springframework.web.multipart.MultipartFile;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.zlt.aps.common.utils.ImportUtil;
+import javax.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.io.*;
+import com.ruoyi.common4ui.utils.file.FileUtils;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+
+import com.zlt.aps.${moduleName}.api.domain.entity.${ClassName};
+import com.zlt.aps.${moduleName}.api.service.I${ClassName}Service;
+
+/**
+ * ${functionName}Controller
+ * @author ${author}
+ * @date ${datetime}
+ */
+@Api(tags = "${functionName}")
+@Controller
+@RequestMapping("/${moduleName}/${businessName}")
+public class ${ClassName}Controller extends BaseController {
+
+    @Autowired
+    private I${ClassName}Service i${ClassName}Service;
+    @Autowired
+    private IExportLogService iExportLogService;
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    private final String prefix = "${moduleName}/${businessName}";
+
+    /**
+     * 跳转至主页面
+     */
+    @RequiresPermissions("${permissionPrefix}:view")
+    @GetMapping()
+    public String toIndex() {
+        return prefix + "/${businessName}";
+    }
+
+    /**
+     * 跳转至新增页面
+     */
+    @GetMapping("/add")
+    public String add(ModelMap mmap) {
+        mmap.put("${className}", new ${ClassName}());
+        return prefix + "/edit";
+    }
+
+    /**
+     * 跳转至修改页面
+     */
+    @GetMapping("/edit/{id}")
+    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
+        mmap.put("${className}", i${ClassName}Service.getInfo(id));
+        return prefix + "/edit";
+    }
+
+    /**
+     * 根据条件查询${functionName}列表
+     */
+    @ApiOperation("根据条件查询${functionName}列表")
+    @RequiresPermissions("${permissionPrefix}:list")
+    @PostMapping("/list")
+    @ResponseBody
+    public TableDataInfo list(${ClassName} entity) {
+        return i${ClassName}Service.list(entity);
+    }
+
+    /**
+     * 修改或新增${functionName}
+     */
+    @ApiOperation("修改或新增${functionName}")
+    @RequiresPermissions("${permissionPrefix}:edit")
+    @PostMapping("/edit")
+    @ResponseBody
+    public AjaxResult editSave(${ClassName} ${className}) {
+        AjaxResult ajaxResult = null;
+        if (${className}.getId() != null){
+            ajaxResult = i${ClassName}Service.edit(${className});
+        } else{
+            ajaxResult = i${ClassName}Service.add(${className});
+        }
+        return ajaxResult;
+    }
+
+    /**
+     * 删除${functionName}
+     */
+    @ApiOperation("删除${functionName}（id不为空）")
+    @RequiresPermissions("${permissionPrefix}:remove")
+    @PostMapping("/remove")
+    @ResponseBody
+    public AjaxResult remove(String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return i${ClassName}Service.remove(arr);
+    }
+
+    /**
+     * 校验${functionName}唯一性
+     */
+    @ApiOperation("校验${functionName}唯一性")
+    @PostMapping("/check${ClassName}Unique")
+    @ResponseBody
+    public String check${ClassName}Unique(${ClassName} ${className}) {
+        return i${ClassName}Service.check${ClassName}Unique(${className});
+    }
+
+    /**
+     * 导出${functionName}
+     */
+    @ApiOperation("导出${functionName}")
+    @RequiresPermissions("${permissionPrefix}:export")
+    @GetMapping("/export")
+    @ResponseBody
+    public void export(HttpServletResponse response,${ClassName} ${className}) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.${businessName}.modelName");
+        List<${ClassName}> list = i${ClassName}Service.getList(${className});
+        ExcelUtil<${ClassName}> util = new ExcelUtil<>(${ClassName}. class);
+        Workbook workbook = util.exportExcel2(response, list, fileName);
+        ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, ${className}.toString(),"ApsConstant.PROCEDURE_CODE_XXX");
+        iExportLogService.add(exportLog);
+    }
+
+    /**
+     * 下载导入模板
+     *
+     * @param response 下载的模板文件
+     * @throws IOException 异常
+     */
+    @ApiOperation("下载导入模板")
+    @GetMapping("/importTemplate")
+    @ResponseBody
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.${businessName}.modelName");
+        ExcelUtil<${ClassName}> util = new ExcelUtil<>(${ClassName}.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
+    /**
+     * excel数据导入
+     *
+     * @param file 要导入的文件
+     * @param updateSupport 已存在的记录是否更新
+     * @return 结果
+     * @throws Exception 异常
+     */
+    @RequiresPermissions("${permissionPrefix}:import")
+    @ApiOperation("excel数据导入")
+    @PostMapping("/importData")
+    @ResponseBody
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
+        //文件解密
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, "ApsConstant.PROCEDURE_CODE_XXX",
+                I18nUtil.getMessage("ui.data.column.${businessName}.modelName"),file.getOriginalFilename());
+        importLog = iImportLogService.add(importLog);
+        ExcelUtil<${ClassName}> util = new ExcelUtil<>(${ClassName}.class);
+        InputStream in = new ByteArrayInputStream(data);
+        List<${ClassName}> list = util.importExcel(in);
+        AjaxResult ajaxResult = i${ClassName}Service.importData(list, updateSupport, importLog.getId());
+        // 更新日志记录成功数，失败数
+        ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
+        // 保存失败记录
+        ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
+        return ajaxResult;
+    }
+
+}

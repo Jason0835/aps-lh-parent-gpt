@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.engine.mapper.CommonLhEngineMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhMachineInfo" id="MachineInfoResult">
+        <result property="id" column="id"/>
+        <result property="machineCode" column="machine_code"/>
+        <result property="machineName" column="machine_name"/>
+        <result property="dimension" column="DIMENSION"/>
+        <result property="dimensionMinmum" column="DIMENSION_MINIMUM"/>
+        <result property="dimensionMaximum" column="DIMENSION_MAXIMUM"/>
+        <result property="centripetalMechanism" column="CENTRIPETAL_MECHANISM"/>
+        <result property="quata" column="quata"/>
+        <result property="classShift" column="class_shift"/>
+        <result property="openMachineClass" column="open_machine_class"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectMachineInfoVo">
+        select id, machine_code, machine_name, DIMENSION, DIMENSION_MINIMUM, DIMENSION_MAXIMUM, CENTRIPETAL_MECHANISM,
+        quata, class_shift, open_machine_class, status, remark, del_flag, create_by, create_time, update_by, update_time
+        from t_lh_machine_info
+    </sql>
+
+    <sql id="selectLhLossRate">
+        select id,sap_code,machine_code,loss_rate,create_by, create_time, update_by, update_time,remark
+        from t_lh_loss_setting
+    </sql>
+
+    <sql id="selectLhEngineScheduleResultVo">
+        select id, batch_no, order_no, lh_machine_code, lh_machine_name, sap_code,embryo_code, spec_desc, stock_area, lh_time,left_right_mold,
+                daily_plan_qty, schedule_date, production_status, class1_plan_qty,class1_start_time,class1_end_time, class1_analysis,class1_analysis_input,class1_analysis_code,
+                class2_plan_qty,class2_start_time,class2_end_time, class2_analysis,class2_analysis_input,class2_analysis_code,
+                class3_plan_qty,class3_start_time,class3_end_time, class1_analysis,class3_analysis_input,class3_analysis_code,is_release, create_by, create_time, update_by, update_time, del_flag, remark
+             from t_lh_schedule_result
+    </sql>
+
+    <select id="selectMachineInfoList" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo"
+            resultMap="MachineInfoResult">
+        <include refid="selectMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null and machineCode != ''">
+                AND machine_code = #{machineCode}
+            </if>
+            <if test="machineName != null and machineName != ''">
+                AND instr(machine_name, #{machineName} )>0
+            </if>
+            <if test="status != null  and status != ''">and status = #{status}</if>
+        </where>
+        order by machine_name asc
+    </select>
+
+    <!--查询硫化排程结果数据-->
+    <select id="selectLhEngineScheduleResultList" parameterType="com.zlt.aps.lh.engine.domain.LhEngineScheduleResult"
+            resultType="com.zlt.aps.lh.engine.domain.LhEngineScheduleResult">
+        <include refid="selectLhEngineScheduleResultVo"/>
+        where del_flag = '0' and embryo_code is not null
+        <if test="lhScheduleDate != null and lhScheduleDate!=''">and schedule_date = to_date(#{lhScheduleDate},'yyyy-MM-dd')</if>
+        <if test="sapCode != null  and sapCode != ''">and sap_code = #{sapCode}</if>
+        <if test="lhMachineCode != null  and lhMachineCode != ''">and LH_MACHINE_CODE = #{lhMachineCode}</if>
+        <if test="productionStatus != null  and productionStatus != ''">
+            and production_status = #{productionStatus}
+        </if>
+        <if test="orderByPlanQtyStr!=null and orderByPlanQtyStr!=''">
+          order by nvl(class3_plan_qty,0) desc,nvl(class2_plan_qty,0) desc,nvl(class1_plan_qty,0) desc
+        </if>
+    </select>
+
+
+    <insert id="insertLhEngineScheduleResult" parameterType="com.zlt.aps.lh.engine.domain.LhEngineScheduleResult">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_LH_SCHEDULE.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_lh_schedule_result
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            id,
+            <if test="batchNo != null">batch_no,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="lhMachineName != null">lh_machine_name,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="embryoCode != null">embryo_code,</if>
+            <if test="specDesc != null">spec_desc,</if>
+            <if test="stockArea != null">stock_area,</if>
+            <if test="lhTime != null">lh_time,</if>
+            <if test="dailyPlanQty != null">daily_plan_qty,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="productionStatus != null">production_status,</if>
+            <if test="class1PlanQty != null">class1_plan_qty,</if>
+            <if test="class1StartTime != null">class1_start_time,</if>
+            <if test="class1EndTime != null">class1_end_time,</if>
+            <if test="class1Analysis != null">class1_analysis,</if>
+            <if test="class1AnalysisInput != null">class1_analysis_input,</if>
+            <if test="class1AnalysisCode != null">class1_analysis_code,</if>
+            <if test="class1FinishQty != null">class1_finish_qty,</if>
+            <if test="class2PlanQty != null">class2_plan_qty,</if>
+            <if test="class2StartTime != null">class2_start_time,</if>
+            <if test="class2EndTime != null">class2_end_time,</if>
+            <if test="class2Analysis != null">class2_analysis,</if>
+            <if test="class2AnalysisInput != null">class2_analysis_input,</if>
+            <if test="class2AnalysisCode != null">class2_analysis_code,</if>
+            <if test="class2FinishQty != null">class2_finish_qty,</if>
+            <if test="class3PlanQty != null">class3_plan_qty,</if>
+            <if test="class3StartTime != null">class3_start_time,</if>
+            <if test="class3EndTime != null">class3_end_time,</if>
+            <if test="class3Analysis != null">class3_analysis,</if>
+            <if test="class3AnalysisInput != null">class3_analysis_input,</if>
+            <if test="class3AnalysisCode != null">class3_analysis_code,</if>
+            <if test="class3FinishQty != null">class3_finish_qty,</if>
+            <if test="isRelease != null">is_release,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataSource != null">data_source,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{id},
+            <if test="batchNo != null">#{batchNo},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="lhMachineName != null">#{lhMachineName},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="embryoCode != null">#{embryoCode},</if>
+            <if test="specDesc != null">#{specDesc},</if>
+            <if test="stockArea != null">#{stockArea},</if>
+            <if test="lhTime != null">#{lhTime},</if>
+            <if test="dailyPlanQty != null">#{dailyPlanQty},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="productionStatus != null">#{productionStatus},</if>
+            <if test="class1PlanQty != null">#{class1PlanQty},</if>
+            <if test="class1StartTime != null">#{class1StartTime},</if>
+            <if test="class1EndTime != null">#{class1EndTime},</if>
+            <if test="class1Analysis != null">#{class1Analysis},</if>
+            <if test="class1AnalysisInput != null">#{class1AnalysisInput},</if>
+            <if test="class1AnalysisCode != null">#{class1AnalysisCode},</if>
+            <if test="class1FinishQty != null">#{class1FinishQty},</if>
+            <if test="class2PlanQty != null">#{class2PlanQty},</if>
+            <if test="class2StartTime != null">#{class2StartTime},</if>
+            <if test="class2EndTime != null">#{class2EndTime},</if>
+            <if test="class2Analysis != null">#{class2Analysis},</if>
+            <if test="class2AnalysisInput != null">#{class2AnalysisInput},</if>
+            <if test="class2AnalysisCode != null">#{class2AnalysisCode},</if>
+            <if test="class2FinishQty != null">#{class2FinishQty},</if>
+            <if test="class3PlanQty != null">#{class3PlanQty},</if>
+            <if test="class3StartTime != null">#{class3StartTime},</if>
+            <if test="class3EndTime != null">#{class3EndTime},</if>
+            <if test="class3Analysis != null">#{class3Analysis},</if>
+            <if test="class3AnalysisInput != null">#{class3AnalysisInput},</if>
+            <if test="class3AnalysisCode != null">#{class3AnalysisCode},</if>
+            <if test="class3FinishQty != null">#{class3FinishQty},</if>
+            <if test="isRelease != null">#{isRelease},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataSource != null">#{dataSource},</if>
+        </trim>
+    </insert>
+
+
+    <!--Joran 2021-08-04 批量生成硫化自动排程结果数据-->
+    <insert id="batchInsertLhScheduleResult" parameterType="list">
+        insert into t_lh_schedule_result (
+        id,
+        batch_no,
+        order_no,
+        lh_machine_code，
+        left_right_mold,
+        sap_code，
+        embryo_code,
+        spec_desc，
+        stock_area，
+        lh_time，
+        change_mold_time,
+        daily_plan_qty，
+        schedule_date，
+        production_status，
+        class1_plan_qty，
+        class1_start_time,
+        class1_end_time,
+        class1_analysis，
+        class1_analysis_input，
+        class1_analysis_code，
+        class2_plan_qty，
+        class2_start_time,
+        class2_end_time,
+        class2_analysis，
+        class2_analysis_input，
+        class2_analysis_code，
+        class3_plan_qty，
+        class3_start_time,
+        class3_end_time,
+        class3_analysis，
+        class3_analysis_input，
+        class3_analysis_code，
+        is_release，
+        create_by,
+        update_by,
+        update_time,
+        remark
+        )
+        select SEQ_LH_SCHEDULE.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="scheduleResultList" item="schedule" separator=" union ">
+            select
+            #{schedule.batchNo,jdbcType=VARCHAR},
+            #{schedule.orderNo,jdbcType=VARCHAR},
+            #{schedule.lhMachineCode,jdbcType=VARCHAR},
+            #{schedule.leftRightMold,jdbcType=VARCHAR},
+            #{schedule.sapCode,jdbcType=VARCHAR},
+            #{schedule.embryoCode,jdbcType=VARCHAR},
+            #{schedule.specDesc,jdbcType=VARCHAR},
+            #{schedule.stockArea,jdbcType=VARCHAR},
+            #{schedule.lhTime,jdbcType=DOUBLE},
+            #{schedule.changeMoldTime,jdbcType=DATE},
+            #{schedule.dailyPlanQty,jdbcType=INTEGER},
+            #{schedule.scheduleDate},
+            #{schedule.productionStatus,jdbcType=VARCHAR},
+            #{schedule.class1PlanQty,jdbcType=INTEGER},
+            #{schedule.class1StartTime,jdbcType=DATE},
+            #{schedule.class1EndTime,jdbcType=DATE},
+            #{schedule.class1Analysis,jdbcType=VARCHAR},
+            #{schedule.class1AnalysisInput,jdbcType=VARCHAR},
+            #{schedule.class1AnalysisCode,jdbcType=VARCHAR},
+            #{schedule.class2PlanQty,jdbcType=INTEGER},
+            #{schedule.class2StartTime,jdbcType=DATE},
+            #{schedule.class2EndTime,jdbcType=DATE},
+            #{schedule.class2Analysis,jdbcType=VARCHAR},
+            #{schedule.class2AnalysisInput,jdbcType=VARCHAR},
+            #{schedule.class2AnalysisCode,jdbcType=VARCHAR},
+            #{schedule.class3PlanQty,jdbcType=INTEGER},
+            #{schedule.class3StartTime,jdbcType=DATE},
+            #{schedule.class3EndTime,jdbcType=DATE},
+            #{schedule.class3Analysis,jdbcType=VARCHAR},
+            #{schedule.class3AnalysisInput,jdbcType=VARCHAR},
+            #{schedule.class3AnalysisCode,jdbcType=VARCHAR},
+            #{schedule.isRelease,jdbcType=VARCHAR},
+            #{schedule.createBy,jdbcType=VARCHAR},
+            #{schedule.updateBy,jdbcType=VARCHAR},
+            #{schedule.updateTime,jdbcType=DATE},
+            #{schedule.remark,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <!--同步排程记录到日志表-->
+    <insert id="syncLhScheduleToLog">
+       insert into T_LH_SCHEDULE_RESULT_LOG
+       SELECT t.* from T_LH_SCHEDULE_RESULT T
+       where t.schedule_date = to_date(#{scheduleDate},'yyyy-MM-dd')
+    </insert>
+
+    <!--物理删除排程表-->
+    <delete id="deleteLhSchedule" parameterType="string">
+        delete from T_LH_SCHEDULE_RESULT where schedule_date = to_date(#{scheduleDate},'yyyy-MM-dd')
+    </delete>
+
+    <!--转机台更新机台-->
+    <update id="updateLhScheduleLhMachine" parameterType="com.zlt.aps.lh.engine.domain.LhEngineScheduleResult">
+        update T_LH_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="lhMachineName != null">lh_machine_name = #{lhMachineName},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="isRelease != null">is_release = #{isRelease},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+
+    <!--Joran 2021-08-17 加载硫化工序设置的耗损率列表-->
+    <select id="selectLossSettingList" parameterType="com.zlt.aps.lh.engine.domain.LhEngineLossRate"
+            resultType="com.zlt.aps.lh.engine.domain.LhEngineLossRate">
+        <include refid="selectLhLossRate"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null and machineCode != ''">
+                AND machine_code = #{machineCode}
+            </if>
+            <if test="sapCode != null and sapCode != ''">
+                AND sap_code=#{sapCode}
+            </if>
+        </where>
+        order by machine_code asc
+    </select>
+
+
+    <!--Joran 2022-06-09 获取模具变更计划-->
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan" id="LhApsMoldAdjustPlanResult">
+        <result property="id" column="id"/>
+        <result property="moldOrderNo" column="mold_order_no"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="planDate" column="plan_date"/>
+        <result property="beforeSapCode" column="before_sap_code"/>
+        <result property="beforeEmbryoCode" column="before_embryo_code"/>
+        <result property="beforeSpecDesc" column="before_spec_desc"/>
+        <result property="tireRoughStock" column="tire_rough_stock"/>
+        <result property="useMoldNumber" column="use_mold_number"/>
+        <result property="leftRightMold" column="left_right_mold"/>
+        <result property="leftMoldCode" column="left_mold_code"/>
+        <result property="rightMoldCode" column="right_mold_code"/>
+        <result property="changeType" column="change_type"/>
+        <result property="afterSapCode" column="after_sap_code"/>
+        <result property="afterEmbryoCode" column="after_embryo_code"/>
+        <result property="afterSpecDesc" column="after_spec_desc"/>
+        <result property="changeMoldTime" column="change_mold_time"/>
+        <result property="finishTime" column="finish_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="is_release" column="isRelease"/>
+        <result property="publish_success_count" column="publishSuccessCount"/>
+        <result property="newest_publish_time" column="newestPublishTime"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="is_execute" column="isExecute"/>
+    </resultMap>
+
+    <sql id="selectLhApsMoldAdjustPlanVo">
+        select
+        mdp.id,
+        mdp.mold_order_no,
+        mdp.lh_machine_code,
+        lmi.MACHINE_NAME lh_machine_name,
+        mdp.plan_date,
+        mdp.before_sap_code,
+        mdp.before_embryo_code,
+        mdp.before_spec_desc,
+        mdp.tire_rough_stock,
+        mdp.use_mold_number,
+        mdp.left_right_mold,
+        mdp.change_type,
+        mdp.after_sap_code,
+        mdp.after_embryo_code,
+        mdp.after_spec_desc,
+        mdp.change_mold_time,
+        mdp.create_by,
+        mdp.create_time,
+        mdp.update_by,
+        mdp.update_time,
+        mdp.del_flag,
+        mdp.is_release,
+        mdp.is_execute,
+        mdp.publish_success_count,
+        mdp.newest_publish_time,
+        mdp.data_source,
+        mdp.remark
+        from t_aps_lh_mold_adjust_plan mdp left join t_lh_machine_info lmi on mdp.lh_machine_code=lmi.machine_code
+    </sql>
+
+    <select id="selectLhApsMoldAdjustPlanList" parameterType="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan" resultMap="LhApsMoldAdjustPlanResult">
+        <include refid="selectLhApsMoldAdjustPlanVo"/>
+        <where>
+            mdp.del_flag = '0' and lmi.del_flag='0'
+            <if test="moldOrderNo != null  and moldOrderNo != ''"> and mdp.mold_order_no = #{moldOrderNo}</if>
+            <if test="lhMachineName != null  and lhMachineName != ''"> and instr(lmi.machine_name , #{lhMachineName})>0</if>
+            <if test="planDate != null "> and mdp.plan_date = #{planDate}</if>
+            <if test="isRelease != null and isRelease!=''"> and mdp.is_release = #{isRelease}</if>
+            <if test="isExecute != null and isExecute!=''"> and mdp.is_execute = #{isExecute}</if>
+            <if test="beforeSapCode != null  and beforeSapCode != ''"> and instr(mdp.before_sap_code,#{beforeSapCode}) > 0  </if>
+            <if test="beforeEmbryoCode != null  and beforeEmbryoCode != ''"> and instr(mdp.before_embryo_code , #{beforeEmbryoCode}) > 0</if>
+            <if test="beforeSpecDesc != null  and beforeSpecDesc != ''"> and instr(mdp.before_spec_desc , #{beforeSpecDesc})>0</if>
+            <if test="rightMoldCode != null  and rightMoldCode != ''"> and mdp.right_mold_code = #{rightMoldCode}</if>
+            <if test="changeType != null  and changeType != ''"> and mdp.change_type = #{changeType}</if>
+        </where>
+        order by mdp.plan_date desc,lh_machine_name asc
+    </select>
+
+    <!--2022-06-09 获取硫化当前在产规格数据-->
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec" id="LhInProductionSpecResult">
+        <result property="id" column="id"/>
+        <result property="productDate" column="product_date"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="machine_name"/>
+        <result property="lhStreamCode" column="lh_stream_code"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="leftRightMold" column="left_right_mold"/>
+        <result property="isEmptyMold" column="is_empty_mold"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectLhInProductionSpecVo">
+        select id, product_date, lh_machine_code, lh_stream_code, sap_code, left_right_mold, is_empty_mold, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_in_production_spec
+    </sql>
+
+    <select id="selectLhInProductionSpecList" parameterType="com.zlt.aps.lh.api.domain.entity.LhInProductionSpec"
+            resultMap="LhInProductionSpecResult">
+        select  * from (
+        select lips.id, lips.product_date, lips.lh_machine_code, lips.lh_stream_code, lips.sap_code,
+        lips.left_right_mold, lips.is_empty_mold, lips.create_by, lips.create_time, lips.update_by, lips.update_time, lips.del_flag, lips.remark,
+        lmi.machine_name
+        from t_lh_in_production_spec lips
+        left join T_LH_MACHINE_INFO lmi
+        on lips.lh_machine_code = lmi.machine_code and lmi.del_flag = 0
+        where lips.del_flag = '0'
+        <if test="productDate != null ">and lips.product_date = #{productDate}</if>
+        <if test="sapCode != null  and sapCode != ''">and lips.sap_code = #{sapCode}</if>
+        ) t
+    </select>
+
+
+    <!--Joran 2022-06-10 月度外胎汇总数据-->
+    <resultMap type="com.zlt.aps.lh.engine.domain.LhSapMonthPlanSurplus" id="LhSapMonthPlanSurplusResult">
+        <result property="id"    column="id"    />
+        <result property="monthPlanApsVersion"    column="month_plan_aps_version"    />
+        <result property="monthPlanVersion"    column="month_plan_version"    />
+        <result property="year"    column="year"    />
+        <result property="month"    column="month"    />
+        <result property="sapCode"    column="sap_code"    />
+        <result property="dataSource"    column="data_source"    />
+        <result property="lastMonthStock" column="last_month_stock" />
+        <result property="sapBadQty" column="sap_bad_qty" />
+        <result property="monthPlanQty"    column="month_plan_qty"    />
+        <result property="planModifyQty"    column="plan_modify_qty"    />
+        <result property="monthFinishQty"    column="month_finish_qty"    />
+        <result property="monthRemainQty"    column="month_remain_qty"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectLhSapMonthPlanSurplusVo">
+        select id, month_plan_aps_version, month_plan_version, year, month, sap_code, month_plan_qty, plan_modify_qty, month_finish_qty, month_remain_qty,data_source,last_month_stock,sap_bad_qty,
+                create_by, create_time, update_by, update_time, del_flag, remark from t_cx_month_plan_surplus
+    </sql>
+
+    <select id="selectLhSapMonthPlanSurplusList" parameterType="com.zlt.aps.lh.engine.domain.LhSapMonthPlanSurplus" resultMap="LhSapMonthPlanSurplusResult">
+        <include refid="selectLhSapMonthPlanSurplusVo"/>
+        <where>
+            del_flag='0'
+            <if test="monthPlanApsVersion != null  and monthPlanApsVersion != ''"> and month_plan_aps_version = #{monthPlanApsVersion}</if>
+            <if test="year != null  and year != ''"> and year = #{year}</if>
+            <if test="month != null  and month != ''"> and month = #{month}</if>
+            <if test="sapCode != null  and sapCode != ''"> and sap_code = #{sapCode}</if>
+            <if test="cxBatchNo != null  and cxBatchNo != ''"> and month_plan_aps_version = (select month_plan_aps_version from T_CX_AUTO_SCHEDULE_RECORD t where t.cx_batch_no=#{cxBatchNo})</if>
+            <if test="isCloseOut">
+                and month_remain_qty <![CDATA[   <=  ]]> 0
+            </if>
+        </where>
+    </select>
+
+    <!--Joran 2022-06-20 自动排程工单日志记录-->
+    <delete id="deleteLhScheduleLogByScheduleDate">
+        update T_LH_AUTO_SCHEDULE_LOG set del_flag='1'
+        <where>
+            del_flag='0'
+            <if test="scheduleDate!=null and scheduleDate!=''">
+                and schedule_date=to_date(#{scheduleDate},'yyyy-MM-dd')
+            </if>
+        </where>
+
+    </delete>
+    <insert id="batchInsertLhScheduleLogResult" parameterType="list">
+        begin
+        <foreach collection="scheduleLogList" item="scheduleLog" separator=" ; ">
+            insert into T_LH_AUTO_SCHEDULE_LOG (id, schedule_date,order_no, log_detail,create_by,update_by,update_time,remark)
+            values
+            (
+            SEQ_LH_AUTO_SCHEDULE_LOG.nextval,
+            #{scheduleLog.scheduleDate,jdbcType=DATE},
+            #{scheduleLog.orderNo,jdbcType=VARCHAR},
+            #{scheduleLog.logDetail,jdbcType=CLOB},
+            #{scheduleLog.createBy,jdbcType=VARCHAR},
+            #{scheduleLog.updateBy,jdbcType=VARCHAR},
+            #{scheduleLog.updateTime,jdbcType=DATE},
+            #{scheduleLog.remark,jdbcType=VARCHAR}
+            )
+        </foreach>
+        ;end;
+    </insert>
+
+    <insert id="insertLhAutoScheduleLog" parameterType="com.zlt.aps.lh.engine.domain.LhAutoScheduleLog">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_LH_AUTO_SCHEDULE_LOG.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into T_LH_AUTO_SCHEDULE_LOG
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="logDetail != null">log_detail,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="logDetail != null">#{logDetail},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+</mapper>

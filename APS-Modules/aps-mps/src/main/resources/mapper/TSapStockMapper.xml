@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TSapStockMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mps.domain.TSapStock">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="stockDate" column="STOCK_DATE" jdbcType="TIMESTAMP"/>
+            <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+            <result property="stockNum" column="STOCK_NUM" jdbcType="DECIMAL"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,STOCK_DATE,SAP_CODE,
+        STOCK_NUM,CREATE_BY,CREATE_TIME,
+        UPDATE_BY,UPDATE_TIME,DEL_FLAG,
+        REMARK
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_SAP_STOCK
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_SAP_STOCK
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TSapStock" useGeneratedKeys="true">
+        insert into T_SAP_STOCK
+        ( ID,STOCK_DATE,SAP_CODE
+        ,STOCK_NUM,CREATE_BY,CREATE_TIME
+        ,UPDATE_BY,UPDATE_TIME,DEL_FLAG
+        ,REMARK)
+        values (SEQ_T_SAP_STOCK.NEXTVAL,#{stockDate,jdbcType=TIMESTAMP},#{sapCode,jdbcType=VARCHAR}
+        ,#{stockNum,jdbcType=DECIMAL},#{createBy,jdbcType=VARCHAR},#{createTime,jdbcType=TIMESTAMP}
+        ,#{updateBy,jdbcType=VARCHAR},#{updateTime,jdbcType=TIMESTAMP},#{delFlag,jdbcType=CHAR}
+        ,#{remark,jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TSapStock" useGeneratedKeys="true">
+        insert into T_SAP_STOCK
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="stockDate != null">stockDate,</if>
+                <if test="sapCode != null">sapCode,</if>
+                <if test="stockNum != null">stockNum,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateBy != null">updateBy,</if>
+                <if test="updateTime != null">updateTime,</if>
+                <if test="delFlag != null">delFlag,</if>
+                <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = SEQ_T_SAP_STOCK.NEXTVAL,</if>
+                <if test="stockDate != null">STOCK_DATE = #{stockDate,jdbcType=TIMESTAMP},</if>
+                <if test="sapCode != null">SAP_CODE = #{sapCode,jdbcType=VARCHAR},</if>
+                <if test="stockNum != null">STOCK_NUM = #{stockNum,jdbcType=DECIMAL},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+                <if test="delFlag != null">DEL_FLAG = #{delFlag,jdbcType=CHAR},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.mps.domain.TSapStock">
+        update T_SAP_STOCK
+        <set>
+                <if test="stockDate != null">
+                    STOCK_DATE = #{stockDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="sapCode != null">
+                    SAP_CODE = #{sapCode,jdbcType=VARCHAR},
+                </if>
+                <if test="stockNum != null">
+                    STOCK_NUM = #{stockNum,jdbcType=DECIMAL},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="delFlag != null">
+                    DEL_FLAG = #{delFlag,jdbcType=CHAR},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TSapStock">
+        update T_SAP_STOCK
+        set 
+            STOCK_DATE =  #{stockDate,jdbcType=TIMESTAMP},
+            SAP_CODE =  #{sapCode,jdbcType=VARCHAR},
+            STOCK_NUM =  #{stockNum,jdbcType=DECIMAL},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
+            DEL_FLAG =  #{delFlag,jdbcType=CHAR},
+            REMARK =  #{remark,jdbcType=VARCHAR}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_SAP_STOCK a USING (
+        <foreach collection="list" item="Item" separator=" union ">
+            select
+            #{Item.stockDate,jdbcType=DATE} stock_date,
+            #{Item.sapCode,jdbcType=VARCHAR} sap_code,
+            #{Item.stockNum,jdbcType=DECIMAL} stock_num,
+            #{Item.remark,jdbcType=VARCHAR} remark,
+            #{Item.createBy,jdbcType=VARCHAR} create_by,
+            #{Item.createTime,jdbcType=DATE} create_time,
+            #{Item.updateTime,jdbcType=DATE} update_time
+            from dual
+        </foreach>
+        ) b ON (
+        ((b.stock_date is null and a.stock_date is null) or (a.stock_date = b.stock_date))
+        AND a.sap_code = b.sap_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.stock_num = b.stock_num,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.stock_date, a.sap_code, a.stock_num, a.create_by, a.create_time, a.remark, a.del_flag) values
+        (SEQ_T_SAP_STOCK.NEXTVAL, b.stock_date, b.sap_code, b.stock_num, b.create_by, sysdate, b.remark, 0)
+    </update>
+</mapper>

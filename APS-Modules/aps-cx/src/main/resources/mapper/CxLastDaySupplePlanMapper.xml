@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxLastDaySupplePlanMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.dto.CxLastDaySupplePlanDto" id="CxLastDaySupplePlanResult">
+        <result property="id" column="id"/>
+        <result property="suppleBatchNo" column="supple_batch_no"/>
+        <result property="supplePlanQty" column="supple_plan_qty"/>
+        <result property="status" column="status"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="taskType" column="task_type"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="cxMachineCode" column="cx_machine_code"/>
+        <result property="cxMachineName" column="cx_machine_name"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="lhMachineQty" column="lh_machine_qty"/>
+        <result property="minimumLhMachineReqQty" column="minimum_lh_machine_req_qty"/>
+        <result property="minimumLhMachineComQty" column="minimum_lh_machine_com_qty"/>
+        <result property="availableMoldQty" column="available_mold_qty"/>
+        <result property="maximumClassQty" column="maximum_class_qty"/>
+        <result property="workShifts" column="work_shifts"/>
+        <result property="storageLocation" column="storage_location"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="specDesc" column="spec_desc"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="lhMiddleNightFinishQty" column="lh_middle_night_finish_qty"/>
+        <result property="cxMonthFinishQty" column="cx_month_finish_qty"/>
+        <result property="planModifyQty" column="plan_modify_qty"/>
+        <result property="rejectQty" column="reject_qty"/>
+        <result property="newestPlanQty" column="newest_plan_qty"/>
+        <result property="class3PlannedQty" column="class3_planned_qty"/>
+        <result property="planSort" column="plan_sort"/>
+        <result property="singleShiftLhQty" column="single_shift_lh_qty"/>
+        <result property="totalStock" column="total_stock"/>
+        <result property="extendedStock" column="extended_stock"/>
+        <result property="monthStock" column="month_stock"/>
+        <result property="actualOverProduction" column="actual_over_production"/>
+        <result property="expectedOverProduction" column="expected_over_production"/>
+        <result property="differenceOverProduction" column="difference_over_production"/>
+        <result property="class1AvailableLhShift" column="class1_available_lh_shift"/>
+        <result property="class1PlanQty" column="class1_plan_qty"/>
+        <result property="class1AnalysisInput" column="class1_analysis_input"/>
+        <result property="class1Analysis" column="class1_analysis"/>
+        <result property="class2AvailableLhShift" column="class2_available_lh_shift"/>
+        <result property="class2PlanQty" column="class2_plan_qty"/>
+        <result property="class2AnalysisInput" column="class2_analysis_input"/>
+        <result property="class2Analysis" column="class2_analysis"/>
+        <result property="class3AvailableLhShift" column="class3_available_lh_shift"/>
+        <result property="class3PlanQty" column="class3_plan_qty"/>
+        <result property="class3Analysis" column="class3_analysis"/>
+        <result property="class4AvailableLhShift" column="class4_available_lh_shift"/>
+        <result property="class4PlanQty" column="class4_plan_qty"/>
+        <result property="class4Analysis" column="class4_analysis"/>
+        <result property="class5AvailableLhShift" column="class5_available_lh_shift"/>
+        <result property="class5PlanQty" column="class5_plan_qty"/>
+        <result property="class5Analysis" column="class5_analysis"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="class3AnalysisInput" column="class3_analysis_input"/>
+        <result property="class4AnalysisInput" column="class4_analysis_input"/>
+        <result property="class5AnalysisInput" column="class5_analysis_input"/>
+        <result property="class1Sort" column="class1_sort"/>
+        <result property="class2Sort" column="class2_sort"/>
+        <result property="class3Sort" column="class3_sort"/>
+        <result property="class4Sort" column="class4_sort"/>
+        <result property="class5Sort" column="class5_sort"/>
+        <result property="lhMachineChangeMoldDesc" column="LH_MACHINE_CHANGE_MOLD_DESC"/>
+        <result property="monthPlanOs" column="monthPlanOs"/>
+        <result property="monthPlan" column="monthPlan"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="bomDataVersion" column="bom_Data_Version"/>
+        <result property="cxMachineType" column="cx_machine_type"/>
+        <result property="specialRequirements" column="special_requirements"/>
+        <result property="confirmSuppleStatus" column="confirm_supple_status"/>
+    </resultMap>
+
+    <sql id="column">
+        a.id, a.supple_batch_no, a.supple_plan_qty, a.confirm_supple_status, a.plan_sort, a.cx_batch_no, a.order_no,a.bom_Data_Version, a.task_type, a.schedule_date, a.production_status, a.cx_machine_code,
+        a.cx_machine_type,a.lh_machine_code, a.lh_machine_qty, a.minimum_lh_machine_req_qty,
+        a.minimum_lh_machine_com_qty,a.available_mold_qty, a.maximum_class_qty, a.work_shifts, a.storage_location, a.sap_code, a.spec_desc,
+        a.embryo_code, a.lh_middle_night_finish_qty, a.cx_month_finish_qty, a.reject_qty,
+        a.class3_planned_qty, a.single_shift_lh_qty, a.total_stock, a.class1_available_lh_shift,
+        a.class1_plan_qty, a.class1_analysis_input, a.class1_analysis, a.class2_available_lh_shift, a.class2_plan_qty,
+        a.class2_analysis_input, a.class2_analysis, a.class3_available_lh_shift, a.class3_plan_qty, a.class3_analysis,
+        a.class4_available_lh_shift, a.class4_plan_qty, a.class4_analysis, a.class5_available_lh_shift,
+        a.class5_plan_qty, a.class5_analysis, a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag,
+        a.remark, a.mark_close_out_tip, a.spec_dimension, a.is_release, a.class3_analysis_input,
+        a.class4_analysis_input, a.class5_analysis_input, a.class1_sort, a.class2_sort, a.class3_sort, a.class4_sort,
+        a.class5_sort,a.LH_MACHINE_CHANGE_MOLD_DESC,a.data_source,a.special_requirements,
+    </sql>
+
+    <select id="selectCxLastDaySupplePlanList" parameterType="com.zlt.aps.cx.api.domain.dto.CxLastDaySupplePlanDto"
+            resultMap="CxLastDaySupplePlanResult">
+        select
+        <include refid="column"/>
+        c.status,
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+        SC.COLOR_TYPE,
+        SC.COLOR_CODE,
+        CS.OVER_TIME_STOCK,
+        MS.OVER_TIME_STOCK AS overTimeMonthStock,
+        pa.PLAN_MODIFY_QTY,
+        sr.MONTH_PLAN_APS_VERSION,
+        cmi.machine_name as cx_machine_name
+        from t_cx_last_day_supple_plan a inner join T_CX_AUTO_SCHEDULE_RECORD sr
+        on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+
+        LEFT JOIN (
+        select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        ) pa
+        on pa.EMBRYO_CODE=a.EMBRYO_CODE
+        and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION
+        and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+
+        LEFT JOIN (
+        SELECT re.CX_BATCH_NO,ps.MATERIAL_CODE,ps.MONTH_PLAN_QTY,ps.MONTH_REMAIN_QTY,0 order_sort
+        FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS ps,T_CX_AUTO_SCHEDULE_RECORD re WHERE
+        ps.MONTH_PLAN_APS_VERSION=re.MONTH_PLAN_APS_VERSION and ps.del_flag='0' and re.del_flag='0' AND re.STATUS='0'
+        <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+        union
+        select casr.cx_batch_no,psl.MATERIAL_CODE,psl.MONTH_PLAN_QTY,psl.MONTH_REMAIN_QTY,1 order_sort
+        from T_CX_AUTO_SCHEDULE_RECORD casr
+        join T_PROCEDURE_SURPLUS_LOG psl
+        on casr.month_plan_aps_version=psl.month_plan_aps_version and psl.procedure_code='1'
+        <where>
+            casr.del_flag='0'
+            and psl.del_flag='0' <!--Joran 2021-12-15 只保留最新版本数据-->
+            <if test="scheduleDate != null ">
+                and casr.cx_batch_no=(
+                select distinct cx_batch_no from
+                t_cx_schedule_result t
+                <where>
+                    t.del_flag=
+                    '0'
+                    and t.schedule_date= #{scheduleDate}
+                </where>
+                )
+                and not exists(
+                SELECT re.CX_BATCH_NO,ps.MATERIAL_CODE,ps.MONTH_PLAN_QTY,ps.MONTH_REMAIN_QTY,0 order_sort
+                FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS ps,T_CX_AUTO_SCHEDULE_RECORD re WHERE
+                ps.MONTH_PLAN_APS_VERSION=re.MONTH_PLAN_APS_VERSION and ps.del_flag='0' and re.del_flag='0' AND
+                re.STATUS='0'
+                <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+                and re.cx_batch_no=casr.cx_batch_no
+                )
+            </if>
+        </where>
+
+        ) b
+        ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq
+        ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+
+        LEFT JOIN T_CX_SPEC_COLOR SC
+        ON SC.SPEC_DESC=a.spec_desc AND SC.del_Flag = '0' AND SC.STATUS='0'
+
+        LEFT JOIN T_CX_STOCK CS
+        ON CS.STOCK_DATE=a.schedule_date
+        and CS.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+        and CS.EMBRYO_CODE=a.embryo_code and CS.DEL_FLAG='0'
+
+        LEFT JOIN T_CX_MONTH_STOCK MS
+        ON TO_CHAR(MS.STOCK_MONTH, 'yyyy-MM')=TO_CHAR(ADD_MONTHS(a.schedule_date,-1), 'yyyy-MM')
+        and MS.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+        AND MS.EMBRYO_CODE=a.embryo_code AND MS.DEL_FLAG='0'
+        left join T_CX_SUPPLE_BATCH_RECORD c
+        on a.supple_batch_no = c.supple_batch_no and c.del_flag = 0
+        left join T_CX_MACHINE_INFO cmi
+        on cmi.del_flag = 0 and a.cx_machine_code = cmi.machine_code
+        where a.del_flag = 0
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="specDimension != null ">and a.spec_dimension = #{specDimension}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and a.cx_machine_code = #{cxMachineCode}</if>
+        <if test="status != null and status != ''">and c.status = #{status}</if>
+        order by a.spec_dimension asc
+    </select>
+
+    <select id="selectCxLastDaySupplePlanList2" parameterType="com.zlt.aps.cx.api.domain.dto.CxLastDaySupplePlanDto"
+            resultMap="CxLastDaySupplePlanResult">
+        select * from t_cx_last_day_supple_plan a
+        where a.supple_batch_no =  #{suppleBatchNo}
+        and a.cx_batch_no =  #{cxBatchNo}
+        and a.del_flag = 0
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="specDimension != null ">and a.spec_dimension = #{specDimension}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and a.cx_machine_code = #{cxMachineCode}</if>
+    </select>
+
+    <update id="updateCxLastDaySupplePlan" parameterType="com.zlt.aps.cx.api.domain.dto.CxLastDaySupplePlanDto">
+        update t_cx_last_day_supple_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="cxMachineCode != null">cx_machine_code = #{cxMachineCode},</if>
+            <if test="confirmSuppleStatus != null">confirm_supple_status = #{confirmSuppleStatus,jdbcType=VARCHAR},</if>
+            <if test="class3PlannedQty != null">class3_planned_qty = #{class3PlannedQty},</if>
+            <if test="planSort != null">plan_sort = #{planSort},</if>
+            <if test="class3PlanQty != null">class3_plan_qty = #{class3PlanQty},</if>
+            <if test="class4PlanQty != null">class4_plan_qty = #{class4PlanQty},</if>
+            <if test="class5PlanQty != null">class5_plan_qty = #{class5PlanQty},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="cxBatchNo != null">cx_batch_no = #{cxBatchNo},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="taskType != null">task_type = #{taskType},</if>
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="productionStatus != null">production_status = #{productionStatus},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="lhMachineQty != null">lh_machine_qty = #{lhMachineQty},</if>
+            <if test="minimumLhMachineReqQty != null">minimum_lh_machine_req_qty = #{minimumLhMachineReqQty},</if>
+            <if test="minimumLhMachineComQty != null">minimum_lh_machine_com_qty = #{minimumLhMachineComQty},</if>
+            <if test="availableMoldQty != null">available_mold_qty = #{availableMoldQty},</if>
+            <if test="maximumClassQty != null">maximum_class_qty = #{maximumClassQty},</if>
+            <if test="workShifts != null">work_shifts = #{workShifts},</if>
+            <if test="storageLocation != null">storage_location = #{storageLocation},</if>
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="specDesc != null">spec_desc = #{specDesc},</if>
+            <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+            <if test="lhMiddleNightFinishQty != null">lh_middle_night_finish_qty = #{lhMiddleNightFinishQty},</if>
+            <if test="cxMonthFinishQty != null">cx_month_finish_qty = #{cxMonthFinishQty},</if>
+            <if test="planModifyQty != null">plan_modify_qty = #{planModifyQty},</if>
+            <if test="rejectQty != null">reject_qty = #{rejectQty},</if>
+            <if test="newestPlanQty != null">newest_plan_qty = #{newestPlanQty},</if>
+            <if test="singleShiftLhQty != null">single_shift_lh_qty = #{singleShiftLhQty},</if>
+            <if test="totalStock != null">total_stock = #{totalStock},</if>
+            <if test="extendedStock != null">extended_stock = #{extendedStock},</if>
+            <if test="monthStock != null">month_stock = #{monthStock},</if>
+            <if test="actualOverProduction != null">actual_over_production = #{actualOverProduction},</if>
+            <if test="expectedOverProduction != null">expected_over_production = #{expectedOverProduction},</if>
+            <if test="differenceOverProduction != null">difference_over_production = #{differenceOverProduction},</if>
+            <if test="class1AvailableLhShift != null">class1_available_lh_shift = #{class1AvailableLhShift},</if>
+            <if test="class1Analysis != null">class1_analysis = #{class1Analysis},</if>
+            <if test="class2AvailableLhShift != null">class2_available_lh_shift = #{class2AvailableLhShift},</if>
+            <if test="class2Analysis != null">class2_analysis = #{class2Analysis},</if>
+            <if test="class3AvailableLhShift != null">class3_available_lh_shift = #{class3AvailableLhShift},</if>
+            <if test="class3Analysis != null">class3_analysis = #{class3Analysis},</if>
+            <if test="class4AvailableLhShift != null">class4_available_lh_shift = #{class4AvailableLhShift},</if>
+            <if test="class4Analysis != null">class4_analysis = #{class4Analysis},</if>
+            <if test="class5AvailableLhShift != null">class5_available_lh_shift = #{class5AvailableLhShift},</if>
+            <if test="class5Analysis != null">class5_analysis = #{class5Analysis},</if>
+            <if test="markCloseOutTip != null">mark_close_out_tip = #{markCloseOutTip},</if>
+            <if test="specDimension != null">spec_dimension = #{specDimension},</if>
+            <if test="isRelease != null">is_release = #{isRelease},</if>
+            <if test="class1Sort != null">class1_sort = #{class1Sort},</if>
+            <if test="class2Sort != null">class2_sort = #{class2Sort},</if>
+            <if test="class3Sort != null">class3_sort = #{class3Sort},</if>
+            <if test="class4Sort != null">class4_sort = #{class4Sort},</if>
+            <if test="class5Sort != null">class5_sort = #{class5Sort},</if>
+            <if test="lhMachineChangeMoldDesc != null">LH_MACHINE_CHANGE_MOLD_DESC = #{lhMachineChangeMoldDesc},</if>
+            <if test="bomDataVersion != null">bom_Data_Version = #{bomDataVersion},</if>
+            <if test="cxMachineType != null">cx_machine_type = #{cxMachineType},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxLastDaySupplePlanByIds" parameterType="String">
+        update t_cx_last_day_supple_plan set del_flag = 1 where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectStatusByIds" parameterType="String" resultType="string">
+        SELECT
+            listagg(status,',') within group (order by status) status
+        FROM
+            t_cx_last_day_supple_plan a
+        LEFT JOIN T_CX_SUPPLE_BATCH_RECORD b
+            ON a.SUPPLE_BATCH_NO = b.SUPPLE_BATCH_NO AND b.DEL_FLAG = 0
+        WHERE
+            a.ID IN
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getInfo" parameterType="long" resultMap="CxLastDaySupplePlanResult">
+        select * from t_cx_last_day_supple_plan where id = #{id}
+    </select>
+
+    <insert id="insertCxLastDaySupplePlan" parameterType="com.zlt.aps.cx.api.domain.dto.CxLastDaySupplePlanDto">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_cx_SCHEDULE.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cx_last_day_supple_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="suppleBatchNo != null">supple_batch_no,</if>
+            <if test="cxBatchNo != null">cx_batch_no,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="taskType != null">task_type,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="productionStatus != null">production_status,</if>
+            <if test="cxMachineCode != null">cx_machine_code,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="lhMachineQty != null">lh_machine_qty,</if>
+            <if test="minimumLhMachineReqQty != null">minimum_lh_machine_req_qty,</if>
+            <if test="minimumLhMachineComQty != null">minimum_lh_machine_com_qty,</if>
+            <if test="availableMoldQty != null">available_mold_qty,</if>
+            <if test="maximumClassQty != null">maximum_class_qty,</if>
+            <if test="workShifts != null">work_shifts,</if>
+            <if test="storageLocation != null">storage_location,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="specDesc != null">spec_desc,</if>
+            <if test="embryoCode != null">embryo_code,</if>
+            <if test="lhMiddleNightFinishQty != null">lh_middle_night_finish_qty,</if>
+            <if test="cxMonthFinishQty != null">cx_month_finish_qty,</if>
+            <if test="planModifyQty != null">plan_modify_qty,</if>
+            <if test="rejectQty != null">reject_qty,</if>
+            <if test="newestPlanQty != null">newest_plan_qty,</if>
+            <if test="class3PlannedQty != null">class3_planned_qty,</if>
+            <if test="planSort != null">#{planSort},</if>
+            <if test="singleShiftLhQty != null">single_shift_lh_qty,</if>
+            <if test="totalStock != null">total_stock,</if>
+            <if test="extendedStock != null">extended_stock,</if>
+            <if test="monthStock != null">month_stock,</if>
+            <if test="actualOverProduction != null">actual_over_production,</if>
+            <if test="expectedOverProduction != null">expected_over_production,</if>
+            <if test="differenceOverProduction != null">difference_over_production,</if>
+            <if test="class1AvailableLhShift != null">class1_available_lh_shift,</if>
+            <if test="class1PlanQty != null">class1_plan_qty,</if>
+            <if test="class1AnalysisInput != null">class1_analysis_input,</if>
+            <if test="class1Analysis != null">class1_analysis,</if>
+            <if test="class2AvailableLhShift != null">class2_available_lh_shift,</if>
+            <if test="class2PlanQty != null">class2_plan_qty,</if>
+            <if test="class2AnalysisInput != null">class2_analysis_input,</if>
+            <if test="class2Analysis != null">class2_analysis,</if>
+            <if test="class3AvailableLhShift != null">class3_available_lh_shift,</if>
+            <if test="class3PlanQty != null">class3_plan_qty,</if>
+            <if test="class3Analysis != null">class3_analysis,</if>
+            <if test="class4AvailableLhShift != null">class4_available_lh_shift,</if>
+            <if test="class4PlanQty != null">class4_plan_qty,</if>
+            <if test="class4Analysis != null">class4_analysis,</if>
+            <if test="class5AvailableLhShift != null">class5_available_lh_shift,</if>
+            <if test="class5PlanQty != null">class5_plan_qty,</if>
+            <if test="class5Analysis != null">class5_analysis,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="markCloseOutTip != null">mark_close_out_tip,</if>
+            <if test="specDimension != null">spec_dimension,</if>
+            <if test="isRelease != null">is_release,</if>
+            <if test="class3AnalysisInput != null">class3_analysis_input,</if>
+            <if test="class4AnalysisInput != null">class4_analysis_input,</if>
+            <if test="class5AnalysisInput != null">class5_analysis_input,</if>
+            <if test="class1Sort != null">class1_sort,</if>
+            <if test="class2Sort != null">class2_sort,</if>
+            <if test="class3Sort != null">class3_sort,</if>
+            <if test="class4Sort != null">class4_sort,</if>
+            <if test="class5Sort != null">class5_sort,</if>
+            <if test="lhMachineChangeMoldDesc != null">LH_MACHINE_CHANGE_MOLD_DESC,</if>
+            <if test="dataSource != null">data_source,</if>
+            <if test="bomDataVersion != null">bom_Data_Version,</if>
+            <if test="cxMachineType != null">cx_machine_type,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="suppleBatchNo != null">#{suppleBatchNo},</if>
+            <if test="cxBatchNo != null">#{cxBatchNo},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="taskType != null">#{taskType},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="productionStatus != null">#{productionStatus},</if>
+            <if test="cxMachineCode != null">#{cxMachineCode},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="lhMachineQty != null">#{lhMachineQty},</if>
+            <if test="minimumLhMachineReqQty != null">#{minimumLhMachineReqQty},</if>
+            <if test="minimumLhMachineComQty != null">#{minimumLhMachineComQty},</if>
+            <if test="availableMoldQty != null">#{availableMoldQty},</if>
+            <if test="maximumClassQty != null">#{maximumClassQty},</if>
+            <if test="workShifts != null">#{workShifts},</if>
+            <if test="storageLocation != null">#{storageLocation},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="specDesc != null">#{specDesc},</if>
+            <if test="embryoCode != null">#{embryoCode},</if>
+            <if test="lhMiddleNightFinishQty != null">#{lhMiddleNightFinishQty},</if>
+            <if test="cxMonthFinishQty != null">#{cxMonthFinishQty},</if>
+            <if test="planModifyQty != null">#{planModifyQty},</if>
+            <if test="rejectQty != null">#{rejectQty},</if>
+            <if test="newestPlanQty != null">#{newestPlanQty},</if>
+            <if test="class3PlannedQty != null">#{class3PlannedQty},</if>
+            <if test="singleShiftLhQty != null">#{singleShiftLhQty},</if>
+            <if test="totalStock != null">#{totalStock},</if>
+            <if test="extendedStock != null">#{extendedStock},</if>
+            <if test="monthStock != null">#{monthStock},</if>
+            <if test="actualOverProduction != null">#{actualOverProduction},</if>
+            <if test="expectedOverProduction != null">#{expectedOverProduction},</if>
+            <if test="differenceOverProduction != null">#{differenceOverProduction},</if>
+            <if test="class1AvailableLhShift != null">#{class1AvailableLhShift},</if>
+            <if test="class1PlanQty != null">#{class1PlanQty},</if>
+            <if test="class1AnalysisInput != null">#{class1AnalysisInput},</if>
+            <if test="class1Analysis != null">#{class1Analysis},</if>
+            <if test="class2AvailableLhShift != null">#{class2AvailableLhShift},</if>
+            <if test="class2PlanQty != null">#{class2PlanQty},</if>
+            <if test="class2AnalysisInput != null">#{class2AnalysisInput},</if>
+            <if test="class2Analysis != null">#{class2Analysis},</if>
+            <if test="class3AvailableLhShift != null">#{class3AvailableLhShift},</if>
+            <if test="class3PlanQty != null">#{class3PlanQty},</if>
+            <if test="class3Analysis != null">#{class3Analysis},</if>
+            <if test="class4AvailableLhShift != null">#{class4AvailableLhShift},</if>
+            <if test="class4PlanQty != null">#{class4PlanQty},</if>
+            <if test="class4Analysis != null">#{class4Analysis},</if>
+            <if test="class5AvailableLhShift != null">#{class5AvailableLhShift},</if>
+            <if test="class5PlanQty != null">#{class5PlanQty},</if>
+            <if test="class5Analysis != null">#{class5Analysis},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="markCloseOutTip != null">#{markCloseOutTip},</if>
+            <if test="specDimension != null">#{specDimension},</if>
+            <if test="isRelease != null">#{isRelease},</if>
+            <if test="class3AnalysisInput != null">#{class3AnalysisInput},</if>
+            <if test="class4AnalysisInput != null">#{class4AnalysisInput},</if>
+            <if test="class5AnalysisInput != null">#{class5AnalysisInput},</if>
+            <if test="class1Sort != null">#{class1Sort},</if>
+            <if test="class2Sort != null">#{class2Sort},</if>
+            <if test="class3Sort != null">#{class3Sort},</if>
+            <if test="class4Sort != null">#{class4Sort},</if>
+            <if test="class5Sort != null">#{class5Sort},</if>
+            <if test="lhMachineChangeMoldDesc != null">#{lhMachineChangeMoldDesc},</if>
+            <if test="dataSource != null">#{dataSource},</if>
+            <if test="bomDataVersion != null">#{bomDataVersion},</if>
+            <if test="cxMachineType != null">#{cxMachineType},</if>
+        </trim>
+    </insert>
+
+    <select id="selectSuppleBatchNoAndCxBatchNoByScheduleDate" parameterType="string"
+            resultMap="CxLastDaySupplePlanResult">
+        SELECT DISTINCT
+            SUPPLE_BATCH_NO,
+            CX_BATCH_NO
+        FROM
+            T_CX_LAST_DAY_SUPPLE_PLAN
+        WHERE
+            SCHEDULE_DATE = TO_DATE(#{scheduleDateStr}, 'yyyy-MM-dd')
+            and del_flag = '0'
+    </select>
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from T_CX_LAST_DAY_SUPPLE_PLAN
+        where del_flag = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getListByLhMachineCode" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxLastDaySupplePlanResult">
+        select * from T_CX_LAST_DAY_SUPPLE_PLAN
+        where del_flag = '0'
+        and id != #{id}
+        and schedule_date = #{scheduleDate}
+        and PRODUCTION_STATUS !='2'
+        and task_type != '5'
+        and ( lh_machine_code like concat(concat('%,', #{lhMachineCode}), ',%')
+        or lh_machine_code like concat(#{lhMachineCode}, ',%')
+        or lh_machine_code like concat('%,', #{lhMachineCode})
+        or lh_machine_code =#{lhMachineCode}
+        )
+        <if test="sapCode != null  and sapCode != ''">and SAP_CODE = #{sapCode}</if>
+    </select>
+</mapper>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zlt.aps</groupId>
+        <artifactId>aps-modules</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <groupId>com.zlt.aps.cd15</groupId>
+    <artifactId>aps-cd15</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>aps-cd15</name>
+    <description>15度裁断工序模块</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-module-starter</artifactId>
+        </dependency>
+        <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>swagger-bootstrap-ui</artifactId>
+            <version>1.9.6</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.cd15</groupId>
+            <artifactId>aps-cd15-api</artifactId>
+        </dependency>
+
+        <!-- APS公共模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-common-core</artifactId>
+        </dependency>
+
+        <!-- 算法引擎模块 -->
+        <dependency>
+            <groupId>com.zlt.aps.cd15</groupId>
+            <artifactId>aps-engine-cd15</artifactId>
+        </dependency>
+        <!-- 和客户做接口的jar -->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-sync-data</artifactId>
+        </dependency>
+        <!-- 操作日志jar -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+
+        <repository>
+            <id>local-release</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
+        </repository>
+
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <!-- 默认不下载快照版本，这里开启下载快照版本到本地仓库 -->
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+</project>

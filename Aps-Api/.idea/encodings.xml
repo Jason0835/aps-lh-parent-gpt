@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/aps-all-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/aps-all-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd15-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd15-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd15-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd90-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd90-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cd90-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cx-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cx-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cx-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gdyy-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gdyy-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gdyy-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gsq-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gsq-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/gsq-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jl-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jl-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jl-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/nc-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/nc-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/nc-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tc-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tc-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tc-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tm-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tm-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tm-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tq-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tq-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tq-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/xwyy-api" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/xwyy-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/xwyy-api/src/main/resources" charset="UTF-8" />
+  </component>
+</project>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改成型排程结果')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-cxScheduleResult-edit" th:object="${cxScheduleResult}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <input name="publishSuccessCount" th:field="*{publishSuccessCount}" type="hidden">
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.cxScheduleResult.taskType}]]：</label>
+                <div class="col-sm-8">
+                    <select name="taskType" class="form-control" th:with="type=${@dict.getType('TASK_TYPE')}">
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{taskType}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.cxScheduleResult.productionStatus}]]：</label>
+                <div class="col-sm-8">
+                    <select name="productionStatus" class="form-control" th:with="type=${@dict.getType('PRODUCTION_STATUS')}">
+                        <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{productionStatus}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark"  class="form-control" rows="3" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+
+            <input name="class1PlanQty" th:field="*{class1PlanQty}"  type="hidden">
+            <input name="class2PlanQty" th:field="*{class2PlanQty}"  type="hidden">
+            <input name="class3PlanQty" th:field="*{class3PlanQty}"  type="hidden">
+            <input name="class4PlanQty" th:field="*{class4PlanQty}"  type="hidden">
+            <input name="class5PlanQty" th:field="*{class5PlanQty}"  type="hidden">
+            <input name="class1AnalysisInput" th:field="*{class1AnalysisInput}" type="hidden">
+            <input name="class2AnalysisInput" th:field="*{class2AnalysisInput}" type="hidden">
+            <input name="class3AnalysisInput" th:field="*{class3AnalysisInput}" type="hidden">
+            <input name="class4AnalysisInput" th:field="*{class4AnalysisInput}" type="hidden">
+            <input name="class5AnalysisInput" th:field="*{class5AnalysisInput}" type="hidden">
+
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+
+        var prefix = ctx + "cx/cxScheduleResult";
+
+        $("#form-cxScheduleResult-edit").validate({
+            focusCleanup: true
+        });
+
+        $("input").change(function () {
+            $(this).val($(this).val().trim());
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var data = $("#form-cxScheduleResult-edit").serializeArray();
+                $.operate.save(prefix + "/modifyStatus", data);
+            }
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('胎面胶库存信息')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <!--/*@thymesVar id="tTmStock" type=""*/-->
+    <form class="form-horizontal m" id="form-stock-edit" th:object="${tmStock}">
+        <input id="editType" name="editType" th:value="${editType}" type="hidden">
+        <input name="id" th:field="*{id}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.stock.stockDate}]]：</label>
+            <div class="col-sm-8">
+                <!--对于添加了disabled="disabled"的值传不到后台问题，在此新增一个hidden的input框-->
+                <input  id="stockDateid2" name="stockDate" th:value="*{#dates.format({stockDate}, 'yyyy-MM-dd')}" type="hidden">
+                <input id="stockDateid" name="stockDate" type="text" class="time-input form-control" th:value="*{#dates.format({stockDate}, 'yyyy-MM-dd')}"
+                       placeholder="yyyy-MM-dd" required="required">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.quota.treadCode}]]：</label>
+            <div class="col-sm-8">
+                <!--对于添加了disabled="disabled"的值传不到后台问题，在此新增一个hidden的input框-->
+                <input id="materialCodeid" name="materialCode" th:field="*{materialCode}" class="form-control" type="text"
+                       required="required" maxlength="50" isCode="true">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.data.column.stock.stockNum}]]：</label>
+            <div class="col-sm-8">
+                <input id="stockNumid"  required="required" name="stockNum" th:field="*{stockNum}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.stock.modifyNum}]]：</label>
+            <div class="col-sm-8">
+                <input id="modifyNumid" name="modifyNum" th:field="*{modifyNum}" class="form-control" type="number" min="-999999" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.stock.badNum}]]：</label>
+            <div class="col-sm-8">
+                <input id="badNumid" name="badNum" th:field="*{badNum}" class="form-control" type="number" min="0" max="999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.stock.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea id="remarkid" name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "tm/stock";
+    $(function () {
+        var editType = $("#editType").val();
+        if(editType=='0') { //新增页面
+            $('#stockDateid2').attr("disabled","disabled");
+        }else if(editType=='1'){ //编辑（日期、物料编号、备注）
+            $('#stockNumid').attr("readonly","true");
+            $('#modifyNumid').attr("readonly","true");
+            $('#badNumid').attr("readonly","true");
+            $('#stockDateid2').attr("disabled","disabled");
+        }else if(editType=='2'){ //库存修正（库存、不良量、修正量）
+            $('#stockDateid').attr("disabled","disabled");
+            $('#stockNumid').attr("readonly","true");
+            $('#materialCodeid').attr("readonly","true");
+            $('#remarkid').attr("readonly","true");
+            $('#remarkid').css("background-color","#EEEEEE");
+        }
+    });
+    $("#form-stock-edit").validate({
+        focusCleanup: true
+    });
+
+    function submitHandler() {
+        var stockNumid= $('#stockNumid').val();
+        var modifyNumid=  $('#modifyNumid').val();
+        var badNumid=  $('#badNumid').val();
+        if(Number(stockNumid)+Number(modifyNumid)-Number(badNumid)<0){
+            $.modal.alertWarning([[#{ui.data.column.stock.stockNumValidate}]]);
+            return;
+        }
+        if ($.validate.form()) {
+            var editType = $("#editType").val();
+            if(editType=='0'){
+                $.operate.save(prefix + "/add", $('#form-stock-edit').serialize());
+            }else{
+                $.operate.save(prefix + "/edit", $('#form-stock-edit').serialize());
+            }
+        }
+    }
+
+</script>
+</body>
+</html>

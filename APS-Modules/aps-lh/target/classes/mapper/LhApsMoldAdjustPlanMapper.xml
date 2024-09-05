@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhApsMoldAdjustPlanMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan" id="LhApsMoldAdjustPlanResult">
+        <result property="id" column="id"/>
+        <result property="moldOrderNo" column="mold_order_no"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="planDate" column="plan_date"/>
+        <result property="beforeSapCode" column="before_sap_code"/>
+        <result property="beforeEmbryoCode" column="before_embryo_code"/>
+        <result property="beforeSpecDesc" column="before_spec_desc"/>
+        <result property="tireRoughStock" column="tire_rough_stock"/>
+        <result property="useMoldNumber" column="use_mold_number"/>
+        <result property="leftRightMold" column="left_right_mold"/>
+        <result property="leftMoldCode" column="left_mold_code"/>
+        <result property="rightMoldCode" column="right_mold_code"/>
+        <result property="changeType" column="change_type"/>
+        <result property="afterSapCode" column="after_sap_code"/>
+        <result property="afterEmbryoCode" column="after_embryo_code"/>
+        <result property="afterSpecDesc" column="after_spec_desc"/>
+        <result property="changeMoldTime" column="change_mold_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="is_release" column="isRelease"/>
+        <result property="publish_success_count" column="publishSuccessCount"/>
+        <result property="newest_publish_time" column="newestPublishTime"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="isExecute" column="is_execute"/>
+    </resultMap>
+    
+    <sql id="selectLhApsMoldAdjustPlanVo">
+        select
+        mdp.id,
+        mdp.mold_order_no,
+        mdp.lh_machine_code,
+        lmi.MACHINE_NAME lh_machine_name,
+        mdp.plan_date,
+        mdp.before_sap_code,
+        mdp.before_embryo_code,
+        mdp.before_spec_desc,
+        mdp.tire_rough_stock,
+        mdp.use_mold_number,
+        mdp.left_right_mold,
+        mdp.change_type,
+        mdp.after_sap_code,
+        mdp.after_embryo_code,
+        mdp.after_spec_desc,
+        mdp.change_mold_time,
+        mdp.create_by,
+        mdp.create_time,
+        mdp.update_by,
+        mdp.update_time,
+        mdp.del_flag,
+        mdp.is_release,
+        mdp.publish_success_count,
+        mdp.newest_publish_time,
+        mdp.data_source,
+        mdp.remark,
+        mdp.is_execute,
+        REPLACE(REPLACE(mdp.left_right_mold, 'L', 'A'), 'R', 'A') orderStr
+        from t_aps_lh_mold_adjust_plan mdp left join t_lh_machine_info lmi on mdp.lh_machine_code=lmi.machine_code
+    </sql>
+
+    <select id="selectLhApsMoldAdjustPlanList" parameterType="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan" resultMap="LhApsMoldAdjustPlanResult">
+        <include refid="selectLhApsMoldAdjustPlanVo"/>
+        <where>
+            mdp.del_flag = '0' and lmi.del_flag='0'
+            <if test="moldOrderNo != null  and moldOrderNo != ''"> and mdp.mold_order_no = #{moldOrderNo}</if>
+            <if test="lhMachineName != null  and lhMachineName != ''"> and instr(lmi.machine_name , #{lhMachineName})>0</if>
+            <if test="planDate != null "> and mdp.plan_date = #{planDate}</if>
+            <if test="isRelease != null and isRelease!=''"> and mdp.is_release = #{isRelease}</if>
+            <if test="beforeSapCode != null  and beforeSapCode != ''"> and instr(mdp.before_sap_code,#{beforeSapCode}) > 0  </if>
+            <if test="beforeEmbryoCode != null  and beforeEmbryoCode != ''"> and instr(mdp.before_embryo_code , #{beforeEmbryoCode}) > 0</if>
+            <if test="beforeSpecDesc != null  and beforeSpecDesc != ''"> and instr(mdp.before_spec_desc , #{beforeSpecDesc})>0</if>
+            <if test="rightMoldCode != null  and rightMoldCode != ''"> and mdp.right_mold_code = #{rightMoldCode}</if>
+            <if test="changeType != null  and changeType != ''"> and mdp.change_type = #{changeType}</if>
+        </where>
+          order by mdp.plan_date desc,lh_machine_name asc, orderStr asc, left_right_mold
+    </select>
+
+    <select id="selectLhApsMoldAdjustPlanById" parameterType="Long" resultMap="LhApsMoldAdjustPlanResult">
+                    <include refid="selectLhApsMoldAdjustPlanVo"/>
+            where mdp.id = #{id}
+    </select>
+
+    <insert id="insertLhApsMoldAdjustPlan" parameterType="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan">
+                    <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                SELECT SEQ_APS_LH_MOLD_ADJUST_PLAN.NEXTVAL as id FROM DUAL
+            </selectKey>
+                insert into t_aps_lh_mold_adjust_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                            <if test="id != null">id,</if>
+                            <if test="moldOrderNo != null">mold_order_no,</if>
+                            <if test="lhMachineCode != null">lh_machine_code,</if>
+                            <if test="planDate != null">plan_date,</if>
+                            <if test="beforeSapCode != null">before_sap_code,</if>
+                            <if test="beforeEmbryoCode != null">before_embryo_code,</if>
+                            <if test="beforeSpecDesc != null">before_spec_desc,</if>
+                            <if test="tireRoughStock != null">tire_rough_stock,</if>
+                            <if test="useMoldNumber != null">use_mold_number,</if>
+                            <if test="leftRightMold != null">left_right_mold,</if>
+                            <if test="changeType != null">change_type,</if>
+                            <if test="afterSapCode != null">after_sap_code,</if>
+                            <if test="afterEmbryoCode != null">after_embryo_code,</if>
+                            <if test="afterSpecDesc != null">after_spec_desc,</if>
+                            <if test="changeMoldTime != null">change_mold_time,</if>
+                            <if test="createBy != null">create_by,</if>
+                            <if test="createTime != null">create_time,</if>
+                            <if test="updateBy != null">update_by,</if>
+                            <if test="updateTime != null">update_time,</if>
+                            <if test="delFlag != null">del_flag,</if>
+                            <if test="remark != null">remark,</if>
+                            <if test="dataSource != null">data_source,</if>
+                            <if test="isExecute != null">is_execute,</if>
+                    </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                            <if test="id != null">#{id},</if>
+                            <if test="moldOrderNo != null">#{moldOrderNo},</if>
+                            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+                            <if test="planDate != null">#{planDate},</if>
+                            <if test="beforeSapCode != null">#{beforeSapCode},</if>
+                            <if test="beforeEmbryoCode != null">#{beforeEmbryoCode},</if>
+                            <if test="beforeSpecDesc != null">#{beforeSpecDesc},</if>
+                            <if test="tireRoughStock != null">#{tireRoughStock},</if>
+                            <if test="useMoldNumber != null">#{useMoldNumber},</if>
+                            <if test="leftRightMold != null">#{leftRightMold},</if>
+                            <if test="changeType != null">#{changeType},</if>
+                            <if test="afterSapCode != null">#{afterSapCode},</if>
+                            <if test="afterEmbryoCode != null">#{afterEmbryoCode},</if>
+                            <if test="afterSpecDesc != null">#{afterSpecDesc},</if>
+                            <if test="changeMoldTime != null">#{changeMoldTime},</if>
+                            <if test="createBy != null">#{createBy},</if>
+                            <if test="createTime != null">#{createTime},</if>
+                            <if test="updateBy != null">#{updateBy},</if>
+                            <if test="updateTime != null">#{updateTime},</if>
+                            <if test="delFlag != null">#{delFlag},</if>
+                            <if test="remark != null">#{remark},</if>
+                            <if test="dataSource != null">#{dataSource},</if>
+                            <if test="isExecute != null">#{isExecute},</if>
+                    </trim>
+    </insert>
+
+    <update id="updateLhApsMoldAdjustPlan" parameterType="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan">
+        update t_aps_lh_mold_adjust_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="moldOrderNo != null">mold_order_no = #{moldOrderNo},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="planDate != null">plan_date = #{planDate},</if>
+            <if test="beforeSapCode != null">before_sap_code = #{beforeSapCode},</if>
+            <if test="beforeEmbryoCode != null">before_embryo_code = #{beforeEmbryoCode},</if>
+            <if test="beforeSpecDesc != null">before_spec_desc = #{beforeSpecDesc},</if>
+            <if test="tireRoughStock != null">tire_rough_stock = #{tireRoughStock},</if>
+            <if test="useMoldNumber != null">use_mold_number = #{useMoldNumber},</if>
+            <if test="leftRightMold != null">left_right_mold = #{leftRightMold},</if>
+            <if test="changeType != null">change_type = #{changeType},</if>
+            <if test="afterSapCode != null">after_sap_code = #{afterSapCode},</if>
+            <if test="afterEmbryoCode != null">after_embryo_code = #{afterEmbryoCode},</if>
+            <if test="afterSpecDesc != null">after_spec_desc = #{afterSpecDesc},</if>
+            <if test="changeMoldTime != null">change_mold_time = #{changeMoldTime},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="isExecute != null">is_execute = #{isExecute},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteLhApsMoldAdjustPlanById" parameterType="Long">
+        update t_aps_lh_mold_adjust_plan set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteLhApsMoldAdjustPlanByIds" parameterType="String">
+        update t_aps_lh_mold_adjust_plan set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteLhApsMoldAdjustPlanByPlanDate" parameterType="String">
+        update t_aps_lh_mold_adjust_plan set del_flag='1' where plan_date = to_date(#{planDate},'yyyy-MM-dd')
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_aps_lh_mold_adjust_plan a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.moldOrderNo,jdbcType=VARCHAR} mold_order_no,
+            #{item.lhMachineCode,jdbcType=VARCHAR} lh_machine_code,
+            #{item.planDate, jdbcType=DATE} plan_date,
+            #{item.beforeSapCode,jdbcType=VARCHAR} before_sap_code,
+            #{item.beforeEmbryoCode,jdbcType=VARCHAR} before_embryo_code,
+            #{item.beforeSpecDesc,jdbcType=VARCHAR} before_spec_desc,
+            #{item.tireRoughStock, jdbcType=DOUBLE} tire_rough_stock,
+            #{item.useMoldNumber, jdbcType=DOUBLE} use_mold_number,
+            #{item.leftRightMold,jdbcType=VARCHAR} left_right_mold,
+            #{item.changeType,jdbcType=VARCHAR} change_type,
+            #{item.afterSapCode,jdbcType=VARCHAR} after_sap_code,
+            #{item.afterEmbryoCode,jdbcType=VARCHAR} after_embryo_code,
+            #{item.afterSpecDesc,jdbcType=VARCHAR} after_spec_desc,
+            #{item.changeMoldTime, jdbcType=DATE} change_mold_time,
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag,
+            #{item.dataSource,jdbcType=VARCHAR} data_source,
+            #{item.isExecute,jdbcType=VARCHAR} is_execute,
+            #{item.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.mold_order_no=b.mold_order_no and a.lh_machine_code=b.lh_machine_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.plan_date = b.plan_date,
+            a.before_sap_code = b.before_sap_code,
+            a.before_embryo_code = b.before_embryo_code,
+            a.before_spec_desc = b.before_spec_desc,
+            a.tire_rough_stock = b.tire_rough_stock,
+            a.use_mold_number = b.use_mold_number,
+            a.left_right_mold= b.left_right_mold,
+            a.change_type = b.change_type,
+            a.after_sap_code = b.after_sap_code,
+            a.after_embryo_code = b.after_embryo_code,
+            a.after_spec_desc = b.after_spec_desc,
+            a.change_mold_time = b.change_mold_time,
+            a.update_by = b.create_by,
+            a.update_time = sysdate,
+            a.remark = b.remark,
+            a.is_execute = b.is_execute
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id,
+        a.mold_order_no,
+        a.lh_machine_code,
+        a.plan_date,
+        a.before_sap_code,
+        a.before_embryo_code,
+        a.before_spec_desc,
+        a.tire_rough_stock,
+        a.use_mold_number,
+        a.left_right_mold,
+        a.change_type,
+        a.after_sap_code,
+        a.after_embryo_code,
+        a.after_spec_desc,
+        a.change_mold_time,
+        a.create_by,
+        a.create_time,
+        a.del_flag,
+        a.data_source,
+        a.remark,
+        a.is_execute
+        )
+        values (
+        SEQ_APS_LH_MOLD_ADJUST_PLAN.NEXTVAL,
+        b.mold_order_no,
+        b.lh_machine_code,
+        b.plan_date,
+        b.before_sap_code,
+        b.before_embryo_code,
+        b.before_spec_desc,
+        b.tire_rough_stock,
+        b.use_mold_number,
+        b.left_right_mold,
+        b.change_type,
+        b.after_sap_code,
+        b.after_embryo_code,
+        b.after_spec_desc,
+        b.change_mold_time,
+        b.create_by,
+        sysdate,
+        0,
+        b.data_source,
+        b.remark,
+        b.is_execute
+        )
+    </update>
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from t_aps_lh_mold_adjust_plan
+        where del_flag = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
+    <select id="isPublishSuccessValidate" parameterType="string" resultType="int">
+        select count(1) from t_aps_lh_mold_adjust_plan
+        <where>
+            del_flag = 0
+            <if test="planDate!=null and planDate!=''">
+                and plan_date=to_date(#{planDate},'yyyy-MM-dd')
+            </if>
+            and nvl(PUBLISH_SUCCESS_COUNT,0)>1
+        </where>
+
+    </select>
+
+    <insert id="deployMoldPlanToMes">
+        INSERT INTO mes_aps_lh_mold_adjust_plan(
+        id,
+        mold_order_no,
+        lh_machine_code,
+        plan_date,
+        before_sap_code,
+        before_embryo_code,
+        before_spec_desc,
+        tire_rough_stock,
+        use_mold_number,
+        left_right_mold,
+        change_type,
+        after_sap_code,
+        after_embryo_code,
+        after_spec_desc,
+        change_mold_time,
+        data_source,
+        remark,
+        DATA_VERSION               ,
+        CREATE_DATE                ,
+        UPDATE_DATE                ,
+        IS_DELETE                  ,
+        FACTORY_CODE,
+        COMPANY_CODE)
+        WITH construction AS (
+             SELECT max(sap_code) sap_code, embryo_code
+               FROM T_CONSTRUCTION_VERSION_INFO c 
+              WHERE c.del_flag = '0'
+              GROUP BY embryo_code
+             )
+        SELECT
+        id,
+        mold_order_no,
+        lh_machine_code,
+        plan_date,
+        before_sap_code,
+        C1.sap_code before_embryo_code,/*胎胚品号，MES要求接口传品号*/
+        before_spec_desc,
+        tire_rough_stock,
+        use_mold_number,
+        left_right_mold,
+        change_type,
+        after_sap_code,
+        C2.sap_code after_embryo_code,/*胎胚品号，MES要求接口传品号*/
+        after_spec_desc,
+        change_mold_time,
+        data_source,
+        remark,
+        #{dataVersion} DATA_VERSION,
+        sysdate    CREATE_DATE ,
+        UPDATE_TIME    UPDATE_DATE ,
+        DEL_FLAG       IS_DELETE,
+        #{factoryCode},
+        #{companyCode}
+        FROM t_aps_lh_mold_adjust_plan p
+        INNER JOIN construction c1 ON c1.embryo_code = p.before_embryo_code
+        INNER JOIN construction c2 ON c2.embryo_code = p.After_Embryo_Code
+        WHERE id in <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    </insert>
+
+    <insert id="insertPublishRecord" parameterType="com.zlt.aps.lh.vo.MoldPlanPublishRecordVo">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into T_MOLD_PLAN_PUBLISH_RECORD
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="publishStatus != null">publish_status,</if>
+            <if test="publishDate != null">publish_date,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataVersion != null">data_version,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="publishStatus != null">#{publishStatus},</if>
+            <if test="publishDate != null">#{publishDate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataVersion != null">#{dataVersion},</if>
+        </trim>
+    </insert>
+
+    <update id="batchUpdate" parameterType="String">
+        update t_aps_lh_mold_adjust_plan set IS_RELEASE = #{status}
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 根据版本更新发布日志状态 -->
+    <update id="updatePublishRecordVersion">
+		UPDATE T_MOLD_PLAN_PUBLISH_RECORD
+		   SET PUBLISH_STATUS = #{status}
+		 WHERE data_version = #{dataVersion}
+	</update>
+
+    <select id="isPublishByIds" parameterType="string" resultType="int">
+        select count(1) from t_aps_lh_mold_adjust_plan
+        where del_flag = 0 and IS_RELEASE = 0
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="changeExecute" parameterType="com.zlt.aps.lh.api.domain.entity.LhApsMoldAdjustPlan">
+        update t_aps_lh_mold_adjust_plan set is_execute = #{isExecute}
+        where id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+</mapper>

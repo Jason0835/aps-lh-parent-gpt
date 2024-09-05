@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.CxMonthPlanSurplusLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.common.engine.domain.CxMonthPlanSurplusLog">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="monthPlanApsVersion" column="MONTH_PLAN_APS_VERSION" jdbcType="VARCHAR"/>
+            <result property="monthPlanVersion" column="MONTH_PLAN_VERSION" jdbcType="VARCHAR"/>
+            <result property="year" column="YEAR" jdbcType="VARCHAR"/>
+            <result property="month" column="MONTH" jdbcType="VARCHAR"/>
+            <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+            <result property="monthPlanQty" column="MONTH_PLAN_QTY" jdbcType="DECIMAL"/>
+            <result property="lastMonthStock" column="LAST_MONTH_STOCK" jdbcType="DECIMAL"/>
+            <result property="sapBadQty" column="SAP_BAD_QTY" jdbcType="DECIMAL"/>
+            <result property="planModifyQty" column="PLAN_MODIFY_QTY" jdbcType="DECIMAL"/>
+            <result property="monthFinishQty" column="MONTH_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="monthRemainQty" column="MONTH_REMAIN_QTY" jdbcType="DECIMAL"/>
+            <result property="dataSource" column="DATA_SOURCE" jdbcType="VARCHAR"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,MONTH_PLAN_APS_VERSION,MONTH_PLAN_VERSION,
+        YEAR,MONTH,SAP_CODE,
+        MONTH_PLAN_QTY,LAST_MONTH_STOCK,SAP_BAD_QTY,
+        PLAN_MODIFY_QTY,MONTH_FINISH_QTY,MONTH_REMAIN_QTY,
+        DATA_SOURCE,CREATE_BY,CREATE_TIME,
+        UPDATE_BY,UPDATE_TIME,DEL_FLAG,
+        REMARK
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_CX_MONTH_PLAN_SURPLUS_LOG
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_CX_MONTH_PLAN_SURPLUS_LOG
+        where  ID = #{id,jdbcType=DECIMAL} 
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.CxMonthPlanSurplusLog" useGeneratedKeys="true">
+        insert into T_CX_MONTH_PLAN_SURPLUS_LOG
+        ( ID,MONTH_PLAN_APS_VERSION,MONTH_PLAN_VERSION
+        ,YEAR,MONTH,SAP_CODE
+        ,MONTH_PLAN_QTY,LAST_MONTH_STOCK,SAP_BAD_QTY
+        ,PLAN_MODIFY_QTY,MONTH_FINISH_QTY,MONTH_REMAIN_QTY
+        ,DATA_SOURCE,CREATE_BY,CREATE_TIME
+        ,UPDATE_BY,UPDATE_TIME,DEL_FLAG
+        ,REMARK)
+        values (#{id,jdbcType=DECIMAL},#{monthPlanApsVersion,jdbcType=VARCHAR},#{monthPlanVersion,jdbcType=VARCHAR}
+        ,#{year,jdbcType=VARCHAR},#{month,jdbcType=VARCHAR},#{sapCode,jdbcType=VARCHAR}
+        ,#{monthPlanQty,jdbcType=DECIMAL},#{lastMonthStock,jdbcType=DECIMAL},#{sapBadQty,jdbcType=DECIMAL}
+        ,#{planModifyQty,jdbcType=DECIMAL},#{monthFinishQty,jdbcType=DECIMAL},#{monthRemainQty,jdbcType=DECIMAL}
+        ,#{dataSource,jdbcType=VARCHAR},#{createBy,jdbcType=VARCHAR},#{createTime,jdbcType=TIMESTAMP}
+        ,#{updateBy,jdbcType=VARCHAR},#{updateTime,jdbcType=TIMESTAMP},#{delFlag,jdbcType=CHAR}
+        ,#{remark,jdbcType=VARCHAR}))
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.CxMonthPlanSurplusLog" useGeneratedKeys="true">
+        insert into T_CX_MONTH_PLAN_SURPLUS_LOG
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="monthPlanApsVersion != null">monthPlanApsVersion,</if>
+                <if test="monthPlanVersion != null">monthPlanVersion,</if>
+                <if test="year != null">year,</if>
+                <if test="month != null">month,</if>
+                <if test="sapCode != null">sapCode,</if>
+                <if test="monthPlanQty != null">monthPlanQty,</if>
+                <if test="lastMonthStock != null">lastMonthStock,</if>
+                <if test="sapBadQty != null">sapBadQty,</if>
+                <if test="planModifyQty != null">planModifyQty,</if>
+                <if test="monthFinishQty != null">monthFinishQty,</if>
+                <if test="monthRemainQty != null">monthRemainQty,</if>
+                <if test="dataSource != null">dataSource,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateBy != null">updateBy,</if>
+                <if test="updateTime != null">updateTime,</if>
+                <if test="delFlag != null">delFlag,</if>
+                <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="monthPlanApsVersion != null">MONTH_PLAN_APS_VERSION = #{monthPlanApsVersion,jdbcType=VARCHAR},</if>
+                <if test="monthPlanVersion != null">MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR},</if>
+                <if test="year != null">YEAR = #{year,jdbcType=VARCHAR},</if>
+                <if test="month != null">MONTH = #{month,jdbcType=VARCHAR},</if>
+                <if test="sapCode != null">SAP_CODE = #{sapCode,jdbcType=VARCHAR},</if>
+                <if test="monthPlanQty != null">MONTH_PLAN_QTY = #{monthPlanQty,jdbcType=DECIMAL},</if>
+                <if test="lastMonthStock != null">LAST_MONTH_STOCK = #{lastMonthStock,jdbcType=DECIMAL},</if>
+                <if test="sapBadQty != null">SAP_BAD_QTY = #{sapBadQty,jdbcType=DECIMAL},</if>
+                <if test="planModifyQty != null">PLAN_MODIFY_QTY = #{planModifyQty,jdbcType=DECIMAL},</if>
+                <if test="monthFinishQty != null">MONTH_FINISH_QTY = #{monthFinishQty,jdbcType=DECIMAL},</if>
+                <if test="monthRemainQty != null">MONTH_REMAIN_QTY = #{monthRemainQty,jdbcType=DECIMAL},</if>
+                <if test="dataSource != null">DATA_SOURCE = #{dataSource,jdbcType=VARCHAR},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+                <if test="delFlag != null">DEL_FLAG = #{delFlag,jdbcType=CHAR},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.common.engine.domain.CxMonthPlanSurplusLog">
+        update T_CX_MONTH_PLAN_SURPLUS_LOG
+        <set>
+                <if test="monthPlanApsVersion != null">
+                    MONTH_PLAN_APS_VERSION = #{monthPlanApsVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="monthPlanVersion != null">
+                    MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="year != null">
+                    YEAR = #{year,jdbcType=VARCHAR},
+                </if>
+                <if test="month != null">
+                    MONTH = #{month,jdbcType=VARCHAR},
+                </if>
+                <if test="sapCode != null">
+                    SAP_CODE = #{sapCode,jdbcType=VARCHAR},
+                </if>
+                <if test="monthPlanQty != null">
+                    MONTH_PLAN_QTY = #{monthPlanQty,jdbcType=DECIMAL},
+                </if>
+                <if test="lastMonthStock != null">
+                    LAST_MONTH_STOCK = #{lastMonthStock,jdbcType=DECIMAL},
+                </if>
+                <if test="sapBadQty != null">
+                    SAP_BAD_QTY = #{sapBadQty,jdbcType=DECIMAL},
+                </if>
+                <if test="planModifyQty != null">
+                    PLAN_MODIFY_QTY = #{planModifyQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthFinishQty != null">
+                    MONTH_FINISH_QTY = #{monthFinishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="monthRemainQty != null">
+                    MONTH_REMAIN_QTY = #{monthRemainQty,jdbcType=DECIMAL},
+                </if>
+                <if test="dataSource != null">
+                    DATA_SOURCE = #{dataSource,jdbcType=VARCHAR},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="delFlag != null">
+                    DEL_FLAG = #{delFlag,jdbcType=CHAR},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+        </set>
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.CxMonthPlanSurplusLog">
+        update T_CX_MONTH_PLAN_SURPLUS_LOG
+        set 
+            MONTH_PLAN_APS_VERSION =  #{monthPlanApsVersion,jdbcType=VARCHAR},
+            MONTH_PLAN_VERSION =  #{monthPlanVersion,jdbcType=VARCHAR},
+            YEAR =  #{year,jdbcType=VARCHAR},
+            MONTH =  #{month,jdbcType=VARCHAR},
+            SAP_CODE =  #{sapCode,jdbcType=VARCHAR},
+            MONTH_PLAN_QTY =  #{monthPlanQty,jdbcType=DECIMAL},
+            LAST_MONTH_STOCK =  #{lastMonthStock,jdbcType=DECIMAL},
+            SAP_BAD_QTY =  #{sapBadQty,jdbcType=DECIMAL},
+            PLAN_MODIFY_QTY =  #{planModifyQty,jdbcType=DECIMAL},
+            MONTH_FINISH_QTY =  #{monthFinishQty,jdbcType=DECIMAL},
+            MONTH_REMAIN_QTY =  #{monthRemainQty,jdbcType=DECIMAL},
+            DATA_SOURCE =  #{dataSource,jdbcType=VARCHAR},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
+            DEL_FLAG =  #{delFlag,jdbcType=CHAR},
+            REMARK =  #{remark,jdbcType=VARCHAR}
+        where   ID = #{id,jdbcType=DECIMAL} 
+    </update>
+    <insert id="insertBatch">
+        insert into T_CX_MONTH_PLAN_SURPLUS_LOG
+        (id,month_plan_aps_version,month_plan_version,
+        year,month,sap_code,
+        month_plan_qty,last_month_stock,sap_bad_qty,
+        plan_modify_qty,month_finish_qty,month_remain_qty,
+        data_source,remark,del_flag,
+        create_by,create_time,update_by,
+        update_time)
+        select SEQ_PUBLIC.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="cxMonthPlanSurplusLogCollection" item="item" separator=" union ">
+            select #{item.monthPlanApsVersion,jdbcType=VARCHAR},#{item.monthPlanVersion,jdbcType=VARCHAR},
+            #{item.year,jdbcType=VARCHAR},#{item.month,jdbcType=VARCHAR},#{item.sapCode,jdbcType=VARCHAR},
+            #{item.monthPlanQty,jdbcType=NUMERIC},#{item.lastMonthStock,jdbcType=NUMERIC},#{item.sapBadQty,jdbcType=NUMERIC},
+            #{item.planModifyQty,jdbcType=NUMERIC},#{item.monthFinishQty,jdbcType=NUMERIC},#{item.monthRemainQty,jdbcType=NUMERIC},
+            #{item.dataSource,jdbcType=VARCHAR},#{item.remark,jdbcType=VARCHAR},#{item.delFlag,jdbcType=VARCHAR},
+            #{item.createBy,jdbcType=VARCHAR},#{item.createTime,jdbcType=TIMESTAMP},#{item.updateBy,jdbcType=VARCHAR},
+            #{item.updateTime,jdbcType=TIMESTAMP}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+</mapper>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.engine.mapper.NcEngineStockMapper">
+
+    <select id="listCxPlanAndConsume" parameterType="string" resultType="com.zlt.aps.nc.engine.vo.NcStockConsumeVo">
+        select cxr.INSIDE_CODE LINING_CODE,   /*内衬代码*/
+               nvl(sum(cxr.CLASS3_PLANNED_QTY*cxr.SIDEWALL_LENGTH/1000),0) CX_CLASS3_PLAN_CONSUME,  /*半制品对应成型(8点-16点)计划量的消耗量*/
+               nvl(sum(cf.FINISH_QTY*cxr.SIDEWALL_LENGTH/1000), 0) CX_FINISH_CONSUME  /*半制品对应成型(8点-12点)完成量的消耗量*/
+        from (
+               SELECT r.EMBRYO_CODE,
+                      r.BOM_DATA_VERSION,
+                      max(ci.INSIDE_CODE) INSIDE_CODE, /*内衬代码*/
+                      max(ci.SIDEWALL_LENGTH) SIDEWALL_LENGTH,  /*胎侧长*/
+                      sum(CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY /*8点-16点成型计划量*/
+               FROM T_CX_SCHEDULE_RESULT r
+               inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
+               where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd') 
+               and r.DEL_FLAG = 0
+               GROUP BY r.EMBRYO_CODE,r.BOM_DATA_VERSION
+              ) cxr /*成型排程结果表*/
+        left join T_CX_PART_FINISH_QTY cf on cf.stat_date = to_date(#{scheduleDate},'yyyy-mm-dd')-1 /*排程日期 要减1天，才是对应8-12点完成量日期*/ and cf.DEL_FLAG = 0 and cf.embryo_code = cxr.embryo_code and cf.BOM_DATA_VERSION = cxr.BOM_DATA_VERSION
+        group by cxr.INSIDE_CODE
+    </select>
+
+    <select id="listNcStock" parameterType="string" resultType="com.zlt.aps.nc.engine.vo.NcStockVo">
+        select MATERIAL_CODE liningCode, (nvl(STOCK_NUM,0)+nvl(MODIFY_NUM,0)-nvl(BAD_NUM,0)) STOCK_NUM
+        from T_NC_STOCK
+        where STOCK_DATE = to_date(#{stockDate},'yyyy-mm-dd') - 1 /*排程日期 要减1天，才是对应库存日期*/
+        and DEL_FLAG = '0'
+    </select>
+</mapper>

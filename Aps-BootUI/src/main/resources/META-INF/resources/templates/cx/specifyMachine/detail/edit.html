@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改定点机台配置列')" />
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-specifyMachinelist-edit" th:object="${tSpecifyMachineList}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <input id="pid"  th:value="${pid}" type="hidden">
+
+            <div id="element" class="row">
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.machine.procedureCode}]]：</label>
+                <div class="col-sm-2">
+                    <select id="procedureCode1" required class="type form-control" th:data-value="*{procedureCode}" data-first-title="+请选择" onchange="setProcedureCode()">
+                        <option value="">[[#{ui.frame.btn.choose}]]</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div class="col-sm-8">
+                    </div>
+                </div>
+
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.cx.machine.machineName}]]：</label>
+                <div class="col-sm-2">
+                    <select id="machineId1" name="machineId1" required class="router form-control" th:data-value="*{machineId}" data-first-title="请选择" onchange="setMachineId()">
+                        <option value="">[[#{ui.frame.btn.choose}]]</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="col-sm-8">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+
+            <input name="specifyMachineId" th:field="*{specifyMachineId}" class="form-control" type="hidden">
+            <input name="procedureCode" th:field="*{procedureCode}" class="form-control" type="hidden">
+            <input name="machineId" th:field="*{machineId}" class="form-control" type="hidden">
+            <input name="machineCode" th:field="*{machineCode}" class="form-control" type="hidden">
+
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: jquery-cxselect-js" />
+    <th:block th:include="include :: select2-js" />
+    <th:block th:include="include :: bootstrap-select-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "cx/specifyMachine/detail";
+        $("#form-specifyMachinelist-edit").validate({
+            focusCleanup: true
+        });
+
+        var data = [[${data}]];
+        $('#element').cxSelect({
+            selects: ['type', 'router'],
+            jsonValue: 'v',
+            data: data
+        });
+
+        function setProcedureCode(){
+            var procedureCode1=$("#procedureCode1").val();
+            $("#procedureCode").val(procedureCode1);
+        }
+        function setMachineId(){
+            var machineId1=$("#machineId1").val();
+            $("#machineId").val(machineId1);
+        }
+
+        function submitHandler() {
+
+            if ($.validate.form()) {
+
+                var machineId=$("#machineId").val();
+                if(machineId==""||machineId==null){
+                    return ;
+                }
+
+                var datas =$('#form-specifyMachinelist-edit').serializeArray();
+                var pid=$("#pid").val();
+                for (var i = 0;i<datas.length;i++){
+                    if(datas[i].name=="specifyMachineId"){
+                        datas[i].value=pid;
+                    }
+                }
+                $.operate.save(prefix + "/detailEditSave", datas);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+
+
+
+shared-configs[0]:
+  data-id: rabbitMQ-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+
+rabbitMQ:
+  #测试队列
+  queueTestHello: QUEUE_TEST_HELLO
+  #死信交换机
+  sysOrderDelayExchange: SYS_ORDER_DELAY_EXCHANGE
+  #接收死信队列消息
+  sysOrderReceiveExchange: SYS_ORDER_RECEIVE_EXCHANGE
+  #死信接收队列
+  sysOrderReceiveQueue: SYS_ORDER_RECEIVE_QUEUE
+  #延时队列
+  sysOrderDelayQueue: SYS_ORDER_DELAY_QUEUE
+  #路由key
+  sysOrderReceiveKey: SYS_ORDER_RECEIVE_KEY
+  #死信队列路由key
+  sysOrderDelayKey: SYS_ORDER_DELAY_KEY
+
+spring:
+  #rabbitmq 配置
+  rabbitmq:
+    username: japhet
+    password: japhet
+    virtual-host: /blog
+    host: 192.168.2.93
+    port: 5672
+
+    listener:
+      type: simple
+      simple:
+        acknowledge-mode: manual
+        ### 开启重试机制
+        retry:
+          enabled: true
+          #最大重试传递次数
+          max-attempts: 3
+          #第一次和第二次尝试传递消息的间隔时间 单位毫秒
+          initial-interval: 5000ms
+          #最大重试时间间隔，单位毫秒
+          max-interval: 300000ms
+          #应用前一次重试间隔的乘法器，multiplier默认为1
+          multiplier: 3
+          #以上配置的间隔0s  5s  15s  45s
+        #重试次数超过上面的设置之后是否丢弃(消费者listener抛出异常，是否重回队列，默认true：重回队列， false为不重回队列(结合死信交换机))
+        default-requeue-rejected: true

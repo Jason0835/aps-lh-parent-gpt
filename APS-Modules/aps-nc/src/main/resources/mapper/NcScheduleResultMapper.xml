@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.mapper.NcScheduleResultMapper">
+
+    <resultMap type="com.zlt.aps.nc.api.domain.entity.NcScheduleResult" id="NcScheduleResultResult">
+        <result property="id" column="id"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="liningCode" column="lining_code"/>
+        <result property="glueCode" column="glue_code"/>
+        <result property="wholeGlueCode" column="whole_glue_code"/>
+        <result property="glueSeq" column="glue_seq"/>
+        <result property="mouthPlateCode" column="mouth_plate_code"/>
+        <result property="unitConsume" column="unit_consume"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="stockQty" column="stock_qty"/>
+        <result property="supplyTime" column="supply_time"/>
+        <result property="dayPlanQty" column="day_plan_qty"/>
+        <result property="dayFinishQty" column="day_finish_qty"/>
+        <result property="dayProduceOrder" column="day_produce_order"/>
+        <result property="dayFinishRate" column="day_finish_rate"/>
+        <result property="daySysAnalysis" column="day_sys_analysis"/>
+        <result property="dayHandAnalysis" column="day_hand_analysis"/>
+        <result property="nightPlanQty" column="night_plan_qty"/>
+        <result property="nightFinishQty" column="night_finish_qty"/>
+        <result property="nightProduceOrder" column="night_produce_order"/>
+        <result property="nightFinishRate" column="night_finish_rate"/>
+        <result property="nightSysAnalysis" column="night_sys_analysis"/>
+        <result property="nightHandAnalysis" column="night_hand_analysis"/>
+        <result property="prePlanQty" column="pre_plan_qty"/>
+        <result property="cxClass1Plan" column="cx_class1_plan"/>
+        <result property="cxClass2Plan" column="cx_class2_plan"/>
+        <result property="cxClass3Plan" column="cx_class3_plan"/>
+        <result property="cxClass4Plan" column="cx_class4_plan"/>
+        <result property="cxClass5Plan" column="cx_class5_plan"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="productionStatus" column="PRODUCTION_STATUS"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="publishSuccessCount" column="publish_success_count"/>
+        <result property="newestPublishTime" column="newest_publish_time"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.nc.api.domain.entity.NcScheduleResult" id="NcScheduleResultResult2">
+        <result property="id" column="id"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="liningCode" column="lining_code"/>
+        <result property="glueCode" column="glue_code"/>
+        <result property="wholeGlueCode" column="whole_glue_code"/>
+        <result property="glueSeq" column="glue_seq"/>
+        <result property="mouthPlateCode" column="mouth_plate_code"/>
+        <result property="unitConsume" column="unit_consume"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="stockQty" column="stock_qty"/>
+        <result property="supplyTime" column="supply_time"/>
+        <result property="dayPlanQty" column="day_plan_qty"/>
+        <result property="dayFinishQty" column="day_finish_qty"/>
+        <result property="dayProduceOrder" column="day_produce_order"/>
+        <result property="dayFinishRate" column="day_finish_rate"/>
+        <result property="daySysAnalysis" column="day_sys_analysis"/>
+        <result property="dayHandAnalysis" column="day_hand_analysis"/>
+        <result property="nightPlanQty" column="night_plan_qty"/>
+        <result property="nightFinishQty" column="night_finish_qty"/>
+        <result property="nightProduceOrder" column="night_produce_order"/>
+        <result property="nightFinishRate" column="night_finish_rate"/>
+        <result property="nightSysAnalysis" column="night_sys_analysis"/>
+        <result property="nightHandAnalysis" column="night_hand_analysis"/>
+        <result property="prePlanQty" column="pre_plan_qty"/>
+        <result property="cxClass1Plan" column="cx_class1_plan"/>
+        <result property="cxClass2Plan" column="cx_class2_plan"/>
+        <result property="cxClass3Plan" column="cx_class3_plan"/>
+        <result property="cxClass4Plan" column="cx_class4_plan"/>
+        <result property="cxClass5Plan" column="cx_class5_plan"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="productionStatus" column="PRODUCTION_STATUS"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="dailyTotalQty" column="daily_total_qty"/>
+        <result property="publishSuccessCount" column="publish_success_count"/>
+        <result property="newestPublishTime" column="newest_publish_time"/>
+    </resultMap>
+
+    <sql id="selectNcScheduleResultVo">
+        select id, schedule_date, cx_batch_no, batch_no, order_no, lining_code, glue_code,whole_glue_code, glue_seq, mouth_plate_code, unit_consume, machine_id, stock_qty, supply_time, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, pre_plan_qty, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, remark,PRODUCTION_STATUS,mark_close_out_tip, del_flag, create_by, create_time, update_by, update_time,data_source, publish_success_count, newest_publish_time from t_nc_schedule_result
+    </sql>
+
+    <sql id="column">
+      a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.lining_code, a.glue_code,a.whole_glue_code, a.glue_seq, a.mouth_plate_code, a.unit_consume, a.machine_id, a.stock_qty, a.supply_time, a.day_plan_qty, a.day_produce_order,a.day_sys_analysis, a.day_hand_analysis, a.night_plan_qty, a.night_produce_order,a.night_sys_analysis, a.night_hand_analysis, a.pre_plan_qty, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.PRODUCTION_STATUS,a.mark_close_out_tip,a.data_source, a.publish_success_count, a.newest_publish_time,
+    </sql>
+
+    <select id="selectNcScheduleResultList" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult"
+            resultType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        select * from (
+            select
+                <include refid="column"/>
+                (NVL(day_plan_qty, 0) + NVL(night_plan_qty, 0)) as daily_total_qty,
+                floor(fq.DAY_FINISH_QTY) as DAY_FINISH_QTY,
+                (case when a.day_plan_qty=0 then null when a.day_plan_qty!=0 then (floor(fq.DAY_FINISH_QTY)/a.day_plan_qty) end) as day_finish_rate,
+                floor(fq.NIGHT_FINISH_QTY) as NIGHT_FINISH_QTY,
+                (case when a.night_plan_qty=0 then null when a.night_plan_qty!=0 then (floor(fq.NIGHT_FINISH_QTY)/a.night_plan_qty) end) as night_finish_rate,
+                b.MONTH_PLAN_QTY as month_plan,
+                ceil(b.MONTH_REMAIN_QTY) as month_plan_os,
+                log.change_machine,
+                log.change_day_plan,
+                log.change_night_plan
+            from t_nc_schedule_result a
+            LEFT JOIN (
+                        SELECT MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY
+                        FROM T_NC_MONTH_PLAN_SURPLUS
+                        WHERE del_flag='0'
+                        and YEAR=#{year,jdbcType=VARCHAR}
+                        and MONTH=#{month,jdbcType=VARCHAR}
+                      ) b on a.lining_code=b.MATERIAL_CODE
+            LEFT JOIN T_NC_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+            LEFT JOIN (/*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
+                        SELECT schedule_id,
+                               max(decode(BEFORE_MACHINE_ID, AFTER_MACHINE_ID,0,1)) change_machine,
+                               max(decode(BEFORE_DAY_PLAN, AFTER_DAY_PLAN,0,1)) change_day_plan,
+                               max(decode(BEFORE_NIGHT_PLAN, AFTER_NIGHT_PLAN,0,1)) change_night_plan
+                        FROM T_NC_DISPATCHER_LOG
+                        where schedule_date = #{scheduleDate}
+                        group by schedule_id
+                      ) log ON a.id = log.schedule_id
+            where a.del_flag='0'
+            <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+            <if test="supplyStartTime != null">and a.SUPPLY_TIME <![CDATA[  >=  ]]> #{supplyStartTime,jdbcType=DECIMAL}</if>
+            <if test="supplyEndTime != null">and a.SUPPLY_TIME <![CDATA[ <= ]]> #{supplyEndTime,jdbcType=DECIMAL}</if>
+            <if test="liningCode != null  and liningCode != ''">and INSTR(a.lining_code, #{liningCode,jdbcType=VARCHAR}) > 0</if>
+            <if test="glueCode != null  and glueCode != ''">and INSTR(a.glue_code, #{glueCode,jdbcType=VARCHAR}) > 0</if>
+            <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
+            <if test="machineId != null  and machineId != ''">and instr(','||a.machine_id||',', ','||#{machineId}||',')>0</if>
+            <if test="ids != null and ids.length > 0">and a.id in <foreach item="scheduleId" collection="ids" open="(" separator="," close=")">#{scheduleId}</foreach></if>
+            order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,
+                     to_number(substr(a.glue_seq,0,instr(a.glue_seq,'.')-1)), to_number(substr(a.glue_seq,instr(a.glue_seq,'.')+1)) asc
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult"
+            resultMap="NcScheduleResultResult">
+        <include refid="selectNcScheduleResultVo"/>
+        where del_flag='0'
+        <if test="id != null ">and id != #{id,jdbcType=DECIMAL}</if>
+        <if test="scheduleDate != null ">and schedule_date = #{scheduleDate,jdbcType=DATE}</if>
+        <if test="machineId != null">and machine_id = #{machineId,jdbcType=VARCHAR}</if>
+        <if test="liningCode != null  and liningCode != ''">and lining_code = #{liningCode,jdbcType=VARCHAR}</if>
+    </select>
+
+    <select id="selectNcScheduleResultById" parameterType="Long" resultMap="NcScheduleResultResult">
+
+        select
+        <include refid="column"/>
+
+        floor(fq.DAY_FINISH_QTY) as DAY_FINISH_QTY,
+        (case when a.day_plan_qty=0 then null when a.day_plan_qty!=0 then (floor(fq.DAY_FINISH_QTY)/a.day_plan_qty) end) as day_finish_rate,
+        floor(fq.NIGHT_FINISH_QTY) as NIGHT_FINISH_QTY,
+        (case when a.night_plan_qty=0 then null when a.night_plan_qty!=0 then (floor(fq.NIGHT_FINISH_QTY)/a.night_plan_qty) end) as night_finish_rate,
+        b.MONTH_PLAN_QTY as monthPlan,ceil(b.MONTH_REMAIN_QTY) as monthPlanOs
+        from t_nc_schedule_result a
+        LEFT JOIN (
+        select MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY,YEAR,MONTH from T_NC_MONTH_PLAN_SURPLUS where del_flag='0'
+        ) b on a.lining_code=b.MATERIAL_CODE and b.YEAR=TO_CHAR(a.schedule_date,'yyyy') and
+        b.MONTH=TO_CHAR(a.schedule_date,'MM')
+
+        LEFT JOIN T_NC_DAY_FINISH_QTY fq on a.schedule_date =fq.schedule_date and a.LINING_CODE=fq.LINING_CODE
+
+        where a.id = #{id,jdbcType=DECIMAL} and ROWNUM=1
+    </select>
+
+    <insert id="insertNcScheduleResult" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_NC_SCHEDULE.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_nc_schedule_result
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="cxBatchNo != null">cx_batch_no,</if>
+            <if test="batchNo != null">batch_no,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="liningCode != null">lining_code,</if>
+            <if test="glueCode != null">glue_code,</if>
+            <if test="wholeGlueCode != null">whole_glue_code,</if>
+            <if test="glueSeq != null">glue_seq,</if>
+            <if test="mouthPlateCode != null">mouth_plate_code,</if>
+            <if test="unitConsume != null">unit_consume,</if>
+            <if test="machineId != null">machine_id,</if>
+            <if test="stockQty != null">stock_qty,</if>
+            <if test="supplyTime != null">supply_time,</if>
+            <if test="dayPlanQty != null">day_plan_qty,</if>
+            <if test="dayFinishQty != null">day_finish_qty,</if>
+            <if test="dayProduceOrder != null">day_produce_order,</if>
+            <if test="dayFinishRate != null">day_finish_rate,</if>
+            <if test="daySysAnalysis != null">day_sys_analysis,</if>
+            <if test="dayHandAnalysis != null">day_hand_analysis,</if>
+            <if test="nightPlanQty != null">night_plan_qty,</if>
+            <if test="nightFinishQty != null">night_finish_qty,</if>
+            <if test="nightProduceOrder != null">night_produce_order,</if>
+            <if test="nightFinishRate != null">night_finish_rate,</if>
+            <if test="nightSysAnalysis != null">night_sys_analysis,</if>
+            <if test="nightHandAnalysis != null">night_hand_analysis,</if>
+            <if test="prePlanQty != null">#{prePlanQty},</if>
+            <if test="cxClass1Plan != null">cx_class1_plan,</if>
+            <if test="cxClass2Plan != null">cx_class2_plan,</if>
+            <if test="cxClass3Plan != null">cx_class3_plan,</if>
+            <if test="cxClass4Plan != null">cx_class4_plan,</if>
+            <if test="cxClass5Plan != null">cx_class5_plan,</if>
+            <if test="isRelease != null">is_release,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="dataSource != null">data_source,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="cxBatchNo != null">#{cxBatchNo},</if>
+            <if test="batchNo != null">#{batchNo},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="liningCode != null">#{liningCode},</if>
+            <if test="glueCode != null">#{glueCode},</if>
+            <if test="wholeGlueCode != null">#{wholeGlueCode},</if>
+            <if test="glueSeq != null">#{glueSeq},</if>
+            <if test="mouthPlateCode != null">#{mouthPlateCode},</if>
+            <if test="unitConsume != null">#{unitConsume},</if>
+            <if test="machineId != null">#{machineId},</if>
+            <if test="stockQty != null">#{stockQty},</if>
+            <if test="supplyTime != null">#{supplyTime},</if>
+            <if test="dayPlanQty != null">#{dayPlanQty},</if>
+            <if test="dayFinishQty != null">#{dayFinishQty},</if>
+            <if test="dayProduceOrder != null">#{dayProduceOrder},</if>
+            <if test="dayFinishRate != null">#{dayFinishRate},</if>
+            <if test="daySysAnalysis != null">#{daySysAnalysis},</if>
+            <if test="dayHandAnalysis != null">#{dayHandAnalysis},</if>
+            <if test="nightPlanQty != null">#{nightPlanQty},</if>
+            <if test="nightFinishQty != null">#{nightFinishQty},</if>
+            <if test="nightProduceOrder != null">#{nightProduceOrder},</if>
+            <if test="nightFinishRate != null">#{nightFinishRate},</if>
+            <if test="nightSysAnalysis != null">#{nightSysAnalysis},</if>
+            <if test="nightHandAnalysis != null">#{nightHandAnalysis},</if>
+            <if test="prePlanQty != null">#{prePlanQty},</if>
+            <if test="cxClass1Plan != null">#{cxClass1Plan},</if>
+            <if test="cxClass2Plan != null">#{cxClass2Plan},</if>
+            <if test="cxClass3Plan != null">#{cxClass3Plan},</if>
+            <if test="cxClass4Plan != null">#{cxClass4Plan},</if>
+            <if test="cxClass5Plan != null">#{cxClass5Plan},</if>
+            <if test="isRelease != null">#{isRelease},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="dataSource != null">#{dataSource},</if>
+        </trim>
+    </insert>
+
+    <update id="updateNcScheduleResult" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        update t_nc_schedule_result
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="cxBatchNo != null">cx_batch_no = #{cxBatchNo},</if>
+            <if test="batchNo != null">batch_no = #{batchNo},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="liningCode != null">lining_code = #{liningCode},</if>
+            <if test="glueCode != null">glue_code = #{glueCode},</if>
+            <if test="glueCode != null">whole_glue_code = #{wholeGlueCode},</if>
+            <if test="glueSeq != null">glue_seq = #{glueSeq},</if>
+            <if test="mouthPlateCode != null">mouth_plate_code = #{mouthPlateCode},</if>
+            <if test="unitConsume != null">unit_consume = #{unitConsume},</if>
+            <if test="machineId != null">machine_id = #{machineId},</if>
+            <if test="stockQty != null">stock_qty = #{stockQty},</if>
+            <if test="supplyTime != null">supply_time = #{supplyTime},</if>
+            day_plan_qty = #{dayPlanQty,jdbcType=DECIMAL},
+            <if test="dayFinishQty != null">day_finish_qty = #{dayFinishQty},</if>
+            day_produce_order = #{dayProduceOrder,jdbcType=DOUBLE},
+            <if test="dayFinishRate != null">day_finish_rate = #{dayFinishRate},</if>
+            <if test="daySysAnalysis != null">day_sys_analysis = #{daySysAnalysis},</if>
+            day_hand_analysis = #{dayHandAnalysis,jdbcType=VARCHAR},
+            night_plan_qty = #{nightPlanQty,jdbcType=DECIMAL},
+            <if test="nightFinishQty != null">night_finish_qty = #{nightFinishQty},</if>
+            night_produce_order = #{nightProduceOrder,jdbcType=DOUBLE},
+            <if test="nightFinishRate != null">night_finish_rate = #{nightFinishRate},</if>
+            <if test="nightSysAnalysis != null">night_sys_analysis = #{nightSysAnalysis},</if>
+            night_hand_analysis = #{nightHandAnalysis,jdbcType=VARCHAR},
+            <if test="prePlanQty != null">pre_plan_qty = #{prePlanQty},</if>
+            <if test="cxClass1Plan != null">cx_class1_plan = #{cxClass1Plan},</if>
+            <if test="cxClass2Plan != null">cx_class2_plan = #{cxClass2Plan},</if>
+            <if test="cxClass3Plan != null">cx_class3_plan = #{cxClass3Plan},</if>
+            <if test="cxClass4Plan != null">cx_class4_plan = #{cxClass4Plan},</if>
+            <if test="cxClass5Plan != null">cx_class5_plan = #{cxClass5Plan},</if>
+            <if test="isRelease != null">is_release = #{isRelease},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteNcScheduleResultById" parameterType="Long">
+      update t_nc_schedule_result set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteNcScheduleResultByIds" parameterType="String">
+        update t_nc_schedule_result set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="batchUpdate" parameterType="String">
+        update t_nc_schedule_result set IS_RELEASE= #{status}
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <insert id="insertPublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_schedule_publish_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="procedureCode != null">procedure_code,</if>
+            <if test="publishStatus != null">publish_status,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataVersion != null">data_version,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="procedureCode != null">#{procedureCode},</if>
+            <if test="publishStatus != null">#{publishStatus},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataVersion != null">#{dataVersion},</if>
+        </trim>
+    </insert>
+
+    <select id="isPublish" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord" resultType="int">
+        select count(1)
+        from t_schedule_publish_record
+        where procedure_code = #{procedureCode,jdbcType=VARCHAR}
+          and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and publish_status = '1'
+          and del_flag = '0'
+    </select>
+
+    <insert id="deployNcScheduleToMid">
+         INSERT INTO MES_NC_SCHEDULE_RESULT(SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, LINING_CODE, SAP_MATERIAL_CODE, GLUE_CODE, WHOLE_GLUE_CODE, GLUE_SEQ, MOUTH_PLATE_CODE, UNIT_CONSUME,
+                                            MACHINE_CODE, STOCK_QTY, SUPPLY_TIME, DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NIGHT_PLAN_QTY,
+                                            NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
+                                            IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DATA_VERSION, CREATE_DATE, UPDATE_DATE, IS_DELETE, FACTORY_CODE, COMPANY_CODE)
+         SELECT SCHEDULE_DATE,
+                CX_BATCH_NO,
+                BATCH_NO,
+                ORDER_NO,
+                LINING_CODE,
+                p.INSIDE_SAP,
+                GLUE_CODE,
+                r.WHOLE_GLUE_CODE,
+                GLUE_SEQ,
+                MOUTH_PLATE_CODE,
+                UNIT_CONSUME,
+                m.MACHINE_CODE,
+                STOCK_QTY,
+                SUPPLY_TIME,
+                DAY_PLAN_QTY,
+                DAY_PRODUCE_ORDER,
+                DAY_SYS_ANALYSIS,
+                DAY_HAND_ANALYSIS,
+                NIGHT_PLAN_QTY,
+                NIGHT_PRODUCE_ORDER,
+                NIGHT_SYS_ANALYSIS,
+                NIGHT_HAND_ANALYSIS,
+                CX_CLASS1_PLAN,
+                CX_CLASS2_PLAN,
+                CX_CLASS3_PLAN,
+                CX_CLASS4_PLAN,
+                CX_CLASS5_PLAN,
+                '1' IS_RELEASE,
+                MARK_CLOSE_OUT_TIP,
+                PRODUCTION_STATUS,
+                r.REMARK,
+                #{dataVersion} DATA_VERSION,
+                sysdate         CREATE_DATE,
+                r.UPDATE_TIME         UPDATE_DATE,
+                r.DEL_FLAG            IS_DELETE,
+                #{factoryCode},
+                #{companyCode}
+           FROM T_NC_SCHEDULE_RESULT r
+           LEFT JOIN T_NC_MACHINE_INFO m ON r.machine_id = to_char(m.id)
+           LEFT JOIN (select max(INSIDE_SAP) INSIDE_SAP,INSIDE_CODE  from T_CONSTRUCTION_VERSION_INFO WHERE DEL_FLAG = '0' group by INSIDE_CODE) p ON r.LINING_CODE = p.INSIDE_CODE
+        WHERE r.id in <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    </insert>
+
+    <select id="isReleasingOrTimeoutByDate" parameterType="date" resultType="int">
+        select count(1) from t_nc_schedule_result
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </select>
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from t_nc_schedule_result
+        where del_flag = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="changeReleaseStatus" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        update t_nc_schedule_result
+        set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
+        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </update>
+
+    <update id="updatePublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
+        update t_schedule_publish_record
+        set publish_status = #{publishStatus, jdbcType=VARCHAR},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where del_flag = 0 and procedure_code = #{procedureCode,jdbcType=VARCHAR}
+          and schedule_date = #{scheduleDate,jdbcType=DATE}
+    </update>
+
+	<!-- 根据版本更新发布日志状态 -->
+	<update id="updatePublishRecordVersion">
+		UPDATE t_schedule_publish_record
+		   SET PUBLISH_STATUS = #{status}
+		 WHERE data_version = #{dataVersion}
+		   AND del_flag = 0
+	</update>
+
+    <update id="combinationMiddleAndNight" parameterType="map">
+        update t_nc_schedule_result
+        set
+        <if test="classifiedShift == 1">DAY_PLAN_QTY = DAY_PLAN_QTY + NIGHT_PLAN_QTY, NIGHT_PLAN_QTY = 0</if>
+        <if test="classifiedShift == 2">NIGHT_PLAN_QTY = DAY_PLAN_QTY + NIGHT_PLAN_QTY, DAY_PLAN_QTY = 0</if>
+        , IS_RELEASE = decode(PUBLISH_SUCCESS_COUNT,0,'0','5')
+        where del_flag = 0 and id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="checkNcCodeExist" resultType="java.lang.Integer">
+        select case when exists(
+                select 1 from t_construction_version_info
+                where
+                    INSIDE_CODE = #{liningCode,jdbcType=VARCHAR}
+                  AND DEL_FLAG = 0
+            ) then 1 else 0 end
+        from dual
+    </select>
+
+    <select id="isPublishByIds" parameterType="string" resultType="int">
+        select count(1) from t_nc_schedule_result
+        where del_flag = 0 and IS_RELEASE = 0
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="selectByIds" resultType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        select * from t_nc_schedule_result
+        where del_flag = 0
+        and id in
+        <foreach item="id" collection="list" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectByScheduleDateAndCode" parameterType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult"
+            resultType="com.zlt.aps.nc.api.domain.entity.NcScheduleResult">
+        <include refid="selectNcScheduleResultVo"/>
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+        and lining_code = #{liningCode,jdbcType=VARCHAR}
+    </select>
+</mapper>

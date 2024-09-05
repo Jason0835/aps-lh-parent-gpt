@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxChangeLhMachineMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine" id="CxChangeLhMachineResult">
+        <result property="id" column="id"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="cxOrderNo" column="cx_order_no"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="changeType" column="change_type"/>
+        <result property="embryoStock" column="embryo_stock"/>
+        <result property="changeMoldTime" column="change_mold_time"/>
+        <result property="useMoldNum" column="use_mold_num"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectCxChangeLhMachineVo">
+        select id, schedule_date, cx_order_no, lh_machine_code, change_type, embryo_stock, change_mold_time, use_mold_num, create_by, create_time, update_by, update_time, del_flag, remark from t_cx_change_lh_machine
+    </sql>
+
+    <select id="selectCxChangeLhMachineList" parameterType="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine"
+            resultMap="CxChangeLhMachineResult">
+        <include refid="selectCxChangeLhMachineVo"/>
+        where del_flag = '0'
+        <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
+        <if test="cxOrderNo != null  and cxOrderNo != ''">and cx_order_no = #{cxOrderNo}</if>
+        <if test="lhMachineCode != null  and lhMachineCode != ''">and lh_machine_code = #{lhMachineCode}</if>
+        <if test="changeType != null  and changeType != ''">and change_type = #{changeType}</if>
+        <if test="embryoStock != null ">and embryo_stock = #{embryoStock}</if>
+        <if test="changeMoldTime != null ">and change_mold_time = #{changeMoldTime}</if>
+        <if test="useMoldNum != null ">and use_mold_num = #{useMoldNum}</if>
+    </select>
+
+    <select id="selectCxChangeLhMachineById" parameterType="Long" resultMap="CxChangeLhMachineResult">
+        <include refid="selectCxChangeLhMachineVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertCxChangeLhMachine" parameterType="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT seq_t_cx_change_lh_machine.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_cx_change_lh_machine
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="cxOrderNo != null">cx_order_no,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="changeType != null">change_type,</if>
+            <if test="embryoStock != null">embryo_stock,</if>
+            <if test="changeMoldTime != null">change_mold_time,</if>
+            <if test="useMoldNum != null">use_mold_num,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="cxOrderNo != null">#{cxOrderNo},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="changeType != null">#{changeType},</if>
+            <if test="embryoStock != null">#{embryoStock},</if>
+            <if test="changeMoldTime != null">#{changeMoldTime},</if>
+            <if test="useMoldNum != null">#{useMoldNum},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateCxChangeLhMachine" parameterType="com.zlt.aps.cx.api.domain.entity.CxChangeLhMachine">
+        update t_cx_change_lh_machine
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="cxOrderNo != null">cx_order_no = #{cxOrderNo},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="changeType != null">change_type = #{changeType},</if>
+            <if test="embryoStock != null">embryo_stock = #{embryoStock},</if>
+            <if test="changeMoldTime != null">change_mold_time = #{changeMoldTime},</if>
+            <if test="useMoldNum != null">use_mold_num = #{useMoldNum},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxChangeLhMachineById" parameterType="Long">
+        update t_cx_change_lh_machine
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteCxChangeLhMachineByIds" parameterType="String">
+        update t_cx_change_lh_machine set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="batchSaveCxChangeLhMachine" parameterType="list">
+        insert into t_cx_change_lh_machine
+        ( id, schedule_date, cx_order_no, lh_machine_code, change_type, embryo_stock, change_mold_time, use_mold_num,
+        create_by, create_time, update_by, update_time, del_flag, remark
+        )
+        select SEQ_CX_CHANGE_LH_MACHINE.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.scheduleDate,jdbcType=DATE},
+            #{item.cxOrderNo,jdbcType=VARCHAR},
+            #{item.lhMachineCode,jdbcType=VARCHAR},
+            #{item.changeType,jdbcType=VARCHAR},
+            #{item.embryoStock,jdbcType=INTEGER},
+            #{item.changeMoldTime,jdbcType=DATE},
+            #{item.useMoldNum,jdbcType=INTEGER},
+            #{item.createBy,jdbcType=VARCHAR},
+            #{item.createTime,jdbcType=DATE},
+            #{item.updateBy,jdbcType=VARCHAR},
+            #{item.updateTime,jdbcType=DATE},
+            '0',
+            #{item.remark,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+</mapper>

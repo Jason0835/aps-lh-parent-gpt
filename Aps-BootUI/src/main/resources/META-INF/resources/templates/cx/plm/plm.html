@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('PLM施工参数列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.plm.sapCode}]]：</label>
+                            <input type="text" name="sapCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.plm.series}]]：</label>
+                            <input type="text" name="series"/>
+                        </li>
+                            <li>
+                                <label>[[#{ui.data.column.plm.code}]]：</label>
+                                <input type="text" name="code"/>
+                            </li>
+                        <li>
+                            <label>[[#{ui.data.column.plm.version}]]：</label>
+                            <input type="text" name="version"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.plm.paramCode}]]：</label>
+                            <input type="text" name="paramCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.plm.paramName}]]：</label>
+                            <input type="text" name="paramName"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.plm.paramType}]]：</label>
+                            <input type="text" name="paramType"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.detail('',540)" shiro:hasPermission="cx:plm:detail">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.detail}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="cx:plm:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var prefix = ctx + "cx/plm";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            detailUrl: prefix + "/{id}",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.plm.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    sortable: true,
+                    visible: false
+                },
+                {
+                    field: 'sapCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.sapCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'series',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.series}]],
+                    sortable: true,
+                },
+                {
+                    field: 'code',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.code}]],
+                    sortable: true,
+                },
+                {
+                    field: 'version',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.version}]],
+                    sortable: true,
+                },
+                {
+                    field: 'paramCode',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.paramCode}]],
+                    sortable: true,
+                },
+                {
+                    field: 'paramName',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.paramName}]],
+                    sortable: true,
+                },
+                {
+                    field: 'paramValue',
+                    align: 'right',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.paramValue}]],
+                    sortable: true,
+                },
+                {
+                    field: 'paramType',
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.plm.paramType}]],
+                    sortable: true,
+                },
+                {
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs" href="javascript:void(0)" onclick="$.operate.detail(\'' + row.id + '\',540)"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.detail}]] + '</a> ');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+</script>
+</body>
+</html>

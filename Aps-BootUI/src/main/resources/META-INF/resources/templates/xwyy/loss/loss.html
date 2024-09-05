@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('纤维压延损耗率设定列表')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+     <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                            <li>
+                                [[#{ui.data.column.loss.xwyy.bigRollCode}]]：
+                                <input type="text" name="bigRollCode"/>
+                            </li>
+                            <li>
+                                <label>[[#{ui.data.column.loss.line}]]：</label>
+                                <select class="form-control" name="machineId" th:with="type=${@xwyy.getMachineInfo()}">
+                                    <option value="">[[#{ui.frame.btn.all}]]</option>
+                                    <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}"
+                                            th:value="${machineInfo.id}"></option>
+                                </select>
+                            </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+
+            <div class="btn-group-sm" id="toolbar" role="group">
+                <a class="btn btn-success" onclick="$.operate.add('','',380)" shiro:hasPermission="xwyy:loss:add">
+                    <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+                </a>
+                <a class="btn btn-primary single disabled" onclick="$.operate.edit('','',380)" shiro:hasPermission="xwyy:loss:edit">
+                    <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+                </a>
+                <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="xwyy:loss:remove">
+                    <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+                </a>
+                <a class="btn btn-danger" onclick="$.operate.removeTotal()" shiro:hasPermission="xwyy:loss:removeAll">
+                    <i class="fa fa-remove"></i> [[#{ui.frame.btn.all.delete}]]
+                </a>
+                <a class="btn btn-info" onclick="$.table.importExcel()" shiro:hasPermission="xwyy:loss:import">
+                    <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]
+                </a>
+                <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="xwyy:loss:export">
+                    <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+                </a>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <table id="bootstrap-table" data-resizable="true"></table>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+     <th:block th:include="include :: select2-js"/>
+     <th:block th:include="include :: bootstrap-select-js"/>
+     <th:block th:include="include :: bootstrap-table-resizable-js" />
+    <script th:inline="javascript">
+        var editFlag = [[${@permission.hasPermi('xwyy:loss:edit')}]];
+        var removeFlag = [[${@permission.hasPermi('xwyy:loss:remove')}]];
+        var prefix = ctx + "xwyy/loss";
+
+        $(function() {
+            var options = {
+                url: prefix + "/list",
+                createUrl: prefix + "/add",
+                updateUrl: prefix + "/edit/{id}",
+                removeUrl: prefix + "/remove",
+                removeAllUrl: prefix + "/removeAll",
+                exportUrl: prefix + "/export",
+                importUrl: prefix + "/importData",
+                modalName: [[#{ui.data.column.xwyy.loss.modelName}]],
+                columns: [{
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    align: 'center',
+                    halign:'center',
+                    visible: false
+                },
+                {
+                    field: 'bigRollCode',
+                    widthUnit: '%',
+                    width: 25,
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.loss.xwyy.bigRollCode}]],
+                },
+                {
+                    field: 'machineName',
+                    widthUnit: '%',
+                    width: 20,
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.loss.line}]],
+                },
+                {
+                    field: 'lossRate',
+                    widthUnit: '%',
+                    width: 15,
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.loss.lossRate}]],
+                    formatter: function (value, row, index) {
+                        if (value == 0 || value == null) {
+                            return '0%';
+                        }
+                        var str = value.toFixed(2);
+                        return str += "%";
+                    }
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    widthUnit: '%',
+                    width: 30,
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 35);
+                    },
+                },
+                {
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    widthUnit: '%',
+                    width: 10,
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit('+row.id+','+'800'+','+'380'+')"><i class="fa fa-edit"></i>'+[[#{ui.frame.btn.update}]]+'</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>'+[[#{ui.frame.btn.delete}]]+'</a>');
+                        return actions.join('');
+                    }
+                }]
+            };
+            $.table.init(options);
+        });
+        // 下载模板
+        function importTemplate() {
+            window.location.href=prefix + "/importTemplate";
+        }
+
+    </script>
+</body>
+<!-- 导入区域 -->
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

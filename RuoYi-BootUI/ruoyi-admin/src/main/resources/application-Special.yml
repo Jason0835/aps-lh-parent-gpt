@@ -1,0 +1,38 @@
+# 项目相关配置
+ruoyi:
+  # 名称
+  name: Telecom Frame
+  # 版本
+  version: 2.2.1
+  # 版权年份
+  copyrightYear: 2020
+  # 实例演示开关
+  demoEnabled: true
+  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
+  profile: D:/Telecom/uploadPath
+  # 获取ip地址开关
+  addressEnabled: false
+
+# 开发环境配置
+server-port: 80
+#nacos服务器
+#nacos-addr: 192.168.2.93:8848
+nacos-addr: 127.0.0.1:8848
+# Spring配置
+spring-app-name: ruoyi-admin-mis
+redis-addr: 192.168.2.93
+#redis-addr: 127.0.0.1
+redis-port: 6379
+redis-password:
+zipkin-addr: "http://192.168.2.93:9411/"
+
+#是否需要走单点
+shiro-sso-enable: false
+sso:
+  cas-addr: http://192.168.2.93:8899/cas
+  #cas-addr: https://casserverpac4j.herokuapp.com
+  current-addr: http://localhost
+#网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
+#gateway-addr: http://192.168.2.93:8080/
+gateway-addr: http://127.0.0.1:8080/
+

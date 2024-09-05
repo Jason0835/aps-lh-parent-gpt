@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改纤维压延损耗率设定')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-loss-edit" th:object="${xwyyLossSetting}">
+            <input name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.data.column.loss.xwyy.bigRollCode}]]：</label>
+                <div class="col-sm-8">
+                    <input name="bigRollCode" th:field="*{bigRollCode}" class="form-control" type="text" isCode="true" maxlength="20">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.loss.line}]]：</label>
+                <div class="col-sm-8">
+                    <select name="machineId" class="form-control"  th:with="type=${@xwyy.getMachineInfo()}">
+                        <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                        <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{ui.data.column.loss.lossRate}]]：</label>
+                <div class="col-sm-8">
+                    <input name="lossRate" th:field="*{lossRate}" class="form-control" type="number" min="0" max="99.99" required>
+                    <span class="help-block m-b-none"><i class="fa fa-info-circle"></i> [[#{ui.data.column.loss.tips}]]</span>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js"/>
+    <th:block th:include="include :: bootstrap-select-js"/>
+    <script th:inline="javascript">
+        var prefix = ctx + "xwyy/loss";
+        $("#form-loss-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/edit", $('#form-loss-edit').serialize());
+            }
+        }
+    </script>
+</body>
+</html>

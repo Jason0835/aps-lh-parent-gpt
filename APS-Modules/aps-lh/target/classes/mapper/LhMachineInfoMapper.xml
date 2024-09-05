@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhMachineInfoMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhMachineInfo" id="MachineInfoResult">
+        <result property="id" column="id"/>
+        <result property="machineCode" column="machine_code"/>
+        <result property="machineName" column="machine_name"/>
+        <result property="dimension" column="dimension"/>
+        <result property="dimensionMinmum" column="dimension_minimum"/>
+        <result property="dimensionMaximum" column="dimension_maximum"/>
+        <result property="centripetalMechanism" column="centripetal_mechanism"/>
+        <result property="maxMoldNum" column="max_mold_num"/>
+        <result property="quata" column="quata"/>
+        <result property="classShift" column="class_shift"/>
+        <result property="openMachineClass" column="open_machine_class"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectMachineInfoVo">
+        select id, machine_code, machine_name, dimension, dimension_minimum, dimension_maximum, centripetal_mechanism,
+        max_mold_num, quata, class_shift, open_machine_class, status, remark, del_flag, create_by, create_time, update_by, update_time
+        from t_lh_machine_info
+    </sql>
+
+    <select id="selectMachineInfoList" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo"
+            resultMap="MachineInfoResult">
+        <include refid="selectMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null  and machineCode != ''">and INSTR(machine_code, #{machineCode}) > 0</if>
+            <if test="machineName != null  and machineName != ''">and machine_name like concat(concat('%',
+                #{machineName}), '%')
+            </if>
+            <if test="status != null  and status != ''">and status = #{status}</if>
+        </where>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkMachineCodeUnique" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo"
+            resultMap="MachineInfoResult">
+        <include refid="selectMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="id != null  and id != ''">and id != #{id}</if>
+            <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+        </where>
+    </select>
+
+    <select id="checkMachineNameUnique" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo"
+            resultMap="MachineInfoResult">
+        <include refid="selectMachineInfoVo"/>
+        <where>
+            del_flag ='0'
+            <if test="machineCode != null  and machineCode != ''">and machine_code != #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+        </where>
+    </select>
+
+
+    <select id="selectMachineInfoById" parameterType="Long" resultMap="MachineInfoResult">
+        <include refid="selectMachineInfoVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertMachineInfo" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_lh_machine_info
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="machineCode != null">machine_code,</if>
+            <if test="machineName != null">machine_name,</if>
+            <if test="dimension != null">DIMENSION,</if>
+            <if test="dimensionMinmum != null">DIMENSION_MINIMUM,</if>
+            <if test="dimensionMaximum != null">DIMENSION_MAXIMUM,</if>
+            <if test="centripetalMechanism != null">CENTRIPETAL_MECHANISM,</if>
+            <if test="maxMoldNum != null">max_mold_num,</if>
+            <if test="quata != null">quata,</if>
+            <if test="classShift != null">class_shift,</if>
+            <if test="openMachineClass != null">open_machine_class,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="machineCode != null">#{machineCode},</if>
+            <if test="machineName != null">#{machineName},</if>
+            <if test="dimension != null">#{dimension},</if>
+            <if test="dimensionMinmum != null">#{dimensionMinmum},</if>
+            <if test="dimensionMaximum != null">#{dimensionMaximum},</if>
+            <if test="centripetalMechanism != null">#{centripetalMechanism},</if>
+            <if test="maxMoldNum != null">#{maxMoldNum},</if>
+            <if test="quata != null">#{quata},</if>
+            <if test="classShift != null">#{classShift},</if>
+            <if test="openMachineClass != null">#{openMachineClass},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMachineInfo" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo">
+        update t_lh_machine_info
+        <trim prefix="SET" suffixOverrides=",">
+            machine_name = #{machineName,jdbcType=VARCHAR},
+            dimension = #{dimension,jdbcType=DECIMAL},
+            DIMENSION_MINIMUM = #{dimensionMinmum,jdbcType=DECIMAL},
+            DIMENSION_MAXIMUM = #{dimensionMaximum,jdbcType=DECIMAL},
+            CENTRIPETAL_MECHANISM = #{centripetalMechanism,jdbcType=VARCHAR},
+            quata = #{quata,jdbcType=DECIMAL},
+            class_shift = #{classShift,jdbcType=VARCHAR},
+            open_machine_class = #{openMachineClass,jdbcType=VARCHAR},
+            status = #{status,jdbcType=VARCHAR},
+            remark = #{remark,jdbcType=VARCHAR},
+            max_mold_num = #{maxMoldNum,jdbcType=DOUBLE},
+            <if test="delFlag != null">del_flag = #{delFlag,jdbcType=VARCHAR},</if>
+            <if test="createBy != null">create_by = #{createBy,jdbcType=VARCHAR},</if>
+            <if test="createTime != null">create_time = #{createTime,jdbcType=DATE},</if>
+            <if test="updateBy != null">update_by = #{updateBy,jdbcType=VARCHAR},</if>
+            <if test="updateTime != null">update_time = #{updateTime,jdbcType=DATE},</if>
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <delete id="deleteMachineInfoByIds" parameterType="String">
+        UPDATE t_lh_machine_info SET del_flag ='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listMachineInfo" parameterType="com.zlt.aps.lh.api.domain.entity.LhMachineInfo"
+            resultMap="MachineInfoResult">
+
+        <if test="id == 1">
+            select a.SAP_CODE,b.MACHINE_CODE,b.MACHINE_NAME
+            from T_LH_SPECIFY_MACHINE a
+            inner JOIN T_LH_MACHINE_INFO b
+            on a.MACHINE_CODE=b.MACHINE_CODE and b.STATUS = '0'
+            where a.DEL_FLAG='0' and a.JOB_TYPE='0'
+            and a.SAP_CODE = #{machineCode,jdbcType=VARCHAR}
+        </if>
+
+        <if test="id == 2">
+            select a.ID,a.MACHINE_CODE,a.MACHINE_NAME
+            from t_lh_machine_info a
+            where a.DEL_FLAG='0' and a.STATUS='0'
+            and a.MACHINE_CODE not in (
+            select MACHINE_CODE
+            from T_LH_SPECIFY_MACHINE
+            where DEL_FLAG='0' and JOB_TYPE='0'
+            and SAP_CODE=#{machineCode,jdbcType=VARCHAR}
+            )
+        </if>
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lh_machine_info a USING (
+        <foreach collection="list" item="MACHINE" separator=" union ">
+            select
+            #{MACHINE.machineCode,jdbcType=VARCHAR} machine_code,
+            #{MACHINE.machineName,jdbcType=VARCHAR} machine_name,
+            #{MACHINE.dimension,jdbcType=DECIMAL} DIMENSION,
+            #{MACHINE.dimensionMinmum,jdbcType=DECIMAL} DIMENSION_MINIMUM,
+            #{MACHINE.dimensionMaximum,jdbcType=DECIMAL} DIMENSION_MAXIMUM,
+            #{MACHINE.centripetalMechanism,jdbcType=VARCHAR} CENTRIPETAL_MECHANISM,
+            #{MACHINE.maxMoldNum,jdbcType=DECIMAL} max_mold_num,
+            #{MACHINE.quata,jdbcType=DECIMAL} quata,
+            #{MACHINE.classShift,jdbcType=VARCHAR} class_shift,
+            #{MACHINE.openMachineClass,jdbcType=VARCHAR} open_machine_class,
+            #{MACHINE.status,jdbcType=VARCHAR} status,
+
+            #{MACHINE.createBy,jdbcType=VARCHAR} create_by,
+            #{MACHINE.createTime,jdbcType=DATE} create_time,
+            #{MACHINE.updateBy,jdbcType=VARCHAR} update_by,
+            #{MACHINE.updateTime,jdbcType=DATE} update_time,
+            #{MACHINE.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (a.machine_code = b.machine_code and a.del_flag = '0')
+        WHEN MATCHED THEN
+        UPDATE SET
+
+        a.machine_name = b.machine_name,
+        a.DIMENSION = b.DIMENSION,
+        a.DIMENSION_MINIMUM = b.DIMENSION_MINIMUM,
+        a.DIMENSION_MAXIMUM = b.DIMENSION_MAXIMUM,
+        a.CENTRIPETAL_MECHANISM = b.CENTRIPETAL_MECHANISM,
+        a.max_mold_num = b.max_mold_num,
+        a.quata = b.quata,
+        a.class_shift = b.class_shift,
+        a.open_machine_class = b.open_machine_class,
+        a.status = b.status,
+
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id ,
+        a.machine_code,
+        a.machine_name,
+        a.DIMENSION ,
+        a.DIMENSION_MINIMUM ,
+        a.DIMENSION_MAXIMUM ,
+        a.CENTRIPETAL_MECHANISM ,
+        a.max_mold_num,
+        a.quata ,
+        a.class_shift ,
+        a.open_machine_class ,
+        a.status ,
+
+        a.create_by ,
+        a.create_time ,
+        a.remark,
+        a.del_flag
+        ) values
+        (SEQ_PUBLIC.NEXTVAL,
+        b.machine_code,
+        b.machine_name,
+        b.DIMENSION ,
+        b.DIMENSION_MINIMUM ,
+        b.DIMENSION_MAXIMUM ,
+        b.CENTRIPETAL_MECHANISM ,
+        b.max_mold_num,
+        b.quata ,
+        b.class_shift ,
+        b.open_machine_class ,
+        b.status ,
+
+        b.create_by,
+        sysdate,
+        b.remark,
+        '0'
+        )
+    </update>
+
+</mapper>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.CommonMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxMachineInfo" id="CxMachineInfoResult">
+        <result property="id"    column="id"    />
+        <result property="no"    column="no"    />
+        <result property="machineCode"    column="machine_code"    />
+        <result property="machineName"    column="machine_name"    />
+        <result property="machineType"    column="machine_type"    />
+        <result property="type"    column="type"    />
+        <result property="dimensionMiniMum"    column="dimension_minimum"    />
+        <result property="dimensionMaxiMum"    column="dimension_maximum"    />
+        <result property="classShift"    column="class_shift"    />
+        <result property="quata"    column="quata"    />
+        <result property="quotaRatio"    column="quota_ratio"    />
+        <result property="openMachineClass1"    column="open_machine_class1"    />
+        <result property="openMachineClass2"    column="open_machine_class2"    />
+        <result property="openMachineClass3"    column="open_machine_class3"    />
+        <result property="operatorQty"    column="operator_qty"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+
+    <sql id="selectCxMachineInfoVo">
+        select id, no, machine_code, machine_name,machine_type, type, dimension_minimum, dimension_maximum, class_shift, quata,quota_ratio, open_machine_class1, open_machine_class2, open_machine_class3, operator_qty, status, create_by, create_time, update_by, update_time, del_flag, remark from t_cx_machine_info
+    </sql>
+
+    <select id="selectCxMachineInfoList" parameterType="com.zlt.aps.cx.api.domain.entity.CxMachineInfo" resultMap="CxMachineInfoResult">
+        <include refid="selectCxMachineInfoVo"/>
+        <where>
+            del_flag='0' and status='0'
+            <if test="machineCode != null  and machineCode != ''"> and machine_code = #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''"> and machine_name like concat(concat('%', #{machineName}), '%')</if>
+            <if test="type != null  and type != ''"> and type = #{type}</if>
+            <if test="openMachineClass1 != null  and openMachineClass1 != ''"> and open_machine_class1 = #{openMachineClass1}</if>
+            <if test="openMachineClass2 != null  and openMachineClass2 != ''"> and open_machine_class2 = #{openMachineClass2}</if>
+            <if test="openMachineClass3 != null  and openMachineClass3 != ''"> and open_machine_class3 = #{openMachineClass3}</if>
+            <if test="operatorQty != null "> and operator_qty = #{operatorQty}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+
+    <select id="listLossConstructionForCx" resultType="string" parameterType="string">
+        select distinct cxr.embryo_code||'$'||cxr.BOM_DATA_VERSION
+        from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
+        left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.Embryo_Version and ci.DEL_FLAG = 0 /*施工信息表*/
+        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        and cxr.DEL_FLAG = 0
+        and ci.id is null
+        order by cxr.embryo_code||'$'||cxr.BOM_DATA_VERSION
+    </select>
+
+    <select id="listLossConstructionForTq" resultType="string" parameterType="string">
+        select distinct cxr.BEAD_CODE
+        from T_TQ_SCHEDULE_RESULT cxr /*胎圈排程结果表*/
+        left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.BEAD_CODE = ci.TIRE_RING_CODE and ci.DEL_FLAG = 0 /*施工信息表*/
+        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        and cxr.DEL_FLAG = 0
+        and ci.id is null
+    </select>
+
+    <!--Joran  2021-09-06 添加硫化工序参数获取-->
+    <select id="selectLhParams" resultType="com.zlt.aps.lh.api.domain.dto.LhParamsDto" parameterType="com.zlt.aps.lh.api.domain.dto.LhParamsDto">
+        select * from t_lh_params
+        <where>
+            del_flag='0'
+            <if test="paramCode!=null and paramCode!=''">
+                and param_code=#{paramCode}
+            </if>
+        </where>
+    </select>
+
+</mapper>

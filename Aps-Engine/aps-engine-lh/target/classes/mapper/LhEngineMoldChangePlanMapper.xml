@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.engine.mapper.LhEngineMoldChangePlanMapper">
+
+    <resultMap type="com.zlt.aps.lh.engine.domain.LhEngineMoldChangePlan" id="LhEngineMoldChangePlanResult">
+        <result property="id" column="id"/>
+        <result property="moldBatchNo" column="mold_batch_no"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="beforeSapCode" column="before_sap_code"/>
+        <result property="beforeSpecDesc" column="before_spec_desc"/>
+        <result property="tireRoughStock" column="tire_rough_stock"/>
+        <result property="changeType" column="change_type"/>
+        <result property="afterSapCode" column="after_sap_code"/>
+        <result property="afterSpecDesc" column="after_spec_desc"/>
+        <result property="stockArea" column="stock_area"/>
+        <result property="changeTime" column="change_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectLhEngineMoldChangePlanVo">
+        select id, mold_batch_no, lh_machine_code, lh_machine_name,before_sap_code, before_spec_desc, tire_rough_stock, change_type, after_sap_code, after_spec_desc, stock_area, change_time, create_by, create_time, update_by, update_time, del_flag, remark from t_lh_mold_change_plan
+    </sql>
+
+    <select id="selectLhEngineMoldChangePlanList" parameterType="com.zlt.aps.lh.engine.domain.LhEngineMoldChangePlan" resultMap="LhEngineMoldChangePlanResult">
+        <include refid="selectLhEngineMoldChangePlanVo"/>
+        <where>
+            del_flag ='0'
+            <if test="moldBatchNo != null  and moldBatchNo != ''">and mold_batch_no = #{moldBatchNo}</if>
+            <if test="lhMachineCode != null  and lhMachineCode != ''">and lh_machine_code = #{lhMachineCode}</if>
+            <if test="lhMachineName != null  and lhMachineName != ''">and lh_machine_name like concat(concat('%',
+                #{lhMachineName}), '%')
+            </if>
+            <if test="beforeSpecDesc != null  and beforeSpecDesc != ''">and before_spec_desc = #{beforeSpecDesc}</if>
+            <if test="tireRoughStock != null ">and tire_rough_stock = #{tireRoughStock}</if>
+            <if test="changeType != null  and changeType != ''">and change_type = #{changeType}</if>
+            <if test="afterSapCode != null  and afterSapCode != ''">and after_sap_code = #{afterSapCode}</if>
+            <if test="afterSpecDesc != null  and afterSpecDesc != ''">and after_spec_desc = #{afterSpecDesc}</if>
+            <if test="stockArea != null  and stockArea != ''">and stock_area = #{stockArea}</if>
+            <if test="changeTime != null ">and change_time = #{changeTime}</if>
+
+            <if test="cxBatchNo!=null and cxBatchNo!=''">
+              and  mold_batch_no = (select mold_batch_no from T_MOLD_AUTO_GENERAGE_RECORD where del_flag='0' and  cx_batch_no=#{cxBatchNo})
+            </if>
+
+        </where>
+    </select>
+
+    <select id="selectLhEngineMoldChangePlanById" parameterType="Long" resultMap="LhEngineMoldChangePlanResult">
+        <include refid="selectLhEngineMoldChangePlanVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertLhEngineMoldChangePlan" parameterType="com.zlt.aps.lh.engine.domain.LhEngineMoldChangePlan">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_lh_mold_change_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="moldBatchNo != null">mold_batch_no,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="lhMachineName != null">lh_machine_name,</if>
+            <if test="beforeSapCode != null">before_sap_code,</if>
+            <if test="beforeSpecDesc != null">before_spec_desc,</if>
+            <if test="tireRoughStock != null">tire_rough_stock,</if>
+            <if test="changeType != null">change_type,</if>
+            <if test="afterSapCode != null">after_sap_code,</if>
+            <if test="afterSpecDesc != null">after_spec_desc,</if>
+            <if test="stockArea != null">stock_area,</if>
+            <if test="changeTime != null">change_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="sourceCxOrder != null">source_cx_order,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="moldBatchNo != null">#{moldBatchNo},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="lhMachineName != null">#{lhMachineName},</if>
+            <if test="beforeSapCode != null">#{beforeSapCode},</if>
+            <if test="beforeSpecDesc != null">#{beforeSpecDesc},</if>
+            <if test="tireRoughStock != null">#{tireRoughStock},</if>
+            <if test="changeType != null">#{changeType},</if>
+            <if test="afterSapCode != null">#{afterSapCode},</if>
+            <if test="afterSpecDesc != null">#{afterSpecDesc},</if>
+            <if test="stockArea != null">#{stockArea},</if>
+            <if test="changeTime != null">#{changeTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="sourceCxOrder != null">#{sourceCxOrder},</if>
+        </trim>
+    </insert>
+
+    <update id="updateLhEngineMoldChangePlan" parameterType="com.zlt.aps.lh.engine.domain.LhEngineMoldChangePlan">
+        update t_lh_mold_change_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="moldBatchNo != null">mold_batch_no = #{moldBatchNo},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="lhMachineName != null">lh_machine_name = #{lhMachineName},</if>
+            <if test="beforeSapCode != null">before_sap_code = #{beforeSapCode},</if>
+            <if test="beforeSpecDesc != null">before_spec_desc = #{beforeSpecDesc},</if>
+            <if test="tireRoughStock != null">tire_rough_stock = #{tireRoughStock},</if>
+            <if test="changeType != null">change_type = #{changeType},</if>
+            <if test="afterSapCode != null">after_sap_code = #{afterSapCode},</if>
+            <if test="afterSpecDesc != null">after_spec_desc = #{afterSpecDesc},</if>
+            <if test="stockArea != null">stock_area = #{stockArea},</if>
+            <if test="changeTime != null">change_time = #{changeTime},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!--根据成型批次号进行模具变动单数据逻辑删除-->
+    <delete id="deleteLhEngineMoldChangePlanByCxBatchNo" parameterType="String">
+        update t_lh_mold_change_plan set del_flag ='1' where mold_batch_no = (select mold_batch_no from T_MOLD_AUTO_GENERAGE_RECORD where del_flag='0' and  cx_batch_no=#{cxBatchNo})
+    </delete>
+
+    <delete id="deleteLhEngineMoldChangePlanById" parameterType="Long">
+        update t_lh_mold_change_plan set del_flag ='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteLhEngineMoldChangePlanByIds" parameterType="String">
+        update t_lh_mold_change_plan set del_flag ='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!--Joran.Zhang 2021-09-02 根据入参进行模具变动单数据删除-->
+    <!--同步模具变动单记录到日志表-->
+    <insert id="syncMoldChagePlanToLog">
+       insert into t_lh_mold_change_plan_log
+       SELECT t.* from t_lh_mold_change_plan T
+        <where>
+            <if test="sourceCxOrder!=null and sourceCxOrder!=''">
+                AND instr(source_cx_order,#{sourceCxOrder}) > 0
+            </if>
+            <if test="list!=null and list.size()>0 ">
+                AND lh_machine_code in
+                <foreach item="machineCode" collection="list" open="(" separator="," close=")">
+                    #{machineCode}
+                </foreach>
+            </if>
+            <if test="idList!=null and idList.size()>0 ">
+                AND id in
+                <foreach item="id" collection="idList" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="cxBatchNo!=null and cxBatchNo!=''">
+                and  mold_batch_no = (select mold_batch_no from T_MOLD_AUTO_GENERAGE_RECORD where del_flag='0' and status='0' and  cx_batch_no=#{cxBatchNo})
+            </if>
+            <if test="moldBatchNo!=null and moldBatchNo!=''">
+                and  mold_batch_no = #{moldBatchNo}
+            </if>
+        </where>
+    </insert>
+
+    <delete id="deleteLhEngineMoldChangePlanByParams" >
+        delete from t_lh_mold_change_plan
+        <where>
+            <if test="sourceCxOrder!=null and sourceCxOrder!=''">
+                AND instr(source_cx_order,#{sourceCxOrder}) > 0
+            </if>
+            <if test="list!=null and list.size()>0 ">
+                AND lh_machine_code in
+                <foreach item="machineCode" collection="list" open="(" separator="," close=")">
+                    #{machineCode}
+                </foreach>
+            </if>
+            <if test="idList!=null and idList.size()>0 ">
+                AND id in
+                <foreach item="id" collection="idList" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="cxBatchNo!=null and cxBatchNo!=''">
+                and  mold_batch_no = (select mold_batch_no from T_MOLD_AUTO_GENERAGE_RECORD where del_flag='0' and status='0' and  cx_batch_no=#{cxBatchNo})
+            </if>
+            <if test="moldBatchNo!=null and moldBatchNo!=''">
+                and  mold_batch_no = #{moldBatchNo}
+            </if>
+        </where>
+    </delete>
+
+    <insert id="batchCreateMoldChangePlan" parameterType="list">
+        insert into t_lh_mold_change_plan
+        (   id,
+            mold_batch_no,
+            lh_machine_code,
+            before_sap_code,
+            before_spec_desc,
+            tire_rough_stock,
+            change_type,
+            after_sap_code,
+            after_spec_desc,
+            stock_area,
+            change_time,
+            create_by,
+            create_time,
+            update_by,
+            update_time,
+            del_flag,
+            source_cx_order,
+            remark
+        )
+        select seq_lh_mold_change_plan.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="list" item="plan" separator=" union ">
+            select
+            #{plan.moldBatchNo,jdbcType=VARCHAR},
+            #{plan.lhMachineCode,jdbcType=VARCHAR},
+            #{plan.beforeSapCode,jdbcType=VARCHAR},
+            #{plan.beforeSpecDesc,jdbcType=VARCHAR},
+            #{plan.tireRoughStock,jdbcType=INTEGER},
+            #{plan.changeType,jdbcType=VARCHAR},
+            #{plan.afterSapCode,jdbcType=VARCHAR},
+            #{plan.afterSpecDesc,jdbcType=VARCHAR},
+            #{plan.stockArea,jdbcType=VARCHAR},
+            #{plan.changeTime,jdbcType=TIMESTAMP},
+            #{plan.createBy,jdbcType=VARCHAR},
+            #{plan.createTime,jdbcType=TIMESTAMP},
+            #{plan.updateBy,jdbcType=VARCHAR},
+            #{plan.updateTime,jdbcType=TIMESTAMP},
+            '0',
+            #{plan.sourceCxOrder,jdbcType=VARCHAR},
+            #{plan.remark,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+
+</mapper>

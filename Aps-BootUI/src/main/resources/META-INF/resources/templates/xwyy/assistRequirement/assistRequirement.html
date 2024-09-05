@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('纤维压延外厂需求列表')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                            <input type="text" class="time-input" id="scheduleDate" th:value="${initDate}"
+                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.xwyy.scheduleResult.bigRollCode}]]：</label>
+                            <input type="text" name="bigRollCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('', 800, 510)" shiro:hasPermission="xwyy:assistRequirement:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('', 800, 510)"
+               shiro:hasPermission="xwyy:assistRequirement:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="xwyy:assistRequirement:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-info" onclick="$.operate.importScheduleData()" shiro:hasPermission="xwyy:assistRequirement:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="xwyy:assistRequirement:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('xwyy:assistRequirement:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('xwyy:assistRequirement:remove')}]];
+    var prefix = ctx + "xwyy/assistRequirement";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/toImport",
+            modalName: [[#{ui.data.column.assistRequirement.modelName}]],
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'scheduleDate',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.scheduleDate}]],
+                },
+                {
+                    field: 'bigRollCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.xwyy.scheduleResult.bigRollCode}]],
+                },
+                {
+                    field: 'dayPlanQty',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.assistRequirement.midPlan}]],
+                },
+                {
+                    field: 'nightPlanQty',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.assistRequirement.nightPlan}]],
+                },
+                {
+                    field: 'todayStock',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.todayStock}]],
+                },
+                {
+                    field: 'dayOut',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.dayOut}]],
+                },
+                {
+                    field: 'fac5Class1Plan',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.fac5Class1Plan}]],
+                },
+                {
+                    field: 'fac5Class2Plan',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.fac5Class2Plan}]],
+                },
+                {
+                    field: 'fac5Class3Plan',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.fac5Class3Plan}]],
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    halign:'center',
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\', 800, 510)"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>' + [[#{ui.frame.btn.delete}]] + '</a>');
+                        return actions.join('');
+                    }
+                }
+            ]
+        };
+        $.table.init(options);
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+</script>
+</body>
+</html>

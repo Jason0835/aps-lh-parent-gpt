@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tc.mapper.TcGlueOrderMapper">
+
+    <select id="listGlueOrder" parameterType="com.zlt.aps.tc.api.domain.dto.TcGlueOrderDto"
+            resultType="com.zlt.aps.tc.api.domain.dto.TcGlueOrderDto">
+        select * from (
+            select o.id, g.id glueGroupId, g.glue_group_code, g.glue_group_name, o.glue_code, o.order_num,
+            g.order_num||'.'||o.order_num as glue_group_order_num, o.remark
+            from T_TC_GLUE_GROUP_ORDER g
+            inner join T_TC_GLUE_ORDER o on g.id = o.glue_group_id
+            where 1=1
+            and g.del_flag=0
+            and o.del_flag=0
+            <if test="glueGroupId != null">
+                and GLUE_GROUP_ID = #{glueGroupId}
+            </if>
+            <if test="glueCode != null and glueCode != ''">
+                and INSTR(GLUE_CODE, #{glueCode}) > 0
+            </if>
+            <if test="orderStr == null">
+                order by g.order_num, o.order_num
+            </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_TC_GLUE_ORDER a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.glueCode,jdbcType=VARCHAR} GLUE_CODE,
+            #{item.glueGroupId,jdbcType=DOUBLE} GLUE_GROUP_ID,
+            #{item.orderNum,jdbcType=DOUBLE} ORDER_NUM,
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime,jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime,jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.GLUE_CODE = b.GLUE_CODE
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.GLUE_GROUP_ID = b.GLUE_GROUP_ID,
+        a.ORDER_NUM = b.ORDER_NUM,
+        a.update_by = b.create_by,
+        a.update_time = sysdate,
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.glue_code, a.GLUE_GROUP_ID, a.ORDER_NUM, a.create_by, a.create_time, a.remark,a.del_flag) values
+        (SEQ_PUBLIC.NEXTVAL, b.glue_code, b.GLUE_GROUP_ID, b.ORDER_NUM, b.create_by, sysdate, b.remark,'0')
+    </update>
+
+</mapper>

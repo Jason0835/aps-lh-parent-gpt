@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.nc.engine.mapper.NcEngineGlueMapper">
+
+    <select id="listGlueSeq" resultType="com.zlt.aps.nc.engine.vo.NcGlueOrderVo" >
+        select o.glue_code, g.order_num||'.'||o.order_num as glue_seq
+        from T_NC_GLUE_GROUP_ORDER g
+        inner join T_NC_GLUE_ORDER o on g.id = o.glue_group_id
+        where 1=1
+        and g.del_flag=0
+        and o.del_flag=0
+    </select>
+
+</mapper>

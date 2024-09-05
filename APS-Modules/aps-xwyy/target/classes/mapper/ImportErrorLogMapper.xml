@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.mapper.ImportErrorLogMapper">
+
+    <resultMap type="com.ruoyi.api.gateway.system.domain.ImportErrorLog" id="ImportErrorLogResult">
+        <result property="id" column="id"/>
+        <result property="importLogId" column="import_log_id"/>
+        <result property="errorRow" column="error_row"/>
+        <result property="errorDetail" column="error_detail"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectImportErrorLogVo">
+        select id, import_log_id, error_row, error_detail, remark, del_flag, create_by, create_time, update_by, update_time from t_import_error_log
+    </sql>
+
+    <select id="selectImportErrorLogList" parameterType="com.ruoyi.api.gateway.system.domain.ImportErrorLog"
+            resultMap="ImportErrorLogResult">
+        <include refid="selectImportErrorLogVo"/>
+    </select>
+
+    <select id="selectImportErrorLogById" parameterType="Long" resultMap="ImportErrorLogResult">
+        <include refid="selectImportErrorLogVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertImportErrorLog" parameterType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_IMPORT_LOG.NEXTVAL as id
+            FROM DUAL
+        </selectKey>
+        insert into t_import_error_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="importLogId != null">import_log_id,</if>
+            <if test="errorRow != null">error_row,</if>
+            <if test="errorDetail != null">error_detail,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="importLogId != null">#{importLogId},</if>
+            <if test="errorRow != null">#{errorRow},</if>
+            <if test="errorDetail != null">#{errorDetail},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateImportErrorLog" parameterType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        update t_import_error_log
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="importLogId != null">import_log_id = #{importLogId},</if>
+            <if test="errorRow != null">error_row = #{errorRow},</if>
+            <if test="errorDetail != null">error_detail = #{errorDetail},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteImportErrorLogById" parameterType="Long">
+        update t_import_error_log
+        set del_flag='1'
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteImportErrorLogByIds" parameterType="String">
+        update t_import_error_log set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="insertImportErrorLogList" parameterType="list">
+        insert into t_import_error_log (id, import_log_id, error_row, error_detail, remark, create_by, create_time)
+        select SEQ_IMPORT_LOG.NEXTVAL AS ID, x.*
+        from (
+        <foreach collection="list" item="importErrorLog" separator=" union ">
+            select #{importErrorLog.importLogId  ,jdbcType=DOUBLE} as import_log_id,
+            #{importErrorLog.errorRow      ,jdbcType=DOUBLE} as error_row,
+            #{importErrorLog.errorDetail   ,jdbcType=VARCHAR} as error_detail,
+            #{importErrorLog.remark         ,jdbcType=VARCHAR} as remark,
+            #{importErrorLog.createBy      ,jdbcType=VARCHAR} as create_by,
+            sysdate as create_time
+            from dual
+        </foreach>
+        ) x
+    </insert>
+</mapper>

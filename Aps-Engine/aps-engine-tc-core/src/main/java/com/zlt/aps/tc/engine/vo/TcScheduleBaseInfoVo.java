@@ -1,0 +1,64 @@
+package com.zlt.aps.tc.engine.vo;
+
+import lombok.Data;
+
+@Data
+public class TcScheduleBaseInfoVo {
+
+    /**
+     * 对应的成型批次号
+     */
+    private String cxBatchNo;
+
+    /**
+     * 胎侧代码
+     */
+    private String sidewallCode;
+
+    /**
+     * 胶料代码
+     */
+    private String glueCode;
+
+    private String wholeGlueCode;
+
+    /**
+     * 口型板代码
+     */
+    private String mouthPlateCode;
+
+    /**
+     * 单耗（毫米）
+     */
+    private Double unitConsume;
+
+    /**
+     * 对应成型一班的胎侧胶计划量
+     */
+    private Double cxClass1Plan;
+
+    /**
+     * 对应成型二班的胎侧胶计划量
+     */
+    private Double cxClass2Plan;
+
+    /**
+     * 对应成型三班的胎侧胶计划量
+     */
+    private Double cxClass3Plan;
+
+    /**
+     * 对应成型次一班的胎侧胶计划量
+     */
+    private Double cxClass4Plan;
+
+    /**
+     * 对应成型次二班的胎侧胶计划量
+     */
+    private Double cxClass5Plan;
+
+    /**
+     * 机台code$胎胚代码，多个逗号分割， 用来计算成型平均定额使用
+     */
+    private String quotaKeys;
+}

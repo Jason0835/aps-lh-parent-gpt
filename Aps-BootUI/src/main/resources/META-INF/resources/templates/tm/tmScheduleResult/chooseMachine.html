@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改胎面排程结果')" />
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-tmScheduleResult-edit" th:object="${scheduleResult}">
+            <input id="id0" name="id" th:field="*{id}" type="hidden">
+            <input name="publishSuccessCount" th:value="*{publishSuccessCount}" type="hidden">
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.data.column.machine.machineName}]]：</label>
+                <div class="col-sm-8">
+                    <select name="machineId" class="form-control"  th:with="type=${machineInfoList}"  th:data-none-selected-text="#{ui.data.column.selectMachineName}">
+                        <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                        <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                    </select>
+                </div>
+            </div>
+
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js" />
+    <th:block th:include="include :: bootstrap-select-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "tm/tmScheduleResult";
+
+        $("#form-tmScheduleResult-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                var fromData = $('#form-tmScheduleResult-edit').serializeArray();
+                $.operate.saveNoRefresh(prefix + "/chooseMachine", fromData, updateParentCell,updateParentMove);
+            }
+        }
+
+        function updateParentCell (result) {
+            if (result.code == web_status.SUCCESS) {
+                var rowIndex = [[${rowIndex}]];
+                let fromData = $('#form-tmScheduleResult-edit').serializeArray();
+                var value = fromData[2].value;
+                var parent = window.parent;
+                parent.$("#" + parent.table.options.id).bootstrapTable('updateCell', {
+                    index: rowIndex,
+                    field: "machineId",
+                    value: value
+                });
+                parent.$("#" + parent.table.options.id).bootstrapTable('updateCell', {
+                    index: rowIndex,
+                    field: "isRelease",
+                    value: fromData[1].value == 0 ? '0' : '5'
+                });
+            }
+        }
+        function updateParentMove() {
+            //解决选机台后，固定列会往回滚的问题（start）
+            var parent = window.parent;
+            var left = parent.$(".fixed-table-body")[0].scrollLeft;
+            if(left < 1){
+                parent.$(".fixed-table-body")[0].scrollLeft = left+1;
+            }else{
+                parent.$(".fixed-table-body")[0].scrollLeft = left-1;
+            }
+            //解决选机台后，固定列会往回滚的问题（end）
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+    <title>成型1</title>
+    <!--<script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="ECharts/echarts.min.js"></script>-->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+<!--    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/font-awesome.min.css" rel="stylesheet">
+    &lt;!&ndash; bootstrap-table 表格插件样式 &ndash;&gt;
+    <link href="css/bootstrap-table.min.css?v=20200727" rel="stylesheet">
+    <link href="css/animate.css" rel="stylesheet">
+    <link href="css/style.css?v=20200903" rel="stylesheet">
+    <link href="css/ry-ui.css?v=4.5.1" rel="stylesheet">
+
+
+<link rel="stylesheet" href="css/layer.css?v=3.1.1" id="layuicss-layer">
+<link rel="stylesheet" href="css/style-layer.css" id="layuicss-thememoonstylecss">
+<link id="layuicss-laydate" rel="stylesheet" href="css/laydate.css?v=5.0.9" media="all">-->
+    <th:block th:include="include :: header('甘特图')" />
+
+</head>
+<body class="gray-bg">
+    <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12 search-collapse">
+                <form id="formId">
+                    <div class="select-list">
+                        <ul>
+                                <li>
+                                <label>工序选择：</label>
+                                <select name=" ">
+                                    <option>成型</option>
+                                    <!--<option>硫化</option>-->
+                                </select>
+                                </li>
+                            <li>
+                                    <label>时间区间：</label>
+                                    <input type="text" class="time-input" style=" width:93px;" value="2023-07-01"> ~ <input type="text" class="time-input" value="2023-07-03" style=" width:93px;">
+                                </li>
+                            <li>
+                                <a class="btn btn-primary btn-rounded btn-sm" onClick="$.table.search()"><i class="fa fa-search"></i>&nbsp;搜索</a>
+                                <a class="btn btn-warning btn-rounded btn-sm" onClick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;重置</a>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="col-sm-12 select-table table-striped">
+                <div class="mainPanl">
+                    <div class="panl_li">
+                        <div class="machineTitle">成型机</div>
+                    </div>
+                    <div class="dataPanl">
+                        <div id="machinePanl">
+
+                        </div>
+                        <div id="gantPanl"></div>
+                        <div style="clear: both;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: echarts-js" />
+            <!--<script type="text/javascript" src="js/jquery.min.js"></script>
+            <script type="text/javascript" src="js/bootstrap.min.js"></script>
+            &lt;!&ndash; bootstrap-table 表格插件 &ndash;&gt;
+            <script type="text/javascript" src="js/bootstrap-table.min.js?v=20200727"></script>
+
+            <script type="text/javascript" src="js/bootstrap-table-zh_CN.js?v=20200727"></script>
+        &lt;!&ndash;	<script th:src="@{/ajax/libs/bootstrap-table/locale/bootstrap-table-zh-CN.min.js?v=20210202}"></script>&ndash;&gt;
+            <script type="text/javascript" src="js/bootstrap-table-mobile.js?v=20200727"></script>
+            &lt;!&ndash; jquery-validate 表单验证插件 &ndash;&gt;
+            <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+            <script type="text/javascript" src="js/validate_messages_zh_CN.min.js"></script>
+            <script type="text/javascript" src="js/jquery.validate.extend.js"></script>
+            <script type="text/javascript" src="js/jquery.validate.extend_zh_CN.js"></script>
+            &lt;!&ndash; jquery-validate 表单树插件 &ndash;&gt;
+            <script type="text/javascript" src="js/bootstrap-treetable.js"></script>
+            <script type="text/javascript" src="js/bootstrap-treetable-zh_CN.js"></script>
+
+            <script type="text/javascript" src="js/locale_zh_CN.js"></script>
+
+            &lt;!&ndash; 遮罩层 &ndash;&gt;
+            <script type="text/javascript" src="js/jquery.blockUI.js"></script>
+            <script type="text/javascript" src="js/jquery.blockUI_zh_CN.js"></script>
+            <script type="text/javascript" src="js/icheck.min.js"></script>
+            <script type="text/javascript" src="js/layer.js"></script>
+            <script type="text/javascript" src="js/layui.js"></script>
+
+            <script type="text/javascript" src="js/laydate_zh_CN.js"></script>
+
+            <script type="text/javascript" src="js/common.js?v=4.5.1"></script>
+            <script type="text/javascript" src="js/ry-ui.js?v=4.5.1"></script>
+
+
+
+            <script> var ctx = "\/"; </script>
+
+        <script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
+
+            <script type="text/javascript" src="js/jquery.dragtable.js"></script>
+            <script type="text/javascript" src="js/bootstrap-table-reorder.js?v=20210202"></script>-->
+<script>
+    var dataJson = []
+    var startDay = 1;
+    var endDay = 3;
+    var isOneLine = true;
+
+    $(function () {
+        initGant();
+        $(window).resize(function (){
+            // initGant();
+        })
+    });
+
+   function initGant(){
+        //初始化表头
+        initTitle({startDay:1,endDay:3});
+        //初始化数据
+        dataJson = initData();
+        //初始化甘特图
+        if(isOneLine){
+            initGridOneLine();
+        }else{
+            initGrid();
+        }
+   }
+
+   //initTitle
+   function initTitle(params){
+        var dayLength = parseInt(params.endDay)-parseInt(params.startDay)+1;
+        var width = 703*dayLength;
+        var str = ""
+        for(var i = parseInt(params.startDay);i<=parseInt(params.endDay);i++){
+            if(i%2!=0){
+                str+='<div class="title_all bg_blue"><div class="title_day">'+i+'号</div><div class="title_hours">';
+            }else{
+                str+='<div class="title_all bg_pink"><div class="title_day">'+i+'号</div><div class="title_hours">';
+            }
+            var hourStr = "";
+            for(var j = 1;j<=24;j++){
+                hourStr+='<div class="title_hour">'+j+'</div>'
+            }
+            str+=hourStr;
+            str+='</div></div>'
+        }
+        $('.mainPanl').css('width',width+100+"px");
+        $('.panl_li').css('width',width+100+"px");
+        $('#gantPanl').css('width',width-10+"px");
+        $('.panl_li').append(str);
+        $('#gantPanl').append("<div class='linePnal'></div><div style='clear:both'></div>");
+   }
+
+   function initData(){
+    var dataJson = [
+    {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'01',
+            endDay:'01',
+            endHour:'02',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'04',
+            endDay:'01',
+            endHour:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'205/60R16 92H',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'07',
+            endDay:'01',
+            endHour:'09',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'11',
+            endDay:'01',
+            endHour:'14',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'140',
+            ywcl:'140',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'16',
+            endDay:'01',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'19',
+            endDay:'01',
+            endHour:'20',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'35',
+            ywcl:'35',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'21',
+            endDay:'01',
+            endHour:'22',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'01',
+            startHour:'23',
+            endDay:'01',
+            endHour:'24',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'35',
+            ywcl:'35',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'01',
+            endDay:'02',
+            endHour:'02',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'04',
+            endDay:'02',
+            endHour:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'07',
+            endDay:'02',
+            endHour:'09',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'11',
+            endDay:'02',
+            endHour:'13',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'15',
+            endDay:'02',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'19',
+            endDay:'02',
+            endHour:'20',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'02',
+            startHour:'22',
+            endDay:'02',
+            endHour:'24',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'02',
+            endDay:'03',
+            endHour:'03',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'05',
+            endDay:'03',
+            endHour:'06',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'205/60R16 92V',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'08',
+            endDay:'03',
+            endHour:'10',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'12',
+            endDay:'03',
+            endHour:'13',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'15',
+            endDay:'03',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'106',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'19',
+            endDay:'03',
+            endHour:'21',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'C02',
+            startDay:'03',
+            startHour:'23',
+            endDay:'03',
+            endHour:'24',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+    {
+            codeId:'J01',
+            startDay:'01',
+            startHour:'01',
+            endDay:'01',
+            endHour:'02',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KCA651/AT651/F27 AF',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J01',
+            startDay:'01',
+            startHour:'04',
+            endDay:'01',
+            endHour:'15',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KLS200',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'420',
+            ywcl:'420',
+        },
+        {
+            codeId:'J01',
+            startDay:'01',
+            startHour:'17',
+            endDay:'01',
+            endHour:'24',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R20A08',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'245',
+            ywcl:'245',
+        },
+        {
+            codeId:'J01',
+            startDay:'02',
+            startHour:'01',
+            endDay:'02',
+            endHour:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R20A08',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'175',
+            ywcl:'175',
+        },
+        {
+            codeId:'J01',
+            startDay:'02',
+            startHour:'07',
+            endDay:'02',
+            endHour:'14',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KCA651/AT651/F27 AF',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'420',
+            ywcl:'420',
+        },
+        {
+            codeId:'J01',
+            startDay:'02',
+            startHour:'16',
+            endDay:'02',
+            endHour:'24',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KLS200',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'420',
+            ywcl:'420',
+        },
+        {
+            codeId:'J01',
+            startDay:'03',
+            startHour:'01',
+            endDay:'03',
+            endHour:'12',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'195/50R15 86H',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'420',
+            ywcl:'420',
+        },
+        {
+            codeId:'J01',
+            startDay:'03',
+            startHour:'14',
+            endDay:'03',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16408',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'150',
+            ywcl:'150',
+        },
+        {
+            codeId:'J01',
+            startDay:'03',
+            startHour:'19',
+            endDay:'03',
+            endHour:'24',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'7.50R16KCA651/AT651/F27 AF',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'210',
+            ywcl:'210',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'01',
+            endDay:'01',
+            endHour:'02',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'04',
+            endDay:'01',
+            endHour:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'205/60R16 92H',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'07',
+            endDay:'01',
+            endHour:'09',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'11',
+            endDay:'01',
+            endHour:'14',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'140',
+            ywcl:'140',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'16',
+            endDay:'01',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'19',
+            endDay:'01',
+            endHour:'20',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'35',
+            ywcl:'35',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'21',
+            endDay:'01',
+            endHour:'22',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'01',
+            startHour:'23',
+            endDay:'01',
+            endHour:'24',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'35',
+            ywcl:'35',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'01',
+            endDay:'02',
+            endHour:'02',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'04',
+            endDay:'02',
+            endHour:'05',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'07',
+            endDay:'02',
+            endHour:'09',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'11',
+            endDay:'02',
+            endHour:'13',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'15',
+            endDay:'02',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'19',
+            endDay:'02',
+            endHour:'20',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'02',
+            startHour:'22',
+            endDay:'02',
+            endHour:'24',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'02',
+            endDay:'03',
+            endHour:'03',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'05',
+            endDay:'03',
+            endHour:'06',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'205/60R16 92V',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'08',
+            endDay:'03',
+            endHour:'10',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'12',
+            endDay:'03',
+            endHour:'13',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'215/60R16C 103/101T',
+            type:'4',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'15',
+            endDay:'03',
+            endHour:'17',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92V',
+            type:'1',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'106',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'19',
+            endDay:'03',
+            endHour:'21',
+            msg:'3405 cv 744F R524 LX-WCV Dec 31 TRT(15)',
+            innerMsg:'215/60R16 99H GREEN',
+            type:'2',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'105',
+            ywcl:'105',
+        },
+        {
+            codeId:'J02',
+            startDay:'03',
+            startHour:'23',
+            endDay:'03',
+            endHour:'24',
+            msg:'3424 cv 744F R524 LX-WCV Dec 31 TRT(14)',
+            innerMsg:'205/60R16 92H',
+            type:'3',
+            cpdh:'TP183119000',
+            specdh:'1000001H',
+            jd:'TP183119000',
+            bc:'1000001H',
+            ydl:'70',
+            ywcl:'70',
+        },
+    ]
+     return dataJson
+   }
+
+   function initGrid(){
+    //数据分组及排序
+    var data = getGroupData(dataJson);
+    $('.machineTitleItem').remove()
+    for(var i = 0;i<data.length;i++){
+        var stopTimes = 0;
+        var str = "";
+        var height = 44
+        if(data[i].data.length>0){
+            height = 45*data[i].data.length-1
+        }
+        str+='<div class="machineTitleItem" style="height:'+height+'px;line-height:'+height+'px">'+data[i].machineCode+'</div>';
+        $('#machinePanl').append(str)
+        var dataItem = data[i].data;
+        var strItem = "";
+        for(var j = 0;j<dataItem.length;j++){
+            var marginLeft = 0;
+            var width = 0;
+            var itemStartDay = parseInt(dataItem[j].startDay);
+            var itemEndDay = parseInt(dataItem[j].endDay);
+            var itemStartHour = parseInt(dataItem[j].startHour);
+            var itemEndHour = parseInt(dataItem[j].endHour);
+            width = (itemEndHour-itemStartHour+1)*25;
+            if(itemEndDay-itemStartDay==1){
+                width = (24-itemStartHour+itemEndHour+1)*25;
+            }
+            if(itemEndDay-itemStartDay>1){
+                width = (24*(itemEndDay-itemStartDay)-itemStartHour+itemEndHour+1)*25;
+            }
+            marginLeft = (itemStartDay-startDay)*25*24+(itemStartHour-1)*25;
+            var colorClass = "bg_item_blue";
+            if(dataItem[j].type=="2"){
+                colorClass = "bg_item_green";
+            }else if(dataItem[j].type=="3"){
+                colorClass = "bg_item_yellow";
+            }else if(dataItem[j].type=="4"){
+                colorClass = "bg_item_rin";
+            }
+            var tooltipClass = "lineItemBottom";
+            if((data.length-i)<=2&&(dataItem.length-j)<=4){
+                tooltipClass = "lineItemTop";
+            }
+            if(i==1&&j<4){
+                tooltipClass = "lineItemBottom";
+            }
+            if(24-itemStartHour<=12&&itemEndDay==endDay){
+                tooltipClass+=" lineItemLeft"
+            }
+            if(itemEndDay-itemStartDay==0&&itemEndHour-itemStartHour==0){
+                strItem+="<div class='lineItem'></div>"
+            }else if(dataItem[j].type=="0"){
+                //停工
+                colorClass = "bg_item_black";
+                stopTimes++;
+                strItem+="<div class='lineItem' style='margin-left:"+marginLeft+"px;'><div class='"+tooltipClass+" "+colorClass+"' style='width:"+width+"px'><span class='itemIndex'>停</span>"+"待料中"+
+                    "</span></div></div>"
+            }else{
+                strItem+="<div class='lineItem' style='margin-left:"+marginLeft+"px;'><div class='"+tooltipClass+" "+colorClass+"' style='width:"+width+"px'><span class='itemIndex'>"+(parseInt(j)+1-stopTimes)+"</span>"+dataItem[j].innerMsg+
+                "<span class='tooltiptext'><span class='tooltipLab'>规格明细：</span>"+dataItem[j].innerMsg+"<hr><span class='tooltipLab'>成品代号：</span><span class='tooltipVal'>"+dataItem[j].cpdh+"</span>"+
+                    "<span class='tooltipLab'>SPEC代号：</span><span class='tooltipVal'>"+dataItem[j].specdh+"</span><br>"+
+                    "<span class='tooltipLab'>阶段：</span><span class='tooltipVal'>"+dataItem[j].jd+"</span>"+
+                    "<span class='tooltipLab'>版次：</span><span class='tooltipVal'>"+dataItem[j].bc+"</span><br>"+
+                    "<span class='tooltipLab'>预定量：</span><span class='tooltipVal'>"+dataItem[j].ydl+"</span>"+
+                    "<span class='tooltipLab'>已完成量：</span><span class='tooltipVal'>"+dataItem[j].ywcl+"</span>"+
+                    "</span></div></div>"
+            }
+
+        }
+        $('.linePnal').append(strItem)
+        $('.linePnal').append("<div style='width:100%;position:absolute;height:1px;background-color:#666;margin-top: -1px;'></div>")
+    }
+   }
+
+   function initGridOneLine(){
+     //数据分组及排序
+     var data = getGroupData(dataJson);
+    $('.machineTitleItem').remove()
+    for(var i = 0;i<data.length;i++){
+        var linDatas = getDayGroupData(data[i].data);
+        var maxLength = 0;
+        for(var j = 0;j<linDatas.length;j++){
+            var lineData = linDatas[j];
+            if(lineData.data.length>maxLength){
+                maxLength = lineData.data.length;
+            }
+        }
+        var stopTimes = 0;
+        var str = "";
+        var height = 44
+        if(maxLength>0){
+            height = 45*maxLength-1
+        }
+        str+='<div class="machineTitleItem" style="height:'+height+'px;line-height:'+height+'px">'+data[i].machineCode+'</div>';
+        $('#machinePanl').append(str)
+        for(var j = 0;j<maxLength;j++){
+            var strItem="<div class='lineItem lineItem"+data[i].machineCode+j+"'></div>";
+            $('.linePnal').append(strItem)
+        }
+        $('.linePnal').append("<div style='width:100%;position:absolute;height:1px;background-color:#666;margin-top: -1px;'></div>")
+        for(var j = 0;j<linDatas.length;j++){
+            var lineData = linDatas[j].data;
+            for(var m=0;m<lineData.length;m++){
+                var strItem = "";
+                var marginLeft = 0;
+                var width = 0;
+                var itemStartDay = parseInt(lineData[m].startDay);
+                var itemEndDay = parseInt(lineData[m].endDay);
+                var itemStartHour = parseInt(lineData[m].startHour);
+                var itemEndHour = parseInt(lineData[m].endHour);
+                width = (itemEndHour-itemStartHour+1)*25;
+                if(itemEndDay-itemStartDay==1){
+                    width = (24-itemStartHour+itemEndHour+1)*25;
+                }
+                if(itemEndDay-itemStartDay>1){
+                    width = (24*(itemEndDay-itemStartDay)-itemStartHour+itemEndHour+1)*25;
+                }
+                marginLeft = (itemStartDay-startDay)*25*24+(itemStartHour-1)*25;
+                var colorClass = "bg_item_blue";
+                if(lineData[m].type=="2"){
+                    colorClass = "bg_item_green";
+                }else if(lineData[m].type=="3"){
+                    colorClass = "bg_item_yellow";
+                }else if(lineData[m].type=="4"){
+                    colorClass = "bg_item_rin";
+                }
+                var tooltipClass = "lineItemBottom";
+                if((data.length-i)<=2&&(lineData.length-m)<=4){
+                    tooltipClass = "lineItemTop";
+                }
+                if(i==0&&m<4){
+                    tooltipClass = "lineItemBottom";
+                }
+                if(24-itemStartHour<=12&&itemEndDay==endDay){
+                    tooltipClass+=" lineItemLeft"
+                }
+                if(itemEndDay-itemStartDay==0&&itemEndHour-itemStartHour==0){
+                    strItem+="<div class='itemDataDom "+tooltipClass+" "+colorClass+"'></div>"
+                }else if(lineData[m].type=="0"){
+                    //停工
+                    colorClass = "bg_item_black";
+                    stopTimes++;
+                    strItem+="<div class='itemDataDom "+tooltipClass+" "+colorClass+"' style='width:"+width+"px;left:"+marginLeft+";margin-left:"+marginLeft+"px;'><span class='itemIndex'>停</span>"+"待料中"+
+                        "</span></div>"
+                }else{
+                    strItem+="<div class='itemDataDom "+tooltipClass+" "+colorClass+"' style='width:"+width+"px;left:"+marginLeft+";margin-left:"+marginLeft+"px;'><span class='itemIndex'>"+(parseInt(m)+1-stopTimes)+"</span>"+lineData[m].innerMsg+
+                    "<span class='tooltiptext'><span class='tooltipLab'>规格明细：</span>"+lineData[m].innerMsg+"<hr><span class='tooltipLab'>成品代号：</span><span class='tooltipVal'>"+lineData[m].cpdh+"</span>"+
+                        "<span class='tooltipLab'>SPEC代号：</span><span class='tooltipVal'>"+lineData[m].specdh+"</span><br>"+
+                        "<span class='tooltipLab'>阶段：</span><span class='tooltipVal'>"+lineData[m].jd+"</span>"+
+                        "<span class='tooltipLab'>版次：</span><span class='tooltipVal'>"+lineData[m].bc+"</span><br>"+
+                        "<span class='tooltipLab'>预定量：</span><span class='tooltipVal'>"+lineData[m].ydl+"</span>"+
+                        "<span class='tooltipLab'>已完成量：</span><span class='tooltipVal'>"+lineData[m].ywcl+"</span>"+
+                        "</span></div>"
+                }
+                $(".lineItem"+data[i].machineCode+m).append(strItem)
+            }
+        }
+    }
+   }
+
+
+   function getGroupData(data){
+    var markData = []
+    for(var i = 0;i<data.length;i++){
+        if(markData.length==0){
+            markData.push({
+                machineCode:data[i].codeId,
+                data:[data[i]]
+            })
+        }else{
+            for(var j=0;j<markData.length;j++){
+                if(data[i].codeId==markData[j].machineCode){
+                    markData[j].data.push(data[i]);
+                    break;
+                }else if(j==(markData.length-1)){
+                    markData.push({
+                        machineCode:data[i].codeId,
+                        data:[]
+                    })
+                }
+            }
+        }
+    }
+    return markData;
+   }
+
+   function linkToPage(){
+    window.location="machine2.html"
+   }
+
+   function getDayGroupData(data){
+    var markData = []
+    for(var i = 0;i<data.length;i++){
+        if(markData.length==0){
+            markData.push({
+                day:data[i].startDay,
+                data:[data[i]]
+            })
+        }else{
+            for(var j=0;j<markData.length;j++){
+                if(data[i].startDay==markData[j].day){
+                    markData[j].data.push(data[i]);
+                    break;
+                }else if(j==(markData.length-1)){
+                    markData.push({
+                        day:data[i].startDay,
+                        data:[]
+                    })
+                }
+            }
+        }
+    }
+    return markData;
+   }
+
+    </script>
+</body>
+<style>
+    body{
+        margin: 0;
+        font-size: 12px;
+    }
+    .mainPanl{
+       overflow-y: auto;
+        overflow-x: hidden;
+        height: calc(100vh - 150px) !important;
+        width: 1640px;
+    }
+    .machineTitle{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+        background-color: #fff;
+        float: left;
+    }
+    .machineTitleDom{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        text-align: center;
+        line-height: 63px;
+    }
+    .machineTitleItem{
+        width: 98px;
+        height: 63px;
+        border: 1px solid;
+        border-top: 0;
+        text-align: center;
+        line-height: 63px;
+    }
+    #machinePanl{
+        float: left;
+        font-size: 14px;
+        width: 100px;
+    }
+    .panl_li{
+        width: 1640px;
+        position: absolute;
+        z-index: 99;
+    }
+    .bg_blue{
+        background-color: #ddebf7;
+    }
+    .bg_pink{
+        background-color: #fce4d6;
+    }
+    .title_hour{
+        width: 25px;
+        height: 30px;
+        float: left;
+    }
+    .title_all_items{
+        height: 63px;
+        float: left;
+    }
+    .title_all_dom{
+        height: 65px;
+        width: 100%;
+    }
+    .title_all{
+        text-align: center;
+        float: left;
+        border: 1px solid;
+        border-left: 0;
+        line-height: 30px;
+        width: 602px;
+        height: 63px;
+        font-size: 14px;
+    }
+    .title_day{
+        border-bottom: 1px solid;
+        font-size: 17px;
+        font-weight: bold;
+    }
+    .title_hours{
+        clear: both;
+        width: 600px;
+        height: 30px;
+    }
+    .linePnal{
+        float: left;
+        width: 100%;
+        position: relative;
+    }
+    .lineItem{
+        height: 45px;
+        position: relative;
+    }
+    .bg_item_blue{
+        background-color: #7b859f;
+    }
+    .bg_item_green{
+        background-color: #a5d4c2;
+    }
+    .bg_item_yellow{
+        background-color: #e9d276;
+    }
+    .bg_item_rin{
+        background-color: #89d1d8;
+    }
+    .bg_item_black{
+        background-color: #e6e7ec;
+    }
+    .lineItemBottom,.lineItemTop{
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black; /* 悬停元素上显示点线 */
+        height: 30px;
+        line-height: 30px;
+        border-radius: 20px;
+        white-space: nowrap;
+        cursor: pointer;
+        margin-top: 5px;
+        float: left;
+    }
+    /* Tooltip 文本 */
+    .lineItemBottom .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: -135px;
+        left: 0%;
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+    /* Tooltip 文本 */
+    .lineItemTop .tooltiptext {
+        visibility: hidden;
+        width: 450px;
+        background-color: black;
+        color: #fff;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+        /* 定位 */
+        position: absolute;
+        z-index: 1;
+        bottom: 30px;
+        left: 0%;
+        margin-left: 0px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+        opacity: 0;
+        transition: opacity 1s;
+        font-size: 14px;
+        border: 1px solid;
+    }
+
+    /* Tooltip 文本 */
+    .lineItemLeft .tooltiptext {
+        margin-left: -450px; /* 使用一半宽度 (120/2 = 60) 来居中提示工具 */
+    }
+
+    /* 鼠标移动上去后显示提示框 */
+    .lineItemBottom:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+     /* 鼠标移动上去后显示提示框 */
+     .lineItemTop:hover .tooltiptext {
+        visibility: visible;
+        opacity: 0.8;
+    }
+
+    /*tooltip样式*/
+    .tooltipLab{
+        width: 75px;
+        display: inline-block;
+        text-align: right;
+    }
+    .tooltipVal{
+        width: 120px;
+        display: inline-block;
+        text-align: left;
+    }
+    .itemIndex{
+        width: 20px;
+        height: 20px;
+        margin-top: 2px;
+        margin-left: 5px;
+        display: inline-block;
+        line-height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        color: #fff;
+        background-color: #d15686;
+        margin-right: 5px;
+    }
+    /* *{
+        box-sizing: content-box;
+    } */
+    #gantPanl{
+        width: 1530px;
+        float: left;
+    }
+    .table-striped {
+        overflow-x: scroll;
+        position: relative;
+        overflow-y: auto;
+        height: calc(100vh - 120px) !important;
+    }
+    .dataPanl{
+        padding-top: 65px;
+    }
+    .dataPanl div{
+        box-sizing: content-box;
+    }
+    .panl_li div{
+        box-sizing: content-box;
+    }
+    hr{
+        margin-bottom: 0;
+        margin-top: 0;;
+    }
+    .itemDataDom {
+        position: absolute;
+    }
+</style>
+</html>

@@ -1,0 +1,1616 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxScheduleResultMapper">
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleResult" id="CxScheduleResultResult">
+        <result property="id" column="id"/>
+        <result property="cxBatchNo" column="cx_batch_no"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="taskType" column="task_type"/>
+        <result property="scheduleDate" column="schedule_date"/>
+        <result property="productionStatus" column="production_status"/>
+        <result property="cxMachineCode" column="cx_machine_code"/>
+        <result property="cxMachineName" column="cx_machine_name"/>
+        <result property="lhMachineCode" column="lh_machine_code"/>
+        <result property="lhMachineName" column="lh_machine_name"/>
+        <result property="lhMachineQty" column="lh_machine_qty"/>
+        <result property="minimumLhMachineReqQty" column="minimum_lh_machine_req_qty"/>
+        <result property="minimumLhMachineComQty" column="minimum_lh_machine_com_qty"/>
+        <result property="availableMoldQty" column="available_mold_qty"/>
+        <result property="maximumClassQty" column="maximum_class_qty"/>
+        <result property="workShifts" column="work_shifts"/>
+        <result property="storageLocation" column="storage_location"/>
+        <result property="sapCode" column="sap_code"/>
+        <result property="specDesc" column="spec_desc"/>
+        <result property="embryoCode" column="embryo_code"/>
+        <result property="lhMiddleNightFinishQty" column="lh_middle_night_finish_qty"/>
+        <result property="cxMonthFinishQty" column="cx_month_finish_qty"/>
+        <result property="planModifyQty" column="plan_modify_qty"/>
+        <result property="rejectQty" column="reject_qty"/>
+        <result property="newestPlanQty" column="newest_plan_qty"/>
+        <result property="class3PlannedQty" column="class3_planned_qty"/>
+        <result property="singleShiftLhQty" column="single_shift_lh_qty"/>
+        <result property="totalStock" column="total_stock"/>
+        <result property="extendedStock" column="extended_stock"/>
+        <result property="monthStock" column="month_stock"/>
+        <result property="actualOverProduction" column="actual_over_production"/>
+        <result property="expectedOverProduction" column="expected_over_production"/>
+        <result property="differenceOverProduction" column="difference_over_production"/>
+        <result property="class1AvailableLhShift" column="class1_available_lh_shift"/>
+        <result property="class1PlanQty" column="class1_plan_qty"/>
+        <result property="class1AnalysisInput" column="class1_analysis_input"/>
+        <result property="class1Analysis" column="class1_analysis"/>
+        <result property="class2AvailableLhShift" column="class2_available_lh_shift"/>
+        <result property="class2PlanQty" column="class2_plan_qty"/>
+        <result property="class2AnalysisInput" column="class2_analysis_input"/>
+        <result property="class2Analysis" column="class2_analysis"/>
+        <result property="class3AvailableLhShift" column="class3_available_lh_shift"/>
+        <result property="class3PlanQty" column="class3_plan_qty"/>
+        <result property="class3Analysis" column="class3_analysis"/>
+        <result property="class4AvailableLhShift" column="class4_available_lh_shift"/>
+        <result property="class4PlanQty" column="class4_plan_qty"/>
+        <result property="class4Analysis" column="class4_analysis"/>
+        <result property="class5AvailableLhShift" column="class5_available_lh_shift"/>
+        <result property="class5PlanQty" column="class5_plan_qty"/>
+        <result property="class5Analysis" column="class5_analysis"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="specDimension" column="spec_dimension"/>
+        <result property="isRelease" column="is_release"/>
+        <result property="class3AnalysisInput" column="class3_analysis_input"/>
+        <result property="class4AnalysisInput" column="class4_analysis_input"/>
+        <result property="class5AnalysisInput" column="class5_analysis_input"/>
+        <result property="class1Sort" column="class1_sort"/>
+        <result property="class2Sort" column="class2_sort"/>
+        <result property="class3Sort" column="class3_sort"/>
+        <result property="class4Sort" column="class4_sort"/>
+        <result property="class5Sort" column="class5_sort"/>
+        <result property="lhMachineChangeMoldDesc" column="LH_MACHINE_CHANGE_MOLD_DESC"/>
+        <result property="monthPlanOs" column="monthPlanOs"/>
+        <result property="monthPlan" column="monthPlan"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="bomDataVersion" column="bom_Data_Version"/>
+        <result property="cxMachineType" column="cx_machine_type"/>
+        <result property="specialRequirements" column="special_requirements"/>
+        <result property="midNightDifferenceQty" column="min_night_difference_qty"/>
+        <result property="publishSuccessCount" column="publish_success_count"/>
+        <result property="newestPublishTime" column="newest_publish_time"/>
+        <result property="noseWidth" column="nose_width"/>
+    </resultMap>
+
+    <resultMap id="cxScheduleResultAndSubResultMap" type="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+               extends="CxScheduleResultResult">
+        <collection property="cd15ScheduleList" notNullColumn="cd15_id" javaType="java.util.List"
+                    resultMap="cd15CxScheduleSub"/>
+        <collection property="cd90ScheduleList" notNullColumn="cd90_id" javaType="java.util.List"
+                    resultMap="cd90CxScheduleSub"/>
+        <collection property="gdyyScheduleList" notNullColumn="gdyy_id" javaType="java.util.List"
+                    resultMap="gdyyCxScheduleSub"/>
+        <collection property="gsqScheduleList" notNullColumn="gsq_id" javaType="java.util.List"
+                    resultMap="gsqCxScheduleSub"/>
+        <collection property="ncScheduleList" notNullColumn="nc_id" javaType="java.util.List"
+                    resultMap="ncCxScheduleSub"/>
+        <collection property="tcScheduleList" notNullColumn="tc_id" javaType="java.util.List"
+                    resultMap="tcCxScheduleSub"/>
+        <collection property="tmScheduleList" notNullColumn="tm_id" javaType="java.util.List"
+                    resultMap="tmCxScheduleSub"/>
+        <collection property="tqScheduleList" notNullColumn="tq_id" javaType="java.util.List"
+                    resultMap="tqCxScheduleSub"/>
+        <collection property="xwyyScheduleList" notNullColumn="xwyy_id" javaType="java.util.List"
+                    resultMap="xwyyCxScheduleSub"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="cd15CxScheduleSub">
+        <result property="id" column="cd15_id"/>
+        <result property="machineId" column="cd15_machine_id"/>
+        <result property="cd15SteelStripCode1" column="cd15SteelStripCode1"/>
+        <result property="cd15DayPlanQty1" column="cd15DayPlanQty1"/>
+        <result property="cd15NightPlanQty1" column="cd15NightPlanQty1"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="cd90CxScheduleSub">
+        <result property="id" column="cd90_id"/>
+        <result property="machineId" column="cd90_machine_id"/>
+        <result property="cd90ClothCode" column="cd90ClothCode"/>
+        <result property="cd90DayPlanQty" column="cd90DayPlanQty"/>
+        <result property="cd90NightPlanQty" column="cd90NightPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="gdyyCxScheduleSub">
+        <result property="id" column="gdyy_id"/>
+        <result property="machineId" column="gdyy_machine_id"/>
+        <result property="gdyyBigRollCode" column="gdyyBigRollCode"/>
+        <result property="gdyyClass1Plan" column="gdyyClass1Plan"/>
+        <result property="gdyyClass2Plan" column="gdyyClass2Plan"/>
+        <result property="gdyyClass3Plan" column="gdyyClass3Plan"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="gsqCxScheduleSub">
+        <result property="id" column="gsq_id"/>
+        <result property="machineId" column="gsq_machine_id"/>
+        <result property="gsqSteelRingCode" column="gsqSteelRingCode"/>
+        <result property="gsqMidPlanQty" column="gsqMidPlanQty"/>
+        <result property="gsqNightPlanQty" column="gsqNightPlanQty"/>
+        <result property="gsqDayPlanQty" column="gsqDayPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="ncCxScheduleSub">
+        <result property="id" column="nc_id"/>
+        <result property="machineId" column="nc_machine_id"/>
+        <result property="ncLiningCode" column="ncLiningCode"/>
+        <result property="ncDayPlanQty" column="ncDayPlanQty"/>
+        <result property="ncNightPlanQty" column="ncNightPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="tcCxScheduleSub">
+        <result property="id" column="tc_id"/>
+        <result property="machineId" column="tc_machine_id"/>
+        <result property="tcSidewallCode" column="tcSidewallCode"/>
+        <result property="tcDayPlanQty" column="tcDayPlanQty"/>
+        <result property="tcNightPlanQty" column="tcNightPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="tmCxScheduleSub">
+        <result property="id" column="tm_id"/>
+        <result property="machineId" column="tm_machine_id"/>
+        <result property="tmTreadCode" column="tmTreadCode"/>
+        <result property="tmDayPlanQty" column="tmDayPlanQty"/>
+        <result property="tmNightPlanQty" column="tmNightPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="tqCxScheduleSub">
+        <result property="id" column="tq_id"/>
+        <result property="machineId" column="tq_machine_id"/>
+        <result property="tqBeadCode" column="tqBeadCode"/>
+        <result property="tqMidPlanQty" column="tqMidPlanQty"/>
+        <result property="tqNightPlanQty" column="tqNightPlanQty"/>
+        <result property="tqDayPlanQty" column="tqDayPlanQty"/>
+        <result property="tqNextMidPlanQty" column="tqNextMidPlanQty"/>
+    </resultMap>
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.CxScheduleSub" id="xwyyCxScheduleSub">
+        <result property="id" column="xwyy_id"/>
+        <result property="machineId" column="xwyy_machine_id"/>
+        <result property="xwyyBigRollCode" column="xwyyBigRollCode"/>
+        <result property="xwyyDayPlanQty" column="xwyyDayPlanQty"/>
+        <result property="xwyyNightPlanQty" column="xwyyNightPlanQty"/>
+    </resultMap>
+
+    <sql id="selectCxScheduleResultVo">
+        select id, cx_batch_no, order_no, bom_Data_Version,task_type, schedule_date, production_status, cx_machine_code, cx_machine_name,
+        cx_machine_type,lh_machine_code, lh_machine_name, lh_machine_qty, minimum_lh_machine_req_qty,minimum_lh_machine_com_qty, available_mold_qty,
+        maximum_class_qty, work_shifts, storage_location, sap_code, spec_desc, embryo_code, lh_middle_night_finish_qty,
+        cx_month_finish_qty, plan_modify_qty, reject_qty, newest_plan_qty, class3_planned_qty, single_shift_lh_qty,
+        total_stock, extended_stock, month_stock, actual_over_production, expected_over_production,
+        difference_over_production, class1_available_lh_shift, class1_plan_qty, class1_analysis_input, class1_analysis,
+        class2_available_lh_shift, class2_plan_qty, class2_analysis_input, class2_analysis, class3_available_lh_shift,
+        class3_plan_qty, class3_analysis, class4_available_lh_shift, class4_plan_qty, class4_analysis,
+        class5_available_lh_shift, class5_plan_qty, class5_analysis, create_by, create_time, update_by, update_time,
+        del_flag, remark, mark_close_out_tip, spec_dimension, is_release, class3_analysis_input, class4_analysis_input,
+        class5_analysis_input, class1_sort, class2_sort, class3_sort, class4_sort, class5_sort,LH_MACHINE_CHANGE_MOLD_DESC,special_requirements,
+        data_source, publish_success_count, newest_publish_time from t_cx_schedule_result
+    </sql>
+
+    <sql id="column">
+        a.id, a.cx_batch_no, a.order_no,a.bom_Data_Version, a.task_type, a.schedule_date, a.production_status, a.cx_machine_code,
+        a.cx_machine_name,a.cx_machine_type,a.lh_machine_code, a.lh_machine_name, a.lh_machine_qty, a.minimum_lh_machine_req_qty,
+        a.minimum_lh_machine_com_qty,a.available_mold_qty, a.maximum_class_qty, a.work_shifts, a.storage_location, a.sap_code, a.spec_desc,
+        a.embryo_code, a.lh_middle_night_finish_qty, a.cx_month_finish_qty, a.reject_qty, a.newest_plan_qty,
+        a.class3_planned_qty, a.single_shift_lh_qty, a.total_stock, a.extended_stock, a.month_stock,
+        a.actual_over_production, a.expected_over_production, a.difference_over_production, a.class1_available_lh_shift,
+        a.class1_plan_qty, a.class1_analysis_input, a.class1_analysis, a.class2_available_lh_shift, a.class2_plan_qty,
+        a.class2_analysis_input, a.class2_analysis, a.class3_available_lh_shift, a.class3_plan_qty, a.class3_analysis,
+        a.class4_available_lh_shift, a.class4_plan_qty, a.class4_analysis, a.class5_available_lh_shift,
+        a.class5_plan_qty, a.class5_analysis, a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag,
+        a.remark, a.mark_close_out_tip, a.spec_dimension, a.is_release, a.class3_analysis_input,
+        a.class4_analysis_input, a.class5_analysis_input, a.class1_sort, a.class2_sort, a.class3_sort, a.class4_sort,
+        a.class5_sort,a.LH_MACHINE_CHANGE_MOLD_DESC,a.data_source,a.bom_data_version,a.special_requirements, a.publish_success_count, a.newest_publish_time,
+    </sql>
+
+    <select id="selectCxScheduleResultList" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        select
+        <include refid="column"/>
+        pci.nose_width,
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+        SC.COLOR_TYPE,
+        SC.COLOR_CODE,
+        CS.OVER_TIME_STOCK,
+        MS.OVER_TIME_STOCK AS overTimeMonthStock,
+        pa.PLAN_MODIFY_QTY,
+        NVL(MNF.CLASS1_FINISH_QTY, 0) + NVL(MNF.CLASS1_FINISH_QTY, 0) - NVL(a.CLASS1_PLAN_QTY, 0) - NVL(a.CLASS2_PLAN_QTY, 0) min_night_difference_qty,
+        sr.MONTH_PLAN_APS_VERSION,
+        log.change_cx_machine,
+        log.change_class1_plan,
+        log.change_class2_plan,
+        log.change_class3_plan,
+        log.change_class4_plan,
+        log.change_class5_plan
+        from T_CX_SCHEDULE_RESULT a
+        inner join T_CX_AUTO_SCHEDULE_RECORD sr on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+        LEFT JOIN T_MID_NIGHT_SHIFT_FINISH MNF ON mnf.FINISH_DATE = a.SCHEDULE_DATE AND mnf.CX_MACHINE_CODE = a.CX_MACHINE_CODE AND mnf.EMBRYO_CODE = a.EMBRYO_CODE AND mnf.BOM_DATA_VERSION = a.BOM_DATA_VERSION AND mnf.DEL_FLAG = '0'
+        LEFT JOIN t_product_construction_info pci on a.EMBRYO_CODE = pci.EMBRYO_CODE and a.BOM_DATA_VERSION = pci.EMBRYO_VERSION and pci.DEL_FLAG = '0'
+        LEFT JOIN (
+                    select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+                    from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+                  ) pa on pa.EMBRYO_CODE=a.EMBRYO_CODE and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+        LEFT JOIN (
+                     <include refid="includeSurplusSql"/>
+                    <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+                    union
+                    select casr.cx_batch_no,psl.MATERIAL_CODE,psl.MONTH_PLAN_QTY,psl.MONTH_REMAIN_QTY,1 order_sort
+                    from T_CX_AUTO_SCHEDULE_RECORD casr
+                    join T_PROCEDURE_SURPLUS_LOG psl
+                    on casr.month_plan_aps_version=psl.month_plan_aps_version and psl.procedure_code='1'
+                    <where>
+                        casr.del_flag='0'
+                        and psl.del_flag='0' <!--Joran 2021-12-15 只保留最新版本数据-->
+                        <if test="scheduleDate != null ">
+                            and casr.cx_batch_no=(
+                            select distinct cx_batch_no from
+                            t_cx_schedule_result t
+                            <where>
+                                t.del_flag=
+                                '0'
+                                and t.schedule_date= #{scheduleDate}
+                            </where>
+                            )
+                            and not exists(
+                            <include refid="includeSurplusSql"/>
+                            <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+                            and re.cx_batch_no=casr.cx_batch_no
+                            )
+                        </if>
+                    </where>
+                 ) b ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+        LEFT JOIN T_CX_SPEC_COLOR SC ON SC.SPEC_DESC=a.spec_desc AND SC.del_Flag = '0' AND SC.STATUS='0'
+        LEFT JOIN T_CX_STOCK CS ON CS.STOCK_DATE=a.schedule_date and CS.BOM_DATA_VERSION=a.BOM_DATA_VERSION and CS.EMBRYO_CODE=a.embryo_code and CS.DEL_FLAG='0'
+        LEFT JOIN T_CX_MONTH_STOCK MS ON TO_CHAR(MS.STOCK_MONTH, 'yyyy-MM')=TO_CHAR(ADD_MONTHS(a.schedule_date,-1), 'yyyy-MM') and MS.BOM_DATA_VERSION=a.BOM_DATA_VERSION AND MS.EMBRYO_CODE=a.embryo_code AND MS.DEL_FLAG='0'
+        LEFT JOIN (/*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
+                    SELECT schedule_id,
+                           max(decode(BEFORE_CX_MACHINE_CODE, AFTER_CX_MACHINE_CODE,0,1)) change_cx_machine,
+                           max(decode(BEFORE_CLASS1_PLAN, AFTER_CLASS1_PLAN,0,1)) change_class1_plan,
+                           max(decode(BEFORE_CLASS2_PLAN, AFTER_CLASS2_PLAN,0,1)) change_class2_plan,
+                           max(decode(BEFORE_CLASS3_PLAN, AFTER_CLASS3_PLAN,0,1)) change_class3_plan,
+                           max(decode(BEFORE_CLASS4_PLAN, AFTER_CLASS4_PLAN,0,1)) change_class4_plan,
+                           max(decode(BEFORE_CLASS5_PLAN, AFTER_CLASS5_PLAN,0,1)) change_class5_plan
+                    FROM T_CX_DISPATCHER_LOG
+                    where schedule_date = #{scheduleDate}
+                    group by schedule_id
+                ) log ON a.id = log.schedule_id
+        where a.del_flag='0'
+        <if test="toProduct != null  and toProduct != ''">and a.to_product = #{toProduct}</if>
+        <if test="taskType != null  and taskType != ''">and a.task_type = #{taskType}</if>
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}
+        </if>
+        <if test="startTime != null and startTime !=''">
+            and a.schedule_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !=''">
+            and a.schedule_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-MM-dd')
+        </if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and a.cx_machine_code = #{cxMachineCode}</if>
+        <if test="lhMachineCode != null  and lhMachineCode != ''">and instr(','||a.lh_machine_code||',',
+            ','||#{lhMachineCode}||',')>0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.is_release = #{isRelease}</if>
+        <if test="bomDataVersion != null  and bomDataVersion != ''">and a.bom_Data_Version = #{bomDataVersion}</if>
+        <if test="cxMachineType != null  and cxMachineType != ''">and a.cx_machine_type = #{cxMachineType}</if>
+        <if test="hasVersion ==1">and a.bom_Data_Version is null</if>
+        <if test="hasVersion ==0">and a.bom_Data_Version is not null</if>
+        <if test="ids != null and ids.length > 0">and a.id in <foreach item="scheduleId" collection="ids" open="(" separator="," close=")">#{scheduleId}</foreach></if>
+        order by a.spec_dimension asc
+    </select>
+
+    <select id="finishedList" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select
+        <include refid="column"/>
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+        SC.COLOR_TYPE,
+        SC.COLOR_CODE,
+        CS.OVER_TIME_STOCK,
+        MS.OVER_TIME_STOCK AS overTimeMonthStock,
+        pa.PLAN_MODIFY_QTY,
+        sr.MONTH_PLAN_APS_VERSION
+        from T_CX_SCHEDULE_RESULT a inner join T_CX_AUTO_SCHEDULE_RECORD sr
+        on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+
+        LEFT JOIN (
+        select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        ) pa
+        on pa.EMBRYO_CODE=a.EMBRYO_CODE
+        and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION
+        and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+
+        LEFT JOIN (
+        <include refid="includeSurplusSql"/>
+        ) b
+        ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq
+        ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+
+        LEFT JOIN T_CX_SPEC_COLOR SC
+        ON SC.SPEC_DESC=a.spec_desc AND SC.del_Flag = '0' AND SC.STATUS='0'
+
+        LEFT JOIN T_CX_STOCK CS
+        ON CS.STOCK_DATE=a.schedule_date
+        and CS.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+        and CS.EMBRYO_CODE=a.embryo_code and CS.DEL_FLAG='0'
+
+        LEFT JOIN T_CX_MONTH_STOCK MS
+        ON TO_CHAR(MS.STOCK_MONTH, 'yyyy-MM')=TO_CHAR(ADD_MONTHS(a.schedule_date,-1), 'yyyy-MM')
+        and MS.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+        AND MS.EMBRYO_CODE=a.embryo_code AND MS.DEL_FLAG='0'
+
+        where a.del_flag='0'
+        <if test="taskType != null  and taskType != ''">and a.task_type = #{taskType}</if>
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}
+        </if>
+        <if test="startTime != null and startTime !=''">
+            and a.schedule_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !=''">
+            and a.schedule_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-MM-dd')
+        </if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and a.cx_machine_code = #{cxMachineCode}</if>
+        <if test="lhMachineCode != null  and lhMachineCode != ''">and instr(','||a.lh_machine_code||',',
+            ','||#{lhMachineCode}||',')>0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.is_release = #{isRelease}</if>
+        <if test="bomDataVersion != null  and bomDataVersion != ''">and a.bom_Data_Version = #{bomDataVersion}</if>
+        <if test="cxMachineType != null  and cxMachineType != ''">and a.cx_machine_type = #{cxMachineType}</if>
+        <if test="hasVersion ==1">and a.bom_Data_Version is null</if>
+        <if test="hasVersion ==0">and a.bom_Data_Version is not null</if>
+        order by a.spec_dimension asc
+    </select>
+
+    <select id="selectCxScheduleResultListForExport" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select
+        a.id, a.cx_batch_no,a.bom_Data_Version,a.order_no, a.schedule_date, a.cx_machine_code, a.cx_machine_name,
+        a.cx_machine_type,a.lh_machine_code, a.lh_machine_name, a.lh_machine_qty, a.minimum_lh_machine_req_qty,
+        a.available_mold_qty,a.minimum_lh_machine_com_qty,
+        a.maximum_class_qty, a.work_shifts, a.sap_code, a.spec_desc, a.embryo_code, a.lh_middle_night_finish_qty,
+        a.cx_month_finish_qty, a.reject_qty, a.newest_plan_qty, a.class3_planned_qty, a.single_shift_lh_qty,
+        a.total_stock, a.extended_stock, a.month_stock, a.actual_over_production, a.expected_over_production,
+        a.difference_over_production, a.class1_available_lh_shift, a.class1_plan_qty, a.class1_analysis_input,
+        a.class1_analysis, a.class2_available_lh_shift, a.class2_plan_qty, a.class2_analysis_input, a.class2_analysis,
+        a.class3_available_lh_shift, a.class3_plan_qty, a.class3_analysis, a.class4_available_lh_shift,
+        a.class4_plan_qty, a.class4_analysis, a.class5_available_lh_shift, a.class5_plan_qty, a.class5_analysis,
+        a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag, a.remark, a.mark_close_out_tip,
+        a.spec_dimension, a.is_release, a.class3_analysis_input, a.class4_analysis_input, a.class5_analysis_input,
+        a.class1_sort, a.class2_sort, a.class3_sort, a.class4_sort,
+        a.class5_sort,a.LH_MACHINE_CHANGE_MOLD_DESC,a.data_source,a.special_requirements,
+        dd.DICT_LABEL as task_type,
+        dd2.DICT_LABEL as storage_location,
+        dd3.DICT_LABEL as production_status,
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+        pa.PLAN_MODIFY_QTY,
+        NVL(MNF.CLASS1_FINISH_QTY, 0) + NVL(MNF.CLASS1_FINISH_QTY, 0)
+          - NVL(a.CLASS1_PLAN_QTY, 0) - NVL(a.CLASS2_PLAN_QTY, 0) min_night_difference_qty,
+        sr.MONTH_PLAN_APS_VERSION
+
+        from T_CX_SCHEDULE_RESULT a inner join T_CX_AUTO_SCHEDULE_RECORD sr
+        on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+        
+        LEFT JOIN T_MID_NIGHT_SHIFT_FINISH MNF
+          ON mnf.FINISH_DATE = a.SCHEDULE_DATE
+         AND mnf.CX_MACHINE_CODE = a.CX_MACHINE_CODE
+         AND mnf.EMBRYO_CODE = a.EMBRYO_CODE
+         AND mnf.BOM_DATA_VERSION = a.BOM_DATA_VERSION
+         AND mnf.DEL_FLAG = '0'
+
+        LEFT JOIN (
+        select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        ) pa
+        on pa.EMBRYO_CODE=a.EMBRYO_CODE
+        and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION
+        and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+
+        LEFT JOIN (
+        <include refid="includeSurplusSql"/>
+        <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+        union
+        select casr.cx_batch_no,psl.MATERIAL_CODE,psl.MONTH_PLAN_QTY,psl.MONTH_REMAIN_QTY,1 order_sort
+        from T_CX_AUTO_SCHEDULE_RECORD casr
+        join T_PROCEDURE_SURPLUS_LOG psl
+        on casr.month_plan_aps_version=psl.month_plan_aps_version and psl.procedure_code='1'
+        <where>
+            casr.del_flag='0'
+            and psl.del_flag='0' <!--Joran 2021-12-15 只保留最新版本数据-->
+            <if test="scheduleDate != null ">
+                and casr.cx_batch_no=(
+                select distinct cx_batch_no from
+                t_cx_schedule_result t
+                <where>
+                    t.del_flag=
+                    '0'
+                    and t.schedule_date= #{scheduleDate}
+                </where>
+                )
+                and not exists(
+                <include refid="includeSurplusSql"/>
+                <if test="scheduleDate != null ">and re.schedule_date = #{scheduleDate}</if>
+                and re.cx_batch_no=casr.cx_batch_no
+                )
+            </if>
+        </where>
+        ) b
+        ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+
+        LEFT JOIN (SELECT DICT_VALUE,DICT_LABEL FROM SYS_DICT_DATA where dict_type='TASK_TYPE' and locale=#{local} ) dd
+        on dd.DICT_VALUE=a.task_type
+
+        LEFT JOIN (SELECT DICT_VALUE,DICT_LABEL FROM SYS_DICT_DATA where dict_type='STORAGE_LOCATION' and
+        locale=#{local} ) dd2
+        on dd2.DICT_VALUE=a.storage_location
+
+        LEFT JOIN (SELECT DICT_VALUE,DICT_LABEL FROM SYS_DICT_DATA where dict_type='PRODUCTION_STATUS' and
+        locale=#{local} ) dd3
+        on dd3.DICT_VALUE=a.production_status
+
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq
+        ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+
+        where a.del_flag='0'
+        <if test="taskType != null  and taskType != ''">and a.task_type = #{taskType}</if>
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}
+        </if>
+        <if test="startTime != null and startTime !=''">
+            and a.schedule_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !=''">
+            and a.schedule_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-MM-dd')
+        </if>
+        <if test="bomDataVersion != null  and bomDataVersion != ''">and a.bom_Data_Version = #{bomDataVersion}</if>
+        <if test="cxMachineType != null  and cxMachineType != ''">and a.cx_machine_type = #{cxMachineType}</if>
+        <if test="hasVersion ==1">and a.bom_Data_Version is null</if>
+        <if test="hasVersion ==0">and a.bom_Data_Version is not null</if>
+        order by a.spec_dimension asc
+    </select>
+
+    <select id="producingIssue" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select
+        a.CX_MACHINE_CODE,
+        max(a.CX_MACHINE_NAME) CX_MACHINE_NAME,
+        a.sap_code,
+        a.embryo_code
+        from t_cx_schedule_result a
+        where a.del_flag='0'
+        and a.PRODUCTION_STATUS in('0','1')
+        <if test="taskType != null  and taskType != ''">and a.task_type = #{taskType}</if>
+        <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate}</if>
+        <if test="embryoCode != null  and embryoCode != ''">AND instr(a.embryo_code,#{embryoCode}) > 0</if>
+        <if test="sapCode != null  and sapCode != ''">AND instr(a.SAP_CODE,#{sapCode}) > 0</if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and a.cx_machine_code = #{cxMachineCode}</if>
+
+        GROUP BY a.cx_machine_code,a.sap_code,a.embryo_code
+    </select>
+
+    <select id="selectCxScheduleResultById" parameterType="Long" resultMap="CxScheduleResultResult">
+        select
+        <include refid="column"/>
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+        pa.PLAN_MODIFY_QTY,
+        sr.MONTH_PLAN_APS_VERSION
+
+        from T_CX_SCHEDULE_RESULT a inner join T_CX_AUTO_SCHEDULE_RECORD sr
+        on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+
+        LEFT JOIN (
+        select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        ) pa
+        on pa.EMBRYO_CODE=a.EMBRYO_CODE
+        and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION
+        and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+
+
+        LEFT JOIN (
+        SELECT re.CX_BATCH_NO,ps.MATERIAL_CODE,ps.MONTH_PLAN_QTY,ps.MONTH_REMAIN_QTY
+        FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS ps,T_CX_AUTO_SCHEDULE_RECORD re WHERE
+        ps.MONTH_PLAN_APS_VERSION=re.MONTH_PLAN_APS_VERSION and ps.del_flag='0' and re.del_flag='0' AND re.STATUS='0'
+        ) b
+        ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq
+        ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+
+        where a.id = #{id}
+    </select>
+
+    <select id="selectCxScheduleResultByIdForQty" parameterType="Long" resultMap="cxScheduleResultAndSubResultMap">
+
+        select
+        <include refid="column"/>
+
+        b.MONTH_PLAN_QTY as monthPlan,
+        b.MONTH_REMAIN_QTY as monthPlanOs,
+
+        fq.CLASS1_FINISH_QTY as class1FinishQty,
+        fq.CLASS2_FINISH_QTY as class2FinishQty,
+        fq.CLASS3_FINISH_QTY as class3FinishQty,
+        fq.CLASS4_FINISH_QTY as class4FinishQty,
+        fq.CLASS5_FINISH_QTY as class5FinishQty,
+
+        cd15.cd15_id,
+        cd15.cd15_machine_id,
+        cd15.cd15SteelStripCode1,
+        cd15.cd15DayPlanQty1,
+        cd15.cd15NightPlanQty1,
+
+        cd90.cd90_id,
+        cd90.cd90_machine_id,
+        cd90.cd90ClothCode,
+        cd90.cd90DayPlanQty,
+        cd90.cd90NightPlanQty,
+
+        gdyy.gdyy_id,
+        gdyy.gdyyBigRollCode,
+        gdyy.gdyyClass1Plan,
+        gdyy.gdyyClass2Plan,
+        gdyy.gdyyClass3Plan,
+
+        gsq.gsq_id,
+        gsq.gsq_machine_id,
+        gsq.gsqSteelRingCode,
+        gsq.gsqMidPlanQty,
+        gsq.gsqNightPlanQty,
+        gsq.gsqDayPlanQty,
+
+        nc.nc_id,
+        nc.nc_machine_id,
+        nc.ncLiningCode,
+        nc.ncDayPlanQty,
+        nc.ncNightPlanQty,
+
+        tc.tc_id,
+        tc.tc_machine_id,
+        tc.tcSidewallCode,
+        tc.tcDayPlanQty,
+        tc.tcNightPlanQty,
+
+        tm.tm_id,
+        tm.tm_machine_id,
+        tm.tmTreadCode,
+        tm.tmDayPlanQty,
+        tm.tmNightPlanQty,
+
+        tq.tq_id,
+        tq.tq_machine_id,
+        tq.tqBeadCode,
+        tq.tqMidPlanQty,
+        tq.tqNightPlanQty,
+        tq.tqDayPlanQty,
+        tq.tqNextMidPlanQty,
+
+        xwyy.xwyy_id,
+        xwyy.xwyy_machine_id,
+        xwyy.xwyyBigRollCode,
+        xwyy.xwyyDayPlanQty,
+        xwyy.xwyyNightPlanQty,
+
+        pa.PLAN_MODIFY_QTY,
+        sr.MONTH_PLAN_APS_VERSION
+
+        from T_CX_SCHEDULE_RESULT a inner join T_CX_AUTO_SCHEDULE_RECORD sr
+        on a.CX_BATCH_NO= sr.CX_BATCH_NO and sr.DEL_FLAG='0' and sr.STATUS='0'
+
+        LEFT JOIN (
+        select sum(PLAN_MODIFY_QTY) as PLAN_MODIFY_QTY,MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        from T_CX_MONTH_PLAN_ADJUST where DEL_FLAG='0' GROUP BY MONTH_PLAN_APS_VERSION,EMBRYO_CODE,BOM_DATA_VERSION
+        ) pa
+        on pa.EMBRYO_CODE=a.EMBRYO_CODE
+        and pa.MONTH_PLAN_APS_VERSION=sr.MONTH_PLAN_APS_VERSION
+        and pa.BOM_DATA_VERSION=a.BOM_DATA_VERSION
+
+
+        LEFT JOIN (
+        SELECT re.CX_BATCH_NO,ps.MATERIAL_CODE,ps.MONTH_PLAN_QTY,ps.MONTH_REMAIN_QTY
+        FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS ps,T_CX_AUTO_SCHEDULE_RECORD re WHERE
+        ps.MONTH_PLAN_APS_VERSION=re.MONTH_PLAN_APS_VERSION and ps.del_flag='0' and re.del_flag='0' AND re.STATUS='0'
+        ) b
+        ON a.CX_BATCH_NO=b.CX_BATCH_NO and a.EMBRYO_CODE=b.MATERIAL_CODE
+
+        LEFT JOIN T_CX_CLASS_SHIFT_FINISH_QTY fq
+        ON fq.ORDER_NO=a.ORDER_NO and fq.del_flag='0'
+
+        left join (
+        select sr.id as cd15_id, sr.schedule_date, sr.machine_id as cd15_machine_id,
+        sr.STEEL_STRIP_CODE1 as cd15SteelStripCode1,sr.DAY_PLAN_QTY1 as cd15DayPlanQty1,
+        sr.NIGHT_PLAN_QTY1 as cd15NightPlanQty1,ci.EMBRYO_CODE,ci.EMBRYO_version
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_CD15_SCHEDULE_RESULT sr
+        where ci.BELT_CODE1=sr.STEEL_STRIP_CODE1
+        ) cd15 on cd15.EMBRYO_CODE=a.embryo_code and cd15.schedule_date=a.schedule_date
+        and a.bom_data_version=cd15.EMBRYO_version
+
+        left join (
+        select sr.id as cd90_id, sr.machine_id as cd90_machine_id, sr.schedule_date, sr.CLOTH_CODE as cd90ClothCode,
+        sr.DAY_PLAN_QTY as cd90DayPlanQty, sr.NIGHT_PLAN_QTY as cd90NightPlanQty, ci.EMBRYO_CODE,ci.EMBRYO_version
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_CD90_SCHEDULE_RESULT sr
+        where ci.TIRE_FABRIC_CODE1=sr.CLOTH_CODE or ci.TIRE_FABRIC_CODE2=sr.CLOTH_CODE or
+        ci.TIRE_FABRIC_CODE3=sr.CLOTH_CODE
+        ) cd90 on cd90.EMBRYO_CODE=a.embryo_code and cd90.schedule_date=a.schedule_date
+        and a.bom_data_version=cd90.EMBRYO_version
+
+        left join (
+        select sr.id as gdyy_id, ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.BIG_ROLL_CODE as
+        gdyyBigRollCode,sr.CLASS1_PLAN as gdyyClass1Plan,sr.CLASS2_PLAN as gdyyClass2Plan,sr.CLASS3_PLAN as
+        gdyyClass3Plan
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_GDYY_SCHEDULE_RESULT sr
+        where ci.ARTICLE_CROWN_SPEC=sr.BIG_ROLL_CODE
+        ) gdyy on gdyy.EMBRYO_CODE=a.embryo_code and gdyy.schedule_date=a.schedule_date
+        and a.bom_data_version=gdyy.EMBRYO_version
+
+        left join (
+        select sr.id as gsq_id, sr.machine_id as gsq_machine_id,
+        ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.STEEL_RING_CODE as gsqSteelRingCode,sr.MID_PLAN_QTY as
+        gsqMidPlanQty,sr.NIGHT_PLAN_QTY as gsqNightPlanQty,sr.DAY_PLAN_QTY as gsqDayPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_GSQ_SCHEDULE_RESULT sr
+        where ci.BEAD_CODE=sr.STEEL_RING_CODE
+        ) gsq on gsq.EMBRYO_CODE=a.embryo_code and gsq.schedule_date=a.schedule_date
+        and a.bom_data_version=gsq.EMBRYO_version
+
+        left join (
+        select sr.id as nc_id, sr.machine_id as
+        nc_machine_id,ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.LINING_CODE as ncLiningCode,sr.DAY_PLAN_QTY
+        as ncDayPlanQty,sr.NIGHT_PLAN_QTY as ncNightPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_NC_SCHEDULE_RESULT sr
+        where ci.INSIDE_CODE=sr.LINING_CODE
+        ) nc on nc.EMBRYO_CODE=a.embryo_code and nc.schedule_date=a.schedule_date
+        and a.bom_data_version=nc.EMBRYO_version
+
+        left join (
+        select sr.id as tc_id, sr.machine_id as
+        tc_machine_id,ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.SIDEWALL_CODE as
+        tcSidewallCode,sr.DAY_PLAN_QTY as tcDayPlanQty,sr.NIGHT_PLAN_QTY as tcNightPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_TC_SCHEDULE_RESULT sr
+        where ci.SIDEWALL_CODE=sr.SIDEWALL_CODE
+        ) tc on tc.EMBRYO_CODE=a.embryo_code and tc.schedule_date=a.schedule_date
+        and a.bom_data_version=tc.EMBRYO_version
+
+        left join (
+        select sr.id as tm_id, sr.machine_id as
+        tm_machine_id,ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.TREAD_CODE as tmTreadCode,sr.DAY_PLAN_QTY as
+        tmDayPlanQty,sr.NIGHT_PLAN_QTY as tmNightPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_TM_SCHEDULE_RESULT sr
+        where ci.TREAD_CODE=sr.TREAD_CODE
+        ) tm on tm.EMBRYO_CODE=a.embryo_code and tm.schedule_date=a.schedule_date
+        and a.bom_data_version=tm.EMBRYO_version
+
+        left join (
+        select sr.id as tq_id, sr.machine_id as
+        tq_machine_id,ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.BEAD_CODE as tqBeadCode,
+        sr.MID_PLAN_QTY as tqMidPlanQty,sr.NIGHT_PLAN_QTY as tqNightPlanQty,sr.DAY_PLAN_QTY as
+        tqDayPlanQty,sr.next_mid_plan_qty as tqNextMidPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_TQ_SCHEDULE_RESULT sr
+        where ci.TIRE_RING_CODE=sr.BEAD_CODE
+        ) tq on tq.EMBRYO_CODE=a.embryo_code and tq.schedule_date=a.schedule_date
+        and a.bom_data_version=tq.EMBRYO_version
+
+        left join (
+        select sr.id as xwyy_id, sr.machine_id as
+        xwyy_machine_id,ci.EMBRYO_CODE,ci.EMBRYO_version,sr.schedule_date,sr.BIG_ROLL_CODE as
+        xwyyBigRollCode,sr.DAY_PLAN_QTY as xwyyDayPlanQty,sr.NIGHT_PLAN_QTY as xwyyNightPlanQty
+        from T_PRODUCT_CONSTRUCTION_INFO ci,T_XWYY_SCHEDULE_RESULT sr
+        where ci.CORD_SPEC=sr.BIG_ROLL_CODE
+        ) xwyy on xwyy.EMBRYO_CODE=a.embryo_code and xwyy.schedule_date=a.schedule_date
+        and a.bom_data_version=xwyy.EMBRYO_version
+
+        where a.id = #{id}
+    </select>
+
+    <update id="updateGsqScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_GSQ_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (mid_plan_qty is not null and mid_plan_qty !=#{gsqMidPlanQty,jdbcType=DECIMAL}) or (mid_plan_qty is null
+            and #{gsqMidPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{gsqNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{gsqNightPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (day_plan_qty is not null and day_plan_qty !=#{gsqDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{gsqDayPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            mid_plan_qty = #{gsqMidPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{gsqNightPlanQty,jdbcType=DECIMAL},
+            day_plan_qty = #{gsqDayPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateXwyyScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_XWYY_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty is not null and day_plan_qty != #{xwyyDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{xwyyDayPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{xwyyNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{xwyyNightPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty = #{xwyyDayPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{xwyyNightPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateGdyyScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_GDYY_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (class1_plan is not null and class1_plan != #{gdyyClass1Plan,jdbcType=DECIMAL}) or (class1_plan is null
+            and #{gdyyClass1Plan,jdbcType=DECIMAL}!=0) )or
+            ( (class2_plan is not null and class2_plan != #{gdyyClass2Plan,jdbcType=DECIMAL}) or (class2_plan is null
+            and #{gdyyClass2Plan,jdbcType=DECIMAL}!=0) )or
+            ( (class3_plan is not null and class3_plan != #{gdyyClass3Plan,jdbcType=DECIMAL}) or (class3_plan is null
+            and #{gdyyClass3Plan,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            class1_plan = #{gdyyClass1Plan,jdbcType=DECIMAL},
+            class2_plan = #{gdyyClass2Plan,jdbcType=DECIMAL},
+            class3_plan = #{gdyyClass3Plan,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateCd90cheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_CD90_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty is not null and day_plan_qty != #{cd90DayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{cd90DayPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{cd90NightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{cd90NightPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty = #{cd90DayPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{cd90NightPlanQty,jdbcType=DECIMAL},
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateCd15ScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_CD15_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty1 is not null and day_plan_qty1 != #{cd15DayPlanQty1,jdbcType=DECIMAL}) or (day_plan_qty1 is
+            null and #{cd15DayPlanQty1,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty1 is not null and night_plan_qty1 != #{cd15NightPlanQty1,jdbcType=DECIMAL}) or
+            (night_plan_qty1 is null and #{cd15NightPlanQty1,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty1 = #{cd15DayPlanQty1,jdbcType=DECIMAL},
+            night_plan_qty1 = #{cd15NightPlanQty1,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateNcScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_NC_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty is not null and day_plan_qty != #{ncDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{ncDayPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{ncNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{ncNightPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty = #{ncDayPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{ncNightPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateTmScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_TM_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty is not null and day_plan_qty != #{tmDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{tmDayPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{tmNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{tmNightPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty = #{tmDayPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{tmNightPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateTcScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_TC_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (day_plan_qty is not null and day_plan_qty != #{tcDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{tcDayPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{tcNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{tcNightPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            day_plan_qty = #{tcDayPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{tcNightPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateTqScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleSub">
+        update T_TQ_SCHEDULE_RESULT
+        <trim prefix="SET" suffixOverrides=",">
+            IS_RELEASE=case when (
+            ( (mid_plan_qty is not null and mid_plan_qty !=#{tqMidPlanQty,jdbcType=DECIMAL}) or (mid_plan_qty is null
+            and #{tqMidPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (night_plan_qty is not null and night_plan_qty != #{tqNightPlanQty,jdbcType=DECIMAL}) or (night_plan_qty
+            is null and #{tqNightPlanQty,jdbcType=DECIMAL}!=0) )or
+            ( (day_plan_qty is not null and day_plan_qty !=#{tqDayPlanQty,jdbcType=DECIMAL}) or (day_plan_qty is null
+            and #{tqDayPlanQty,jdbcType=DECIMAL}!=0) ) or
+            ( (next_mid_plan_qty is not null and next_mid_plan_qty !=#{tqNextMidPlanQty,jdbcType=DECIMAL}) or
+            (next_mid_plan_qty is null and #{tqNextMidPlanQty,jdbcType=DECIMAL}!=0) )
+            ) then '0'
+            else IS_RELEASE end,
+            mid_plan_qty = #{tqMidPlanQty,jdbcType=DECIMAL},
+            night_plan_qty = #{tqNightPlanQty,jdbcType=DECIMAL},
+            day_plan_qty = #{tqDayPlanQty,jdbcType=DECIMAL},
+            next_mid_plan_qty = #{tqNextMidPlanQty,jdbcType=DECIMAL}
+        </trim>
+        where id = #{id,jdbcType=DECIMAL}
+    </update>
+
+
+    <select id="getLhList" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select
+        id,
+        schedule_date
+        from t_lh_schedule_result
+        where del_flag='0'
+        <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
+    </select>
+
+    <select id="getListByLhMachineCode" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select * from t_cx_schedule_result
+        where del_flag='0'
+        and id !=#{id}
+        and schedule_date = #{scheduleDate}
+        and PRODUCTION_STATUS !='2'
+        and task_type !='5'
+        and ( lh_machine_code like concat(concat('%,', #{lhMachineCode}), ',%')
+        or lh_machine_code like concat(#{lhMachineCode}, ',%')
+        or lh_machine_code like concat('%,', #{lhMachineCode})
+        or lh_machine_code =#{lhMachineCode}
+        )
+        <if test="sapCode != null  and sapCode != ''">and SAP_CODE = #{sapCode}</if>
+    </select>
+
+    <insert id="insertCxScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_cx_SCHEDULE.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_cx_schedule_result
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="cxBatchNo != null">cx_batch_no,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="taskType != null">task_type,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="productionStatus != null">production_status,</if>
+            <if test="cxMachineCode != null">cx_machine_code,</if>
+            <if test="cxMachineName != null">cx_machine_name,</if>
+            <if test="lhMachineCode != null">lh_machine_code,</if>
+            <if test="lhMachineName != null">lh_machine_name,</if>
+            <if test="lhMachineQty != null">lh_machine_qty,</if>
+            <if test="minimumLhMachineReqQty != null">minimum_lh_machine_req_qty,</if>
+            <if test="minimumLhMachineComQty != null">minimum_lh_machine_com_qty,</if>
+            <if test="availableMoldQty != null">available_mold_qty,</if>
+            <if test="maximumClassQty != null">maximum_class_qty,</if>
+            <if test="workShifts != null">work_shifts,</if>
+            <if test="storageLocation != null">storage_location,</if>
+            <if test="sapCode != null">sap_code,</if>
+            <if test="specDesc != null">spec_desc,</if>
+            <if test="embryoCode != null">embryo_code,</if>
+            <if test="lhMiddleNightFinishQty != null">lh_middle_night_finish_qty,</if>
+            <if test="cxMonthFinishQty != null">cx_month_finish_qty,</if>
+            <if test="planModifyQty != null">plan_modify_qty,</if>
+            <if test="rejectQty != null">reject_qty,</if>
+            <if test="newestPlanQty != null">newest_plan_qty,</if>
+            <if test="class3PlannedQty != null">class3_planned_qty,</if>
+            <if test="singleShiftLhQty != null">single_shift_lh_qty,</if>
+            <if test="totalStock != null">total_stock,</if>
+            <if test="extendedStock != null">extended_stock,</if>
+            <if test="monthStock != null">month_stock,</if>
+            <if test="actualOverProduction != null">actual_over_production,</if>
+            <if test="expectedOverProduction != null">expected_over_production,</if>
+            <if test="differenceOverProduction != null">difference_over_production,</if>
+            <if test="class1AvailableLhShift != null">class1_available_lh_shift,</if>
+            <if test="class1PlanQty != null">class1_plan_qty,</if>
+            <if test="class1AnalysisInput != null">class1_analysis_input,</if>
+            <if test="class1Analysis != null">class1_analysis,</if>
+            <if test="class2AvailableLhShift != null">class2_available_lh_shift,</if>
+            <if test="class2PlanQty != null">class2_plan_qty,</if>
+            <if test="class2AnalysisInput != null">class2_analysis_input,</if>
+            <if test="class2Analysis != null">class2_analysis,</if>
+            <if test="class3AvailableLhShift != null">class3_available_lh_shift,</if>
+            <if test="class3PlanQty != null">class3_plan_qty,</if>
+            <if test="class3Analysis != null">class3_analysis,</if>
+            <if test="class4AvailableLhShift != null">class4_available_lh_shift,</if>
+            <if test="class4PlanQty != null">class4_plan_qty,</if>
+            <if test="class4Analysis != null">class4_analysis,</if>
+            <if test="class5AvailableLhShift != null">class5_available_lh_shift,</if>
+            <if test="class5PlanQty != null">class5_plan_qty,</if>
+            <if test="class5Analysis != null">class5_analysis,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="markCloseOutTip != null">mark_close_out_tip,</if>
+            <if test="specDimension != null">spec_dimension,</if>
+            <if test="isRelease != null">is_release,</if>
+            <if test="class3AnalysisInput != null">class3_analysis_input,</if>
+            <if test="class4AnalysisInput != null">class4_analysis_input,</if>
+            <if test="class5AnalysisInput != null">class5_analysis_input,</if>
+            <if test="class1Sort != null">class1_sort,</if>
+            <if test="class2Sort != null">class2_sort,</if>
+            <if test="class3Sort != null">class3_sort,</if>
+            <if test="class4Sort != null">class4_sort,</if>
+            <if test="class5Sort != null">class5_sort,</if>
+            <if test="lhMachineChangeMoldDesc != null">LH_MACHINE_CHANGE_MOLD_DESC,</if>
+            <if test="dataSource != null">data_source,</if>
+            <if test="bomDataVersion != null">bom_Data_Version,</if>
+            <if test="cxMachineType != null">cx_machine_type,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="cxBatchNo != null">#{cxBatchNo},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="taskType != null">#{taskType},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="productionStatus != null">#{productionStatus},</if>
+            <if test="cxMachineCode != null">#{cxMachineCode},</if>
+            <if test="cxMachineName != null">#{cxMachineName},</if>
+            <if test="lhMachineCode != null">#{lhMachineCode},</if>
+            <if test="lhMachineName != null">#{lhMachineName},</if>
+            <if test="lhMachineQty != null">#{lhMachineQty},</if>
+            <if test="minimumLhMachineReqQty != null">#{minimumLhMachineReqQty},</if>
+            <if test="minimumLhMachineComQty != null">#{minimumLhMachineComQty},</if>
+            <if test="availableMoldQty != null">#{availableMoldQty},</if>
+            <if test="maximumClassQty != null">#{maximumClassQty},</if>
+            <if test="workShifts != null">#{workShifts},</if>
+            <if test="storageLocation != null">#{storageLocation},</if>
+            <if test="sapCode != null">#{sapCode},</if>
+            <if test="specDesc != null">#{specDesc},</if>
+            <if test="embryoCode != null">#{embryoCode},</if>
+            <if test="lhMiddleNightFinishQty != null">#{lhMiddleNightFinishQty},</if>
+            <if test="cxMonthFinishQty != null">#{cxMonthFinishQty},</if>
+            <if test="planModifyQty != null">#{planModifyQty},</if>
+            <if test="rejectQty != null">#{rejectQty},</if>
+            <if test="newestPlanQty != null">#{newestPlanQty},</if>
+            <if test="class3PlannedQty != null">#{class3PlannedQty},</if>
+            <if test="singleShiftLhQty != null">#{singleShiftLhQty},</if>
+            <if test="totalStock != null">#{totalStock},</if>
+            <if test="extendedStock != null">#{extendedStock},</if>
+            <if test="monthStock != null">#{monthStock},</if>
+            <if test="actualOverProduction != null">#{actualOverProduction},</if>
+            <if test="expectedOverProduction != null">#{expectedOverProduction},</if>
+            <if test="differenceOverProduction != null">#{differenceOverProduction},</if>
+            <if test="class1AvailableLhShift != null">#{class1AvailableLhShift},</if>
+            <if test="class1PlanQty != null">#{class1PlanQty},</if>
+            <if test="class1AnalysisInput != null">#{class1AnalysisInput},</if>
+            <if test="class1Analysis != null">#{class1Analysis},</if>
+            <if test="class2AvailableLhShift != null">#{class2AvailableLhShift},</if>
+            <if test="class2PlanQty != null">#{class2PlanQty},</if>
+            <if test="class2AnalysisInput != null">#{class2AnalysisInput},</if>
+            <if test="class2Analysis != null">#{class2Analysis},</if>
+            <if test="class3AvailableLhShift != null">#{class3AvailableLhShift},</if>
+            <if test="class3PlanQty != null">#{class3PlanQty},</if>
+            <if test="class3Analysis != null">#{class3Analysis},</if>
+            <if test="class4AvailableLhShift != null">#{class4AvailableLhShift},</if>
+            <if test="class4PlanQty != null">#{class4PlanQty},</if>
+            <if test="class4Analysis != null">#{class4Analysis},</if>
+            <if test="class5AvailableLhShift != null">#{class5AvailableLhShift},</if>
+            <if test="class5PlanQty != null">#{class5PlanQty},</if>
+            <if test="class5Analysis != null">#{class5Analysis},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="markCloseOutTip != null">#{markCloseOutTip},</if>
+            <if test="specDimension != null">#{specDimension},</if>
+            <if test="isRelease != null">#{isRelease},</if>
+            <if test="class3AnalysisInput != null">#{class3AnalysisInput},</if>
+            <if test="class4AnalysisInput != null">#{class4AnalysisInput},</if>
+            <if test="class5AnalysisInput != null">#{class5AnalysisInput},</if>
+            <if test="class1Sort != null">#{class1Sort},</if>
+            <if test="class2Sort != null">#{class2Sort},</if>
+            <if test="class3Sort != null">#{class3Sort},</if>
+            <if test="class4Sort != null">#{class4Sort},</if>
+            <if test="class5Sort != null">#{class5Sort},</if>
+            <if test="lhMachineChangeMoldDesc != null">#{lhMachineChangeMoldDesc},</if>
+            <if test="dataSource != null">#{dataSource},</if>
+            <if test="bomDataVersion != null">#{bomDataVersion},</if>
+            <if test="cxMachineType != null">#{cxMachineType},</if>
+
+        </trim>
+    </insert>
+
+    <update id="updateCxScheduleResult" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        update t_cx_schedule_result
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="cxBatchNo != null">cx_batch_no = #{cxBatchNo},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="taskType != null">task_type = #{taskType},</if>
+            <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
+            <if test="productionStatus != null">production_status = #{productionStatus},</if>
+            <if test="cxMachineCode != null">cx_machine_code = #{cxMachineCode},</if>
+            <if test="cxMachineName != null">cx_machine_name = #{cxMachineName},</if>
+            <if test="lhMachineCode != null">lh_machine_code = #{lhMachineCode},</if>
+            <if test="lhMachineName != null">lh_machine_name = #{lhMachineName},</if>
+            <if test="lhMachineQty != null">lh_machine_qty = #{lhMachineQty},</if>
+            <if test="minimumLhMachineReqQty != null">minimum_lh_machine_req_qty = #{minimumLhMachineReqQty},</if>
+            <if test="minimumLhMachineComQty != null">minimum_lh_machine_com_qty = #{minimumLhMachineComQty},</if>
+            <if test="availableMoldQty != null">available_mold_qty = #{availableMoldQty},</if>
+            maximum_class_qty = #{maximumClassQty,jdbcType=DECIMAL},
+            <if test="workShifts != null">work_shifts = #{workShifts},</if>
+            <if test="storageLocation != null">storage_location = #{storageLocation},</if>
+            <if test="sapCode != null">sap_code = #{sapCode},</if>
+            <if test="specDesc != null">spec_desc = #{specDesc},</if>
+            <if test="embryoCode != null">embryo_code = #{embryoCode},</if>
+            <if test="lhMiddleNightFinishQty != null">lh_middle_night_finish_qty = #{lhMiddleNightFinishQty},</if>
+            <if test="cxMonthFinishQty != null">cx_month_finish_qty = #{cxMonthFinishQty},</if>
+            <if test="planModifyQty != null">plan_modify_qty = #{planModifyQty},</if>
+            <if test="rejectQty != null">reject_qty = #{rejectQty},</if>
+            <if test="newestPlanQty != null">newest_plan_qty = #{newestPlanQty},</if>
+            <if test="class3PlannedQty != null">class3_planned_qty = #{class3PlannedQty},</if>
+            <if test="singleShiftLhQty != null">single_shift_lh_qty = #{singleShiftLhQty},</if>
+            <if test="totalStock != null">total_stock = #{totalStock},</if>
+            <if test="extendedStock != null">extended_stock = #{extendedStock},</if>
+            <if test="monthStock != null">month_stock = #{monthStock},</if>
+            <if test="actualOverProduction != null">actual_over_production = #{actualOverProduction},</if>
+            expected_over_production = #{expectedOverProduction,jdbcType=DECIMAL},
+            <if test="differenceOverProduction != null">difference_over_production = #{differenceOverProduction},</if>
+            <if test="class1AvailableLhShift != null">class1_available_lh_shift = #{class1AvailableLhShift},</if>
+            <if test="class1Analysis != null">class1_analysis = #{class1Analysis},</if>
+            <if test="class2AvailableLhShift != null">class2_available_lh_shift = #{class2AvailableLhShift},</if>
+            <if test="class2Analysis != null">class2_analysis = #{class2Analysis},</if>
+            <if test="class3AvailableLhShift != null">class3_available_lh_shift = #{class3AvailableLhShift},</if>
+            <if test="class3Analysis != null">class3_analysis = #{class3Analysis},</if>
+            <if test="class4AvailableLhShift != null">class4_available_lh_shift = #{class4AvailableLhShift},</if>
+            <if test="class4Analysis != null">class4_analysis = #{class4Analysis},</if>
+            <if test="class5AvailableLhShift != null">class5_available_lh_shift = #{class5AvailableLhShift},</if>
+            <if test="class5Analysis != null">class5_analysis = #{class5Analysis},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="markCloseOutTip != null">mark_close_out_tip = #{markCloseOutTip},</if>
+            <if test="specDimension != null">spec_dimension = #{specDimension},</if>
+            <if test="isRelease != null">is_release = #{isRelease},</if>
+            <if test="class1Sort != null">class1_sort = #{class1Sort},</if>
+            <if test="class2Sort != null">class2_sort = #{class2Sort},</if>
+            <if test="class3Sort != null">class3_sort = #{class3Sort},</if>
+            <if test="class4Sort != null">class4_sort = #{class4Sort},</if>
+            <if test="class5Sort != null">class5_sort = #{class5Sort},</if>
+            <if test="lhMachineChangeMoldDesc != null">LH_MACHINE_CHANGE_MOLD_DESC = #{lhMachineChangeMoldDesc},</if>
+            class1_plan_qty = #{class1PlanQty,jdbcType=DECIMAL},
+            class2_plan_qty = #{class2PlanQty,jdbcType=DECIMAL},
+            class3_plan_qty = #{class3PlanQty,jdbcType=DECIMAL},
+            class4_plan_qty = #{class4PlanQty,jdbcType=DECIMAL},
+            class5_plan_qty = #{class5PlanQty,jdbcType=DECIMAL},
+            class1_analysis_input = #{class1AnalysisInput,jdbcType=VARCHAR},
+            class2_analysis_input = #{class2AnalysisInput,jdbcType=VARCHAR},
+            class3_analysis_input = #{class3AnalysisInput,jdbcType=VARCHAR},
+            class4_analysis_input = #{class4AnalysisInput,jdbcType=VARCHAR},
+            class5_analysis_input = #{class5AnalysisInput,jdbcType=VARCHAR},
+
+            <if test="bomDataVersion != null">bom_Data_Version = #{bomDataVersion},</if>
+            <if test="cxMachineType != null">cx_machine_type = #{cxMachineType},</if>
+
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="changeBomDataVersion" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        update t_cx_schedule_result
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="isRelease != null">is_release = #{isRelease},</if>
+            <if test="bomDataVersion != null">bom_Data_Version = #{bomDataVersion},</if>
+            <if test="specDimension != null">spec_dimension = #{specDimension},</if>
+            <if test="specDesc != null and specDesc!=''">spec_desc = #{specDesc},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCxScheduleResultById" parameterType="Long">
+        update t_cx_schedule_result set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteCxScheduleResultByIds" parameterType="String">
+        update t_cx_schedule_result set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="manualClose" parameterType="String">
+        update t_cx_schedule_result set PRODUCTION_STATUS='2',task_type='5' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="batchUpdate" parameterType="String">
+        update t_cx_schedule_result set IS_RELEASE = #{status}
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="checkScheduleResultUnique" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select * from t_cx_schedule_result
+        where del_flag='0'
+        <if test="id != null and id !='' ">and id != #{id}</if>
+        <if test="scheduleDate != null ">and schedule_date =#{scheduleDate}</if>
+        <if test="cxMachineCode != null  and cxMachineCode != ''">and cx_machine_code = #{cxMachineCode}</if>
+        <if test="embryoCode != null  and embryoCode != ''">and embryo_code = #{embryoCode}</if>
+        <if test="sapCode != null  and sapCode != ''">and SAP_CODE = #{sapCode}</if>
+        <if test="bomDataVersion != null and bomDataVersion != ''">
+            AND bom_Data_Version=#{bomDataVersion}
+        </if>
+    </select>
+
+    <insert id="insertPublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_schedule_publish_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="procedureCode != null">procedure_code,</if>
+            <if test="publishStatus != null">publish_status,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataVersion != null">data_version,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="procedureCode != null">#{procedureCode},</if>
+            <if test="publishStatus != null">#{publishStatus},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataVersion != null">#{dataVersion},</if>
+        </trim>
+    </insert>
+
+    <select id="isPublish" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord" resultType="int">
+        select count(1)
+        from t_schedule_publish_record
+        where procedure_code = #{procedureCode,jdbcType=VARCHAR}
+          and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and publish_status = '1'
+          and del_flag = '0'
+    </select>
+
+    <select id="modelChangeValidate" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult" resultType="int">
+           select count(1) from T_MOLD_AUTO_GENERAGE_RECORD
+           where status='0' and DEL_FLAG='0'
+           and generage_date=#{scheduleDate,jdbcType=DATE}
+    </select>
+
+    <insert id="deployScheduleToMes">
+        INSERT INTO MES_CX_SCHEDULE_RESULT(
+        CX_BATCH_NO ,
+        ORDER_NO ,
+        SCHEDULE_DATE ,
+        PRODUCTION_STATUS ,
+        IS_RELEASE ,
+        CX_MACHINE_CODE ,
+        CX_MACHINE_NAME ,
+        LH_MACHINE_CODE ,
+        LH_MACHINE_NAME ,
+        LH_MACHINE_QTY ,
+        MINIMUM_LH_MACHINE_REQ_QTY ,
+        AVAILABLE_MOLD_QTY ,
+        MAXIMUM_CLASS_QTY ,
+        WORK_SHIFTS ,
+        STORAGE_LOCATION ,
+        STORAGE_LOCATION_DESC ,
+        SAP_CODE ,
+        EMBRYO_SAP_CODE ,
+        SPEC_DESC ,
+        SPEC_DIMENSION ,
+        EMBRYO_CODE ,
+        LH_MIDDLE_NIGHT_FINISH_QTY ,
+        CX_MONTH_FINISH_QTY ,
+        REJECT_QTY ,
+        NEWEST_PLAN_QTY ,
+        CLASS3_PLANNED_QTY ,
+        SINGLE_SHIFT_LH_QTY ,
+        TOTAL_STOCK ,
+        EXTENDED_STOCK ,
+        MONTH_STOCK ,
+        ACTUAL_OVER_PRODUCTION ,
+        EXPECTED_OVER_PRODUCTION ,
+        DIFFERENCE_OVER_PRODUCTION ,
+        CLASS1_AVAILABLE_LH_SHIFT ,
+        CLASS1_PLAN_QTY ,
+        CLASS1_ANALYSIS_INPUT ,
+        CLASS1_ANALYSIS ,
+        CLASS2_AVAILABLE_LH_SHIFT ,
+        CLASS2_PLAN_QTY ,
+        CLASS2_ANALYSIS_INPUT ,
+        CLASS2_ANALYSIS ,
+        CLASS3_AVAILABLE_LH_SHIFT ,
+        CLASS3_PLAN_QTY ,
+        CLASS3_ANALYSIS_INPUT ,
+        CLASS3_ANALYSIS ,
+        CLASS4_AVAILABLE_LH_SHIFT ,
+        CLASS4_PLAN_QTY ,
+        CLASS4_ANALYSIS_INPUT ,
+        CLASS4_ANALYSIS ,
+        CLASS5_AVAILABLE_LH_SHIFT ,
+        CLASS5_PLAN_QTY ,
+        CLASS5_ANALYSIS_INPUT ,
+        CLASS5_ANALYSIS ,
+        MARK_CLOSE_OUT_TIP ,
+        REMARK ,
+        DATA_VERSION ,
+        CREATE_DATE ,
+        UPDATE_DATE ,
+        IS_DELETE ,
+        FACTORY_CODE ,
+        COMPANY_CODE ,
+        BOM_DATA_VERSION )
+        SELECT
+        R.CX_BATCH_NO ,
+        R.ORDER_NO ,
+        R.SCHEDULE_DATE ,
+        R.PRODUCTION_STATUS ,
+        '1' ,
+        R.CX_MACHINE_CODE ,
+        R.CX_MACHINE_NAME ,
+        R.LH_MACHINE_CODE ,
+        R.LH_MACHINE_NAME ,
+        R.LH_MACHINE_QTY ,
+        R.MINIMUM_LH_MACHINE_REQ_QTY ,
+        R.AVAILABLE_MOLD_QTY ,
+        R.MAXIMUM_CLASS_QTY ,
+        R.WORK_SHIFTS ,
+        R.STORAGE_LOCATION ,
+        SL.DICT_LABEL ,
+        R.SAP_CODE ,
+        C.SAP_CODE ,
+        R.SPEC_DESC ,
+        R.SPEC_DIMENSION ,
+        R.EMBRYO_CODE ,
+        R.LH_MIDDLE_NIGHT_FINISH_QTY ,
+        R.CX_MONTH_FINISH_QTY ,
+        R.REJECT_QTY ,
+        R.NEWEST_PLAN_QTY ,
+        R.CLASS3_PLANNED_QTY ,
+        R.SINGLE_SHIFT_LH_QTY ,
+        R.TOTAL_STOCK ,
+        R.EXTENDED_STOCK ,
+        R.MONTH_STOCK ,
+        R.ACTUAL_OVER_PRODUCTION ,
+        R.EXPECTED_OVER_PRODUCTION ,
+        R.DIFFERENCE_OVER_PRODUCTION ,
+        R.CLASS1_AVAILABLE_LH_SHIFT ,
+        R.CLASS1_PLAN_QTY ,
+        R.CLASS1_ANALYSIS_INPUT ,
+        R.CLASS1_ANALYSIS ,
+        R.CLASS2_AVAILABLE_LH_SHIFT ,
+        R.CLASS2_PLAN_QTY ,
+        R.CLASS2_ANALYSIS_INPUT ,
+        R.CLASS2_ANALYSIS ,
+        R.CLASS3_AVAILABLE_LH_SHIFT ,
+        R.CLASS3_PLAN_QTY ,
+        R.CLASS3_ANALYSIS_INPUT ,
+        R.CLASS3_ANALYSIS ,
+        R.CLASS4_AVAILABLE_LH_SHIFT ,
+        R.CLASS4_PLAN_QTY ,
+        R.CLASS4_ANALYSIS_INPUT ,
+        R.CLASS4_ANALYSIS ,
+        R.CLASS5_AVAILABLE_LH_SHIFT ,
+        R.CLASS5_PLAN_QTY ,
+        R.CLASS5_ANALYSIS_INPUT ,
+        R.CLASS5_ANALYSIS ,
+        R.MARK_CLOSE_OUT_TIP ,
+        R.REMARK ,
+        #{dataVersion} DATA_VERSION ,
+        sysdate CREATE_DATE ,
+        R.UPDATE_TIME UPDATE_DATE ,
+        R.DEL_FLAG IS_DELETE,
+        #{factoryCode},
+        #{companyCode},
+        R.BOM_DATA_VERSION
+        FROM T_CX_SCHEDULE_RESULT R
+        left JOIN T_PRODUCT_CONSTRUCTION_INFO C ON R.embryo_code = C.embryo_code AND R.BOM_DATA_VERSION=C.EMBRYO_VERSION
+        AND C.del_flag = '0'
+        inner JOIN sys_dict_data sl ON sl.dict_value = r.STORAGE_LOCATION AND sl.dict_type = 'STORAGE_LOCATION' and
+        sl.locale=#{language}
+        <where>
+            R.del_flag='0'
+            and R.TO_PRODUCT='0' <!--Joran 2022-02-18 只发布机台任务上同胎胚标记为投产的工单-->
+            <if test="ids !=null">
+                AND R.id in(
+                WITH temp_table AS (
+                <foreach collection="ids" item="item" separator=" union ">
+                    SELECT ${item} result_id FROM dual
+                </foreach>
+                )
+                select result_id from temp_table)
+            </if>
+            and r.bom_data_version is not null
+        </where>
+
+
+    </insert>
+
+    <select id="singleMachinAutoPlanValidate" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultMap="CxScheduleResultResult">
+        select SCHEDULE_DATE from T_TM_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_TC_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_NC_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_TQ_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_GSQ_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_GDYY_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_XWYY_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_CD15_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+        UNION
+        select SCHEDULE_DATE from T_CD90_AUTO_SCHEDULE_RECORD  where STATUS='0'  and DEL_FLAG='0'
+        and SCHEDULE_DATE=#{scheduleDate}
+    </select>
+
+    <!--Joran 2021-12-13 查询出需要删除的数据集合-->
+    <select id="selectRemoveList" resultMap="CxScheduleResultResult">
+        WITH id_table AS (
+        <foreach collection="ids" item="id" separator=" union ">
+            SELECT #{id} id FROM dual
+        </foreach>
+        )
+        select a.id, a.cx_batch_no, a.order_no,a.bom_Data_Version, a.task_type, a.schedule_date, a.production_status,
+        a.cx_machine_code,
+        a.cx_machine_name, a.lh_machine_code, a.lh_machine_name, a.lh_machine_qty, a.minimum_lh_machine_req_qty,a.minimum_lh_machine_com_qty,
+        a.available_mold_qty, a.maximum_class_qty, a.work_shifts, a.storage_location, a.sap_code, a.spec_desc,
+        a.embryo_code, a.lh_middle_night_finish_qty, a.cx_month_finish_qty, a.reject_qty, a.newest_plan_qty,
+        a.class3_planned_qty, a.single_shift_lh_qty, a.total_stock, a.extended_stock, a.month_stock,
+        a.actual_over_production, a.expected_over_production, a.difference_over_production, a.class1_available_lh_shift,
+        a.class1_plan_qty, a.class1_analysis_input, a.class1_analysis, a.class2_available_lh_shift, a.class2_plan_qty,
+        a.class2_analysis_input, a.class2_analysis, a.class3_available_lh_shift, a.class3_plan_qty, a.class3_analysis,
+        a.class4_available_lh_shift, a.class4_plan_qty, a.class4_analysis, a.class5_available_lh_shift,
+        a.class5_plan_qty, a.class5_analysis, a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag,
+        a.remark, a.mark_close_out_tip, a.spec_dimension, a.is_release, a.class3_analysis_input,
+        a.class4_analysis_input, a.class5_analysis_input, a.class1_sort, a.class2_sort, a.class3_sort, a.class4_sort,
+        a.class5_sort,a.LH_MACHINE_CHANGE_MOLD_DESC,a.data_source,a.bom_data_version
+        from T_CX_SCHEDULE_RESULT a
+        <where>
+            a.id in (select id from id_table)
+        </where>
+    </select>
+
+    <select id="isReleasingOrTimeoutByDate" parameterType="date" resultType="int">
+        select count(1) from t_cx_schedule_result
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </select>
+
+    <select id="lhIsReleasingOrTimeoutByDate" parameterType="date" resultType="int">
+        select count(1) from t_lh_schedule_result
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </select>
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from t_cx_schedule_result
+        where del_flag = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="changeReleaseStatus" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        update t_cx_schedule_result
+        set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
+        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </update>
+
+    <update id="updatePublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
+        update t_schedule_publish_record
+        set publish_status = #{publishStatus, jdbcType=VARCHAR},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where del_flag = 0 and procedure_code = #{procedureCode,jdbcType=VARCHAR}
+          and schedule_date = #{scheduleDate,jdbcType=DATE}
+    </update>
+    
+	<!-- 根据版本更新发布日志状态 -->
+	<update id="updatePublishRecordVersion">
+		UPDATE t_schedule_publish_record
+		   SET PUBLISH_STATUS = #{status}
+		 WHERE data_version = #{dataVersion}
+		   AND del_flag = 0
+	</update>
+
+    <select id="selectMaxScheduleDate" resultType="date">
+        SELECT max(schedule_date) FROM t_cx_schedule_result where del_flag = '0'
+    </select>
+
+    <select id="isPublishByIds" parameterType="string" resultType="int">
+        select count(1) from t_cx_schedule_result
+        where del_flag = 0 and IS_RELEASE = 0
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!--Joran 2022-04-27 进行重复sql拆分start -->
+    <sql id="includeSurplusSql">
+        SELECT re.CX_BATCH_NO,ps.MATERIAL_CODE,ps.MONTH_PLAN_QTY,ps.MONTH_REMAIN_QTY,0 order_sort
+         FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS ps,T_CX_AUTO_SCHEDULE_RECORD re
+          WHERE ps.MONTH_PLAN_APS_VERSION=re.MONTH_PLAN_APS_VERSION
+           AND ps.del_flag='0'
+           AND re.del_flag='0'
+           AND re.STATUS='0'
+    </sql>
+    <!--Joran 2022-04-27 进行重复sql拆分end -->
+
+    <select id="selectByScheduleDateAndCode" parameterType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult"
+            resultType="com.zlt.aps.cx.api.domain.entity.CxScheduleResult">
+        <include refid="selectCxScheduleResultVo"/>
+        where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+        and embryo_code = #{embryoCode,jdbcType=VARCHAR} and bom_data_version = #{bomDataVersion,jdbcType=VARCHAR}
+        and sap_code = #{sapCode,jdbcType=VARCHAR}
+    </select>
+
+    <!--Joran 2022-06-20 检验是否版本是否存在，如果大于0则标识还存在没有施工版本的数据start -->
+    <select id="checkBomDataVersionEmpty" parameterType="string" resultType="int">
+        select count(1) from t_cx_schedule_result
+       <where>
+           del_flag='0'
+           and bom_data_version is null
+           <if test="scheduleDate!=null">
+               and schedule_date = #{scheduleDate,jdbcType=DATE}
+           </if>
+       </where>
+    </select>
+    <!--Joran 2022-06-20 检验是否版本是否存在，如果大于0则标识还存在没有施工版本的数据end -->
+
+    <resultMap type="com.zlt.aps.cx.api.domain.entity.Gante" id="GanteResult">
+        <result property="id" column="id"/>
+        <result property="codeId" column="codeId"/>
+        <result property="startDate" column="startDate"/>
+        <result property="endDate" column="endDate"/>
+        <result property="innerMsg" column="innerMsg"/>
+        <result property="cpdh" column="cpdh"/>
+        <result property="specdh" column="specdh"/>
+        <result property="jd" column="jd"/>
+        <result property="ydl" column="ydl"/>
+        <result property="ywcl" column="ywcl"/>
+        <result property="scheduleDate" column="scheduleDate"/>
+    </resultMap>
+
+    <select id="getCxGanteData" parameterType="com.zlt.aps.cx.api.domain.entity.Gante" resultMap="GanteResult">
+        select
+        c.schedule_Date as scheduleDate,
+        c.cx_machine_name as codeId,
+        c.spec_desc as innerMsg,
+        c.SAP_CODE as cpdh,
+        c.embryo_code as specdh,
+        (case WHEN instr(c.BOM_DATA_VERSION,'SZ',1,1)>0 THEN '试制阶段' else '投产阶段' end) as jd,
+        t.estimate_start_time as startDate,
+        t.estimate_end_time as endDate,
+        NVL(class1_plan_qty, 0)+NVL(class2_plan_qty, 0)+NVL(class3_plan_qty, 0)+NVL(class4_plan_qty, 0)+NVL(class5_plan_qty, 0) as ydl,
+        NVL(fq.CLASS1_FINISH_QTY, 0)+NVL(fq.CLASS2_FINISH_QTY, 0)+NVL(fq.CLASS3_FINISH_QTY, 0)+NVL(fq.CLASS4_FINISH_QTY, 0)+NVL(fq.CLASS5_FINISH_QTY, 0) as ywcl
+        from T_CX_SCHEDULE_RESULT c
+        left join T_CX_SCHEDULE_TASK_TIME t on c.order_no = t.cx_order_no and c.del_flag=0 and t.del_flag=0
+        left join T_CX_CLASS_SHIFT_FINISH_QTY fq on fq.ORDER_NO=c.ORDER_NO and fq.del_flag='0'
+        where 1=1
+        and t.estimate_start_time is not null
+        and c.spec_desc is not null
+        and NVL(class1_plan_qty, 0)+NVL(class2_plan_qty, 0)+NVL(class3_plan_qty, 0)+NVL(class4_plan_qty, 0)+NVL(class5_plan_qty, 0)>0
+        and c.schedule_date = #{scheduleDate,jdbcType=DATE}
+        order by c.cx_machine_name, t.estimate_start_time
+    </select>
+
+    <select id="getCxSpecGanteData" parameterType="com.zlt.aps.cx.api.domain.entity.Gante" resultMap="GanteResult">
+        select
+        min(c.schedule_Date) as scheduleDate,
+        c.spec_desc as codeId,
+        min(t.estimate_start_time) as startDate,
+        max(t.estimate_end_time) as endDate,
+        c.spec_desc as innerMsg,
+        c.SAP_CODE as cpdh,
+        c.embryo_code as specdh,
+        (case WHEN instr(c.BOM_DATA_VERSION,'SZ',1,1)>0 THEN '试制阶段' else '投产阶段' end) as jd,
+        sum(NVL(class1_plan_qty, 0)+NVL(class2_plan_qty, 0)+NVL(class3_plan_qty, 0)) as ydl,
+        sum(NVL(fq.CLASS1_FINISH_QTY, 0)+NVL(fq.CLASS2_FINISH_QTY, 0)+NVL(fq.CLASS3_FINISH_QTY, 0)+NVL(fq.CLASS4_FINISH_QTY, 0)+NVL(fq.CLASS5_FINISH_QTY, 0)) as ywcl
+        from T_CX_SCHEDULE_RESULT c
+        left join T_CX_SCHEDULE_TASK_TIME t on c.order_no = t.cx_order_no and c.del_flag=0 and t.del_flag=0
+        left join T_CX_CLASS_SHIFT_FINISH_QTY fq on fq.ORDER_NO=c.ORDER_NO and fq.del_flag='0'
+        where 1=1
+        and t.estimate_start_time is not null
+        and c.spec_desc is not null
+        and NVL(class1_plan_qty, 0)+NVL(class2_plan_qty, 0)+NVL(class3_plan_qty, 0)>0
+        and c.schedule_date <![CDATA[ <= ]]> to_date(#{endDay,jdbcType=VARCHAR},'yyyy-mm-dd')
+        and c.schedule_date <![CDATA[ >= ]]> to_date(#{startDay,jdbcType=VARCHAR},'yyyy-mm-dd')
+        group by c.spec_desc,c.SAP_CODE,c.embryo_code,BOM_DATA_VERSION
+    </select>
+
+</mapper>

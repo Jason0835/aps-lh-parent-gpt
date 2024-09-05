@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('PLM施工参数明细')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-info-edit" th:object="${entity}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.sapCode}]]：</label>
+            <div class="form-control-static" th:text="*{sapCode}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.series}]]：</label>
+            <div class="form-control-static" th:text="*{series}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.code}]]：</label>
+            <div class="form-control-static" th:text="*{code}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.version}]]：</label>
+            <div class="form-control-static" th:text="*{version}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.paramCode}]]：</label>
+            <div class="form-control-static" th:text="*{paramCode}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.paramName}]]：</label>
+            <div class="form-control-static" th:text="*{paramName}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.paramValue}]]：</label>
+            <div class="form-control-static" th:text="*{paramValue}"></div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.plm.paramType}]]：</label>
+            <div class="form-control-static" th:text="*{paramType}"></div>
+        </div>
+    </form>
+</div>
+</body>
+</html>

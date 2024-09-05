@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd90.engine.mapper.Cd90EngineSpecifyMachineMapper">
+	<!-- 查询顶点机台的映射配置信息 -->
+    <select id="selectCd90SpecifyMachineList" resultType="com.zlt.aps.cd90.engine.vo.Cd90SpecifyMachineVo">
+		SELECT cloth_code,
+		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		  FROM T_CD90_SPECIFY_MACHINE M
+		  LEFT JOIN T_CD90_MACHINE_INFO MI
+		    ON MI.ID = M.MACHINE_ID
+		 WHERE M.DEL_FLAG = '0'
+		   AND MI.DEL_FLAG = '0'
+		   AND MI.STATUS = '0'
+		   AND M.JOB_TYPE = #{jobType}
+         GROUP BY cloth_code
+    </select>
+
+</mapper>

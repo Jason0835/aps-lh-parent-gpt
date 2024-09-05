@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('颜色提示信息维护')" />
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{ui.data.column.scheduleResult.steelType}]]：<input type="text" name="steelType"/>
+                        </li>
+                        <li>
+                            [[#{ui.bigRollColor.column.colorCode}]]：<input type="text" name="colorCode"/>
+                        </li>
+                        <li>
+                            [[#{ui.bigRollColor.column.colorType}]]：
+                            <select class="form-control" name="colorType" th:with="type=${@dict.getType('BIG_ROLL_COLOR')}">
+                                <option value="">[[#{ui.frame.select.select.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('',400)" shiro:hasPermission="gsq:gsqSteelTypeColor:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',400)" shiro:hasPermission="gsq:gsqSteelTypeColor:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()" shiro:hasPermission="gsq:gsqSteelTypeColor:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-info" onclick="$.table.importExcel()" shiro:hasPermission="gsq:gsqSteelTypeColor:import">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="gsq:gsqSteelTypeColor:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true" data-resizable="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer" />
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<th:block th:include="include :: bootstrap-table-reorder-columns-js" />
+<th:block th:include="include :: bootstrap-table-resizable-js" />
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('gsq:gsqSteelTypeColor:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('gsq:gsqSteelTypeColor:remove')}]];
+    var colorType = [[${@dict.getType('BIG_ROLL_COLOR')}]];
+    var prefix = ctx + "gsq/gsqSteelTypeColor";
+    $(function() {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.steelType.column.modalName}]],
+            columns: [
+                {
+                    checkbox: true,
+                    widthUnit: '%',
+                    width: 5,
+                },
+                {
+                    field: 'id',
+                    title: '主键ID',
+                    align: 'center',
+                    halign:'center',
+                    visible: false,
+                    widthUnit: '%',
+                    width: 5,
+                },
+                {
+                    field: 'steelType',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.scheduleResult.steelType}]],
+                    widthUnit: '%',
+                    width: 15,
+
+                },
+                {
+                    field: 'colorCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.bigRollColor.column.colorCode}]],
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<span style="margin-right:5px;width:12px;height:12px;display: inline-block;background: '+value+'"></span><span>'+value+'</span>');
+                        return actions.join('');
+                    },
+                    widthUnit: '%',
+                    width: 15,
+                },
+                {
+                    field: 'colorType',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.bigRollColor.column.colorType}]],
+                    formatter: function(value, row, index) {
+                       return $.table.selectDictLabel(colorType, value);
+                    },
+                    widthUnit: '%',
+                    width: 15,
+                },
+                {
+                    field: 'status',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.bigRollColor.column.status}]],
+                    formatter: function (value, row, index) {
+                        return statusTools(row);
+                    },
+                    widthUnit: '%',
+                    width: 10,
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    halign:'center',
+                    title: [[#{ui.common.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value);
+                    },
+                    widthUnit: '%',
+                    width: 30,
+                },
+                {
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.btn.option}]],
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit('+row.id+','+'400'+')"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>' + [[#{ui.frame.btn.delete}]] + '</a>');
+                        return actions.join('');
+                    },
+                    widthUnit: '%',
+                    width: 10,
+                }]
+        };
+        $.table.init(options);
+    });
+
+    function statusTools(row) {
+        var datas=JSON.stringify(row)
+        if (row.status =='1') {
+            return "<i class=\"fa fa-toggle-off text-info fa-2x\" onclick='enable("+ datas + ")'></i> ";
+        } else {
+            return "<i class=\"fa fa-toggle-on text-info fa-2x\" onclick='disable("+ datas + ")'></i> ";
+        }
+    }
+
+    /* 用户管理-停用 */
+    function disable(datas) {
+        $.modal.confirm([[#{ui.common.layer.boxMsg.context}]], function() {
+            datas.status='1';
+            $.operate.post(prefix + "/save", datas);
+        })
+    }
+
+    /* 用户管理启用 */
+    function enable(datas) {
+        $.modal.confirm([[#{ui.common.layer.boxMsg.context}]], function() {
+            datas.status='0';
+            $.operate.post(prefix + "/save", datas);
+        })
+    }
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href=prefix + "/importTemplate";
+    }
+</script>
+</body>
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <!--调整文件上传支持国际化-->
+            <input type="button" th:value="#{ui.file.btn.text}" onclick="javascript:$('input[name=\'file\']').click();" />
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}" onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;" onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);" />
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport" > [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp;	<a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+</html>

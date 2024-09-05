@@ -1,0 +1,20 @@
+# Tomcat
+server:
+  port: 9511
+
+nacos:
+  server-addr: 192.168.3.112:9917,192.168.3.115:9917,192.168.3.122:9917
+  run-group: APS_PROD_GROUP
+  cfg-group: PROD_GROUP
+  run-namespace: prod
+  cfg-namespace: prod
+
+#域登录接口ip和端口
+dc:
+  switch: true #ad域登录的开关（开关为true，增登录验证通过ad域接口在客户系统那校验是否登录成功。如果开关为false，则不进行ad域接口校验，默认都登录成功，fasel主要用来开发和测试环境）
+  head: zlt
+  tail: com
+  domain:
+    service:
+      ip: 192.168.2.104
+      port: 389

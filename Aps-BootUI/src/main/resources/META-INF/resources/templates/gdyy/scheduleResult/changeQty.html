@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改钢带压延排程结果')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-scheduleResult-edit" th:object="${scheduleResult}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <input name="batchNo" th:field="*{batchNo}" class="form-control" type="hidden">
+        <input name="orderNo" th:field="*{orderNo}" class="form-control" type="hidden">
+        <input name="publishSuccessCount" th:field="*{publishSuccessCount}" type="hidden">
+
+        <div class="row" id="planQty">
+            <input name="id" th:field="*{id}" type="hidden">
+            <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.baseInfo}]]</h4>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.scheduleDate}]]：</label>
+                        <div class="col-sm-8">
+                            <div class="input-group date">
+                                <input name="scheduleDate"
+                                       th:value="${#dates.format(scheduleResult.scheduleDate, 'yyyy-MM-dd')}"
+                                       class="form-control" placeholder="yyyy-MM-dd" type="hidden">
+                                <input name="scheduleDate" id="scheduleDate"
+                                       th:value="${#dates.format(scheduleResult.scheduleDate, 'yyyy-MM-dd')}"
+                                       class="form-control" placeholder="yyyy-MM-dd" type="text" readonly disabled>
+                                <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.bigRollCode}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="bigRollCode" th:field="*{bigRollCode}" class="form-control" type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.dayUsed}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="dayUsed" th:value="*{@nf.stripZeros(dayUsed)}" class="form-control" readonly type="number" min="0" max="99999999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.stockQty}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="stockQty" th:value="*{@nf.stripZeros(stockQty)}" class="form-control" readonly type="number" min="0" max="99999999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label ">[[#{ui.data.column.scheduleResult.isRelease}]]：</label>
+                        <div class="col-sm-8">
+                            <select name="isRelease" class="form-control" th:with="type=${@dict.getType('IS_RELEASE')}"disabled>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{isRelease}"></option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.scheduleResult.monthPlanOs}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="monthPlanOs" th:value="*{@nf.stripZeros(monthPlanOs)}" class="form-control" type="text"
+                                   th:readonly="true">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                        <div class="col-sm-8">
+                            <textarea name="remark"  class="form-control" style="width: 827px;" rows="3" th:field="*{remark}" maxlength="300"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.midPlanEightHour}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class1Plan}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class1Plan" th:value="*{@nf.stripZeros(class1Plan)}" class="form-control" type="text">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class1Plan.noStock}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class1PlanNoStock" th:value="*{@nf.stripZeros(class1PlanNoStock)}" class="form-control" type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class1Finish}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class1Finish" th:value="*{@nf.stripZeros(class1Finish)}" class="form-control" type="number" min="0" max="99999999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class1Remark}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class1Remark" th:field="*{class1Remark}" class="form-control" type="text" maxlength="300">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.nightPlanEightHour}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class2Plan}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class2Plan" th:value="*{@nf.stripZeros(class2Plan)}" class="form-control" type="text">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class2Plan.noStock}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class2PlanNoStock" th:value="*{@nf.stripZeros(class2PlanNoStock)}" class="form-control" type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class2Finish}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class2Finish" th:value="*{@nf.stripZeros(class2Finish)}" class="form-control" type="number" min="0" max="99999999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class2Remark}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class2Remark" th:field="*{class2Remark}" class="form-control" type="text" maxlength="300">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.data.column.scheduleResult.dayPlanEightHour}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class3Plan}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class3Plan" th:value="*{@nf.stripZeros(class3Plan)}" class="form-control" type="text">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class3Plan.noStock}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class3PlanNoStock" th:value="*{@nf.stripZeros(class3PlanNoStock)}" class="form-control" type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class3Finish}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class3Finish" th:value="*{@nf.stripZeros(class3Finish)}" class="form-control" type="number" min="0" max="99999999">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.class3Remark}]]：</label>
+                        <div class="col-sm-8">
+                            <input name="class3Remark" th:field="*{class3Remark}" class="form-control" type="text" maxlength="300">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="form-header h4">[[#{ui.data.column.gdyy.scheduleResult.notes}]]</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">[[#{ui.data.column.gdyy.scheduleResult.notes}]]：</label>
+                        <div class="col-sm-8">
+                            <textarea name="notes"  class="form-control" style="width: 827px;" rows="3" th:field="*{notes}" maxlength="300" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "gdyy/scheduleResult";
+    $("#form-scheduleResult-edit").validate({
+        focusCleanup: true
+    });
+
+    // 根据编辑类型显示页面
+    $(function () {
+            //历史的排程记录，不允许修改计划量和顺序
+            var scheduleDate = $("#scheduleDate").val();
+            scheduleDate = scheduleDate.replace(/-/g, "/");
+            let now = new Date()
+            let three1PlanTime = new Date(scheduleDate)
+            let three2PlanTime = new Date(scheduleDate + " 08:00:00")
+            let three3PlanTime = new Date(scheduleDate + " 16:00:00")
+            //超过1班
+            if (now > three1PlanTime) {
+                $("input[name='class1Plan']").attr("readonly", true);
+            }
+            //超过2班
+            if (now > three2PlanTime) {
+                $("input[name='class2Plan']").attr("readonly", true);
+            }
+            //超过3班
+            if (now > three3PlanTime) {
+                $("input[name='class3Plan']").attr("readonly", true);
+            }
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            $.operate.save(prefix + "/changeQty", $('#form-scheduleResult-edit').serialize());
+        }
+    }
+</script>
+</body>
+</html>

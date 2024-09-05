@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tc.mapper.TcSidewallCodeColorMapper">
+
+    <resultMap type="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor" id="TcSidewallCodeColorResult">
+        <result property="id" column="id"/>
+        <result property="sidewallCode" column="sidewall_code"/>
+        <result property="matchType" column="match_type"/>
+        <result property="colorType" column="color_type"/>
+        <result property="colorCode" column="color_code"/>
+        <result property="regularExpression" column="regular_expression"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectTcSidewallCodeColorVo">
+        select id, sidewall_code, match_type, color_type, color_code, regular_expression, status, remark, del_flag, create_by, create_time, update_by, update_time from t_tc_sidewall_code_color
+    </sql>
+
+    <select id="selectTcSidewallCodeColorList" parameterType="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor"
+            resultMap="TcSidewallCodeColorResult">
+        <include refid="selectTcSidewallCodeColorVo"/>
+        where del_flag = '0'
+        <if test="sidewallCode != null  and sidewallCode != ''">and INSTR(sidewall_code, #{sidewallCode}) > 0</if>
+        <if test="matchType != null  and matchType != ''">and match_type = #{matchType}</if>
+        <if test="colorType != null  and colorType != ''">and color_type = #{colorType}</if>
+        <if test="colorCode != null  and colorCode != ''">and color_code = #{colorCode}</if>
+        <if test="status != null  and status != ''">and status = #{status}</if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkTcSidewallCodeColorUnique" parameterType="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor"
+            resultMap="TcSidewallCodeColorResult">
+        <include refid="selectTcSidewallCodeColorVo"/>
+        where del_flag = '0'
+        <if test="id != null">and id !=#{id}</if>
+        <if test="sidewallCode != null  and sidewallCode != ''">and sidewall_code = #{sidewallCode}</if>
+    </select>
+
+    <select id="selectTcSidewallCodeColorById" parameterType="Long" resultMap="TcSidewallCodeColorResult">
+        <include refid="selectTcSidewallCodeColorVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertTcSidewallCodeColor" parameterType="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor">
+        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+            SELECT seq_public.NEXTVAL as id FROM DUAL
+        </selectKey>
+        insert into t_tc_sidewall_code_color
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="sidewallCode != null">sidewall_code,</if>
+            <if test="matchType != null">match_type,</if>
+            <if test="colorType != null">color_type,</if>
+            <if test="colorCode != null">color_code,</if>
+            <if test="regularExpression != null">regular_expression,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="sidewallCode != null">#{sidewallCode},</if>
+            <if test="matchType != null">#{matchType},</if>
+            <if test="colorType != null">#{colorType},</if>
+            <if test="colorCode != null">#{colorCode},</if>
+            <if test="regularExpression != null">#{regularExpression},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateTcSidewallCodeColor" parameterType="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor">
+        update t_tc_sidewall_code_color
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="sidewallCode != null">sidewall_code = #{sidewallCode},</if>
+            <if test="matchType != null">match_type = #{matchType},</if>
+            <if test="colorType != null">color_type = #{colorType},</if>
+            <if test="colorCode != null">color_code = #{colorCode},</if>
+            <if test="regularExpression != null">regular_expression = #{regularExpression},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteTcSidewallCodeColorById" parameterType="Long">
+        update t_tc_sidewall_code_color set del_flag='1' where id = #{id}
+    </delete>
+
+    <delete id="deleteTcSidewallCodeColorByIds" parameterType="String">
+        update t_tc_sidewall_code_color set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_tc_sidewall_code_color a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            select
+            #{item.sidewallCode,jdbcType=VARCHAR} sidewall_code,
+            #{item.matchType,jdbcType=VARCHAR} match_type,
+            #{item.colorType,jdbcType=VARCHAR} color_type,
+            #{item.colorCode,jdbcType=VARCHAR} color_code,
+            #{item.regularExpression,jdbcType=VARCHAR} regular_expression,
+            #{item.status,jdbcType=VARCHAR} status,
+
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR} remark
+            from dual
+
+        </foreach>
+        ) b ON (
+        a.sidewall_code = b.sidewall_code
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+            UPDATE SET
+            a.match_type = b.match_type,
+            a.color_type = b.color_type,
+            a.color_code = b.color_code,
+            a.regular_expression = b.regular_expression,
+            a.status = b.status,
+            a.update_by = b.create_by,
+            a.update_time = sysdate,
+            a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (
+          a.id, a.sidewall_code, a.match_type, a.color_type, a.color_code, a.regular_expression, a.status,
+          a.remark,a.del_flag, a.create_by, a.create_time)
+        values (
+          SEQ_PUBLIC.NEXTVAL, b.sidewall_code, b.match_type, b.color_type, b.color_code, b.regular_expression, b.status,
+          b.remark, '0', b.create_by, sysdate)
+    </update>
+
+</mapper>

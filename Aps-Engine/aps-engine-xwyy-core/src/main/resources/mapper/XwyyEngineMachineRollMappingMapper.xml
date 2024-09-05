@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.xwyy.engine.mapper.XwyyEngineMachineRollMappingMapper">
+	<!-- 查询大卷与机台的映射关系 -->
+    <select id="selectXwyyMachineRollMappingList" resultType="com.zlt.aps.xwyy.engine.vo.XwyyMachineRollMappingVo">
+		SELECT M.BIG_ROLL_CODE, 
+		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		  FROM T_XWYY_MACHINE_ROLL_MAPPING M
+		  LEFT JOIN T_XWYY_MACHINE_INFO MI
+		    ON MI.ID = M.MACHINE_ID
+		 WHERE M.DEL_FLAG = '0'
+		   AND MI.DEL_FLAG = '0'
+		   AND MI.STATUS = '0'
+		 GROUP BY M.BIG_ROLL_CODE
+    </select>
+</mapper>
