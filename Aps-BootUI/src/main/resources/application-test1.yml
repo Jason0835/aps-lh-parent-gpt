@@ -14,7 +14,6 @@ ruoyi:
 nacos:
   server-addr: 192.168.241.102:8848
 #  server-addr: 127.0.0.1:8848
-
 spring:
   redis:
     host: 192.168.241.102
