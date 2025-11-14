@@ -1,6 +1,0 @@
-14:21:30.714 [main] ERROR c.r.c.i.u.I18nUtil - [getLocaleFromRedis,83] - 加载token异常：com.ruoyi.common.i18n.utils.I18nUtil.getRequest(I18nUtil.java:139)
-14:21:30.715 [main] ERROR c.r.c.i.u.I18nUtil - [getMessage,67] - 读取国际化异常：com.ruoyi.common.i18n.utils.I18nUtil.getMessage(I18nUtil.java:64)
-14:21:30.716 [main] ERROR c.r.c.i.u.I18nUtil - [getLocaleFromRedis,83] - 加载token异常：com.ruoyi.common.i18n.utils.I18nUtil.getRequest(I18nUtil.java:139)
-14:21:30.716 [main] ERROR c.r.c.i.u.I18nUtil - [getMessage,67] - 读取国际化异常：com.ruoyi.common.i18n.utils.I18nUtil.getMessage(I18nUtil.java:64)
-14:21:30.716 [main] ERROR c.r.c.i.u.I18nUtil - [getLocaleFromRedis,83] - 加载token异常：com.ruoyi.common.i18n.utils.I18nUtil.getRequest(I18nUtil.java:139)
-14:21:30.717 [main] ERROR c.r.c.i.u.I18nUtil - [getMessage,67] - 读取国际化异常：com.ruoyi.common.i18n.utils.I18nUtil.getMessage(I18nUtil.java:64)

@@ -1,4 +1,0 @@
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.zlt.mq.rabbit.config.RabbitMQConfig,\
-  com.zlt.mq.rabbit.listener.DelayReceiveMsgListener,\
-  com.zlt.mq.rabbit.service.MsgSenderService

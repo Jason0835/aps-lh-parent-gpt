@@ -1,4 +1,0 @@
-#需要自定义路由到其它服务的时候，把Path更换掉，设置为在GATEWAY的路由
-api:
-  path:
-    job: schedule/job

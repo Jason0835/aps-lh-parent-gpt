@@ -1,3 +1,0 @@
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.zlt.framework.config.SsoConfig,\
-com.zlt.framework.shiro.service.CasShiroService
