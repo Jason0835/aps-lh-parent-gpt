@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -174,4 +175,24 @@ public interface IGsqScheduleResultService {
      */
     @PostMapping("/gsq/scheduleResult/changeReleaseStatus")
     public AjaxResult changeReleaseStatus(@RequestBody GsqScheduleResultDto entity);
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/gsq/scheduleResult/importFinishQty")
+    @ApiOperation("导入完成量")
+    AjaxResult importFinishQty(@RequestBody List<GsqDayFinishQty> list, @RequestParam("importLogId") Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/gsq/scheduleResult/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody GsqScheduleResultDto scheduleResult);
 }

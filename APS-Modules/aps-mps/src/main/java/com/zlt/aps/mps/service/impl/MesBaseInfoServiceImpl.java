@@ -54,7 +54,7 @@ public class MesBaseInfoServiceImpl implements MesBaseInfoService {
     		return null; // 定时任务已被锁定
     	}
         // 合并
-        bomInfoMapper.mergeSql(dataVersion);
+//        bomInfoMapper.mergeSql(dataVersion);
         try {
         	// 开始更新前记录时间点
     		Date currentDate = this.truncSecond(DateUtils.getNowDate());
@@ -92,6 +92,18 @@ public class MesBaseInfoServiceImpl implements MesBaseInfoService {
 			String errorMessage = e.getCause() != null ? e.getCause().toString() : e.getMessage();
 			return AjaxResult.error(errorMessage);
 		}
+    }
+    
+    @Override
+    public AjaxResult mergeBasMaterial(String dataVersion) {
+        try {
+            bomInfoMapper.mergeMdmProductInfo(dataVersion);
+            return AjaxResult.success();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            String errorMessage = e.getCause() != null ? e.getCause().toString() : e.getMessage();
+            return AjaxResult.error(errorMessage);
+        }
     }
     
     /**

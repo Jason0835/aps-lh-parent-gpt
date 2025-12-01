@@ -24,13 +24,13 @@ import static org.apache.ibatis.type.JdbcType.DATE;
 @Getter
 @TableName("T_XWYY_BIG_ROLL_COLOR")
 @ApiModel(value = "XwyyBigRollColor对象", description = "帘布大卷颜色提示信息表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class XwyyBigRollColor extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC", position = 10)
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "帘布大卷编号")

@@ -22,9 +22,10 @@ public interface GdyyEngineLossService {
 	/**
 	 * 获得损耗率 从损耗率表获取对应的损耗率，按以下优先级匹配：物料编号 > 默认值
 	 *
+	 * @param machineIds      机器编号
 	 * @param bigRollCode     大卷编号
 	 * @param defaultLossRate 损耗率默认值
 	 * @return
 	 */
-	double getLossRate(String bigRollCode, Map<String, Double> lossMap, double defaultLossRate);
+	double getLossRate(String bigRollCode, String machineIds, Map<String, Double> lossMap, double defaultLossRate);
 }

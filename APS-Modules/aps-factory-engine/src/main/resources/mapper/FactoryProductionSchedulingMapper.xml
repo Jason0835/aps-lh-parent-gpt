@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionSchedulingMapper">
+
+    <update id="updateProductionVersionInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion">
+        UPDATE t_mp_proc_version
+           SET IS_NATURAL_MONTH = #{isNaturalMonth,jdbcType=DECIMAL},
+               PRODUCTION_START_DATE = #{productionStartDate,jdbcType=DATE},
+               PRODUCTION_END_DATE = #{productionEndDate,jdbcType=DATE}
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getConstructionByRequire" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT DISTINCT prp.FACTORY_CODE,
+               prp.PRODUCT_CODE,
+               mpc.CONSTRUCTION_CODE,
+               mpc.SPEC_CODE,
+               mpc.EMBRYO_CODE,
+               mpc.MOULD_METHOD,
+               mpc.CURING_TIME,
+               mpc.CURING_TIME2,
+               mpc.MOLD_CAVITY,
+               mpc.MOULD_CLAMPING_PRESSURE
+          FROM t_mp_product_require_plan prp
+          LEFT JOIN t_mdm_product_construction mpc
+            ON mpc.FACTORY_CODE = prp.FACTORY_CODE
+           AND mpc.PRODUCT_CODE = prp.PRODUCT_CODE
+           AND IFNULL(mpc.IS_DELETE, 0) = 0
+         WHERE IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getBaseConstructionInfo" resultType="com.zlt.aps.factory.domain.vo.BaseConstructionVersionInfoVo">
+        SELECT embryo_code,
+               tire_fabric_code1,
+               tire_fabric_code2,
+               tire_fabric_code3
+          FROM t_construction_version_info
+         WHERE IFNULL(del_flag, 0) = 0
+    </select>
+
+    <select id="getFactoryNoProductionConfiguration" resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction">
+        SELECT FACTORY_CODE,
+               YEAR,
+               MONTH,
+               PRODUCT_CODE
+          FROM t_mdm_factory_no_production
+         WHERE IFNULL(IS_DELETE, 0) = 0
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+    </select>
+
+    <select id="getFactoryMouldMaintenanceConfiguration" resultType="com.zlt.aps.factory.domain.vo.MouldMaintenanceConfigurationVo">
+        SELECT DISTINCT mdmp.FACTORY_CODE,
+               mdmp.YEAR,
+               mdmp.MONTH,
+               mdmp.MACHINE_CODE AS MOULD_CODE,
+               mdmp.BEGIN_DATE,
+               mdmp.END_DAY,
+               mmi.MOULD_NO,
+               mmi.MOULD_AIR_TYPE
+          FROM t_mdm_device_maintenance_plan mdmp
+         INNER JOIN t_mdm_model_info mmi
+            ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
+           AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
+         INNER JOIN t_mdm_product_model_relation pmr
+            ON pmr.MOULD_CODE = mdmp.MACHINE_CODE
+           AND pmr.FACTORY_CODE = mdmp.FACTORY_CODE
+         INNER JOIN t_mp_product_require_plan prp
+            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
+           AND IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+         WHERE IFNULL(mdmp.IS_DELETE, 0) = 0
+           AND mdmp.MACHINE_TYPE = 2
+           AND mdmp.PLAN_TYPE = 0
+           AND mdmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mdmp.YEAR = #{year,jdbcType=DECIMAL}
+           AND mdmp.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
+
+    <select id="getFactoryMouldMaintenanceConfigurationByDateRange" resultType="com.zlt.aps.factory.domain.vo.MouldMaintenanceConfigurationVo">
+        SELECT DISTINCT mdmp.FACTORY_CODE,
+               mdmp.YEAR,
+               mdmp.MONTH,
+               mdmp.MACHINE_CODE AS MOULD_CODE,
+               mdmp.BEGIN_DATE,
+               mdmp.END_DAY,
+               mmi.MOULD_NO,
+               mmi.MOULD_AIR_TYPE
+          FROM t_mdm_device_maintenance_plan mdmp
+         INNER JOIN t_mdm_model_info mmi
+            ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
+           AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
+         INNER JOIN t_mdm_product_model_relation pmr
+            ON pmr.MOULD_CODE = mdmp.MACHINE_CODE
+           AND pmr.FACTORY_CODE = mdmp.FACTORY_CODE
+         INNER JOIN t_mp_product_require_plan prp
+            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
+           AND IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+         WHERE IFNULL(mdmp.IS_DELETE, 0) = 0
+           AND mdmp.MACHINE_TYPE = 2
+           AND mdmp.PLAN_TYPE = 0
+           AND mdmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mdmp.BEGIN_DATE >= #{startDate,jdbcType=DATE}
+           AND mdmp.END_DAY &lt;= #{endDate,jdbcType=DATE}
+    </select>
+
+    <select id="getProductBaseInfoByRequire" resultType="com.zlt.aps.factory.domain.vo.ProductBaseInfoVo">
+        SELECT DISTINCT prp.FACTORY_CODE,
+               prp.PRODUCT_CODE,
+               mpi.PRODUCT_DESC,
+               mpi.PRO_SIZE,
+               mpi.TIRE_TYPE,
+               mpi.CURING_TIME,
+               mpi.MOULD_CATEGORY,
+               mpi.COMMON_TYPE,
+               mpi.GROSS_RATE_JSON
+          FROM t_mp_product_require_plan prp
+          LEFT JOIN t_mdm_product_info mpi
+            ON mpi.FACTORY_CODE = prp.FACTORY_CODE
+           AND mpi.PRODUCT_CODE = prp.PRODUCT_CODE
+           AND IFNULL(mpi.IS_DELETE, 0) = 0
+         WHERE IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getMonthEnableMouldConfiguration" resultType="com.zlt.aps.factory.domain.vo.MouldInfoVO">
+        SELECT DISTINCT mus.FACTORY_CODE,
+               mus.YEAR,
+               mus.MONTH,
+               mus.MOULD_CODE,
+               mus.MOULD_TYPE,
+               mmi.MOULD_NO,
+               mmi.MOULD_AIR_TYPE
+          FROM t_mdm_mould_use_status mus
+         INNER JOIN t_mdm_model_info mmi
+            ON mmi.MOULD_CODE = mus.MOULD_CODE
+           AND mmi.FACTORY_CODE = mus.FACTORY_CODE
+         INNER JOIN t_mdm_product_model_relation pmr
+            ON pmr.MOULD_CODE = mus.MOULD_CODE
+           AND pmr.FACTORY_CODE = mus.FACTORY_CODE
+         INNER JOIN t_mp_product_require_plan prp
+            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
+           AND IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+         WHERE mus.MOULD_STATUS = 1
+           AND mus.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mus.YEAR = #{year,jdbcType=DECIMAL}
+           AND mus.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
+
+    <select id="getProductionMouldRelation" resultType="com.zlt.aps.factory.domain.vo.ProductMouldConfigurationVo">
+        SELECT DISTINCT prp.FACTORY_CODE,
+               prp.PRODUCT_CODE,
+               pmr.MOULD_CODE,
+               pmr.SPEC_CODE
+          FROM t_mdm_product_model_relation pmr
+         INNER JOIN t_mp_product_require_plan prp
+            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
+           AND prp.FACTORY_CODE = pmr.FACTORY_CODE
+           AND IFNULL(prp.IS_DELETE, 0) = 0
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND prp.PLAN_QTY > 0
+         INNER JOIN t_mdm_model_info mmi
+            ON mmi.MOULD_CODE = pmr.MOULD_CODE
+           AND mmi.FACTORY_CODE = prp.FACTORY_CODE
+    </select>
+
+    <delete id="deleteProductionInitVersion">
+        DELETE FROM t_mp_month_plan_pre_capacity
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_month_plan_init
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_no_production_record
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+    </delete>
+
+    <delete id="deleteProductionMouldVersion">
+        DELETE FROM t_mp_proc_no_production_plan
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_day_result
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_day_result_detail
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_production_group_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+    </delete>
+
+    <select id="getVulcanizationMachineCount" resultType="java.lang.Integer">
+        SELECT count(1) AS count
+          FROM T_LH_MACHINE_INFO tlmi
+         WHERE IFNULL(tlmi.IS_DELETE, 0) = 0
+           AND tlmi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getFactoryProductionGroupConfiguration" resultType="com.zlt.aps.factory.domain.vo.ProductionGroupVo">
+        SELECT tlmi.MAX_MOLD_NUM AS MOULD_NUMBER,
+               count(1) AS GROUP_COUNT
+          FROM T_LH_MACHINE_INFO tlmi
+         WHERE IFNULL(tlmi.IS_DELETE, 0) = 0
+           AND tlmi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+         GROUP BY tlmi.MAX_MOLD_NUM
+    </select>
+
+    <select id="getFormingMachineCount" resultType="java.lang.Integer">
+        SELECT count(1) AS count
+          FROM t_mdm_molding_machine tmmm
+         WHERE IFNULL(tmmm.IS_DELETE, 0) = 0
+           AND tmmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getFactoryAverageSaleProduct" resultType="com.zlt.aps.factory.domain.vo.ProductAverageSaleVo">
+        SELECT PRODUCT_CODE,
+               AVERAGE_VALUE
+          FROM (SELECT DISTINCT PRODUCT_CODE,
+                       SUM(AVERAGE_VALUE) AS AVERAGE_VALUE
+                  FROM t_mdm_stock_up_plan
+                 WHERE IFNULL(IS_DELETE, 0) = 0
+                   AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                   AND YEAR = #{year,jdbcType=DECIMAL}
+                   AND MONTH = #{month,jdbcType=DECIMAL}
+                 GROUP BY PRODUCT_CODE
+               ) A
+         WHERE A.AVERAGE_VALUE >= #{averageValue,jdbcType=DECIMAL}
+    </select>
+
+    <select id="getRequireMinConfiguration" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration">
+        SELECT DISTINCT mprp.PRODUCT_CODE,
+               tmmp.MIN_QTY
+          FROM t_mp_product_require_plan mprp
+          LEFT JOIN t_mdm_min_prod tmmp
+            ON tmmp.FACTORY_CODE = mprp.FACTORY_CODE
+           AND tmmp.PRODUCT_CODE = mprp.PRODUCT_CODE
+           AND IFNULL(tmmp.IS_DELETE, 0) = 0
+         WHERE IFNULL(mprp.IS_DELETE, 0) = 0
+           AND mprp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mprp.`YEAR` = #{year,jdbcType=DECIMAL}
+           AND mprp.`MONTH` = #{month,jdbcType=DECIMAL}
+           AND mprp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+    </select>
+</mapper>

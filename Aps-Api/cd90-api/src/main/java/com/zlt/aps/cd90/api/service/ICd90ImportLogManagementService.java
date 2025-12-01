@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd90.api.domain.dto.Cd90ImportErrorLogManagementDto;
 import com.zlt.aps.cd90.api.domain.dto.Cd90ImportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "ICd90ImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.cd90:cd90}")
 public interface ICd90ImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +49,6 @@ public interface ICd90ImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/cd90/importLogManagement/importData")
-    List<Cd90ImportLogManagementDto> importData(@SpringQueryMap Cd90ImportLogManagementDto dto);
+    @PostMapping("/cd90/importLogManagement/importData")
+    List<Cd90ImportLogManagementDto> importData(@RequestBody Cd90ImportLogManagementDto dto);
 }

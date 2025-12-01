@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueScheduleSupplementMapper">
+	<!-- 生产补量列表 -->
+    <select id="listGlueScheduleSupplement" resultType="com.zlt.mix.schedule.api.domain.entity.GlueScheduleSupplement">
+    	SELECT T.ID,
+		       T.SCHEDULE_RESULT_ID,
+		       T.SCHEDULE_DATE,
+		       to_char(T.SCHEDULE_DATE, 'YYYY-MM-DD') SCHEDULE_DATE_CHAR,
+		       T.MIX_AREA,
+		       T.GLUE,
+		       T.SAP_CODE,
+		       T.MACHINE_CODE,
+		       b.MACHINE_NAME,
+		       T.RECIPE_VERSION_ID,
+		       T.RECIPE_TYPE,
+		       trt.RECIPE_TYPE_NAME,
+		       T.RECIPE_STAGE,
+		       T.RECIPE_MATERIAL_CODE,
+		       T.FORMULA_WEIGHT,
+		       T.FORMULA_TIME,
+		       T.TOTAL_PLAN_QTY,
+			   TRUNCATE(T.MID_CAPACITY/60,0) MID_CAPACITY,
+		       T.MID_PRODUCE_ORDER,
+		       T.MID_PLAN_QTY,
+			   TRUNCATE(T.NIGHT_CAPACITY/60,0) NIGHT_CAPACITY,
+		       T.NIGHT_PRODUCE_ORDER,
+		       T.NIGHT_PLAN_QTY,
+			   TRUNCATE(T.DAY_CAPACITY/60,0) DAY_CAPACITY,
+		       T.DAY_PRODUCE_ORDER,
+		       T.DAY_PLAN_QTY,
+		       T.REMARK,
+		       T.DEL_FLAG,
+		       T.CREATE_BY,
+		       T.CREATE_TIME,
+		       T.UPDATE_BY,
+		       T.UPDATE_TIME
+		  FROM T_GLUE_SCHEDULE_SUPPLEMENT T
+          LEFT JOIN t_mix_machine b on b.del_flag = 0 and t.machine_code = b.machine_code and t.mix_area = b.mix_area
+          LEFT JOIN t_recipe_type trt on t.recipe_type = trt.recipe_type_code and trt.del_flag = 0
+         WHERE t.del_flag = '0'
+    	   AND t.schedule_date = #{scheduleDate}
+    	<if test="mixArea != null and mixArea != ''">
+    	   AND t.mix_area = #{mixArea}
+    	</if>
+    	 ORDER BY MACHINE_CODE, TOTAL_PLAN_QTY
+    </select>
+    
+	<!-- 检查当天是否已经补量 -->
+    <select id="hasSupplement" resultType="boolean">
+	    SELECT CASE WHEN COUNT(1) > 0 THEN 'TRUE'
+	             ELSE 'FALSE'
+	           END
+		  FROM T_GLUE_SCHEDULE_SUPPLEMENT T
+	     WHERE t.del_flag = '0'
+	   	   AND t.schedule_date = #{scheduleDate}
+	   	   AND t.mix_area = #{mixArea}
+    </select>
+    
+    <!-- 查询密炼机常用大规格设置列表 -->
+    <select id="listGlueCommonDemandList" resultType="com.zlt.mix.setting.api.domain.entity.GlueCommonDemand">
+        select g.id, g.mix_area, g.machine_code, m.machine_name, g.glue
+          from t_glue_common_demand g
+          left join t_mix_machine m
+            on m.del_flag = '0'
+           and m.machine_code = g.machine_code
+           and m.mix_area = g.mix_area
+         where g.del_flag = '0'
+	    <if test="mixArea != null  and mixArea != ''"> and g.mix_area = #{mixArea}</if>
+	    <if test="machineCode != null  and machineCode != ''"> and g.machine_code = #{machineCode}</if>
+	    <if test="glue != null  and glue != ''"> and g.glue = #{glue}</if>
+    </select>
+    
+    <!-- 保存补量数据 -->
+    <insert id="saveSupplement">
+    	INSERT INTO T_GLUE_SCHEDULE_SUPPLEMENT
+		  (ID,
+		   SCHEDULE_RESULT_ID,
+		   SCHEDULE_DATE,
+		   MIX_AREA,
+		   GLUE,
+		   SAP_CODE,
+		   MACHINE_CODE,
+		   RECIPE_VERSION_ID,
+		   RECIPE_TYPE,
+		   RECIPE_STAGE,
+		   RECIPE_MATERIAL_CODE,
+		   FORMULA_WEIGHT,
+		   FORMULA_TIME,
+		   TOTAL_PLAN_QTY,
+		   MID_CAPACITY,
+		   MID_PRODUCE_ORDER,
+		   MID_PLAN_QTY,
+		   NIGHT_CAPACITY,
+		   NIGHT_PRODUCE_ORDER,
+		   NIGHT_PLAN_QTY,
+		   DAY_CAPACITY,
+		   DAY_PRODUCE_ORDER,
+		   DAY_PLAN_QTY,
+		   CREATE_BY,
+		   CREATE_TIME,
+		   UPDATE_BY,
+		   UPDATE_TIME)
+        SELECT NULL id, t.*
+          FROM (
+        <foreach collection="list" item="item" separator=" union all ">
+			SELECT #{item.scheduleResultId, jdbcType=VARCHAR} SCHEDULE_RESULT_ID,
+				   #{item.scheduleDate, jdbcType=DATE} SCHEDULE_DATE,
+				   #{item.mixArea, jdbcType=VARCHAR} MIX_AREA,
+				   #{item.glue, jdbcType=VARCHAR} GLUE,
+				   #{item.sapCode, jdbcType=VARCHAR} SAP_CODE,
+				   #{item.machineCode, jdbcType=VARCHAR} MACHINE_CODE,
+				   #{item.recipeVersionId, jdbcType=VARCHAR} RECIPE_VERSION_ID,
+				   #{item.recipeType, jdbcType=VARCHAR} RECIPE_TYPE,
+				   #{item.recipeStage, jdbcType=VARCHAR} RECIPE_STAGE,
+				   #{item.recipeMaterialCode, jdbcType=VARCHAR} RECIPE_MATERIAL_CODE,
+				   #{item.formulaWeight, jdbcType=DOUBLE} FORMULA_WEIGHT,
+				   #{item.formulaTime, jdbcType=INTEGER} FORMULA_TIME,
+				   #{item.totalPlanQty, jdbcType=DOUBLE} TOTAL_PLAN_QTY,
+				   #{item.midCapacity, jdbcType=DOUBLE} MID_CAPACITY,
+				   #{item.midProduceOrder, jdbcType=INTEGER} MID_PRODUCE_ORDER,
+				   #{item.midPlanQty, jdbcType=DOUBLE} MID_PLAN_QTY,
+				   #{item.nightCapacity, jdbcType=DOUBLE} NIGHT_CAPACITY,
+				   #{item.nightProduceOrder, jdbcType=INTEGER} NIGHT_PRODUCE_ORDER,
+				   #{item.nightPlanQty, jdbcType=DOUBLE} NIGHT_PLAN_QTY,
+				   #{item.dayCapacity, jdbcType=DOUBLE} DAY_CAPACITY,
+				   #{item.dayProduceOrder, jdbcType=INTEGER} DAY_PRODUCE_ORDER,
+				   #{item.dayPlanQty, jdbcType=DOUBLE} DAY_PLAN_QTY,
+				   #{item.createBy, jdbcType=VARCHAR} CREATE_BY,
+				   #{item.createTime, jdbcType=DATE} CREATE_TIME,
+				   #{item.updateBy, jdbcType=VARCHAR} UPDATE_BY,
+				   #{item.updateTime, jdbcType=DATE} UPDATE_TIME
+			FROM DUAL
+        </foreach>
+        ) t
+    </insert>
+</mapper>

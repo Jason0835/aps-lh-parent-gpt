@@ -17,6 +17,13 @@ public interface TqEngineStockMapper {
     List<TqStockConsumeVo> listCxPlanAndConsume(@Param("scheduleDate") String scheduleDate);
 
     /**
+     * 查询昨日早班计划量
+     * @param scheduleDate
+     * @return
+     */
+    List<TqStockConsumeVo> listLastDayMidPlan(@Param("scheduleDate") String scheduleDate);
+
+    /**
      * 查询指定日期的胎圈库存量
      * @param stockDate  日期，格式：yyyy-mm-dd
      * @return

@@ -7,12 +7,16 @@ nacos:
 
 # Spring
 spring:
+  # 添加了后端的swagger接口才会显示
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   application:
     # 应用名称
     name: aps-tq
   profiles:
     # 环境配置
-    active: dev
+    active: prod
   main:
     allow-bean-definition-overriding: true
   cloud:

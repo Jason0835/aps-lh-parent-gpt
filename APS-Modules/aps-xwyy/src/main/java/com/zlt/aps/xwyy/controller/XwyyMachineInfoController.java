@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Api(tags = "纤维压延机台信息维护接口")
 @RestController
-@RequestMapping("/machine")
+@RequestMapping("/xwyy/machine")
 public class XwyyMachineInfoController extends BaseController {
     @Autowired
     private XwyyMachineInfoService machineInfoService;

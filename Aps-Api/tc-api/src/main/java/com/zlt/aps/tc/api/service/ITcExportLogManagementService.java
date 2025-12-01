@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.dto.TcExportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,7 @@ import java.util.List;
 @FeignClient(contextId = "ITcExportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tc:tc}")
 public interface ITcExportLogManagementService
 {
-    
+
     /**
      * 查询纤维压延参数信息列表
      */
@@ -43,6 +42,6 @@ public interface ITcExportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/tc/exportLogManagement/exportData")
-    List<TcExportLogManagementDto> exportData(@SpringQueryMap TcExportLogManagementDto dto);
+    @PostMapping("/tc/exportLogManagement/exportData")
+    List<TcExportLogManagementDto> exportData(@RequestBody TcExportLogManagementDto dto);
 }

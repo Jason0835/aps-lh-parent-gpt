@@ -1,49 +1,16 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AssistSpec;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMapper;
-import com.zlt.aps.cd15.engine.service.Cd15EngineEquilibriumService;
-import com.zlt.aps.cd15.engine.service.Cd15EngineLossService;
-import com.zlt.aps.cd15.engine.service.Cd15EngineMachineService;
-import com.zlt.aps.cd15.engine.service.Cd15EngineMonthSurplusService;
-import com.zlt.aps.cd15.engine.service.Cd15EnginePlanQtyService;
-import com.zlt.aps.cd15.engine.service.Cd15EngineProductOrderService;
-import com.zlt.aps.cd15.engine.service.Cd15EngineService;
-import com.zlt.aps.cd15.engine.vo.Cd15MonthSurplusVo;
-import com.zlt.aps.cd15.engine.vo.Cd15ParamsVo;
-import com.zlt.aps.cd15.engine.vo.Cd15ScheduleRecordVo;
-import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
-import com.zlt.aps.cd15.engine.vo.Cd15StockVo;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
+import com.zlt.aps.cd15.engine.service.*;
+import com.zlt.aps.cd15.engine.vo.*;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.engine.constants.EngineConstants;
@@ -52,12 +19,29 @@ import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 15度裁断自动排程服务实现类
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-7 10:36:57
@@ -84,6 +68,8 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 	private IncrementService incrementService;
 	@Resource
 	private AutoScheduleLogService autoScheduleLogService;
+    @Autowired
+    private Cd15EngineMonthSurplusMapper cd15EngineMonthSurplusMapper;
 
 	/**
 	 * 生产阶段校验开关状态：打开
@@ -108,7 +94,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 15度裁断自动排程
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-19 11:26:33
@@ -170,8 +156,12 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 			/**
 			 * 将15度裁断排程安排到具体生产线上
 			 */
-			cd15EngineMachineService.scheduleMachine(scheduleList);
+//			cd15EngineMachineService.scheduleMachine(scheduleList);
 
+			// 一出二机台处理
+//			scheduleList = cd15EngineMachineService.handleOneOutTwoMachine(scheduleList);
+
+            this.loadMonthSurplus(scheduleDate, scheduleList); // 加载月度计划剩余量
 			/**
 			 * 计算库存相关信息，包括库存量、重算计划量、计算可用时长
 			 */
@@ -196,12 +186,9 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 			/**
 			 * 均衡排产，减少中班与晚班的计划量差异
 			 */
-			String planDifferenceRate = paramsMap.get(EngineConstants.PLAN_DIFFERENCE_RATE);
-			String supplyTimePass = paramsMap.get(EngineConstants.SUPPLY_TIME_PASS);
-			String equalShareThreshold = paramsMap.get(EngineConstants.EQUAL_SHARE_THRESHOLD);
-			cd15EngineEquilibriumService.scheduleEquilibrium(scheduleList, planDifferenceRate, supplyTimePass,
-					equalShareThreshold);
-
+			cd15EngineEquilibriumService.scheduleEquilibrium(scheduleList, paramsMap);
+			cd15EngineMachineService.chooseMachineByCapacity4Machine(scheduleList); // 根据产能选择机台
+            scheduleList = cd15EngineMachineService.handleOneOutTwoMachine(scheduleList); // 选完机台后处理一出二记录
 			/**
 			 * 计算排产结果的生产顺序
 			 */
@@ -246,9 +233,29 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 		autoScheduleLogService.insertCd15ScheduleLog(batchNo, "", "7.1、最终排产结果", toJSONString(scheduleList));
 	}
 
+    /**
+     *  加载月度计划剩余量
+     * @param scheduleDate
+     * @param scheduleList
+     */
+    private void loadMonthSurplus(Date scheduleDate, List<Cd15ScheduleResultVo> scheduleList) {
+        String year = DateUtils.parseDateToStr("yyyy", scheduleDate);
+        String month = DateUtils.parseDateToStr("MM", scheduleDate);
+        List<Cd15MonthSurplusVo> monthSurplusList = cd15EngineMonthSurplusMapper.listCd15MonthPlanSurplus(year, month);
+        Map<String, Double> monthSurplus = monthSurplusList.stream()
+                .collect(Collectors.toMap(Cd15MonthSurplusVo::getMaterialCode, Cd15MonthSurplusVo::getMonthRemainQty, (v1, v2) -> v2)); // 按钢带分组
+        scheduleList.stream()
+                .forEach(s -> {
+                    Double remainQty1 = monthSurplus.getOrDefault(s.getSteelStripCode1(), 0D);
+                    Double remainQty2 = monthSurplus.getOrDefault(s.getSteelStripCode2(), 0D);
+                    s.setSurplusQty(remainQty1); // 剩余量取最小值
+                    s.setSurplusQty2(remainQty2); // 剩余量取最小值
+                }); // 按帘布+层级获取剩余量
+    }
+
 	/**
 	 * 获取库存损耗率
-	 * 
+     *
 	 * @param paramsMap
 	 * @return
 	 */
@@ -264,7 +271,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 处理一个已发布规格有多个排程的情况
-	 * 
+     *
 	 * @param batchNo        排程批次号
 	 * @param scheduleList   排程明细列表
 	 * @param isReleaseGroup 已发布多笔的规格排程列表
@@ -297,7 +304,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 取出当天已经发布过的排程记录
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @return
 	 */
@@ -314,7 +321,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 获取已发布规格标识，格式：1号钢带+2号钢带+裁断角度
-	 * 
+     *
 	 * @param schedule
 	 * @return
 	 */
@@ -325,7 +332,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 初始化排程明细
-	 * 
+     *
 	 * @param batchNo      排程批次号
 	 * @param scheduleList 排程明细列表
 	 * @param isReleaseMap 已发布排程列表
@@ -363,7 +370,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 生成外协计划列表
-	 * 
+     *
 	 * @param scheduleDate   排产日
 	 * @param isProductStage 是否只排生产阶段
 	 * @param scheduleList   原排产计划
@@ -405,7 +412,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 将正常排程计划中的外协规格转移出来
-	 * 
+     *
 	 * @param scheduleList  原排产计划
 	 * @param assistSpecMap 外协规格清单map
 	 * @return
@@ -426,7 +433,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 15度裁断插单
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-24 20:40:48
@@ -462,7 +469,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 批量导入15度裁断排程记录
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
 	 * @return 导入异常日志
@@ -494,7 +501,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 批量保存15度裁断排程记录
-	 * 
+     *
 	 * @param batchNo      批次号
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
@@ -515,7 +522,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 		Map<String, Cd15StockVo> stockMap = cd15EnginePlanQtyService.getStockMap(scheduleDate, stockLossRate,
 				isProductStage);
 		// 插单基础信息
-		Map<String, Cd15ScheduleResultVo> baseInfoMap = cd15EngineMapper.listInsertOrderBaseInfo(scheduleList).stream()
+		Map<String, Cd15ScheduleResultVo> baseInfoMap = cd15EngineMapper.listInsertOrderBaseInfo1(scheduleList).stream()
 				.collect(Collectors.toMap(v -> this.createBaseInfoMapKey(v), Function.identity(), (v1, v2) -> v1));
 		// 参数：收尾提醒阈值
 		String closeOutNum = this.getParamsMap().get(EngineConstants.CLOSE_OUT_NUM);
@@ -595,9 +602,9 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 	}
 
 	/**
-	 * 
+     *
 	 * 15度裁断转机台（仅记录日志）
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-24 21:11:58
@@ -615,9 +622,9 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 	}
 
 	/**
-	 * 
+     *
 	 * 确认机台
-	 * 
+     *
 	 * @param scheduleResult 确认后的排产记录
 	 */
 	@Transactional
@@ -658,7 +665,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 将指定日期的15度裁断排产结果做平衡处理
-	 * 
+     *
 	 * @param scheduleDate 排产日期
 	 */
 	@Transactional
@@ -673,6 +680,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 		String batchNo = CollectionUtil.firstElement(scheduleList).getBatchNo();
 		// 选择机台前的排程数据json字符串，用于日志记录
 		String oldScheduleResult = toJSONString(scheduleList);
+        Map<String, String> paramsMap = this.getParamsMap(); // 加载排产参数
 		for (Cd15ScheduleResultVo schedule : scheduleList) {
 			// 如果发布次数大于0，则需要将状态更新为待发布
 			if (Optional.ofNullable(schedule.getPublishSuccessCount()).orElse(0) > 0) {
@@ -682,21 +690,17 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 			}
 			schedule.setBaseVale(schedule.getId());
 			// 处理排产计划量，防止二次投产
-			cd15EnginePlanQtyService.handleSecondaryProduct(schedule, null);
+//			cd15EnginePlanQtyService.handleSecondaryProduct(schedule, paramsMap);
 		}
-
-		// 取出平衡参数
-		Map<String, String> paramsMap = this.getParamsMap();
-		String planDifferenceRate = paramsMap.get(EngineConstants.PLAN_DIFFERENCE_RATE);
-		String supplyTimePass = paramsMap.get(EngineConstants.SUPPLY_TIME_PASS);
-		String equalShareThreshold = paramsMap.get(EngineConstants.EQUAL_SHARE_THRESHOLD);
 		// 平衡中夜班产量
-		cd15EngineEquilibriumService.scheduleEquilibrium(scheduleList, planDifferenceRate, supplyTimePass,
-				equalShareThreshold);
+		cd15EngineEquilibriumService.scheduleEquilibrium(scheduleList, paramsMap);
 		// 计算生产顺序
 		cd15EngineProductOrderService.calculateProduceOrder(scheduleList);
 		// 更新排程数据至数据库
-		cd15EngineMapper.updateCd15ScheduleResultPlanQty(scheduleList);
+		cd15EngineMapper.createTempTable();
+		cd15EngineMapper.insertTempTable(scheduleList);
+		cd15EngineMapper.updateCd15ScheduleResultPlanQty(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), scheduleList);
+//		cd15EngineMapper.dropTempTable();
 		// 记录日志
 		String logdetail = logSplit("平衡前排程数据：" + oldScheduleResult, "平衡后排产数据：" + toJSONString(scheduleList));
 		autoScheduleLogService.insertCd15ScheduleLog(batchNo, null, "手工平衡中夜班产量", logdetail);
@@ -704,7 +708,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 清理排产日当天的历史排程数据
-	 * 
+     *
 	 * @param scheduleDate 排程日期
 	 */
 	private void cleanHistoryScheduleResult(Date scheduleDate) {
@@ -719,7 +723,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 通过导入的排程明细创建单耗信息map的key
-	 * 
+     *
 	 * @param resultVo 导入的排产明细
 	 * @return
 	 */
@@ -732,7 +736,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 通过新生成的排程明细创建单耗信息map的key
-	 * 
+     *
 	 * @param resultVo 新生成排产明细
 	 * @return
 	 */
@@ -745,7 +749,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 验证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-	 * 
+     *
 	 * @param scheduleDate   排程日志
 	 * @param batchNo        批次号
 	 * @param isProductStage 仅对投产阶段规格排产
@@ -800,12 +804,12 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 					break validate;
 				}
 				// 钢带规格
-				if (StringUtil.isEmpty(constructionInfo.getArticleCrownSpec())) {
-					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.articleCrownSpec");
-				}
-				if (StringUtils.isNotEmpty(errorMsg)) {
-					break validate;
-				}
+//				if (StringUtil.isEmpty(constructionInfo.getArticleCrownSpec())) {
+//					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.articleCrownSpec");
+//				}
+//				if (StringUtils.isNotEmpty(errorMsg)) {
+//					break validate;
+//				}
 				// 贴合鼓周长
 				if (constructionInfo.getFitDrumPerimeter() == null || constructionInfo.getFitDrumPerimeter() == 0L) {
 					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.fitDrumPerimeter");
@@ -832,7 +836,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 返回错误信息（抛出异常）
-	 * 
+     *
 	 * @param errorMsg
 	 */
 	private void returnErrorMessage(String errorMsg) {
@@ -843,7 +847,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 反馈校验错误信息
-	 * 
+     *
 	 * @param batchNo       排产批次号
 	 * @param embryoCode    胎号
 	 * @param columnNameKey 校验字段名称key（国际化）
@@ -860,7 +864,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 创建自动排程记录
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-12 10:54:58
@@ -879,7 +883,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 创建批次号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-12 10:02:41
@@ -893,7 +897,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 创建工单号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-12 10:02:41
@@ -906,7 +910,7 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 
 	/**
 	 * 获取工序参数map
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-26 15:26:34
@@ -916,4 +920,29 @@ public class Cd15EngineServiceImpl implements Cd15EngineService {
 		return cd15EngineMapper.listCd15Params().stream()
 				.collect(Collectors.toMap(Cd15ParamsVo::getParamCode, Cd15ParamsVo::getParamValue, (v1, v2) -> v2));
 	}
+
+    @Override
+    public void batchUpdateBatchNoAndOrderNo(Date scheduleDate) {
+        List<Cd15ScheduleResultVo> scheduleResultVoList = cd15EngineMapper.selectCd15ScheduleList(scheduleDate);
+        //查询当前排程的批次号
+        String batchNo = cd15EngineMapper.getCurrentBatchNo(scheduleDate);
+        if (StringUtils.isBlank(batchNo)) {
+            //当前的批次号为空，说明还没”自动排程“或者做的批量导入（需要删掉已排的数据），那么自己生成一个排程批次号
+            //排程批次号
+            batchNo = this.createBatchNo(scheduleDate);
+            //创建自动排程记录
+            this.createScheduleRecord(scheduleDate, "", batchNo);
+        }
+        for (Cd15ScheduleResultVo scheduleResult : scheduleResultVoList) {
+            //批次号
+            scheduleResult.setBatchNo(batchNo);
+            //工单号
+            String orderNo = this.createOrderNo(batchNo);
+            scheduleResult.setOrderNo(orderNo);
+        }
+
+		if (org.apache.commons.collections.CollectionUtils.isNotEmpty(scheduleResultVoList)) {
+			cd15EngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
+		}
+    }
 }

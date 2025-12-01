@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.ScheduleOperLogMapper">
+
+    <select id="selectScheduleOperLogList" parameterType="com.zlt.mix.schedule.api.domain.entity.ScheduleOperLog"
+            resultType="com.zlt.mix.schedule.api.domain.entity.ScheduleOperLog">
+        select id, schedule_type, schedule_id, oper_type, schedule_date, mix_area, material_code, before_machine_code,
+        before_recipe_type,before_recipe_version_id,before_recipe_stage,
+        before_mid_plan, before_mid_order, before_night_plan, before_night_order, before_day_plan, before_day_order,
+        after_machine_code, after_recipe_type,after_recipe_version_id,after_recipe_stage, after_mid_plan, after_mid_order,
+        after_night_plan, after_night_order, after_day_plan,after_day_order, remark, del_flag, create_by, create_time, update_by, update_time,
+        oper_ip, before_Release_Status, after_Release_Status
+        from t_schedule_oper_log
+        where del_flag = '0'
+        <if test="scheduleType != null  and scheduleType != ''">and schedule_type = #{scheduleType}</if>
+        <if test="scheduleId != null ">and schedule_id = #{scheduleId}</if>
+        <if test="operType != null  and operType != ''">and oper_type = #{operType}</if>
+        <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
+        <if test="mixArea != null  and mixArea != ''">and mix_area = #{mixArea}</if>
+        <if test="materialCode != null  and materialCode != ''">and material_code = #{materialCode}</if>
+        <if test="orderStr == null">order by create_time desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <insert id="batchInsertScheduleOperLogInfo">
+        insert into t_schedule_oper_log
+        (id,schedule_type,schedule_id,oper_type,schedule_date,mix_area,material_code,before_machine_code,before_recipe_type,before_recipe_version_id,before_recipe_stage,before_mid_plan,before_mid_order,before_night_plan,before_night_order,before_day_plan,before_day_order,after_machine_code,after_recipe_type,after_recipe_version_id,after_recipe_stage,after_mid_plan,after_mid_order,after_night_plan,after_night_order,after_day_plan,after_day_order,remark,del_flag,create_by,create_time,update_by,update_time,
+        oper_ip, before_Release_Status, after_Release_Status
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="scheduleOperLog" separator=" union all ">
+            select
+            #{scheduleOperLog.scheduleType,jdbcType= VARCHAR} schedule_type,
+            #{scheduleOperLog.scheduleId,jdbcType=DOUBLE} schedule_id, #{scheduleOperLog.operType,jdbcType= VARCHAR}
+            oper_type, #{scheduleOperLog.scheduleDate,jdbcType=DATE} schedule_date,
+            #{scheduleOperLog.mixArea,jdbcType= VARCHAR} mix_area, #{scheduleOperLog.materialCode,jdbcType= VARCHAR}
+            material_code, #{scheduleOperLog.beforeMachineCode,jdbcType= VARCHAR} before_machine_code,
+            #{scheduleOperLog.beforeRecipeType,jdbcType=VARCHAR} before_recipe_type,
+            #{scheduleOperLog.beforeRecipeVersionId,jdbcType=VARCHAR} before_recipe_version_id,
+            #{scheduleOperLog.beforeRecipeStage,jdbcType=VARCHAR} before_recipe_stage,
+            #{scheduleOperLog.beforeMidPlan,jdbcType=DOUBLE} before_mid_plan,
+            #{scheduleOperLog.beforeMidOrder,jdbcType=DOUBLE} before_mid_order,
+            #{scheduleOperLog.beforeNightPlan,jdbcType=DOUBLE} before_night_plan,
+            #{scheduleOperLog.beforeNightOrder,jdbcType=DOUBLE} before_night_order,
+            #{scheduleOperLog.beforeDayPlan,jdbcType=DOUBLE} before_day_plan,
+            #{scheduleOperLog.beforeDayOrder,jdbcType=DOUBLE} before_day_order,
+            #{scheduleOperLog.afterMachineCode,jdbcType= VARCHAR} after_machine_code,
+            #{scheduleOperLog.afterRecipeType,jdbcType=VARCHAR} after_recipe_type,
+            #{scheduleOperLog.afterRecipeVersionId,jdbcType=VARCHAR} after_recipe_version_id,
+            #{scheduleOperLog.afterRecipeStage,jdbcType=VARCHAR} after_recipe_stage,
+            #{scheduleOperLog.afterMidPlan,jdbcType=DOUBLE} after_mid_plan,
+            #{scheduleOperLog.afterMidOrder,jdbcType=DOUBLE} after_mid_order,
+            #{scheduleOperLog.afterNightPlan,jdbcType=DOUBLE} after_night_plan,
+            #{scheduleOperLog.afterNightOrder,jdbcType=DOUBLE} after_night_order,
+            #{scheduleOperLog.afterDayPlan,jdbcType=DOUBLE} after_day_plan,
+            #{scheduleOperLog.afterDayOrder,jdbcType=DOUBLE} after_day_order,
+            #{scheduleOperLog.remark,jdbcType= VARCHAR} remark, '0' del_flag,
+            #{scheduleOperLog.createBy,jdbcType= VARCHAR} create_by, #{scheduleOperLog.createTime,jdbcType=DATE}
+            create_time, #{scheduleOperLog.updateBy,jdbcType= VARCHAR} update_by,
+            #{scheduleOperLog.updateTime,jdbcType=DATE} update_time,
+            #{scheduleOperLog.operIp,jdbcType= VARCHAR} oper_ip,
+            #{scheduleOperLog.beforeReleaseStatus,jdbcType= VARCHAR} before_Release_Status,
+            #{scheduleOperLog.afterReleaseStatus,jdbcType= VARCHAR} after_Release_Status
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <select id="selectRecipeTypeList" parameterType="com.zlt.mix.setting.api.domain.entity.RecipeType" resultType="com.zlt.mix.setting.api.domain.entity.RecipeType">
+        select
+        id,
+        recipe_type_code,
+        recipe_type_name,
+        create_by,
+        create_time,
+        update_by,
+        update_time,
+        del_flag,
+        remark
+        from t_recipe_type
+        where del_flag = '0'
+    </select>
+</mapper>

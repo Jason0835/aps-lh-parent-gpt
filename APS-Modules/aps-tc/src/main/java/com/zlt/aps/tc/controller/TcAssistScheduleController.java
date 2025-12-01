@@ -36,7 +36,7 @@ import java.util.Locale;
  * @date 2022-02-15
  */
 @RestController
-@RequestMapping("/assistSchedule")
+@RequestMapping("/tc/assistSchedule")
 public class TcAssistScheduleController extends BaseController {
 
     @Value("${excelModelPath}")

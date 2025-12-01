@@ -1,10 +1,11 @@
 package com.zlt.aps.gdyy.engine.vo;
 
-import java.util.Date;
-
 import com.zlt.aps.common.core.domain.ApsBaseDto;
-
 import lombok.Data;
+import org.apache.commons.lang3.ObjectUtils;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 钢带压延排程结果值对象
@@ -37,6 +38,11 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 	/** 钢压大卷编号 */
 	private String bigRollCode;
 
+	/**
+	 * 机台ID
+	 */
+	private String machineCode;
+
 	/** 日用参考（个） */
 	private Double dayUsed;
 
@@ -45,6 +51,11 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 
 	/** 中班（一班16点-24点）计划量 */
 	private Double class1Plan;
+
+    /**
+     * 一班排产顺序
+     */
+    private Long class1ProduceOrder;
 
 	/** 中班计划量个数 */
 	private Double class1PlanNum;
@@ -58,6 +69,11 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 	/** 夜班（二班0点-8点）计划量 */
 	private Double class2Plan;
 
+    /**
+     * 二班排产顺序
+     */
+    private Long class2ProduceOrder;
+
 	/** 中班计划量个数 */
 	private Double class2PlanNum;
 
@@ -69,6 +85,14 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 
 	/** 白班（三班8点-16点）计划量 */
 	private Double class3Plan;
+    
+    /** 钢丝原线代码 */
+    private String SteelLineCode;
+
+    /**
+     * 三班排产顺序
+     */
+    private Long class3ProduceOrder;
 
 	/** 中班计划量个数 */
 	private Double class3PlanNum;
@@ -78,6 +102,9 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 
 	/** 白班（三班8点-16点）备注 */
 	private String class3Remark;
+	
+	/** 库存用量比例 **/
+	private BigDecimal stockPlanRate;
 
 	/** 是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE */
 	private String isRelease;
@@ -106,4 +133,50 @@ public class GdyyScheduleResultVo extends ApsBaseDto {
 	 */
 	private String dataSource;
 
+    /**
+     * 对应成型一班的计划量
+     */
+    private Double cxClass1Plan;
+
+    /**
+     * 对应成型二班的计划量
+     */
+    private Double cxClass2Plan;
+
+    /**
+     * 对应成型三班的计划量
+     */
+    private Double cxClass3Plan;
+
+    /**
+     * 对应成型次一班的计划量
+     */
+    private Double cxClass4Plan;
+
+    /**
+     * 对应成型次二班的计划量
+     */
+    private Double cxClass5Plan;
+
+    /**
+     * 对应成型次三班的计划量
+     */
+    private Double cxClass6Plan;
+    
+    /**
+     * 上一天计划量
+     */
+    private Double lastPlanQty;
+
+    // 辅助方法：获取总计划量
+    public Double getTotalPlanQty() {
+        return getTotalPlan(this);
+    }
+
+	// 辅助方法：获取总计划量
+	public static double getTotalPlan(GdyyScheduleResultVo item) {
+		return ObjectUtils.defaultIfNull(item.getClass1Plan(), 0D)
+				+ ObjectUtils.defaultIfNull(item.getClass2Plan(), 0D)
+				+ ObjectUtils.defaultIfNull(item.getClass3Plan(), 0D);
+	}
 }

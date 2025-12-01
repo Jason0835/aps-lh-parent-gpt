@@ -2,6 +2,7 @@ package com.zlt.aps.mps;
 
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.mps.controller.MesMergeController;
+import com.zlt.aps.mps.controller.RequestMesController;
 import com.zlt.aps.mps.domain.TCxClassShiftFinishQty;
 import com.zlt.aps.mps.mapper.TCxClassShiftFinishQtyMapper;
 import com.zlt.aps.mps.service.*;
@@ -27,21 +28,28 @@ public class MesSyncTest {
 
 	@Autowired
 	private MesMergeController mergeController;
-	@Resource
+
+    @Autowired
+	private RequestMesController requestMesController;
+
+    @Resource
 	private TCxClassShiftFinishQtyMapper cxClassShiftFinishQtyMapper;
 	
 	@Test
     public void test() {
 //		mesConstructionInfoService.mergeConstructionInfo();
-		monthPlanStatisticsService.actualOverProduction();
+//		monthPlanStatisticsService.actualOverProduction();
+//	    mesConstructionInfoService.mergeBomToConstruction("MES_APS_202503240002");
+//        mesConstructionInfoService.mergePlmToConstruction("002");
+        requestMesController.kettleSync("MES_BAS_MATERIAL");
     }
 
-    @Test
+//    @Test
 	public void mpsToFacTest() {
 		mergeController.mpsSyncTest("APS202109070001", "MPS_TO_APS_FAC", "2021", "09", "0");
 	}
 
-	@Test
+//	@Test
 	public void getCxClassTest() {
 		Date date = DateUtil.from("2021-09");
 		String dates = DateUtil.formatMonth(date);

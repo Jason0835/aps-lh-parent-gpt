@@ -10,12 +10,11 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 定点机台信息对外暴露接口
  */
-@FeignClient(contextId = "iCxSpecifyMachineService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
+@FeignClient(contextId = "iCxSpecifyMachineService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:/cxlh}")
 public interface ICxMatchingSpecifyMachineService {
 
     /**
@@ -116,7 +115,7 @@ public interface ICxMatchingSpecifyMachineService {
     public AjaxResult detailImportData(@RequestBody List<CxMatchingSpecifyMachineList> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     @PostMapping("/specifyMachine/detail/viewList")
-    List<CxMatchingSpecifyMachineList> viewList(@RequestBody CxMatchingSpecifyMachineList cxMatchingSpecifyMachineList);
+    AjaxResult viewList(@RequestBody CxMatchingSpecifyMachineList cxMatchingSpecifyMachineList);
 
 
 }

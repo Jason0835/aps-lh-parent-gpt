@@ -15,6 +15,7 @@ import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
+import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.common.handle.TqSyncDataHandle;
 import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.entity.TqScheduleResult;
@@ -266,7 +267,7 @@ public class TqScheduleResultController extends BaseController {
             syncParamsVO.setCompanyCode(companyCode);
             //往消息队列发送消息
             tqSyncDataHandle.syncNotice(syncParamsVO);
-            
+
 			// 取回mes的反馈结果
 			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
 			String status = logs.getStatus();
@@ -313,7 +314,7 @@ public class TqScheduleResultController extends BaseController {
     /**
      * 根据排程日期、物料编号、机台id校验唯一性
      *
-     * @param scheduleResult 要校验记录
+     * @param dto 要校验记录
      * @return 查询到的记录数
      */
     @ApiOperation("根据排程日期、物料编号、机台id校验唯一性")
@@ -357,7 +358,7 @@ public class TqScheduleResultController extends BaseController {
 
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     * @param scheduleDate 排程日期
+     * @param scheduleResult 排程日期
      * @return 查询到的记录数
      */
     @PostMapping("/isReleasingOrTimeoutByDate")
@@ -367,7 +368,7 @@ public class TqScheduleResultController extends BaseController {
 
     /**
      * 更改发布状态
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Log(title = "ui.data.column.tq.scheduleResult.modelName")
@@ -377,5 +378,34 @@ public class TqScheduleResultController extends BaseController {
         BeanUtils.copyProperties(entity, tqScheduleResult);
         tqScheduleResultService.changeReleaseStatus(tqScheduleResult);
         return AjaxResult.success();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<TqDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return tqScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody TqScheduleResultDto scheduleResult) {
+        TqScheduleResult result = new TqScheduleResult();
+        BeanUtils.copyProperties(scheduleResult, result);
+        return tqScheduleResultService.getSummaryVo(result);
     }
 }

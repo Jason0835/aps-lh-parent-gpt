@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineSpecifyMachineMapper">
+
+    <select id="selectGdyySpecifyMachineList" resultType="com.zlt.aps.gdyy.engine.vo.GdyySpecifyMachineVo">
+        SELECT M.BIG_ROLL_CODE,
+               GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
+        FROM T_GDYY_SPECIFY_MACHINE M
+                 LEFT JOIN T_GDYY_MACHINE_INFO MI
+                           ON MI.ID = M.MACHINE_ID
+        WHERE M.DEL_FLAG = '0'
+          AND MI.DEL_FLAG = '0'
+          AND MI.STATUS = '0'
+          AND M.JOB_TYPE = #{jobType}
+        GROUP BY M.BIG_ROLL_CODE
+    </select>
+</mapper>

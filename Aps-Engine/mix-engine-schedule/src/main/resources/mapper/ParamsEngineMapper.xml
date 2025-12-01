@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.ParamsEngineMapper">
+
+    <select id="listLhflParamsList" resultType="com.zlt.mix.setting.api.domain.entity.LhflScheduleParams">
+        SELECT param_code, param_name, param_value
+        FROM T_LHFL_SCHEDULE_PARAMS p
+        where mix_area = (SELECT max(mix_area)
+                          FROM T_LHFL_SCHEDULE_PARAMS p1
+                          WHERE mix_area in <foreach collection="mixAreas" item="mixArea" open="(" close=")" separator=",">#{mixArea}</foreach>
+                          AND p1.del_flag = '0'
+                          AND p.param_code=p1.param_code)
+        and p.mix_area in <foreach collection="mixAreas" item="mixArea" open="(" close=")" separator=",">#{mixArea}</foreach>
+        and p.del_flag = '0'
+    </select>
+    
+    <!-- 加载胶料排程参数设置 -->
+    <select id="listGlueParams" resultType="com.zlt.mix.setting.api.domain.entity.SettingScheduleParams">
+	    SELECT DISTINCT
+		  PARAM_CODE, PARAM_VALUE, PARAM_NAME 
+		FROM (
+		  SELECT CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_CODE ELSE a.PARAM_CODE END PARAM_CODE,
+		         CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_NAME ELSE a.PARAM_NAME END PARAM_NAME,
+		         CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_VALUE ELSE a.PARAM_VALUE END PARAM_VALUE
+		    FROM  T_SCHEDULE_PARAMS A
+		    LEFT JOIN T_SCHEDULE_PARAMS B
+		      ON A.Param_Code = b.param_code
+		     AND b.mix_area = #{mixArea}
+		     AND b.del_flag = 0
+		    where a.mix_area = '0'
+			  AND a.DEL_FLAG = '0'
+		) as TSP WHERE PARAM_CODE IS NOT NULL
+    </select>
+</mapper>

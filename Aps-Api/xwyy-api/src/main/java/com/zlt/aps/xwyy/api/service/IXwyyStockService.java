@@ -22,7 +22,7 @@ public interface IXwyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/xwyy/stock/list")
     TableDataInfo list(@RequestBody XwyyStock stock);
 
     /**
@@ -31,7 +31,7 @@ public interface IXwyyStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/xwyy/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -40,7 +40,7 @@ public interface IXwyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/xwyy/stock")
     AjaxResult add(@Validated @RequestBody XwyyStock stock);
 
 
@@ -50,7 +50,7 @@ public interface IXwyyStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/xwyy/stock/selectStockById/{id}")
     XwyyStock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface IXwyyStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/xwyy/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -68,7 +68,7 @@ public interface IXwyyStockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/xwyy/stock")
     AjaxResult edit(@Validated @RequestBody XwyyStock stock);
 
     /**
@@ -77,13 +77,13 @@ public interface IXwyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/xwyy/stock/exportList")
     List<XwyyStock> exportList(@RequestBody XwyyStock stock);
 
     /**
      * 导入数据
      */
-    @PostMapping("/stock/importData")
+    @PostMapping("/xwyy/stock/importData")
     public AjaxResult importData(@RequestBody List<XwyyStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 

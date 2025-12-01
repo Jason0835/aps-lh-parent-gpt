@@ -5,7 +5,7 @@
     <parent>
         <artifactId>aps-engine</artifactId>
         <groupId>com.zlt.aps</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -47,7 +47,7 @@
         <dependency>
             <groupId>com.zlt.aps.nc</groupId>
             <artifactId>aps-nc-api</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
 
@@ -67,7 +67,7 @@
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <optional>true</optional>
             <exclusions>
                 <exclusion>
@@ -81,7 +81,7 @@
         <dependency>
             <groupId>com.zlt.aps.common.engine</groupId>
             <artifactId>aps-engine-common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <dependency>

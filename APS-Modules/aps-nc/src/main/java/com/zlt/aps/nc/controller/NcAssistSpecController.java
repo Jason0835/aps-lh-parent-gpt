@@ -22,15 +22,15 @@ import java.util.List;
 
 @Api(tags = {"内衬外协规格管理接口"})
 @RestController
-@RequestMapping("/assistSpec")
+@RequestMapping("/nc/assistSpec")
 public class NcAssistSpecController extends BaseController {
 
     @Resource
     private NcAssistSpecService ncAssistSpecService;
 
     @ApiOperation("根据条件查询外协规格管理列表")
-    @GetMapping("/listAssistSpec")
-    public TableDataInfo listAssistSpec(NcAssistSpec dto) {
+    @PostMapping("/listAssistSpec")
+    public TableDataInfo listAssistSpec(@RequestBody NcAssistSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcAssistSpec> list = ncAssistSpecService.listAssistSpec(dto);
@@ -77,8 +77,8 @@ public class NcAssistSpecController extends BaseController {
 
     @Log(title = "ui.nc.assistSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<NcAssistSpec> exportData(NcAssistSpec dto) {
+    @PostMapping("/exportData")
+    public List<NcAssistSpec> exportData(@RequestBody NcAssistSpec dto) {
         dto.setOrderStr(orderStr());
         List<NcAssistSpec> list = ncAssistSpecService.listAssistSpec(dto);
         return list;

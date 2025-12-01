@@ -201,6 +201,9 @@ public class TmLossSettingServiceImpl extends ServiceImpl<TmLossSettingMapper, T
             if (CollectionUtils.isEmpty(validated)) {
                 lossSetting.setMachineId(machineId);
                 lossSetting.setBaseVale(null);
+                if (StringUtils.isBlank(lossSetting.getTreadCode())) {
+                    lossSetting.setTreadCode(null);
+                }
                 importList.add(lossSetting);
             } else {
                 failureNum++;

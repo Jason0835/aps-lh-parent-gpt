@@ -1,18 +1,17 @@
 package com.zlt.aps.gdyy.engine.service.impl;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.annotation.Resource;
-
-import org.springframework.stereotype.Service;
-
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.gdyy.engine.mapper.GdyyEngineLossMapper;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineLossService;
 import com.zlt.aps.gdyy.engine.vo.GdyyLossSettingVo;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 损耗率服务实现类
@@ -38,7 +37,7 @@ public class GdyyEngineLossServiceImpl implements GdyyEngineLossService {
 		Map<String, Double> lossMap = new HashMap<>();
 		List<GdyyLossSettingVo> list = gdyyEngineLossMapper.listLossRate();
 		for (GdyyLossSettingVo lossVo : list) {
-			lossMap.put(lossVo.getBigRollCode(), lossVo.getLossRate());
+			lossMap.put(lossVo.getLossKey(), lossVo.getLossRate());
 		}
 		return lossMap;
 	}
@@ -51,11 +50,27 @@ public class GdyyEngineLossServiceImpl implements GdyyEngineLossService {
 	 * @return
 	 */
 	@Override
-	public double getLossRate(String bigRollCode, Map<String, Double> lossMap, double paramLossRate) {
-		bigRollCode = (StringUtils.isBlank(bigRollCode) ? "" : bigRollCode);
+	public double getLossRate(String bigRollCode, String machineIds, Map<String, Double> lossMap, double paramLossRate) {
+		/*bigRollCode = (StringUtils.isBlank(bigRollCode) ? "" : bigRollCode);
 		// 获大卷的损耗率设定值
 		double totalLoss = lossMap.getOrDefault(bigRollCode, paramLossRate);
 		// 把耗损率由百分比，转成对应小数
-		return BigDecimalUtil.div(totalLoss, 100D);
+		return BigDecimalUtil.div(totalLoss, 100D);*/
+		bigRollCode = (StringUtils.isBlank(bigRollCode) ? "" : bigRollCode);
+		// 如果有没有机台或有多个机台，则耗损率为0
+		if (StringUtils.isBlank(machineIds) || machineIds.contains(",")) {
+			return BigDecimal.ZERO.doubleValue();
+		}
+		// 第一优先级：机台+大卷编号
+		String key1 = machineIds + "#" + bigRollCode;
+		// 第二优先级：大卷编号
+		String key2 = "#" + bigRollCode;
+		// 第三优先级：机台
+		String key3 = machineIds + "#";
+		// 按优先级取出损耗率
+		Double lossRate = lossMap.getOrDefault(key1,
+				lossMap.getOrDefault(key2, lossMap.getOrDefault(key3, paramLossRate)));
+		// 把耗损率由百分比，转成对应小数
+		return BigDecimalUtil.div(lossRate, 100D);
 	}
 }

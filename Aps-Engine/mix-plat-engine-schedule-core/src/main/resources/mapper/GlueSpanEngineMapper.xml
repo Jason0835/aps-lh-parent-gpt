@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.GlueSpanEngineMapper">
+	<!-- 根据查询条件获取胶料跨区接收信息 -->
+    <select id="listGlueSpanReceive" resultType="com.zlt.mix.schedule.engine.vo.GlueSpanReceiveVo">
+		SELECT R.ID,
+		       R.SCHEDULE_DATE,
+		       R.ENTRUST_MIX_AREA,
+		       R.ENTRUSTED_MIX_AREA,
+		       R.GLUE,
+		       R.SEND_QTY,
+		       R.RECEIVE_QTY,
+		       R.MACHINE_CODE,
+		       R.RECIPE_TYPE,
+		       R.RECIPE_VERSION_ID,
+		       R.RECIPE_STAGE,
+		       R.RECEIVE_STATUS,
+		       ifnull(PR.LOT_TOTAL_WEIGHT, 0) LOT_TOTAL_WEIGHT,
+		       M.MAJOR_TYPE
+		  FROM T_GLUE_SPAN_RECEIVE R
+		  LEFT JOIN (SELECT PR.MIX_AREA,
+		                    PR.RECIPE_MATERIAL_NAME,
+		                    MAX(PR.LOT_TOTAL_WEIGHT) LOT_TOTAL_WEIGHT
+		               FROM T_MES_PMT_RECIPE PR
+		              WHERE PR.RECIPE_STATE = '1'
+		                AND PR.AUDIT_FLAG = '1'
+		                AND PR.DEL_FLAG = '0'
+		              GROUP BY PR.MIX_AREA, PR.RECIPE_MATERIAL_NAME) PR
+		    ON R.GLUE = PR.RECIPE_MATERIAL_NAME
+		   AND PR.MIX_AREA = R.ENTRUSTED_MIX_AREA
+		  LEFT JOIN (SELECT M.MATERIAL_NAME, MAX(M.MAJOR_TYPE) MAJOR_TYPE
+		               FROM T_MES_BAS_MATERIAL M
+		              WHERE M.DEL_FLAG = '0'
+		              GROUP BY M.MATERIAL_NAME) M
+		    ON M.MATERIAL_NAME = R.GLUE
+		 WHERE R.DEL_FLAG = '0'
+		   /*AND R.RECEIVE_STATUS = '1'*/
+		   AND R.SCHEDULE_DATE = #{params.scheduleDate}
+         <if test="params.entrustMixArea != null and params.entrustMixArea != ''">
+           AND R.ENTRUST_MIX_AREA = #{params.entrustMixArea}
+         </if>
+         <if test="params.entrustedMixArea != null and params.entrustedMixArea != ''">
+           AND R.ENTRUSTED_MIX_AREA = #{params.entrustedMixArea}
+         </if>
+         <if test="params.glue != null and params.glue != ''">
+           AND R.GLUE = #{params.glue}
+         </if>
+    </select>
+</mapper>

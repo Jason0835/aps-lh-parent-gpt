@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Api(tags = "内衬机台信息维护接口")
 @RestController
-@RequestMapping("/machine")
+@RequestMapping("/nc/machine")
 public class NcMachineInfoController extends BaseController {
     @Autowired
     private NcMachineInfoService machineInfoService;

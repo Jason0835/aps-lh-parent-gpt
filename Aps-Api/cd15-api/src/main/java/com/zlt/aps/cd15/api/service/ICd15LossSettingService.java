@@ -22,53 +22,53 @@ public interface ICd15LossSettingService {
     /**
      * 查询15度裁断损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/cd15/loss/list")
     TableDataInfo list(@RequestBody Cd15LossSettingDto dto);
 
     /**
     * 新增15度裁断损耗率设定
     */
-    @PostMapping("/loss/add")
+    @PostMapping("/cd15/loss/add")
     AjaxResult add(@RequestBody Cd15LossSettingDto dto);
 
     /**
      * 修改15度裁断损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/cd15/loss/edit")
     AjaxResult edit(@RequestBody Cd15LossSettingDto dto);
 
     /**
      * 删除15度裁断损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/cd15/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/cd15/loss/{id}")
     Cd15LossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验15度裁断损耗率设定唯一性
      */
-    @PostMapping("/loss/checkCd15LossSettingUnique")
+    @PostMapping("/cd15/loss/checkCd15LossSettingUnique")
     String checkCd15LossSettingUnique(@RequestBody Cd15LossSettingDto dto);
 
     /**
      * 导出15度裁断损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/cd15/loss/getList")
     List<Cd15LossSettingDto> getList(@RequestBody Cd15LossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/cd15/loss/importData")
     @ApiOperation("导入15度裁断损耗率信息")
     public AjaxResult importData(@RequestBody List<Cd15LossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/cd15/loss/deleteAll")
     AjaxResult deleteAll();
 
 }

@@ -38,4 +38,6 @@ public interface TqEngineService {
      * @param scheduleResult  排程信息
      */
     void confirmTqMachine(TqScheduleResultDto scheduleResult);
+
+    void batchUpdateBatchNoAndOrderNo(String scheduleDate);
 }

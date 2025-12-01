@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('硫磺辅料超期预警列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+    	<form id="formId">
+    		<input name="mixArea" type="hidden" th:value="${mixArea}"/>
+    	</form>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+
+    $(function () {
+        var options = {
+            uniqueId: "id",
+            url: ctx + "schedule/materialScheduleResult/expireWarning",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            singleSelect: true,
+            clickToSelect: true,
+            modalName: [[#{schedule.materialScheduleResult.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            columns: [
+                {
+                    field: 'mixArea',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.mixArea}]],
+                },
+                {
+                    field: 'materialName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.expireWarning.materialName}]],
+                },
+                {
+                    field: 'validTime',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.expireWarning.validTime}]],
+                },
+                {
+                    field: 'warningQty',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.expireWarning.warningQty}]],
+                },
+                {
+                    field: 'warningWeight',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.expireWarning.warningWeight}]],
+                },
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    function changeMachineName(){
+        $.table.refresh();
+    }
+
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+</style>
+</html>

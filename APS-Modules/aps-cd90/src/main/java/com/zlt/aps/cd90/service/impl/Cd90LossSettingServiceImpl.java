@@ -203,6 +203,9 @@ public class Cd90LossSettingServiceImpl extends ServiceImpl<Cd90LossSettingMappe
                 BeanUtils.copyProperties(dto, newEntity);
                 newEntity.setMachineId(machineCodeMap.get(machineName));
                 newEntity.setBaseVale(null);
+                if (StringUtils.isBlank(newEntity.getClothCode())) {
+                    newEntity.setClothCode(null);
+                }
                 newList.add(newEntity);
             }
         }

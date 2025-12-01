@@ -25,45 +25,25 @@
         </if>
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_XWYY_MACHINE_ROLL_MAPPING a USING (
-        <foreach collection="list" item="MACHINE" separator=" union ">
-            select
-            #{MACHINE.bigRollCode,jdbcType=VARCHAR} BIG_ROLL_CODE,
-            #{MACHINE.machineId,jdbcType=VARCHAR} MACHINE_ID,
-
-            #{MACHINE.createBy,jdbcType=VARCHAR} create_by,
-            #{MACHINE.createTime,jdbcType=DATE} create_time,
-            #{MACHINE.updateBy,jdbcType=VARCHAR} update_by,
-            #{MACHINE.updateTime,jdbcType=DATE} update_time,
-            #{MACHINE.remark,jdbcType=VARCHAR} remark
-            from dual
-        </foreach>
-        ) b ON (a.BIG_ROLL_CODE = b.BIG_ROLL_CODE and a.MACHINE_ID = b.MACHINE_ID and  a.del_flag = '0')
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.BIG_ROLL_CODE,
-        a.MACHINE_ID,
-
-        a.create_by ,
-        a.create_time ,
-        a.remark,
-        a.del_flag
-        ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.BIG_ROLL_CODE,
-        b.MACHINE_ID,
-        b.create_by,
-        sysdate,
-        b.remark,
-        '0'
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_XWYY_MACHINE_ROLL_MAPPING (
+        BIG_ROLL_CODE, MACHINE_ID, create_by, create_time, remark, del_flag
         )
-    </update>
+        VALUES
+        <foreach collection="list" item="MACHINE" separator=",">
+            (
+            #{MACHINE.bigRollCode,jdbcType=VARCHAR},
+            #{MACHINE.machineId,jdbcType=VARCHAR},
+            #{MACHINE.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{MACHINE.remark,jdbcType=VARCHAR},
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 </mapper>

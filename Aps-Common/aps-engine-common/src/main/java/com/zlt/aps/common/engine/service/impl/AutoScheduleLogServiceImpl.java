@@ -66,9 +66,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertTmScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TM, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TM, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -79,9 +79,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertTcScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TC, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TC, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -92,9 +92,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertNcScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_NC, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_NC, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -105,9 +105,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertTqScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TQ, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_TQ, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -118,9 +118,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertGsqScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_GSQ, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_GSQ, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -131,9 +131,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertCd15ScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_CD15, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_CD15, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -144,9 +144,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertCd90ScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_CD90, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_CD90, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -157,9 +157,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertGdyyScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_GDYY, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_GDYY, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**
@@ -170,9 +170,9 @@ public class AutoScheduleLogServiceImpl implements AutoScheduleLogService
      * @param logDetail  日志内容
      */
     public void insertXwyyScheduleLog(String batchNo, String orderNo, String title, String logDetail) {
-        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_XWYY, batchNo, orderNo, title, logDetail);
-        autoScheduleLog.setBaseVale(null);
-        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
+//        AutoScheduleLog autoScheduleLog = new AutoScheduleLog(EngineConstants.PROCEDURE_CODE_XWYY, batchNo, orderNo, title, logDetail);
+//        autoScheduleLog.setBaseVale(null);
+//        rabbitTemplate.convertAndSend(exchange, rutekey, JSON.toJSONString(autoScheduleLog));
     }
 
     /**

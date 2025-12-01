@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gsq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -11,7 +12,7 @@ import java.io.Serializable;
 
 @Data
 @ApiModel(value="钢丝圈定点机台导入模板", description="钢丝圈定点机台导入模板")
-public class GsqSpecifyMachineTemp {
+public class GsqSpecifyMachineTemp extends BaseEntity {
 
     @ApiModelProperty(value = "钢丝圈代码")
     @Excel(name="ui.gsq.specifyMachine.column.steelRingCode")

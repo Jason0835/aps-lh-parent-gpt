@@ -85,8 +85,8 @@ public class NcParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.nc.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出内衬参数信息")
-    @GetMapping("/exportData")
-    public List<NcParamsDto> export(@SpringQueryMap NcParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<NcParamsDto> export(@RequestBody NcParamsDto dto) {
         NcParams params = new NcParams();
         BeanUtils.copyProperties(dto, params);
         startPage();

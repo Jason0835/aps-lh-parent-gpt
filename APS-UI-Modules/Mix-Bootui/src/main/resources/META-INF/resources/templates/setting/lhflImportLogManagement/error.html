@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('日志导入管理错误信息')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <div class="select-list" style="margin-bottom: 10px; height: 40px;">
+        <ul>
+            <li>
+                [[#{ui.data.column.import.errorRow}]]：
+                <input type="text" id="errorRow" name="errorRow"/>
+            </li>
+            <li>
+                <a class="btn btn-primary btn-rounded btn-sm" onclick="linkTo()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+            </li>
+        </ul>
+    </div>
+    <div th:each="item:${errorList}">
+        <hr style="margin-left: 0px;">
+        <table class="table table-bordered table-striped" border="1" cellspacing="0" cellpadding="0">
+            <tr>
+                <td width="15%">[[#{ui.data.column.import.errorRow}]]</td>
+                <td width="35%" th:text="${item.errorRow}">-</td>
+                <td width="15%">[[#{ui.data.column.import.createTime}]]</td>
+                <td width="35%" th:text="${#dates.format(item.createTime,'yyyy-MM-dd HH:mm:ss')}">-</td>
+            </tr>
+            <tr>
+                <td>[[#{ui.data.column.errorList.detail}]]</td>
+                <td colspan="3" th:text="${item.errorDetail}">-</td>
+            </tr>
+        </table>
+    </div>
+    <div th:if="${#lists.isEmpty(errorList)}">
+        <hr style="margin-left: 0px;">
+        <div style="font-size: 30px;text-align: center;line-height: 280px;">查无此数据</div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+</body>
+<script th:inline="javascript">
+    //错误行数定点查询
+    function linkTo() {
+        var rowValue = document.getElementById("errorRow").value;
+        if (isNaN(Number(rowValue))) {
+            $.modal.confirm("请输入数字查询", function () {
+                document.getElementById("errorRow").value = "";
+            });
+            return;
+        }
+        var pTableId = parent.table.options.id;
+        var id = parent.$("#" + pTableId).bootstrapTable('getSelections')[0].id + ',' + rowValue;
+        window.location.href = id;
+    }
+
+    function submitHandler() {
+        $.modal.close();
+    }
+</script>
+</html>

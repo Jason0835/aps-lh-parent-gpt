@@ -51,7 +51,8 @@ public enum SyncKeyEnum {
     CX_MID_NIGHT_FINISH("CX_MID_NIGHT_FINISH"),// 成型中夜班完成量接口
     LH_IN_PRODUCTION_SPEC("LH_IN_PRODUCTION_SPEC"),// 硫化机台当前生产规格接口
     LH_MOLD_ADJUST_PLAN("LH_MOLD_ADJUST_PLAN"),// 硫化工序模具变更计划
-    CLASS_FINISH_QTY("CLASS_FINISH_QTY")// 各工序班次完成量同步接口
+    CLASS_FINISH_QTY("CLASS_FINISH_QTY"),// 各工序班次完成量同步接口
+    MES_BAS_MATERIAL("MES_BAS_MATERIAL") // MES基础物料
     ;
 
     private String description;

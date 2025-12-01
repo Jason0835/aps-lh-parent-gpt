@@ -1,35 +1,37 @@
 package com.zlt.aps.nc.service.impl;
 
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.lang.StringUtils;
-import org.springframework.stereotype.Service;
-
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.dto.NcCurlRollDto;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
+import com.zlt.aps.nc.entity.NcParams;
 import com.zlt.aps.nc.mapper.NcCurlRollMapper;
+import com.zlt.aps.nc.mapper.NcParamsMapper;
 import com.zlt.aps.nc.service.NcCurlRollService;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * <p>
@@ -70,13 +72,12 @@ public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlR
      * @param ids 多个id逗号分割
      */
     public void deleteCurlRoll(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            NcCurlRoll entity = new NcCurlRoll();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<NcCurlRoll> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**
@@ -98,6 +99,10 @@ public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlR
         }
         return UserConstants.UNIQUE;
     }
+
+    private static final Integer DEFAULT_CURL_LENGTH = 82;
+    @Autowired
+    private NcParamsMapper paramsMapper;
 
     /**
      * 导入数据
@@ -128,7 +133,7 @@ public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlR
                 failureNum++;
 				continue;
 			}
-            
+
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, rowNo, sourceEntity);
             if (CollectionUtils.isNotEmpty(validated)) {
                 sourceEntity.setId(-999L);
@@ -163,7 +168,7 @@ public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlR
             	}
             }
         }
-        
+
         //新集合操作（更新或插入操作）
         if (CollectionUtils.isNotEmpty(list)) {
             try {
@@ -215,5 +220,27 @@ public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlR
         }
     }
 
-
+    /**
+     * 根据code查询卷曲长度
+     *
+     * @param curlRoll 查询条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult selectCurlLengthByCode(NcCurlRoll curlRoll) {
+        LambdaQueryWrapper<NcCurlRoll> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(NcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+        queryWrapper.eq(NcCurlRoll::getLiningCode, curlRoll.getQueryCode());
+        NcCurlRoll data = ncCurlRollMapper.selectOne(queryWrapper);
+        LambdaQueryWrapper<NcParams> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApsBaseEntity::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+        wrapper.eq(NcParams::getParamCode, "STANDARD_CRIMP_LENGTH");
+        NcParams params = paramsMapper.selectOne(wrapper);
+        if (data == null) {
+            data = new NcCurlRoll();
+            data.setLiningCode(curlRoll.getQueryCode());
+            data.setCurlLength(params == null ? new BigDecimal(DEFAULT_CURL_LENGTH) : new BigDecimal(params.getParamValue()));
+        }
+        return AjaxResult.success(data);
+    }
 }

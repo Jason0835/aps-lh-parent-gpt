@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.SettingFormulaInfoMapper">
+
+    <insert id="batchInsertFormulaInfo">
+        insert into T_FORMULA_INFO
+        (id,glue,weight,GLUE_TYPE,remark,DEL_FLAG,create_by,create_time)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="formulaInfo" separator=" union all ">
+            select
+            #{formulaInfo.glue,jdbcType=VARCHAR} GLUE,
+            #{formulaInfo.formula,jdbcType=DOUBLE} WEIGHT,
+            #{formulaInfo.glueType,jdbcType=VARCHAR} GLUE_TYPE,
+            #{formulaInfo.remark,jdbcType=VARCHAR} REMARK,
+            #{formulaInfo.delFlag,jdbcType=VARCHAR} DEL_FLAG,
+            #{formulaInfo.createBy,jdbcType=VARCHAR} CREATE_BY,
+            #{formulaInfo.createTime,jdbcType=TIMESTAMP} CREATE_TIME
+            
+        </foreach>
+        ) x
+    </insert>
+
+
+    <update id="mergeSql" parameterType="list">
+        insert into T_FORMULA_INFO(
+        GLUE,
+        weight,
+        GLUE_TYPE,
+        del_flag,
+        REMARK,
+        CREATE_BY,
+        CREATE_TIME
+        ) values
+        <foreach collection="list" item="formulaInfo" separator=" , ">
+            (
+            #{formulaInfo.glue,jdbcType=VARCHAR},
+            #{formulaInfo.weight,jdbcType=DOUBLE},
+            #{formulaInfo.glueType,jdbcType=VARCHAR},
+            #{formulaInfo.delFlag,jdbcType=VARCHAR },
+            #{formulaInfo.remark,jdbcType=VARCHAR},
+            #{formulaInfo.createBy,jdbcType=VARCHAR},
+            #{formulaInfo.createTime,jdbcType=TIMESTAMP}
+            )
+        </foreach>
+        on duplicate key
+        update
+        weight=values(weight),
+        GLUE_TYPE=values(GLUE_TYPE),
+        REMARK=values(REMARK),
+        UPDATE_BY=values(CREATE_BY),
+        UPDATE_TIME=now()
+    </update>
+    
+    <delete id="deleteBatchByIds">
+        update T_FORMULA_INFO
+        set DEL_FLAG = null
+        where id in
+        <foreach item="id" collection="list" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+
+    <select id="listFormulaInfoNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.glue,jdbcType= VARCHAR} GLUE 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_FORMULA_INFO m
+        inner join temp_table t on m.glue = t.glue and m.del_flag ='0'
+    </select>
+
+    <select id="selectSettingFormulaInfoList"
+            parameterType="com.zlt.mix.setting.api.domain.entity.SettingFormulaInfo"
+            resultType="com.zlt.mix.setting.api.domain.entity.SettingFormulaInfo">
+        select id, GLUE, weight, GLUE_TYPE, remark, del_flag, create_by, create_time, update_by, update_time from
+        T_FORMULA_INFO
+        where del_flag = '0'
+        <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+</mapper>

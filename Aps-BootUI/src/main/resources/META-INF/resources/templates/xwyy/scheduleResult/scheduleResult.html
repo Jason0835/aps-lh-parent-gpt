@@ -97,8 +97,8 @@
                shiro:hasPermission="xwyy:scheduleResult:export">
                 <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
             </a>
-            <a class="btn btnPutAway btn-info" onclick="$.operate.importScheduleData2()" shiro:hasPermission="xwyy:scheduleResult:import2">
-                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import2}]]
+            <a class="btn btnPutAway btn-info" onclick="importData2()" shiro:hasPermission="xwyy:scheduleResult:import2">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]2
             </a>
             <a class="btn btnPutAway btn-primary" onclick="changeReleaseStatus()" shiro:hasRole="admin">
                 <i class="fa fa-edit"></i> [[#{ui.data.column.scheduleResult.changeReleaseStatus}]]
@@ -1145,6 +1145,12 @@
         // }
         // return Number(b[0] + "." + c);
         return Math.ceil(obj * 10) / 10;
+    }
+
+    function importData2() {
+        table.set();
+        var url = table.options.importUrl2;
+        $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 450, '', true);
     }
 </script>
 </body>

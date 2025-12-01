@@ -14,12 +14,13 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.utils.StringUtils;
-import com.ruoyi.common4ui.utils.file.FileUtils;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common4ui.utils.file.FileUtils4UI;
 import com.zlt.aps.common.constant.ApsBootConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
+import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult2;
@@ -227,7 +228,9 @@ public class TcScheduleResultController extends BaseController {
     @ResponseBody
     public AjaxResult changeQty(TcScheduleResult entity) {
         AjaxResult error = checkUnique(entity);
-        if (error != null) return error;
+        if (error != null) {
+            return error;
+        }
         return iTcScheduleResultService.changeQty(entity);
     }
 
@@ -240,7 +243,9 @@ public class TcScheduleResultController extends BaseController {
     @ResponseBody
     public AjaxResult changeMachine(TcScheduleResult entity) {
         AjaxResult error = checkUnique(entity);
-        if (error != null) return error;
+        if (error != null) {
+            return error;
+        }
         return iTcScheduleResultService.changeMachine(entity);
     }
 
@@ -513,7 +518,7 @@ public class TcScheduleResultController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.common.message.fileNotFound"));
         }
         ExcelUtil.setResponseHeader(response, fileName);
-        FileUtils.writeInputStream(in, response.getOutputStream());
+        FileUtils4UI.writeInputStream(in, response.getOutputStream());
         return AjaxResult.success();
     }
 
@@ -521,7 +526,6 @@ public class TcScheduleResultController extends BaseController {
      * 数据导入
      *
      * @param file
-     * @param updateSupport
      * @return
      * @throws Exception
      */
@@ -565,7 +569,6 @@ public class TcScheduleResultController extends BaseController {
      * 数据导入
      *
      * @param file
-     * @param updateSupport
      * @return
      * @throws Exception
      */
@@ -702,5 +705,67 @@ public class TcScheduleResultController extends BaseController {
     public AjaxResult combinationMiddleAndNight(String ids, String classifiedShift) {
         Long[] arr = Convert.toLongArray(ids);
         return iTcScheduleResultService.combinationMiddleAndNight(arr, classifiedShift);
+    }
+
+    /**
+     * 完成量下载模板
+     *
+     * @param response 下载
+     * @throws IOException 异常
+     */
+    @ApiOperation("完成量下载模板")
+    @GetMapping("/importFinishQtyTemplate")
+    @ResponseBody
+    public AjaxResult importFinishQtyTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.dayFinishQty.modelName");
+        ExcelUtil<TcDayFinishQty> util = new ExcelUtil<>(TcDayFinishQty.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 完成量数据导入
+     *
+     * @param file 要导入的文件
+     * @return 结果
+     * @throws Exception 异常
+     */
+    @RequiresPermissions("tc:finishQty:import")
+    @ApiOperation("完成量数据导入")
+    @PostMapping("/importFinishQty")
+    @ResponseBody
+    public AjaxResult importFinishQty(MultipartFile file) throws Exception {
+        //文件解密
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+
+        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data,
+                ApsConstant.PROCEDURE_CODE_TC,
+                I18nUtil.getMessage("ui.data.column.dayFinishQty.modelName"),
+                file.getOriginalFilename());
+        importLog = iImportLogService.add(importLog);
+        //文件解析
+        InputStream in = new ByteArrayInputStream(data);
+        ExcelUtil<TcDayFinishQty> util = new ExcelUtil<>(TcDayFinishQty.class);
+        List<TcDayFinishQty> list = util.importExcel(in);
+
+        AjaxResult ajaxResult = iTcScheduleResultService.importFinishQty(list, importLog.getId());
+        // 更新日志记录成功数，失败数
+        ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
+        // 保存导入失败详细信息
+        ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
+        return ajaxResult;
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    @ResponseBody
+    public AjaxResult getSummaryVo(TcScheduleResult scheduleResult) {
+        return iTcScheduleResultService.getSummaryVo(scheduleResult);
     }
 }

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.CxEmbryoMonthPlanSurplusEntityMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.CxEmbryoMonthPlanSurplus">
+        <id column="ID" property="id" jdbcType="BIGINT"/>
+        <result column="YEAR" property="year" jdbcType="VARCHAR"/>
+        <result column="MONTH" property="month" jdbcType="VARCHAR"/>
+        <result column="FACTORY_CODE" property="factoryCode" jdbcType="VARCHAR"/>
+        <result column="MATERIAL_CODE" property="materialCode" jdbcType="VARCHAR"/>
+        <result column="BOM_DATA_VERSION" property="bomDataVersion" jdbcType="VARCHAR"/>
+        <result column="MONTH_PLAN_QTY" property="monthPlanQty" jdbcType="INTEGER"/>
+        <result column="MONTH_PLAN_VERSION" property="monthPlanVersion" jdbcType="VARCHAR"/>
+        <result column="LAST_MONTH_STOCK" property="lastMonthStock" jdbcType="INTEGER"/>
+        <result column="MONTH_FINISH_QTY" property="monthFinishQty" jdbcType="INTEGER"/>
+        <result column="MONTH_REMAIN_QTY" property="monthRemainQty" jdbcType="INTEGER"/>
+        <result column="DATA_SOURCE" property="dataSource" jdbcType="VARCHAR"/>
+        <result column="CREATE_TIME" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="UPDATE_TIME" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 根据唯一键组合批量查询 -->
+    <select id="selectByUniqueKeys" resultMap="BaseResultMap" parameterType="java.util.List">
+        SELECT * FROM T_CX_EMBRYO_MONTH_PLAN_SURPLUS
+        WHERE IS_DELETE = 0 AND
+        <foreach item="key" collection="list" open="(" separator=" OR " close=")">
+            CONCAT(
+            YEAR, '_',
+            MONTH, '_',
+            FACTORY_CODE, '_',
+            MATERIAL_CODE, '_',
+            BOM_DATA_VERSION
+            ) = #{key}
+        </foreach>
+    </select>
+
+    <!-- 批量插入 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO T_CX_EMBRYO_MONTH_PLAN_SURPLUS
+        (YEAR, MONTH, FACTORY_CODE, MATERIAL_CODE, BOM_DATA_VERSION,
+        MONTH_PLAN_QTY, MONTH_PLAN_VERSION, LAST_MONTH_STOCK,
+        MONTH_FINISH_QTY, MONTH_REMAIN_QTY, DATA_SOURCE,
+        CREATE_TIME, UPDATE_TIME)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.materialCode},
+            #{item.bomDataVersion}, #{item.monthPlanQty}, #{item.monthPlanVersion},
+            #{item.lastMonthStock}, #{item.monthFinishQty}, #{item.monthRemainQty},
+            #{item.dataSource}, NOW(), NOW())
+        </foreach>
+    </insert>
+
+    <!-- 批量更新 -->
+    <update id="batchUpdate" parameterType="java.util.List">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_CX_EMBRYO_MONTH_PLAN_SURPLUS
+            SET
+            MONTH_PLAN_QTY = #{item.monthPlanQty},
+            MONTH_PLAN_VERSION = #{item.monthPlanVersion},
+            LAST_MONTH_STOCK = #{item.lastMonthStock},
+            MONTH_FINISH_QTY = #{item.monthFinishQty},
+            MONTH_REMAIN_QTY = #{item.monthRemainQty},
+            DATA_SOURCE = #{item.dataSource},
+            UPDATE_TIME = NOW()
+            WHERE
+            YEAR = #{item.year}
+            AND MONTH = #{item.month}
+            AND FACTORY_CODE = #{item.factoryCode}
+            AND MATERIAL_CODE = #{item.materialCode}
+            AND BOM_DATA_VERSION = #{item.bomDataVersion}
+        </foreach>
+    </update>
+</mapper>

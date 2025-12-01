@@ -3,6 +3,7 @@ package com.zlt.aps.gdyy.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
 import com.zlt.aps.gdyy.entity.GdyyScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,7 +76,7 @@ public interface GdyyScheduleResultService extends IService<GdyyScheduleResult> 
      *
      * @param ids 要发布的排程结果id
      */
-    public void publish(GdyyScheduleResult scheduleResult, long[] ids);
+    public void publish(GdyyScheduleResult scheduleResult, long[] ids, String dataVersion);
 
     /**
      * 查询排程日期是否已发布
@@ -134,4 +135,39 @@ public interface GdyyScheduleResultService extends IService<GdyyScheduleResult> 
      * @return 查询到的数据
      */
     List<GdyyScheduleResult> selectByScheduleDateAndCode(GdyyScheduleResult scheduleResult);
+
+    /**
+     * 给mes发送排程下发通知
+     *
+     * @param scheduleDate 排产日
+     * @param dataVersion  数据版本
+     * @param rowCount  同步记录数据
+     */
+    void publishNoticeMes(Date scheduleDate, String dataVersion, int rowCount);
+
+    /**
+     * 更新指定相关数据记录的发布状态
+     *
+     * @param dataVersion 数据版本
+     * @param ids         排程ID列表
+     * @param status      更新的状态
+     */
+    void updateRelaseStatus(String dataVersion, long[] ids, String status);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<GdyyDayFinishQty> list, Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(GdyyScheduleResultDto scheduleResult);
 }

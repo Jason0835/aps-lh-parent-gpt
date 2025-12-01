@@ -2,7 +2,7 @@ package com.zlt.aps.service;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common4ui.utils.StringUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.tc.api.domain.dto.TcGlueGroupOrderDto;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;

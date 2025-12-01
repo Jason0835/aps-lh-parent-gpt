@@ -17,17 +17,21 @@
         <result property="notes" column="notes"/>
         <result property="stockQty" column="stock_qty"/>
         <result property="class1Plan" column="class1_plan"/>
+        <result property="class1ProduceOrder" column="class1_produce_order"/>
         <result property="class1PlanNoStock" column="class1_plan_no_stock"/>
         <result property="class1Finish" column="class1_finish"/>
         <result property="class1Remark" column="class1_remark"/>
         <result property="class2Plan" column="class2_plan"/>
+        <result property="class2ProduceOrder" column="class2_produce_order"/>
         <result property="class2PlanNoStock" column="class2_plan_no_stock"/>
         <result property="class2Finish" column="class2_finish"/>
         <result property="class2Remark" column="class2_remark"/>
         <result property="class3Plan" column="class3_plan"/>
+        <result property="class3ProduceOrder" column="class3_produce_order"/>
         <result property="class3PlanNoStock" column="class3_plan_no_stock"/>
         <result property="class3Finish" column="class3_finish"/>
         <result property="class3Remark" column="class3_remark"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="isRelease" column="is_release"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
@@ -56,14 +60,18 @@
         <result property="notes" column="notes"/>
         <result property="stockQty" column="stock_qty"/>
         <result property="class1Plan" column="class1_plan"/>
+        <result property="class1ProduceOrder" column="class1_produce_order"/>
         <result property="class1Finish" column="class1_finish"/>
         <result property="class1Remark" column="class1_remark"/>
         <result property="class2Plan" column="class2_plan"/>
+        <result property="class2ProduceOrder" column="class2_produce_order"/>
         <result property="class2Finish" column="class2_finish"/>
         <result property="class2Remark" column="class2_remark"/>
         <result property="class3Plan" column="class3_plan"/>
+        <result property="class3ProduceOrder" column="class3_produce_order"/>
         <result property="class3Finish" column="class3_finish"/>
         <result property="class3Remark" column="class3_remark"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="isRelease" column="is_release"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
@@ -82,12 +90,48 @@
     </resultMap>
 
     <sql id="selectGdyyScheduleResultVo">
-        select id, schedule_date, cd15_batch_no, batch_no, order_no, big_roll_code, day_used, stock_qty, class1_plan, class1_finish, class1_remark, class2_plan, class2_finish, class2_remark, class3_plan, class3_finish, class3_remark, is_release, remark, del_flag, create_by, create_time, update_by, update_time, mark_close_out_tip, production_status,data_source, publish_success_count, newest_publish_time, close_out_spec_flag,class1_plan_num,class2_plan_num,class3_plan_num
+        select id,
+               schedule_date,
+               cd15_batch_no,
+               batch_no,
+               order_no,
+               big_roll_code,
+               day_used,
+               stock_qty,
+               class1_plan,
+               class1_produce_order,
+               class1_finish,
+               class1_remark,
+               class2_plan,
+               class2_produce_order,
+               class2_finish,
+               class2_remark,
+               class3_plan,
+               class3_produce_order,
+               class3_finish,
+               class3_remark,
+               machine_code,
+               is_release,
+               remark,
+               del_flag,
+               create_by,
+               create_time,
+               update_by,
+               update_time,
+               mark_close_out_tip,
+               production_status,
+               data_source,
+               publish_success_count,
+               newest_publish_time,
+               close_out_spec_flag,
+               class1_plan_num,
+               class2_plan_num,
+               class3_plan_num
         from t_gdyy_schedule_result
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cd15_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.day_used, a.stock_qty, a.class1_plan, a.CLASS1_PLAN_NO_STOCK, a.class1_finish, a.class1_remark, a.class2_plan, a.CLASS2_PLAN_NO_STOCK, a.class2_finish, a.class2_remark, a.class3_plan, a.CLASS3_PLAN_NO_STOCK, a.class3_finish, a.class3_remark, a.is_release, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time, a.mark_close_out_tip, a.production_status,a.data_source, a.publish_success_count, a.newest_publish_time, a.close_out_spec_flag,a.class1_plan_num,a.class2_plan_num,a.class3_plan_num,
+        a.id, a.schedule_date, a.cd15_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.day_used, a.stock_qty, a.class1_plan, a.class1_produce_order, a.CLASS1_PLAN_NO_STOCK, a.class1_finish, a.class1_remark, a.class2_plan, a.class2_produce_order, a.CLASS2_PLAN_NO_STOCK, a.class2_finish, a.class2_remark, a.class3_plan, a.class3_produce_order, a.CLASS3_PLAN_NO_STOCK, a.class3_finish, a.class3_remark, a.machine_code, a.is_release, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time, a.mark_close_out_tip, a.production_status,a.data_source, a.publish_success_count, a.newest_publish_time, a.close_out_spec_flag,a.class1_plan_num,a.class2_plan_num,a.class3_plan_num,
     </sql>
 
     <select id="selectScheduleResultList" parameterType="com.zlt.aps.gdyy.entity.GdyyScheduleResult"
@@ -95,13 +139,16 @@
         select * from (
             select
                 <include refid="column"/>
-                (NVL(CLASS1_PLAN, 0) + NVL(CLASS2_PLAN, 0) + NVL(CLASS3_PLAN, 0)) as daily_total_qty,
-                (NVL(CLASS1_PLAN_NUM, 0) + NVL(CLASS2_PLAN_NUM, 0) + NVL(CLASS3_PLAN_NUM, 0)) as daily_total_qty_num,
+                (IFNULL(CLASS1_PLAN, 0) + IFNULL(CLASS2_PLAN, 0) + IFNULL(CLASS3_PLAN, 0)) as daily_total_qty,
+                TRUNCATE(IFNULL(CLASS1_PLAN_NUM, 0) + IFNULL(CLASS2_PLAN_NUM, 0) + IFNULL(CLASS3_PLAN_NUM, 0), 1) as daily_total_qty_num,
                 b.MONTH_PLAN_QTY as month_plan,
-                CEIL(b.MONTH_REMAIN_QTY) as month_plan_os,
+                CEILING(b.MONTH_REMAIN_QTY) as month_plan_os,
+                TRUNCATE(f.class1_finish_qty, 0) as class1_finish_qty,
+                TRUNCATE(f.class2_finish_qty, 0) as class2_finish_qty,
                 c.COLOR_TYPE,
                 c.COLOR_CODE,
                 d.notes,
+                log.change_machine,
                 log.change_mid_plan,
                 log.change_night_plan,
                 log.change_day_plan
@@ -113,21 +160,23 @@
                         and MONTH= #{month,jdbcType=VARCHAR}
                         and del_flag = '0'
                       ) b on a.BIG_ROLL_CODE=b.MATERIAL_CODE
-            LEFT JOIN T_GDYY_BIG_ROLL_COLOR c ON a.BIG_ROLL_CODE = c.BIG_ROLL_CODE AND c.STATUS = '0' AND c.DEL_FLAG = '0'
+        LEFT JOIN T_GDYY_DAY_FINISH_QTY f ON a.order_no = f.order_no and f.del_flag = '0'
+        LEFT JOIN T_GDYY_BIG_ROLL_COLOR c ON a.BIG_ROLL_CODE = c.BIG_ROLL_CODE AND c.STATUS = '0' AND c.DEL_FLAG = '0'
             LEFT JOIN (
-                        SELECT BIG_ROLL_CODE,listagg(notes,',') within group (order by notes) notes
+                        SELECT BIG_ROLL_CODE,GROUP_CONCAT(notes order by notes SEPARATOR ',') notes
                         FROM T_GDYY_NOTE
                         WHERE STATUS = '0'
                         AND DEL_FLAG = '0'
-                        AND NVL(START_TIME, TO_DATE('0001-01-01', 'yyyy-MM-dd')) <![CDATA[ <= ]]> #{scheduleDate}
-                        AND NVL(END_TIME, TO_DATE('9999-12-31', 'yyyy-MM-dd')) <![CDATA[ >= ]]> #{scheduleDate}
+                        AND IFNULL(START_TIME, STR_TO_DATE('0001-01-01', '%Y-%m-%d')) <![CDATA[ <= ]]> #{scheduleDate}
+                        AND IFNULL(END_TIME, STR_TO_DATE('9999-12-31', '%Y-%m-%d')) <![CDATA[ >= ]]> #{scheduleDate}
                         GROUP BY BIG_ROLL_CODE
                       ) d ON d.BIG_ROLL_CODE = a.BIG_ROLL_CODE
             LEFT JOIN (/*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
                         SELECT schedule_id,
-                               max(decode(BEFORE_MID_PLAN, AFTER_MID_PLAN,0,1)) change_mid_plan,
-                               max(decode(BEFORE_NIGHT_PLAN, AFTER_NIGHT_PLAN,0,1)) change_night_plan,
-                               max(decode(BEFORE_DAY_PLAN, AFTER_DAY_PLAN,0,1)) change_day_plan
+                               max(IF(BEFORE_MACHINE_ID = AFTER_MACHINE_ID,0,1)) change_machine,
+                               max(IF(BEFORE_MID_PLAN = AFTER_MID_PLAN,0,1)) change_mid_plan,
+                               max(IF(BEFORE_NIGHT_PLAN = AFTER_NIGHT_PLAN,0,1)) change_night_plan,
+                               max(IF(BEFORE_DAY_PLAN = AFTER_DAY_PLAN,0,1)) change_day_plan
                         FROM T_GDYY_DISPATCHER_LOG
                         where schedule_date = #{scheduleDate}
                         group by schedule_id
@@ -165,8 +214,8 @@
         from T_GDYY_MONTH_PLAN_SURPLUS
         where del_flag = '0'
         ) b on a.BIG_ROLL_CODE=b.MATERIAL_CODE
-        and b.YEAR = TO_CHAR(a.schedule_date,'yyyy')
-        and b.MONTH = TO_CHAR(a.schedule_date,'MM')
+        and b.YEAR = DATE_FORMAT(a.schedule_date,'%Y')
+        and b.MONTH = DATE_FORMAT(a.schedule_date,'%m')
 
         LEFT JOIN
         T_GDYY_BIG_ROLL_COLOR c
@@ -175,7 +224,7 @@
         AND c.DEL_FLAG = '0'
 
         LEFT JOIN (
-        SELECT BIG_ROLL_CODE, START_TIME, END_TIME,listagg(notes,',') within group (order by notes) notes
+        SELECT BIG_ROLL_CODE, START_TIME, END_TIME,GROUP_CONCAT(notes order by notes SEPARATOR ',') notes
         FROM T_GDYY_NOTE
         WHERE STATUS = '0'
         AND DEL_FLAG = '0'
@@ -199,9 +248,6 @@
     </update>
 
     <insert id="insertPublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_schedule_publish_record
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -245,6 +291,7 @@
         where del_flag = '0'
         <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
         <if test="bigRollCode != null  and bigRollCode != ''">and big_roll_code = #{bigRollCode}</if>
+        <if test="machineCode != null  and machineCode != ''">and MACHINE_CODE = #{machineCode}</if>
         <if test="id != null and id != ''">and id != #{id}</if>
     </select>
 
@@ -268,14 +315,14 @@
     <update id="changeReleaseStatus" parameterType="com.zlt.aps.gdyy.entity.GdyyScheduleResult">
         update t_gdyy_schedule_result
         set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
-        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
         where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
           and (IS_RELEASE = 3 or IS_RELEASE = 4)
     </update>
 
     <select id="checkGdyyCodeExist" resultType="java.lang.Integer">
         select case when exists(
-                select 1 from t_construction_version_info
+                select 1 from t_product_construction_info
                 where
                     ARTICLE_CROWN_SPEC = #{bigRollCode,jdbcType=VARCHAR}
                   AND DEL_FLAG = 0
@@ -283,19 +330,19 @@
         from dual
     </select>
 
-    <update id="batchUpdate" parameterType="String">
+    <update id="batchUpdate">
         update t_gdyy_schedule_result set IS_RELEASE = #{status}
-        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
         where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
+        <foreach item="id" collection="list" open="(" separator="," close=")">
             #{id}
         </foreach>
     </update>
 
-    <update id="deleteByIds" parameterType="String">
-        update t_gdyy_schedule_result set del_flag = 1
+    <update id="deleteByIds">
+        update t_gdyy_schedule_result set del_flag = NULL
         where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
+        <foreach item="id" collection="list" open="(" separator="," close=")">
             #{id}
         </foreach>
     </update>
@@ -315,4 +362,101 @@
         where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
         and big_roll_code = #{bigRollCode,jdbcType=VARCHAR}
     </select>
+
+    <select id="listCd15BigRoll" resultType="com.zlt.aps.gdyy.engine.vo.GdyyBigRollVo">
+        SELECT BIG_ROLL_CODE,
+               IFNULL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
+        FROM T_CD15_BIG_ROLL
+        WHERE DEL_FLAG = '0'
+        GROUP BY BIG_ROLL_CODE
+    </select>
+
+    <!-- 根据版本更新发布日志状态 -->
+    <update id="updatePublishRecordVersion">
+        UPDATE t_schedule_publish_record
+        SET PUBLISH_STATUS = #{status}
+        WHERE data_version = #{dataVersion}
+          AND del_flag = 0
+    </update>
+
+    <insert id="deployGdyyScheduleToMid">
+        INSERT INTO MES_GDYY_SCHEDULE_RESULT(SCHEDULE_DATE, CD15_BATCH_NO, BATCH_NO, ORDER_NO, BIG_ROLL_CODE,
+        DAY_USED, STOCK_QTY, DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NIGHT_PLAN_QTY,
+        NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
+        MACHINE_CODE, IS_RELEASE, REMARK,
+        MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, DATA_VERSION, CREATE_DATE, UPDATE_DATE, IS_DELETE, FACTORY_CODE,
+        COMPANY_CODE)
+
+        SELECT SCHEDULE_DATE, CD15_BATCH_NO, BATCH_NO, ORDER_NO, BIG_ROLL_CODE,
+        DAY_USED, STOCK_QTY,
+        CLASS2_PLAN, CLASS2_PRODUCE_ORDER, CLASS2_FINISH, CLASS2_REMARK,
+        CLASS1_PLAN, CLASS1_PRODUCE_ORDER, CLASS1_FINISH, CLASS1_REMARK,
+        m.MACHINE_CODE, '1' IS_RELEASE, r.REMARK,
+        MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS,
+        #{dataVersion} DATA_VERSION,
+        #{createTime} CREATE_DATE,
+        r.UPDATE_TIME UPDATE_DATE,
+        r.DEL_FLAG IS_DELETE,
+        #{factoryCode},
+        #{companyCode}
+        FROM T_GDYY_SCHEDULE_RESULT r
+        LEFT JOIN T_GDYY_MACHINE_INFO m ON r.machine_code = m.id
+        WHERE 1=1
+        <if test="ids == null">
+            AND r.SCHEDULE_DATE = #{scheduleDate}
+            AND r.IS_RELEASE = '0'
+        </if>
+        <if test="ids != null">
+            AND r.id in
+            <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        </if>
+    </insert>
+
+    <select id="getSummaryVo" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT schedule_date,
+        SUM(class1_plan) as day_plan_qty,
+        SUM(class2_plan) as night_plan_qty,
+        SUM(stock_qty) as stock_qty
+        FROM t_gdyy_schedule_result
+        WHERE schedule_date = #{scheduleDate}
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="productionStatus != null  and productionStatus != ''">and production_status = #{productionStatus}</if>
+        <if test="isRelease != null and isRelease != ''">and is_release = #{isRelease}</if>
+    </select>
+
+    <select id="getLastDayPlanQty" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT SUM(class2_plan) as night_plan_qty
+        FROM t_gdyy_schedule_result
+        WHERE schedule_date = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="productionStatus != null  and productionStatus != ''">and production_status = #{productionStatus}</if>
+        <if test="isRelease != null and isRelease != ''">and is_release = #{isRelease}</if>
+    </select>
+
+    <select id="getCxConsume" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT
+        IFNULL(CEILING(SUM((IFNULL(R.CLASS2_PLAN_QTY, 0) + IFNULL(R.CLASS3_PLANNED_QTY, 0)) *
+        IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+        (IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, gp.param_value) / 1000 / 1000)), 0)
+        cxConsumeQty
+        FROM T_CX_schedule_RESULT R
+        LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
+        ON R.EMBRYO_CODE = CI.EMBRYO_CODE
+        AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+        LEFT JOIN T_CD15_BIG_ROLL RO
+        ON RO.BIG_ROLL_CODE = CI.ARTICLE_CROWN_SPEC
+        AND RO.DEL_FLAG = '0'
+        LEFT JOIN t_gdyy_params gp
+        ON gp.param_code = 'BREADTH' AND gp.del_flag = '0'
+        WHERE R.schedule_DATE = #{scheduleDate}
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(ci.ARTICLE_CROWN_SPEC, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+    </select>
+
+
 </mapper>

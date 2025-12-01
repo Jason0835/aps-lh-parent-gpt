@@ -5,12 +5,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-engine</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.gsq</groupId>
     <artifactId>aps-engine-gsq</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-engine-gsq</name>
 
     <properties>
@@ -70,7 +70,7 @@
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <optional>true</optional>
             <exclusions>
                 <exclusion>
@@ -84,20 +84,20 @@
         <dependency>
             <groupId>com.zlt.aps.common.engine</groupId>
             <artifactId>aps-engine-common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <!--   对应引擎平台的core     -->
         <dependency>
             <groupId>com.zlt.aps.gsq</groupId>
             <artifactId>aps-plat-engine-gsq-core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>com.zlt.aps.gsq</groupId>
             <artifactId>aps-gsq-api</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
     </dependencies>

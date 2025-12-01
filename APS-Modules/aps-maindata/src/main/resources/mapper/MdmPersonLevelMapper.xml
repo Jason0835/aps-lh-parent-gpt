@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmPersonLevelMapper">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel" id="MdmPersonLevelResult">
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="year" column="YEAR"/>
+        <result property="month" column="MONTH"/>
+        <result property="levelCode" column="LEVEL_CODE"/>
+        <result property="methodType" column="METHOD_TYPE"/>
+        <result property="machineNumber" column="MACHINE_NUMBER"/>
+        <result property="factor" column="FACTOR"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+    </resultMap>
+
+
+    <sql id="selectMdmPersonLevelVo">
+        SELECT ID, FACTORY_CODE, YEAR, MONTH, LEVEL_CODE, METHOD_TYPE, MACHINE_NUMBER, FACTOR, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME FROM T_MDM_PERSON_LEVEL
+    </sql>
+
+    <select id="selectMdmPersonLevelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel" resultMap="MdmPersonLevelResult">
+        <include refid="selectMdmPersonLevelVo"/>
+        WHERE IS_DELETE = 0
+        <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null "> AND YEAR = #{year}</if>
+        <if test="month != null "> AND MONTH = #{month}</if>
+        <if test="levelCode != null  and levelCode != ''"> AND LEVEL_CODE = #{levelCode}</if>
+        <if test="methodType != null  and methodType != ''"> AND METHOD_TYPE = #{methodType}</if>
+        <if test="machineNumber != null "> AND MACHINE_NUMBER = #{machineNumber}</if>
+        <if test="factor != null "> AND FACTOR = #{factor}</if>
+    </select>
+
+</mapper>

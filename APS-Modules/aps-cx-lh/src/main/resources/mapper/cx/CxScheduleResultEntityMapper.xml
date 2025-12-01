@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.entity.CxScheduleResultEntityMapper">
+
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from t_cx_schedule_result
+        where is_delete = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="changeReleaseStatus" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult"
+            resultType="java.lang.Integer">
+        update t_cx_schedule_result
+        set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
+        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
+        where is_delete = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
+        and (IS_RELEASE = 3 or IS_RELEASE = 4)
+    </select>
+
+
+    <update id="batchUpdate">
+        update t_cx_schedule_result set IS_RELEASE = #{status}
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+
+    <update id="updateMonthPlanSurplus">
+        UPDATE t_cx_embryo_month_plan_surplus tcp
+            JOIN (SELECT YEAR(SCHEDULE_DATE)  AS `YEAR`,
+                         MONTH(SCHEDULE_DATE) AS `MONTH`,
+                         BOM_DATA_VERSION,
+                         EMBRYO_CODE,
+                         SUM(
+                                 IFNULL(CLASS1_FINISH_QTY, 0) +
+                                 IFNULL(CLASS2_FINISH_QTY, 0) +
+                                 IFNULL(CLASS3_FINISH_QTY, 0) +
+                                 IFNULL(CLASS4_FINISH_QTY, 0) +
+                                 IFNULL(CLASS5_FINISH_QTY, 0) +
+                                 IFNULL(CLASS6_FINISH_QTY, 0)
+                         )
+                  FROM t_cx_schedule_result
+                  WHERE IS_DELETE = 0
+                  GROUP BY YEAR(SCHEDULE_DATE),
+                           MONTH(SCHEDULE_DATE),
+                           BOM_DATA_VERSION,
+                           EMBRYO_CODE) tdfq ON tlp.`YEAR` = tdfq.`YEAR`
+                AND tcp.`MONTH` = tdfq.`MONTH`
+                AND tcp.BOM_DATA_VERSION = tdfq.BOM_DATA_VERSION
+                AND tcp.MATERIAL_CODE = tdfq.EMBRYO_CODE
+        SET tcp.MONTH_FINISH_QTY = tdfq.MONTH_FINISH_QTY
+        WHERE tcp.IS_DELETE = 0
+    </update>
+
+    <!--Joran 2021-12-13 查询出需要删除的数据集合-->
+    <select id="selectRemoveList" resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult">
+        WITH id_table AS (
+        <foreach collection="ids" item="id" separator=" union ">
+            SELECT #{id} id FROM dual
+        </foreach>
+        )
+        select a.id,
+        a.cx_batch_no,
+        a.order_no,
+        a.bom_Data_Version,
+        a.schedule_date,
+        a.production_status,
+        a.cx_machine_code,
+        a.cx_machine_name,
+        a.lh_machine_code,
+        a.lh_machine_name,
+        a.lh_machine_qty,
+        a.work_shifts,
+        a.storage_location,
+        a.sap_code,
+        a.spec_desc,
+        a.embryo_code,
+        a.class3_planned_qty,
+        a.single_shift_lh_qty,
+        a.total_stock,
+        a.class1_plan_qty,
+        a.class1_analysis_input,
+        a.class1_analysis,
+        a.class2_plan_qty,
+        a.class2_analysis_input,
+        a.class2_analysis,
+        a.class3_plan_qty,
+        a.class3_analysis,
+        a.class4_plan_qty,
+        a.class4_analysis,
+        a.class5_plan_qty,
+        a.class5_analysis,
+        a.create_by,
+        a.create_time,
+        a.update_by,
+        a.update_time,
+        a.del_flag,
+        a.remark,
+        a.mark_close_out_tip,
+        a.spec_dimension,
+        a.is_release,
+        a.class3_analysis_input,
+        a.class4_analysis_input,
+        a.class5_analysis_input,
+        a.class1_sort,
+        a.class2_sort,
+        a.class3_sort,
+        a.class4_sort,
+        a.class5_sort,
+        a.data_source,
+        a.bom_data_version
+        from T_CX_SCHEDULE_RESULT a
+        <where>
+            a.id in (select id from id_table)
+        </where>
+    </select>
+
+    <insert id="deployScheduleToMes">
+        INSERT INTO MES_CX_SCHEDULE_RESULT(
+        CX_BATCH_NO ,
+        ORDER_NO ,
+        SCHEDULE_DATE ,
+        PRODUCTION_STATUS ,
+        IS_RELEASE ,
+        CX_MACHINE_CODE ,
+        CX_MACHINE_NAME ,
+        LH_MACHINE_CODE ,
+        LH_MACHINE_NAME ,
+        LH_MACHINE_QTY ,
+        WORK_SHIFTS ,
+        STORAGE_LOCATION ,
+        SAP_CODE ,
+        EMBRYO_SAP_CODE ,
+        SPEC_DESC ,
+        SPEC_DIMENSION ,
+        EMBRYO_CODE ,
+        CLASS3_PLANNED_QTY ,
+        SINGLE_SHIFT_LH_QTY ,
+        TOTAL_STOCK ,
+        CLASS1_PLAN_QTY ,
+        CLASS1_PLAN_QTY_SEQ ,
+        CLASS1_ANALYSIS_INPUT ,
+        CLASS1_ANALYSIS ,
+        CLASS2_PLAN_QTY ,
+        CLASS2_PLAN_QTY_SEQ ,
+        CLASS2_ANALYSIS_INPUT ,
+        CLASS2_ANALYSIS ,
+        CLASS3_PLAN_QTY ,
+        CLASS3_ANALYSIS_INPUT ,
+        CLASS3_ANALYSIS ,
+        CLASS4_PLAN_QTY ,
+        CLASS4_ANALYSIS_INPUT ,
+        CLASS4_ANALYSIS ,
+        CLASS5_PLAN_QTY ,
+        CLASS5_ANALYSIS_INPUT ,
+        CLASS5_ANALYSIS ,
+        MARK_CLOSE_OUT_TIP ,
+        REMARK ,
+        DATA_VERSION ,
+        CREATE_DATE ,
+        UPDATE_DATE ,
+        IS_DELETE ,
+        FACTORY_CODE ,
+        COMPANY_CODE ,
+        BOM_DATA_VERSION )
+        SELECT
+        R.CX_BATCH_NO ,
+        R.ORDER_NO ,
+        R.SCHEDULE_DATE ,
+        R.PRODUCTION_STATUS ,
+        '1' ,
+        R.CX_MACHINE_CODE ,
+        R.CX_MACHINE_NAME ,
+        R.LH_MACHINE_CODE ,
+        R.LH_MACHINE_NAME ,
+        R.LH_MACHINE_QTY ,
+        R.WORK_SHIFTS ,
+        R.STORAGE_LOCATION ,
+        R.SAP_CODE ,
+        C.SAP_CODE ,
+        R.SPEC_DESC ,
+        R.SPEC_DIMENSION ,
+        R.EMBRYO_CODE ,
+        R.CLASS3_PLANNED_QTY ,
+        R.SINGLE_SHIFT_LH_QTY ,
+        R.TOTAL_STOCK ,
+        R.CLASS1_PLAN_QTY ,
+        R.CLASS1_SORT ,
+        R.CLASS1_ANALYSIS_INPUT ,
+        R.CLASS1_ANALYSIS ,
+        R.CLASS2_PLAN_QTY ,
+        R.CLASS2_SORT ,
+        R.CLASS2_ANALYSIS_INPUT ,
+        R.CLASS2_ANALYSIS ,
+        R.CLASS3_PLAN_QTY ,
+        R.CLASS3_ANALYSIS_INPUT ,
+        R.CLASS3_ANALYSIS ,
+        R.CLASS4_PLAN_QTY ,
+        R.CLASS4_ANALYSIS_INPUT ,
+        R.CLASS4_ANALYSIS ,
+        R.CLASS5_PLAN_QTY ,
+        R.CLASS5_ANALYSIS_INPUT ,
+        R.CLASS5_ANALYSIS ,
+        R.MARK_CLOSE_OUT_TIP ,
+        R.REMARK ,
+        #{dataVersion} DATA_VERSION ,
+        NOW() CREATE_DATE ,
+        R.UPDATE_TIME UPDATE_DATE ,
+        R.DEL_FLAG IS_DELETE,
+        #{factoryCode},
+        #{companyCode},
+        R.BOM_DATA_VERSION
+        FROM T_CX_SCHEDULE_RESULT R
+        left JOIN T_PRODUCT_CONSTRUCTION_INFO C ON R.embryo_code = C.embryo_code AND R.BOM_DATA_VERSION=C.EMBRYO_VERSION
+        AND C.del_flag = '0'
+        <where>
+            R.del_flag='0'
+            <if test="ids !=null">
+                AND R.id in(
+                WITH temp_table AS (
+                <foreach collection="ids" item="item" separator=" union ">
+                    SELECT ${item} result_id FROM dual
+                </foreach>
+                )
+                select result_id from temp_table)
+            </if>
+            and r.bom_data_version is not null
+        </where>
+    </insert>
+
+    <insert id="insertPublishRecord">
+        insert into t_schedule_publish_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="procedureCode != null">procedure_code,</if>
+            <if test="publishStatus != null">publish_status,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataVersion != null">data_version,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="procedureCode != null">#{procedureCode},</if>
+            <if test="publishStatus != null">#{publishStatus},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataVersion != null">#{dataVersion},</if>
+        </trim>
+    </insert>
+
+    <select id="getCxGanttData" resultType="com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo">
+        select *
+        from (select c.id,
+                     c.schedule_Date,
+                     c.cx_machine_code,
+                     c.spec_desc,
+                     c.spec_code,
+                     c.embryo_code,
+                     (
+                         case
+                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
+                                 case
+                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
+                                         case
+                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
+                                                 case
+                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then (
+                                                         case
+                                                             when IFNULL(CLASS5_PLAN_QTY, 0) = 0 then (
+                                                                 case
+                                                                     when IFNULL(CLASS6_PLAN_QTY, 0) = 0 then null
+                                                                     else CLASS6_START_TIME end
+                                                                 )
+                                                             else CLASS5_START_TIME end
+                                                         )
+                                                     else CLASS4_START_TIME end
+                                                 )
+                                             else CLASS3_START_TIME end
+                                         )
+                                     else CLASS2_START_TIME end
+                                 )
+                             else CLASS1_START_TIME end
+                         )
+                                                  as startDate,
+                     (
+                         case
+                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
+                                 case
+                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
+                                         case
+                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
+                                                 case
+                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then (
+                                                         case
+                                                             when IFNULL(CLASS5_PLAN_QTY, 0) = 0 then (
+                                                                 case
+                                                                     when IFNULL(CLASS6_PLAN_QTY, 0) = 0 then null
+                                                                     else CLASS6_END_TIME end
+                                                                 )
+                                                             else CLASS5_END_TIME end
+                                                         )
+                                                     else CLASS4_END_TIME end
+                                                 )
+                                             else CLASS3_END_TIME end
+                                         )
+                                     else CLASS2_END_TIME end
+                                 )
+                             else CLASS1_END_TIME end
+                         )                        as endDate,
+                     IFNULL(class1_plan_qty, 0) + IFNULL(class2_plan_qty, 0) + IFNULL(class3_plan_qty, 0) +
+                     IFNULL(class4_plan_qty, 0) + IFNULL(class5_plan_qty, 0) +
+                     IFNULL(class6_plan_qty, 0)   as planQty,
+                     IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                     IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                     IFNULL(CLASS6_FINISH_QTY, 0) as finishQty
+              from t_cx_schedule_result_ref c
+              where 1 = 1
+                and c.IS_DELETE = '0'
+                and c.spec_desc is not null
+                and c.embryo_code is not null
+                and c.schedule_date = #{scheduleDate}) t
+        where planQty > 0
+          AND startDate is not null
+          AND endDate is not null
+        order by CX_MACHINE_CODE, startDate
+    </select>
+
+    <select id="selectOldNewConstruction"
+            resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxProductConstructionInfo">
+        SELECT * FROM t_product_construction_info WHERE embryo_code = #{embryoCode} AND embryo_version IN(#{oldVersion}, #{newVersion})
+    </select>
+
+    <select id="selectByEmbryoCodeAndScheduleDate"
+            resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult">
+        SELECT
+            *
+        FROM
+            t_cx_schedule_result cx
+        WHERE
+            cx.DEL_FLAG = '0'
+          AND cx.IS_DELETE = 0
+          AND cx.schedule_date = #{scheduleDate}
+          AND EXISTS (
+            SELECT
+                1
+            FROM
+                t_product_construction_info cons
+            WHERE
+                cons.del_flag = '0'
+              AND cx.embryo_code = cons.embryo_code
+              AND cx.bom_data_version = cons.embryo_version
+              AND
+              <if test='partFieldName != null and partFieldName == "treadCode"'>cons.tread_code</if>
+              <if test='partFieldName != null and partFieldName == "sidewallCode"'>cons.tread_code</if>
+              = #{oldFieldValue}
+        )
+    </select>
+
+    <select id="selectByPartFieldNameAndScheduleDate" resultType="java.math.BigDecimal">
+        SELECT IFNULL(stock_num, 0) + IFNULL(modify_num, 0) - IFNULL(bad_num, 0) FROM
+        <if test='partFieldName != null and partFieldName == "treadCode"'>t_tm_stock</if>
+        WHERE del_flag = '0' and stock_date = #{scheduleDate}
+    </select>
+</mapper>

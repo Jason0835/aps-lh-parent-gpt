@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"纤维压延定点机台接口"})
 @RestController
-@RequestMapping("/specifyMachine")
+@RequestMapping("/xwyy/specifyMachine")
 public class XwyySpecifyMachineController extends BaseController {
 
     @Resource
     private XwyySpecifyMachineService XwyySpecifyMachineService;
 
     @ApiOperation("根据条件查询定点机台列表")
-    @GetMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(XwyySpecifyMachineDto dto) {
+    @PostMapping("/listSpecifyMachine")
+    public TableDataInfo listSpecifyMachine(@RequestBody XwyySpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<XwyySpecifyMachineDto> list = XwyySpecifyMachineService.listSpecifyMachine(dto);
@@ -80,8 +80,8 @@ public class XwyySpecifyMachineController extends BaseController {
 
     @Log(title = "ui.xwyy.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<XwyySpecifyMachineDto> exportData(XwyySpecifyMachineDto dto) {
+    @PostMapping("/exportData")
+    public List<XwyySpecifyMachineDto> exportData(@RequestBody XwyySpecifyMachineDto dto) {
         dto.setOrderStr(orderStr());
         List<XwyySpecifyMachineDto> list = XwyySpecifyMachineService.listSpecifyMachine(dto);
         return list;

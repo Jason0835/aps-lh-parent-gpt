@@ -127,6 +127,36 @@ public class BigDecimalUtil {
         }
         return str.matches("-?[0-9]+.?[0-9]*");
     }
+
+    /**
+     * 判断字符串是否整数
+     * @param str
+     * @return
+     */
+    public static boolean isInteger(String str) {
+        if (StringUtils.isEmpty(str)) {
+            return false;
+        }
+        return str.matches("^[-+]?(0|[1-9]\\d*)$");
+    }
+
+    /**
+     * 空值处理，空数据返回0
+     * @param value
+     * @return
+     */
+    public static BigDecimal defaultValue(BigDecimal value) {
+        return null != value? value: BigDecimal.ZERO;
+    }
+    
+    /**
+     * 空值处理，空数据返回0
+     * @param value
+     * @return
+     */
+    public static double defaultDoubleValue(BigDecimal value) {
+        return null != value? value.doubleValue(): 0d;
+    }
 }
 
 

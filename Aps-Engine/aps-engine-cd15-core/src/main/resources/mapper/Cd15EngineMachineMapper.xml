@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineMapper">
+	<!-- 查询大卷与机台的映射配置信息 -->
+    <select id="selectNotOutTwoMachineList" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo">
+		SELECT ID, MACHINE_CODE, MACHINE_NAME, QUATA, OPEN_MACHINE_CLASS, IS_OUT_TWO, CLASS_SHIFT
+		  FROM T_CD15_MACHINE_INFO
+		 WHERE DEL_FLAG = '0'
+		  AND IS_OUT_TWO = '0'
+    </select>
+
+</mapper>

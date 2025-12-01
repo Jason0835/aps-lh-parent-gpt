@@ -1,6 +1,7 @@
 package com.zlt.aps.gsq.engine.mapper;
 
 
+import com.zlt.aps.gsq.api.domain.dto.GsqReserveStockDto;
 import com.zlt.aps.gsq.engine.vo.GsqStockConsumeVo;
 import com.zlt.aps.gsq.engine.vo.GsqStockVo;
 import org.apache.ibatis.annotations.Param;
@@ -15,6 +16,20 @@ public interface GsqEngineStockMapper {
      * @return
      */
     List<GsqStockConsumeVo> listCxPlanAndConsume(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 查询昨日早班计划量
+     * @param scheduleDate
+     * @return
+     */
+    List<GsqStockConsumeVo> listLastDayMidPlan(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 根据规格查询预生产库存倍数
+     * @param codeList 规格列表
+     * @return 结果
+     */
+    List<GsqReserveStockDto> listReserveStock(@Param("codeList") List<String> codeList);
 
     /**
      * 查询指定日期的钢丝圈库存量

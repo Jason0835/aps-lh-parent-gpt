@@ -2,7 +2,7 @@ package com.zlt.aps.service;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common4ui.utils.StringUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.service.ICd90MachineInfoService;

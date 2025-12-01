@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.LhflSafeStockMapper">
+
+    <select id="selectLhflSafeStockList" parameterType="com.zlt.mix.setting.api.domain.entity.LhflSafeStock"
+            resultType="com.zlt.mix.setting.api.domain.entity.LhflSafeStock">
+        SELECT
+        t.id,
+        t.mix_area,
+        t.material,
+        p.stock_num,
+        t.safe_stock,
+        t.remark,
+        t.del_flag,
+        t.create_by,
+        t.create_time,
+        t.update_by,
+        t.update_time
+        FROM
+        t_lhfl_safe_stock t
+        LEFT JOIN
+            (SELECT MIX_AREA,
+                    MATERIAL_NAME MATERIAL,
+                    STOCK_DATE,
+                    SUM(ifnull(STOCK_NUM, 0)) STOCK_NUM
+               FROM T_LHFL_GLUE_STOCK
+               WHERE DEL_FLAG = '0' 
+              GROUP BY MIX_AREA, MATERIAL_NAME, STOCK_DATE) p
+         ON p.STOCK_DATE = #{todayDate,jdbcType=TIMESTAMP}
+        AND t.MATERIAL = p.MATERIAL
+        AND t.MIX_AREA = p.MIX_AREA
+        WHERE
+        t.del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and t.mix_area = #{mixArea}</if>
+        <if test="material != null  and material != ''">and INSTR(t.material, #{material}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteLhflSafeStockByIds" parameterType="String">
+        update t_lhfl_safe_stock set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listLhflSafeStockNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType=VARCHAR} MIX_AREA, #{data.material,jdbcType=VARCHAR}
+            material
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_lhfl_SAFE_STOCK m
+        inner join temp_table t on m.MIX_AREA = t.MIX_AREA and m.material = t.material and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertLhflSafeStockInfo">
+        insert into t_lhfl_safe_stock
+        (id,mix_area,material,safe_stock,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="lhflSafeStock" separator=" union all ">
+            select
+            #{lhflSafeStock.mixArea,jdbcType=VARCHAR} mix_area,
+            #{lhflSafeStock.material,jdbcType=VARCHAR} material,
+            #{lhflSafeStock.safeStock,jdbcType=DOUBLE} safe_stock,
+            #{lhflSafeStock.remark,jdbcType=VARCHAR} remark,
+            #{lhflSafeStock.delFlag,jdbcType=VARCHAR} del_flag,
+            #{lhflSafeStock.createBy,jdbcType=VARCHAR} create_by,
+            #{lhflSafeStock.createTime,jdbcType=TIMESTAMP}
+            create_time, #{lhflSafeStock.updateBy,jdbcType=VARCHAR} update_by,
+            #{lhflSafeStock.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lhfl_safe_stock a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.mixArea,jdbcType=VARCHAR} mix_area, #{item.material,jdbcType=VARCHAR} material,
+            #{item.safeStock, jdbcType=DECIMAL} safe_stock, #{item.remark,jdbcType=VARCHAR} remark,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time, #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) b ON ( a.MIX_AREA = b.MIX_AREA and a.material = b.material AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.safe_stock = b.safe_stock,
+            a.remark = b.remark, a.update_by = b.create_by,
+            a.update_time = now()
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.mix_area, a.material, a.safe_stock, a.remark, a.del_flag, a.create_by, a.create_time )
+        values ( get_sequence_nextval('SEQ_t_lhfl_safe_stock'), b.mix_area, b.material, b.safe_stock, b.remark, 0,
+        b.create_by, now() )
+    </update>
+
+    <update id="updateSafeStockByMixAreaAndLhfl">
+        update t_lhfl_safe_stock set safe_stock = #{safeStock, jdbcType=DECIMAL}
+        where del_flag = 0 and mix_area = #{mixArea} and material = #{material}
+    </update>
+</mapper>

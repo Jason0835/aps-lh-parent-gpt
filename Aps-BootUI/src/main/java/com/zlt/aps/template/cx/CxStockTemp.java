@@ -21,7 +21,7 @@ import java.util.Date;
 @Data
 @TableName("T_CX_STOCK")
 @ApiModel(value = "CxStock对象", description = "成型库存信息")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class CxStockTemp extends ApsBaseEntity {
 
     /**

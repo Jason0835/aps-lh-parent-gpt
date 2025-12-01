@@ -23,7 +23,7 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/tq/machine/list")
     TableDataInfo list(@RequestBody TqMachineInfo machineInfo);
 
     /**
@@ -32,7 +32,7 @@ public interface ITqMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/tq/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/tq/machine")
     AjaxResult add(@Validated @RequestBody TqMachineInfo machineInfo);
 
     /**
@@ -50,7 +50,7 @@ public interface ITqMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/tq/machine/{id}")
     TqMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/tq/machine")
     AjaxResult edit(@Validated @RequestBody TqMachineInfo machineInfo);
 
     /**
@@ -68,7 +68,7 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/tq/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody TqMachineInfo machineInfo);
 
     /**
@@ -77,7 +77,7 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/tq/machine/exportList")
     List<TqMachineInfo> exportList(@RequestBody TqMachineInfo machineInfo);
 
     /**
@@ -85,10 +85,10 @@ public interface ITqMachineInfoService {
      * @param machineInfo 查询条件
      * @return 结果
      */
-    @PostMapping("/machine/listMachineInfo")
+    @PostMapping("/tq/machine/listMachineInfo")
     List<TqMachineInfo> listMachineInfo(@RequestBody TqMachineInfo machineInfo);
 
-    @PostMapping("/machine/importData")
+    @PostMapping("/tq/machine/importData")
     @ApiOperation("导入胎面机台信息")
     public AjaxResult importData(@RequestBody List<TqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

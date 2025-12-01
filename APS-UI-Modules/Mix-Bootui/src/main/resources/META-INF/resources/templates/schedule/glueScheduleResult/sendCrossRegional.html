@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('跨区发送')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: datetimepicker-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <div class="tabs-container">
+        <ul class="nav nav-tabs">
+            <li class="active"><a data-toggle="tab" href="#tab-1" aria-expanded="true">
+                [[#{ui.data.tabTitle.sendCrossRegional}]]</a>
+            </li>
+            <li class=""><a data-toggle="tab" href="#tab-2" onclick="initTab2()" aria-expanded="false">[[#{ui.data.tabTitle.querySendCrossRegional}]]</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div id="tab-1" class="tab-pane active">
+                <div class="panel-body">
+                    <input id="mixArea" th:value="${mixArea}" type="hidden">
+                    <input id="sendPerson" th:value="${sendPerson}" type="hidden">
+                    <div class="col-sm-12">
+                        <div class="col-sm-1" style="width: 88px;">
+                            <button type="button" class="btn btn-white btn-sm" onclick="addColumn()"><i
+                                    class="fa fa-plus"> [[#{ui.frame.btn.add}]]</i></button>
+                        </div>
+                        <div class="col-sm-1" style="width: 88px;">
+                            <button type="button" class="btn btn-white btn-sm" onclick="sub.delColumn()"><i
+                                    class="fa fa-minus"> [[#{ui.frame.btn.delete}]]</i></button>
+                        </div>
+                        <div class="col-sm-1" style="width: 90px;">
+                            <form id="form1">
+                                <select id="setMixArea" class="form-control"
+                                        th:with="type=${@dict.getType('MIX_AREA')}">
+                                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                            th:value="${dict.dictValue}"></option>
+                                </select>
+                            </form>
+                        </div>
+                        <div class="col-sm-1" style="width: 126px;">
+                            <button type="button" class="btn btn-white btn-sm" onclick="setMixArea()"><i
+                                    class="fa fa-pencil-square-o"> [[#{ui.data.btn.setMixArea}]]</i></button>
+                        </div>
+                        <div class="col-sm-1" style="width: 115px;">
+                            <button type="button" class="btn btn-white btn-sm" onclick="sendGlueSpan()"><i
+                                    class="fa fa-check"> [[#{ui.data.btn.send}]]</i></button>
+                        </div>
+                        <form class="form-horizontal m" id="form-glueScheduleResult-sendCrossRegional">
+                            <div class="col-sm-8 select-table table-bordered">
+                                <table id="bootstrap-table"></table>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div id="tab-2" class="tab-pane">
+                <div class="panel-body">
+                    <div class="col-sm-12">
+                        <div class="col-sm-12 search-collapse">
+                            <form id="formId">
+                                <div class="select-list">
+                                    <ul>
+                                        <li class="select-time">
+                                            <label>[[#{schedule.glueScheduleResult.sendCrossRegional.scheduleDate}]]：</label>
+                                            <input type="text" class="time-input" id="scheduleDate"
+                                                   th:placeholder="yyyy-mm-dd"
+                                                   th:value="${initDate}"/>
+                                        </li>
+                                        <li>
+                                            [[#{schedule.sendCrossRegional.entrustedMixArea}]]：
+                                            <select id="entrustedMixArea" class="form-control" name="entrustedMixArea"
+                                                    th:with="type=${@dict.getType('MIX_AREA')}">
+                                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                                        th:value="${dict.dictValue}"></option>
+                                            </select>
+                                        </li>
+                                        <li>
+                                            <label>[[#{schedule.sendCrossRegional.glue}]]：</label>
+                                            <div class="neat">
+                                                <input id="glue" type="text" name="glue" class="GlueNames"
+                                                       autocomplete="off"/>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search('formId', 'bootstrap-table-tab2')"><i
+                                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset('formId', 'bootstrap-table-tab2')"><i
+                                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                                            <a class="btn btn-danger btn-rounded btn-sm" onclick="$.operate.removeAll()"
+                                               shiro:hasPermission="glueScheduleResult:glueSpanSend:remove">
+                                                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-sm-12 select-table table-bordered">
+                            <table id="bootstrap-table-tab2"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: datetimepicker-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueScheduleResult";
+    var mixAreaDatasPermission = [[${@setting.scheduleMixAreaPermission()}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var receiveStatusDatas = [[${@dict.getType('RECEIVE_STATUS')}]];
+    var initDate = [[${initDate}]];
+    var selectList = [[${selectList}]];
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+        items: 6
+    });
+
+    $("#form-glueScheduleResult-sendCrossRegional").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        var selectData = initSelectList(selectList);
+        var options1 = {
+            id: 'bootstrap-table',
+            uniqueId: 'uuid',
+            pagination: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            sidePagination: "client",
+            data: selectData,
+            columns: [
+                {
+                    checkbox: true,
+                    width: '2',
+                    widthUnit: '%',
+                },
+                {
+                    field: 'uuid',
+                    align: 'center',
+                    width: '3',
+                    widthUnit: '%',
+                    title: 'uuid',
+                    visible: false,
+                    formatter: function (value, row, index) {
+                        var uuid = $.common.sprintf("<input type='hidden' name='uuid' value='%s'>", value);
+                        var scheduleId = $.common.sprintf("<input type='hidden' name='scheduleId' value='%s'>", row.scheduleId);
+                        return uuid + value + scheduleId;
+                    }
+                },
+                {
+                    field: 'index',
+                    align: 'center',
+                    width: '3',
+                    widthUnit: '%',
+                    title: [[#{ui.data.column.index}]],
+                    formatter: function (value, row, index) {
+                        var columnIndex = $.common.sprintf("<input type='hidden' name='index' value='%s'>", index);
+                        var sendFlag = $.common.sprintf("<input type='hidden' id='sendFlag%s' name='sendFlag' value='%s'>", row.uuid, row.sendFlag);
+                        return columnIndex + $.table.serialNumber(index) + sendFlag;
+                    }
+                },
+                {
+                    field: 'sendPerson',
+                    align: 'center',
+                    width: '8',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendPerson}]],
+                    formatter: function (value, row, index) {
+                        var columnIndex = $.common.sprintf("<input type='hidden' name='glueSpanSendList[%s].sendPerson' value='%s'>", row.uuid, value);
+                        return columnIndex + value;
+                    }
+                },
+                {
+                    field: 'scheduleDate',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.glueScheduleResult.sendCrossRegional.scheduleDate}]],
+                    formatter: function (value, row, index) {
+                        return $.common.sprintf("<div class='col-sm-12'><input id='scheduleDate%s' type='text' class='form-control' name='glueSpanSendList[%s].scheduleDate'" +
+                            " value='%s' style='min-width: 80px' autocomplete='off' placeholder='yyyy-MM-dd' onchange='changeScheduleDate(this)' required></div>", row.uuid, index, value);
+                    },
+                },
+                {
+                    field: 'entrustMixArea',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustMixArea}]],
+                    formatter: function (value, row, index) {
+                        return getMixAreaSelect(mixAreaDatasPermission ,value, row, index, 'entrustMixArea', true);
+                    },
+                },
+                {
+                    field: 'entrustedMixArea',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustedMixArea}]],
+                    formatter: function (value, row, index) {
+                        return getMixAreaSelect(mixAreaDatas ,value, row, index, 'entrustedMixArea', false);
+                    },
+                },
+                {
+                    field: 'glue',
+                    align: 'center',
+                    width: '13',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.glue}]],
+                    formatter: function (value, row, index) {
+                    	var readonly = row.scheduleId != ""? "disabled": "";
+                        return $.common.sprintf("<div class='col-sm-12'><input id='glue%s' type='text' class='form-control GlueNames' name='glueSpanSendList[%s].glue'" +
+                            " value='%s' autocomplete='off' style='min-width: 70px' maxlength='30' required " + readonly + "></div>", row.uuid, index, value);
+                    },
+                },
+                {
+                    field: 'sendQty',
+                    align: 'center',
+                    width: '15',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendQty}]],
+                    formatter: function (value, row, index) {
+                        return $.common.sprintf("<div class='col-sm-12'><input id='sendQty%s' type='text' class='form-control' name='glueSpanSendList[%s].sendQty'" +
+                            " value='%s' style='min-width: 70px' digits='true' min='0' max='9999999' required></div>", row.uuid, index, value);
+                    },
+                },
+                {
+                    field: 'expectDemandTime',
+                    align: 'center',
+                    width: '15',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.expectDemandTime}]],
+                    formatter: function (value, row, index) {
+                        return $.common.sprintf("<div class='col-sm-12'><input id='expectDemandTime%s' type='text' class='form-control' name='glueSpanSendList[%s].expectDemandTime'" +
+                            " value='%s' style='min-width: 130px' autocomplete='off' placeholder='yyyy-MM-dd' onchange='changeExpectDemandTime(this)'></div>", row.uuid, index, value);
+                    },
+                },
+                // {
+                //     field: 'receiveStatus',
+                //     align: 'center',
+                //     width: '10',
+                //     widthUnit: '%',
+                //     title: [[#{schedule.sendCrossRegional.receiveStatus}]],
+                //     formatter: function (value, row, index) {
+                //         return getReceiveStatusSelect(value, row, index);
+                //     },
+                // },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    width: '25',
+                    widthUnit: '%',
+                    title: [[#{ui.data.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.common.sprintf("<div class='col-sm-12'><input type='text' class='form-control' name='glueSpanSendList[%s].remark'" +
+                            " style='min-width: 80px' maxlength='300' value='%s'/></div>", index, value);
+                    },
+                },
+            ]
+        };
+        $.table.init(options1, false);
+    });
+
+    function initTab2() {
+        var options2 = {
+            id: 'bootstrap-table-tab2',
+            uniqueId: 'id',
+            formId: 'formId',
+            url: prefix + "/listGlueSpanSend",
+            removeUrl: prefix + "/deleteGlueSpanSend",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            modalName: [[#{schedule.glueScheduleResult.receiveCrossRegional.modelName}]],
+            queryParams: queryParams,
+            onLoadSuccess: function () {
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $($(".fixed-table-container")[1]).offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-35);//基础默认表格高度
+                //设置最低高度
+                if(bh<wh*0.65){
+                    bh=wh*0.65
+                }
+                if (bh < 300) {
+                    bh = 300
+                }
+                $('#bootstrap-table-tab2').bootstrapTable("resetView",{height:bh});
+            },
+            rowStyle: function (row, index){
+                if (row.receiveStatus === "1") {
+                    return {css: { "background": "#c6e0b4"}};
+                }
+                return {};
+            },
+            columns: [
+                {
+                    checkbox: true,
+                    width: '2',
+                    widthUnit: '%',
+                },
+                {
+                    field: 'id',
+                    align: 'center',
+                    width: '3',
+                    widthUnit: '%',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'sendPerson',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendPerson}]],
+                },
+                {
+                    field: 'entrustMixArea',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustMixArea}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(mixAreaDatas, value);
+                    },
+                },
+                {
+                    field: 'entrustedMixArea',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustedMixArea}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(mixAreaDatas, value);
+                    },
+                },
+                {
+                    field: 'glue',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.glue}]],
+                },
+                {
+                    field: 'sendQty',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendQty}]],
+                },
+                {
+                    field: 'receiveQty',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.receiveQty}]],
+                },
+                {
+                    field: 'expectDemandTime',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.expectDemandTime}]],
+                },
+                {
+                    field: 'finishQty',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.finishQty}]],
+                },
+                {
+                    field: 'receiveStatus',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.receiveStatus}]],
+                    visible: false
+                },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    width: '15',
+                    widthUnit: '%',
+                    title: [[#{ui.data.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 20);
+                    },
+                },
+            ]
+        };
+        $.table.init(options2);
+    }
+
+    $("#bootstrap-table").on("post-body.bs.table", function (e, args) {
+        var $expectDemandTime = $("input[name$='expectDemandTime']");
+        $expectDemandTime.datetimepicker({
+            format: "yyyy-mm-dd hh:ii:ss",
+            autoclose: true,
+            pickerPosition: 'bottom-right'
+        });
+        $expectDemandTime.datetimepicker().on('hide', function (ev) {
+            // 小于 0，表示输入日期不合法，赋值默认日期
+            if (ev.date.getTime() < 0) {
+                $(ev.target).val(initDate + " 00:00:00");
+            }
+        });
+        var $scheduleDate = $("input[name$='scheduleDate']");
+        $scheduleDate.datetimepicker({
+            format: "yyyy-mm-dd",
+            autoclose: true,
+            pickerPosition: 'bottom-right',
+            minView: 'month',
+        });
+        $scheduleDate.datetimepicker().on('hide', function (ev) {
+            // 小于 0，表示输入日期不合法，赋值默认日期
+            if (ev.date.getTime() < 0) {
+                $(ev.target).val(initDate);
+            }
+        });
+        $('.GlueNames').typeahead({
+            source: datas,
+            autoSelect: false,
+            items: 6
+        });
+    });
+
+    //添加行
+    function addColumn() {
+        var mixArea = $("#mixArea").val();
+        var sendPerson = $("#sendPerson").val();
+        if ($.common.isEmpty(sendPerson) || $.common.isEmpty(mixArea)) {
+            $.modal.alertWarning([[#{ui.data.message.sendPersonOrEntrustedMixAreaNull}]]);
+            return;
+        }
+        table.set('bootstrap-table');
+        var count = $("#bootstrap-table").bootstrapTable('getData').length;
+        var row = {
+            uuid: getUUID(),
+            sendFlag: "0",
+            index: count,
+            sendPerson: sendPerson,
+            scheduleDate: initDate,
+            entrustMixArea: mixArea,
+            entrustedMixArea: "",
+            glue: "",
+            sendQty: "",
+            expectDemandTime: "",
+            receiveStatus: "",
+            scheduleId: "",
+            remark: ""
+        }
+        //editColumn('bootstrap-table');// 性能有问题，先注释掉
+        $("#bootstrap-table").bootstrapTable('insertRow', {
+            index: count + 1,
+            row: row
+        });
+    }
+
+    // 初始化选中记录到发送列表
+    function initSelectList(list) {
+    	var selectData = [];
+        var mixArea = $("#mixArea").val();
+        var sendPerson = $("#sendPerson").val();
+        if ($.common.isEmpty(sendPerson) || $.common.isEmpty(mixArea)) {
+            $.modal.alertWarning([[#{ui.data.message.sendPersonOrEntrustedMixAreaNull}]]);
+            return selectData;
+        }
+        for (var i = 0; i < list.length; i++) {
+            //table.set('bootstrap-table');
+            //var count = $("#bootstrap-table").bootstrapTable('getData').length;
+            var count = i - 1
+            var row = {
+                uuid: getUUID(),
+                sendFlag: "0",
+                index: count,
+                sendPerson: sendPerson,
+                scheduleDate: list[i].scheduleDate,
+                entrustMixArea: mixArea,
+                entrustedMixArea: "",
+                glue: list[i].glue,
+                sendQty: list[i].totalPlanQty,
+                expectDemandTime: "",
+                receiveStatus: "",
+                scheduleId: list[i].id,
+                remark: list[i].remark
+            }
+            //editColumn('bootstrap-table');// 性能有问题，先注释掉
+            //$("#bootstrap-table").bootstrapTable('insertRow', {
+            //    index: count + 1,
+            //    row: row
+            //});
+            selectData.push(row);
+        }
+        return selectData;
+    }
+
+    // 获取密炼区下拉框
+    function getMixAreaSelect(datas ,value, row, index, field, isReadonly) {
+    	var readonly = isReadonly? "disabled": ""; // 有切换事件的可编辑，反之不可编辑
+        var select = $.common.sprintf("<div class='col-sm-12'><select style='min-width: 60px' class=\"form-control\" id='%s%s' name=\"glueSpanSendList[%s].%s\" required " + readonly + ">", field, row.uuid, index, field);
+        for (var i = 0; i < datas.length; i++) {
+            var item = datas[i];
+            if (item.dictValue === value) {
+                select = select + "<option value='" + item.dictValue + "' selected>" + item.dictLabel + "</option>";
+            } else {
+                select = select + "<option value='" + item.dictValue + "'>" + item.dictLabel + "</option>";
+            }
+        }
+        return select + "</select></div>";
+    }
+
+    // 设定被委托密炼区
+    function setMixArea() {
+        var setMixArea = $("#setMixArea option:selected").val();
+        let $bootstrap = $("#bootstrap-table");
+        var selections = $bootstrap.bootstrapTable('getSelections');
+        if (selections.length > 0) {
+            for (var i = 0; i < selections.length; i++) {
+                $("#entrustedMixArea" + selections[i].uuid + " option[value=" + setMixArea + "]").prop('selected', true);
+            }
+        } else {
+            var tableData = $bootstrap.bootstrapTable('getData');
+            if (tableData.length > 0) {
+                for (var j = 0; j < tableData.length; j++) {
+                    $("#entrustedMixArea" + tableData[j].uuid + " option[value=" + setMixArea + "]").prop('selected', true);
+                }
+            }
+        }
+    }
+
+    // 获取接收状态下拉框
+    function getReceiveStatusSelect(value, row, index) {
+        var select = $.common.sprintf("<div class='col-sm-12'><select class=\"form-control\" id='receiveStatus%s' name=\"glueSpanSendList[%s].receiveStatus\" required>", index, index);
+        for (var i = 0; i < receiveStatusDatas.length; i++) {
+            var item = receiveStatusDatas[i];
+            if (item.dictValue === value) {
+                select = select + "<option value='" + item.dictValue + "' selected>" + item.dictLabel + "</option>";
+            } else {
+                select = select + "<option value='" + item.dictValue + "'>" + item.dictLabel + "</option>";
+            }
+        }
+        return select + "</select></div>";
+    }
+
+    // 发送跨区请求
+    function sendGlueSpan() {
+        var selectList = getSelectedData('bootstrap-table');
+        if (selectList.length === 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        // 校验选中记录的单元格和机台
+        var validateFlag = true;
+        var $form = $('#form-glueScheduleResult-sendCrossRegional');
+        var alreadySendIndexes = [];
+        for (var i = 0; i < selectList.length; i++) {
+            validateFlag = validateFlag && $form.validate().element($("#scheduleDate" + selectList[i].uuid));
+            validateFlag = validateFlag && $form.validate().element($("#glue" + selectList[i].uuid));
+            validateFlag = validateFlag && $form.validate().element($("#sendQty" + selectList[i].uuid));
+            validateFlag = validateFlag && $form.validate().element($("#expectDemandTime" + selectList[i].uuid));
+            var entrustMixArea = $("#entrustMixArea" + selectList[i].uuid + " option:selected").val();
+            var entrustedMixArea = $("#entrustedMixArea" + selectList[i].uuid + " option:selected").val();
+            var isDifferentMixArea = entrustMixArea !== entrustedMixArea;
+            validateFlag = validateFlag && isDifferentMixArea;
+            if (!isDifferentMixArea) {
+                $.modal.alertWarning([[#{ui.data.message.sameMixArea}]]);
+                return ;
+            }
+            var sendFlag = $("#sendFlag" + selectList[i].uuid).val();
+            if ($.common.isNotEmpty(sendFlag) && sendFlag === "1") {
+                // 序号为 index + 1
+                alreadySendIndexes.push(Number(selectList[i].index) + 1);
+            }
+        }
+        if (alreadySendIndexes.length > 0) {
+            var message = $.common.sprintf([[#{ui.data.message.alreadySend}]], alreadySendIndexes.join(","));
+            $.modal.alertWarning(message);
+            return ;
+        }
+        if (validateFlag) {
+            var data = [];
+            var sendIds = [];
+            for (var j = 0; j < selectList.length; j++) {
+                var keyList = Object.keys(selectList[j]);
+                var valueList = Object.values(selectList[j]);
+                for (var k = 0; k < keyList.length; k++) {
+                    data.push({name: "glueSpanSendList[" + j + "]." + keyList[k], value: valueList[k]})
+                }
+                sendIds.push(selectList[j].uuid);
+            }
+            $.operate.postNotRefresh(prefix + "/sendGlueSpan", data, function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var tableData = getTableData('bootstrap-table');
+                    var filterData = tableData.filter(item => sendIds.indexOf(item.id) !== -1);
+                    var loadParentData = [];
+                    for (var i = 0; i < filterData.length; i++) {
+                        // 发送标识修改为已发送
+                        filterData[i].row['sendFlag'] = '1';
+                    }
+                    for (var j = 0; j < tableData.length; j++) {
+                        loadParentData.push(tableData[j].row);
+                    }
+                    $("#bootstrap-table").bootstrapTable('load', loadParentData);
+                }
+            });
+        }
+    }
+
+    // 获取表格选中的数据，包括文本框内填写的值
+    function getSelectedData(tableId) {
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = $('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = $("#" + currentId).bootstrapTable('getSelections');
+        var count = data.length;
+        var selectIds = data.map(item => item.uuid);
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = $('#' + currentId + ' tr[data-uniqueid="' + selectIds[dataIndex] + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = $(columns[i]).find('input');
+                var selectValue = $(columns[i]).find('select');
+                var textareaValue = $(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push(extendObj);
+        }
+        return params;
+    }
+
+    // 获取表格的数据，包括文本框内填写的值
+    function getTableData(tableId) {
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = $('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = $("#" + currentId).bootstrapTable('getData');
+        var count = data.length;
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = $('#' + currentId + ' tr[data-index="' + dataIndex + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = $(columns[i]).find('input');
+                var selectValue = $(columns[i]).find('select');
+                var textareaValue = $(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push({id: extendObj.uuid, row: extendObj});
+        }
+        return params;
+    }
+
+    // 添加行时回写其他行数据
+    function editColumn(tableId) {
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = $('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = $("#" + currentId).bootstrapTable('getData');
+        var count = data.length;
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = $('#' + currentId + ' tr[data-index="' + dataIndex + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = $(columns[i]).find('input');
+                var selectValue = $(columns[i]).find('select');
+                var textareaValue = $(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push({index: dataIndex, row: extendObj});
+        }
+        $("#" + currentId).bootstrapTable("updateRow", params);
+    }
+
+    // 跨区请求查询参数赋值
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        search.scheduleDate = $("#scheduleDate").val();
+        search.entrustedMixArea = $("#entrustedMixArea option:selected").val();
+        search.glue = $("#glue").val();
+        search.source = "1";
+        search.permissionMixAreaList = mixAreaDatasPermission.map(item => item.dictValue).join(',');
+        return search;
+    }
+
+    // 用于生成UUID给表作为唯一id
+    function getUUID() {
+        function S4() {
+            return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+        }
+        return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
+    }
+
+    function changeScheduleDate($ele) {
+        if (/Invalid|NaN/.test(new Date($ele.value).toString())) {
+            $ele.value = initDate;
+        }
+    }
+
+    function changeExpectDemandTime($ele) {
+        if (/Invalid|NaN/.test(new Date($ele.value).toString())) {
+            $ele.value = initDate + " 00:00:00";
+        }
+    }
+</script>
+</body>
+</html>

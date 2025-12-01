@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改提醒设备')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-remindSetting-edit" th:object="${remindSetting}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.remindSetting.fieldCode}]]：</label>
+            <div class="col-sm-8">
+                <select name="fieldCode" class="form-control" th:with="type=${@dict.getType('REMIND_CODE')}"
+                        required="true">
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"
+                            th:field="*{fieldCode}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.remindSetting.fieldValue}]]：</label>
+            <div class="col-sm-8">
+                <input name="fieldValue" th:field="*{fieldValue}" class="form-control" type="text" required="true"
+                       maxlength="40">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{setting.remindSetting.wordColor}]]：</label>
+            <div class="col-sm-8">
+                <div class="form-control">
+                    <input id="wordColor" readonly=true th:placeholder="#{ui.color.text.placeholder}" name="wordColor" th:field="*{wordColor}" class="layui-input form-control colorpicker-input" type="text"  maxlength="15">
+                    <div id="colorpicker1"></div>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{setting.remindSetting.backgroundColor}]]：</label>
+            <div class="col-sm-8">
+                <div class="form-control">
+                    <input id="backgroundColor" readonly=true th:placeholder="#{ui.color.back.placeholder}" name="backgroundColor" th:field="*{backgroundColor}" class="layui-input form-control colorpicker-input" type="text"  maxlength="15">
+                    <div id="colorpicker2"></div>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{setting.remindSetting.tips}]]：</label>
+            <div class="col-sm-8">
+                <input name="tips" th:field="*{tips}" class="form-control" type="text" maxlength="300">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: colorpicker" />
+<script th:inline="javascript">
+
+    layui.use(['colorpicker', 'layer'], function(){
+        var colorpicker1 = layui.colorpicker;
+        colorpicker1.render({
+            elem: '#colorpicker1'
+            ,predefine: true //开启预定义颜色
+            ,colors: '#000000'
+            ,change: function(color){
+                layui.$("#wordColor").val(color);
+            }
+            ,done: function(color){
+                layui.$('#wordColor').val(color);
+            }
+        });
+        try{
+            layui.$(".layui-colorpicker-trigger-span")[0].style.background=layui.$("#wordColor").val();
+        }catch (e) {
+
+        }
+    })
+
+    layui.use(['colorpicker', 'layer'], function(){
+        var colorpicker2 = layui.colorpicker;
+        colorpicker2.render({
+            elem: '#colorpicker2'
+            ,predefine: true //开启预定义颜色
+            ,colors: '#ffffff'
+            ,change: function(color){
+                layui.$("#backgroundColor").val(color);
+            }
+            ,done: function(color){
+                layui.$('#backgroundColor').val(color);
+            }
+        });
+        try{
+            var myLayUi = layui.$(".layui-colorpicker-trigger-span");
+
+            var i = 1;
+            //颜色组件的生成过程可能不会按照html文档的顺序
+            if (myLayUi.length == 1) {
+                i = 0;
+            }
+
+            myLayUi[i].style.background = layui.$("#backgroundColor").val();
+        }catch (e) {
+
+        }
+    })
+
+    var prefix = ctx + "setting/remindSetting";
+    $("#form-remindSetting-edit").validate({
+        focusCleanup: true
+    });
+
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            if ($("#id").val() == null || $("#id").val() == '') {
+                $.operate.save(prefix + "/save", $('#form-remindSetting-edit').serialize());
+            } else {
+                $.operate.saveUpdateParentRow(prefix + "/save", $('#form-remindSetting-edit').serializeArray());
+            }
+        }
+    }
+</script>
+</body>
+</html>

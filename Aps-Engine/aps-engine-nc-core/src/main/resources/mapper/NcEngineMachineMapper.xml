@@ -4,7 +4,7 @@
 
     <select id="listNcSpecifyMachine" resultType="com.zlt.aps.nc.engine.vo.NcSpecifyMachineVo" >
         select LINING_CODE,
-               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
         from T_NC_SPECIFY_MACHINE sm
         inner join T_NC_MACHINE_INFO m on sm.machine_id = m.id
         where sm.DEL_FLAG = '0'
@@ -14,5 +14,23 @@
         and m.STATUS = '0'
         and m.DEL_FLAG = '0'
         group by LINING_CODE
+    </select>
+
+    <select id="listNcMachine" resultType="com.zlt.aps.nc.api.domain.entity.NcMachineInfo">
+        select ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               WIDTH_MIN,
+               WIDTH_MAX,
+               THICK_MIN,
+               THICK_MAX,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               STATUS,
+               REMARK
+        from T_NC_MACHINE_INFO
+        where STATUS = '0'
+          and DEL_FLAG = '0'
     </select>
 </mapper>

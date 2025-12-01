@@ -17,4 +17,9 @@ public class TmGlueOrderVo {
      * 胶料序号
      */
     private String glueSeq;
+
+    /**
+     * 机台ID
+     */
+    private String machineId;
 }

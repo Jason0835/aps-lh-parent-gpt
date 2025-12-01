@@ -18,38 +18,33 @@
             order by ${orderStr}
         </if>
     </select>
-    <update id="mergeSql" parameterType="list">
-        merge into T_GDYY_NOTE a USING (
-        <foreach collection="list" item="Attention" separator=" union ">
-            select
-            #{Attention.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{Attention.notes,jdbcType=VARCHAR} notes,
-            #{Attention.startTime,jdbcType=DATE} start_time,
-            #{Attention.endTime,jdbcType=DATE} end_time,
-            #{Attention.status,jdbcType=VARCHAR} status,
-
-            #{Attention.remark,jdbcType=VARCHAR} remark,
-            #{Attention.createBy,jdbcType=VARCHAR} create_by,
-            #{Attention.createTime,jdbcType=DATE} create_time,
-            #{Attention.updateBy,jdbcType=VARCHAR} update_by,
-            #{Attention.updateTime,jdbcType=DATE} update_time
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GDYY_NOTE (
+        big_roll_code, notes, start_time, end_time, status,
+        remark, create_by, create_time, update_by, update_time, del_flag
+        ) VALUES
+        <foreach collection="list" item="Attention" separator=",">
+            (
+            #{Attention.bigRollCode,jdbcType=VARCHAR},
+            #{Attention.notes,jdbcType=VARCHAR},
+            #{Attention.startTime,jdbcType=DATE},
+            #{Attention.endTime,jdbcType=DATE},
+            #{Attention.status,jdbcType=VARCHAR},
+            #{Attention.remark,jdbcType=VARCHAR},
+            #{Attention.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{Attention.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.big_roll_code is null and a.big_roll_code is null) or (a.big_roll_code = b.big_roll_code))
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.notes = b.notes,
-        a.start_time = b.start_time,
-        a.end_time = b.end_time,
-        a.status = b.status,
-
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.big_roll_code, a.notes, a.start_time, a.end_time, a.status, a.create_by, a.create_time, a.remark, a.del_flag) values
-        (SEQ_QUOTA_SETTING.NEXTVAL, b.big_roll_code, b.notes, b.start_time, b.end_time, b.status, b.create_by, sysdate, b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        notes = VALUES(notes),
+        start_time = VALUES(start_time),
+        end_time = VALUES(end_time),
+        status = VALUES(status),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

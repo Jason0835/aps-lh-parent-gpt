@@ -21,13 +21,13 @@ public interface ITqAssistScheduleService {
      * 查询胎圈外协排程结果列表
      */
     @ApiOperation("查询胎圈外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/tq/assistSchedule/list")
     TableDataInfo list(@RequestBody TqAssistSchedule tqAssistSchedule);
 
     /**
      * 导出胎圈外协排程结果信息
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/tq/assistSchedule/export")
     @ApiOperation("导出胎圈外协排程结果信息")
     public byte[] export(@RequestBody TqAssistSchedule assistSchedule);
 }

@@ -4,7 +4,7 @@
 	<!-- 查询顶点机台的映射配置信息 -->
     <select id="selectCd90SpecifyMachineList" resultType="com.zlt.aps.cd90.engine.vo.Cd90SpecifyMachineVo">
 		SELECT cloth_code,
-		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		       GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
 		  FROM T_CD90_SPECIFY_MACHINE M
 		  LEFT JOIN T_CD90_MACHINE_INFO MI
 		    ON MI.ID = M.MACHINE_ID
@@ -15,4 +15,30 @@
          GROUP BY cloth_code
     </select>
 
+    <select id="listCd90Machine" resultType="com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo">
+        SELECT ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               IS_STICK_FILM,
+               CLOTH_WITH_MAX,
+               CLOTH_WITH_MIN,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               STATUS,
+               DEL_FLAG
+        FROM T_CD90_MACHINE_INFO
+        WHERE DEL_FLAG = '0'
+          AND STATUS = '0'
+    </select>
+
+    <select id="listLastDayPlanMachine" resultType="com.zlt.aps.cd90.engine.vo.Cd90SpecifyMachineVo">
+        SELECT cloth_code, max(MACHINE_ID) MACHINE_ID
+        FROM T_CD90_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+          AND NIGHT_PLAN_QTY > 0
+          AND MACHINE_ID IS NOT NULL
+        GROUP BY CLOTH_CODE
+    </select>
 </mapper>

@@ -5,6 +5,7 @@ import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
  * @author zlt
  * @date 2021-05-28
  */
+@Data
 @ApiModel(value="t_tm_machine_info胎面机台信息对象", description="胎面机台信息对象 ")
 public class TmMachineInfo extends ApsBaseEntity
 {
@@ -84,6 +86,14 @@ public class TmMachineInfo extends ApsBaseEntity
     @ImportValidated(maxLength = 10 ,required = true)
     private String status;
 
+    /**
+     * 支持全口型标记，0--支持，1--不支持。对应数据字典IS_SUPPORTED
+     */
+    @ApiModelProperty(value = "支持全口型标记，0--支持，1--不支持", position = 100)
+    @Excel(name = "ui.data.column.machine.supportsAllMouthFlag", dictType = "IS_SUPPORTED")
+    @ImportValidated(maxLength = 10, required = true)
+    private String supportsAllMouthFlag;
+
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(name = "ui.common.column.remark", maxLength = 300)
     private String remark;
@@ -100,118 +110,6 @@ public class TmMachineInfo extends ApsBaseEntity
 
     /** 删除标识：0--正常，1-删除.对应数据字典DEL_FLAG */
     private String delFlag;
-
-    public void setId(Long id) 
-    {
-        this.id = id;
-    }
-
-    public Long getId() 
-    {
-        return id;
-    }
-    public void setMachineCode(String machineCode) 
-    {
-        this.machineCode = machineCode;
-    }
-
-    public String getMachineCode() 
-    {
-        return machineCode;
-    }
-    public void setMachineName(String machineName) 
-    {
-        this.machineName = machineName;
-    }
-
-    public String getMachineName() 
-    {
-        return machineName;
-    }
-    public void setWidthMin(BigDecimal widthMin)
-    {
-        this.widthMin = widthMin;
-    }
-
-    public BigDecimal getWidthMin()
-    {
-        return widthMin;
-    }
-    public void setWidthMax(BigDecimal widthMax)
-    {
-        this.widthMax = widthMax;
-    }
-
-    public BigDecimal getWidthMax()
-    {
-        return widthMax;
-    }
-    public void setThickMin(BigDecimal thickMin)
-    {
-        this.thickMin = thickMin;
-    }
-
-    public BigDecimal getThickMin()
-    {
-        return thickMin;
-    }
-    public void setThickMax(BigDecimal thickMax)
-    {
-        this.thickMax = thickMax;
-    }
-
-    public BigDecimal getThickMax()
-    {
-        return thickMax;
-    }
-
-    public void setQuata(BigDecimal quata)
-    {
-        this.quata = quata;
-    }
-
-    public BigDecimal getQuata()
-    {
-        return quata;
-    }
-
-    public String getClassShift() 
-    {
-        return classShift;
-    }
-
-    public void setClassShift(String classShift)
-    {
-        this.classShift = classShift;
-    }
-
-    public void setOpenMachineClass(String openMachineClass) 
-    {
-        this.openMachineClass = openMachineClass;
-    }
-
-    public String getOpenMachineClass() 
-    {
-        return openMachineClass;
-    }
-    public void setStatus(String status) 
-    {
-        this.status = status;
-    }
-
-    public String getStatus() 
-    {
-        return status;
-    }
-    public void setDelFlag(String delFlag) 
-    {
-        this.delFlag = delFlag;
-    }
-
-    public String getDelFlag() 
-    {
-        return delFlag;
-    }
 
     @Override
     public String toString() {

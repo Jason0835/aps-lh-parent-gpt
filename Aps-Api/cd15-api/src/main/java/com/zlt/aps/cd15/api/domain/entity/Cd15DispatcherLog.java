@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -23,7 +24,7 @@ import java.util.Map;
 @Data
 @TableName("t_cd15_dispatcher_log")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_T_CD15_DISPATCHER_LOG", clazz = Long.class)
+@KeySequence(value = "SEQ_T_CD15_DISPATCHER_LOG",dbType = DbType.ORACLE)
 public class Cd15DispatcherLog extends ApsBaseEntity{
 
     private static final long serialVersionUID = 1L;

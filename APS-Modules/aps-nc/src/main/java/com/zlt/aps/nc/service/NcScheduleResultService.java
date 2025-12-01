@@ -1,7 +1,9 @@
 package com.zlt.aps.nc.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
+import com.zlt.bill.common.service.IBillService;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
@@ -13,7 +15,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-24
  */
-public interface NcScheduleResultService {
+public interface NcScheduleResultService extends IBillService<NcScheduleResult> {
     /**
      * 查询内衬排程结果
      *
@@ -88,16 +90,16 @@ public interface NcScheduleResultService {
      * @param ids
      */
     public int batchUpdate(long[] ids, Date scheduleDate, String dataVersion, String factoryCode, String companyCode);
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
 	 */
 	void updateRelaseStatus(String dataVersion, long[] ids, String status);
-    
+
     /**
      * 查询排程日期是否已发布
      * @param scheduleDate 排程日期
@@ -156,4 +158,21 @@ public interface NcScheduleResultService {
     int isPublishByIds(Long[] ids);
 
     List<NcScheduleResult> selectByIds(List<Long> ids2);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<NcDayFinishQty> list, Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(NcScheduleResult scheduleResult);
 }

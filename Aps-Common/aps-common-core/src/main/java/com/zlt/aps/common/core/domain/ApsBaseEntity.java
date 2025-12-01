@@ -3,7 +3,9 @@ package com.zlt.aps.common.core.domain;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import io.swagger.annotations.ApiModelProperty;
 
@@ -13,7 +15,7 @@ import java.util.Date;
 /**
  * entity基类
  */
-public class ApsBaseEntity implements Serializable {
+public class ApsBaseEntity extends BaseEntity {
 
     @ApiModelProperty(value = "备注", position = 500)
     @TableField("REMARK")
@@ -22,6 +24,10 @@ public class ApsBaseEntity implements Serializable {
     @ApiModelProperty(value = "删除标识：0--正常，1-删除", position = 600)
     @TableField("DEL_FLAG")
     private String delFlag;
+
+    @ApiModelProperty("删除标识：0--正常，1-删除")
+    @TableField(exist = false)
+    private Integer isDelete = 0;
 
     @ApiModelProperty(value = "创建者", position = 700)
     @TableField("CREATE_BY")

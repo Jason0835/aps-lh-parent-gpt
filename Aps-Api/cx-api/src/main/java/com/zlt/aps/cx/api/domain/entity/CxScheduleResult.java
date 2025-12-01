@@ -86,7 +86,6 @@ public class CxScheduleResult extends ApsBaseEntity implements Cloneable {
     /**
      * 硫化机台编号
      */
-//    @Excel(name = "ui.data.column.cxScheduleResult.lhMachineCode1")
     @ApiModelProperty(value = "硫化机台编号")
     private String lhMachineCode;
 
@@ -690,6 +689,14 @@ public class CxScheduleResult extends ApsBaseEntity implements Cloneable {
 
     @ApiModelProperty(value = "月计划剩余量悬浮显示信息")
     private String monthPlanOsHoverStr;
+
+    @ApiModelProperty(value = "最小硫化机对比数颜色")
+    private String minimumLhMachineComRatioColor;
+
+
+    @ApiModelProperty(value = "月计划剩余量提示颜色")
+    private String monthPlanSurplusTipColor;
+
 
     /**
      * 机头宽度

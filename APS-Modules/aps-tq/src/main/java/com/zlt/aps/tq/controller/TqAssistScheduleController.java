@@ -23,7 +23,7 @@ import java.util.List;
  * @date 2022-02-16
  */
 @RestController
-@RequestMapping("/assistSchedule")
+@RequestMapping("/tq/assistSchedule")
 public class TqAssistScheduleController extends BaseController {
     @Autowired
     private TqAssistScheduleService tqAssistScheduleService;

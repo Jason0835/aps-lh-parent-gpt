@@ -11,7 +11,6 @@ import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.service.TmMachineInfoService;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -144,7 +143,7 @@ public class TmMachineInfoServiceImpl implements TmMachineInfoService {
             //校验机台名称唯一性
             nameUniqueErrorLogs = this.machineInfoMapper.listMachineNameNotUnique(list, importLogId, I18nUtil.getMessage("ui.data.column.cx.machineName.message"), SecurityUtils.getUsername(), updateSupport);
             importErrorLogs.addAll(nameUniqueErrorLogs);
-            nameUniqueErrorMap = codeUniqueErrorLogs.stream().collect(Collectors.groupingBy(a -> a.getErrorRow(), Collectors.counting()));
+            nameUniqueErrorMap = nameUniqueErrorLogs.stream().collect(Collectors.groupingBy(a -> a.getErrorRow(), Collectors.counting()));
 
             //按业务主键分组
             Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> a.getMachineCode(), Collectors.counting()));

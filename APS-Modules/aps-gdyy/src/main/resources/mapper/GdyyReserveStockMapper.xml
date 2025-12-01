@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.mapper.GdyyReserveStockMapper">
+
+    <resultMap type="com.zlt.aps.gdyy.api.domain.dto.GdyyReserveStockDto" id="reserveStockResult">
+        <result property="id" column="id"/>
+        <result property="bigRollCode" column="big_roll_code"/>
+        <result property="reserveStockRate" column="reserve_stock_rate"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectGdyyReserveStockVo">
+        select id, big_roll_code, reserve_stock_rate, create_by, create_time, update_by, update_time, del_flag, remark from t_gdyy_reserve_stock
+    </sql>
+
+    <select id="selectReserveStockList" parameterType="com.zlt.aps.gdyy.entity.GdyyReserveStock"
+            resultMap="reserveStockResult">
+        <include refid="selectGdyyReserveStockVo"/>
+        WHERE del_flag = '0'
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0</if>
+        <if test="orderStr == null">
+            order by CREATE_TIME desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectReserveStockById" parameterType="Long" resultMap="reserveStockResult">
+        <include refid="selectGdyyReserveStockVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.gdyy.entity.GdyyReserveStock" resultMap="reserveStockResult">
+        <include refid="selectGdyyReserveStockVo"/>
+        where del_flag = '0'
+        <if test="id != null and id != ''">and id != #{id}</if>
+        <if test="bigRollCode == null or bigRollCode == ''">and big_roll_code is null</if>
+        <if test="bigRollCode != null  and bigRollCode != ''">and big_roll_code = #{bigRollCode}</if>
+    </select>
+
+    <delete id="deleteReserveStockByIds" parameterType="long">
+        update t_gdyy_reserve_stock set del_flag = NULL where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_gdyy_reserve_stock (
+        big_roll_code, reserve_stock_rate,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="ReserveStock" separator=",">
+            (
+            #{ReserveStock.bigRollCode,jdbcType=VARCHAR},
+            #{ReserveStock.reserveStockRate,jdbcType=DOUBLE},
+            #{ReserveStock.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{ReserveStock.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{ReserveStock.remark,jdbcType=VARCHAR},
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        reserve_stock_rate = VALUES(reserve_stock_rate),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
+</mapper>

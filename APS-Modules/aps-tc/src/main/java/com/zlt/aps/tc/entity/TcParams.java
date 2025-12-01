@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_TC_PARAMS")
 @ApiModel(value = "TcParams对象", description = "胎侧参数信息")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class TcParams extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1110056585174675868L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "参数code")

@@ -48,36 +48,33 @@
     </select>
 
     <delete id="deleteQuotaSettingByIds" parameterType="long">
-        update t_gdyy_quota_setting set del_flag = 1 where id in
+        update t_gdyy_quota_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_gdyy_quota_setting a USING (
-        <foreach collection="list" item="QuotaSetting" separator=" union ">
-            select
-            #{QuotaSetting.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{QuotaSetting.quota,jdbcType=DOUBLE} quota,
-            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
-            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
-            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_gdyy_quota_setting (
+        big_roll_code, quota,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="QuotaSetting" separator=",">
+            (
+            #{QuotaSetting.bigRollCode,jdbcType=VARCHAR},
+            #{QuotaSetting.quota,jdbcType=DOUBLE},
+            #{QuotaSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.big_roll_code is null and a.big_roll_code is null) or (a.big_roll_code = b.big_roll_code))
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.quota = b.quota,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.big_roll_code, a.quota, a.create_by, a.create_time, a.remark, a.del_flag) values
-        (SEQ_QUOTA_SETTING.NEXTVAL, b.big_roll_code, b.quota, b.create_by, sysdate, b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        quota = VALUES(quota),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

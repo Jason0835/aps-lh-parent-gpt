@@ -1,34 +1,45 @@
 package com.zlt.aps.tc.service.impl;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
+import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.tc.api.domain.entity.TcDispatcherLog;
-import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor;
+import com.zlt.aps.common.engine.constants.EngineConstants;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
+import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.engine.service.TcEngineService;
 import com.zlt.aps.tc.engine.vo.TcScheduleResultVo;
+import com.zlt.aps.tc.entity.TcParams;
+import com.zlt.aps.tc.mapper.TcCurlRollMapper;
+import com.zlt.aps.tc.mapper.TcParamsMapper;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.service.TcDispatcherLogService;
 import com.zlt.aps.tc.service.TcMachineInfoService;
 import com.zlt.aps.tc.service.TcScheduleResultService;
 import com.zlt.aps.tc.service.TcSidewallCodeColorService;
+import com.zlt.bill.common.service.AbstractBillService;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -41,7 +52,7 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
  * @date 2021-06-21
  */
 @Service
-public class TcScheduleResultServiceImpl implements TcScheduleResultService {
+public class TcScheduleResultServiceImpl extends AbstractBillService<TcScheduleResult> implements TcScheduleResultService {
 
     @Resource
     private TcScheduleResultMapper tcScheduleResultMapper;
@@ -60,6 +71,15 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     @Resource
     private TcDispatcherLogService tcDispatcherLogService;
 
+    /**
+     * 默认标准长度
+     */
+    private static final String DEFAULT_STANDARD_LENGTH = "50";
+    @Autowired
+    private TcCurlRollMapper curlRollMapper;
+    @Autowired
+    private TcParamsMapper paramsMapper;
+
 
     /**
      * 查询胎侧排程结果
@@ -73,6 +93,27 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     }
 
     /**
+     * 赋值成型消耗量(成型昨日早班消耗量+成型夜班消耗量)、卷曲长度、交接班库存、计划量对应卷数
+     *
+     * @param scheduleResult 排程结果
+     * @param cxConsumeMap   成型消耗量map
+     * @param curlRollMap    卷曲长度map
+     */
+    private static void setLastDayAndCalculate(TcScheduleResult scheduleResult, Map<String, Double> cxConsumeMap,
+                                               Map<String, BigDecimal> curlRollMap, BigDecimal standardLength) {
+        String code = scheduleResult.getSidewallCode();
+        if (cxConsumeMap.containsKey(code)) {
+            Double cxConsumeQty = cxConsumeMap.get(code);
+            scheduleResult.setCxConsumeQty(cxConsumeQty);
+        }
+        BigDecimal curlRollLength = curlRollMap.getOrDefault(code, standardLength);
+        scheduleResult.setCurlLength(curlRollLength.doubleValue());
+        ReflectUtils.invokeMethodByName(scheduleResult, "calculateTheoreticClassLastDayPlanQty", new Object[]{});
+        // 执行计算卷数方法
+        ReflectUtils.invokeMethodByName(scheduleResult, "calculatePlanQty", new Object[]{});
+    }
+
+    /**
      * 查询胎侧排程结果列表
      *
      * @param tcScheduleResult 胎侧排程结果
@@ -81,14 +122,56 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     @Override
     public List<TcScheduleResult> selectTcScheduleResultList(TcScheduleResult tcScheduleResult) {
         List<TcScheduleResult> list=tcScheduleResultMapper.selectTcScheduleResultList(tcScheduleResult);
+        if (CollectionUtils.isEmpty(list)) {
+            return new ArrayList<>();
+        }
+        List<String> codeList = list.stream().map(TcScheduleResult::getSidewallCode).collect(Collectors.toList());
+        tcScheduleResult.getParams().put("codeList", codeList);
+        Map<String, Double> cxConsumeMap = new HashMap<>(16);
+        List<TcScheduleResult> cxConsumeList = tcScheduleResultMapper.getCxConsume4List(tcScheduleResult);
+        if (CollectionUtils.isNotEmpty(cxConsumeList)) {
+            cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(TcScheduleResult::getSidewallCode, TcScheduleResult::getCxConsumeQty));
+        }
+        TcCurlRoll curlRoll = new TcCurlRoll();
+        curlRoll.getParams().put("codeList", codeList);
+        List<TcCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(curlRollList)) {
+            curlRollMap = curlRollList.stream().collect(Collectors.toMap(TcCurlRoll::getSidewallCode, TcCurlRoll::getCurlLength));
+        }
+        LambdaQueryWrapper<TcParams> paramWrapper = new LambdaQueryWrapper<>();
+        paramWrapper.eq(TcParams::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
+        TcParams standardLength = paramsMapper.selectOne(paramWrapper);
 
+        List<TcMachineInfo> machineInfoList = tcMachineInfoService.selectMachineInfoList(new TcMachineInfo());
+        Map<Long, TcMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(TcMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
         //设置胎侧代码颜色值
         if (CollectionUtils.isNotEmpty(list)){
             TcSidewallCodeColor tcSidewallCodeColor=new TcSidewallCodeColor();
             tcSidewallCodeColor.setStatus("0");
             List<TcSidewallCodeColor> colorList=tcSidewallCodeColorService.selectTcSidewallCodeColorList(tcSidewallCodeColor);
-            if (CollectionUtils.isNotEmpty(colorList)){
-                for (TcScheduleResult tcs:list){
+
+            for (TcScheduleResult tcs : list) {
+                String machineIdStr = tcs.getMachineId();
+                if (StringUtils.isNotBlank(machineIdStr)) {
+                    List<String> machineNameList = new ArrayList<>();
+                    String[] machineIdArr = machineIdStr.split(",");
+                    for (String machineId : machineIdArr) {
+                        Long key = null;
+                        try {
+                            key = Long.valueOf(machineId);
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                            continue;
+                        }
+                        if (machineInfoMap.containsKey(key)) {
+                            TcMachineInfo machineInfo = machineInfoMap.get(key);
+                            machineNameList.add(machineInfo.getMachineName());
+                        }
+                    }
+                    tcs.setMachineName(String.join(",", machineNameList));
+                }
+                if (CollectionUtils.isNotEmpty(colorList)) {
                     for (TcSidewallCodeColor color:colorList){
                         if(Pattern.matches(color.getRegularExpression(),tcs.getSidewallCode())){
                             tcs.setColorCode(color.getColorCode());
@@ -97,11 +180,15 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
                         }
                     }
                 }
+                // 赋值卷曲长度、计算计划量对应卷数
+                setLastDayAndCalculate(tcs, cxConsumeMap, curlRollMap,
+                        standardLength == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH) : new BigDecimal(standardLength.getParamValue()));
             }
         }
 
         return list;
     }
+
 
     /**
      * 新增胎侧排程结果
@@ -150,6 +237,7 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
      * @param operType 操作类型：0--转机台、1--调量
      * @param newSchedule
      */
+    @Override
     public void insetDispatcherLog(String operType, TcScheduleResult newSchedule) {
         // 20231018 需求确认单各个工序中，调度员操作日志，改成排程操作日志，统计全部人员的操作记录，调度员字段改为“操作人员”字段
         //        if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
@@ -264,7 +352,8 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
      */
     @Override
     public int batchUpdate(long[] ids, String status) {
-        return tcScheduleResultMapper.batchUpdate(ids, status);
+        return tcScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), status);
     }
 
     /**
@@ -284,6 +373,7 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     /**
      * 唯一性校验
      */
+    @Override
     public List<TcScheduleResult> checkUnique(TcScheduleResult entity) {
         return tcScheduleResultMapper.checkUnique(entity);
     }
@@ -398,6 +488,7 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     /**
      * 排程发布
      */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult publish(long[] ids, Date scheduleDate, String dataVersion, String factoryCode, String companyCode) {
         //数据同步,发起通知
@@ -411,13 +502,14 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
         record.setPublishStatus(ApsConstant.RELEASING);
         record.setDataVersion(dataVersion);
         tcScheduleResultMapper.insertPublishRecord(record);
-        tcScheduleResultMapper.batchUpdate(ids, ApsConstant.RELEASING);
+        tcScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), ApsConstant.RELEASING);
         return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
     }
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
@@ -431,6 +523,7 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     /**
      * 选机台
      */
+    @Override
     public AjaxResult chooseMachine(TcScheduleResult scheduleResult) {
         if (CollectionUtils.isNotEmpty(tcScheduleResultMapper.checkUnique(scheduleResult))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
@@ -466,7 +559,7 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     /**
      * 更改发布状态
      *
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Override
@@ -509,4 +602,155 @@ public class TcScheduleResultServiceImpl implements TcScheduleResultService {
     public List<TcScheduleResult> selectByIds(List<Long> ids2) {
         return tcScheduleResultMapper.selectByIds(ids2);
     }
+
+    @Override
+    protected String getBillTypeCode() {
+        return BillTypeCodeEnums.TC_SCHEDULE_RESULT.getBillTypeCode();
+    }
+
+    @Override
+    public int importData(List<TcScheduleResult> list, boolean b, long l) {
+        return 0;
+    }
+
+    @Autowired
+    private BaseFinishQtyImportService baseFinishQtyImportService;
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list        要导入数据
+     * @param importLogId 导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importFinishQty(List<TcDayFinishQty> list, Long importLogId) {
+        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.TC);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @Override
+    public AjaxResult getSummaryVo(TcScheduleResult scheduleResult) {
+        List<TcScheduleResult> tmScheduleResultList = selectTcScheduleResultList(scheduleResult);
+        List<TcScheduleResult> lastDayPlanQty4List = tcScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+        // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
+        List<String> resultCodeList = tmScheduleResultList.stream().map(TcScheduleResult::getSidewallCode).collect(Collectors.toList());
+        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(TcScheduleResult::getSidewallCode)
+                .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
+        TcCurlRoll curlRoll = new TcCurlRoll();
+        curlRoll.getParams().put("codeList", notExistCodeList);
+        List<TcCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(curlRollList)) {
+            curlRollMap = curlRollList.stream().collect(Collectors.toMap(TcCurlRoll::getSidewallCode, TcCurlRoll::getCurlLength));
+        }
+
+        LambdaQueryWrapper<TcParams> paramWrapper = new LambdaQueryWrapper<>();
+        paramWrapper.eq(TcParams::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
+        TcParams standardLengthParams = paramsMapper.selectOne(paramWrapper);
+
+        for (String code : notExistCodeList) {
+            TcScheduleResult result = new TcScheduleResult();
+            result.setSidewallCode(code);
+            BigDecimal standardLength = standardLengthParams == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH) : new BigDecimal(standardLengthParams.getParamValue());
+            scheduleResult.setCurlLength(curlRollMap.getOrDefault(code, standardLength).doubleValue());
+            tmScheduleResultList.add(result);
+        }
+        Map<String, TcScheduleResult> lastDayPlanMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
+            lastDayPlanMap = lastDayPlanQty4List.stream().collect(Collectors.toMap(TcScheduleResult::getSidewallCode, Function.identity()));
+        }
+        List<TcScheduleResult> cxConsume4List = tcScheduleResultMapper.getCxConsume4List(scheduleResult);
+        Map<String, TcScheduleResult> cxConsumeMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
+            cxConsumeMap = cxConsume4List.stream().collect(Collectors.toMap(TcScheduleResult::getSidewallCode, Function.identity()));
+        }
+        BigDecimal totalDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalDayPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
+        BigDecimal totalNightPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalStockQty = BigDecimal.ZERO;
+        BigDecimal totalStockQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalLastDayPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
+        BigDecimal totalTheoreticClassStockQtyRollNum = BigDecimal.ZERO;
+
+        for (TcScheduleResult result : tmScheduleResultList) {
+            Double nightPlanQty = ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D);
+            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
+            String code = result.getSidewallCode();
+            if (lastDayPlanMap.containsKey(code)) {
+                TcScheduleResult lastDayResult = lastDayPlanMap.get(code);
+                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
+                result.setLastMidPlanQtyRollNum(lastDayResult.getLastMidPlanQtyRollNum());
+            }
+            if (cxConsumeMap.containsKey(code)) {
+                TcScheduleResult cxConsumeResult = cxConsumeMap.get(code);
+                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
+            }
+            Double lastMidPlanQty = result.getLastMidPlanQty();
+            Double cxConsumeQty = result.getCxConsumeQty();
+            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+            if (lastMidPlanQty != null && cxConsumeQty != null) {
+                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
+            }
+            result.calculatePlanQty();
+
+            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D), totalDayPlanQty);
+            totalDayPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQtyRollNum(), 0D), totalDayPlanQtyRollNum);
+            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D), totalNightPlanQty);
+            totalNightPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQtyRollNum(), 0D), totalNightPlanQtyRollNum);
+            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
+            totalStockQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQtyRollNum(), 0D), totalStockQtyRollNum);
+            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D), totalLastDayPlanQty);
+            totalLastDayPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQtyRollNum(), 0D), totalLastDayPlanQtyRollNum);
+            totalTheoreticClassStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+            totalTheoreticClassStockQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQtyRollNum(), 0D), totalTheoreticClassStockQtyRollNum);
+        }
+        ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
+        scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
+        scheduleSummaryVo.setDayPlanQtyRollNum(totalDayPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setNightPlanQty(totalNightPlanQty.doubleValue());
+        scheduleSummaryVo.setNightPlanQtyRollNum(totalNightPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
+        scheduleSummaryVo.setStockQtyRollNum(totalStockQtyRollNum.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQtyRollNum(totalLastDayPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
+        scheduleSummaryVo.setTheoreticClassStockQtyRollNum(totalTheoreticClassStockQtyRollNum.doubleValue());
+        /*ScheduleSummaryVo summaryVo = tcScheduleResultMapper.getSummaryVo(scheduleResult);
+        if (summaryVo == null) {
+            summaryVo = new ScheduleSummaryVo();
+            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
+        }
+        ScheduleSummaryVo lastDayPlanQtySummaryVo = tcScheduleResultMapper.getLastDayPlanQty(scheduleResult);
+        Double lastDayPlanQty = null;
+        if (lastDayPlanQtySummaryVo != null) {
+            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
+            summaryVo.setLastDayPlanQty(lastDayPlanQty);
+        }
+        ScheduleSummaryVo cxConsumeSummaryVo = null;
+        Double cxConsumeQty = null;
+        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineId())) {
+            cxConsumeSummaryVo = tcScheduleResultMapper.getCxConsume(scheduleResult);
+        }
+        if (cxConsumeSummaryVo != null) {
+            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
+            summaryVo.setCxConsumeQty(cxConsumeQty);
+        }
+        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
+        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
+        if (lastDayPlanQty != null && cxConsumeQty != null) {
+            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
+        }*/
+        return AjaxResult.success(scheduleSummaryVo);
+    }
+
 }

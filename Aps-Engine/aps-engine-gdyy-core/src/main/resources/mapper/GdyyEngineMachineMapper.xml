@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineMachineMapper">
+    <!-- 查询大卷与机台的映射关系 -->
+    <select id="selectGdyyMachineRollMappingList" resultType="com.zlt.aps.gdyy.engine.vo.GdyyMachineRollMappingVo">
+        SELECT M.BIG_ROLL_CODE,
+               GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
+        FROM T_GDYY_MACHINE_ROLL_MAPPING M
+                 LEFT JOIN T_GDYY_MACHINE_INFO MI
+                           ON MI.ID = M.MACHINE_ID
+        WHERE M.DEL_FLAG = '0'
+          AND MI.DEL_FLAG = '0'
+          AND MI.STATUS = '0'
+        GROUP BY M.BIG_ROLL_CODE
+    </select>
+
+    <select id="listGdyyMachine" resultType="com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo">
+        select ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               STATUS,
+               REMARK
+        from T_GDYY_MACHINE_INFO
+        where STATUS = '0'
+          and DEL_FLAG = '0'
+    </select>
+</mapper>

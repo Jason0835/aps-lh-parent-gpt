@@ -25,15 +25,15 @@ import java.util.List;
  * @since 2022-02-08
  */
 @RestController
-@RequestMapping("/maintenanceLog")
+@RequestMapping("/tm/maintenanceLog")
 public class MaintenanceLogController extends BaseController {
 
     @Resource
     private MaintenanceLogService maintenanceLogService;
 
     @ApiOperation("根据查询条件查询运维操作日志")
-    @GetMapping("/listMaintenanceLog")
-    public TableDataInfo listMaintenanceLog(MaintenanceLogDto dto) {
+    @PostMapping("/listMaintenanceLog")
+    public TableDataInfo listMaintenanceLog(@RequestBody MaintenanceLogDto dto) {
         startPage();
         dto.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
         List<MaintenanceLog> list = maintenanceLogService.listMaintenanceLog(dto);

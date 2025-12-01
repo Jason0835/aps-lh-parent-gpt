@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -9,6 +10,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.tm.api.domain.dto.TmGlueGroupOrderDto;
 import com.zlt.aps.tm.api.domain.dto.TmGlueOrderDto;
@@ -22,10 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -74,6 +73,7 @@ public class TmGlueOrderServiceImpl extends ServiceImpl<TmGlueOrderMapper, TmGlu
         }
         QueryWrapper<TmGlueOrder> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("GLUE_CODE", dto.getGlueCode());
+        queryWrapper.eq("MACHINE_ID", dto.getMachineId());
         queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
         if (dto.getId() != null) {
             queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
@@ -91,14 +91,12 @@ public class TmGlueOrderServiceImpl extends ServiceImpl<TmGlueOrderMapper, TmGlu
      * @param ids 多个id逗号分割
      */
     public void deleteGlueOrder(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            TmGlueOrder entity = new TmGlueOrder();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateBy(SecurityUtils.getUsername());
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<TmGlueOrder> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**
@@ -126,19 +124,22 @@ public class TmGlueOrderServiceImpl extends ServiceImpl<TmGlueOrderMapper, TmGlu
         Map<String, Long> glueGroupOrderMap = glueGroupOrderList.stream().collect(Collectors.toMap(TmGlueGroupOrderDto::getGlueGroupCode, TmGlueGroupOrderDto::getId));
 
         //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> a.getGlueCode(), Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a ->
+                String.join(",", a.getMachineId() == null ? "" : a.getMachineName(), a.getGlueCode()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TmGlueOrderDto glueOrder = list.get(i);
+            String mapKey = String.join(",", glueOrder.getMachineName() == null ? "" : glueOrder.getMachineName(), glueOrder.getGlueCode());
 
             //重复记录校验
-            Long hasValue = groupMap.get(glueOrder.getGlueCode());
+            Long hasValue = groupMap.get(mapKey);
             if (hasValue > 1) {
                 failureNum++;
                 glueOrder.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                 String columnName = I18nUtil.getMessage("ui.glueOrder.column.glueCode");
-                message=String.format(message,columnName);
+                String columnName1 = I18nUtil.getMessage("ui.data.column.machine.machineName");
+                message = String.format(message, columnName + "," + columnName1);
                 addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
                 continue;
             }
@@ -150,6 +151,8 @@ public class TmGlueOrderServiceImpl extends ServiceImpl<TmGlueOrderMapper, TmGlu
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.glueGroupNotExist"), validated);
             }
+            // TODO 机台名称转成机台id，保存SQL写入机台ID
+
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 glueOrder.setId(-999L);

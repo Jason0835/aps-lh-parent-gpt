@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "胎圈机台信息导入模板", description = "胎圈机台信息导入模板")
-public class TqMachineInfoTemp {
+public class TqMachineInfoTemp extends ApsBaseEntity {
 
     /** 机台编号 */
     @ApiModelProperty(value = "机台编号", position =20)

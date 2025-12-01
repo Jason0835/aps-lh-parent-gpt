@@ -23,7 +23,7 @@ public interface ITqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/tq/stock/list")
     TableDataInfo list(@RequestBody TqStock stock);
 
     /**
@@ -32,7 +32,7 @@ public interface ITqStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/tq/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface ITqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/tq/stock")
     AjaxResult add(@Validated @RequestBody TqStock stock);
 
 
@@ -51,7 +51,7 @@ public interface ITqStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/tq/stock/selectStockById/{id}")
     TqStock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -60,7 +60,7 @@ public interface ITqStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/tq/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface ITqStockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/tq/stock")
     AjaxResult edit(@Validated @RequestBody TqStock stock);
 
     /**
@@ -78,10 +78,10 @@ public interface ITqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/tq/stock/exportList")
     List<TqStock> exportList(@RequestBody TqStock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/tq/stock/importData")
     @ApiOperation("导入胎圈定点机台信息")
     public AjaxResult importData(@RequestBody List<TqStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

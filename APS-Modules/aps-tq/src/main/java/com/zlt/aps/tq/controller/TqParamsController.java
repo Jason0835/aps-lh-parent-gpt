@@ -85,8 +85,8 @@ public class TqParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.tq.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出胎圈参数信息")
-    @GetMapping("/exportData")
-    public List<TqParamsDto> export(@SpringQueryMap TqParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<TqParamsDto> export(@RequestBody TqParamsDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         TqParams params = new TqParams();

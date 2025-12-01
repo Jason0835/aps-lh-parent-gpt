@@ -3,6 +3,7 @@ package com.zlt.aps.template.nc;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -17,7 +18,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel(value = "NcMouthPlate对象", description = "内衬口型板信息维护")
-public class NcMouthPlateTemp extends ApsBaseDto {
+public class NcMouthPlateTemp extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1110056585174675867L;
 

@@ -21,13 +21,13 @@ import java.io.Serializable;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_TM_SPECIFY_MACHINE")
 @ApiModel(value = "TmSpecifyMachine对象", description = "胎面定点机台表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class TmSpecifyMachine extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "胎面代码")

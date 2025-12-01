@@ -3,12 +3,12 @@ package com.zlt.aps.cx.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import io.swagger.annotations.ApiOperation;
 
-import com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo;
+import java.util.List;
 
 
 /**
@@ -16,7 +16,7 @@ import com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo;
  * @author zlt
  * @date 2021-12-02
  */
-@FeignClient(contextId = "ICxProductConstructionInfoService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
+@FeignClient(contextId = "ICxProductConstructionInfoService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:/cxlh}")
 public interface ICxProductConstructionInfoService {
 
     /**
@@ -76,7 +76,7 @@ public interface ICxProductConstructionInfoService {
      * 导出投产施工信息列表
      */
     @ApiOperation("导出投产施工信息列表")
-    @PostMapping("/productConstruction/getList")
+    @PostMapping("/conversion/productConstruction/getList")
     List<CxProductConstructionInfo> getList(@RequestBody CxProductConstructionInfo cxProductConstructionInfo);
 
     /**

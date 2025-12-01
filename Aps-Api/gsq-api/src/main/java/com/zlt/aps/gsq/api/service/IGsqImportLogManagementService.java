@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqImportErrorLogManagementDto;
 import com.zlt.aps.gsq.api.domain.dto.GsqImportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "IGsqImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gsq:gsq}")
 public interface IGsqImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +49,6 @@ public interface IGsqImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/gsq/importLogManagement/importData")
-    List<GsqImportLogManagementDto> importData(@SpringQueryMap GsqImportLogManagementDto dto);
+    @PostMapping("/gsq/importLogManagement/importData")
+    List<GsqImportLogManagementDto> importData(@RequestBody GsqImportLogManagementDto dto);
 }

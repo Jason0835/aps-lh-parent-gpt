@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2021-06-29
  */
 @RestController
-@RequestMapping("/quota")
+@RequestMapping("/nc/quota")
 public class NcQuotaSettingController extends BaseController {
     @Autowired
     private NcQuotaSettingService ncQuotaSettingService;

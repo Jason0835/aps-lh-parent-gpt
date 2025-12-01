@@ -13,7 +13,7 @@ import java.util.Date;
 
 @Data
 @ApiModel(value = "胎圈库存信息模板", description = "胎圈库存信息模板")
-public class TqStockTemp {
+public class TqStockTemp extends ApsBaseEntity {
 
     @Excel(name = "ui.data.column.stock.stockDate")
     @ApiModelProperty(value = "库存日期", position = 20)

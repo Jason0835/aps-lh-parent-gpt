@@ -29,4 +29,8 @@ public class Cd90StockVo {
 	 * 成型定额
 	 */
 	private BigDecimal quotaQty;
+	/**
+	 * 层数
+	 */
+	private Integer layers;
 }

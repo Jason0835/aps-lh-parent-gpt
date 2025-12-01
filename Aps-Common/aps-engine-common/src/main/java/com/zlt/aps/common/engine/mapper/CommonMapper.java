@@ -2,7 +2,6 @@ package com.zlt.aps.common.engine.mapper;
 
 
 import com.zlt.aps.cx.api.domain.entity.CxMachineInfo;
-import com.zlt.aps.lh.api.domain.dto.LhParamsDto;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -37,10 +36,4 @@ public interface CommonMapper {
      */
     List<String> listLossConstructionForTq(@Param("scheduleDate") String scheduleDate);
 
-    /**
-     * 加载硫化工序参数
-     * @param lhParamsDto
-     * @return
-     */
-    List<LhParamsDto> selectLhParams(LhParamsDto lhParamsDto);
 }

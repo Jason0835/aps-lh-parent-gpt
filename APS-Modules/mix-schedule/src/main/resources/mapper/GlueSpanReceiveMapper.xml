@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueSpanReceiveMapper">
+
+    <insert id="batchInsertGlueSpanReceive">
+        insert into t_glue_span_receive
+        (id,send_id,schedule_date,entrust_mix_area,entrusted_mix_area,glue,send_qty,receive_qty,machine_code,recipe_type,recipe_version_id,recipe_stage,expect_demand_time,receive_status,receive_time,receive_person,source,is_auto, schedule_id,create_by,create_time,update_by,update_time,del_flag,remark)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueSpanReceive" separator=" union all ">
+            select
+            #{glueSpanReceive.sendId,jdbcType=DOUBLE} send_id, #{glueSpanReceive.scheduleDate,jdbcType=DATE}
+            schedule_date, #{glueSpanReceive.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{glueSpanReceive.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area,
+            #{glueSpanReceive.glue,jdbcType=VARCHAR} glue, #{glueSpanReceive.sendQty,jdbcType=DOUBLE} send_qty,
+            #{glueSpanReceive.receiveQty,jdbcType=DOUBLE} receive_qty, #{glueSpanReceive.machineCode,jdbcType=VARCHAR}
+            machine_code, #{glueSpanReceive.recipeType,jdbcType=VARCHAR} recipe_type,
+            #{glueSpanReceive.recipeVersionId,jdbcType=VARCHAR} recipe_version_id,
+            #{glueSpanReceive.recipeStage,jdbcType=VARCHAR} recipe_stage,
+            #{glueSpanReceive.expectDemandTime,jdbcType=DATE} expect_demand_time,
+            #{glueSpanReceive.receiveStatus,jdbcType=VARCHAR} receive_status,
+            #{glueSpanReceive.receiveTime,jdbcType=DATE} receive_time,
+            #{glueSpanReceive.receivePerson,jdbcType=VARCHAR} receive_person,
+            #{glueSpanReceive.source,jdbcType=VARCHAR} source,#{glueSpanReceive.isAuto,jdbcType=VARCHAR} is_auto,
+            #{glueSpanReceive.scheduleId,jdbcType=DOUBLE} schedule_id, #{glueSpanReceive.createBy,jdbcType=VARCHAR} create_by,
+            #{glueSpanReceive.createTime,jdbcType=DATE} create_time, #{glueSpanReceive.updateBy,jdbcType=VARCHAR}
+            update_by, #{glueSpanReceive.updateTime,jdbcType=DATE} update_time,
+            #{glueSpanReceive.delFlag,jdbcType=VARCHAR} del_flag, #{glueSpanReceive.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <select id="listGlueSpanReceive" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive">
+        select
+        gsr.id,
+        gsr.send_id,
+        gsr.schedule_date,
+        gsr.entrust_mix_area,
+        gsr.entrusted_mix_area,
+        gsr.glue,
+        gsr.send_qty,
+        gsr.receive_qty,
+        gsr.machine_code,
+        gsr.recipe_type,
+        gsr.recipe_version_id,
+        gsr.recipe_stage,
+        gsr.expect_demand_time,
+        gsr.receive_status,
+        gsr.receive_time,
+        gsr.receive_person,
+        gsr.source,
+        gsr.create_by,
+        gsr.create_time,
+        gsr.update_by,
+        gsr.update_time,
+        gsr.del_flag,
+        gsr.remark,
+        gsr.is_auto,
+        gsr.schedule_id,
+        gss.SEND_PERSON,
+        trt.RECIPE_TYPE_NAME,
+        tmi.MACHINE_NAME,
+        ifnull(gf.MID_FINISH_QTY, 0) + ifnull(gf.NIGHT_FINISH_QTY, 0) + ifnull(gf.DAY_FINISH_QTY, 0) AS finishQty
+        from t_glue_span_receive gsr
+        LEFT JOIN T_GLUE_SPAN_SEND gss
+        ON gsr.SEND_ID = gss.ID AND gss.DEL_FLAG = '0'
+        left join t_recipe_type trt on gsr.recipe_type = trt.recipe_type_code and trt.del_flag = 0
+        left join
+        (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+        on gsr.machine_code = tmi.machine_code and gsr.entrusted_mix_area = tmi.mix_area
+        LEFT JOIN
+        (SELECT SUM(MID_FINISH_QTY) MID_FINISH_QTY,SUM(NIGHT_FINISH_QTY) NIGHT_FINISH_QTY,SUM(DAY_FINISH_QTY) DAY_FINISH_QTY, SCHEDULE_DATE, MIX_AREA, GLUE FROM T_GLUE_FINISH WHERE DEL_FLAG = '0' GROUP BY SCHEDULE_DATE, MIX_AREA, GLUE) gf
+            ON gsr.SCHEDULE_DATE = gf.SCHEDULE_DATE AND gsr.ENTRUSTED_MIX_AREA = gf.MIX_AREA AND gsr.GLUE = gf.GLUE
+        where gsr.DEL_FLAG = '0'
+        <if test="scheduleDate != null">and gsr.schedule_date = #{scheduleDate}</if>
+        <if test="entrustedMixArea != null and entrustedMixArea != ''">and gsr.entrusted_mix_area = #{entrustedMixArea}</if>
+        <if test="entrustMixArea != null and entrustMixArea != ''">and gsr.entrust_mix_area = #{entrustMixArea}</if>
+        <if test="permissionMixAreaList != null and permissionMixAreaList.size() > 0">
+            and gsr.entrusted_mix_area in
+            <foreach collection="permissionMixAreaList" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="glue != null and glue != ''">and INSTR(gsr.glue, #{glue}) > 0</if>
+        <if test="receiveStatus != null">and gsr.receive_status = #{receiveStatus}</if>
+        <if test="source != null">and gsr.source = #{source}</if>
+        <if test="orderStr == null">order by receive_status asc, gsr.create_time desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+
+    <select id="getGlueSpanReceiveInfo" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive">
+        select
+            gsr.id,
+            gsr.send_id,
+            gsr.schedule_date,
+            gsr.entrust_mix_area,
+            gsr.entrusted_mix_area,
+            gsr.glue,
+            gsr.send_qty,
+            gsr.receive_qty,
+            gsr.machine_code,
+            gsr.recipe_type,
+            gsr.recipe_version_id,
+            gsr.recipe_stage,
+            gsr.expect_demand_time,
+            gsr.receive_status,
+            gsr.receive_time,
+            gsr.receive_person,
+            gsr.source,
+            gsr.create_by,
+            gsr.create_time,
+            gsr.update_by,
+            gsr.update_time,
+            gsr.del_flag,
+            gsr.remark,
+            gsr.is_auto,
+            gsr.schedule_id,
+            gss.SEND_PERSON,
+            trt.RECIPE_TYPE_NAME,
+            tmi.MACHINE_NAME
+        from t_glue_span_receive gsr
+                 LEFT JOIN T_GLUE_SPAN_SEND gss
+                           ON gsr.SEND_ID = gss.ID AND gss.DEL_FLAG = '0'
+                 left join t_recipe_type trt on gsr.recipe_type = trt.recipe_type_code and trt.del_flag = 0
+                 left join
+             (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+             on gsr.machine_code = tmi.machine_code and gsr.entrusted_mix_area = tmi.mix_area
+        where gsr.DEL_FLAG = '0' AND gsr.ID = #{id}
+    </select>
+
+    <update id="mergeGlueSpanReceive" parameterType="list">
+        merge into t_glue_span_receive a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id,jdbcType=DOUBLE} id, #{item.receiveQty, jdbcType=DOUBLE} receive_qty,
+            #{item.machineCode,jdbcType=VARCHAR } machine_code, #{item.recipeType,jdbcType=VARCHAR } recipe_type,
+            #{item.recipeVersionId,jdbcType=VARCHAR } recipe_version_id, #{item.recipeStage,jdbcType=VARCHAR } recipe_stage,
+            #{item.receiveStatus,jdbcType=VARCHAR } receive_status, #{item.receiveTime, jdbcType=DATE} receive_time,
+            #{item.receivePerson,jdbcType=VARCHAR } receive_person, #{item.source,jdbcType=VARCHAR } source,
+            #{item.updateBy,jdbcType=VARCHAR } update_by, #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR } remark from dual
+        </foreach>
+        ) b ON ( a.id = b.id AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.receive_qty = b.receive_qty, a.machine_code = b.machine_code, a.recipe_type = b.recipe_type, a.recipe_version_id =
+            b.recipe_version_id, a.recipe_stage = b.recipe_stage,
+            a.receive_status = b.receive_status, a.receive_time = b.receive_time, a.receive_person = b.receive_person,
+            a.source = b.source, a.update_by = b.update_by,
+            a.update_time = b.update_time, a.remark = b.remark
+        </set>
+    </update>
+
+    <select id="listGlueSpanReceiveNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="list" item="data" index="index" separator=" union all ">
+            SELECT #{index} id, #{data.scheduleDate,jdbcType=DATE} schedule_date,#{data.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{data.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area, #{data.glue,jdbcType=VARCHAR} glue
+            FROM dual
+        </foreach>
+        )
+        select t.id errorRow
+        from t_glue_span_receive m
+        inner join temp_table t on m.schedule_date = t.schedule_date and m.entrust_mix_area = t.entrust_mix_area
+        and m.entrusted_mix_area = t.entrusted_mix_area and m.glue = t.glue and m.del_flag = '0'
+    </select>
+
+    <select id="selectUnReceiveCount" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive"
+            resultType="int">
+        select count(1)
+        from t_glue_span_receive
+        where DEL_FLAG = '0' and receive_status = '0'
+        and schedule_date = #{scheduleDate,jdbcType=DATE}
+        and entrusted_mix_area = #{entrustedMixArea,jdbcType=VARCHAR}
+        <if test="source != null">and source = #{source}</if>
+    </select>
+
+    <select id="getAlreadyReceivedCount" parameterType="string" resultType="integer">
+        select count(1)
+        from t_glue_span_receive
+        where del_flag = '0' and receive_status = '1' and send_id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="deleteBySendIds">
+        update t_glue_span_receive set del_flag = '1'
+        where send_id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="getAlreadyReceivedCountByIds" resultType="integer">
+        select count(1)
+        from t_glue_span_receive
+        where del_flag = '0' and receive_status = '1' and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

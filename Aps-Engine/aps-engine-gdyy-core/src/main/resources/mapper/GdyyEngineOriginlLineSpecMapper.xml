@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineOriginlLineSpecMapper">
+
+    <select id="listGdyyOriginalLineSpec" resultType="com.zlt.aps.gdyy.engine.vo.GdyyOriginalLineSpecVo">
+        SELECT ID,
+               ORIGINAL_LINE_CODE,
+               ORIGINAL_LINE_LENGTH,
+               REMARK
+          FROM T_GDYY_ORIGINAL_LINE_SPEC
+         WHERE DEL_FLAG = 0
+           AND ORIGINAL_LINE_CODE IS NOT NULL
+           AND ORIGINAL_LINE_LENGTH IS NOT NULL
+    </select>
+
+</mapper>

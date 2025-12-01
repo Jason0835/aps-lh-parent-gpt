@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2022-02-15
  */
 @RestController
-@RequestMapping("/assistSchedule")
+@RequestMapping("/gsq/assistSchedule")
 public class GsqAssistScheduleController extends BaseController {
 
     @Value("${excelModelPath}")

@@ -32,7 +32,7 @@ public class GdyyStock extends ApsBaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd",timezone = "GMT+8")
     @Excel(name = "ui.data.column.stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "库存日期", position = 20)
-    @ImportValidated(name = "ui.data.column.stock.stockDate", date = true)
+    @ImportValidated(name = "ui.data.column.stock.stockDate", required = true, date = true)
     private Date stockDate;
 
     @ApiModelProperty(value = "查询库存的开始日期yyyy-MM-dd", position = 21)

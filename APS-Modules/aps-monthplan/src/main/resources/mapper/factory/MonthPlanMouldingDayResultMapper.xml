@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.factory.mapper.MonthPlanMouldingDayResultMapper">
+
+    <select id="productionVersionList" resultType="java.lang.String">
+        select distinct PRODUCTION_VERSION
+        from T_MP_PROC_VERSION
+        where IFNULL(IS_DELETE, 0) = 0
+          and YEAR = #{year}
+          and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and MONTH_PLAN_VERSION = #{monthPlanVersion}
+          and PRODUCTION_VERSION is not null
+    </select>
+
+    <select id="getStatisticsDay" resultType="com.zlt.aps.monthplan.api.domain.vo.DayProductionTotalVo">
+        SELECT 1 AS DAYS,
+               COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
+               SUM(DAY_1) AS QTY
+          FROM t_mp_moulding_day_result
+         WHERE PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+           AND DAY_1 > 0
+        <foreach collection="days" item="day" index="index">
+         UNION ALL
+        SELECT ${day} AS DAYS,
+               COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
+               SUM(DAY_${day}) AS QTY
+          FROM t_mp_moulding_day_result
+         WHERE PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+           AND DAY_${day} > 0
+        </foreach>
+    </select>
+
+    <select id="listFacProduct" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanMouldingDayResultVo">
+        SELECT a.FACTORY_CODE,
+               a.`YEAR`,
+               a.`MONTH`,
+               a.PRODUCT_CODE,
+               MAX(a.SPEC_CODE)                                      AS SPEC_CODE,
+               MAX(a.EMBRYO_CODE)                                    AS EMBRYO_CODE,
+               MAX(a.LOCATION_TYPE)                                  AS LOCATION_TYPE,
+               MAX(a.CHANNEL)                                        AS CHANNEL,
+               MAX(a.PRODUCT_DESC)                                   AS PRODUCT_DESC,
+               MAX(a.SPECIFICATIONS)                                 AS SPECIFICATIONS,
+               MAX(a.PRO_SIZE)                                       AS PRO_SIZE,
+               MAX(a.PATTERN)                                        AS PATTERN,
+               MAX(a.BRAND)                                          AS BRAND,
+               MAX(a.MOULD_NO)                                       AS MOULD_NO,
+               MAX(a.MOULD_QTY)                                      AS MOULD_QTY,
+               MAX(allocation.inPlanQty)                             AS inPlanQty,
+               MAX(allocation.outPlanQty)                            AS outPlanQty,
+               MAX(allocation.oePlanQty)                             AS oePlanQty,
+               MAX(allocation.totalPlanQty)                          AS totalPlanQty,
+               MAX(allocation.ptPlanQty)                             AS ptPlanQty,
+               MAX(allocation.thPlanQty)                             AS thPlanQty,
+               MAX(allocation.kzPlanQty)                             AS kzPlanQty,
+               MAX(allocation.rtPlanQty)                             AS rtPlanQty,
+               MAX(allocation.wmPlanQty)                             AS wmPlanQty,
+               MAX(allocation.kaPlanQty)                             AS kaPlanQty,
+               MAX(stock.stockQty)                                   AS stockQty,
+               MAX(stockUp.inMonthAvgSaleQty)                        AS inMonthAvgSaleQty,
+               MAX(stockUp1.inStockUpRate)                            AS inStockUpRate,
+               MAX(stockUp1.inStockUpPlanQty)                         AS inStockUpPlanQty,
+               MAX(stockUp.outMonthAvgSaleQty)                       AS outMonthAvgSaleQty,
+               MAX(stockUp1.outStockUpRate)                           AS outStockUpRate,
+               MAX(stockUp1.outStockUpPlanQty)                        AS outStockUpPlanQty,
+               MAX(stockUp.oeMonthAvgSaleQty)                        AS oeMonthAvgSaleQty,
+               MAX(stockUp1.oeStockUpRate)                            AS oeStockUpRate,
+               MAX(stockUp1.oeStockUpPlanQty)                         AS oeStockUpPlanQty,
+               MAX(stockUp1.totalStockUpQty)                          AS totalStockUpQty,
+               MAX(allocation.totalAllocationQty)                    AS totalAllocationQty,
+               MAX(allocation.totalProduceQty)                       AS totalProduceQty,
+               SUM(a.TOTAL_QTY)                                      AS totalProductQty,
+               SUM(CASE WHEN a.CHANNEL IS NULL THEN a.TOTAL_QTY END) AS totalStockUpActQty,
+               SUM(stock.stockQty + a.TOTAL_QTY)                     AS monthStock,
+               GROUP_CONCAT(DISTINCT CASE WHEN REASON IS NOT NULL AND REASON != '' THEN REASON END ORDER BY REASON DESC
+                            SEPARATOR '|') AS REASON,
+               MAX(init.continueFlag)                                AS continueFlag,
+               MAX(init.importantCustomFlag)                         AS importantCustomFlag,
+               MAX(init.ensurePlanFlag)                              AS ensurePlanFlag,
+               MAX(init.emergencyFlag)                               AS emergencyFlag,
+               MAX(init.debitPlanFlag)                               AS debitPlanFlag,
+               MAX(init.stockUpFlag)                                 AS stockUpFlag,
+               MAX(init.dateDueFlag)                                 AS dateDueFlag,
+               SUM(a.DAY_1)                                          AS DAY_1,
+               SUM(a.DAY_2)                                          AS DAY_2,
+               SUM(a.DAY_3)                                          AS DAY_3,
+               SUM(a.DAY_4)                                          AS DAY_4,
+               SUM(a.DAY_5)                                          AS DAY_5,
+               SUM(a.DAY_6)                                          AS DAY_6,
+               SUM(a.DAY_7)                                          AS DAY_7,
+               SUM(a.DAY_8)                                          AS DAY_8,
+               SUM(a.DAY_9)                                          AS DAY_9,
+               SUM(a.DAY_10)                                         AS DAY_10,
+               SUM(a.DAY_11)                                         AS DAY_11,
+               SUM(a.DAY_12)                                         AS DAY_12,
+               SUM(a.DAY_13)                                         AS DAY_13,
+               SUM(a.DAY_14)                                         AS DAY_14,
+               SUM(a.DAY_15)                                         AS DAY_15,
+               SUM(a.DAY_16)                                         AS DAY_16,
+               SUM(a.DAY_17)                                         AS DAY_17,
+               SUM(a.DAY_18)                                         AS DAY_18,
+               SUM(a.DAY_19)                                         AS DAY_19,
+               SUM(a.DAY_20)                                         AS DAY_20,
+               SUM(a.DAY_21)                                         AS DAY_21,
+               SUM(a.DAY_22)                                         AS DAY_22,
+               SUM(a.DAY_23)                                         AS DAY_23,
+               SUM(a.DAY_24)                                         AS DAY_24,
+               SUM(a.DAY_25)                                         AS DAY_25,
+               SUM(a.DAY_26)                                         AS DAY_26,
+               SUM(a.DAY_27)                                         AS DAY_27,
+               SUM(a.DAY_28)                                         AS DAY_28,
+               SUM(a.DAY_29)                                         AS DAY_29,
+               SUM(a.DAY_30)                                         AS DAY_30,
+               SUM(a.DAY_31)                                         AS DAY_31
+
+        FROM T_MP_MOULDING_DAY_RESULT a
+
+                 LEFT JOIN (select PRODUCT_CODE,
+                                   SUM(stock_qty) stockQty
+                            from t_mp_month_require_stock
+                            where `YEAR` = #{year}
+                              and `MONTH` = (#{month} - 1)
+                              and is_delete = 0
+                              and month_plan_version = (SELECT MONTH_PLAN_VERSION
+                                                        FROM t_mp_proc_version
+                                                        WHERE IS_DELETE = 0
+                                                          AND PRODUCTION_VERSION = #{productionVersion})
+                            GROUP BY PRODUCT_CODE) stock on a.PRODUCT_CODE = stock.PRODUCT_CODE
+
+                 LEFT JOIN (select product_code,
+                                ROUND(SUM(CASE LOCATION_TYPE WHEN 1 THEN AVERAGE_VALUE END) / 3) as inMonthAvgSaleQty,
+                                ROUND(SUM(CASE LOCATION_TYPE WHEN 2 THEN AVERAGE_VALUE END) / 3) as outMonthAvgSaleQty,
+                                ROUND(SUM(CASE LOCATION_TYPE WHEN 3 THEN AVERAGE_VALUE END) / 3) as oeMonthAvgSaleQty
+                            from T_MDM_STOCK_UP_PLAN
+                            where
+                                <if test="month != null and month &lt;= 3">
+                                    (`YEAR` = #{year} and `MONTH` <![CDATA[ <= ]]>  #{month})
+                                    OR (`YEAR` = #{year} - 1 AND `MONTH` <![CDATA[ >= ]]> (#{month} + 9))
+                                </if>
+                                <if test="month &gt; 3">
+                                    `YEAR` = #{year}
+                                    and `MONTH` <![CDATA[ <= ]]>  #{month}
+                                    AND `MONTH` <![CDATA[ >= ]]> (#{month} - 3 )
+                                </if>
+                            group by product_code) stockUp on a.PRODUCT_CODE = stockUp.product_code
+
+                 LEFT JOIN (select product_code,
+                                   MAX(CASE LOCATION_TYPE WHEN 1 THEN factor END) as inStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 1 THEN stock_qty END)     as inStockUpPlanQty,
+                                   MAX(CASE LOCATION_TYPE WHEN 2 THEN factor END) as outStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 2 THEN stock_qty END)     as outStockUpPlanQty,
+                                   MAX(CASE LOCATION_TYPE WHEN 3 THEN factor END) as oeStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 3 THEN stock_qty END)     as oeStockUpPlanQty,
+                                   SUM(stock_qty)                                        AS totalStockUpQty
+                            from T_MDM_STOCK_UP_PLAN
+                            where `YEAR` = #{year}
+                              and `MONTH` = #{month}
+                            group by product_code) stockUp1 on a.PRODUCT_CODE = stockUp1.product_code
+
+                 LEFT JOIN (select PRODUCT_CODE,
+                                   sum(case when LOCATION_TYPE = 1 then plan_qty else 0 end) inPlanQty,
+                                   sum(case when LOCATION_TYPE = 2 then plan_qty else 0 end) outPlanQty,
+                                   sum(case when LOCATION_TYPE = 3 then plan_qty else 0 end) oePlanQty,
+                                   sum(plan_qty)                                             totalPlanQty,
+                                   sum(case when CHANNEL = '01' then plan_qty else 0 end)    ptPlanQty,
+                                   sum(case when CHANNEL = '02' then plan_qty else 0 end)    thPlanQty,
+                                   sum(case when CHANNEL = '03' then plan_qty else 0 end)    kzPlanQty,
+                                   sum(case when CHANNEL = '04' then plan_qty else 0 end)    rtPlanQty,
+                                   sum(case when CHANNEL = '05' then plan_qty else 0 end)    wmPlanQty,
+                                   sum(case when CHANNEL = '09' then plan_qty else 0 end)    kaPlanQty,
+                                   sum(ALLOCATION_QTY)                                       totalAllocationQty,
+                                   sum(PRODUCE_QTY_DUE)                                      totalProduceQty
+                            from T_MP_ORDER_PLAN_ALLOCATION
+                            where `YEAR` = #{year}
+                              and `MONTH` = #{month}
+                              AND is_delete = 0
+                              and MONTH_PLAN_VERSION = (SELECT MONTH_PLAN_VERSION
+                                                        FROM t_mp_proc_version
+                                                        WHERE IS_DELETE = 0
+                                                          AND PRODUCTION_VERSION = #{productionVersion})
+                            group by PRODUCT_CODE) allocation ON a.PRODUCT_CODE = allocation.PRODUCT_CODE
+
+                 LEFT JOIN (SELECT PRODUCT_CODE,
+                                   CASE WHEN MAX(IS_CONTINUE) = 1 THEN '续作' END               AS continueFlag,
+                                   CASE WHEN MAX(IS_IMPORTANT_CUSTOM) = 1 THEN '重要客户' END   AS importantCustomFlag,
+                                   CASE WHEN MAX(IS_ENSURE_PLAN) = 1 THEN '必保' END            AS ensurePlanFlag,
+                                   CASE WHEN MAX(IS_EMERGENCY) = 1 THEN '急单' END              AS emergencyFlag,
+                                   CASE WHEN MAX(IS_DEBIT_PLAN) = 1 THEN '欠产' END             AS debitPlanFlag,
+                                   CASE WHEN MAX(IS_STOCK_UP) = 1 THEN '有备货' END             AS stockUpFlag,
+                                   CASE WHEN MIN(DELIVERY_DATE_DUE) IS NOT NULL THEN '交期' END AS dateDueFlag
+                            FROM t_mp_proc_month_plan_init
+                            WHERE IS_DELETE = 0
+                              AND `YEAR` = #{year}
+                              AND `MONTH` = #{month}
+                              AND PRODUCTION_VERSION = #{productionVersion}
+                            GROUP BY PRODUCT_CODE) init ON a.PRODUCT_CODE = init.PRODUCT_CODE
+
+        WHERE a.IS_DELETE = 0
+          AND a.`YEAR` = #{year}
+          AND a.`MONTH` = #{month}
+          AND a.PRODUCTION_VERSION = #{productionVersion}
+        <if test="productCode != null and productCode != ''"> and INSTR(a.PRODUCT_CODE, #{productCode}) > 0</if>
+        <if test="specCode != null and specCode != ''"> and INSTR(a.SPEC_CODE, #{specCode}) > 0</if>
+        <if test="embryoCode != null and embryoCode != ''"> and INSTR(a.EMBRYO_CODE, #{embryoCode}) > 0</if>
+        <if test="productDesc != null and productDesc != ''"> and INSTR(a.PRODUCT_DESC, #{productDesc}) > 0</if>
+        <if test="locationType != null and locationType != ''"> and a.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''"> and a.CHANNEL = #{channel}</if>
+        <if test="brand != null and brand != ''"> and a.BRAND = #{brand}</if>
+        <if test="specifications != null and specifications != ''"> and INSTR(a.SPECIFICATIONS, #{specifications}) > 0</if>
+        <if test="proSize != null and proSize != ''"> and a.PRO_SIZE = #{proSize}</if>
+        <if test="pattern != null and pattern != ''"> and INSTR(a.PATTERN, #{pattern}) > 0</if>
+        <if test="mouldNo != null and mouldNo != ''"> and INSTR(a.MOULD_NO, #{mouldNo}) > 0</if>
+
+        GROUP BY a.FACTORY_CODE,
+                 a.`YEAR`,
+                 a.`MONTH`,
+                 a.PRODUCT_CODE
+    </select>
+
+    <select id="listFacProductStatistics"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanDayResultStatisticsVo">
+        SELECT a.FACTORY_CODE,
+               a.`YEAR`,
+               a.`MONTH`,
+               a.PRODUCT_CODE,
+               MAX(a.SPEC_CODE)                                      AS SPEC_CODE,
+               MAX(a.EMBRYO_CODE)                                    AS EMBRYO_CODE,
+               MAX(a.LOCATION_TYPE)                                  AS LOCATION_TYPE,
+               MAX(a.CHANNEL)                                        AS CHANNEL,
+               MAX(a.PRODUCT_DESC)                                   AS PRODUCT_DESC,
+               MAX(a.SPECIFICATIONS)                                 AS SPECIFICATIONS,
+               MAX(a.PRO_SIZE)                                       AS PRO_SIZE,
+               MAX(a.PATTERN)                                        AS PATTERN,
+               MAX(a.BRAND)                                          AS BRAND,
+               MAX(a.MOULD_NO)                                       AS MOULD_NO,
+               MAX(a.MOULD_QTY)                                      AS MOULD_QTY,
+               MAX(allocation.inPlanQty)                             AS inPlanQty,
+               MAX(allocation.outPlanQty)                            AS outPlanQty,
+               MAX(allocation.oePlanQty)                             AS oePlanQty,
+               MAX(allocation.totalPlanQty)                          AS totalPlanQty,
+               MAX(allocation.ptPlanQty)                             AS ptPlanQty,
+               MAX(allocation.thPlanQty)                             AS thPlanQty,
+               MAX(allocation.kzPlanQty)                             AS kzPlanQty,
+               MAX(allocation.rtPlanQty)                             AS rtPlanQty,
+               MAX(allocation.wmPlanQty)                             AS wmPlanQty,
+               MAX(allocation.kaPlanQty)                             AS kaPlanQty,
+               MAX(stock.stockQty)                                   AS stockQty,
+               MAX(stockUp.inMonthAvgSaleQty)                        AS inMonthAvgSaleQty,
+               MAX(stockUp1.inStockUpRate)                            AS inStockUpRate,
+               MAX(stockUp1.inStockUpPlanQty)                         AS inStockUpPlanQty,
+               MAX(stockUp.outMonthAvgSaleQty)                       AS outMonthAvgSaleQty,
+               MAX(stockUp1.outStockUpRate)                           AS outStockUpRate,
+               MAX(stockUp1.outStockUpPlanQty)                        AS outStockUpPlanQty,
+               MAX(stockUp.oeMonthAvgSaleQty)                        AS oeMonthAvgSaleQty,
+               MAX(stockUp1.oeStockUpRate)                            AS oeStockUpRate,
+               MAX(stockUp1.oeStockUpPlanQty)                         AS oeStockUpPlanQty,
+               MAX(stockUp1.totalStockUpQty)                          AS totalStockUpQty,
+               MAX(allocation.totalAllocationQty)                    AS totalAllocationQty,
+               MAX(allocation.totalProduceQty)                       AS totalProduceQty,
+               SUM(a.TOTAL_QTY)                                      AS totalProductQty,
+               SUM(CASE WHEN a.CHANNEL IS NULL THEN a.TOTAL_QTY END) AS totalStockUpActQty,
+               SUM(stock.stockQty + a.TOTAL_QTY)                     AS monthStock,
+               GROUP_CONCAT(DISTINCT CASE WHEN REASON IS NOT NULL AND REASON != '' THEN REASON END ORDER BY REASON DESC
+                            SEPARATOR '|')                           AS REASON,
+               MAX(init.continueFlag)                                AS continueFlag,
+               MAX(init.importantCustomFlag)                         AS importantCustomFlag,
+               MAX(init.ensurePlanFlag)                              AS ensurePlanFlag,
+               MAX(init.emergencyFlag)                               AS emergencyFlag,
+               MAX(init.debitPlanFlag)                               AS debitPlanFlag,
+               MAX(init.stockUpFlag)                                 AS stockUpFlag,
+               MAX(init.dateDueFlag)                                 AS dateDueFlag,
+               SUM(a.DAY_1)                                          AS DAY_1,
+               SUM(a.DAY_2)                                          AS DAY_2,
+               SUM(a.DAY_3)                                          AS DAY_3,
+               SUM(a.DAY_4)                                          AS DAY_4,
+               SUM(a.DAY_5)                                          AS DAY_5,
+               SUM(a.DAY_6)                                          AS DAY_6,
+               SUM(a.DAY_7)                                          AS DAY_7,
+               SUM(a.DAY_8)                                          AS DAY_8,
+               SUM(a.DAY_9)                                          AS DAY_9,
+               SUM(a.DAY_10)                                         AS DAY_10,
+               SUM(a.DAY_11)                                         AS DAY_11,
+               SUM(a.DAY_12)                                         AS DAY_12,
+               SUM(a.DAY_13)                                         AS DAY_13,
+               SUM(a.DAY_14)                                         AS DAY_14,
+               SUM(a.DAY_15)                                         AS DAY_15,
+               SUM(a.DAY_16)                                         AS DAY_16,
+               SUM(a.DAY_17)                                         AS DAY_17,
+               SUM(a.DAY_18)                                         AS DAY_18,
+               SUM(a.DAY_19)                                         AS DAY_19,
+               SUM(a.DAY_20)                                         AS DAY_20,
+               SUM(a.DAY_21)                                         AS DAY_21,
+               SUM(a.DAY_22)                                         AS DAY_22,
+               SUM(a.DAY_23)                                         AS DAY_23,
+               SUM(a.DAY_24)                                         AS DAY_24,
+               SUM(a.DAY_25)                                         AS DAY_25,
+               SUM(a.DAY_26)                                         AS DAY_26,
+               SUM(a.DAY_27)                                         AS DAY_27,
+               SUM(a.DAY_28)                                         AS DAY_28,
+               SUM(a.DAY_29)                                         AS DAY_29,
+               SUM(a.DAY_30)                                         AS DAY_30,
+               SUM(a.DAY_31)                                         AS DAY_31,
+               SUM(finish.finish_qty)                                AS finishQty,
+               SUM(a.TOTAL_QTY) - SUM(finish.finish_qty)             AS remainingQty,
+               MAX(proInfo.GROSS_RATE_JSON)                          AS grossRateJson,
+               MAX(proInfo.SINGLE_TIRE_WEIGHT)                       AS singleTireWeight,
+               max(substr(ci.TREAD_RUBBER_CATEGORY,1, INSTR(concat(ci.TREAD_RUBBER_CATEGORY,'/'),'/')-1)) AS treadGlue,
+               MAX(proCon.CURING_TIME)                               AS curingTime,
+               MAX(proCon.CURING_TIME2)                              AS curingTime2,
+               MAX(proCon.CONSTRUCTION_CODE)                         AS constructionCode
+
+        FROM T_MP_MOULDING_DAY_RESULT a
+
+                 LEFT JOIN (select PRODUCT_CODE,
+                                   SUM(stock_qty) stockQty
+                            from t_mp_month_require_stock
+                            where `YEAR` = #{year}
+                              and `MONTH` = (#{month} - 1)
+                              and is_delete = 0
+                              and month_plan_version = (SELECT MONTH_PLAN_VERSION
+                                                        FROM t_mp_proc_version
+                                                        WHERE IS_DELETE = 0
+                                                          AND PRODUCTION_VERSION = #{productionVersion})
+                            GROUP BY PRODUCT_CODE) stock on a.PRODUCT_CODE = stock.PRODUCT_CODE
+
+                 LEFT JOIN (select product_code,
+                                   SUM(CASE LOCATION_TYPE WHEN 1 THEN AVERAGE_VALUE END) as inMonthAvgSaleQty,
+                                   SUM(CASE LOCATION_TYPE WHEN 2 THEN AVERAGE_VALUE END) as outMonthAvgSaleQty,
+                                   SUM(CASE LOCATION_TYPE WHEN 3 THEN AVERAGE_VALUE END) as oeMonthAvgSaleQty
+                            from T_MDM_STOCK_UP_PLAN
+                            where
+                            <if test="month != null and month &lt;= 3">
+                                (`YEAR` = #{year} and `MONTH` <![CDATA[ <= ]]>  #{month})
+                                OR (`YEAR` = #{year} - 1 AND `MONTH` <![CDATA[ >= ]]> (#{month} + 9))
+                            </if>
+                            <if test="month &gt; 3">
+                                `YEAR` = #{year}
+                                and `MONTH` <![CDATA[ <= ]]>  #{month}
+                                AND `MONTH` <![CDATA[ >= ]]> (#{month} - 3 )
+                            </if>
+                            group by product_code) stockUp on a.PRODUCT_CODE = stockUp.product_code
+
+                 LEFT JOIN (select product_code,
+                                   MAX(CASE LOCATION_TYPE WHEN 1 THEN factor END) as inStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 1 THEN stock_qty END)     as inStockUpPlanQty,
+                                   MAX(CASE LOCATION_TYPE WHEN 2 THEN factor END) as outStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 2 THEN stock_qty END)     as outStockUpPlanQty,
+                                   MAX(CASE LOCATION_TYPE WHEN 3 THEN factor END) as oeStockUpRate,
+                                   SUM(CASE LOCATION_TYPE WHEN 3 THEN stock_qty END)     as oeStockUpPlanQty,
+                                   SUM(stock_qty)                                        AS totalStockUpQty
+                            from T_MDM_STOCK_UP_PLAN
+                            where `YEAR` = #{year}
+                              and `MONTH` = #{month}
+                            group by product_code) stockUp1 on a.PRODUCT_CODE = stockUp1.product_code
+
+                 LEFT JOIN (select PRODUCT_CODE,
+                                   sum(case when LOCATION_TYPE = 1 then plan_qty else 0 end) inPlanQty,
+                                   sum(case when LOCATION_TYPE = 2 then plan_qty else 0 end) outPlanQty,
+                                   sum(case when LOCATION_TYPE = 3 then plan_qty else 0 end) oePlanQty,
+                                   sum(plan_qty)                                             totalPlanQty,
+                                   sum(case when CHANNEL = '01' then plan_qty else 0 end)    ptPlanQty,
+                                   sum(case when CHANNEL = '02' then plan_qty else 0 end)    thPlanQty,
+                                   sum(case when CHANNEL = '03' then plan_qty else 0 end)    kzPlanQty,
+                                   sum(case when CHANNEL = '04' then plan_qty else 0 end)    rtPlanQty,
+                                   sum(case when CHANNEL = '05' then plan_qty else 0 end)    wmPlanQty,
+                                   sum(case when CHANNEL = '09' then plan_qty else 0 end)    kaPlanQty,
+                                   sum(ALLOCATION_QTY)                                       totalAllocationQty,
+                                   sum(PRODUCE_QTY_DUE)                                      totalProduceQty
+                            from T_MP_ORDER_PLAN_ALLOCATION
+                            where `YEAR` = #{year}
+                              and `MONTH` = #{month}
+                              AND is_delete = 0
+                              and MONTH_PLAN_VERSION = (SELECT MONTH_PLAN_VERSION
+                                                        FROM t_mp_proc_version
+                                                        WHERE IS_DELETE = 0
+                                                          AND PRODUCTION_VERSION = #{productionVersion})
+                            group by PRODUCT_CODE) allocation ON a.PRODUCT_CODE = allocation.PRODUCT_CODE
+
+                 LEFT JOIN (SELECT PRODUCT_CODE,
+                                   CASE WHEN MAX(IS_CONTINUE) = 1 THEN '续作' END               AS continueFlag,
+                                   CASE WHEN MAX(IS_IMPORTANT_CUSTOM) = 1 THEN '重要客户' END   AS importantCustomFlag,
+                                   CASE WHEN MAX(IS_ENSURE_PLAN) = 1 THEN '必保' END            AS ensurePlanFlag,
+                                   CASE WHEN MAX(IS_EMERGENCY) = 1 THEN '急单' END              AS emergencyFlag,
+                                   CASE WHEN MAX(IS_DEBIT_PLAN) = 1 THEN '欠产' END             AS debitPlanFlag,
+                                   CASE WHEN MAX(IS_STOCK_UP) = 1 THEN '有备货' END             AS stockUpFlag,
+                                   CASE WHEN MIN(DELIVERY_DATE_DUE) IS NOT NULL THEN '交期' END AS dateDueFlag
+                            FROM t_mp_proc_month_plan_init
+                            WHERE IS_DELETE = 0
+                              AND `YEAR` = #{year}
+                              AND `MONTH` = #{month}
+                              AND PRODUCTION_VERSION = #{productionVersion}
+                            GROUP BY PRODUCT_CODE) init ON a.PRODUCT_CODE = init.PRODUCT_CODE
+                 LEFT JOIN (SELECT f.PRODUCT_CODE,
+                                   sum(f.DAY_FINISH_QTY) finish_qty
+                            FROM t_lh_day_finish_qty f
+                            WHERE f.IS_DELETE = 0
+                              AND ((
+                                       -- 上个月 26 - 31 日的数据
+                                       f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+                                           AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+                                       )
+                                OR
+                                   (
+                                       -- 本月 1 - 25 日的数据
+                                       f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+                                           STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+                                       ))
+                            GROUP BY f.PRODUCT_CODE) finish on a.PRODUCT_CODE = finish.PRODUCT_CODE
+
+                 LEFT JOIN t_mdm_product_info proInfo ON a.PRODUCT_CODE = proInfo.PRODUCT_CODE and a.factory_code = proInfo.factory_code
+                 LEFT JOIN t_mdm_product_construction proCon ON a.PRODUCT_CODE = proCon.PRODUCT_CODE and a.factory_code = proCon.factory_code
+                 LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO ci on proCon.EMBRYO_CODE = ci.embryo_code and proCon.BOM_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
+
+
+        WHERE a.IS_DELETE = 0
+          AND a.`YEAR` = #{year}
+          AND a.`MONTH` = #{month}
+          AND a.PRODUCTION_VERSION = #{productionVersion}
+        <if test="productCode != null and productCode != ''"> and INSTR(a.PRODUCT_CODE, #{productCode}) > 0</if>
+        <if test="specCode != null and specCode != ''"> and INSTR(a.SPEC_CODE, #{specCode}) > 0</if>
+        <if test="embryoCode != null and embryoCode != ''"> and INSTR(a.EMBRYO_CODE, #{embryoCode}) > 0</if>
+        <if test="productDesc != null and productDesc != ''"> and INSTR(a.PRODUCT_DESC, #{productDesc}) > 0</if>
+        <if test="locationType != null and locationType != ''"> and a.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''"> and a.CHANNEL = #{channel}</if>
+        <if test="brand != null and brand != ''"> and a.BRAND = #{brand}</if>
+        <if test="specifications != null and specifications != ''"> and INSTR(a.SPECIFICATIONS, #{specifications}) > 0</if>
+        <if test="proSize != null and proSize != ''"> and a.PRO_SIZE = #{proSize}</if>
+        <if test="pattern != null and pattern != ''"> and INSTR(a.PATTERN, #{pattern}) > 0</if>
+        <if test="mouldNo != null and mouldNo != ''"> and INSTR(a.MOULD_NO, #{mouldNo}) > 0</if>
+
+        GROUP BY a.FACTORY_CODE,
+                 a.`YEAR`,
+                 a.`MONTH`,
+                 a.PRODUCT_CODE
+    </select>
+</mapper>

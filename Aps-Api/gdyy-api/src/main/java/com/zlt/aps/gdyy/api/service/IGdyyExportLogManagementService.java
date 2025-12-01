@@ -20,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "IGdyyExportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gdyy:gdyy}")
 public interface IGdyyExportLogManagementService
 {
-    
+
     /**
      * 查询纤维压延参数信息列表
      */
@@ -43,6 +43,6 @@ public interface IGdyyExportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/gdyy/exportLogManagement/exportData")
-    List<GdyyExportLogManagementDto> exportData(@SpringQueryMap GdyyExportLogManagementDto dto);
+    @PostMapping("/gdyy/exportLogManagement/exportData")
+    List<GdyyExportLogManagementDto> exportData(@RequestBody GdyyExportLogManagementDto dto);
 }

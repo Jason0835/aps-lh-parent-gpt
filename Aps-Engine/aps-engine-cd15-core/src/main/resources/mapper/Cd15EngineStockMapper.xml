@@ -6,39 +6,41 @@
 		SELECT S.MATERIAL_CODE BELT_CODE, /*钢带编号*/
 		       T.CX_MACHINE_CODE, /*机台编号，用于计算成型定额*/
 		       CASE
-		         WHEN (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) +
-		              NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} > NVL(T.USE_NUM, 0) THEN
-		          (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) + NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} -
-		          NVL(T.USE_NUM, 0)
+		         WHEN (IFNULL(S.STOCK_NUM, 0) - IFNULL(S.BAD_NUM, 0) +
+		              IFNULL(S.MODIFY_NUM, 0)) * #{stockLossRate} > IFNULL(T.USE_NUM, 0) THEN
+		          (IFNULL(S.STOCK_NUM, 0) - IFNULL(S.BAD_NUM, 0) + IFNULL(S.MODIFY_NUM, 0)) * #{stockLossRate} -
+		          IFNULL(T.USE_NUM, 0)
 		         ELSE
 		          0
 		       END STOCK_QTY /*16点半部件库存量 公式：(库存量 - 不良数 + 修正数) - 预计消耗量，不能小于0*/
 		  FROM T_CD15_STOCK S
 		  LEFT JOIN (SELECT BELT_CODE BELT_CODE,
 		               SCHEDULE_DATE,
-		               regexp_replace(listagg(CX_MACHINE_CODE, ',') WITHIN GROUP (ORDER BY CX_MACHINE_CODE, EMBRYO_CODE), '([^,]+)(,\1)+', '\1') CX_MACHINE_CODE, /*机台编号，多个机台用逗号隔开*/
-		               SUM(CLASS3_PLANNED_QTY * FIT_DRUM_PERIMETER) USE_NUM /*12点后半部件预计消耗量， 公式：（前日成型三班计划量 - 12点成型完成量) * 单耗*/
+		               GROUP_CONCAT(DISTINCT CX_MACHINE_CODE ORDER BY CX_MACHINE_CODE, EMBRYO_CODE SEPARATOR ',') CX_MACHINE_CODE, /*机台编号，多个机台用逗号隔开*/
+		               SUM(CLASS3_PLANNED_QTY) USE_NUM /*12点后半部件预计消耗量， 公式：（前日成型三班计划量 - 12点成型完成量) * 单耗*/
 		          FROM (SELECT CI.BELT_CODE1 BELT_CODE, /*1#钢带编号*/
 		                       R.CX_MACHINE_CODE,
 		                       R.EMBRYO_CODE,
-                               CASE
-                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
-                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+                               /*CASE
+                                 WHEN IFNULL(R.CLASS3_PLANNED_QTY, 0) > (IFNULL(F.night_plan_qty1, 0) / IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 1)) THEN
+                                   IFNULL(R.CLASS3_PLANNED_QTY, 0) - (IFNULL(F.night_plan_qty1, 0) / IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 1))
                                  ELSE
                                    0
-                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
-		                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) FIT_DRUM_PERIMETER,	/*单耗，毫米换算成米*/
+                               END*/
+		((IFNULL(R.CLASS3_PLANNED_QTY, 0))*IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0)) - IFNULL(F.night_plan_qty1, 0)
+		CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
+		                       IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0) FIT_DRUM_PERIMETER,	/*单耗，毫米换算成米*/
 		                       R.SCHEDULE_DATE
 		                  FROM (
-			                  	SELECT r.SCHEDULE_DATE, 
-			                  	       listagg(CX_MACHINE_CODE || '$' || EMBRYO_CODE || '$' || r.BOM_DATA_VERSION, ',') WITHIN GROUP (ORDER BY CX_MACHINE_CODE, EMBRYO_CODE, r.BOM_DATA_VERSION) CX_MACHINE_CODE, 
+			                  	SELECT r.SCHEDULE_DATE,
+	                  	       		   GROUP_CONCAT(concat(CX_MACHINE_CODE , '$' , EMBRYO_CODE , '$' , r.BOM_DATA_VERSION) ORDER BY CX_MACHINE_CODE, EMBRYO_CODE, r.BOM_DATA_VERSION SEPARATOR ',') CX_MACHINE_CODE,
 			                  	       r.EMBRYO_CODE, 
 			                  	       r.BOM_DATA_VERSION,
-			                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+		SUM(IFNULL(r.CLASS3_PLANNED_QTY, 0) + IFNULL(r.CLASS2_PLAN_QTY, 0)) CLASS3_PLANNED_QTY
 			                  	  FROM T_CX_SCHEDULE_RESULT r
 			                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
 			                  	   AND r.DEL_FLAG = '0'
-			                  	 GROUP BY r.SCHEDULE_DATE, 
+			                  	 GROUP BY r.SCHEDULE_DATE,
 			                  	          r.EMBRYO_CODE,
 			                  	          r.BOM_DATA_VERSION
 			                  ) R
@@ -49,34 +51,44 @@
 						   /* 仅对投产阶段的规格排产 */
 						   AND CI.PRODUCTION_STAGE = '0'
 					   </if>
-		                  LEFT JOIN T_CX_PART_FINISH_QTY F
+
+		                  /*LEFT JOIN T_CX_PART_FINISH_QTY F
 		                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
-		                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1	/*完成量同样要取上一天的*/
+		                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
 		                   AND F.DEL_FLAG = '0'
 		                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
-		                 WHERE CI.DEL_FLAG = '0'
+		                 WHERE CI.DEL_FLAG = '0'*/
+
+						LEFT JOIN t_cd15_schedule_result F
+						ON F.steel_strip_code1 = CI.BELT_CODE1
+						AND F.SCHEDULE_DATE = DATE_SUB(R.SCHEDULE_DATE, INTERVAL 1 DAY)
+						AND F.DEL_FLAG = '0'
+						AND CI.EMBRYO_VERSION = R.BOM_DATA_VERSION
+						WHERE CI.DEL_FLAG = '0'
+
 		                UNION
 		                SELECT CI.BELT_CODE2 BELT_CODE, /*2#钢带编号*/
 		                       R.CX_MACHINE_CODE,
 		                       R.EMBRYO_CODE,
-                               CASE
-                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
-                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+                               /*CASE
+                                 WHEN IFNULL(R.CLASS3_PLANNED_QTY, 0) > IFNULL(F.FINISH_QTY, 0) THEN
+                                   IFNULL(R.CLASS3_PLANNED_QTY, 0) - IFNULL(F.FINISH_QTY, 0)
                                  ELSE
                                    0
-                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
-		                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) FIT_DRUM_PERIMETER, /*单耗*/
+                               END*/
+		(IFNULL(R.CLASS3_PLANNED_QTY, 0)*IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0)) - IFNULL(F.night_plan_qty1, 0)  CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
+		                       IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0) FIT_DRUM_PERIMETER, /*单耗*/
 		                       R.SCHEDULE_DATE
 		                  FROM (
-			                  	SELECT r.SCHEDULE_DATE, 
-			                  	       listagg(CX_MACHINE_CODE || '$' || EMBRYO_CODE || '$' || r.BOM_DATA_VERSION, ',') WITHIN GROUP (ORDER BY CX_MACHINE_CODE, EMBRYO_CODE, r.BOM_DATA_VERSION) CX_MACHINE_CODE, 
+			                  	SELECT r.SCHEDULE_DATE,
+			                  	       GROUP_CONCAT(concat(CX_MACHINE_CODE , '$' , EMBRYO_CODE , '$' , r.BOM_DATA_VERSION) ORDER BY CX_MACHINE_CODE, EMBRYO_CODE, r.BOM_DATA_VERSION SEPARATOR ',') CX_MACHINE_CODE,
 			                  	       r.EMBRYO_CODE, 
 			                  	       r.BOM_DATA_VERSION,
-			                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+		SUM(IFNULL(r.CLASS3_PLANNED_QTY, 0) + IFNULL(r.CLASS2_PLAN_QTY, 0)) CLASS3_PLANNED_QTY
 			                  	  FROM T_CX_SCHEDULE_RESULT r
 			                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
 			                  	   AND r.DEL_FLAG = '0'
-			                  	 GROUP BY r.SCHEDULE_DATE, 
+			                  	 GROUP BY r.SCHEDULE_DATE,
 			                  	          r.EMBRYO_CODE,
 			                  	          r.BOM_DATA_VERSION
 			                  ) R
@@ -87,24 +99,34 @@
 						   /* 仅对投产阶段的规格排产 */
 						   AND CI.PRODUCTION_STAGE = '0'
 					   </if>
-		                  LEFT JOIN T_CX_PART_FINISH_QTY F
+
+		                  /*LEFT JOIN T_CX_PART_FINISH_QTY F
 		                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
-		                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1	/*完成量同样要取上一天的*/
+		                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
 		                   AND F.DEL_FLAG = '0'
 		                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
-		                 WHERE CI.DEL_FLAG = '0')
+		                 WHERE CI.DEL_FLAG = '0'*/
+
+						LEFT JOIN t_cd15_schedule_result F
+						ON F.steel_strip_code2 = CI.BELT_CODE2
+						AND F.SCHEDULE_DATE = DATE_SUB(R.SCHEDULE_DATE, INTERVAL 1 DAY)
+						AND F.DEL_FLAG = '0'
+						AND CI.EMBRYO_VERSION = R.BOM_DATA_VERSION
+						WHERE CI.DEL_FLAG = '0'
+
+		                 ) t
 		         GROUP BY BELT_CODE,
 		                  SCHEDULE_DATE) T
 		    ON S.MATERIAL_CODE = T.BELT_CODE
 		 WHERE S.DEL_FLAG = '0'
-		   AND S.STOCK_DATE = #{scheduleDate} - 1	/*库存要取排产日上一天的*/
+		   AND S.STOCK_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)	/*库存要取排产日上一天的*/
     </select>
     
     <!-- 查询当天的收尾规格 -->
     <select id="listCloseOutSpec" resultType="String">
-	        SELECT CI.Belt_Code1 || '#' ||
-	               CI.Belt_Code2 || '#' ||
-	               REGEXP_SUBSTR(CI.BELT_CUTTING_ANGLE, '[0-9]+') Belt_Code /*钢带规格*/
+	        SELECT concat(CI.Belt_Code1 , '#' ,
+	               CI.Belt_Code2 , '#' ,
+	               REGEXP_SUBSTR(CI.BELT_CUTTING_ANGLE, '[0-9]+')) Belt_Code /*钢带规格*/
 		      FROM T_CX_SCHEDULE_RESULT R
 		     INNER JOIN T_PRODUCT_CONSTRUCTION_INFO CI
 		        ON R.EMBRYO_CODE = CI.EMBRYO_CODE
@@ -136,19 +158,20 @@
 		                  /* 仅对投产阶段的规格排产 */
 		               AND CI2.PRODUCTION_STAGE = '0'
 		</if>
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
-			           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
+			           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
 		         GROUP BY CI.Belt_Code1, 
 		                  CI.Belt_Code2,
-		                  REGEXP_SUBSTR(CI.BELT_CUTTING_ANGLE, '[0-9]+')
+		                  REGEXP_SUBSTR(CI.BELT_CUTTING_ANGLE, '[0-9]+'),
+						  CI.BELT_CUTTING_ANGLE
     </select>
     
 	<!-- 查询钢带压延排产参数 -->
@@ -160,7 +183,7 @@
     
 	<!-- 查询15度裁断线边库库存数 -->
     <select id="listCd15LineSideStock" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15LineSideStock">
-        select id, material_code, machine_code, nvl(trunc(stock_num), 0) stock_num
+        select id, material_code, machine_code, IFNULL(TRUNCATE(stock_num, 0), 0) stock_num
         from T_CD15_LINE_SIDE_STOCK
         where DEL_FLAG = '0'
           and stock_date = #{scheduleDate} - 1
@@ -172,5 +195,37 @@
     	       machine_code
     	  from t_cd15_machine_info
     	 where del_flag = '0'
+    </select>
+
+	<!-- 查询15度排产参数 -->
+	<select id="listCd15Params" resultType="com.zlt.aps.cd15.engine.vo.Cd15ParamsVo">
+		select param_code, param_value
+		from T_CD15_PARAMS
+		where DEL_FLAG = '0'
+	</select>
+    
+    <!-- 查询15度裁断库存量 -->
+    <select id="selectCd15StockQty" resultType="com.zlt.aps.cd15.engine.vo.Cd15StockVo">
+         SELECT MATERIAL_CODE BELT_CODE, /*钢带编号*/
+                SUM(IFNULL(S.STOCK_NUM, 0) - IFNULL(S.BAD_NUM, 0) +
+                    IFNULL(S.MODIFY_NUM, 0)) STOCK_QTY
+           FROM T_Cd15_STOCK S
+          WHERE S.DEL_FLAG = '0'
+            AND S.STOCK_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)    /*库存要取排产日上一天的*/
+         GROUP BY MATERIAL_CODE
+    </select>
+
+    <select id="listLastDayMidPlan" resultType="com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo">
+        SELECT STEEL_STRIP_CODE1 STEEL_STRIP_CODE1, IFNULL(SUM(NIGHT_PLAN_QTY1), 0) NIGHT_PLAN_QTY1
+        FROM T_CD15_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+        GROUP BY STEEL_STRIP_CODE1
+        UNION ALL
+        SELECT STEEL_STRIP_CODE2 STEEL_STRIP_CODE1, IFNULL(SUM(NIGHT_PLAN_QTY1), 0) NIGHT_PLAN_QTY1
+        FROM T_CD15_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+        GROUP BY STEEL_STRIP_CODE2
     </select>
 </mapper>

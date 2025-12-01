@@ -9,8 +9,8 @@
         <if test="operType != null and operType != ''">and OPER_TYPE = #{operType}</if>
         <if test="procedureCode != null and procedureCode != ''">and PROCEDURE_CODE = #{procedureCode}</if>
         <if test="createBy != null and createBy != ''"> and INSTR(CREATE_BY, #{createBy}) > 0</if>
-        <if test="startTime != null  and startTime != ''"> and CREATE_TIME &gt;= to_date(#{startTime},'yyyy-mm-dd')</if>
-        <if test="endTime != null  and endTime != ''"> and CREATE_TIME &lt;= to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')</if>
+        <if test="startTime != null  and startTime != ''"> and CREATE_TIME &gt;= STR_TO_DATE(#{startTime},'%Y-%m-%d')</if>
+        <if test="endTime != null  and endTime != ''"> and CREATE_TIME &lt;= STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')</if>
 
         <if test="orderStr == null">order by CREATE_TIME desc</if>
         <if test="orderStr != null">order by ${orderStr}</if>
@@ -18,8 +18,8 @@
 
     <update id="deleteSchedulePublishRecord" parameterType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
         update t_schedule_publish_record
-        set DEL_FLAG = '1'
-        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+        set del_flag = NULL
+        where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         and PROCEDURE_CODE = #{procedureCode}
     </update>
 
@@ -36,7 +36,7 @@
         <if test="procedureCode == '9'.toString()">update t_gdyy_schedule_result </if>
         <if test="procedureCode == '10'.toString()">update t_xwyy_schedule_result </if>
         set IS_RELEASE = '0', PUBLISH_SUCCESS_COUNT = 0, NEWEST_PUBLISH_TIME = null
-        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+        where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </update>
 
     <update id="deleteSchedule" parameterType="com.zlt.aps.tm.api.domain.dto.MaintenanceLogDto">
@@ -51,8 +51,8 @@
         <if test="procedureCode == '8'.toString()">update t_cd90_schedule_result r </if>
         <if test="procedureCode == '9'.toString()">update t_gdyy_schedule_result r </if>
         <if test="procedureCode == '10'.toString()">update t_xwyy_schedule_result r </if>
-        set DEL_FLAG = '1'
-        where SCHEDULE_DATE = to_date(#{scheduleDate}, 'yyyy-mm-dd')
+        set del_flag = NULL
+        where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="procedureCode == '0'.toString()">
             <if test="sapCode != null and sapCode != ''">and SAP_CODE = #{sapCode}</if>
             <if test="machineId != null">and exists (select 1 from t_lh_machine_info m where m.MACHINE_CODE = r.LH_MACHINE_CODE and m.id=#{machineId})</if>
@@ -64,38 +64,38 @@
         </if>
         <if test="procedureCode == '2'.toString()">
             <if test="materialCode != null and materialCode != ''">and TREAD_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '3'.toString()">
             <if test="materialCode != null and materialCode != ''">and SIDEWALL_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '4'.toString()">
             <if test="materialCode != null and materialCode != ''">and LINING_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '5'.toString()">
             <if test="materialCode != null and materialCode != ''">and BEAD_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '6'.toString()">
             <if test="materialCode != null and materialCode != ''">and STEEL_RING_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '7'.toString()">
             <if test="materialCode != null and materialCode != ''">and STEEL_STRIP_CODE1 = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '8'.toString()">
             <if test="materialCode != null and materialCode != ''">and CLOTH_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
         <if test="procedureCode == '9'.toString()">
             <if test="materialCode != null and materialCode != ''">and BIG_ROLL_CODE = #{materialCode}</if>
         </if>
         <if test="procedureCode == '10'.toString()">
             <if test="materialCode != null and materialCode != ''">and BIG_ROLL_CODE = #{materialCode}</if>
-            <if test="machineId != null">and r.MACHINE_ID = to_char(#{machineId})</if>
+            <if test="machineId != null">and r.MACHINE_ID = FORMAT(#{machineId}, 0)</if>
         </if>
     </update>
 

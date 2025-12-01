@@ -26,7 +26,7 @@ import io.swagger.annotations.ApiOperation;
  * @date 2021-05-31
  */
 @RestController
-@RequestMapping("/lineSideStock")
+@RequestMapping("/cd90/lineSideStock")
 @Api(tags = "90°裁断库存信息维护接口")
 public class Cd90LineSideStockController extends BaseController {
     @Autowired

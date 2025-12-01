@@ -1,15 +1,15 @@
 package com.zlt.aps.nc.api.domain.dto;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
-
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "内衬卷曲信息维护导入模板", description = "内衬卷曲信息维护导入模板")
-public class NcCurlRollDto {
+public class NcCurlRollDto extends BaseEntity {
 	
 	private Long id;
 

@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.dto.TcParamsDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +42,6 @@ public interface ITcParamsService
      * 导出接口
      * @param dto
      */
-    @GetMapping("/tc/params/exportData")
-    List<TcParamsDto> exportData(@SpringQueryMap TcParamsDto dto);
+    @PostMapping("/tc/params/exportData")
+    List<TcParamsDto> exportData(@RequestBody TcParamsDto dto);
 }

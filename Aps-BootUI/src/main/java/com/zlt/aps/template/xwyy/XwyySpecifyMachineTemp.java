@@ -3,6 +3,7 @@ package com.zlt.aps.template.xwyy;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -19,7 +20,7 @@ import java.io.Serializable;
  */
 @Data
 @ApiModel(value = "TmSpecifyMachine对象", description = "纤维压延定点机台表")
-public class XwyySpecifyMachineTemp  {
+public class XwyySpecifyMachineTemp extends ApsBaseEntity {
 
     @ApiModelProperty(value = "帘布大卷代码")
     @Excel(name = "ui.xwyy.specifyMachine.column.bigRollCode")

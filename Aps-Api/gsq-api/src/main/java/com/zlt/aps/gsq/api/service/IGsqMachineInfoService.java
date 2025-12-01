@@ -23,7 +23,7 @@ public interface IGsqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/gsq/machine/list")
     TableDataInfo list(@RequestBody GsqMachineInfo machineInfo);
 
     /**
@@ -32,7 +32,7 @@ public interface IGsqMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/gsq/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface IGsqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/gsq/machine")
     AjaxResult add(@Validated @RequestBody GsqMachineInfo machineInfo);
 
     /**
@@ -50,7 +50,7 @@ public interface IGsqMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/gsq/machine/{id}")
     GsqMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface IGsqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/gsq/machine")
     AjaxResult edit(@Validated @RequestBody GsqMachineInfo machineInfo);
 
     /**
@@ -68,7 +68,7 @@ public interface IGsqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/gsq/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody GsqMachineInfo machineInfo);
 
     /**
@@ -77,7 +77,7 @@ public interface IGsqMachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/gsq/machine/exportList")
     List<GsqMachineInfo> exportList(@RequestBody GsqMachineInfo machineInfo);
 
     /**
@@ -86,10 +86,10 @@ public interface IGsqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/listMachineInfo")
+    @PostMapping("/gsq/machine/listMachineInfo")
     List<GsqMachineInfo> listMachineInfo(@RequestBody GsqMachineInfo machineInfo);
 
-    @PostMapping("/machine/importData")
+    @PostMapping("/gsq/machine/importData")
     @ApiOperation("导入钢丝圈机台信息")
     public AjaxResult importData(@RequestBody List<GsqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

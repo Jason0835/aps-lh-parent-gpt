@@ -2,7 +2,9 @@ package com.zlt.aps.gdyy.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.engine.vo.GdyyBigRollVo;
 import com.zlt.aps.gdyy.entity.GdyyScheduleResult;
 import org.apache.ibatis.annotations.Param;
 
@@ -85,9 +87,9 @@ public interface GdyyScheduleResultMapper extends BaseMapper<GdyyScheduleResult>
 
     int checkGdyyCodeExist(GdyyScheduleResult scheduleResult);
 
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
-    public int deleteByIds(long[] ids);
+    public int deleteByIds(List<Long> ids);
 
     /**
      * 根据id查询未发布记录的条数
@@ -101,4 +103,58 @@ public interface GdyyScheduleResultMapper extends BaseMapper<GdyyScheduleResult>
      * @return 查询到的记录
      */
     List<GdyyScheduleResult> selectByScheduleDateAndCode(GdyyScheduleResult scheduleResult);
+
+    /**
+     * 获取钢压大卷配置信息
+     * @Author hakimryan
+     * @Description
+     * @Date 2021-7-19 10:01:43
+     * @return
+     */
+    List<GdyyBigRollVo> listCd15BigRoll();
+
+    /**
+     * 更新发布日志状态
+     *
+     * @param dataVersion 数据版本
+     * @param status      状态
+     */
+    public int updatePublishRecordVersion(@Param("dataVersion") String dataVersion, @Param("status") String status);
+
+    /**
+     * 把排程数据发布到中间库
+     * @param dataVersion 接口发布版本号
+     * @param scheduleDate 排程日期
+     * @param ids  排程发布的ids
+     * @param factoryCode 厂别
+     * @param companyCode 分公司编号
+     * @param createTime  数据同步时间
+     */
+    void deployGdyyScheduleToMid(@Param("dataVersion") String dataVersion, @Param("scheduleDate") Date scheduleDate, @Param("ids") long[] ids,
+                                 @Param("factoryCode") String factoryCode, @Param("companyCode") String companyCode,
+                                 @Param("createTime") Date createTime);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(GdyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(GdyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(GdyyScheduleResultDto scheduleResult);
 }

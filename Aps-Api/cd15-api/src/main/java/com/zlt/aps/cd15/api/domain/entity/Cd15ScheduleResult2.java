@@ -7,8 +7,6 @@ import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 
 import java.util.Date;
 
@@ -207,6 +205,12 @@ public class Cd15ScheduleResult2 extends ApsBaseEntity{
     /** 生产状态:0-未生产；1-生产中；2-生产完成 */
     @ApiModelProperty(value = "生产状态:0-未生产；1-生产中；2-生产完成")
     private String productionStatus;
+
+    /**
+     * 边胶用量
+     */
+    @ApiModelProperty(value = "边胶用量")
+    private Double edgeGluePlan;
 
     /** 删除标识：0--正常，1-删除 */
     private String delFlag;

@@ -24,55 +24,55 @@ public interface IXwyyBigRollOriginalBrandService {
      * 查询帘布大卷原线品牌列表
      */
     @ApiOperation("查询帘布大卷原线品牌列表")
-    @PostMapping("/bigRollOriginalBrand/list")
+    @PostMapping("/xwyy/bigRollOriginalBrand/list")
     TableDataInfo list(@RequestBody XwyyBigRollOriginalBrand xwyyBigRollOriginalBrand);
 
     /**
      * 新增帘布大卷原线品牌
      */
     @ApiOperation("新增帘布大卷原线品牌")
-    @PostMapping("/bigRollOriginalBrand/add")
+    @PostMapping("/xwyy/bigRollOriginalBrand/add")
     AjaxResult add(@RequestBody XwyyBigRollOriginalBrand xwyyBigRollOriginalBrand);
 
     /**
      * 修改帘布大卷原线品牌
      */
     @ApiOperation("修改帘布大卷原线品牌")
-    @PostMapping("/bigRollOriginalBrand/edit")
+    @PostMapping("/xwyy/bigRollOriginalBrand/edit")
     AjaxResult edit(@RequestBody XwyyBigRollOriginalBrand xwyyBigRollOriginalBrand);
 
     /**
      * 删除帘布大卷原线品牌
      */
     @ApiOperation("删除帘布大卷原线品牌")
-    @DeleteMapping("/bigRollOriginalBrand/{ids}")
+    @DeleteMapping("/xwyy/bigRollOriginalBrand/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/bigRollOriginalBrand/{id}")
+    @GetMapping(value = "/xwyy/bigRollOriginalBrand/{id}")
     XwyyBigRollOriginalBrand getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验帘布大卷原线品牌唯一性
      */
     @ApiOperation("校验帘布大卷原线品牌唯一性")
-    @PostMapping("/bigRollOriginalBrand/checkXwyyBigRollOriginalBrandUnique")
+    @PostMapping("/xwyy/bigRollOriginalBrand/checkXwyyBigRollOriginalBrandUnique")
     String checkXwyyBigRollOriginalBrandUnique(@RequestBody XwyyBigRollOriginalBrand xwyyBigRollOriginalBrand);
 
     /**
      * 导出帘布大卷原线品牌列表
      */
     @ApiOperation("导出帘布大卷原线品牌列表")
-    @PostMapping("/bigRollOriginalBrand/getList")
+    @PostMapping("/xwyy/bigRollOriginalBrand/getList")
     List<XwyyBigRollOriginalBrand> getList(@RequestBody XwyyBigRollOriginalBrand xwyyBigRollOriginalBrand);
 
     /**
      * 导入帘布大卷原线品牌数据
      */
     @ApiOperation("导入帘布大卷原线品牌")
-    @PostMapping("/bigRollOriginalBrand/importData")
+    @PostMapping("/xwyy/bigRollOriginalBrand/importData")
     public AjaxResult importData(@RequestBody List<XwyyBigRollOriginalBrand> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

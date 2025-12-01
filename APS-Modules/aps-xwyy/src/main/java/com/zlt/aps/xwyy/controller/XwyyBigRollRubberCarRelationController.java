@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2022-05-10
  */
 @RestController
-@RequestMapping("/bigRollRubberCarRelation")
+@RequestMapping("/xwyy/bigRollRubberCarRelation")
 public class XwyyBigRollRubberCarRelationController extends BaseController {
     @Autowired
     private XwyyBigRollRubberCarRelationService xwyyBigRollRubberCarRelationService;

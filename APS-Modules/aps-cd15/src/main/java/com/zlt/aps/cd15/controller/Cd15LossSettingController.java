@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2021-07-19
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/cd15/loss")
 public class Cd15LossSettingController extends BaseController {
     @Autowired
     private Cd15LossSettingService cd15LossSettingService;

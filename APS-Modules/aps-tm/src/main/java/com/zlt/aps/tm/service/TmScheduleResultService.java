@@ -1,7 +1,10 @@
 package com.zlt.aps.tm.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.bill.common.service.IBillService;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
@@ -13,7 +16,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-17
  */
-public interface TmScheduleResultService {
+public interface TmScheduleResultService extends IBillService<TmScheduleResult> {
     /**
      * 查询胎面排程结果
      *
@@ -115,10 +118,10 @@ public interface TmScheduleResultService {
      * 排程发布
      */
     public AjaxResult publish(long[] ids, Date scheduleDate, String dataVersion, String factoryCode, String companyCode);
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
@@ -146,7 +149,7 @@ public interface TmScheduleResultService {
 
     /**
      * 更改发布状态
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Transactional(rollbackFor = Exception.class)
@@ -164,4 +167,32 @@ public interface TmScheduleResultService {
     int isPublishByIds(Long[] ids);
 
     List<TmScheduleResult> selectByIds(List<Long> ids2);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<TmDayFinishQty> list, Long importLogId);
+
+    /**
+     * 查询出对应的施工信息字段
+     *
+     * @param embryoCodeList  施工代码
+     * @param productionStage 仅投产阶段规格排产标识
+     * @return 结果
+     */
+    List<EngineConstructionInfo> listConstruction(List<String> embryoCodeList, String productionStage);
+
+    AjaxResult getSummaryVo(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 批量转机台
+     *
+     * @param scheduleResult 排程结果
+     * @return 结果
+     */
+    AjaxResult batchChangeMachine(TmScheduleResult scheduleResult);
 }

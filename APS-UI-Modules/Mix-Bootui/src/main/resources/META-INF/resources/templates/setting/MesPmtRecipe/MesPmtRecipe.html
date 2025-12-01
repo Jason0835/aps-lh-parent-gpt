@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('配方信息列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{setting.MesPmtRecipe.recipeMaterialName}]]：</label>
+                            <div class="neat">
+                                <input type="text" name="recipeMaterialName" class="MaterialNames" autocomplete="off"/>
+                            </div>
+                        </li>
+                        <li>
+                            <label>[[#{setting.MesPmtRecipe.machineName}]]：</label>
+                            <input type="text" name="machineName"/>
+                        </li>
+                        <li>
+                            [[#{setting.MesPmtRecipe.recipeTypeName}]]：
+                            <input type="text" name="recipeTypeName"/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.MesPmtRecipe.recipeState}]]：</label>
+                            <select id="recipeState" class="form-control" name="recipeState"
+                                    th:with="type=${@dict.getType('RECIPE_STATE')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm"
+                               onclick="$.table.search('formId', 'bootstrap-table1')"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm"
+                               onclick="reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                            <a class="btn btn-info btn-rounded btn-sm" onclick="syncMesPmtRecipe()" shiro:hasPermission="setting:MesPmtRecipe:syncMesPmtRecipe">
+                                <i class="fa fa-cloud-download"></i> [[#{btn.MesPmtRecipe.syncMesPmtRecipe}]]
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar1" role="group">
+            <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                [[#{setting.MesPmtRecipe.modelName}]]
+            </div>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table1"></table>
+        </div>
+    </div>
+</div>
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse" hidden>
+            <form id="formId2">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            [[#{setting.MesPmtRecipeWeight.fatherRecipeId}]]：
+                            <input id="fatherRecipeId" name="fatherRecipeId" type="text" readonly
+                                   style="background-color: #eeeeee">
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="btn-group-sm" id="toolbar2" role="group">
+            <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                [[#{setting.MesPmtRecipeWeight.modelName}]]
+            </div>
+            <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                [[#{setting.MesPmtRecipeWeight.fatherRecipeId}]]：<span id="fatherRecipeIdShow"></span>
+            </div>
+        </div>
+        <div class="col-xs-12 select-table table-striped">
+            <table id="bootstrap-table2"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "setting/MesPmtRecipe";
+    var prefix2 = ctx + "setting/MesPmtRecipeWeight";
+    var recipeStateData = [[${@dict.getType('RECIPE_STATE')}]];
+    var productStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+    var auditFlagData = [[${@dict.getType('AUDIT_FLAG')}]];
+
+    //获取物料名称列表
+    var datas = [[${@setting.getMaterialNames()}]];
+    $('.MaterialNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        var options = {
+            id: "bootstrap-table1",
+            toolbar: "toolbar1",
+            uniqueId: "id",
+            url: prefix + "/list",
+            firstLoad: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            modalName: [[#{setting.MesPmtRecipe.modelName}]],
+            pageSize: 5,
+            pageList: [5, 10, 25],
+            onClickRow: function (row, $element) {
+                // 去除当前所有选中的样式
+                var allTr = $("#bootstrap-table1").find("tr");
+                allTr.removeClass('selected');
+                // 添加当前点击行选中
+                $element.attr('class', 'selected');
+                let recipeId = row.recipeId;
+                $('#fatherRecipeId').val(recipeId);
+                $('#fatherRecipeIdShow').text(recipeId);
+                $.table.search('formId2', 'bootstrap-table2');
+            },
+            onLoadSuccess: function (data) {
+                $('#fatherRecipeId').val('');
+                $('#fatherRecipeIdShow').text('');
+                $("#bootstrap-table2").bootstrapTable('removeAll');
+            },
+            columns: [
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'recipeId',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeId}]],
+                },
+                {
+                    field: 'mixArea',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.mixArea}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeEquipCode',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeEquipCode}]],
+                    visible: false
+                },
+                {
+                    field: 'machineName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.machineName}]],
+                },
+                {
+                    field: 'recipeMaterialCode',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialCode}]],
+                },
+                {
+                    field: 'recipeMaterialName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialName}]],
+                },
+                {
+                    field: 'recipeVersionId',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeVersionId}]],
+                },
+                {
+                    field: 'recipeType',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.recipeType}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeTypeName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeTypeName}]],
+                },
+                {
+                    field: 'productStage',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.productStage}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(productStageData, value);
+                    },
+                },
+                {
+                    field: 'summerMixTime',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.summerMixTime}]],
+                },
+                {
+                    field: 'winterMixTime',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.winterMixTime}]],
+                },
+                {
+                    field: 'lotTotalWeight',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.lotTotalWeight}]],
+                },
+                {
+                    field: 'recipeState',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeState}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(recipeStateData, value);
+                    },
+                },
+                {
+                    field: 'auditFlag',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.auditFlag}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(auditFlagData, value);
+                    },
+                },
+            ]
+        };
+        $.table.init(options, true);
+
+        var options2 = {
+            id: "bootstrap-table2",
+            toolbar: "toolbar2",
+            uniqueId: "id",
+            url: prefix2 + "/list",
+            modalName: [[#{setting.MesPmtRecipeWeight.modelName}]],
+            firstLoad: false,
+            pagination: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            queryParams: queryParams,
+            columns: [
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'fatherRecipeId',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipeWeight.fatherRecipeId}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeId',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipeWeight.recipeId}]],
+                },
+                {
+                    field: 'weightOrder',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipeWeight.weightOrder}]],
+                },
+                {
+                    field: 'recipeMaterialCode',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipeWeight.recipeMaterialCode}]],
+                },
+                {
+                    field: 'recipeMaterialName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipeWeight.recipeMaterialName}]],
+                },
+                {
+                    field: 'setWeight',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipeWeight.setWeight}]],
+                },
+                {
+                    field: 'allowError',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipeWeight.allowError}]],
+                },
+            ]
+        };
+        $.table.init(options2, true);
+    });
+
+    /**
+     * 查询参数
+     * @param params
+     * @returns {*}
+     */
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        search.fatherRecipeId = $('#fatherRecipeId').val();
+        return search;
+    }
+
+    // 重置两个表单数据
+    function reset() {
+        table.set('bootstrap-table1');
+        $(".select2-selection__rendered").html(frame.alter.all);
+        $("#formId")[0].reset();
+        let $table = $("#bootstrap-table1");
+        var params = $table.bootstrapTable('getOptions');
+        $table.bootstrapTable('refresh', params);
+        $.form.reset('formId2', 'bootstrap-table2');
+    }
+
+    // 手动同步mes配方
+    function syncMesPmtRecipe() {
+        $.modal.confirm([[#{message.confirm.syncMesPmtRecipe}]], function () {
+            $.operate.post(prefix + "/syncMesPmtRecipe");
+        });
+    }
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+</style>
+</html>

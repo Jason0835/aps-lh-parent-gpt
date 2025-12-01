@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.zlt.aps.cd90.api.domain.dto.Cd90LossSettingDto;
 import com.zlt.aps.cd90.entity.Cd90LossSetting;
 import com.zlt.aps.cd90.service.Cd90LossSettingService;
@@ -25,7 +24,7 @@ import java.util.List;
  * @date 2021-07-19
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/cd90/loss")
 public class Cd90LossSettingController extends BaseController {
     @Autowired
     private Cd90LossSettingService cd90LossSettingService;

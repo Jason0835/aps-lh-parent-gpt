@@ -2,6 +2,7 @@ package com.zlt.aps.tc.engine.service;
 
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.aps.tc.engine.vo.TcScheduleResultVo;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -50,4 +51,12 @@ public interface TcEngineService {
      * @param scheduleDate
      */
     void handGlueMerge(String scheduleDate);
+
+    /**
+     * 批量设置批次号和订单号
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-mm-dd
+     */
+    @Transactional(rollbackFor = Exception.class)
+    void batchUpdateBatchNoAndOrderNo(String scheduleDate);
 }

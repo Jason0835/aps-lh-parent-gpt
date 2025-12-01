@@ -1,13 +1,14 @@
 package com.zlt.aps.template.xwyy;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "XwyyBigRollColor对象", description = "帘布大卷颜色提示信息表")
-public class XwyyBigRollColorTemp {
+public class XwyyBigRollColorTemp extends ApsBaseEntity {
 
     @ApiModelProperty(value = "帘布大卷编号")
     @Excel(name = "ui.bigRollColor.column.bigRollCode", sort = 10)

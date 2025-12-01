@@ -90,7 +90,6 @@ public class ExportUtil {
      *
      * @param response       浏览器响应
      * @param data           字节流
-     * @param uploadFilePath 上传路径
      * @param fileName       导出指定的文件名，不需要后缀
      * @param exportParams   导出记录的查询参数
      * @param procedureCode  导出记录的工序

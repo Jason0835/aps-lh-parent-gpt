@@ -1,8 +1,9 @@
 package com.zlt.aps.cd15.engine.mapper;
 
-import java.util.List;
-
+import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.engine.vo.Cd15BigRollVo;
+
+import java.util.List;
 
 /**
  * 15度裁断钢带大卷信息数据Mapper
@@ -22,4 +23,10 @@ public interface Cd15EngineBigRollMapper {
 	 * @return
 	 */
 	List<Cd15BigRollVo> listCd15BigRoll();
+
+	/**
+	 * 查询15度裁断卷曲长度
+	 * @return 结果
+	 */
+	List<Cd15CurlLength> listCd15CurlLength();
 }

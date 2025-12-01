@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tq.api.domain.dto.TqParamsDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,7 @@ import java.util.List;
 @FeignClient(contextId = "ITqParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tq:tq}")
 public interface ITqParamsService
 {
-    
+
     /**
      * 查询胎圈参数信息列表
      */
@@ -43,6 +42,6 @@ public interface ITqParamsService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/tq/params/exportData")
-    List<TqParamsDto> exportData(@SpringQueryMap TqParamsDto dto);
+    @PostMapping("/tq/params/exportData")
+    List<TqParamsDto> exportData(@RequestBody TqParamsDto dto);
 }

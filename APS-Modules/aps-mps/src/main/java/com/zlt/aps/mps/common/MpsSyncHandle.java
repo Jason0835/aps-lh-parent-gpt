@@ -1,5 +1,6 @@
 package com.zlt.aps.mps.common;
 
+import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.constant.GatewayConstants;
 import com.ruoyi.common.constant.HttpStatus;
@@ -10,6 +11,8 @@ import com.zlt.aps.mps.domain.TServiceSyncLog;
 import com.zlt.aps.mps.service.*;
 import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import com.zlt.sync.handle.SyncDataHandle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -53,11 +56,14 @@ public class MpsSyncHandle {
     @Resource
     private MesConstructionInfoService mesConstructionInfoService;
 
+    private static final Logger logger = LoggerFactory.getLogger(MpsSyncHandle.class);
+
     public void asyncResult(AjaxResult ajaxResult, SyncDataHandle handle) {
         // AjaxResult 返回的都是成功的数据;
 
         // 需要一个dataVersion，一个调用哪个接口的标识
         List<AuxReqSyncDataLogs> dataList = (List<AuxReqSyncDataLogs>) ajaxResult.get(Constants.DATA);
+        logger.info("mps同步处理 asyncResult ==> dataList={}", JSONObject.toJSONString(dataList));
         if (CollectionUtil.isEmpty(dataList)) {
             // 同步失败处理 日志
             TServiceSyncLog log = new TServiceSyncLog();
@@ -149,7 +155,11 @@ public class MpsSyncHandle {
                     // PLM参数同步
                     AjaxResult result = infoService.mergePlmConstructionInfo(dataVersion);
                     buildSuccessOrFailList(failList, successList, syncDataLog, result);
-                } else if (syncKey.equals(SyncKeyEnum.FINISH_SCHE_COMPLETE.getDescription())) {
+                } else if (syncKey.equals(SyncKeyEnum.MES_BAS_MATERIAL.getDescription())) {
+                    // MES基础物料同步
+                    AjaxResult result = infoService.mergeBasMaterial(dataVersion);
+                    buildSuccessOrFailList(failList, successList, syncDataLog, result);
+                } if (syncKey.equals(SyncKeyEnum.FINISH_SCHE_COMPLETE.getDescription())) {
                     // ========================================================================  完成量回报  ============================================================
                     // 成型排程完成量回报
                     AjaxResult result = finishService.mergeCxFinish(dataVersion);

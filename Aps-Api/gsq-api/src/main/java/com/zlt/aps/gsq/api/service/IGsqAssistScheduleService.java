@@ -21,12 +21,12 @@ public interface IGsqAssistScheduleService {
      * 查询钢丝圈外协排程结果列表
      */
     @ApiOperation("查询钢丝圈外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/gsq/assistSchedule/list")
     TableDataInfo list(@RequestBody GsqAssistSchedule gsqAssistSchedule);
 
     /**
      * 导出列表
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/gsq/assistSchedule/export")
     byte[] export(@RequestBody GsqAssistSchedule assistSchedule);
 }

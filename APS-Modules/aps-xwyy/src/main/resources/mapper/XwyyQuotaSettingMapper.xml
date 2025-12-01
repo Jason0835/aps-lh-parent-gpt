@@ -64,7 +64,7 @@
     </select>
 
     <delete id="deleteQuotaSettingByIds" parameterType="long">
-        update t_xwyy_quota_setting set del_flag = 1 where id in
+        update t_xwyy_quota_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -107,15 +107,13 @@
     <insert id="insertList" parameterType="list">
         insert into t_xwyy_quota_setting
         (id, big_roll_code, machine_id, quota, create_by, create_time, del_flag, remark)
-        select SEQ_QUOTA_SETTING.NEXTVAL AS ID, x.*
-        from (
-        <foreach collection="list" item="XwyyQuotaSetting" separator=" union ">
-            select
+        VALUES
+        <foreach collection="list" item="XwyyQuotaSetting" separator=",">
+            (NULL,
             #{XwyyQuotaSetting.bigRollCode,jdbcType=VARCHAR},#{XwyyQuotaSetting.machineId,jdbcType=DOUBLE},#{XwyyQuotaSetting.quota,jdbcType=DOUBLE},#{XwyyQuotaSetting.createBy},#{XwyyQuotaSetting.createTime},
             #{XwyyQuotaSetting.delFlag},#{XwyyQuotaSetting.remark,jdbcType=VARCHAR}
-            from dual
+            )
         </foreach>
-        ) x
     </insert>
 
     <delete id="deleteById">
@@ -141,32 +139,26 @@
         </trim>
     </update>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_xwyy_quota_setting a USING (
-        <foreach collection="list" item="XwyyQuotaSetting" separator=" union ">
-            select
-            #{XwyyQuotaSetting.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{XwyyQuotaSetting.machineId,jdbcType=DOUBLE} machine_id,
-            #{XwyyQuotaSetting.quota,jdbcType=DOUBLE} quota,
-            #{XwyyQuotaSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{XwyyQuotaSetting.createTime,jdbcType=DATE} create_time,
-            #{XwyyQuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{XwyyQuotaSetting.updateTime,jdbcType=DATE} update_time,
-            #{XwyyQuotaSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_xwyy_quota_setting (
+        big_roll_code, machine_id, quota, create_by, create_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="XwyyQuotaSetting" separator=",">
+            (
+            #{XwyyQuotaSetting.bigRollCode,jdbcType=VARCHAR},
+            #{XwyyQuotaSetting.machineId,jdbcType=DOUBLE},
+            #{XwyyQuotaSetting.quota,jdbcType=DOUBLE},
+            #{XwyyQuotaSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{XwyyQuotaSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.big_roll_code is null and a.big_roll_code is null) or (a.big_roll_code = b.big_roll_code))
-        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.quota = b.quota,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.big_roll_code, a.machine_id, a.quota, a.create_by, a.create_time, a.remark,a.del_flag) values
-        (SEQ_QUOTA_SETTING.NEXTVAL, b.big_roll_code, b.machine_id, b.quota, b.create_by, sysdate, b.remark,'0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        quota = VALUES(quota),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

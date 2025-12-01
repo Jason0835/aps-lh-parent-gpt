@@ -47,10 +47,6 @@
     </select>
 
     <insert id="insertXwyyBigRollRubberCarRelation" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_XWYY_BG_RUB_CAR_RELATION.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into T_XWYY_BG_RUB_CAR_RELATION
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -96,7 +92,7 @@
 
     <delete id="deleteXwyyBigRollRubberCarRelationById" parameterType="Long">
         update T_XWYY_BG_RUB_CAR_RELATION
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
@@ -110,56 +106,35 @@
 
 
     <delete id="deleteXwyyBigRollRubberCarRelationByIds" parameterType="String">
-        update T_XWYY_BG_RUB_CAR_RELATION set del_flag='1' where id in
+        update T_XWYY_BG_RUB_CAR_RELATION set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_XWYY_BG_RUB_CAR_RELATION a USING (
-        <foreach collection="list" item="bigRollRubberCarRelation" separator=" union ">
-            select
-            #{bigRollRubberCarRelation.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{bigRollRubberCarRelation.rubberCode,jdbcType=VARCHAR} rubber_code,
-            #{bigRollRubberCarRelation.carNumber,jdbcType=VARCHAR} car_number,
-            #{bigRollRubberCarRelation.createBy,jdbcType=VARCHAR} create_by,
-            #{bigRollRubberCarRelation.createTime,jdbcType=DATE} create_time,
-            #{bigRollRubberCarRelation.updateBy,jdbcType=VARCHAR} update_by,
-            #{bigRollRubberCarRelation.updateTime,jdbcType=DATE} update_time,
-            #{bigRollRubberCarRelation.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_XWYY_BG_RUB_CAR_RELATION (
+        big_roll_code, rubber_code, car_number, create_by, create_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="bigRollRubberCarRelation" separator=",">
+            (
+            #{bigRollRubberCarRelation.bigRollCode,jdbcType=VARCHAR},
+            #{bigRollRubberCarRelation.rubberCode,jdbcType=VARCHAR},
+            #{bigRollRubberCarRelation.carNumber,jdbcType=VARCHAR},
+            #{bigRollRubberCarRelation.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{bigRollRubberCarRelation.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.big_roll_code = b.big_roll_code
-        AND a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.rubber_code = b.rubber_code,
-        a.car_number = b.car_number,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.big_roll_code ,
-        a.rubber_code,
-        a.car_number,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_XWYY_BG_RUB_CAR_RELATION.NEXTVAL,
-        b.big_roll_code ,
-        b.rubber_code,
-        b.car_number,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        rubber_code = VALUES(rubber_code),
+        car_number = VALUES(car_number),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
     <select id="selectByBigRollCode" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation"
             resultMap="XwyyBigRollRubberCarRelationResult">

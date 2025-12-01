@@ -1,20 +1,31 @@
 package com.zlt.aps.xwyy.service.impl;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyOriginalLineSpec;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyStock;
+import com.zlt.aps.xwyy.entity.XwyyParams;
+import com.zlt.aps.xwyy.mapper.XwyyOriginalLineSpecMapper;
+import com.zlt.aps.xwyy.mapper.XwyyParamsMapper;
 import com.zlt.aps.xwyy.mapper.XwyyStockMapper;
 import com.zlt.aps.xwyy.service.XwyyStockService;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +43,12 @@ public class XwyyStockServiceImpl implements XwyyStockService {
     @Autowired
     private XwyyStockMapper stockMapper;
 
+    @Autowired
+    private XwyyOriginalLineSpecMapper originalLineSpecMapper;
+
+    @Autowired
+    private XwyyParamsMapper paramsMapper;
+
     /**
      * 查询纤维压延库存信息
      *
@@ -40,7 +57,15 @@ public class XwyyStockServiceImpl implements XwyyStockService {
      */
     @Override
     public XwyyStock selectStockById(Long id) {
-        return stockMapper.selectStockById(id);
+        XwyyStock stock = stockMapper.selectStockById(id);
+        LambdaQueryWrapper<XwyyOriginalLineSpec> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(XwyyOriginalLineSpec::getOriginalLineCode, stock.getMaterialCode());
+        wrapper.eq(XwyyOriginalLineSpec::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+        XwyyOriginalLineSpec curlRoll = originalLineSpecMapper.selectOne(wrapper);
+        if (curlRoll != null) {
+            stock.setCurlLength(new BigDecimal(curlRoll.getOriginalLineLength()));
+        }
+        return stock;
     }
 
     /**
@@ -54,7 +79,26 @@ public class XwyyStockServiceImpl implements XwyyStockService {
         if (StringUtils.isNotEmpty(stock.getEndTime())) {
             stock.setEndTime(stock.getEndTime() + " 23:59:59");
         }
-        return stockMapper.selectStockList(stock);
+        List<XwyyStock> stockList = stockMapper.selectStockList(stock);
+        if (CollectionUtils.isNotEmpty(stockList)) {
+            List<String> codeList = stockList.stream().map(XwyyStock::getMaterialCode).distinct().collect(Collectors.toList());
+            Map<String, BigDecimal> lengthMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(codeList)) {
+                LambdaQueryWrapper<XwyyOriginalLineSpec> wrapper = new LambdaQueryWrapper<>();
+                wrapper.in(XwyyOriginalLineSpec::getOriginalLineCode, codeList);
+                wrapper.eq(XwyyOriginalLineSpec::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+                List<XwyyOriginalLineSpec> curlRollList = originalLineSpecMapper.selectList(wrapper);
+                lengthMap = curlRollList.stream().collect(Collectors.toMap(XwyyOriginalLineSpec::getOriginalLineCode, item -> new BigDecimal(item.getOriginalLineLength())));
+            }
+            for (XwyyStock xwyyStock : stockList) {
+                String materialCode = xwyyStock.getMaterialCode();
+                if (lengthMap.containsKey(materialCode)) {
+                    BigDecimal length = lengthMap.get(materialCode);
+                    xwyyStock.setCurlLength(length);
+                }
+            }
+        }
+        return stockList;
     }
 
     /**
@@ -111,15 +155,35 @@ public class XwyyStockServiceImpl implements XwyyStockService {
         List<XwyyStock> newList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
 
+        LambdaUpdateWrapper<XwyyParams> paramsWrapper = new LambdaUpdateWrapper<>();
+        paramsWrapper.eq(XwyyParams::getParamCode, "STANDARD_SIZE");
+        XwyyParams params = paramsMapper.selectOne(paramsWrapper);
+
 		// 按业务主键分组
 		Map<String, Long> groupMap = list.stream()
 				.collect(Collectors.groupingBy(v -> (v.getMaterialCode() + DateUtil.formatDate(v.getStockDate())), Collectors.counting()));
+
+        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+        List<XwyyOriginalLineSpec> curlRollList = new ArrayList<>();
+        List<String> codeList = list.stream().map(XwyyStock::getMaterialCode).filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+        List<List<String>> splitList = CollectionUtil.splitList(codeList, 100);
+        for (List<String> stringList : splitList) {
+            LambdaUpdateWrapper<XwyyOriginalLineSpec> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.in(XwyyOriginalLineSpec::getOriginalLineCode, stringList);
+            wrapper.eq(XwyyOriginalLineSpec::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+            curlRollList.addAll(originalLineSpecMapper.selectList(wrapper));
+        }
+        if (CollectionUtils.isNotEmpty(curlRollList)) {
+            curlRollMap = curlRollList.stream().collect(Collectors.toMap(XwyyOriginalLineSpec::getOriginalLineCode, item -> new BigDecimal(StringUtils.defaultIfBlank(item.getOriginalLineLength(), "0")), (m1, m2) -> m1));
+        }
+
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
             int j = i + 2;
             XwyyStock dto = list.get(i);
 			// excel内业务主键唯一校验
-			Long hasValue = groupMap.get(dto.getMaterialCode() + DateUtil.formatDate(dto.getStockDate()));
+            String materialCode = dto.getMaterialCode();
+            Long hasValue = groupMap.get(materialCode + DateUtil.formatDate(dto.getStockDate()));
 			if (hasValue > 1) {
 				dto.setId(-999L);
 				String columnName1 = I18nUtil.getMessage("ui.data.column.xwyy.quota.bigRollCode");
@@ -131,6 +195,50 @@ public class XwyyStockServiceImpl implements XwyyStockService {
                 failureNum++;
 				continue;
 			}
+
+            // 库存量(米)和库存量(卷)不能同时为空
+            if (ObjectUtils.allNull(dto.getStockNum(), dto.getRollStockNum())) {
+                failureNum++;
+                dto.setId(-999L);
+                addImportErrorLog(importLogId, i + 2,
+                        I18nUtil.getMessage("ui.data.column.stock.stockNumAndRollNumNotNull"), importErrorLogs);
+                continue;
+            }
+
+            // 卷数转换成米数，或米数转换成卷数
+            /*if (!curlRollMap.containsKey(materialCode)) {
+                failureNum++;
+                dto.setId(-999L);
+                addImportErrorLog(importLogId, i + 2,
+                        I18nUtil.getMessage("ui.data.column.xwyy.stock.curlLengthNotExist"), importErrorLogs);
+                continue;
+            }*/
+
+            BigDecimal curlLength = curlRollMap.getOrDefault(materialCode, new BigDecimal(params.getParamValue()));
+            BigDecimal rollStockNum = dto.getRollStockNum();
+            if (rollStockNum != null) {
+                BigDecimal stockNum = rollStockNum.multiply(curlLength);
+                dto.setStockNum(stockNum);
+            } else if (dto.getStockNum() != null) {
+                dto.setRollStockNum(dto.getStockNum().divide(curlLength, 2, RoundingMode.HALF_UP));
+            }
+
+            BigDecimal rollModifyNum = dto.getRollModifyNum();
+            if (rollModifyNum != null) {
+                BigDecimal modifyNum = rollModifyNum.multiply(curlLength);
+                dto.setModifyNum(modifyNum);
+            } else if (dto.getModifyNum() != null) {
+                dto.setRollModifyNum(dto.getModifyNum().divide(curlLength, 2, RoundingMode.HALF_UP));
+            }
+
+            BigDecimal rollBadNum = dto.getRollBadNum();
+            if (rollBadNum != null) {
+                BigDecimal badNum = rollBadNum.multiply(curlLength);
+                dto.setBadNum(badNum);
+            } else if (dto.getBadNum() != null) {
+                dto.setRollBadNum(dto.getBadNum().divide(curlLength, 2, RoundingMode.HALF_UP));
+            }
+
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, dto);
             if (CollectionUtils.isNotEmpty(validated)) {
                 dto.setId(-999L);

@@ -1,6 +1,7 @@
 package com.zlt.aps.template.cd15;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -12,7 +13,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value="钢压大卷信息导入模板", description="钢压大卷信息导入模板")
-public class Cd15BigRollTemp {
+public class Cd15BigRollTemp extends BaseEntity {
 
     @ApiModelProperty(value = "钢压大卷编号")
     @Excel(name="ui.common.column.gy.bigRollCode")

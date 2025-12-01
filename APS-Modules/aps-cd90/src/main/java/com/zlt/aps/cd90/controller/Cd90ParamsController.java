@@ -85,8 +85,8 @@ public class Cd90ParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.cd90.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出90度裁断参数信息")
-    @GetMapping("/exportData")
-    public List<Cd90ParamsDto> export(@SpringQueryMap Cd90ParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd90ParamsDto> export(@RequestBody Cd90ParamsDto dto) {
         dto.setOrderStr(orderStr());
         Cd90Params params = new Cd90Params();
         BeanUtils.copyProperties(dto, params);

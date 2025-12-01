@@ -19,13 +19,13 @@ import java.io.Serializable;
 @Getter
 @TableName("T_GSQ_STEEL_TYPE_COLOR")
 @ApiModel(value = "GsqSteelTypeColor对象", description = "钢带大卷颜色提示信息表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class GsqSteelTypeColor extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC", position = 10)
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "钢丝类型")

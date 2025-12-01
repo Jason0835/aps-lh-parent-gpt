@@ -5,24 +5,30 @@
     <parent>
         <artifactId>aps-api</artifactId>
         <groupId>com.zlt.aps</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.zlt.aps</groupId>
     <artifactId>aps-all-api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-all-api</name>
     <description>全工序api合集</description>
 
     <properties>
-        <aps-api.version>0.0.1-SNAPSHOT</aps-api.version>
+        <aps-api.version>1.0.3-SNAPSHOT</aps-api.version>
     </properties>
 
     <dependencies>
         <dependency>
-            <groupId>com.zlt.aps.lh</groupId>
-            <artifactId>aps-lh-api</artifactId>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-monthplan-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
             <version>${aps-api.version}</version>
         </dependency>
 
@@ -83,6 +89,24 @@
         <dependency>
             <groupId>com.zlt.aps.xwyy</groupId>
             <artifactId>aps-xwyy-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.mix.schedule</groupId>
+            <artifactId>mix-schedule-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.mix.setting</groupId>
+            <artifactId>mix-setting-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
             <version>${aps-api.version}</version>
         </dependency>
 

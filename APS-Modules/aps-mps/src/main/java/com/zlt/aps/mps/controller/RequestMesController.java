@@ -2,6 +2,7 @@ package com.zlt.aps.mps.controller;
 
 import javax.annotation.Resource;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.mps.common.MpsSyncHandle;
@@ -548,6 +550,28 @@ public class RequestMesController extends SyncDataHandle {
 		paramsVO.setCompanyCode(companyCode);
 		return this.syncRequest(paramsVO);
 	}
+	
+
+    @ApiOperation("触发指定kettle同步任务")
+    @PostMapping("/kettleSync/{syncKey}")
+    @ApiImplicitParams({
+        @ApiImplicitParam(name = "syncKey", dataType = "string", value = "接口码", paramType = "query") })
+    public AjaxResult kettleSync(@PathVariable("syncKey") String syncKey) {
+        if (StringUtils.isEmpty(syncKey)) {
+            return AjaxResult.error("接口码不能为空！");
+        }
+        String factoryCode = factoryService.getFactoryCode();
+        String companyCode = factoryService.getCompanyCode();
+        SyncParamsVO paramsVO = new SyncParamsVO();
+        paramsVO.setSyncKey(syncKey);
+        JSONObject json = new JSONObject();
+        paramsVO.setParams(json);
+        paramsVO.setFactoryCode(factoryCode);
+        paramsVO.setCompanyCode(companyCode);
+        paramsVO.setNoMq(1); // 固定不触发mq
+        paramsVO.setDataVersion(this.getDataVersion(syncKey)); // 生成dataversion
+        return this.syncNotice(paramsVO);
+    }
 
 	@Override
 	public void asyncResult(AjaxResult ajaxResult) {

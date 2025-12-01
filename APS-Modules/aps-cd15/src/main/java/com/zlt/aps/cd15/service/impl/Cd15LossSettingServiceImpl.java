@@ -195,6 +195,9 @@ public class Cd15LossSettingServiceImpl extends ServiceImpl<Cd15LossSettingMappe
             if (CollectionUtils.isEmpty(validated)) {
                 lossSetting.setMachineId(machineId);
                 lossSetting.setBaseVale(null);
+                if (StringUtils.isBlank(lossSetting.getSteelStripCode())) {
+                    lossSetting.setSteelStripCode(null);
+                }
                 importList.add(lossSetting);
             } else {
                 failureNum++;

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('汇总胶料需求计划列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.glueCollectPlan.planDate}]]：</label>
+                            <input type="text" class="time-input" id="planDate"
+                                   th:placeholder="yyyy-mm-dd" name="planDate" th:value="${initDate}"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueCollectPlan.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueCollectPlan.glue}]]：</label>
+                            <div class="neat">
+                                <input id="glue" type="text" name="glue" class="GlueNames" autocomplete="off"/>
+                            </div>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-info" onclick="summaryPlan()"
+               shiro:hasPermission="schedule:glueCollectPlan:summaryPlan">
+                <i class="fa fa-calendar-o"></i> [[#{schedule.glueCollectPlan.btn.summaryPlan}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="schedule:glueCollectPlan:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="schedule:glueCollectPlan:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var factoryDatas = [[${@dict.getType('FACTORY')}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var machineNameList = [[${@setting.getMachineInfo()}]];
+    var prefix = ctx + "schedule/glueCollectPlan";
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            summaryPlanUrl: prefix + "/toSummaryPlan",
+            removeUrl: prefix + "/remove",
+            chooseMachineUrl: prefix + "/toChooseMachine/{id}",
+            modalName: [[#{schedule.glueCollectPlan.modelName}]],
+            columns: [
+                [
+                    {
+                        title: [[#{ui.baseInfo}]],
+                        align: 'center',
+                        colspan: 11
+                    },
+                    {
+                        title: [[#{schedule.common.midClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.common.nightClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.common.dayClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'planDate',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.planDate}]],
+                    },
+                    {
+                        field: 'factory',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.factory}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabels(factoryDatas, value);
+                        }
+                    },
+                    {
+                        field: 'glue',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.glue}]],
+                    },
+                    {
+                        field: 'mixArea',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.mixArea}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(mixAreaDatas, value);
+                        },
+                    },
+                    {
+                        field: 'machineCode',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.machineCode}]],
+                        formatter: function (value, row, index) {
+                            var actions = [];
+                            if ($.common.isEmpty(value)) {
+                                actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\',\'' + index + '\')">' + [[#{ui.frame.btn.choose}]] + [[#{schedule.glueCollectPlan.machineCode}]] + '</a> ');
+                                return actions.join('');
+                            }
+                            var machineName = selectMachineName(machineNameList, row);
+                            actions.push('<a href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\',\'' + index + '\')">' + machineName + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'isFinishing',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.isFinishing}]],
+                        formatter: function (value, row, index) {
+                            return statusTools(row);
+                        },
+                    },
+                    {
+                        field: 'totalPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.totalPlanQty}]],
+                    },
+                    {
+                        field: 'lastSurplus',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.lastSurplus}]],
+                    },
+                    {
+                        field: 'produceQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.produceQty}]],
+                    },
+                    {
+                        field: 'midPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.midPlanQty}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'midRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.midRemark}]],
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.nightPlanQty}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'nightRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.nightRemark}]],
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueCollectPlan.dayPlanQty}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'dayRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.dayRemark}]],
+                    },
+                ]
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    function summaryPlan() {
+        table.set();
+        var url = table.options.summaryPlanUrl;
+        $.modal.open(table.options.modalName + [[#{schedule.glueCollectPlan.btn.summaryPlan}]], url, 420, 500);
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, row) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = row.machineCode.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode + '' == item && row.mixArea == dict.mixArea) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span class=\'badge badge-primary\'>%s</span> ", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join('');
+    }
+
+    function chooseMachine(id) {
+        url = table.options.chooseMachineUrl.replace("{id}", id);
+        $.modal.open(table.options.modalName, url, 500, 500);
+    }
+
+    /* 是否收尾显示 */
+    function statusTools(row) {
+        var datas = JSON.stringify(row)
+        if (row.isFinishing == '0') {
+            return "<i class=\"fa fa-toggle-off text-info fa-2x\" onclick='enable(" + datas + ")'></i> ";
+        } else {
+            return "<i class=\"fa fa-toggle-on text-info fa-2x\" onclick='disable(" + datas + ")'></i> ";
+        }
+    }
+
+    /* 否 */
+    function disable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isStop}]], function () {
+            datas.isFinishing = '0';
+            $.operate.postSwitch(prefix + "/save", datas);
+        })
+    }
+
+    /* 是 */
+    function enable(datas) {
+        $.modal.confirm([[#{ui.biz.alter.isOpen}]], function () {
+            datas.isFinishing = '1';
+            $.operate.postSwitch(prefix + "/save", datas);
+        })
+    }
+</script>
+</body>
+</html>

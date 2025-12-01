@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper">
+
+    <update id="updateProductInfo">
+        UPDATE t_mp_month_require_stock mrs
+          JOIN t_mdm_product_info mpi
+            ON mrs.FACTORY_CODE = mpi.FACTORY_CODE
+           AND mrs.PRODUCT_CODE = mpi.PRODUCT_CODE
+           AND IFNULL(mpi.IS_DELETE, 0) = 0
+           SET mrs.PRODUCT_DESC =  mpi.PRODUCT_DESC,
+               mrs.PRO_SIZE = mpi.PRO_SIZE,
+               mrs.PRODUCT_TYPE_CODE = mpi.PRODUCT_TYPE_CODE,
+               mrs.PRODUCT_TYPE_NAME = mpi.PRODUCT_TYPE_NAME,
+               mrs.SPECIFICATIONS = mpi.SPECIFICATIONS,
+               mrs.PATTERN = mpi.PATTERN,
+               mrs.BRAND = mpi.BRAND,
+               mrs.HIERARCHY = mpi.HIERARCHY
+         WHERE mrs.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mrs.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+    </update>
+</mapper>

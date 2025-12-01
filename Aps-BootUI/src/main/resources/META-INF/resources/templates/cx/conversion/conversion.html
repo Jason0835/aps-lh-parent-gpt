@@ -299,6 +299,7 @@
             return ;
         }
         rowData.scheduleDate = $("#scheduleDate").val();
+        rowData.params = [];
         $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.frame.btn.name.save}]] + "?", function () {
             $.operate.postNotRefresh(prefix + "/save", rowData, function (result) {
                 var dateFormat = $.common.dateFormat(new Date(), 'HH:mm:ss ');
@@ -377,6 +378,7 @@
                 $.modal.alertWarning([[#{mes.error.message.cxHalfPartConversion.machineIdIsNull}]]);
                 return ;
             }
+            delete rowData[i].params;
         }
         var data = {'listStr': JSON.stringify(rowData), 'scheduleDate': $("#scheduleDate").val()}
         $.modal.confirm([[#{ui.frame.btn.name.commit}]] + [[#{ui.frame.btn.name.save}]] + "?", function () {

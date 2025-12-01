@@ -25,7 +25,7 @@
         DATA_VERSION,CREATE_DATE,UPDATE_DATE,
         IS_DELETE
     </sql>
-    
+
     <resultMap id="MesTcFinishResultMap" type="com.zlt.aps.mps.domain.TMesTcDayFinishQty">
             <id property="id" column="ID" jdbcType="DECIMAL"/>
             <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
@@ -46,7 +46,7 @@
         DATA_VERSION,CREATE_DATE,UPDATE_DATE,
         IS_DELETE
     </sql>
-    
+
     <resultMap id="MesNcFinishResultMap" type="com.zlt.aps.mps.domain.TMesNcDayFinishQty">
             <id property="id" column="ID" jdbcType="DECIMAL"/>
             <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
@@ -264,11 +264,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.schedule_date, a.TREAD_CODE, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.TREAD_CODE, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.TREAD_CODE, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeTcFinish" parameterType="list">
@@ -295,11 +296,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.SIDEWALL_CODE, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.SIDEWALL_CODE, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.SIDEWALL_CODE, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeNcFinish" parameterType="list">
@@ -326,11 +328,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.lining_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.lining_code, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.lining_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeCd15Finish" parameterType="list">
@@ -357,11 +360,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.steel_strip_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_strip_code, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_strip_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeCd90Finish" parameterType="list">
@@ -388,11 +392,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.cloth_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.cloth_code, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.cloth_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeXwyyFinish" parameterType="list">
@@ -419,11 +424,12 @@
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.big_roll_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.big_roll_code, NVL(b.day_finish_qty, 0), NVL(b.night_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.big_roll_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeTqFinish" parameterType="list">
@@ -452,11 +458,12 @@
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.bead_code, a.mid_finish_qty, a.night_finish_qty, a.day_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.bead_code, NVL(b.mid_finish_qty, 0), NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.bead_code, NVL(b.mid_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeGsqFinish" parameterType="list">
@@ -485,11 +492,12 @@
         a.night_finish_qty = NVL(b.night_finish_qty, 0),
         a.day_finish_qty = NVL(b.day_finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.steel_ring_code, a.mid_finish_qty, a.night_finish_qty, a.day_finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_ring_code, NVL(b.mid_finish_qty, 0), NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_ring_code, NVL(b.mid_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 

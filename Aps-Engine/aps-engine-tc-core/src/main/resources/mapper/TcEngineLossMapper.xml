@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.tc.engine.mapper.TcEngineLossMapper">
 
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.tc.engine.vo.TcLossVo">
-        select nvl(machine_id,'') || '#' || nvl(sidewall_code,'') LOSS_KEY, LOSS_RATE
+        select concat(IFNULL(machine_id,'') , '#' , IFNULL(sidewall_code,'')) LOSS_KEY, LOSS_RATE
         from T_TC_LOSS_SETTING
         where DEL_FLAG = 0
     </select>

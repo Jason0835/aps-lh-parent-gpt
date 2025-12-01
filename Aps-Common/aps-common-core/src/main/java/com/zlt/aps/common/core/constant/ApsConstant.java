@@ -1,5 +1,8 @@
 package com.zlt.aps.common.core.constant;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ApsConstant {
 
     /**
@@ -11,6 +14,51 @@ public class ApsConstant {
      * 删除标识：删除
      */
     public static final String DEL_FLAG_DEL = "1";
+
+
+    /**
+     * 四个班次
+     */
+    public static final Integer FOUR_CLASS = 4;
+
+    /**
+     * 六个班次
+     */
+    public static final Integer SIX_CLASS = 6;
+
+    /**
+     * 单模
+     */
+    public static final Integer SINGLE_MOLD = 1;
+
+    /**
+     * 双模
+     */
+    public static final Integer DOUBLE_MOLD = 2;
+
+    /**
+     * 2天
+     */
+    public static final Integer TWO_DAY = 2;
+
+    /**
+     * 1天
+     */
+    public static final Integer ONE_DAY = 1;
+
+    /**
+     * 左模
+     */
+    public static final String L_MOLD = "L";
+    /**
+     * 右模
+     */
+    public static final String R_MOLD = "R";
+
+    /**
+     * 分隔符号
+     */
+    public static final String SPLIT_CHAR = "#@%#";
 
     /**
      * 状态：启用
@@ -63,9 +111,9 @@ public class ApsConstant {
     public static final String IS_PRODUNTION = "1";
 
     /**
-     * 工序类型：硫化
+     * 工序类型：硫化（工序值0已被密炼占用）
      */
-    public static String PROCEDURE_CODE_LH = "0";
+    public static String PROCEDURE_CODE_LH = "11";
 
     /**
      * 工序类型：成型
@@ -177,9 +225,9 @@ public class ApsConstant {
      * 硫化排程下发接口同步key
      */
     public static String LH_DEPLOY_SYNC_KEY = "VULCANIZE_SCHE_RST_FBK";
-    
+
     /**
-     *APS模具计划下发接口
+     * APS模具计划下发接口
      */
     public static String APS_MOLD_PLAN_2_MES = "APS_MOLD_PLAN_2_MES";
 
@@ -191,7 +239,7 @@ public class ApsConstant {
     /**
      * 请求MES系统模具变更计划同步KEY
      */
-    public static String LH_MOLD_ADJUST_PLAN="LH_MOLD_ADJUST_PLAN";
+    public static String LH_MOLD_ADJUST_PLAN = "LH_MOLD_ADJUST_PLAN";
 
     /**
      * MES监听APS发送的消息-QUEUE
@@ -232,4 +280,143 @@ public class ApsConstant {
      * 调度员角色编码
      */
     public static String DISPATCHER_ROLE = "dispatcher";
+
+    /**
+     * 接口token前缀
+     */
+    public static final String TOKEN_PREFIX = "Bearer:";
+
+    /**
+     * 是
+     */
+    public static final String TRUE = "1";
+
+    /**
+     * 否
+     */
+    public static final String FALSE = "0";
+
+    /**
+     * 是否 为否
+     */
+    public static final Integer APS_YES_NO_0 = 0;
+    /**
+     * 是否 为是
+     */
+    public static final Integer APS_YES_NO_1 = 1;
+
+    /**
+     * 升序
+     */
+    public static final Integer SORT_ASC = 1;
+
+    /**
+     * 降序
+     */
+    public static final Integer SORT_DESC = 2;
+
+    /**
+     * 常用字符数字
+     */
+    public static final String APS_STRING_0 = "0";
+    public static final String APS_STRING_1 = "1";
+    public static final String APS_STRING_2 = "2";
+    public static final String APS_STRING_3 = "3";
+    public static final String APS_STRING_36 = "36";
+    public static final String APS_STRING_37 = "37";
+    public static final String APS_STRING_4 = "4";
+    public static final String APS_STRING_5 = "5";
+    public static final String APS_STRING_6 = "6";
+    public static final String APS_STRING_10 = "10";
+    public static final String APS_STRING_11 = "11";
+    public static final String APS_STRING_20 = "20";
+    public static final String APS_STRING_30 = "30";
+    public static final String VN_TAX_CODE = "CN8";
+
+    /**
+     * 常用带零字符数字
+     */
+    public static final String APS_ZERO_1 = "01";
+    public static final String APS_ZERO_2 = "02";
+    public static final String APS_ZERO_3 = "03";
+    public static final String APS_ZERO_4 = "04";
+    public static final String APS_ZERO_5 = "05";
+    public static final String APS_ZERO_6 = "06";
+
+    public static final String APS_ZERO_00 = "00";
+
+    public static final String APS_ZERO_01 = "01";
+
+    public static final String PLAN_DELAY_AUTO_SUPPLE = "延误增补";
+
+    public static final String CHANGE_MOULD_LIMIT = "超出换模次数限制";
+
+    /**
+     * POST请求
+     */
+    public static final String HTTP_POST = "POST";
+
+    /**
+     * 26个字母表
+     */
+    public static final String ALPHABET = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z";
+    /**
+     * 返回成功
+     **/
+    public static final String SUCCESS = "success";
+
+    /**
+     * 返回成功
+     **/
+    public static final String FAIL = "fail";
+
+    /**
+     * DC-SCM桶
+     **/
+    public static final String DC_APS_BUCKET = "upload-file";
+
+    public static final Long EXPIRE_ONE = 1L;
+
+    /**
+     * 硫化排程管理，自动排程
+     */
+    public static final String REDIS_APS_LH_AUTO_SCHEDULE = "APS:LH:AUTO:SCHEDULE:";
+
+
+    // 月份与后缀的映射关系
+    public static final Map<Integer, String> MONTH_SUFFIX_MAP = new HashMap<>();
+
+    /**
+     * 日志分割符
+     */
+    public static final String DIVISION = "\r\n---------------------------------------------------\r\n";
+
+    static {
+        MONTH_SUFFIX_MAP.put(1, "1");
+        MONTH_SUFFIX_MAP.put(2, "2");
+        MONTH_SUFFIX_MAP.put(3, "3");
+        MONTH_SUFFIX_MAP.put(4, "4");
+        MONTH_SUFFIX_MAP.put(5, "5");
+        MONTH_SUFFIX_MAP.put(6, "6");
+        MONTH_SUFFIX_MAP.put(7, "7");
+        MONTH_SUFFIX_MAP.put(8, "8");
+        MONTH_SUFFIX_MAP.put(9, "9");
+        MONTH_SUFFIX_MAP.put(10, "10");
+        MONTH_SUFFIX_MAP.put(11, "11");
+        MONTH_SUFFIX_MAP.put(12, "12");
+    }
+
+    // 库位类型与字段名称的映射关系
+    public static final Map<Integer, String> LOCATION_TYPE_FIELD_MAP = new HashMap<>();
+
+    static {
+        LOCATION_TYPE_FIELD_MAP.put(1, "domestic");
+        LOCATION_TYPE_FIELD_MAP.put(2, "foreign");
+        LOCATION_TYPE_FIELD_MAP.put(3, "oe");
+    }
+
+    /**
+     * 生产顺序标识
+     */
+    public static final Integer PRODUCT_ORDER_FLAG = 1;
 }

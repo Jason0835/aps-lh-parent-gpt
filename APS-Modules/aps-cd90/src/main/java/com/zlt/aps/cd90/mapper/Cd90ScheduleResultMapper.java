@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.mapper;
 
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -63,7 +64,7 @@ public interface Cd90ScheduleResultMapper {
      */
     public int deleteCd90ScheduleResultByIds(Long[] ids);
 
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
     public List<Cd90ScheduleResult> checkScheduleResultUnique(Cd90ScheduleResult cd90ScheduleResult);
 
@@ -148,4 +149,44 @@ public interface Cd90ScheduleResultMapper {
      * @return 查询到的记录
      */
     List<Cd90ScheduleResult> selectByScheduleDateAndCode(Cd90ScheduleResult cd90ScheduleResult);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(Cd90ScheduleResult scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(Cd90ScheduleResult scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(Cd90ScheduleResult scheduleResult);
+
+    /**
+     * 获取昨日早班计划量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<Cd90ScheduleResult> getLastDayPlanQty4List(Cd90ScheduleResult tmScheduleResult);
+
+    /**
+     * 获取成型消耗量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<Cd90ScheduleResult> getCxConsume4List(Cd90ScheduleResult tmScheduleResult);
 }

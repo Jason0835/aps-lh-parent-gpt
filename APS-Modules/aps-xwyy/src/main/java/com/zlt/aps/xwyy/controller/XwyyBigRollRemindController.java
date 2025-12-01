@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2022-04-27
  */
 @RestController
-@RequestMapping("/bigRollRemind")
+@RequestMapping("/xwyy/bigRollRemind")
 public class XwyyBigRollRemindController extends BaseController {
     @Autowired
     private XwyyBigRollRemindService xwyyBigRollRemindService;

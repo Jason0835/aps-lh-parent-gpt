@@ -4,13 +4,14 @@ import java.math.BigDecimal;
 
 import com.ruoyi.common.core.annotation.Excel;
 
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "胎侧卷曲信息维护导入模板", description = "胎侧卷曲信息维护导入模板")
-public class TcCurlRollTemp {
+public class TcCurlRollTemp extends ApsBaseEntity {
 
     @ApiModelProperty(value = "胎侧代码")
     @Excel(name = "ui.data.column.quota.sidewallCode")

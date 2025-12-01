@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.GlueScheduleEngineBaseMapper">
+	<!-- 查询胶料分解 -->
+    <select id="selectGlueDecomposePlan" resultType="com.zlt.mix.schedule.engine.vo.GlueDecomposePlanVo">
+        SELECT glue,
+               plan_Qty,
+               machine_Code,
+               up_glue,
+               up_machine_code,
+               p.batch_no,
+               p.Produce_Qty,
+               B.MAJOR_TYPE,
+               p.is_finishing,
+               p.day_flag
+          FROM T_GLUE_DECOMPOSE_PLAN p
+         INNER JOIN (
+           SELECT B.MATERIAL_NAME,
+                  max(MAJOR_TYPE) MAJOR_TYPE
+             FROM T_MES_BAS_MATERIAL B
+            WHERE b.del_flag = '0'
+            GROUP BY B.MATERIAL_NAME
+             ) B
+            ON B.MATERIAL_NAME = p.glue
+         WHERE p.PLAN_DATE = #{scheduleDate}
+           AND p.del_flag = '0'
+           AND p.MIX_AREA = #{mixArea}
+           AND p.machine_Code IS NOT NULL
+           AND p.glue IS NOT NULL
+         <if test="glueCode != null and glueCode != ''">
+           AND p.glue = #{glueCode}
+         </if>
+         ORDER BY day_flag
+    </select>
+    
+    <!-- 删除指定排产日的排程记录 -->
+    <delete id="deleteScheduleResultList">
+    	DELETE FROM t_glue_schedule_result t WHERE t.schedule_date = #{scheduleDate} AND t.mix_area = #{mixArea}
+    </delete>
+    
+    <!-- 排程列 -->
+    <sql id="scheduleResultColumn">
+    	   ID,
+		   DECOMPOSE_BATCH_NO,
+		   BATCH_NO,
+		   ORDER_NO,
+		   SCHEDULE_DATE,
+		   MIX_AREA,
+		   GLUE,
+		   SAP_CODE,
+		   MACHINE_CODE,
+		   RECIPE_VERSION_ID,
+		   RECIPE_TYPE,
+		   RECIPE_STAGE,
+		   RECIPE_MATERIAL_CODE,
+		   IS_FINISHING,
+		   STOCK_QTY,
+		   SAFE_STOCK_QTY,
+		   FORMULA_WEIGHT,
+		   FORMULA_TIME,
+		   TOTAL_PLAN_QTY,
+		   TOTAL_SURPLUS,
+		   MID_PLAN_QTY,
+		   MID_PRODUCE_ORDER,
+		   MID_EXPECT_START_TIME,
+		   MID_EXPECT_FINISH_TIME,
+		   MID_REMARK,
+		   NIGHT_PLAN_QTY,
+		   NIGHT_PRODUCE_ORDER,
+		   NIGHT_EXPECT_START_TIME,
+		   NIGHT_EXPECT_FINISH_TIME,
+		   NIGHT_REMARK,
+		   DAY_PLAN_QTY,
+		   DAY_PRODUCE_ORDER,
+		   DAY_EXPECT_START_TIME,
+		   DAY_EXPECT_FINISH_TIME,
+		   DAY_REMARK,
+		   RELEASE_STATUS,
+		   PUBLISH_SUCCESS_COUNT,
+		   NEWEST_PUBLISH_TIME,
+		   DATA_SOURCE,
+		   REMARK,
+		   DEL_FLAG,
+		   CREATE_BY,
+		   CREATE_TIME,
+		   UPDATE_BY,
+		   UPDATE_TIME
+    </sql>
+    
+    <!-- 将排指定排产日的排程记录拷贝至日志表中 -->
+    <insert id="copyScheduleResultListToLog">
+	    INSERT INTO T_GLUE_SCHEDULE_RESULT_LOG
+		  (
+		  <include refid="scheduleResultColumn"/>
+		  ,MID_PUBLISH_STATUS
+		  ,NIGHT_PUBLISH_STATUS
+		  ,DAY_PUBLISH_STATUS
+		  )
+		  SELECT 
+		  <include refid="scheduleResultColumn"/>
+		  ,MID_PUBLISH_STATUS
+		  ,NIGHT_PUBLISH_STATUS
+		  ,DAY_PUBLISH_STATUS
+		    FROM T_GLUE_SCHEDULE_RESULT
+		   WHERE SCHEDULE_DATE = #{scheduleDate}
+		     AND MIX_AREA = #{mixArea}
+    </insert>
+    
+    <!-- 将排指定排产日的排程记录拷贝至初始排程日志表中 -->
+    <insert id="copyScheduleResultListToInitLog">
+	    INSERT INTO T_GLUE_SCHEDULE_INIT_LOG
+		  (
+		  <include refid="scheduleResultColumn"/>
+		  ,MID_PUBLISH_STATUS
+		  ,NIGHT_PUBLISH_STATUS
+		  ,DAY_PUBLISH_STATUS
+		  )
+		  SELECT 
+		  <include refid="scheduleResultColumn"/>
+		  ,MID_PUBLISH_STATUS
+		  ,NIGHT_PUBLISH_STATUS
+		  ,DAY_PUBLISH_STATUS
+		    FROM T_GLUE_SCHEDULE_RESULT
+		   WHERE SCHEDULE_DATE = #{scheduleDate}
+		     AND MIX_AREA = #{mixArea}
+    </insert>
+    
+    <!-- 删除指定排产日的初始排程日志记录 -->
+    <delete id="deleteScheduleInitLogList">
+    	DELETE FROM T_GLUE_SCHEDULE_INIT_LOG t WHERE t.schedule_date = #{scheduleDate} AND t.mix_area = #{mixArea}
+    </delete>
+    
+    <!-- 批量保存排程结果 -->
+    <update id="batchInsertScheduleResult">
+    	INSERT INTO t_glue_schedule_result
+  		  (
+  		  <include refid="scheduleResultColumn"/>
+  		  )
+        SELECT NULL id, t.*
+          FROM (
+        <foreach collection="list" item="scheduleResult" separator=" union all ">
+        	SELECT #{scheduleResult.decomposeBatchNo,jdbcType= VARCHAR} DECOMPOSE_BATCH_NO,
+			       #{scheduleResult.batchNo,jdbcType= VARCHAR} BATCH_NO,
+			       #{scheduleResult.orderNo,jdbcType= VARCHAR} ORDER_NO,
+			       #{scheduleResult.scheduleDate,jdbcType=TIMESTAMP} SCHEDULE_DATE,
+			       #{scheduleResult.mixArea,jdbcType= VARCHAR} MIX_AREA,
+			       #{scheduleResult.glue,jdbcType= VARCHAR} GLUE,
+			       #{scheduleResult.sapCode,jdbcType= VARCHAR} SAP_CODE,
+			       #{scheduleResult.machineCode,jdbcType= VARCHAR} MACHINE_CODE,
+			       #{scheduleResult.recipeVersionId,jdbcType= VARCHAR} RECIPE_VERSION_ID,
+			       #{scheduleResult.recipeType,jdbcType= VARCHAR} RECIPE_TYPE,
+			       #{scheduleResult.recipeStage,jdbcType= VARCHAR} RECIPE_STAGE,
+			       #{scheduleResult.recipeMaterialCode,jdbcType= VARCHAR} RECIPE_MATERIAL_CODE,
+			       #{scheduleResult.isFinishing,jdbcType= VARCHAR} IS_FINISHING,
+			       #{scheduleResult.stockQty,jdbcType= DOUBLE} STOCK_QTY,
+			       #{scheduleResult.safeStockQty,jdbcType= DOUBLE} SAFE_STOCK_QTY,
+			       #{scheduleResult.formulaWeight,jdbcType= DOUBLE} FORMULA_WEIGHT,
+			       #{scheduleResult.formulaTime,jdbcType= DOUBLE} FORMULA_TIME,
+			       #{scheduleResult.totalPlanQty,jdbcType= DOUBLE} TOTAL_PLAN_QTY,
+			       #{scheduleResult.totalSurplus,jdbcType= DOUBLE} TOTAL_SURPLUS,
+			       #{scheduleResult.midPlanQty,jdbcType= DOUBLE} MID_PLAN_QTY,
+			       #{scheduleResult.midProduceOrder,jdbcType= INTEGER} MID_PRODUCE_ORDER,
+			       #{scheduleResult.midExpectStartTime,jdbcType=TIMESTAMP} MID_EXPECT_START_TIME,
+			       #{scheduleResult.midExpectFinishTime,jdbcType=TIMESTAMP} MID_EXPECT_FINISH_TIME,
+			       #{scheduleResult.midRemark,jdbcType= VARCHAR} MID_REMARK,
+			       #{scheduleResult.nightPlanQty,jdbcType= DOUBLE} NIGHT_PLAN_QTY,
+			       #{scheduleResult.nightProduceOrder,jdbcType= INTEGER} NIGHT_PRODUCE_ORDER,
+			       #{scheduleResult.nightExpectStartTime,jdbcType=TIMESTAMP} NIGHT_EXPECT_START_TIME,
+			       #{scheduleResult.nightExpectFinishTime,jdbcType=TIMESTAMP} NIGHT_EXPECT_FINISH_TIME,
+			       #{scheduleResult.nightRemark,jdbcType= VARCHAR} NIGHT_REMARK,
+			       #{scheduleResult.dayPlanQty,jdbcType= DOUBLE} DAY_PLAN_QTY,
+			       #{scheduleResult.dayProduceOrder,jdbcType= INTEGER} DAY_PRODUCE_ORDER,
+			       #{scheduleResult.dayExpectStartTime,jdbcType=TIMESTAMP} DAY_EXPECT_START_TIME,
+			       #{scheduleResult.dayExpectFinishTime,jdbcType=TIMESTAMP} DAY_EXPECT_FINISH_TIME,
+			       #{scheduleResult.dayRemark,jdbcType= VARCHAR} DAY_REMARK,
+			       #{scheduleResult.releaseStatus,jdbcType= VARCHAR} RELEASE_STATUS,
+			       #{scheduleResult.publishSuccessCount,jdbcType= INTEGER} PUBLISH_SUCCESS_COUNT,
+			       #{scheduleResult.newestPublishTime,jdbcType=TIMESTAMP} NEWEST_PUBLISH_TIME,
+			       #{scheduleResult.dataSource,jdbcType= VARCHAR} DATA_SOURCE,
+			       #{scheduleResult.remark,jdbcType= VARCHAR} REMARK,
+			       #{scheduleResult.delFlag,jdbcType= VARCHAR} DEL_FLAG,
+			       #{scheduleResult.createBy,jdbcType= VARCHAR} CREATE_BY,
+			       #{scheduleResult.createTime,jdbcType=TIMESTAMP} CREATE_TIME,
+			       #{scheduleResult.updateBy,jdbcType= VARCHAR} UPDATE_BY,
+			       #{scheduleResult.updateTime,jdbcType=TIMESTAMP} UPDATE_TIME
+        	  FROM dual
+        </foreach>
+        ) t
+    </update>
+    
+    <!-- 查询终炼母炼日计划列表 -->
+    <select id="selectScheduleResult" resultType="com.zlt.mix.schedule.engine.vo.GlueScheduleResultVo">
+    	<if test="params.idList != null and params.idList.size() > 0 or params.orderNoList != null and params.orderNoList.size() > 0">
+    	WITH tab AS (
+    		SELECT * FROM dual
+    	)
+    		<if test="params.idList != null and params.idList.size() > 0">
+    	, id_tab AS (
+        		<foreach collection="params.idList" item="id" separator=" union all ">
+    		SELECT #{id} id FROM dual
+    			</foreach>
+    	)
+    		</if>
+    		<if test="params.orderNoList != null and params.orderNoList.size() > 0">
+    	, orderNo_tab AS (
+        		<foreach collection="params.orderNoList" item="orderNo" separator=" union all ">
+    		SELECT #{orderNo} orderNo FROM dual
+    			</foreach>
+    	)
+    		</if>
+    	</if>
+    	SELECT 
+		<include refid="scheduleResultColumn"/>
+		       ,'FALSE' IS_ADD_NEW
+    	  FROM T_GLUE_SCHEDULE_RESULT
+    	 WHERE del_flag = '0'
+    	<if test="params.idList != null and params.idList.size() > 0">
+    	   AND id in (
+    	          SELECT id FROM id_tab
+    	       )
+    	</if>
+    	<if test="params.orderNoList != null and params.orderNoList.size() > 0">
+    	   AND ORDER_NO in (
+    	          SELECT orderNo FROM orderNo_tab
+    	       )
+    	</if>
+    	<if test="params.scheduleDate != null">
+    	   AND SCHEDULE_DATE = #{params.scheduleDate}
+    	</if>
+    	<if test="params.mixArea != null and params.mixArea != ''">
+    	   AND MIX_AREA = #{params.mixArea}
+    	</if>
+    	<if test="params.machineCode != null and params.machineCode != ''">
+    	   AND MACHINE_CODE = #{params.machineCode}
+    	</if>
+    	<if test="params.releaseStatus != null and params.releaseStatus != ''">
+    	   AND RELEASE_STATUS = #{params.releaseStatus}
+    	</if>
+    	<if test="params.publishSuccessCount != null and params.publishSuccessCount > 0">
+    	   AND PUBLISH_SUCCESS_COUNT >= #{params.publishSuccessCount}
+    	</if>
+    	<if test="params.glue != null and params.glue != ''">
+    	   AND GLUE = #{params.glue}
+    	</if>
+    	
+    </select>
+    
+	<!-- 合并排程数据 -->
+    <update id="mergeScheduleResult">
+        insert INTO T_GLUE_SCHEDULE_RESULT
+		(
+		id,
+		DECOMPOSE_BATCH_NO,
+		BATCH_NO,
+		ORDER_NO,
+		SCHEDULE_DATE,
+		MIX_AREA,
+		GLUE,
+		SAP_CODE,
+		MACHINE_CODE,
+		RECIPE_VERSION_ID,
+		RECIPE_TYPE,
+		RECIPE_STAGE,
+		RECIPE_MATERIAL_CODE,
+		IS_FINISHING,
+		STOCK_QTY,
+		SAFE_STOCK_QTY,
+		FORMULA_WEIGHT,
+		FORMULA_TIME,
+		TOTAL_PLAN_QTY,
+		TOTAL_SURPLUS,
+		MID_PLAN_QTY,
+		MID_PRODUCE_ORDER,
+		MID_EXPECT_START_TIME,
+		MID_EXPECT_FINISH_TIME,
+		MID_REMARK,
+		NIGHT_PLAN_QTY,
+		NIGHT_PRODUCE_ORDER,
+		NIGHT_EXPECT_START_TIME,
+		NIGHT_EXPECT_FINISH_TIME,
+		NIGHT_REMARK,
+		DAY_PLAN_QTY,
+		DAY_PRODUCE_ORDER,
+		DAY_EXPECT_START_TIME,
+		DAY_EXPECT_FINISH_TIME,
+		DAY_REMARK,
+		RELEASE_STATUS,
+		PUBLISH_SUCCESS_COUNT,
+		NEWEST_PUBLISH_TIME,
+		DATA_SOURCE,
+		REMARK,
+		DEL_FLAG,
+		CREATE_BY,
+		CREATE_TIME,
+		UPDATE_BY,
+		UPDATE_TIME)
+		values
+        <foreach collection="list" item="scheduleResult" separator=" , ">    (
+        	SELECT
+            #{scheduleResult.id,jdbcType= NUMERIC} ,
+            #{scheduleResult.decomposeBatchNo,jdbcType= VARCHAR} ,
+            #{scheduleResult.batchNo,jdbcType= VARCHAR} ,
+            #{scheduleResult.orderNo,jdbcType= VARCHAR} ,
+            #{scheduleResult.scheduleDate,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.mixArea,jdbcType= VARCHAR} ,
+            #{scheduleResult.glue,jdbcType= VARCHAR} ,
+            #{scheduleResult.sapCode,jdbcType= VARCHAR} ,
+            #{scheduleResult.machineCode,jdbcType= VARCHAR} ,
+            #{scheduleResult.recipeVersionId,jdbcType= VARCHAR} ,
+            #{scheduleResult.recipeType,jdbcType= VARCHAR} ,
+            #{scheduleResult.recipeStage,jdbcType= VARCHAR} ,
+            #{scheduleResult.recipeMaterialCode,jdbcType= VARCHAR} ,
+            #{scheduleResult.isFinishing,jdbcType= VARCHAR} ,
+            #{scheduleResult.stockQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.safeStockQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.formulaWeight,jdbcType= DOUBLE} ,
+            #{scheduleResult.formulaTime,jdbcType= DOUBLE} ,
+            #{scheduleResult.totalPlanQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.totalSurplus,jdbcType= DOUBLE} ,
+            #{scheduleResult.midPlanQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.midProduceOrder,jdbcType= INTEGER} ,
+            #{scheduleResult.midExpectStartTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.midExpectFinishTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.midRemark,jdbcType= VARCHAR} ,
+            #{scheduleResult.nightPlanQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.nightProduceOrder,jdbcType= INTEGER} ,
+            #{scheduleResult.nightExpectStartTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.nightExpectFinishTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.nightRemark,jdbcType= VARCHAR} ,
+            #{scheduleResult.dayPlanQty,jdbcType= DOUBLE} ,
+            #{scheduleResult.dayProduceOrder,jdbcType= INTEGER} ,
+            #{scheduleResult.dayExpectStartTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.dayExpectFinishTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.dayRemark,jdbcType= VARCHAR} ,
+            #{scheduleResult.releaseStatus,jdbcType= VARCHAR} ,
+            #{scheduleResult.publishSuccessCount,jdbcType= INTEGER} ,
+            #{scheduleResult.newestPublishTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.dataSource,jdbcType= VARCHAR} ,
+            #{scheduleResult.remark,jdbcType= VARCHAR} ,
+            #{scheduleResult.delFlag,jdbcType= VARCHAR} ,
+            #{scheduleResult.createBy,jdbcType= VARCHAR} ,
+            #{scheduleResult.createTime,jdbcType=TIMESTAMP} ,
+            #{scheduleResult.updateBy,jdbcType= VARCHAR} ,
+            #{scheduleResult.updateTime,jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+		ON duplicate key
+		UPDATE
+		DECOMPOSE_BATCH_NO = values(DECOMPOSE_BATCH_NO),
+		BATCH_NO = values(BATCH_NO),
+		ORDER_NO = values(ORDER_NO),
+		SCHEDULE_DATE = values(SCHEDULE_DATE),
+		MIX_AREA = values(MIX_AREA),
+		GLUE = values(GLUE),
+		SAP_CODE = values(SAP_CODE),
+		MACHINE_CODE = values(MACHINE_CODE),
+		RECIPE_VERSION_ID = values(RECIPE_VERSION_ID),
+		RECIPE_TYPE = values(RECIPE_TYPE),
+		RECIPE_STAGE = values(RECIPE_STAGE),
+		RECIPE_MATERIAL_CODE = values(RECIPE_MATERIAL_CODE),
+		IS_FINISHING = values(IS_FINISHING),
+		STOCK_QTY = values(STOCK_QTY),
+		SAFE_STOCK_QTY = values(SAFE_STOCK_QTY),
+		FORMULA_WEIGHT = values(FORMULA_WEIGHT),
+		FORMULA_TIME = values(FORMULA_TIME),
+		TOTAL_PLAN_QTY = values(TOTAL_PLAN_QTY),
+		TOTAL_SURPLUS = values(TOTAL_SURPLUS),
+		MID_PLAN_QTY = values(MID_PLAN_QTY),
+		MID_PRODUCE_ORDER = values(MID_PRODUCE_ORDER),
+		MID_EXPECT_START_TIME = values(MID_EXPECT_START_TIME),
+		MID_EXPECT_FINISH_TIME = values(MID_EXPECT_FINISH_TIME),
+		MID_REMARK = values(MID_REMARK),
+		NIGHT_PLAN_QTY = values(NIGHT_PLAN_QTY),
+		NIGHT_PRODUCE_ORDER = values(NIGHT_PRODUCE_ORDER),
+		NIGHT_EXPECT_START_TIME = values(NIGHT_EXPECT_START_TIME),
+		NIGHT_EXPECT_FINISH_TIME = values(NIGHT_EXPECT_FINISH_TIME),
+		NIGHT_REMARK = values(NIGHT_REMARK),
+		DAY_PLAN_QTY = values(DAY_PLAN_QTY),
+		DAY_PRODUCE_ORDER = values(DAY_PRODUCE_ORDER),
+		DAY_EXPECT_START_TIME = values(DAY_EXPECT_START_TIME),
+		DAY_EXPECT_FINISH_TIME = values(DAY_EXPECT_FINISH_TIME),
+		DAY_REMARK = values(DAY_REMARK),
+		RELEASE_STATUS = values(RELEASE_STATUS),
+		PUBLISH_SUCCESS_COUNT = values(PUBLISH_SUCCESS_COUNT),
+		NEWEST_PUBLISH_TIME = values(NEWEST_PUBLISH_TIME),
+		DATA_SOURCE = values(DATA_SOURCE),
+		REMARK = values(REMARK),
+		DEL_FLAG = values(DEL_FLAG),
+		CREATE_BY = values(CREATE_BY),
+		CREATE_TIME = values(CREATE_TIME),
+		UPDATE_BY = values(UPDATE_BY),
+		UPDATE_TIME = values(UPDATE_TIME)
+    </update>
+    
+    <update id="updateExpectTime">
+		with temp_data as(
+			SELECT ifnull(#{scheduleResult.id,jdbcType= NUMERIC}, -999) ID,
+				   #{scheduleResult.midExpectStartTime,jdbcType=TIMESTAMP} 	MID_EXPECT_START_TIME,
+				   #{scheduleResult.midExpectFinishTime,jdbcType=TIMESTAMP}	MID_EXPECT_FINISH_TIME,
+				   #{scheduleResult.nightExpectStartTime,jdbcType=TIMESTAMP}	NIGHT_EXPECT_START_TIME,
+				   #{scheduleResult.nightExpectFinishTime,jdbcType=TIMESTAMP}	NIGHT_EXPECT_FINISH_TIME,
+				   #{scheduleResult.dayExpectStartTime,jdbcType=TIMESTAMP}	DAY_EXPECT_START_TIME,
+				   #{scheduleResult.dayExpectFinishTime,jdbcType=TIMESTAMP}	DAY_EXPECT_FINISH_TIME,
+				   #{scheduleResult.updateBy,jdbcType= VARCHAR}	UPDATE_BY,
+				   #{scheduleResult.updateTime,jdbcType=TIMESTAMP}	UPDATE_TIME
+		)
+        update T_GLUE_SCHEDULE_RESULT a
+			join temp_data b on a.id = b.id
+            set a.MID_EXPECT_START_TIME = b.MID_EXPECT_START_TIME,
+				a.MID_EXPECT_FINISH_TIME = b.MID_EXPECT_FINISH_TIME,
+				a.NIGHT_EXPECT_START_TIME = b.NIGHT_EXPECT_START_TIME,
+				a.NIGHT_EXPECT_FINISH_TIME = b.NIGHT_EXPECT_FINISH_TIME,
+				a.DAY_EXPECT_START_TIME = b.DAY_EXPECT_START_TIME,
+				a.DAY_EXPECT_FINISH_TIME = b.DAY_EXPECT_FINISH_TIME,
+				a.UPDATE_BY = b.UPDATE_BY,
+				a.UPDATE_TIME = b.UPDATE_TIME
+		where a.id = b.id
+    </update>
+    
+    <!-- 通过ID条件查询终炼母炼日计划列表，查出同一天同一密炼区统一胶料的所有记录 -->
+    <select id="selectScheduleResultSameGlue" resultType="com.zlt.mix.schedule.engine.vo.GlueScheduleResultVo">
+    	WITH id_tab AS (
+        	<foreach collection="idList" item="id" separator=" union all ">
+    		SELECT #{id} id FROM dual
+    		</foreach>
+    	)
+    	SELECT 
+		<include refid="scheduleResultColumn"/>
+    	  FROM T_GLUE_SCHEDULE_RESULT r
+    	 WHERE del_flag = '0'
+    	   AND EXISTS (
+    	     SELECT 1
+    	       FROM T_GLUE_SCHEDULE_RESULT r2
+	    	  WHERE r2.id in (SELECT id FROM id_tab)
+	    	    AND r2.GLUE = r.GLUE
+	    	    AND r2.MIX_AREA = r.MIX_AREA
+	    	    AND r2.SCHEDULE_DATE = r.SCHEDULE_DATE
+    	   )
+    	   AND r.MACHINE_CODE IS NOT NULL
+    </select>
+    
+    <!-- 通过ID条件查询终炼母炼日计划列表，查出同一天同一密炼区的所有记录 -->
+    <select id="selectScheduleResultSameArea" resultType="com.zlt.mix.schedule.engine.vo.GlueScheduleResultVo">
+    	WITH id_tab AS (
+        	<foreach collection="idList" item="id" separator=" union all ">
+    		SELECT #{id} id FROM dual
+    		</foreach>
+    	)
+    	SELECT 
+		<include refid="scheduleResultColumn"/>
+    	  FROM T_GLUE_SCHEDULE_RESULT r
+    	 WHERE del_flag = '0'
+    	   AND EXISTS (
+    	     SELECT 1
+    	       FROM T_GLUE_SCHEDULE_RESULT r2
+	    	  WHERE r2.id in (SELECT id FROM id_tab)
+	    	    AND r2.MIX_AREA = r.MIX_AREA
+	    	    AND r2.SCHEDULE_DATE = r.SCHEDULE_DATE
+    	   )
+    </select>
+    
+    
+    <!-- 查询终炼母炼日完成情况 -->
+    <select id="selectGlueFinishList" resultType="com.zlt.mix.setting.api.domain.entity.GlueFinish">
+    	SELECT ID,
+		       ORDER_NO,
+		       SCHEDULE_DATE,
+		       MIX_AREA,
+		       GLUE,
+		       MACHINE_CODE,
+		       ifnull(MID_FINISH_QTY, 0) MID_FINISH_QTY,
+		       ifnull(NIGHT_FINISH_QTY, 0) NIGHT_FINISH_QTY,
+		       ifnull(DAY_FINISH_QTY, 0) DAY_FINISH_QTY,
+		       ifnull(MID_FINISH_QTY, 0) + ifnull(NIGHT_FINISH_QTY, 0) +
+		       ifnull(DAY_FINISH_QTY, 0) TOTAL_FINISH_QTY
+		  FROM T_GLUE_FINISH
+		 WHERE DEL_FLAG = '0'
+           AND schedule_date = #{scheduleDate}
+           AND mix_area = #{mixArea}
+    </select>
+    
+    <!-- 获取排产日的需求计划汇总 -->
+    <select id="selectGlueCollectPlanList" resultType="com.zlt.mix.schedule.api.domain.entity.GlueCollectPlan">
+    	SELECT p.glue,
+		       ifnull(sum(p.mid_plan_qty), 0) mid_plan_qty,
+		       ifnull(sum(p.night_plan_qty), 0) night_plan_qty,
+		       ifnull(sum(p.day_plan_qty), 0) day_plan_qty,
+		       ifnull(sum(p.total_plan_qty), 0) total_plan_qty
+		  FROM T_GLUE_COLLECT_PLAN p
+		 WHERE p.mix_area = #{mixArea}
+		   AND p.plan_date = #{scheduleDate}
+		   AND p.del_flag = '0'
+		 GROUP BY glue
+    </select>
+
+	<select id="selectNegativeStockDecompose"
+			resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+		select glue, sum(STOCK_QTY) STOCK_QTY
+		from t_glue_decompose_plan
+		where DEL_FLAG = '0'
+		  and STOCK_QTY &lt; 0
+		  and mix_area = #{mixArea}
+		  AND plan_date = #{scheduleDate}
+		group by GLUE
+	</select>
+
+	<!-- 删除补量记录 -->
+    <update id="deleteGlueScheduleSupplement">
+    	update T_GLUE_SCHEDULE_SUPPLEMENT set del_flag = '1', update_time = now()
+    	 WHERE schedule_date = #{scheduleDate}
+    	   AND mix_area = #{mixArea}
+    	   AND del_flag = '0'
+    </update>
+</mapper>

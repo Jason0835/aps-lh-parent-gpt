@@ -39,12 +39,12 @@
         select
         <include refid="Base_Column_List" />
         from T_CX_EMBRYO_MONTH_PLAN_SURPLUS
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_CX_EMBRYO_MONTH_PLAN_SURPLUS
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TCxEmbryoMonthPlanSurplus" useGeneratedKeys="true">
         insert into T_CX_EMBRYO_MONTH_PLAN_SURPLUS
@@ -149,11 +149,11 @@
                     REMARK = #{remark,jdbcType=VARCHAR},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.TCxEmbryoMonthPlanSurplus">
         update T_CX_EMBRYO_MONTH_PLAN_SURPLUS
-        set 
+        set
             MONTH_PLAN_APS_VERSION =  #{monthPlanApsVersion,jdbcType=VARCHAR},
             MONTH_PLAN_VERSION =  #{monthPlanVersion,jdbcType=VARCHAR},
             YEAR =  #{year,jdbcType=VARCHAR},
@@ -172,7 +172,7 @@
             UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
             DEL_FLAG =  #{delFlag,jdbcType=CHAR},
             REMARK =  #{remark,jdbcType=VARCHAR}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
 
     <delete id="deleteByIds" parameterType="java.lang.Long">
@@ -313,12 +313,14 @@
         a.embryo_bad_qty = NVL(b.embryo_bad_qty, 0),
         a.month_remain_qty = NVL(b.month_remain_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.year, a.month, a.material_code, a.month_plan_qty, a.month_plan_modify_qty, a.last_month_stock, a.embryo_bad_qty, a.month_finish_qty, a.month_remain_qty, a.data_source, a.create_by, a.create_time, a.remark,
         a.del_flag) values
-        (CX_EMBRYO_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.year, b.month, b.material_code, b.month_plan_qty, b.month_plan_modify_qty, b.last_month_stock, b.embryo_bad_qty, b.month_finish_qty, b.month_remain_qty, 0, b.create_by, sysdate, b.remark, '0')
+        (CX_EMBRYO_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.year, b.month,
+        b.material_code, b.month_plan_qty, b.month_plan_modify_qty, b.last_month_stock, b.embryo_bad_qty,
+        b.month_finish_qty, b.month_remain_qty, 0, b.create_by, now(), b.remark, '0')
     </update>
     <select id="selectAllByMaterialCodeInAndMonthPlanApsVersionAndDelFlag" resultMap="BaseResultMap">
         WITH temp_table AS (

@@ -1,13 +1,17 @@
 package com.zlt.aps.tc.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.ObjectUtils;
 
+import java.math.RoundingMode;
 import java.util.Date;
 import java.util.List;
 
@@ -319,4 +323,174 @@ public class TcScheduleResult extends ApsBaseEntity {
     private Date newestPublishTime;
 
     private transient List<Long> ids2;
+
+    @ApiModelProperty(value = "机台名称")
+    @TableField(exist = false)
+    private String machineName;
+
+    /**
+     * 昨日早班计划量
+     */
+    @ApiModelProperty(value = "昨日早班计划量")
+    @TableField(value = "LAST_MID_PLAN_QTY")
+    private Double lastMidPlanQty = 0D;
+
+    /**
+     * 卷曲长度
+     */
+    @ApiModelProperty(value = "卷曲长度")
+    @TableField(exist = false)
+    private Double curlLength;
+
+    /**
+     * 理论交班库存=昨日早班计划+库存+夜班计划-(成型昨日早班消耗量+成型夜班消耗量)
+     */
+    @ApiModelProperty(value = "理论交班库存")
+    @TableField(exist = false)
+    private Double theoreticClassStockQty = 0D;
+
+    /**
+     * 理论交班库存=成型消耗量
+     */
+    @ApiModelProperty(value = "成型消耗量")
+    @TableField(exist = false)
+    private Double cxConsumeQty = 0D;
+
+    /**
+     * 库存数量(卷)
+     */
+    @ApiModelProperty(value = "库存数量(卷)")
+    @TableField(exist = false)
+    private Double stockQtyRollNum = 0D;
+
+    @ApiModelProperty(value = "月计划剩余量(卷)", position = 51)
+    @TableField(exist = false)
+    private Double monthPlanOsRollNum = 0D;
+
+    /**
+     * 当日日计划量合计(卷)
+     */
+    @ApiModelProperty(value = "当日日计划量合计(卷)")
+    @TableField(exist = false)
+    private Double dailyTotalQtyRollNum = 0D;
+
+    /**
+     * 夜班计划量(卷)
+     */
+    @ApiModelProperty(value = "夜班计划量(卷)")
+    @TableField(exist = false)
+    private Double dayPlanQtyRollNum = 0D;
+
+    /**
+     * 早班计划量(卷)
+     */
+    @ApiModelProperty(value = "早班计划量(卷)")
+    @TableField(exist = false)
+    private Double nightPlanQtyRollNum = 0D;
+
+    /**
+     * 预计划量(卷)
+     */
+    @ApiModelProperty(value = "预计划量(卷)")
+    @TableField(exist = false)
+    private Double prePlanQtyRollNum = 0D;
+
+    /**
+     * 昨日早班计划用量(卷)
+     */
+    @ApiModelProperty(value = "昨日早班计划用量(卷)")
+    @TableField(exist = false)
+    private Double cxClass1PlanRollNum = 0D;
+
+    /**
+     * 夜班计划用量(卷)
+     */
+    @ApiModelProperty(value = "夜班计划用量(卷)")
+    @TableField(exist = false)
+    private Double cxClass2PlanRollNum = 0D;
+
+    /**
+     * 早班计划用量(卷)
+     */
+    @ApiModelProperty(value = "早班计划用量(卷)")
+    @TableField(exist = false)
+    private Double cxClass3PlanRollNum = 0D;
+
+    /**
+     * 次日夜班计划用量(卷)
+     */
+    @ApiModelProperty(value = "次日夜班计划用量(卷)")
+    @TableField(exist = false)
+    private Double cxClass4PlanRollNum = 0D;
+
+    /**
+     * 次日早班计划用量(卷)
+     */
+    @ApiModelProperty(value = "次日早班计划用量(卷)")
+    @TableField(exist = false)
+    private Double cxClass5PlanRollNum = 0D;
+
+    /**
+     * 昨日早班计划量(卷)
+     */
+    @ApiModelProperty(value = "昨日早班计划量(卷)")
+    @TableField(exist = false)
+    private Double lastMidPlanQtyRollNum = 0D;
+
+    /**
+     * 理论交接班库存(卷)
+     */
+    @ApiModelProperty(value = "理论交接班库存(卷)")
+    @TableField(exist = false)
+    private Double theoreticClassStockQtyRollNum = 0D;
+
+    /**
+     * 中班(12点-24点)完成量(卷)
+     */
+    @ApiModelProperty(value = "中班(12点-24点)完成量(卷)", position = 34)
+    @TableField(exist = false)
+    private Double dayFinishQtyRollNum = 0D;
+
+    /**
+     * 夜班(0点-12点)完成量(卷)
+     */
+    @ApiModelProperty(value = "夜班(0点-12点)完成量(卷)", position = 40)
+    @TableField(exist = false)
+    private Double nightFinishQtyRollNum = 0D;
+
+    /**
+     * 理论昨日早班计划量
+     */
+    public void calculateTheoreticClassLastDayPlanQty() {
+        Double lastMidPlanQty = ObjectUtils.defaultIfNull(this.lastMidPlanQty, 0D);
+        Double stockQty = ObjectUtils.defaultIfNull(this.stockQty, 0D);
+        Double dayPlanQty = ObjectUtils.defaultIfNull(this.dayPlanQty, 0D);
+        Double cxConsumeQty = ObjectUtils.defaultIfNull(this.cxConsumeQty, 0D);
+        this.theoreticClassStockQty = lastMidPlanQty + stockQty + dayPlanQty - cxConsumeQty;
+    }
+
+    /**
+     * 计算计划量对应卷数
+     */
+    public void calculatePlanQty() {
+        Double curlLengthValue = this.curlLength;
+        if (curlLengthValue == null || curlLengthValue <= 0) {
+            return;
+        }
+        this.stockQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.stockQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.monthPlanOsRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.monthPlanOs, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.dailyTotalQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dailyTotalQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.dayPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dayPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.nightPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.nightPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.prePlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.prePlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.dayFinishQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dayFinishQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.nightFinishQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.nightFinishQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.cxClass1PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass1Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.cxClass2PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass2Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.cxClass3PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass3Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.cxClass4PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass4Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.cxClass5PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass5Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.lastMidPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.lastMidPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        this.theoreticClassStockQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.theoreticClassStockQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
 }

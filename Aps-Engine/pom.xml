@@ -5,14 +5,15 @@
     <parent>
         <artifactId>ruoyi</artifactId>
         <groupId>com.ruoyi</groupId>
-        <version>2.2.2-SNAPSHOT</version>
+        <version>3.5.2-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.zlt.aps</groupId>
     <artifactId>aps-engine</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -22,13 +23,11 @@
         <module>aps-engine-cx-core</module>
         <module>aps-engine-gdyy-core</module>
         <module>aps-engine-gsq-core</module>
-        <module>aps-engine-lh-core</module>
         <module>aps-engine-nc-core</module>
         <module>aps-engine-tc-core</module>
         <module>aps-engine-tq-core</module>
         <module>aps-engine-xwyy-core</module>
         <module>aps-engine-tm</module>
-        <module>aps-engine-lh</module>
         <module>aps-engine-cx</module>
         <module>aps-engine-tc</module>
         <module>aps-engine-nc</module>
@@ -38,5 +37,8 @@
         <module>aps-engine-xwyy</module>
         <module>aps-engine-tq</module>
         <module>aps-engine-gsq</module>
+        <module>mix-engine-schedule</module>
+        <module>mix-engine-setting</module>
+        <module>mix-plat-engine-schedule-core</module>
     </modules>
 </project>

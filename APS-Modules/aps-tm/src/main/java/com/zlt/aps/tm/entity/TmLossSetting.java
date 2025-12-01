@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_TM_LOSS_SETTING")
 @ApiModel(value = "TmLossSetting对象", description = "胎面损耗率设定表")
-@KeySequence(value = "SEQ_LOSS_SETTING", clazz = Long.class)
+//@KeySequence(value = "SEQ_LOSS_SETTING",dbType = DbType.ORACLE)
 public class TmLossSetting extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_LOSS_SETTING")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "胎面代码")

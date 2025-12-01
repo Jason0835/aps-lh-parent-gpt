@@ -24,20 +24,20 @@ public interface INcDispatcherLogService {
      * 查询调度员排程操作日志列表
      */
     @ApiOperation("查询调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/list")
+    @PostMapping("/nc/dispatcherLog/list")
     TableDataInfo list(@RequestBody NcDispatcherLog ncDispatcherLog);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/dispatcherLog/{id}")
+    @GetMapping(value = "/nc/dispatcherLog/{id}")
     NcDispatcherLog getInfo(@PathVariable("id") Long id);
 
     /**
      * 导出调度员排程操作日志列表
      */
     @ApiOperation("导出调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/export")
+    @PostMapping("/nc/dispatcherLog/export")
     public byte[] export(@RequestBody NcDispatcherLog dispatcherLog);
 }

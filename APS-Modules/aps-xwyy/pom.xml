@@ -6,12 +6,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-modules</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.xwyy</groupId>
     <artifactId>aps-xwyy</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-xwyy</name>
     <description>纤维压延工序模块</description>
 
@@ -50,11 +50,23 @@
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <!-- 钢带压延 -->
+        <dependency>
+            <groupId>com.zlt.aps.gdyy</groupId>
+            <artifactId>aps-gdyy</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

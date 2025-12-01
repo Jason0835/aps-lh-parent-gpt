@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('跨区接收')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: datetimepicker-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <div class="tabs-container">
+        <ul class="nav nav-tabs">
+            <li class="active"><a data-toggle="tab" href="#tab-1" aria-expanded="true">
+                [[#{ui.data.tabTitle.receiveCrossRegional}]]</a>
+            </li>
+            <li class=""><a data-toggle="tab" href="#tab-2" onclick="initTab2()" aria-expanded="false">[[#{ui.data.tabTitle.queryReceiveCrossRegional}]]</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div id="tab-1" class="tab-pane active">
+                <div class="panel-body">
+                    <div class="col-sm-12">
+                        <div class="col-sm-1" style="width: 190px;height: 35px;">
+                            <form id="form1">
+                                <div class="select-list">
+                                    <ul>
+                                        <li>
+                                            [[#{schedule.glueScheduleResult.receiveCrossRegional.scheduleDate}]]：
+                                            <input type="text" class="time-input" id="scheduleDateTab1"
+                                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"
+                                                   th:value="${initDate}" style="width: 80px"/>
+                                        </li>
+                                        <li>
+                                            <input id="entrustedMixAreaTab1" type="hidden" name="entrustedMixArea" th:value="${entrustedMixArea}"/>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-sm-1" style="padding-top: 5px;">
+                            <button type="button" class="btn btn-white btn-sm" onclick="receiveGlueSpan()"><i
+                                    class="fa fa-check-square-o"> [[#{ui.data.btn.receiveGlueSpan}]]</i></button>
+                        </div>
+                        <form class="form-horizontal m" id="form-glueScheduleResult-receiveCrossRegional">
+                            <div class="col-sm-8 select-table table-bordered">
+                                <table id="bootstrap-table"></table>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div id="tab-2" class="tab-pane">
+                <div class="panel-body">
+                    <div class="col-sm-12">
+                        <div class="col-sm-12 search-collapse">
+                            <form id="formId1">
+                                <div class="select-list">
+                                    <ul>
+                                        <li class="select-time">
+                                            <label>[[#{schedule.glueScheduleResult.receiveCrossRegional.scheduleDate}]]：</label>
+                                            <input type="text" class="time-input" id="scheduleDateTab2"
+                                                   th:placeholder="yyyy-mm-dd" name="scheduleDate"
+                                                   th:value="${initDate}"/>
+                                        </li>
+                                        <li>
+                                            [[#{schedule.sendCrossRegional.entrustMixArea}]]：
+                                            <select id="entrustMixAreaTab2" class="form-control" name="entrustMixArea"
+                                                    th:with="type=${@dict.getType('MIX_AREA')}">
+                                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                                        th:value="${dict.dictValue}"></option>
+                                            </select>
+                                        </li>
+                                        <li>
+                                            <label>[[#{schedule.sendCrossRegional.glue}]]：</label>
+                                            <div class="neat">
+                                                <input id="glue" type="text" name="glue" class="GlueNames"
+                                                       autocomplete="off"/>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search('formId1', 'bootstrap-table-tab2')"><i
+                                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset('formId1', 'bootstrap-table-tab2')"><i
+                                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-sm-12 select-table table-bordered">
+                            <table id="bootstrap-table-tab2"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: datetimepicker-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueScheduleResult";
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var mixAreaDatasPermission = [[${@setting.scheduleMixAreaPermission()}]];
+    var receiveStatusDatas = [[${@dict.getType('RECEIVE_STATUS')}]];
+    var recipeStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+    var receivePerson = [[${receivePerson}]];
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+        items: 6
+    });
+
+    layui.use('laydate', function () {
+        var laydate = layui.laydate;
+        laydate.render({
+            elem: '#scheduleDateTab1',
+            done: function(value, date, endDate){
+                // 更改排程日期后查询未接收跨区请求个数
+                $.table.search('form1', 'bootstrap-table');
+            }
+        });
+    });
+
+    $("#form-glueScheduleResult-receiveCrossRegional").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        var options1 = {
+            id: 'bootstrap-table',
+            uniqueId: 'id',
+            url: prefix + "/listGlueSpanReceive",
+            pagination: false,
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            formId: 'form1',
+            queryParams: queryParamsTable1,
+            rowStyle: function (row, index){
+                if (row.receiveStatus === "1") {
+                    return {css: { "background": "#c6e0b4"}};
+                }
+                return {};
+            },
+            columns: [
+                {
+                    checkbox: true,
+                    width: '2',
+                    widthUnit: '%',
+                },
+                {
+                    field: 'id',
+                    align: 'center',
+                    width: '3',
+                    widthUnit: '%',
+                    title: 'id',
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].id' value='%s'>", index, value);
+                        return sprintf + value;
+                    },
+                    visible: false
+                },
+                {
+                    field: 'sendPerson',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendPerson}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].sendPerson' value='%s'>", index, value);
+                        return sprintf + value;
+                    },
+                },
+                {
+                    field: 'entrustMixArea',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustMixArea}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].entrustMixArea' value='%s'>", index, value);
+                        return sprintf + $.table.selectDictLabel(mixAreaDatas, value);
+                    },
+                },
+                {
+                    field: 'entrustedMixArea',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustedMixArea}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].entrustedMixArea' value='%s'>", index, value);
+                        return sprintf + $.table.selectDictLabel(mixAreaDatasPermission, value);
+                    },
+                },
+                {
+                    field: 'glue',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.glue}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].glue' value='%s'>", index, value);
+                        return sprintf + value;
+                    },
+                },
+                {
+                    field: 'sendQty',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.sendQty}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].sendQty' value='%s'>", index, value);
+                        return sprintf + value;
+                    },
+                },
+                {
+                    field: 'receiveQty',
+                    align: 'center',
+                    width: '14',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.receiveQty}]],
+                    formatter: function (value, row, index) {
+                        if (row.receiveStatus === '1') {
+                            return $.common.sprintf("<div class='col-sm-12'><input style='min-width: 70px' id='receiveQty%s' type='text' class='form-control' name='glueSpanReceiveList[%s].receiveQty'" +
+                                " value='%s' digits='true' min='0' max='9999999' required readonly></div>", row.id, index, value);
+                        }
+                        if ($.common.isNotEmpty(value) || row.isChooseMachine) {
+                            return $.common.sprintf("<div class='col-sm-12'><input style='min-width: 70px' id='receiveQty%s' type='text' class='form-control' name='glueSpanReceiveList[%s].receiveQty'" +
+                                " value='%s' digits='true' min='0' max='9999999' required></div>", row.id, index, value);
+                        }
+                        return $.common.sprintf("<div class='col-sm-12'><input style='min-width: 70px' id='receiveQty%s' type='text' class='form-control' name='glueSpanReceiveList[%s].receiveQty'" +
+                            " value='%s' digits='true' min='0' max='9999999' required></div>", row.id, index, row.sendQty);
+                    },
+                },
+                {
+                    field: 'expectDemandTime',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.expectDemandTime}]],
+                    formatter: function (value, row, index) {
+                        var sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].expectDemandTime' value='%s'>", index, value);
+                        if ($.common.isEmpty(value)) {
+                            return sprintf + "-";
+                        }
+                        return sprintf + value;
+                    },
+                },
+                {
+                    field: 'machineName',
+                    align: 'center',
+                    width: '8',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.machineCode}]],
+                    formatter: function (value, row, index) {
+                        var defaultValue;
+                        if ($.common.isEmpty(value)) {
+                            defaultValue = '---';
+                        }else {
+                            defaultValue = value;
+                        }
+                        var actions = [];
+                        if (row.receiveStatus === '1') {
+                            actions.push(defaultValue);
+                        }else {
+                            actions.push('<a id="machineName' + row.id + '" href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\')">' + defaultValue + '</a> ');
+                        }
+                        actions.push($.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].machineName' value='%s'>", index, value));
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'recipeTypeName',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeTypeName}]],
+                    formatter: function (value, row, index) {
+                        var defaultValue;
+                        if ($.common.isEmpty(value)) {
+                            defaultValue = '---';
+                        }else {
+                            defaultValue = value;
+                        }
+                        var actions = [];
+                        if (row.receiveStatus === '1') {
+                            actions.push(defaultValue);
+                        }else {
+                            actions.push('<a id="recipeTypeName' + row.id + '" href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\')">' + defaultValue + '</a> ');
+                        }
+                        actions.push($.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].recipeTypeName' value='%s'>", index, value));
+                        actions.push($.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].recipeType' value='%s'>", index, row.recipeType));
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'recipeVersionId',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeVersionId}]],
+                    formatter: function (value, row, index) {
+                        var defaultValue;
+                        if ($.common.isEmpty(value)) {
+                            defaultValue = '---';
+                        }else {
+                            defaultValue = value;
+                        }
+                        var actions = [];
+                        if (row.receiveStatus === '1') {
+                            actions.push(defaultValue);
+                        }else {
+                            actions.push('<a id="recipeVersionId' + row.id + '" href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\')">' + defaultValue + '</a> ');
+                        }
+                        actions.push($.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].recipeVersionId' value='%s'>", index, value));
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'recipeStage',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeStage}]],
+                    formatter: function (value, row, index) {
+                        var dictLabel;
+                        if ($.common.isEmpty(value)) {
+                            dictLabel = '---';
+                        }else {
+                            dictLabel = getDictLabel(recipeStageData, value);
+                        }
+                        var actions = [];
+                        if (row.receiveStatus === '1') {
+                            actions.push(dictLabel);
+                        }else {
+                            actions.push('<a id="recipeStage' + row.id + '" href="javascript:void(0)" onclick="chooseMachine(\'' + row.id + '\')">' + dictLabel + '</a> ');
+                        }
+                        actions.push($.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].recipeStage' value='%s'>", index, value));
+                        return actions.join('');
+                    },
+                },
+                {
+                    field: 'receivePerson',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.receivePerson}]],
+                    formatter: function (value, row, index) {
+                        var sprintf;
+                        if ($.common.isNotEmpty(value)) {
+                            sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].receivePerson' value='%s'>", index, value);
+                            return sprintf + value;
+                        }
+                        sprintf = $.common.sprintf("<input type='hidden' name='glueSpanReceiveList[%s].receivePerson' value='%s'>", index, receivePerson);
+                        return sprintf + receivePerson;
+                    },
+                },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{ui.data.column.remark}]],
+                    formatter: function (value, row, index) {
+                        if (row.receiveStatus === '1') {
+                            return $.common.sprintf("<div class='col-sm-12'><input type='text' style='min-width: 100px' class='form-control' name='glueSpanReceiveList[%s].remark'" +
+                                " maxlength='300' value='%s' readonly></div>", index, value);
+                        }
+                        return $.common.sprintf("<div class='col-sm-12'><input type='text' style='min-width: 100px' class='form-control' name='glueSpanReceiveList[%s].remark'" +
+                            " maxlength='300' value='%s'></div>", index, value);
+                    },
+                },
+            ]
+        };
+        $.table.init(options1, false);
+    });
+
+    function initTab2() {
+        var options2 = {
+            id: 'bootstrap-table-tab2',
+            uniqueId: 'id',
+            formId: 'formId1',
+            url: prefix + "/listGlueSpanReceive",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            modalName: [[#{schedule.glueScheduleResult.receiveCrossRegional.modelName}]],
+            queryParams: queryParamsTable2,
+            onLoadSuccess: function () {
+                resetTab2View();
+            },
+            rowStyle: function (row, index){
+                if (row.receiveStatus === "1") {
+                    return {css: { "background": "#c6e0b4"}};
+                }
+                return {};
+            },
+            columns: [
+                {
+                    checkbox: true,
+                    width: '2',
+                    widthUnit: '%',
+                },
+                {
+                    field: 'id',
+                    align: 'center',
+                    width: '3',
+                    widthUnit: '%',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'sendPerson',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.sendPerson}]],
+                },
+                {
+                    field: 'entrustMixArea',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustMixArea}]],
+                },
+                {
+                    field: 'entrustedMixArea',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.entrustedMixArea}]],
+                },
+                {
+                    field: 'glue',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.glue}]],
+                },
+                {
+                    field: 'sendQty',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.sendQty}]],
+                },
+                {
+                    field: 'receiveQty',
+                    align: 'center',
+                    width: '14',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.receiveQty}]],
+                },
+                {
+                    field: 'expectDemandTime',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.expectDemandTime}]],
+                },
+                {
+                    field: 'machineName',
+                    align: 'center',
+                    width: '8',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.machineCode}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            value = '-';
+                        }
+                        return value;
+                    },
+                },
+                {
+                    field: 'recipeTypeName',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeTypeName}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            value = '-';
+                        }
+                        return value;
+                    },
+                },
+                {
+                    field: 'recipeVersionId',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeVersionId}]],
+                    formatter: function (value, row, index) {
+                        if ($.common.isEmpty(value)) {
+                            value = '-';
+                        }
+                        return value;
+                    },
+                },
+                {
+                    field: 'recipeStage',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.recipeStage}]],
+                    formatter: function (value, row, index) {
+                        var dictLabel;
+                        if ($.common.isEmpty(value)) {
+                            dictLabel = '-';
+                        }else {
+                            dictLabel = getDictLabel(recipeStageData, value);
+                        }
+                        return dictLabel;
+                    },
+                },
+                {
+                    field: 'receivePerson',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.receiveCrossRegional.receivePerson}]],
+                },
+                {
+                    field: 'finishQty',
+                    align: 'center',
+                    width: '5',
+                    widthUnit: '%',
+                    title: [[#{schedule.sendCrossRegional.finishQty}]],
+                },
+                {
+                    field: 'remark',
+                    align: 'center',
+                    width: '10',
+                    widthUnit: '%',
+                    title: [[#{ui.data.column.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 20);
+                    },
+                },
+            ]
+        };
+        $.table.init(options2);
+        setTimeout(function () {
+            resetTab2View();
+        }, 300);
+    }
+
+    function chooseMachine(id) {
+        table.set();
+        var row = $("#bootstrap-table").bootstrapTable('getRowByUniqueId', id);
+        var param = [];
+        param.push("id=" + encodeURIComponent(id));
+        if ($.common.isNotEmpty(row.machineCode)) {
+            param.push("machineCode=" + encodeURIComponent(row.machineCode));
+        }
+        if ($.common.isNotEmpty(row.machineName)) {
+            param.push("machineName=" + encodeURIComponent(row.machineName));
+        }
+        if ($.common.isNotEmpty(row.recipeTypeName)) {
+            param.push("recipeTypeName=" + encodeURIComponent(row.recipeTypeName));
+        }
+        if ($.common.isNotEmpty(row.recipeType)) {
+            param.push("recipeType=" + encodeURIComponent(row.recipeType));
+        }
+        if ($.common.isNotEmpty(row.recipeVersionId)) {
+            param.push("recipeVersionId=" + encodeURIComponent(row.recipeVersionId));
+        }
+        if ($.common.isNotEmpty(row.recipeStage)) {
+            param.push("recipeStage=" + encodeURIComponent(row.recipeStage));
+        }
+        var url = prefix + "/toChooseMachine?" + param.join("&");
+        $.modal.open([[#{schedule.glueScheduleResult.receiveCrossRegional.modelName}]], url, 800, 580);
+    }
+
+    // 接收跨区请求
+    function receiveGlueSpan() {
+        table.set();
+        var selectList = getSelectedData('bootstrap-table', true);
+        if (selectList.length === 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var validateFlag = true;
+        // 校验选中记录的单元格和机台
+        for (var i = 0; i < selectList.length; i++) {
+            validateFlag = validateFlag && $('#form-glueScheduleResult-receiveCrossRegional').validate().element($("#receiveQty" + selectList[i].id));
+            var validateMachineFlag = $.common.isNotEmpty(selectList[i].machineCode);
+            var validateRecipeTypeFlag = $.common.isNotEmpty(selectList[i].recipeType);
+            validateFlag = validateFlag && validateMachineFlag;
+            validateFlag = validateFlag && validateRecipeTypeFlag;
+            if (!validateMachineFlag) {
+                $.modal.alertWarning([[#{ui.data.message.receiveMachineAndRecipeTypeNull}]]);
+                return ;
+            }
+            if (!validateRecipeTypeFlag) {
+                $.modal.alertWarning([[#{ui.data.message.receiveMachineAndRecipeTypeNull}]]);
+                return ;
+            }
+            /*var validateReceiveFlag = Number(selectList[i].receiveQty) <= Number(selectList[i].sendQty);
+            validateFlag = validateFlag && validateReceiveFlag;
+            if (!validateReceiveFlag) {
+                $.modal.alertWarning([[#{ui.data.message.receiveMoreThanSend}]]);
+                return ;
+            }*/
+        }
+        if (validateFlag) {
+            var data = [];
+            var receiveIds = [];
+            for (var j = 0; j < selectList.length; j++) {
+                var keyList = Object.keys(selectList[j]);
+                var valueList = Object.values(selectList[j]);
+                for (var k = 0; k < keyList.length; k++) {
+                    data.push({name: "glueSpanReceiveList[" + j + "]." + keyList[k], value: valueList[k]})
+                }
+                receiveIds.push(selectList[j].id);
+            }
+            $.operate.postNotRefresh(prefix + "/receiveGlueSpanReceive", data, function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var tableData = getTableData('bootstrap-table');
+                    var filterData = tableData.filter(item => receiveIds.indexOf(item.id) !== -1);
+                    var loadParentData = [];
+                    for (var i = 0; i < filterData.length; i++) {
+                        // 发送标识修改为已发送
+                        filterData[i].row['receiveStatus'] = '1';
+                    }
+                    for (var j = 0; j < tableData.length; j++) {
+                        loadParentData.push(tableData[j].row);
+                    }
+                    $("#bootstrap-table").bootstrapTable('load', loadParentData);
+                }
+            });
+        }
+    }
+
+    // 获取表格选中的数据，包括文本框内填写的值
+    function getSelectedData(tableId) {
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = $('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = $("#" + currentId).bootstrapTable('getSelections');
+        var count = data.length;
+        var selectIds = data.map(item => item.id);
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = $('#' + currentId + ' tr[data-uniqueid="' + selectIds[dataIndex] + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = $(columns[i]).find('input');
+                var selectValue = $(columns[i]).find('select');
+                var textareaValue = $(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push(extendObj);
+        }
+        return params;
+    }
+
+    // 获取表格的数据，包括文本框内填写的值
+    function getTableData(tableId) {
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = $('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = $("#" + currentId).bootstrapTable('getData');
+        var count = data.length;
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = $('#' + currentId + ' tr[data-index="' + dataIndex + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = $(columns[i]).find('input');
+                var selectValue = $(columns[i]).find('select');
+                var textareaValue = $(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push({id: extendObj.id, row: extendObj});
+        }
+        return params;
+    }
+
+    // 跨区接收请求查询 表格1请求参数
+    function queryParamsTable1(params) {
+        var search = $.table.queryParams(params);
+        search.scheduleDate = $("#scheduleDateTab1").val();
+        search.entrustedMixArea = $("#entrustedMixAreaTab1").val();
+        return search;
+    }
+
+    // 跨区接收请求查询 表格2请求参数
+    function queryParamsTable2(params) {
+        var search = $.table.queryParams(params);
+        // 仅查询已接收跨区请求
+        search.receiveStatus = "1";
+        search.scheduleDate = $("#scheduleDateTab2").val();
+        search.entrustMixArea = $("#entrustMixAreaTab2 option:selected").val();
+        search.glue = $("#glue").val();
+        search.permissionMixAreaList = mixAreaDatasPermission.map(item => item.dictValue).join(',');
+        return search;
+    }
+
+    function getDictLabel(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        $.each(datas, function(index, dict) {
+            if (dict.dictValue == ('' + value)) {
+                actions.push(dict.dictLabel);
+                return false;
+            }
+        });
+        return actions.join('');
+    }
+
+    function resetTab2View() {
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $($(".fixed-table-container")[1]).offset().top;  //表格到顶部的像素
+        var bh = wh-(fixTop-35);//基础默认表格高度
+        //设置最低高度
+        if(bh<wh*0.65){
+            bh=wh*0.65
+        }
+        if (bh < 300) {
+            bh = 300
+        }
+        $('#bootstrap-table-tab2').bootstrapTable("resetView",{height:bh});
+    }
+</script>
+</body>
+</html>

@@ -41,6 +41,12 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 	 */
 	@Value("${syncdata.publish.lockTime:1000}")
 	private Integer publishLockTime;
+	
+    /**
+     * 检查开关
+     */
+    @Value("${syncdata.publish.checkSyncResult:0}")
+    private String checkSyncResult;
 
 	/**
 	 * 获取同步日志的反馈状态
@@ -50,6 +56,11 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 	 */
 	@Override
 	public SyncDataLogs getSyncDataResult(String dataVersion) {
+        if ("0".equals(checkSyncResult)) { // 是否检查接口返回状态，不检查则直接返回
+            SyncDataLogs logs = new SyncDataLogs();
+            logs.setStatus(ApsConstant.IS_RELEASE);
+            return logs;
+        }
 		// 扫描截止时间：30秒后
 		Date endTime = DateUtil.secondLater(feedbackTimeOut);
 		while (true) {

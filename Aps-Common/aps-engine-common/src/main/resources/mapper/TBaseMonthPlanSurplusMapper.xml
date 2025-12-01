@@ -64,11 +64,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_TM_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_TM_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -104,11 +106,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_TC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_TC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -144,11 +148,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_NC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_NC_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -184,11 +190,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_TQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_TQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -224,11 +232,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_GSQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_GSQ_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -264,11 +274,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_CD15_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_CD15_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -304,11 +316,13 @@
         a.MONTH_FINISH_QTY = NVL(b.MONTH_FINISH_QTY, 0),
         a.MONTH_REMAIN_QTY = NVL(b.MONTH_REMAIN_QTY, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_CD90_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, sysdate,
+        (T_CD90_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -352,11 +366,14 @@
         MONTH_FINISH_QTY2 = NVL(b.MONTH_FINISH_QTY2, 0),
         MONTH_REMAIN_QTY2 = NVL(b.MONTH_REMAIN_QTY2, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.MONTH_PLAN_QTY2, a.MONTH_PLAN_MODIFY_QTY2, a.MONTH_FINISH_QTY2, a.MONTH_REMAIN_QTY2, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_XWYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0), NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, sysdate,
+        (T_XWYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0),
+        NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -400,14 +417,17 @@
         MONTH_FINISH_QTY2 = NVL(b.MONTH_FINISH_QTY2, 0),
         MONTH_REMAIN_QTY2 = NVL(b.MONTH_REMAIN_QTY2, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.MONTH_PLAN_APS_VERSION, a.MONTH_PLAN_VERSION, a.YEAR, a.MONTH, a.MATERIAL_CODE, a.MONTH_PLAN_QTY, a.MONTH_PLAN_MODIFY_QTY, a.MONTH_FINISH_QTY, a.MONTH_REMAIN_QTY, a.MONTH_PLAN_QTY2, a.MONTH_PLAN_MODIFY_QTY2, a.MONTH_FINISH_QTY2, a.MONTH_REMAIN_QTY2, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (T_GDYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR,  b.MONTH, b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0), NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0), NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, sysdate,
+        (T_GDYY_MONTH_PLAN_SURPLUS_SEQ.NEXTVAL, b.MONTH_PLAN_APS_VERSION, b.MONTH_PLAN_VERSION, b.YEAR, b.MONTH,
+        b.MATERIAL_CODE, NVL(b.MONTH_PLAN_QTY, 0), NVL(b.MONTH_PLAN_MODIFY_QTY, 0), NVL(b.MONTH_FINISH_QTY, 0),
+        NVL(b.MONTH_REMAIN_QTY, 0), NVL(b.MONTH_PLAN_QTY2, 0), NVL(b.MONTH_PLAN_MODIFY_QTY2, 0),
+        NVL(b.MONTH_FINISH_QTY2, 0), NVL(b.MONTH_REMAIN_QTY2, 0), b.create_by, now(),
         b.remark, '0')
     </update>
-    
+
     <!-- 获取指定年月的月度计划版本号 -->
     <select id="selectMonthPlanApsVersion" resultType="string">
     	SELECT DISTINCT MONTH_PLAN_APS_VERSION

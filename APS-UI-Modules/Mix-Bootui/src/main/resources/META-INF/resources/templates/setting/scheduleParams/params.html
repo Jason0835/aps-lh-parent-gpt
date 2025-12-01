@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('密炼参数信息列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.paramsCode}]]：</label>
+                            <input type="text" name="paramCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.paramsName}]]：</label>
+                            <input type="text" name="paramName"/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.safeStock.mixArea}]]：</label>
+                            <select class="form-control" name="mixArea" th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option value="0">[[#{ui.data.column.default}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',400)"
+               shiro:hasPermission="setting:scheduleParams:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-success single disabled" onclick="copy('',400)"
+               shiro:hasPermission="setting:scheduleParams:copy">
+                <i class="fa fa-plus"></i> [[#{ui.params.copy}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="setting:scheduleParams:export">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table" data-reorderable-columns="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:src="@{/ajax/libs/highlight/highlight.min.js}"></script>
+<script th:src="@{/js/jquery-ui-1.10.4.min.js}"></script>
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('setting:scheduleParams:edit')}]];
+    var copyFlag = [[${@permission.hasPermi('setting:scheduleParams:copy')}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var prefix = ctx + "setting/scheduleParams";
+
+    //复制窗口相关
+    var copyUrl = prefix + "/toCopy/";
+
+    function copy(row, height) {
+        var title = [[#{ui.params.copy}]] + " ";
+        if ($.common.isEmpty(row)) {
+            rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            row = rows[0];
+        }
+        table.set();
+        $.modal.open(title + table.options.modalName, copyUrl + row, '', height);
+    }
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            updateUrl: prefix + "/{id}",
+            exportUrl: prefix + "/export",
+            modalName: [[#{ui.data.column.schedule.params.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    title: 'ID',
+                    halign: 'center',
+                    align: 'center',
+                    visible: false
+                },
+                {
+                    field: 'mixArea',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 13,
+                    title: [[#{setting.machine.mixArea}]],
+                    formatter: function (value, row, index) {
+                        if (value == 0) {
+                            return [[#{ui.data.column.default}]]
+                        }
+                        return $.table.selectDictLabel(mixAreaDatas, value);
+                    },
+                },
+                {
+                    field: 'paramCode',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{ui.data.column.paramsCode}]],
+                },
+                {
+                    field: 'paramName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{ui.data.column.paramsName}]],
+                },
+                {
+                    field: 'paramValue',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{ui.data.column.paramsValue}]],
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    widthUnit: '%',
+                    width: 20,
+                    title: [[#{ui.remark}]],
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 20);
+                    },
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 20,
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(' + row.id + ',' + '400' + ')"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        actions.push('<a class="btn btn-success btn-xs ' + copyFlag + '" href="javascript:void(0)" onclick="copy(' + row.id + ',' + '400' + ')"><i class="fa fa-plus"></i>' + [[#{ui.params.copy}]] + '</a> ');
+                        return actions.join('');
+                    },
+                }]
+        };
+        $.table.init(options);
+    });
+</script>
+</body>
+</html>

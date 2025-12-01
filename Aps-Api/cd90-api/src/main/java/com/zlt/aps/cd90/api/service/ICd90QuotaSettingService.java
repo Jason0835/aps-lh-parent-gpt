@@ -8,7 +8,6 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -74,7 +73,7 @@ public interface ICd90QuotaSettingService {
      */
     @PostMapping("/cd90/quota/export")
     @ApiOperation("导出90度裁断定额设定信息")
-    public List<Cd90QuotaSettingDto> exportData(@SpringQueryMap Cd90QuotaSettingDto dto);
+    public List<Cd90QuotaSettingDto> exportData(@RequestBody Cd90QuotaSettingDto dto);
 
     /**
      * 导入数据

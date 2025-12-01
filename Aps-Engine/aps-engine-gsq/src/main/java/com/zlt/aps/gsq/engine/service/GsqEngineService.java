@@ -38,4 +38,6 @@ public interface GsqEngineService {
      * @param scheduleResult  排程信息
      */
     void confirmGsqMachine(GsqScheduleResultDto scheduleResult);
+
+    void batchUpdateBatchNoAndOrderNo(String scheduleDate);
 }

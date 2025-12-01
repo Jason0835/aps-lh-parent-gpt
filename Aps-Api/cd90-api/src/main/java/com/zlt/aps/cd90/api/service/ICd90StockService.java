@@ -22,7 +22,7 @@ public interface ICd90StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/cd90/stock/list")
     TableDataInfo list(@RequestBody Cd90Stock stock);
 
     /**
@@ -31,7 +31,7 @@ public interface ICd90StockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/cd90/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -40,7 +40,7 @@ public interface ICd90StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/cd90/stock")
     AjaxResult add(@Validated @RequestBody Cd90Stock stock);
 
 
@@ -50,7 +50,7 @@ public interface ICd90StockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/cd90/stock/selectStockById/{id}")
     Cd90Stock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface ICd90StockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/cd90/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -68,7 +68,7 @@ public interface ICd90StockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/cd90/stock")
     AjaxResult edit(@Validated @RequestBody Cd90Stock stock);
 
     /**
@@ -77,13 +77,13 @@ public interface ICd90StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/cd90/stock/exportList")
     List<Cd90Stock> exportList(@RequestBody Cd90Stock stock);
 
     /**
      * 导入数据
      */
-    @PostMapping("/stock/importData")
+    @PostMapping("/cd90/stock/importData")
     public AjaxResult importData(@RequestBody List<Cd90Stock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 }

@@ -3,13 +3,16 @@ package com.zlt.aps.xwyy.service.impl;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyMachineRollMappingDto;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyMachineInfo;
@@ -92,13 +95,12 @@ public class XwyyMachineRollMappingServiceImpl extends ServiceImpl<XwyyMachineRo
      * @param ids 多个id逗号分割
      */
     public void deleteXwyyMachineRollMapping(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            XwyyMachineRollMapping entity = new XwyyMachineRollMapping();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<XwyyMachineRollMapping> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**

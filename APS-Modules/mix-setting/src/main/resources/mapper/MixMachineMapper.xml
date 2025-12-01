@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MixMachineMapper">
+
+    <select id="selectMixMachineList" parameterType="com.zlt.mix.setting.api.domain.entity.MixMachine"
+            resultType="com.zlt.mix.setting.api.domain.entity.MixMachine">
+        select id, machine_name, mix_area, machine_code,have_sulfur_steelyard,have_material_steelyard, remark,status,
+        mid_status, night_status, day_status, del_flag, create_by, create_time, update_by,
+        update_time
+        from t_mix_machine
+        where del_flag = '0'
+        <if test="machineName != null  and machineName != ''">and INSTR(machine_name, #{machineName}) > 0</if>
+        <if test="mixArea != null  and mixArea != ''">and mix_area = #{mixArea}</if>
+        <if test="status != null  and status != ''">and status = #{status}</if>
+        <if test="orderStr == null">
+            order by machine_name
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteMixMachineByIds" parameterType="String">
+        update t_mix_machine set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listMixMachineNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType=VARCHAR} mix_area,
+            #{data.machineCode,jdbcType=VARCHAR} machine_code 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_MIX_MACHINE m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_code = t.machine_code and m.del_flag ='0'
+    </select>
+
+    <select id="listMixMachineNotUnique2" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType=VARCHAR} mix_area,
+            #{data.machineName,jdbcType=VARCHAR} machine_name 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_MIX_MACHINE m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_name = t.machine_name and m.del_flag ='0'
+    </select>
+
+    <select id="listMixMachineNotUnique3" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType=VARCHAR} mix_area,
+            #{data.machineName,jdbcType=VARCHAR} machine_name,#{data.machineCode,jdbcType=VARCHAR} machine_code FROM
+            dual
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_MIX_MACHINE m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_name = t.machine_name and m.machine_code !=
+        t.machine_code and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertMixMachineInfo">
+        insert into t_mix_machine
+        (id,machine_name,mix_area,machine_code,have_sulfur_steelyard,have_material_steelyard,remark,status,mid_status, night_status, day_status,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="mixMachine" separator=" union all ">
+            select
+            #{mixMachine.machineName,jdbcType=VARCHAR} machine_name, #{mixMachine.mixArea,jdbcType=VARCHAR} mix_area,
+            #{mixMachine.machineCode,jdbcType=VARCHAR} machine_code,
+            #{mixMachine.haveSulfurSteelyard,jdbcType=VARCHAR} have_sulfur_steelyard,
+            #{mixMachine.haveMaterialSteelyard,jdbcType=VARCHAR} have_material_steelyard,
+            #{mixMachine.remark,jdbcType=VARCHAR} remark,
+            #{mixMachine.status,jdbcType=VARCHAR} status,
+            #{mixMachine.midStatus,jdbcType=VARCHAR} mid_status,
+            #{mixMachine.nightStatus,jdbcType=VARCHAR} night_status,
+            #{mixMachine.dayStatus,jdbcType=VARCHAR} day_status,
+            #{mixMachine.delFlag,jdbcType=VARCHAR} del_flag, #{mixMachine.createBy,jdbcType=VARCHAR} create_by,
+            #{mixMachine.createTime,jdbcType=TIMESTAMP} create_time, #{mixMachine.updateBy,jdbcType=VARCHAR} update_by,
+            #{mixMachine.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_mix_machine
+        (
+        machine_name, mix_area, machine_code,have_sulfur_steelyard,have_material_steelyard,
+        remark,status,mid_status,night_status,day_status, del_flag, create_by, create_time )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.machineName,jdbcType=VARCHAR} ,
+            #{item.mixArea,jdbcType=VARCHAR} , #{item.machineCode,jdbcType=VARCHAR} ,
+            #{item.haveSulfurSteelyard,jdbcType=VARCHAR} ,
+            #{item.haveMaterialSteelyard,jdbcType=VARCHAR} ,
+            #{item.remark,jdbcType=VARCHAR} , #{item.status,jdbcType=VARCHAR},
+            #{item.midStatus,jdbcType=VARCHAR} ,
+            #{item.nightStatus,jdbcType=VARCHAR} ,#{item.dayStatus,jdbcType=VARCHAR} ,#{item.delFlag,jdbcType=VARCHAR} ,
+            #{item.createBy,jdbcType=VARCHAR} , #{item.createTime, jdbcType=TIMESTAMP}
+            )
+        </foreach>
+        on duplicate key
+        update
+        machine_name = values(machine_name),
+        have_sulfur_steelyard=values(have_sulfur_steelyard),
+        have_material_steelyard=values(have_material_steelyard),
+        remark = values(remark),status=values(status), update_by = values(create_by),
+        update_time = now()
+    </update>
+
+    <select id="getAllMachineInfo" resultType="com.zlt.mix.setting.api.domain.entity.MixMachine">
+        select id, mix_area, machine_code, machine_name, remark, status, create_by, create_time, update_by, update_time
+        from t_mix_machine where del_flag = '0'
+        union
+        select id, mix_area, machine_code, machine_name, remark, status, create_by, create_time, update_by, update_time
+        from t_lhfl_machine where del_flag = '0'
+    </select>
+</mapper>

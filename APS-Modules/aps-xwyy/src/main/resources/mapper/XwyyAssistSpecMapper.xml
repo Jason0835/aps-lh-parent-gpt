@@ -19,40 +19,25 @@
 
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_xwyy_assist_spec a USING (
-        <foreach collection="list" item="AssistSpec" separator=" union ">
-            select
-            #{AssistSpec.materialCode,jdbcType=VARCHAR} MATERIAL_CODE,
-            #{AssistSpec.createBy,jdbcType=VARCHAR} create_by,
-            #{AssistSpec.createTime,jdbcType=DATE} create_time,
-            #{AssistSpec.updateBy,jdbcType=VARCHAR} update_by,
-            #{AssistSpec.updateTime,jdbcType=DATE} update_time,
-            #{AssistSpec.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_xwyy_assist_spec (
+        MATERIAL_CODE, create_by, create_time, update_by, update_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="AssistSpec" separator=",">
+            (
+            #{AssistSpec.materialCode,jdbcType=VARCHAR},
+            #{AssistSpec.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{AssistSpec.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{AssistSpec.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.MATERIAL_CODE = b.MATERIAL_CODE
-        AND a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.MATERIAL_CODE ,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.MATERIAL_CODE ,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

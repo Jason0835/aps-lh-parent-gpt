@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('重排')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-scheduleResult-rePlan">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.glueScheduleResult.scheduleDate}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <div class="select-time">
+                        <input id="scheduleDate" name="scheduleDate" type="text" class="time-input form-control"
+                               th:value="${initDate}" th:min="${initDate}" placeholder="yyyy-MM-dd" required>
+                    </div>
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueScheduleResult";
+
+    $("#form-scheduleResult-rePlan").validate({
+        focusCleanup: true,
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            let scheduleDate = $("#scheduleDate").val();
+            var config = {
+                url: prefix + "/validateRePlan",
+                type: "post",
+                dataType: "json",
+                data: {"scheduleDate": scheduleDate},
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        $.operate.save(prefix + "/reschedule", {"scheduleDate": scheduleDate}, function (result) {
+                            if (result.code == web_status.SUCCESS) {
+                                parent.$('#scheduleDate').val(scheduleDate);
+                            }
+                        });
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            };
+
+            $.ajax(config);
+
+        }
+    }
+</script>
+</body>
+</html>

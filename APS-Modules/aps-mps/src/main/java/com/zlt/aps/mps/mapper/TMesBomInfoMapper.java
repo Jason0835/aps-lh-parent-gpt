@@ -18,6 +18,12 @@ public interface TMesBomInfoMapper {
      */
     public void mergeSql(@Param("dataVersion") String dataVersion);
 
+    /**
+     * 将物料表的成品信息同步至业务表
+     * @param dataVersion
+     * @return
+     */
+    int mergeMdmProductInfo(@Param("dataVersion") String dataVersion);
 }
 
 

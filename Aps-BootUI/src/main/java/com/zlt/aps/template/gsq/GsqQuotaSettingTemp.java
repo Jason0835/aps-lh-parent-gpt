@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gsq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -11,7 +12,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "钢丝圈定额设定导入模板", description = "钢丝圈定额设定导入模板 ")
-public class GsqQuotaSettingTemp {
+public class GsqQuotaSettingTemp extends BaseEntity {
 
     @Excel(name = "ui.data.column.quota.steelRingCode")
     @ApiModelProperty(value = "钢丝圈代码")

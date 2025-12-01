@@ -1,11 +1,13 @@
 package com.zlt.aps.xwyy.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -16,6 +18,7 @@ import java.util.Date;
  * @author zlt
  * @date 2021-05-31
  */
+@Data
 @ApiModel(value = "纤维压延库存信息对象", description = "纤维压延库存信息对象")
 public class XwyyStock extends ApsBaseEntity {
     private static final long serialVersionUID = 1L;
@@ -53,7 +56,7 @@ public class XwyyStock extends ApsBaseEntity {
      * 库存量
      */
     @ApiModelProperty(value = "库存量", position = 40)
-    @ImportValidated(required = true, number = true, min = 0, max = 999999)
+    @ImportValidated(number = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.stock.stockNum")
     private BigDecimal stockNum;
 
@@ -73,6 +76,30 @@ public class XwyyStock extends ApsBaseEntity {
     @Excel(name = "ui.data.column.stock.badNum")
     private BigDecimal badNum;
 
+    /**
+     * 库存量(卷)
+     */
+    @ApiModelProperty(value = "库存量(卷)", position = 70)
+    @Excel(name = "ui.data.column.stock.rollStockNum", scale = 1)
+    @ImportValidated(name = "ui.data.column.stock.rollStockNum", number = true, min = 0, max = 999999)
+    private BigDecimal rollStockNum;
+
+    /**
+     * 修正数量(卷)
+     */
+    @ApiModelProperty(value = "修正数量(卷)", position = 80)
+    @Excel(name = "ui.data.column.stock.rollModifyNum")
+    @ImportValidated(name = "ui.data.column.stock.rollModifyNum", number = true, min = -999999, max = 999999)
+    private BigDecimal rollModifyNum;
+
+    /**
+     * 不良数量(卷)
+     */
+    @ApiModelProperty(value = "不良数量(卷)", position = 90)
+    @Excel(name = "ui.data.column.stock.rollBadNum")
+    @ImportValidated(name = "ui.data.column.stock.rollBadNum", number = true, min = 0, max = 999999)
+    private BigDecimal rollBadNum;
+
     @ImportValidated(maxLength = 300)
     @Excel(name = "ui.data.column.stock.remark")
     private String remark;
@@ -82,101 +109,10 @@ public class XwyyStock extends ApsBaseEntity {
      */
     private String delFlag;
 
-
-    @Override
-    public String getRemark() {
-        return remark;
-    }
-
-    @Override
-    public void setRemark(String remark) {
-        this.remark = remark;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Date getStockDate() {
-        return stockDate;
-    }
-
-    public void setStockDate(Date stockDate) {
-        this.stockDate = stockDate;
-    }
-
-    public String getMaterialCode() {
-        return materialCode;
-    }
-
-    public void setMaterialCode(String materialCode) {
-        this.materialCode = materialCode;
-    }
-
-    public BigDecimal getStockNum() {
-        return stockNum;
-    }
-
-    public void setStockNum(BigDecimal stockNum) {
-        this.stockNum = stockNum;
-    }
-
-    public BigDecimal getModifyNum() {
-        return modifyNum;
-    }
-
-    public void setModifyNum(BigDecimal modifyNum) {
-        this.modifyNum = modifyNum;
-    }
-
-    public BigDecimal getBadNum() {
-        return badNum;
-    }
-
-    public void setBadNum(BigDecimal badNum) {
-        this.badNum = badNum;
-    }
-
-    public String getDelFlag() {
-        return delFlag;
-    }
-
-    public void setDelFlag(String delFlag) {
-        this.delFlag = delFlag;
-    }
-
-    public String getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(String startTime) {
-        this.startTime = startTime;
-    }
-
-    public String getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(String endTime) {
-        this.endTime = endTime;
-    }
-
-    @Override
-    public String toString() {
-        return "TcStock{" +
-                "id=" + id +
-                ", stockDate=" + stockDate +
-                ", startTime='" + startTime + '\'' +
-                ", endTime='" + endTime + '\'' +
-                ", materialCode='" + materialCode + '\'' +
-                ", stockNum=" + stockNum +
-                ", modifyNum=" + modifyNum +
-                ", badNum=" + badNum +
-                ", delFlag='" + delFlag + '\'' +
-                '}';
-    }
+    /**
+     * 卷曲长度。此胎面一卷的最大长度，单位：米。
+     */
+    @ApiModelProperty(value = "卷曲长度。此胎面一卷的最大长度，单位：米。")
+    @TableField(exist = false)
+    private BigDecimal curlLength;
 }

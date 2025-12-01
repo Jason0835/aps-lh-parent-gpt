@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2021-07-13
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/nc/loss")
 public class NcLossSettingController extends BaseController {
     @Autowired
     private NcLossSettingService ncLossSettingService;

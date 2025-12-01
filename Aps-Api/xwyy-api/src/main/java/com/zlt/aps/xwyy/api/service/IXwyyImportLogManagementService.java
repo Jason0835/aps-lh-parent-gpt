@@ -21,7 +21,7 @@ import java.util.List;
 @FeignClient(contextId = "IXwyyImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.xwyy:xwyy}")
 public interface IXwyyImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +50,6 @@ public interface IXwyyImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/xwyy/importLogManagement/importData")
-    List<XwyyImportLogManagementDto> importData(@SpringQueryMap XwyyImportLogManagementDto dto);
+    @PostMapping("/xwyy/importLogManagement/importData")
+    List<XwyyImportLogManagementDto> importData(@RequestBody XwyyImportLogManagementDto dto);
 }

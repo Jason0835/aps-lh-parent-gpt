@@ -20,7 +20,7 @@
                     <result property="delFlag" column="del_flag"/>
                     <result property="remark" column="remark"/>
             </resultMap>
-    
+
     <sql id="selectCxScheduleTaskTimeVo">
         select id, schedule_date, cx_order_no, machine_code, product_order, estimate_start_time, estimate_end_time, data_source, create_by, create_time, update_by, update_time, del_flag, remark from t_cx_schedule_task_time
     </sql>
@@ -160,7 +160,7 @@
             #{id}
         </foreach>
     </delete>
-    
+
     <update id="mergeSql" parameterType="list">
         merge into t_cx_schedule_task_time a USING (
         <foreach collection="list" item="item" separator=" union ">
@@ -191,8 +191,8 @@
             a.product_order = b.product_order,
             a.estimate_start_time = b.estimate_start_time,
             a.estimate_end_time = b.estimate_end_time,
-            a.update_by = sysdate,
-            a.update_time = sysdate,
+            a.update_by = now(),
+            a.update_time = now(),
             a.remark = b.remark
         </set>
         WHEN NOT MATCHED THEN
@@ -220,7 +220,7 @@
         b.estimate_end_time,
         b.data_source,
         b.create_by,
-        sysdate,
+        now(),
         0,
         b.remark
         )

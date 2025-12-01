@@ -1,11 +1,12 @@
 package com.zlt.aps.controller.gdyy;
 
-import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.constant.GatewayConstants;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -15,14 +16,16 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.common4ui.utils.file.FileUtils;
+import com.ruoyi.common4ui.utils.file.FileUtils4UI;
 import com.zlt.aps.common.constant.ApsBootConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto2;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
 import com.zlt.aps.gdyy.api.service.IGdyyScheduleResultService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import com.zlt.framework.utils.AuthorizationUtils;
 import io.swagger.annotations.Api;
@@ -183,6 +186,54 @@ public class GdyyScheduleResultController extends BaseController {
     }
 
     /**
+     * 转机台
+     */
+    @ApiOperation("转机台")
+    @PostMapping("/batchChangeMachine/{machineId}")
+    @ResponseBody
+    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+        List<GdyyScheduleResultDto> scheduleResultList = JSON.parseArray(selects, GdyyScheduleResultDto.class);
+        GdyyScheduleResultDto query = new GdyyScheduleResultDto();
+        StringBuilder sb1 = new StringBuilder();
+        StringBuilder sb2 = new StringBuilder();
+        for (GdyyScheduleResultDto scheduleResult : scheduleResultList) {
+            query.setId(scheduleResult.getId());
+            query.setScheduleDate(scheduleResult.getScheduleDate());
+            query.setMachineCode(machineId);
+            query.setBigRollCode(scheduleResult.getBigRollCode());
+            Boolean unique = iGdyyScheduleResultService.checkUnique(query);
+            if (!unique) {
+                if (sb1.length() > 0) {
+                    sb1.append(",").append(query.getBigRollCode());
+                } else {
+                    sb1.append(query.getBigRollCode());
+                }
+                continue;
+            }
+            scheduleResult.setMachineCode(machineId);
+            AjaxResult result = iGdyyScheduleResultService.changeMachine(scheduleResult);
+            if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
+                if (sb2.length() > 0) {
+                    sb2.append(",").append(query.getBigRollCode());
+                } else {
+                    sb2.append(query.getBigRollCode());
+                }
+            }
+        }
+        if (sb1.length() > 0) {
+            sb1.append(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
+        }
+        if (sb2.length() > 0) {
+            sb2.append(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById2"));
+        }
+        sb1.append(sb2);
+        if (sb1.length() > 0) {
+            return AjaxResult.error(sb1.toString());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 删除钢带压延排程结果
      */
     @ApiOperation("删除钢带压延排程结果（id不为空）")
@@ -252,10 +303,10 @@ public class GdyyScheduleResultController extends BaseController {
         Boolean unique = iGdyyScheduleResultService.checkUnique(dto);
         if (unique) {
             // 未生成，直接生成
-            return AjaxResult.success("1");
+            return AjaxResult.success("2");
         } else {
             // 排程记录已生成，弹窗提示，确认后重新生成
-            return AjaxResult.success("2");
+            return AjaxResult.success("1");
         }
     }
 
@@ -367,7 +418,7 @@ public class GdyyScheduleResultController extends BaseController {
         }
         String fileName = I18nUtil.getMessage("ui.data.column.gdyy.scheduleResult.modelName");
         ExcelUtil.setResponseHeader(response, fileName);
-        FileUtils.writeInputStream(in, response.getOutputStream());
+        FileUtils4UI.writeInputStream(in, response.getOutputStream());
         return AjaxResult.success();
     }
 
@@ -375,7 +426,6 @@ public class GdyyScheduleResultController extends BaseController {
      * 数据导入
      *
      * @param file
-     * @param updateSupport
      * @return
      * @throws Exception
      */
@@ -422,7 +472,6 @@ public class GdyyScheduleResultController extends BaseController {
      * 数据导入
      *
      * @param file
-     * @param updateSupport
      * @return
      * @throws Exception
      */
@@ -458,7 +507,7 @@ public class GdyyScheduleResultController extends BaseController {
         ExcelUtil<GdyyScheduleResultDto2> util = new ExcelUtil<>(GdyyScheduleResultDto2.class);
         List<GdyyScheduleResultDto2> list = util.importExcel(in, 1);
         List<GdyyScheduleResultDto> newList = new ArrayList<>();
-        if (CollectionUtils.isNotEmpty(list)) {
+        if (PubUtil.isNotEmpty(list)) {
             newList = list.stream().map(a -> {
                 GdyyScheduleResultDto result = new GdyyScheduleResultDto();
                 BeanUtils.copyProperties(a, result);
@@ -496,5 +545,67 @@ public class GdyyScheduleResultController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.chooseScheduleDate"));
         }
         return iGdyyScheduleResultService.changeReleaseStatus(entity);
+    }
+
+    /**
+     * 完成量下载模板
+     *
+     * @param response 下载
+     * @throws IOException 异常
+     */
+    @ApiOperation("完成量下载模板")
+    @GetMapping("/importFinishQtyTemplate")
+    @ResponseBody
+    public AjaxResult importFinishQtyTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.dayFinishQty.modelName");
+        ExcelUtil<GdyyDayFinishQty> util = new ExcelUtil<>(GdyyDayFinishQty.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 完成量数据导入
+     *
+     * @param file 要导入的文件
+     * @return 结果
+     * @throws Exception 异常
+     */
+    @RequiresPermissions("gdyy:finishQty:import")
+    @ApiOperation("完成量数据导入")
+    @PostMapping("/importFinishQty")
+    @ResponseBody
+    public AjaxResult importFinishQty(MultipartFile file) throws Exception {
+        //文件解密
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+
+        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data,
+                ApsConstant.PROCEDURE_CODE_GDYY,
+                I18nUtil.getMessage("ui.data.column.dayFinishQty.modelName"),
+                file.getOriginalFilename());
+        importLog = iImportLogService.add(importLog);
+        //文件解析
+        InputStream in = new ByteArrayInputStream(data);
+        ExcelUtil<GdyyDayFinishQty> util = new ExcelUtil<>(GdyyDayFinishQty.class);
+        List<GdyyDayFinishQty> list = util.importExcel(in);
+
+        AjaxResult ajaxResult = iGdyyScheduleResultService.importFinishQty(list, importLog.getId());
+        // 更新日志记录成功数，失败数
+        ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
+        // 保存导入失败详细信息
+        ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
+        return ajaxResult;
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    @ResponseBody
+    public AjaxResult getSummaryVo(GdyyScheduleResultDto scheduleResult) {
+        return iGdyyScheduleResultService.getSummaryVo(scheduleResult);
     }
 }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionMouldConfigurationMapper">
+
+    <select id="getVulcanizingProduct" resultType="com.zlt.aps.factory.domain.dto.VulcanizingProductInfoDto">
+        SELECT tlsr.LH_MACHINE_CODE,
+               tlsr.SPEC_CODE,
+               tlsr.MOLD_QTY,
+               tlmi.MAX_MOLD_NUM AS MOULD_NUMBER,
+               mpm.PRODUCT_CODE,
+               tlsr.EMBRYO_CODE,
+               mpc.PRODUCT_CODE AS CONSTRUCTION_PRODUCT_CODE,
+               mpm.MOULD_CODE
+          FROM t_lh_schedule_result tlsr
+          LEFT JOIN t_lh_machine_info tlmi
+            ON tlmi.MACHINE_CODE = tlsr.LH_MACHINE_CODE
+           AND tlmi.FACTORY_CODE = tlsr.FACTORY_CODE
+           AND IFNULL(tlmi.IS_DELETE, 0) = 0
+          LEFT JOIN t_mdm_product_construction mpc
+            ON mpc.SPEC_CODE = tlsr.SPEC_CODE
+           AND mpc.FACTORY_CODE = tlsr.FACTORY_CODE
+           AND IFNULL(mpc.IS_DELETE, 0) = 0
+          LEFT JOIN t_mdm_product_model_relation mpm
+            ON mpm.FACTORY_CODE = tlsr.FACTORY_CODE
+           AND mpm.SPEC_CODE = tlsr.SPEC_CODE
+        where IFNULL(tlsr.IS_DELETE, 0) = 0
+          AND (tlsr.CLASS1_PLAN_QTY > 0 OR tlsr.CLASS2_PLAN_QTY > 0)
+          AND tlsr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+          AND tlsr.SCHEDULE_DATE = #{vulcanizingDate,jdbcType=DATE}
+    </select>
+</mapper>

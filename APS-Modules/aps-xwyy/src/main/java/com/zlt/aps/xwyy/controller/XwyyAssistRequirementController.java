@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2022-03-14
  */
 @RestController
-@RequestMapping("/assistRequirement")
+@RequestMapping("/xwyy/assistRequirement")
 public class XwyyAssistRequirementController extends BaseController {
     @Autowired
     private XwyyAssistRequirementService xwyyAssistRequirementService;

@@ -14,7 +14,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -85,8 +84,8 @@ public class GsqParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.gsq.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出钢丝圈参数信息")
-    @GetMapping("/exportData")
-    public List<GsqParamsDto> export(@SpringQueryMap GsqParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<GsqParamsDto> export(@RequestBody GsqParamsDto dto) {
         dto.setOrderStr(orderStr());
         GsqParams params = new GsqParams();
         BeanUtils.copyProperties(dto, params);

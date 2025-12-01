@@ -2,7 +2,6 @@ package com.zlt.aps.cd15.common.config;
 
 import com.baomidou.mybatisplus.extension.incrementer.OracleKeyGenerator;
 import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -16,7 +15,7 @@ public class MybatisPlusConfigurer {
      * @author zhenggc
      * @date 2019/1/2
      */
-    @Bean
+//    @Bean
     public OracleKeyGenerator oracleKeyGenerator() {
         return new OracleKeyGenerator();
     }

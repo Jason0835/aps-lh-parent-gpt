@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd90.api.domain.dto.Cd90MachineRollMappingDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,25 +22,25 @@ public interface ICd90MachineRollMappingService {
     /**
      * 根据条件查询90度裁断帘布大卷与机台的映射表
      */
-    @PostMapping("/MachineRollMapping/listMachineRollMapping")
+    @PostMapping("/cd90/MachineRollMapping/listMachineRollMapping")
     TableDataInfo listMachineRollMapping(@RequestBody Cd90MachineRollMappingDto dto);
 
     /**
      * 根据id查询90度裁断帘布大卷与机台的映射表
      */
-    @GetMapping("/MachineRollMapping/getMachineRollMapping/{id}")
+    @GetMapping("/cd90/MachineRollMapping/getMachineRollMapping/{id}")
     Cd90MachineRollMappingDto getBigRollColor(@PathVariable("id") Long id);
 
     /**
      * 保存90度裁断帘布大卷与机台的映射表（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/MachineRollMapping/saveMachineRollMapping")
+    @PostMapping("/cd90/MachineRollMapping/saveMachineRollMapping")
     AjaxResult saveMachineRollMapping(@RequestBody Cd90MachineRollMappingDto dto);
 
     /**
      * 保存帘90度裁断帘布大卷与机台的映射表（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/MachineRollMapping/checkMachineRollMapping")
+    @PostMapping("/cd90/MachineRollMapping/checkMachineRollMapping")
     String checkMachineRollMapping(@RequestBody Cd90MachineRollMappingDto dto);
 
     /**
@@ -49,7 +48,7 @@ public interface ICd90MachineRollMappingService {
      *
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/MachineRollMapping/deleteMachineRollMapping/{ids}")
+    @PostMapping("/cd90/MachineRollMapping/deleteMachineRollMapping/{ids}")
     AjaxResult deleteMachineRollMapping(@PathVariable("ids") Long[] ids);
 
     /**
@@ -57,18 +56,18 @@ public interface ICd90MachineRollMappingService {
      *
      * @param dto
      */
-    @GetMapping("/MachineRollMapping/exportData")
-    List<Cd90MachineRollMappingDto> exportData(@SpringQueryMap Cd90MachineRollMappingDto dto);
+    @PostMapping("/cd90/MachineRollMapping/exportData")
+    List<Cd90MachineRollMappingDto> exportData(@RequestBody Cd90MachineRollMappingDto dto);
 
     /**
      * 导入数据
      */
-    @PostMapping("/MachineRollMapping/importData")
+    @PostMapping("/cd90/MachineRollMapping/importData")
     public AjaxResult importData(@RequestBody List<Cd90MachineRollMappingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/MachineRollMapping/deleteAll")
+    @PostMapping("/cd90/MachineRollMapping/deleteAll")
     AjaxResult deleteAll();
 
 }

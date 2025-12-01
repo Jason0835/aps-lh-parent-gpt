@@ -1,19 +1,16 @@
 package com.zlt.aps.controller.cx;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
@@ -38,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -81,7 +77,7 @@ public class CxStockController extends BaseController {
     public String add(ModelMap mmap) {
         mmap.put("cxStock", new CxStock());
         mmap.put("editType", "0");
-        List<CxProductConstructionInfo> pcList=new ArrayList<CxProductConstructionInfo>();
+        List<CxProductConstructionInfo> pcList = new ArrayList<CxProductConstructionInfo>();
         mmap.put("embryoVersions", pcList);
         return prefix + "/edit";
     }
@@ -115,7 +111,7 @@ public class CxStockController extends BaseController {
     public String modifyStock(@PathVariable("id") Long id, ModelMap mmap) {
         mmap.put("cxStock", cxStockService.selectCxStockById(id));
         mmap.put("editType", "2");
-        List<CxProductConstructionInfo> pcList=new ArrayList<CxProductConstructionInfo>();
+        List<CxProductConstructionInfo> pcList = new ArrayList<CxProductConstructionInfo>();
         mmap.put("embryoVersions", pcList);
         return prefix + "/edit";
     }
@@ -171,7 +167,7 @@ public class CxStockController extends BaseController {
     @ResponseBody
     public void export(HttpServletResponse response, CxStock stock) throws IOException {
         List<CxStock> list = cxStockService.exportList(stock);
-        ExcelUtil<CxStock> util = new ExcelUtil(CxStock.class);
+        ExcelUtil<CxStock> util = new ExcelUtil<>(CxStock.class);
         String fileName = I18nUtil.getMessage("ui.cx.stock.export.fileName");
         Workbook workbook = util.exportExcel2(response, list, fileName);
         ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, stock.toString(), ApsConstant.PROCEDURE_CODE_CX);
@@ -212,16 +208,5 @@ public class CxStockController extends BaseController {
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
         ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
         return ajaxResult;
-    }
-
-    /**
-     * 不可用库存释放
-     */
-    @ApiOperation("不可用库存释放")
-    @RequiresPermissions("cx:stock:releaseStock")
-    @PostMapping("/releaseStock")
-    @ResponseBody
-    public AjaxResult releaseStock(Long[] ids) {
-        return cxStockService.releaseStock(ids);
     }
 }

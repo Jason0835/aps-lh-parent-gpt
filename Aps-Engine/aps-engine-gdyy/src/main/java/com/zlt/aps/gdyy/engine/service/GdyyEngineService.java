@@ -1,10 +1,10 @@
 package com.zlt.aps.gdyy.engine.service;
 
-import java.util.Date;
-import java.util.List;
-
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+
+import java.util.Date;
+import java.util.List;
 
 /**
  * 钢带压延自动排程服务
@@ -24,7 +24,7 @@ public interface GdyyEngineService {
 	 * @Return
 	 */
 	public void autoGdyySchedule(Date scheduleDate);
-	
+
     /**
      * 90度裁断插单
      * @Author hakimryan
@@ -36,10 +36,12 @@ public interface GdyyEngineService {
 
 	/**
 	 * 批量导入的钢带压延排程记录
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
 	 * @return 导入异常日志
 	 */
     List<ImportErrorLog> batchSaveGdyySchedule(Date scheduleDate, List<GdyyScheduleResultDto> scheduleList);
+
+    void batchUpdateBatchNoAndOrderNo(Date scheduleDate);
 }

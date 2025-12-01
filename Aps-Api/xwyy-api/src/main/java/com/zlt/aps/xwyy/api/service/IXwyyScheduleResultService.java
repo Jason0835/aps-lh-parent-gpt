@@ -1,9 +1,11 @@
 package com.zlt.aps.xwyy.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyDayFinishQty;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -188,4 +190,45 @@ public interface IXwyyScheduleResultService {
      */
     @PostMapping("/xwyy/scheduleResult/combinationMiddleAndNight/{ids}")
     AjaxResult combinationMiddleAndNight(@PathVariable("ids")Long[] ids, @RequestParam("classifiedShift") String classifiedShift);
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/xwyy/scheduleResult/importFinishQty")
+    @ApiOperation("导入完成量")
+    AjaxResult importFinishQty(@RequestBody List<XwyyDayFinishQty> list, @RequestParam("importLogId") Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/xwyy/scheduleResult/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 导出线下计划导入列表
+     *
+     * @param importContext 上下文
+     * @return 结果
+     */
+    @ApiOperation("导出线下计划导入列表")
+    @PostMapping("/xwyy/scheduleResult/importExcelToListAndExport")
+    byte[] importExcelToListAndExport(@RequestBody ImportContext importContext);
+
+    /**
+     * 将线下排程模板的昨日计划、昨日库存，导入到系统
+     *
+     * @param context       上下文
+     * @param updateSupport 是否更新
+     * @return 结果
+     */
+    @ApiOperation("将线下排程模板的昨日计划、昨日库存，导入到系统")
+    @PostMapping("/xwyy/scheduleResult/importExcelToLastDayPlanAndStock")
+    AjaxResult importExcelToLastDayPlanAndStock(@RequestBody ImportContext context, @RequestParam("updateSupport") boolean updateSupport);
 }

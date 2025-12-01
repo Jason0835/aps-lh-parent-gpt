@@ -86,8 +86,8 @@ public class XwyyBigRollColorController extends BaseController {
 
     @Log(title = "ui.bigRollColor.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<XwyyBigRollColorDto> exportData(XwyyBigRollColorDto dto) {
+    @PostMapping("/exportData")
+    public List<XwyyBigRollColorDto> exportData(@RequestBody XwyyBigRollColorDto dto) {
         dto.setOrderStr(orderStr());
         List<XwyyBigRollColorDto> list = xwyyBigRollColorService.listXwyyBigRollColor(dto);
         return list;

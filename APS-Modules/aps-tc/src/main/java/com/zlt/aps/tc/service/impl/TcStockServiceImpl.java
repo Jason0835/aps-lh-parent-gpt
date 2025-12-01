@@ -1,19 +1,30 @@
 package com.zlt.aps.tc.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.tc.api.domain.entity.TcCurlRoll;
 import com.zlt.aps.tc.api.domain.entity.TcStock;
+import com.zlt.aps.tc.entity.TcParams;
+import com.zlt.aps.tc.mapper.TcCurlRollMapper;
+import com.zlt.aps.tc.mapper.TcParamsMapper;
 import com.zlt.aps.tc.mapper.TcStockMapper;
 import com.zlt.aps.tc.service.TcStockService;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +42,12 @@ public class TcStockServiceImpl implements TcStockService {
     @Autowired
     private TcStockMapper tcStockMapper;
 
+    @Autowired
+    private TcCurlRollMapper curlRollMapper;
+
+    @Autowired
+    private TcParamsMapper paramsMapper;
+
     /**
      * 查询胎侧库存信息
      *
@@ -39,7 +56,15 @@ public class TcStockServiceImpl implements TcStockService {
      */
     @Override
     public TcStock selectTcStockById(Long id) {
-        return tcStockMapper.selectTcStockById(id);
+        TcStock stock = tcStockMapper.selectTcStockById(id);
+        LambdaQueryWrapper<TcCurlRoll> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TcCurlRoll::getSidewallCode, stock.getMaterialCode());
+        wrapper.eq(TcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+        TcCurlRoll curlRoll = curlRollMapper.selectOne(wrapper);
+        if (curlRoll != null) {
+            stock.setCurlLength(curlRoll.getCurlLength());
+        }
+        return stock;
     }
 
     /**
@@ -53,7 +78,26 @@ public class TcStockServiceImpl implements TcStockService {
         if (StringUtils.isNotEmpty(tcStock.getEndTime())) {
             tcStock.setEndTime(tcStock.getEndTime() + " 23:59:59");
         }
-        return tcStockMapper.selectTcStockList(tcStock);
+        List<TcStock> stockList = tcStockMapper.selectTcStockList(tcStock);
+        if (CollectionUtils.isNotEmpty(stockList)) {
+            List<String> codeList = stockList.stream().map(TcStock::getMaterialCode).distinct().collect(Collectors.toList());
+            Map<String, BigDecimal> lengthMap = new HashMap<>(16);
+            if (com.alibaba.nacos.common.utils.CollectionUtils.isNotEmpty(codeList)) {
+                LambdaQueryWrapper<TcCurlRoll> wrapper = new LambdaQueryWrapper<>();
+                wrapper.in(TcCurlRoll::getSidewallCode, codeList);
+                wrapper.eq(TcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+                List<TcCurlRoll> curlRollList = curlRollMapper.selectList(wrapper);
+                lengthMap = curlRollList.stream().collect(Collectors.toMap(TcCurlRoll::getSidewallCode, TcCurlRoll::getCurlLength));
+            }
+            for (TcStock stock : stockList) {
+                String materialCode = stock.getMaterialCode();
+                if (lengthMap.containsKey(materialCode)) {
+                    BigDecimal length = lengthMap.get(materialCode);
+                    stock.setCurlLength(length);
+                }
+            }
+        }
+        return stockList;
     }
 
     /**
@@ -121,15 +165,34 @@ public class TcStockServiceImpl implements TcStockService {
         List<TcStock> newList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
 
+        LambdaUpdateWrapper<TcParams> paramsWrapper = new LambdaUpdateWrapper<>();
+        paramsWrapper.eq(TcParams::getParamCode, "STANDARD_CRIMP_LENGTH");
+        TcParams params = paramsMapper.selectOne(paramsWrapper);
+
         //按业务主键分组
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate()+a.getMaterialCode()), Collectors.counting()));
+
+        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+        List<TcCurlRoll> curlRollList = new ArrayList<>();
+        List<String> codeList = list.stream().map(TcStock::getMaterialCode).filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+        List<List<String>> splitList = CollectionUtil.splitList(codeList, 100);
+        for (List<String> stringList : splitList) {
+            LambdaUpdateWrapper<TcCurlRoll> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.in(TcCurlRoll::getSidewallCode, stringList);
+            wrapper.eq(TcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
+            curlRollList.addAll(curlRollMapper.selectList(wrapper));
+        }
+        if (CollectionUtils.isNotEmpty(curlRollList)) {
+            curlRollMap = curlRollList.stream().collect(Collectors.toMap(TcCurlRoll::getSidewallCode, TcCurlRoll::getCurlLength, (m1, m2) -> m1));
+        }
 
         //校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
             TcStock stock = list.get(i);
 
+            String materialCode = stock.getMaterialCode();
             //重复记录校验
-            Long hasValue = groupMap.get(stock.getStockDate()+stock.getMaterialCode());
+            Long hasValue = groupMap.get(stock.getStockDate()+materialCode);
             if (hasValue > 1) {
                 failureNum++;
                 stock.setId(-999L);
@@ -139,6 +202,49 @@ public class TcStockServiceImpl implements TcStockService {
                 message=String.format(message,columnName+"+"+columnName2);
                 addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
                 continue;
+            }
+
+            // 库存量(米)和库存量(卷)不能同时为空
+            if (ObjectUtils.allNull(stock.getStockNum(), stock.getRollStockNum())) {
+                failureNum++;
+                stock.setId(-999L);
+                addImportErrorLog(importLogId, i + 2,
+                        I18nUtil.getMessage("ui.data.column.stock.stockNumAndRollNumNotNull"), importErrorLogs);
+                continue;
+            }
+
+            // 卷数转换成米数，或米数转换成卷数
+            /*if (!curlRollMap.containsKey(materialCode)) {
+                failureNum++;
+                stock.setId(-999L);
+                addImportErrorLog(importLogId, i + 2,
+                        I18nUtil.getMessage("ui.data.column.tc.stock.curlLengthNotExist"), importErrorLogs);
+                continue;
+            }*/
+
+            BigDecimal curlLength = curlRollMap.getOrDefault(materialCode, new BigDecimal(params.getParamValue()));
+            BigDecimal rollStockNum = stock.getRollStockNum();
+            if (rollStockNum != null) {
+                BigDecimal stockNum = rollStockNum.multiply(curlLength);
+                stock.setStockNum(stockNum);
+            } else {
+                stock.setRollStockNum(stock.getStockNum().divide(curlLength, 2, RoundingMode.HALF_UP));
+            }
+
+            BigDecimal rollModifyNum = stock.getRollModifyNum();
+            if (rollModifyNum != null) {
+                BigDecimal modifyNum = rollModifyNum.multiply(curlLength);
+                stock.setModifyNum(modifyNum);
+            } else if (stock.getModifyNum() != null) {
+                stock.setRollModifyNum(stock.getModifyNum().divide(curlLength, 2, RoundingMode.HALF_UP));
+            }
+
+            BigDecimal rollBadNum = stock.getRollBadNum();
+            if (rollBadNum != null) {
+                BigDecimal badNum = rollBadNum.multiply(curlLength);
+                stock.setBadNum(badNum);
+            } else if (stock.getBadNum() != null){
+                stock.setRollBadNum(stock.getBadNum().divide(curlLength, 2, RoundingMode.HALF_UP));
             }
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, stock);

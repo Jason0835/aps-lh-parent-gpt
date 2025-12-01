@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('硫磺辅料排程参数列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{setting.lhflScheduleParams.paramCode}]]：</label>
+                            <input type="text" name="paramCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.lhflScheduleParams.paramName}]]：</label>
+                            <input type="text" name="paramName"/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.lhflScheduleParams.mixArea}]]：</label>
+                            <select class="form-control" name="mixArea" th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option value="0">[[#{ui.data.column.default}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',400)"
+               shiro:hasPermission="setting:lhflScheduleParams:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-success single disabled" onclick="copy('',400)"
+               shiro:hasPermission="setting:lhflScheduleParams:copy">
+                <i class="fa fa-plus"></i> [[#{setting.lhflScheduleParams.copy}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="setting:lhflScheduleParams:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('setting:lhflScheduleParams:edit')}]];
+    var copyFlag = [[${@permission.hasPermi('setting:lhflScheduleParams:copy')}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var prefix = ctx + "setting/lhflScheduleParams";
+
+
+    //复制窗口相关
+    var copyUrl = prefix + "/toCopy/";
+
+    function copy(row, height) {
+        var title = [[#{setting.lhflScheduleParams.copy}]] + " ";
+        if ($.common.isEmpty(row)) {
+            rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            row = rows[0];
+        }
+        table.set();
+        $.modal.open(title + table.options.modalName, copyUrl + row, '', height);
+    }
+
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            updateUrl: prefix + "/edit/{id}",
+            exportUrl: prefix + "/export",
+            modalName: [[#{setting.lhflScheduleParams.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                {
+                    field: 'id',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.lhflScheduleParams.id}]],
+                    visible: false
+                },
+                {
+                    field: 'mixArea',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 13,
+                    title: [[#{setting.machine.mixArea}]],
+                    formatter: function (value, row, index) {
+                        if (value == 0) {
+                            return [[#{ui.data.column.default}]]
+                        }
+                        return $.table.selectDictLabel(mixAreaDatas, value);
+                    },
+                },
+                {
+                    field: 'paramCode',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{setting.lhflScheduleParams.paramCode}]],
+                },
+                {
+                    field: 'paramName',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{setting.lhflScheduleParams.paramName}]],
+                },
+                {
+                    field: 'paramValue',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    widthUnit: '%',
+                    width: 15,
+                    title: [[#{setting.lhflScheduleParams.paramValue}]],
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    title: [[#{ui.common.column.remark}]],
+                    halign: 'center',
+                    align: 'left',
+                    widthUnit: '%',
+                    width: 20,
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 20);
+                    },
+                    title: [[#{setting.lhflScheduleParams.remark}]],
+                },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    widthUnit: '%',
+                    width: 20,
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                        actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\',400)"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.update}]] + '</a> ');
+                        actions.push('<a class="btn btn-success btn-xs ' + copyFlag + '" href="javascript:void(0)" onclick="copy(' + row.id + ',' + '400' + ')"><i class="fa fa-plus"></i>' + [[#{setting.lhflScheduleParams.copy}]] + '</a> ');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+
+    /**
+     * 解决重置后为所有的问题
+     */
+    function reset() {
+        $.form.reset();
+        var defaultSelect= [[#{ui.data.column.default}]];
+        $(".select2-selection__rendered").html(defaultSelect);
+    }
+
+
+</script>
+</body>
+</html>

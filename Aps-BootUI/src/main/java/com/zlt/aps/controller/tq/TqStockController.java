@@ -138,7 +138,14 @@ public class TqStockController extends BaseController {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(TqStock stock) {
-        return stockService.edit(stock);
+        AjaxResult ajaxResult = null;
+        //id为空则是新增操作，否则是编辑
+        if (stock.getId() != null) {
+            ajaxResult = stockService.edit(stock);
+        } else {
+            ajaxResult = stockService.add(stock);
+        }
+        return ajaxResult;
     }
 
     @ApiOperation("导出胎圈库存信息")

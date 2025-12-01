@@ -13,8 +13,8 @@ import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.common4ui.utils.file.FileUploadUtils;
-import com.ruoyi.common4ui.utils.file.FileUtils;
+import com.ruoyi.common4ui.utils.file.FileUploadUtils4UI;
+import com.ruoyi.common4ui.utils.file.FileUtils4UI;
 import com.ruoyi.file.api.service.IApsFileService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.fileupload.FileItem;
@@ -76,7 +76,7 @@ public class ImportUtil {
             fileInputStream = new FileInputStream(templateFilePath);
             FileItem fileItem = ExcelUtil.createFileItem(fileInputStream, "1.xlsx");
             MultipartFile tempFile = new CommonsMultipartFile(fileItem);
-            String pathFileName = FileUploadUtils.upload(importFilePath, tempFile);
+            String pathFileName = FileUploadUtils4UI.upload(importFilePath, tempFile);
             // 保存导入记录
             importLog.setProcedureCode(procedureCode);
             importLog.setFunctionCode(Objects.requireNonNull(ServletUtils.getRequest()).getRequestURI().split("/")[2]);
@@ -84,7 +84,7 @@ public class ImportUtil {
             importLog.setFileName(file.getOriginalFilename());
             importLog.setFileUrl(pathFileName);
             //删除临时文件
-            FileUtils.deleteFile(templateFilePath);
+            FileUtils4UI.deleteFile(templateFilePath);
         } catch (Exception e) {
             e.printStackTrace();
             log.error(e.getMessage());
@@ -97,8 +97,6 @@ public class ImportUtil {
     /**
      * 获取导入记录并上传导入的文件
      *
-     * @param file           导入的文件
-     * @param importFilePath 上传的导入文件地址
      * @param procedureCode  导入记录的生产代码
      * @param functionName   导入记录的功能名称
      * @param fileName       原始文件名

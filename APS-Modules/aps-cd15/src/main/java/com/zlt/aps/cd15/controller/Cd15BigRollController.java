@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"15度裁断钢压大卷信息接口"})
 @RestController
-@RequestMapping("/bigRoll")
+@RequestMapping("/cd15/bigRoll")
 public class Cd15BigRollController extends BaseController {
 
     @Resource
     private Cd15BigRollService cd15BigRollService;
 
     @ApiOperation("根据条件查询钢压大卷信息列表")
-    @GetMapping("/listBigRoll")
-    public TableDataInfo listBigRoll(Cd15BigRollDto dto) {
+    @PostMapping("/listBigRoll")
+    public TableDataInfo listBigRoll(@RequestBody Cd15BigRollDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<Cd15BigRollDto> list = cd15BigRollService.listBigRoll(dto);
@@ -78,8 +78,8 @@ public class Cd15BigRollController extends BaseController {
 
     @Log(title = "ui.cd15.bigRoll.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<Cd15BigRollDto> exportData(Cd15BigRollDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd15BigRollDto> exportData(@RequestBody Cd15BigRollDto dto) {
         dto.setOrderStr(orderStr());
         List<Cd15BigRollDto> list = cd15BigRollService.listBigRoll(dto);
         return list;

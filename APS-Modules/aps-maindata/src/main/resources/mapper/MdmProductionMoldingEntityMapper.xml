@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmProductionMoldingEntityMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.MdmProductionMolding">
+        <id property="id" column="ID" jdbcType="DECIMAL"/>
+        <result property="year" column="YEAR" jdbcType="DECIMAL"/>
+        <result property="month" column="MONTH" jdbcType="DECIMAL"/>
+        <result property="productCode" column="PRODUCT_CODE" jdbcType="VARCHAR"/>
+        <result property="factoryCode" column="FACTORY_CODE" jdbcType="VARCHAR"/>
+        <result property="moldingMachineCode" column="MOLDING_MACHINE_CODE" jdbcType="VARCHAR"/>
+        <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+        <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+        <result property="constructionCode" column="CONSTRUCTION_CODE" jdbcType="VARCHAR"/>
+        <result property="mouldMethod" column="MOULD_METHOD" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <insert id="generateByMonthPlan">
+        insert into T_MDM_PRODUCTION_MOLDING(year, month, product_code, construction_code, factory_code, molding_machine_code, mould_method, CREATE_BY)
+        select distinct #{generateYear},
+                        #{generateMonth},
+                        tmmppf.PRODUCT_CODE,
+                        tmmppf.construction_code,
+                        tmmppf.factory_code,
+                        tmmppf.molding_machine_code,
+                        tmmmc.mould_method,
+                        #{username}
+        from t_mp_month_plan_vulcanizing_final tmmppf
+                 left join T_MDM_MOLDING_MACHINE tmmm on tmmm.id = tmmppf.MOLDING_MACHINE_ID
+                 left join T_MDM_MOLDING_MACHINE_CLS tmmmc on tmmmc.id = tmmm.MOLDING_MACHINE_CLASS_ID
+        where tmmppf.IS_DELETE = 0
+          and tmmppf.YEAR = #{fromYear}
+          and tmmppf.month = #{fromMonth}
+          and tmmppf.FACTORY_CODE = #{factoryCode}
+          and IFNULL(tmmppf.${productionDayField}, 0) > 0
+    </insert>
+
+    <select id="checkFactoryProductionProductUnique"
+            parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmProductionMolding"
+            resultType="int">
+        select count(id) from T_MDM_PRODUCTION_MOLDING
+        <where>
+            <if test="id != null ">and id != #{id}</if>
+            <if test="year != null ">and year = #{year}</if>
+            <if test="month != null ">and month = #{month}</if>
+            <if test="factoryCode != null  and factoryCode != ''">and factory_code = #{factoryCode}</if>
+            <if test="productCode != null  and productCode != ''">and product_code = #{productCode}</if>
+            <if test="moldingMachineCode != null  and moldingMachineCode != ''">and MOLDING_MACHINE_CODE = #{moldingMachineCode}</if>
+        </where>
+    </select>
+
+</mapper>

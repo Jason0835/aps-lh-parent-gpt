@@ -1,8 +1,9 @@
 package com.zlt.aps.xwyy.engine.service;
 
-import java.util.List;
-
 import com.zlt.aps.xwyy.engine.vo.XwyyScheduleResultVo;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 纤维压延生产线服务接口
@@ -22,4 +23,12 @@ public interface XwyyEngineMachineService {
 	 * @Return
 	 */
 	void scheduleMachine(List<XwyyScheduleResultVo> scheduleList);
+
+	/**
+	 * 根据产能选机台
+	 *
+	 * @param scheduleList 排程数据
+     * @param machineQuataHour 机台产能时长
+	 */
+	void chooseMachineByCapacity(List<XwyyScheduleResultVo> scheduleList, BigDecimal machineQuataHour);
 }

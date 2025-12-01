@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.tc.engine.mapper.TcEngineGlueMapper">
 
     <select id="listGlueSeq" resultType="com.zlt.aps.tc.engine.vo.TcGlueOrderVo" >
-        select o.glue_code, g.order_num||'.'||o.order_num as glue_seq
+        select o.glue_code, concat(g.order_num,'.',o.order_num) as glue_seq
         from T_TC_GLUE_GROUP_ORDER g
         inner join T_TC_GLUE_ORDER o on g.id = o.glue_group_id
         where 1=1

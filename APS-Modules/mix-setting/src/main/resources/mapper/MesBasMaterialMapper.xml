@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MesBasMaterialMapper">
+
+    <select id="selectMesBasMaterialList" parameterType="com.zlt.mix.setting.api.domain.entity.MesBasMaterial"
+            resultType="com.zlt.mix.setting.api.domain.entity.MesBasMaterial">
+        select
+        id,
+        mes_id,
+        material_code,
+        material_name,
+        erp_code,
+        sap_material_code,
+        valid_date,
+        material_group,
+        minpark_time,
+        major_type,
+        glue_type,
+        is_high_consumption,
+        remark,
+        del_flag,
+        create_by,
+        create_time,
+        update_by,
+        update_time
+        from t_mes_bas_material
+        <where>
+            del_flag = '0'
+            <if test="materialCode != null  and materialCode != ''">and instr(material_code,#{materialCode}) > 0</if>
+            <if test="materialName != null  and materialName != ''">and INSTR(material_name, #{materialName}) > 0</if>
+            <if test="erpCode != null  and erpCode != ''">and erp_code = #{erpCode}</if>
+            <if test="sapMaterialCode != null  and sapMaterialCode != ''">and sap_material_code = #{sapMaterialCode}
+            </if>
+            <if test="validDate != null ">and valid_date = #{validDate}</if>
+            <if test="materialGroup != null ">and material_group = #{materialGroup}</if>
+            <if test="majorType != null ">and major_type = #{majorType}</if>
+            <if test="glueType != null  and glueType != ''">and glue_type = #{glueType}</if>
+            <if test="glueTypeEmpty != null  and glueTypeEmpty != '' and glueTypeEmpty =='NULL'">and glue_type is null</if>
+            <if test="isHighConsumption != null  and isHighConsumption != ''">and is_high_consumption = #{isHighConsumption}</if>
+        </where>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteMesBasMaterialByIds" parameterType="String">
+        update t_mes_bas_material set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listMesBasMaterialNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.materialCode} material_code
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_mes_bas_material m
+        inner join temp_table t on m.material_code = t.material_code and m.del_flag ='0'
+    </select>
+
+    <select id="listMesBasMaterial" resultType="java.lang.String">
+        SELECT distinct MATERIAL_NAME FROM T_MES_BAS_MATERIAL
+        <where>
+            del_flag = '0'
+            <if test="majorTypes != null and majorTypes.size() > 0">
+            AND MAJOR_TYPE in
+	            <foreach item="majorType" collection="majorTypes" open="(" separator="," close=")">
+	                #{majorType}
+	            </foreach>
+            </if>
+        </where>
+        order by MATERIAL_NAME
+    </select>
+
+    <insert id="batchInsertMesBasMaterialInfo">
+        insert into t_mes_bas_material (
+        id,
+        mes_id,
+        material_code,
+        material_name,
+        erp_code,
+        sap_material_code,
+        valid_date,material_group,
+        minpark_time,
+        major_type,
+        glue_type,
+        is_high_consumption,
+        remark,
+        del_flag,
+        create_by,
+        create_time,
+        update_by,
+        update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="mesBasMaterial" separator=" union all ">
+            select
+            #{mesBasMaterial.mesId,jdbcType=DOUBLE} mes_id,
+            #{mesBasMaterial.materialCode,jdbcType= VARCHAR} material_code,
+            #{mesBasMaterial.materialName,jdbcType= VARCHAR} material_name,
+            #{mesBasMaterial.erpCode,jdbcType= VARCHAR} erp_code,
+            #{mesBasMaterial.sapMaterialCode,jdbcType= VARCHAR} sap_material_code,
+            #{mesBasMaterial.validDate,jdbcType=DOUBLE} valid_date,
+            #{mesBasMaterial.materialGroup,jdbcType=VARCHAR} material_group,
+            #{mesBasMaterial.minparkTime,jdbcType=DOUBLE} minpark_time,
+            #{mesBasMaterial.majorType,jdbcType=VARCHAR} major_type,
+            #{mesBasMaterial.glueType,jdbcType= VARCHAR} glue_type,
+            #{mesBasMaterial.isHighConsumption,jdbcType= VARCHAR} is_high_consumption,
+            #{mesBasMaterial.remark,jdbcType= VARCHAR} remark,
+            #{mesBasMaterial.delFlag,jdbcType= VARCHAR} del_flag,
+            #{mesBasMaterial.createBy,jdbcType= VARCHAR} create_by,
+            #{mesBasMaterial.createTime,jdbcType=TIMESTAMP} create_time,
+            #{mesBasMaterial.updateBy,jdbcType= VARCHAR} update_by,
+            #{mesBasMaterial.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_mes_bas_material
+        (
+        mes_id,
+        material_code,
+        material_name,
+        erp_code,
+        sap_material_code,
+        valid_date,
+        material_group,
+        minpark_time,
+        major_type,
+        glue_type,
+        is_high_consumption,
+        remark,
+        del_flag,
+        create_by,
+        create_time
+        ) values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.mesId, jdbcType=DOUBLE} ,
+            #{item.materialCode,jdbcType=VARCHAR } ,
+            #{item.materialName,jdbcType=VARCHAR } ,
+            #{item.erpCode,jdbcType=VARCHAR } ,
+            #{item.sapMaterialCode,jdbcType=VARCHAR } ,
+            #{item.validDate, jdbcType=DECIMAL} ,
+            #{item.materialGroup, jdbcType=VARCHAR} ,
+            #{item.minparkTime, jdbcType=DECIMAL} ,
+            #{item.majorType, jdbcType=VARCHAR} ,
+            #{item.glueType,jdbcType=VARCHAR } ,
+            #{item.isHighConsumption,jdbcType=VARCHAR } ,
+            #{item.remark,jdbcType=VARCHAR } ,
+            #{item.delFlag,jdbcType=VARCHAR } ,
+            #{item.createBy,jdbcType=VARCHAR } ,
+            #{item.createTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        update
+        material_code = values(material_code),
+        material_name = values(material_name),
+        erp_code = values(erp_code),
+        sap_material_code = values(sap_material_code),
+        valid_date = values(valid_date),
+        material_group = values(material_group),
+        minpark_time = values(minpark_time),
+        major_type = values(major_type),
+        glue_type = values(glue_type),
+        is_high_consumption = values(is_high_consumption),
+        remark = values(remark),
+        update_by = values(create_by),
+        update_time = now()
+    </update>
+</mapper>

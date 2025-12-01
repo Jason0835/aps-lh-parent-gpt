@@ -8,7 +8,6 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -74,7 +73,7 @@ public interface IXwyyQuotaSettingService {
      */
     @PostMapping("/xwyy/quota/export")
     @ApiOperation("导出纤维压延定额设定信息")
-    public List<XwyyQuotaSettingDto> exportData(@SpringQueryMap XwyyQuotaSettingDto dto);
+    public List<XwyyQuotaSettingDto> exportData(@RequestBody XwyyQuotaSettingDto dto);
 
     /**
      * 导入数据

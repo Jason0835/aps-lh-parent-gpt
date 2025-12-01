@@ -7,8 +7,8 @@
     <select id="selectCxDayByFinishDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         select embryo_code as material_code, sum(DAY_FINISH_QTY) as DAY_FINISH_QTY
         from T_CX_DAY_FINISH_QTY
-        where FINISH_DATE BETWEEN to_date(#{finishDate}, 'yyyy-mm' )
-            and last_day( to_date(#{finishDate}, 'yyyy-mm' ) )
+        where FINISH_DATE BETWEEN STR_TO_DATE(#{finishDate}, '%Y-%m' )
+            and last_day( STR_TO_DATE(#{finishDate}, '%Y-%m' ) )
         and is_delete = '0'
         GROUP BY
             EMBRYO_CODE
@@ -17,8 +17,8 @@
     <select id="selectLhDayByFinishDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         select sap_code as material_code, sum(DAY_FINISH_QTY) as DAY_FINISH_QTY
         from T_LH_DAY_FINISH_QTY
-        where FINISH_DATE BETWEEN to_date(#{finishDate}, 'yyyy-mm' )
-            and last_day( to_date(#{finishDate}, 'yyyy-mm' ) )
+        where FINISH_DATE BETWEEN STR_TO_DATE(#{finishDate}, '%Y-%m' )
+            and last_day( STR_TO_DATE(#{finishDate}, '%Y-%m' ) )
           and is_delete = '0'
         GROUP BY
             sap_code
@@ -28,8 +28,8 @@
     <select id="selectTmByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT tread_code material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_TM_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY tread_code
     </select>
@@ -38,8 +38,8 @@
     <select id="selectTcByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT SIDEWALL_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_TC_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY SIDEWALL_CODE
     </select>
@@ -47,8 +47,8 @@
     <select id="selectTqByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT BEAD_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_TQ_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY BEAD_CODE
     </select>
@@ -56,8 +56,8 @@
     <select id="selectGsqByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT STEEL_RING_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_GSQ_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY STEEL_RING_CODE
     </select>
@@ -65,8 +65,8 @@
     <select id="selectNcByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT LINING_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_NC_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY LINING_CODE
     </select>
@@ -74,8 +74,8 @@
     <select id="selectCd15ByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT STEEL_STRIP_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_CD15_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY STEEL_STRIP_CODE
     </select>
@@ -83,8 +83,8 @@
     <select id="selectCd90ByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT CLOTH_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_CD90_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY CLOTH_CODE
     </select>
@@ -92,8 +92,8 @@
     <select id="selectXwyyByScheduleDate" resultType="com.zlt.aps.common.engine.domain.DayFinishVo">
         SELECT BIG_ROLL_CODE material_code, sum(FINISH_QTY) day_finish_qty
         FROM T_XWYY_DAY_FINISH_TOTAL
-        WHERE SCHEDULE_DATE BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' ) AND
-            last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+        WHERE SCHEDULE_DATE BETWEEN STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) AND
+            last_day( STR_TO_DATE(#{scheduleMonth}, '%Y-%m' ) )
           AND del_flag = '0'
         GROUP BY BIG_ROLL_CODE
     </select>

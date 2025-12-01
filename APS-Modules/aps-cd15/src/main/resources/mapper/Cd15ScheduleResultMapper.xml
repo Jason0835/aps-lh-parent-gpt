@@ -51,6 +51,11 @@
         <result property="totalFinishQty" column="total_finish_qty"/>
         <result property="dailyFinishRate" column="daily_finish_rate"/>
         <result property="closeOutSpecFlag" column="close_out_spec_flag"/>
+        <result property="edgeGluePlan" column="edge_glue_plan"/>
+        <result property="lastMidPlanQty1" column="last_mid_plan_qty1"/>
+        <result property="lastMidPlanQty2" column="last_mid_plan_qty2"/>
+        <result property="curlLength" column="curl_length"/>
+        <result property="nextDayPlanQty" column="next_day_plan_qty"/>
     </resultMap>
     <resultMap type="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult" id="Cd15ScheduleResultResult2">
         <result property="id" column="id"/>
@@ -100,14 +105,67 @@
         <result property="totalFinishQty" column="total_finish_qty"/>
         <result property="dailyFinishRate" column="daily_finish_rate"/>
         <result property="closeOutSpecFlag" column="close_out_spec_flag"/>
+        <result property="edgeGluePlan" column="edge_glue_plan"/>
+        <result property="lastMidPlanQty1" column="last_mid_plan_qty1"/>
+        <result property="lastMidPlanQty2" column="last_mid_plan_qty2"/>
+        <result property="curlLength" column="curl_length"/>
+        <result property="nextDayPlanQty" column="next_day_plan_qty"/>
     </resultMap>
 
     <sql id="selectCd15ScheduleResultVo">
-        select id, schedule_date, cx_batch_no, batch_no, order_no, big_roll_code, machine_id, steel_strip_code1, steel_strip_code2, unit_consume1, stock1_qty1, stock1_qty2, supply_time1, day_plan_qty1, day_finish_qty1, day_produce_order1, day_finish_rate1, day_sys_analysis1, day_hand_analysis1, night_plan_qty1, night_finish_qty1, night_produce_order1, night_finish_rate1, night_sys_analysis1, night_hand_analysis1, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, update_by, update_time,data_source,craft1,craft2,edge_glue,close_out_spec_flag from t_cd15_schedule_result
+        select id,
+               schedule_date,
+               cx_batch_no,
+               batch_no,
+               order_no,
+               big_roll_code,
+               machine_id,
+               steel_strip_code1,
+               steel_strip_code2,
+               unit_consume1,
+               stock1_qty1,
+               stock1_qty2,
+               supply_time1,
+               day_plan_qty1,
+               day_finish_qty1,
+               day_produce_order1,
+               day_finish_rate1,
+               day_sys_analysis1,
+               day_hand_analysis1,
+               night_plan_qty1,
+               night_finish_qty1,
+               night_produce_order1,
+               night_finish_rate1,
+               night_sys_analysis1,
+               night_hand_analysis1,
+               cx_class1_plan,
+               cx_class2_plan,
+               cx_class3_plan,
+               cx_class4_plan,
+               cx_class5_plan,
+               is_release,
+               mark_close_out_tip,
+               production_status,
+               remark,
+               del_flag,
+               create_by,
+               create_time,
+               update_by,
+               update_time,
+               data_source,
+               craft1,
+               craft2,
+               edge_glue,
+               close_out_spec_flag,
+               edge_glue_plan,
+               last_mid_plan_qty1,
+               last_mid_plan_qty2,
+               next_day_plan_qty
+        from t_cd15_schedule_result
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.machine_id, a.steel_strip_code1, a.steel_strip_code2, a.unit_consume1, a.stock1_qty1, a.stock1_qty2, a.supply_time1, a.day_plan_qty1, a.day_produce_order1, a.day_sys_analysis1, a.day_hand_analysis1, a.night_plan_qty1, a.night_produce_order1, a.night_sys_analysis1, a.night_hand_analysis1, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.CUTTING_ANGLE,a.data_source, a.publish_success_count, a.newest_publish_time,a.craft1,a.craft2,a.edge_glue,a.close_out_spec_flag,
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.big_roll_code, a.machine_id, a.steel_strip_code1, a.steel_strip_code2, a.unit_consume1, a.stock1_qty1, a.stock1_qty2, a.supply_time1, a.day_plan_qty1, a.day_produce_order1, a.day_sys_analysis1, a.day_hand_analysis1, a.night_plan_qty1, a.night_produce_order1, a.night_sys_analysis1, a.night_hand_analysis1, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.CUTTING_ANGLE,a.data_source, a.publish_success_count, a.newest_publish_time,a.craft1,a.craft2,a.edge_glue,a.close_out_spec_flag,a.edge_glue_plan, a.last_mid_plan_qty1, a.last_mid_plan_qty2, a.next_day_plan_qty,
     </sql>
 
     <select id="selectCd15ScheduleResultList" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult"
@@ -115,25 +173,26 @@
         select * from (
             select
                 <include refid="column"/>
-                (NVL(day_plan_qty1, 0) + NVL(night_plan_qty1, 0)) as daily_total_qty,
-                TRUNC(fq.DAY_FINISH_QTY) as day_finish_qty1,
-                case when a.day_plan_qty1=0 then null when a.day_plan_qty1!=0 then (TRUNC(fq.DAY_FINISH_QTY)/a.day_plan_qty1) end as day_finish_rate1,
-                TRUNC(fq.NIGHT_FINISH_QTY) as NIGHT_FINISH_QTY1,
-                case when a.night_plan_qty1=0 then null when a.night_plan_qty1!=0 then (TRUNC(fq.NIGHT_FINISH_QTY)/a.night_plan_qty1) end as night_finish_rate1,
+                (IFNULL(day_plan_qty1, 0) + IFNULL(night_plan_qty1, 0)) as daily_total_qty,
+                TRUNCATE(fq.DAY_FINISH_QTY, 0) as day_finish_qty1,
+                case when a.day_plan_qty1=0 then null when a.day_plan_qty1!=0 then (TRUNCATE(fq.DAY_FINISH_QTY, 0)/a.day_plan_qty1) end as day_finish_rate1,
+                TRUNCATE(fq.NIGHT_FINISH_QTY, 0) as NIGHT_FINISH_QTY1,
+                case when a.night_plan_qty1=0 then null when a.night_plan_qty1!=0 then (TRUNCATE(fq.NIGHT_FINISH_QTY, 0)/a.night_plan_qty1) end as night_finish_rate1,
                 b.MONTH_PLAN_QTY as month_plan,
-                CEIL(b.MONTH_REMAIN_QTY) as month_plan_os,
+                CEILING(b.MONTH_REMAIN_QTY) as month_plan_os,
                 log.change_machine,
                 log.change_day_plan,
                 log.change_night_plan,
-                
-		        (TRUNC(nvl(fq.NIGHT_FINISH_QTY, 0)) + TRUNC(nvl(fq.DAY_FINISH_QTY, 0))) AS total_finish_qty,
-		        CASE WHEN (TRUNC(NVL(a.day_plan_qty1, 0)) + TRUNC(NVL(a.night_plan_qty1, 0))) != 0 
-		               THEN trunc((nvl(fq.NIGHT_FINISH_QTY, 0) + nvl(fq.DAY_FINISH_QTY, 0)) 
-		               		/ (TRUNC(NVL(a.day_plan_qty1, 0)) + TRUNC(NVL(a.night_plan_qty1, 0))), 4)
+
+		        (TRUNCATE(IFNULL(fq.NIGHT_FINISH_QTY, 0), 0) + TRUNCATE(IFNULL(fq.DAY_FINISH_QTY, 0), 0)) AS total_finish_qty,
+		        CASE WHEN (TRUNCATE(IFNULL(a.day_plan_qty1, 0), 0) + TRUNCATE(IFNULL(a.night_plan_qty1, 0), 0)) != 0
+		               THEN TRUNCATE((IFNULL(fq.NIGHT_FINISH_QTY, 0) + IFNULL(fq.DAY_FINISH_QTY, 0))
+		               		/ (TRUNCATE(IFNULL(a.day_plan_qty1, 0), 0) + TRUNCATE(IFNULL(a.night_plan_qty1, 0), 0)), 4)
 		             ELSE 0
-		        END AS daily_finish_rate
-		        
-            from t_cd15_schedule_result a
+        END AS daily_finish_rate,
+        cr.curl_length
+
+        from t_cd15_schedule_result a
             LEFT JOIN (
                          SELECT MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY
                          FROM T_CD15_MONTH_PLAN_SURPLUS
@@ -144,19 +203,20 @@
             LEFT JOIN T_CD15_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
             LEFT JOIN (/*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
                          SELECT schedule_id,
-                         max(decode(BEFORE_MACHINE_ID, AFTER_MACHINE_ID,0,1)) change_machine,
-                         max(decode(BEFORE_DAY_PLAN, AFTER_DAY_PLAN,0,1)) change_day_plan,
-                         max(decode(BEFORE_NIGHT_PLAN, AFTER_NIGHT_PLAN,0,1)) change_night_plan
+                         max(IF(BEFORE_MACHINE_ID = AFTER_MACHINE_ID,0,1)) change_machine,
+                         max(IF(BEFORE_DAY_PLAN = AFTER_DAY_PLAN,0,1)) change_day_plan,
+                         max(IF(BEFORE_NIGHT_PLAN = AFTER_NIGHT_PLAN,0,1)) change_night_plan
                          FROM T_CD15_DISPATCHER_LOG
                          where schedule_date = #{scheduleDate}
                          group by schedule_id
                     ) log ON a.id = log.schedule_id
+        LEFT JOIN t_cd15_curl_length cr on a.steel_strip_code1 = cr.steel_strip_code and cr.is_delete = '0'
             where a.del_flag='0'
             <if test="scheduleDate != null ">and a.schedule_date = #{scheduleDate,jdbcType=DATE}</if>
             <if test="bigRollCode != null  and bigRollCode != ''">
               and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
             </if>
-            <if test="machineId != null  and machineId != ''">and instr(','||a.machine_id||',', ','||#{machineId}||',')>0</if>
+            <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),  concat(',',#{machineId},','))>0</if>
             <if test="steelStripCode1 != null  and steelStripCode1 != ''">
                 and INSTR(a.steel_strip_code1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
             </if>
@@ -194,20 +254,17 @@
         LEFT JOIN (
         select MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY,YEAR,MONTH from T_CD15_MONTH_PLAN_SURPLUS where
         del_flag='0'
-        ) b on a.steel_strip_code1=b.MATERIAL_CODE and b.YEAR=TO_CHAR(a.schedule_date,'yyyy') and
-        b.MONTH=TO_CHAR(a.schedule_date,'MM')
+        ) b on a.steel_strip_code1=b.MATERIAL_CODE and b.YEAR=DATE_FORMAT(a.schedule_date,'%Y') and
+        b.MONTH=DATE_FORMAT(a.schedule_date,'%m')
 
         LEFT JOIN T_CD15_DAY_FINISH_QTY fq on a.schedule_date =fq.schedule_date and
         a.steel_strip_code1=fq.STEEL_STRIP_CODE
 
-        where a.id=#{id} and ROWNUM=1
+        where a.id=#{id}
+        limit 1
     </select>
 
     <insert id="insertCd15ScheduleResult" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_cd15_SCHEDULE.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_cd15_schedule_result
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -251,6 +308,7 @@
             <if test="updateTime != null">update_time,</if>
             <if test="dataSource != null">data_source,</if>
             <if test="edgeGlue != null">edge_glue,</if>
+            <if test="edgeGluePlan != null">edge_glue_plan,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
@@ -293,7 +351,8 @@
             <if test="updateBy != null">#{updateBy},</if>
             <if test="updateTime != null">#{updateTime},</if>
             <if test="dataSource != null">#{dataSource},</if>
-            <if test="edgeGlue != null">#{edge_glue},</if>
+            <if test="edgeGlue != null">#{edgeGlue},</if>
+            <if test="edgeGluePlan != null">#{edgeGluePlan},</if>
         </trim>
     </insert>
 
@@ -339,26 +398,27 @@
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="edgeGlue != null">edge_glue = #{edgeGlue},</if>
+            <if test="edgeGluePlan != null">edge_glue_plan = #{edgeGluePlan},</if>
         </trim>
         where id = #{id}
     </update>
 
     <delete id="deleteCd15ScheduleResultById" parameterType="Long">
-        update t_cd15_schedule_result set del_flag='1' where id = #{id}
+        update t_cd15_schedule_result set del_flag = null where id = #{id}
     </delete>
 
     <delete id="deleteCd15ScheduleResultByIds" parameterType="String">
-        update t_cd15_schedule_result set del_flag='1' where id in
+        update t_cd15_schedule_result set del_flag = null where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="batchUpdate" parameterType="String">
+    <update id="batchUpdate">
         update t_cd15_schedule_result set IS_RELEASE = #{status}
-        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
         where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
+        <foreach item="id" collection="list" open="(" separator="," close=")">
             #{id}
         </foreach>
     </update>
@@ -387,9 +447,6 @@
     </select>
 
     <insert id="insertPublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_schedule_publish_record
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -445,14 +502,14 @@
         STOCK1_QTY2,
         CUTTING_ANGLE,
         SUPPLY_TIME1,
-        DAY_PLAN_QTY1,
-        DAY_PRODUCE_ORDER1,
-        DAY_SYS_ANALYSIS1,
-        DAY_HAND_ANALYSIS1,
-        NIGHT_PLAN_QTY1,
-        NIGHT_PRODUCE_ORDER1,
-        NIGHT_SYS_ANALYSIS1,
-        NIGHT_HAND_ANALYSIS1,
+        DAY_PLAN_QTY,
+        DAY_PRODUCE_ORDER,
+        DAY_SYS_ANALYSIS,
+        DAY_HAND_ANALYSIS,
+        NIGHT_PLAN_QTY,
+        NIGHT_PRODUCE_ORDER,
+        NIGHT_SYS_ANALYSIS,
+        NIGHT_HAND_ANALYSIS,
         CX_CLASS1_PLAN,
         CX_CLASS2_PLAN,
         CX_CLASS3_PLAN,
@@ -487,14 +544,14 @@
         STOCK1_QTY2,
         CUTTING_ANGLE,
         SUPPLY_TIME1,
-        DAY_PLAN_QTY1,
-        DAY_PRODUCE_ORDER1,
-        DAY_SYS_ANALYSIS1,
-        DAY_HAND_ANALYSIS1,
         NIGHT_PLAN_QTY1,
         NIGHT_PRODUCE_ORDER1,
         NIGHT_SYS_ANALYSIS1,
         NIGHT_HAND_ANALYSIS1,
+        DAY_PLAN_QTY1,
+        DAY_PRODUCE_ORDER1,
+        DAY_SYS_ANALYSIS1,
+        DAY_HAND_ANALYSIS1,
         CX_CLASS1_PLAN,
         CX_CLASS2_PLAN,
         CX_CLASS3_PLAN,
@@ -513,7 +570,7 @@
         #{factoryCode},
         #{companyCode}
         FROM T_CD15_SCHEDULE_RESULT r
-        LEFT JOIN T_CD15_MACHINE_INFO m ON r.machine_id = to_char(m.id)
+        LEFT JOIN T_CD15_MACHINE_INFO m ON r.machine_id = m.id
         LEFT JOIN (SELECT max(BELT_SAP1) BELT_SAP1, max(BELT_SAP2) BELT_SAP2, BELT_CODE1, BELT_CODE2 FROM T_CONSTRUCTION_VERSION_INFO WHERE DEL_FLAG = '0' GROUP BY BELT_CODE1, BELT_CODE2) p1 ON r.STEEL_STRIP_CODE1 = p1.BELT_CODE1 and r.STEEL_STRIP_CODE2 = p1.BELT_CODE2
         WHERE r.id in
         <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
@@ -537,12 +594,12 @@
     <update id="changeReleaseStatus" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult">
         update t_cd15_schedule_result
         set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
-        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = sysdate</if>
+        <if test="isRelease == 1">,PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
         where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
           and (IS_RELEASE = 3 or IS_RELEASE = 4)
     </update>
-    
-	<!-- 根据版本更新发布日志状态 -->
+
+    <!-- 根据版本更新发布日志状态 -->
 	<update id="updatePublishRecordVersion">
 		UPDATE t_schedule_publish_record
 		   SET PUBLISH_STATUS = #{status}
@@ -555,7 +612,7 @@
         set
         <if test="classifiedShift == 1">DAY_PLAN_QTY1 = DAY_PLAN_QTY1 + NIGHT_PLAN_QTY1, NIGHT_PLAN_QTY1 = 0</if>
         <if test="classifiedShift == 2">NIGHT_PLAN_QTY1 = DAY_PLAN_QTY1 + NIGHT_PLAN_QTY1, DAY_PLAN_QTY1 = 0</if>
-        , IS_RELEASE = decode(PUBLISH_SUCCESS_COUNT,0,'0','5')
+        , IS_RELEASE = IF(PUBLISH_SUCCESS_COUNT = 0,'0','5')
         where del_flag = 0 and id in
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -564,7 +621,7 @@
 
     <select id="checkCd15CodeExist" resultType="java.lang.Integer">
         select case when exists(
-                select 1 from t_construction_version_info
+                select 1 from t_product_construction_info
                 where
                     BELT_CODE1 = #{steelStripCode1,jdbcType=VARCHAR}
                   AND DEL_FLAG = 0
@@ -595,4 +652,193 @@
         where del_flag = 0 and schedule_date = #{scheduleDate,jdbcType=DATE}
         and big_roll_code = #{bigRollCode,jdbcType=VARCHAR}
     </select>
+
+    <select id="listConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
+        select ci.EMBRYO_CODE EMBRYO_CODE, /*成型排程胎胚代码，施工表的胎胚代码*/
+        ci.EMBRYO_VERSION as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本*/
+        CI.FIT_DRUM_PERIMETER,
+        CI.ARTICLE_CROWN_SPEC,
+        CI.BELT_CUTTING_ANGLE,
+        CI.BELT_CODE1,
+        CI.BELT_CODE2,
+        CI.CORD_SPEC,
+        CI.TIRE_FABRIC_CODE1,
+        CI.TIRE_FABRIC_LENGTH1 SIDEWALL_LENGTH,
+        ci.BEAD_TYPE,
+        ci.BEAD_ARRANGE, /*排列*/
+        ci.DIMENSION, /*寸口*/
+        ci.TIRE_RING_CODE, /*胎圈代码*/
+        ci.BEAD_CODE, /*钢丝圈代码*/
+        ci.APEX_CODE, /*三角胶代码*/
+        ci.HEXAGON_RUBBER_CODE, /*胎圈胶料代码*/
+        ci.HEXAGON_MOUTH_PLATE, /*胎圈口型板*/
+        ci.HEXAGON_RUBBER_DIMENSION, /*胎圈尺寸*/
+        ci.INSIDE_CODE, /*内衬代码*/
+        ci.INSIDE_RUBBER, /*内衬胶料代码*/
+        ci.SIDEWALL_LENGTH, /*内衬长*/
+        CI.ID,
+        CI.PRODUCTION_STAGE
+        from T_PRODUCT_CONSTRUCTION_INFO ci
+        where 1=1 AND ci.DEL_FLAG = 0
+        <if test="embryoCodeList != null and embryoCodeList.size() > 0">
+            AND ci.embryo_code IN
+            <foreach item="code" collection="embryoCodeList" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        <if test="productionStage == '1'.toString()">
+            and (ci.PRODUCTION_STAGE = '0' or ci.PRODUCTION_STAGE is null)
+        </if>
+    </select>
+
+    <select id="getSummaryVo" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT schedule_date,
+               SUM(day_plan_qty1)   as day_plan_qty,
+               SUM(night_plan_qty1) as night_plan_qty,
+        SUM(next_day_plan_qty) as next_day_plan_qty,
+               SUM(stock1_qty1)     as stock_qty,
+               SUM(stock1_qty2)     as stock_qty2
+        FROM t_cd15_schedule_result a
+        WHERE a.schedule_date = #{scheduleDate}
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),
+            concat(',',#{machineId},','))>0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(a.steel_strip_code1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(a.steel_strip_code2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease ,jdbcType=VARCHAR}</if>
+    </select>
+
+    <select id="getLastDayPlanQty" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT SUM(night_plan_qty1) as night_plan_qty
+        FROM t_cd15_schedule_result a
+        WHERE a.schedule_date = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),
+            concat(',',#{machineId},','))>0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(a.steel_strip_code1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(a.steel_strip_code2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease ,jdbcType=VARCHAR}</if>
+    </select>
+
+    <select id="getCxConsume" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
+        SELECT IFNULL(CEILING(sum((IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)) *
+        CI.FIT_DRUM_PERIMETER / 1000)), 0) cxConsumeQty
+        FROM T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
+                 inner join T_PRODUCT_CONSTRUCTION_INFO ci
+                            on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION /*施工信息表*/
+        WHERE cxr.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(ci.ARTICLE_CROWN_SPEC, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(ci.BELT_CODE1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(ci.BELT_CODE2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+    </select>
+
+    <select id="getCxConsume4List" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult">
+        SELECT
+        <if test="params != null and params.code1List != null and params.code1List.size() > 0">
+            ci.BELT_CODE1 as steelStripCode1,
+        </if>
+        <if test="params != null and params.code2List != null and params.code2List.size() > 0">
+            ci.BELT_CODE2 as steelStripCode2,
+        </if>
+        IFNULL(CEILING(sum((IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)) *
+        CI.FIT_DRUM_PERIMETER / 1000)), 0) cxConsumeQty
+        FROM T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
+        inner join T_PRODUCT_CONSTRUCTION_INFO ci
+        on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION /*施工信息表*/
+        WHERE cxr.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(ci.ARTICLE_CROWN_SPEC, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(ci.BELT_CODE1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(ci.BELT_CODE2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="params != null and params.code1List != null and params.code1List.size() > 0">
+            AND ci.BELT_CODE1 IS NOT NULL AND ci.BELT_CODE1 IN
+            <foreach collection="params.code1List" item="code" separator="," open="(" close=") GROUP BY ci.BELT_CODE1">
+                #{code}
+            </foreach>
+        </if>
+        <if test="params != null and params.code2List != null and params.code2List.size() > 0">
+            AND ci.BELT_CODE2 IS NOT NULL AND ci.BELT_CODE2 IN
+            <foreach collection="params.code2List" item="code" separator="," open="(" close=") GROUP BY ci.BELT_CODE2">
+                #{code}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getLastDayPlanQty4List1" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult">
+        SELECT
+        a.steel_strip_code1,
+        SUM(night_plan_qty1) as lastMidPlanQty,
+        ROUND(SUM(IFNULL(a.night_plan_qty1, 0) / IFNULL(b.curl_length, c.param_value)), 1) as lastMidPlanQtyRollNum
+        FROM t_cd15_schedule_result a
+        left join t_cd15_curl_length b on a.steel_strip_code1 = b.steel_strip_code and b.is_delete = '0'
+        left join t_cd15_params c on c.del_flag = '0' and c.param_code = 'CRIMP_LENGTH'
+        WHERE a.del_flag = '0' and a.schedule_date = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)
+        AND a.steel_strip_code1 IS NOT NULL
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),
+            concat(',',#{machineId},','))>0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(a.steel_strip_code1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(a.steel_strip_code2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease ,jdbcType=VARCHAR}</if>
+        GROUP BY a.steel_strip_code1
+    </select>
+
+    <select id="getLastDayPlanQty4List2" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult">
+        SELECT
+        a.steel_strip_code2,
+        SUM(night_plan_qty1) as lastMidPlanQty,
+        ROUND(SUM(IFNULL(a.night_plan_qty1, 0) / IFNULL(b.curl_length, c.param_value)), 1) as lastMidPlanQtyRollNum
+        FROM t_cd15_schedule_result a
+        left join t_cd15_curl_length b on a.steel_strip_code1 = b.steel_strip_code and b.is_delete = '0'
+        left join t_cd15_params c on c.del_flag = '0' and c.param_code = 'CRIMP_LENGTH'
+        WHERE a.schedule_date = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)
+        AND a.del_flag = '0' and a.steel_strip_code2 IS NOT NULL
+        <if test="bigRollCode != null  and bigRollCode != ''">
+            and INSTR(a.big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),
+            concat(',',#{machineId},','))>0
+        </if>
+        <if test="steelStripCode1 != null  and steelStripCode1 != ''">
+            and INSTR(a.steel_strip_code1, #{steelStripCode1,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="steelStripCode2 != null  and steelStripCode2 != ''">
+            and INSTR(a.steel_strip_code2, #{steelStripCode2,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease ,jdbcType=VARCHAR}</if>
+        GROUP BY a.steel_strip_code2
+    </select>
+
 </mapper>

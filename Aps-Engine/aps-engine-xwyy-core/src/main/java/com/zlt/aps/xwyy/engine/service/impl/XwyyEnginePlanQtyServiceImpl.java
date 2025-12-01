@@ -1,10 +1,32 @@
 package com.zlt.aps.xwyy.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.common.CxEngineQuotaCommonService;
+import com.zlt.aps.common.engine.constants.EngineConstants;
+import com.zlt.aps.common.engine.service.AutoScheduleLogService;
+import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
+import com.zlt.aps.xwyy.api.domain.dto.XwyyReserveStockDto;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyMachineInfo;
+import com.zlt.aps.xwyy.engine.common.XwyyConstants;
+import com.zlt.aps.xwyy.engine.mapper.XwyyEngineMachineRollMappingMapper;
+import com.zlt.aps.xwyy.engine.mapper.XwyyEngineMapper;
+import com.zlt.aps.xwyy.engine.mapper.XwyyEngineSpecifyMachineMapper;
+import com.zlt.aps.xwyy.engine.mapper.XwyyEngineStockMapper;
+import com.zlt.aps.xwyy.engine.service.XwyyEngineLossService;
+import com.zlt.aps.xwyy.engine.service.XwyyEnginePlanQtyService;
+import com.zlt.aps.xwyy.engine.vo.*;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -12,32 +34,8 @@ import java.util.Map.Entry;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
-import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.BigDecimalUtil;
-import com.zlt.aps.common.engine.common.CxEngineQuotaCommonService;
-import com.zlt.aps.common.engine.constants.EngineConstants;
-import com.zlt.aps.common.engine.service.AutoScheduleLogService;
-import com.zlt.aps.common.engine.utils.CollectionUtil;
-import com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind;
-import com.zlt.aps.xwyy.engine.common.XwyyConstants;
-import com.zlt.aps.xwyy.engine.mapper.XwyyEngineMapper;
-import com.zlt.aps.xwyy.engine.mapper.XwyyEngineStockMapper;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineLossService;
-import com.zlt.aps.xwyy.engine.service.XwyyEnginePlanQtyService;
-import com.zlt.aps.xwyy.engine.vo.XwyyAssistRequirement;
-import com.zlt.aps.xwyy.engine.vo.XwyyBigRollVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyOriginalLineSpec;
-import com.zlt.aps.xwyy.engine.vo.XwyyParamsVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyScheduleResultVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyStockVo;
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.*;
 
 /**
  * 纤维压延库存信息处理服务实现类
@@ -52,15 +50,15 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 	/**
 	 * 可供时长参数：8小时
 	 */
-	private static final BigDecimal SUPPLY_TIME_PARAM = new BigDecimal("8");
+	private static final BigDecimal SUPPLY_TIME_PARAM = new BigDecimal("12");
 	/**
 	 * 计算大卷原先破卷数的特殊卷数
 	 */
 	private static final BigDecimal SEVEN = new BigDecimal("7");
 	/**
-	 * 预留库存系数默认值：1.4
+	 * 预留库存系数默认值：1
 	 */
-	private static final Double DEFAULT_STOCK_RATIO = new Double("1.4");
+	private static final Double DEFAULT_STOCK_RATIO = new Double("1");
 	/**
 	 * 原线可破大卷数默认值：5
 	 */
@@ -97,6 +95,9 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 	 * 是否使用外协库存计算开关：打开
 	 */
 	private final static String ASSIST_STOCK_SWITCH_NO = "1";
+    private final static BigDecimal HOUR24 = new BigDecimal("24"); // 24小时
+    private final static String DEFAULT_PRODUCT_STOCK_HOUR = "48"; // 默认值：保库存供应时长，两天
+    private final static String DEFAULT_LARGE_DEMAND = "5000"; // 需求量超过该值的算大需求量规格
 
 	@Autowired
 	private XwyyEngineStockMapper xwyyEngineStockMapper;
@@ -108,6 +109,8 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 	private AutoScheduleLogService autoScheduleLogService;
 	@Autowired
 	private XwyyEngineMapper xwyyEngineMapper;
+    @Autowired
+    private XwyyEngineSpecifyMachineMapper xwyyEngineSpecifyMachineMapper;
 
 	/**
 	 * 计算排产库存
@@ -122,12 +125,13 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 	 * @Param stockLossRate 库存损耗率
 	 * @param breadth           幅宽
 	 * @param isProductionStage 仅对投产阶段规格排产
+     * @param isBreak 是否计算破大卷
 	 * @Return
 	 */
 	@Override
 	public void calculateSchedulePlanQty(Date scheduleDate, List<XwyyScheduleResultVo> scheduleList,
 			Map<String, XwyyAssistRequirement> assistMap, Map<String, XwyyOriginalLineSpec> originalLineMap,
-			BigDecimal stockLossRate, Double breadth, boolean isProductionStage) {
+			BigDecimal stockLossRate, Double breadth, boolean isProductionStage, boolean isBreak) {
 		// 加载排产参数设置
 		Map<String, String> paramsMap = xwyyEngineMapper.listXwyyParams().stream()
 				.collect(Collectors.toMap(XwyyParamsVo::getParamCode, XwyyParamsVo::getParamValue, (v1, v2) -> v2));
@@ -135,28 +139,29 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		String defaultLossRate = paramsMap.get(EngineConstants.LOSS_RATE); // 默认损耗率
 		boolean isAssistStock = ASSIST_STOCK_SWITCH_NO.equals(paramsMap.get(ASSIST_STOCK_SWITCH));
 		String standardSize = paramsMap.get(EngineConstants.STANDARD_SIZE); // 标准长度
-		boolean isNoStock = WITH_OUT_STOCK_ON
-				.equals(paramsMap.getOrDefault(EngineConstants.SCHEDULE_WITH_OUT_STOCK, WITH_OUT_STOCK_OFF)); // 判断忽略库存是否打开
-		String defaultBreakRollNum = paramsMap.getOrDefault(EngineConstants.XWYY_BREAK_ROLL_NUM,
-				DEFAULT_BREAK_ROLL_NUM); // 原线默认可破大卷数
+		boolean isNoStock = WITH_OUT_STOCK_ON.equals(paramsMap.getOrDefault(EngineConstants.SCHEDULE_WITH_OUT_STOCK, WITH_OUT_STOCK_OFF)); // 判断忽略库存是否打开
+//		String defaultBreakRollNum = paramsMap.getOrDefault(EngineConstants.XWYY_BREAK_ROLL_NUM, DEFAULT_BREAK_ROLL_NUM); // 原线默认可破大卷数
+        BigDecimal productStockHour = new BigDecimal(paramsMap.getOrDefault(EngineConstants.PRODUCT_STOCK_HOUR, DEFAULT_PRODUCT_STOCK_HOUR));
+        BigDecimal productStockDay = productStockHour.divide(HOUR24, 2, RoundingMode.HALF_UP); // 预生产库存天数
+        BigDecimal largeDemand = new BigDecimal(paramsMap.getOrDefault(EngineConstants.LARGE_DEMAND, DEFAULT_LARGE_DEMAND)); // 大需求量阈值
 
 		String batchNo = CollectionUtil.firstElement(scheduleList).getBatchNo();
 		// 获取当日库存
 		Map<String, XwyyStockVo> stockMap = this.getStockMap(scheduleDate, stockLossRate, breadth, isProductionStage,
 				isAssistStock);
-		// 先抓取90度裁断的库存损耗率
-		BigDecimal cd90StockLossRate = this.getCd90StockLossRate();
-		// 获取90度裁断（帘布）换算成的大卷库存
-		Map<String, BigDecimal> cd90StockMap = xwyyEngineStockMapper
-				.selectCd90Stock(scheduleDate, cd90StockLossRate, breadth).stream()
-				.collect(Collectors.toMap(XwyyStockVo::getBigRollCode, XwyyStockVo::getStockQty, (v1, v2) -> v2));
+//		// 先抓取90度裁断的库存损耗率
+//		BigDecimal cd90StockLossRate = this.getCd90StockLossRate();
+//		// 获取90度裁断（帘布）换算成的大卷库存
+//		Map<String, BigDecimal> cd90StockMap = xwyyEngineStockMapper
+//				.selectCd90Stock(scheduleDate, cd90StockLossRate, breadth).stream()
+//				.collect(Collectors.toMap(XwyyStockVo::getBigRollCode, XwyyStockVo::getStockQty, (v1, v2) -> v2));
 		// 获取大卷提醒配置中不提醒的大卷编号
 		Set<String> noNeedRemaind = xwyyEngineStockMapper.listBigRollRemind().stream()
 				.filter(r -> XwyyConstants.REMAIND_FLAG_NO.equals(r.getRemindFlag()))
 				.map(XwyyBigRollRemind::getBigRollCode).collect(Collectors.toSet());
-		// 纤维大卷长度配置
-		Map<String, BigDecimal> xwyyBigRollMap = xwyyEngineStockMapper.listXwyyBigRoll().stream()
-				.collect(Collectors.toMap(XwyyBigRollVo::getBigRollCode, XwyyBigRollVo::getClothLength));
+        // 纤维大卷长度配置
+        Map<String, BigDecimal> xwyyBigRollMap = xwyyEngineStockMapper.listXwyyBigRoll().stream()
+                .collect(Collectors.toMap(XwyyBigRollVo::getBigRollCode, XwyyBigRollVo::getClothLength));
 		// 收尾规格列表
 		List<String> closeOutSpecList = xwyyEngineStockMapper.listCloseOutSpec(scheduleDate, isProductionStage);
 
@@ -169,35 +174,63 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		Double defaultLossRateNum = getDouble(defaultLossRate);
 		// 参数：库存预留系数
 		BigDecimal stockRatioNum = BigDecimal.valueOf(getDoubleOrDefault(stockRatio, DEFAULT_STOCK_RATIO));
+		List<String> codeList = scheduleList.stream().map(XwyyScheduleResultVo::getBigRollCode).distinct().collect(Collectors.toList());
+		Map<String, BigDecimal> reserveStockMap = this.getReserveStockMap(codeList, stockRatioNum.doubleValue());
 		// 记录算法描述日志
 		this.insertDescriptionLog(batchNo);
 		// 记录基础参数日志
 		this.insertBasedataLog(assistMap, originalLineMap, batchNo, stockMap, lossRateMap, noNeedRemaind);
+		List<String> machineIdList = scheduleList.stream().map(XwyyScheduleResultVo::getMachineId).distinct().collect(Collectors.toList());
+		// 查询机台的开机班次，如果有是一个班，则全部安排在这个班，两个班，则平均分配
+		List<List<String>> splitList = CollectionUtil.splitList(machineIdList, 500);
+		List<XwyyMachineInfo> machineList = new ArrayList<>();
+		for (List<String> machineIds : splitList) {
+			machineList.addAll(xwyyEngineMapper.listMachineShift(machineIds));
+		}
+		Map<Long, String> machineClassShiftMap = machineList.stream().collect(Collectors.toMap(XwyyMachineInfo::getId, XwyyMachineInfo::getOpenMachineClass, (v1, v2) -> v1));
 
+		// 计划排序，根据库存/用量/库存倍率，顺序排序
+        for (XwyyScheduleResultVo resultVo : scheduleList) {
+            XwyyStockVo stockVo = stockMap.get(resultVo.getBigRollCode());
+            BigDecimal todayStockQty = Optional.ofNullable(stockVo).map(XwyyStockVo::getTodayStock).orElse(BigDecimal.ZERO); // 取出当天库存信息
+            BigDecimal planQtyOneDay = BigDecimalUtils.add(resultVo.getCxClass3Plan(), resultVo.getCxClass4Plan());
+            BigDecimal stockPlanRate = null;
+            if (planQtyOneDay.compareTo(BigDecimal.ZERO) != 0) {
+                stockPlanRate = todayStockQty.divide(planQtyOneDay.multiply(stockRatioNum), 2, RoundingMode.HALF_UP);
+            }
+            resultVo.setTodayStockQty(todayStockQty);
+            resultVo.setStockPlanRate(stockPlanRate);
+        }
+        scheduleList = scheduleList.stream().sorted(Comparator.comparing(XwyyScheduleResultVo::getStockPlanRate, Comparator.nullsLast(BigDecimal::compareTo))).collect(Collectors.toList());
+		
 		// 计算库存相关信息：根据库存重算计划量
 		for (XwyyScheduleResultVo resultVo : scheduleList) {
+			// 根据开机班次计算计划量
+//			this.computePlanQtyByMachineClassShift(resultVo, machineClassShiftMap);
 			// 计算前的排程数据json字符串，用于日志记录
 			String oldScheduleResult = toJSONString(resultVo);
 			String bigRollCode = resultVo.getBigRollCode();
+			BigDecimal resultStockRatio = reserveStockMap.getOrDefault(bigRollCode, stockRatioNum);
 			// 获取6厂中班、晚班计划量，都要乘库存倍率
-			BigDecimal dayPlanQty = BigDecimal.valueOf(resultVo.getDayPlanQty()).multiply(stockRatioNum);
-			BigDecimal nightPlanQty = BigDecimal.valueOf(resultVo.getNightPlanQty()).multiply(stockRatioNum);
+			BigDecimal dayPlanQty = BigDecimal.valueOf(resultVo.getDayPlanQty()).multiply(resultStockRatio);
+			BigDecimal nightPlanQty = BigDecimal.valueOf(resultVo.getNightPlanQty()).multiply(resultStockRatio);
 			// 晚中半计划量合计
 			BigDecimal allPlanQty = dayPlanQty.add(nightPlanQty);
 			// 纤维压延库存信息
 			XwyyStockVo stockVo = stockMap.get(bigRollCode);
-			// 取出当天库存信息
-			Optional<XwyyStockVo> stockOptional = Optional.ofNullable(stockVo);
 			// 当日库存量
-			BigDecimal todayStockQty = stockOptional.map(XwyyStockVo::getTodayStock).orElse(BigDecimal.ZERO);
+			BigDecimal todayStockQty = resultVo.getTodayStockQty();
 			// 16点成型预计消耗量
-			BigDecimal cxUseQty = stockOptional.map(XwyyStockVo::getCxUseQty).orElse(BigDecimal.ZERO);
+//			BigDecimal cxUseQty = Optional.ofNullable(stockVo).map(XwyyStockVo::getCxUseQty).orElse(BigDecimal.ZERO);
+//			BigDecimal cxUseQty = BigDecimalUtils.add(resultVo.getCxClass1Plan(), resultVo.getCxClass2Plan());
 			// 90度裁断存量换算成大卷的库存量
-			BigDecimal cd90StockQty = cd90StockMap.getOrDefault(bigRollCode, BigDecimal.ZERO);
+//			BigDecimal cd90StockQty = cd90StockMap.getOrDefault(bigRollCode, BigDecimal.ZERO);
 			// 当日库存量计算值，要加上90度库存的换算量，并减去成型预计消耗量；如果忽略库存开关打开，则赋值为0
-			BigDecimal todayStock = isNoStock ? BigDecimal.ZERO : todayStockQty.add(cd90StockQty).subtract(cxUseQty);
+//			BigDecimal todayStock = isNoStock ? BigDecimal.ZERO : todayStockQty.add(cd90StockQty).subtract(cxUseQty);
+			BigDecimal todayStock = todayStockQty;
 			// 上一天库存量
 			Double yesStockQty = yesStockMap.getOrDefault(bigRollCode, 0D);
+			
 			// 计算库存可供成型时长
 			BigDecimal supplyTime = this.caculateSuppliyTime(resultVo, stockVo);
 			// 外协规格，以及需求的计划量
@@ -240,39 +273,48 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 				// 如果算库存，则需要扣减掉白班应支的量
 				todayStock = isNoStock ? BigDecimal.ZERO : todayStock.subtract(dayOut);
 			}
-			// 处理过程记录，上线前期验证算法用
-			this.handleProcessValue(resultVo, dayPlanQty, nightPlanQty, cxUseQty, cd90StockQty, assistDayPlan,
-					assistNightPlan, dayOut, isFac5);
 			// 库存算出负数则直接赋值成0
-			todayStock = todayStock.compareTo(BigDecimal.ZERO) > 0 ? todayStock : BigDecimal.ZERO;
+			todayStock = BigDecimalUtils.greatest(todayStock, BigDecimal.ZERO);
 
-			// 判断是否需要处理原线破大卷，6厂或者5厂都有需求量
-			boolean isBreakRoll = allPlanQty.compareTo(BigDecimal.ZERO) != 0 || isFac5;
-
-			// 中班总需求量，6厂中班计划量 * 倍率 + 外协中班需求量
-			BigDecimal dayPlanTotalQty = dayPlanQty.add(assistDayPlan);
-			// 夜班总需求量，6厂夜班计划量 * 倍率 + 外协夜班需求量
-			BigDecimal nightPlanTotalQty = nightPlanQty.add(assistNightPlan);
+			// 判断是否需要处理原线破大卷，开关打开且6厂或者5厂都有需求量
+			boolean isBreakRoll = isBreak && (allPlanQty.compareTo(BigDecimal.ZERO) != 0 || isFac5);
+			
+//			// 中班总需求量，6厂中班计划量 * 倍率 + 外协中班需求量
+//			BigDecimal dayPlanTotalQty = dayPlanQty.add(assistDayPlan);
+//			// 夜班总需求量，6厂夜班计划量 * 倍率 + 外协夜班需求量
+//			BigDecimal nightPlanTotalQty = nightPlanQty.add(assistNightPlan);
 
 			BigDecimal dayPlanResult = BigDecimal.ZERO;
 			BigDecimal nightPlanResult = BigDecimal.ZERO;
 
 			// 比较库存与 中班总需求量
-			if (todayStock.compareTo(dayPlanTotalQty) >= 0) {
-				// 如果库存量足够，则中班计划量为0，全部安排到晚班生产
-				dayPlanResult = BigDecimal.ZERO;
-				// 夜班计划量排库存不足的部分
-				nightPlanResult = dayPlanTotalQty.add(nightPlanTotalQty).subtract(todayStock);
-			} else {
-				// 如果库存量不足，则中班排不足的部分
-				dayPlanResult = dayPlanTotalQty.subtract(todayStock);
-				// 剩下的排到夜班
-				nightPlanResult = nightPlanTotalQty;
-			}
-			// 计划量不能小于0（库存量很大的场景）
-			dayPlanResult = dayPlanResult.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : dayPlanResult;
-			// 计划量不能小于0（库存量或者中班很大的场景）
-			nightPlanResult = nightPlanResult.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : nightPlanResult;
+//			if (todayStock.compareTo(dayPlanTotalQty) >= 0) {
+//			    // 如果库存量足够，则中班计划量为0，全部安排到晚班生产
+//			    dayPlanResult = BigDecimal.ZERO;
+//			    // 夜班计划量排库存不足的部分
+//			    nightPlanResult = dayPlanTotalQty.add(nightPlanTotalQty).subtract(todayStock);
+//			} else {
+//			    // 如果库存量不足，则中班排不足的部分
+//			    dayPlanResult = dayPlanTotalQty.subtract(todayStock);
+//			    // 剩下的排到夜班
+//			    nightPlanResult = nightPlanTotalQty;
+//			}
+//			// 计划量不能小于0（库存量很大的场景）
+//			dayPlanResult = dayPlanResult.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : dayPlanResult;
+//			// 计划量不能小于0（库存量或者中班很大的场景）
+//			nightPlanResult = nightPlanResult.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : nightPlanResult;
+
+            // 需求量=(成型早班需求+成型次日夜班需求)*预生产天数
+			// 根据库存可用天数判断是否需要生产
+			BigDecimal planQtyOneDay = BigDecimalUtils.add(resultVo.getCxClass3Plan(), resultVo.getCxClass4Plan()).multiply(stockRatioNum); // 一天的需求量，要计算库存倍率
+            BigDecimal planQty = BigDecimalUtils.multiply(planQtyOneDay, productStockDay); // 预生产库存 = 一天的需求量 * 预生产天数
+            if (planQty.compareTo(largeDemand) > 0 || todayStock.compareTo(planQty) < 0) { // 日用量超过阈值，或者库存较小的，则按一天需求量生产
+                dayPlanResult = planQtyOneDay; // 计划暂时先全部放到夜班
+                nightPlanResult = BigDecimal.ZERO;
+            } else {
+                dayPlanResult = BigDecimal.ZERO;
+                nightPlanResult = BigDecimal.ZERO;
+            }
 
 			// 判断是否收尾规格
 			String closeOutSpecFlag = closeOutSpecList.contains(bigRollCode) ? ApsConstant.STATUS_ENABLE
@@ -284,10 +326,12 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 			resultVo.setNightPlanQty(nightPlanResult.doubleValue());
 			resultVo.setTotalPlan(BigDecimalUtil.add(resultVo.getDayPlanQty(), resultVo.getNightPlanQty()));
 			resultVo.setTodayStock(todayStockQty.setScale(0, RoundingMode.DOWN).doubleValue());
+			resultVo.setTodayStockQty(todayStockQty);
 			resultVo.setYesStock(Math.floor(yesStockQty));
 			resultVo.setSupplyTime(supplyTime.doubleValue());
 			resultVo.setBreakRollFlag(isBreakRoll);
 			resultVo.setCloseOutSpecFlag(closeOutSpecFlag);
+			resultVo.getParams().put(EngineConstants.STOCK_RATIO, stockRatioNum);
 			// 默认无需提醒
 			resultVo.setOriginalRemindFlag(XwyyConstants.ORIGINAL_REMIND_FLAG_NO);
 			// 记录每个规格的计算日志
@@ -298,10 +342,65 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		// 中夜班均衡
 		this.equilibrium(scheduleList);
 		// 计算计划量大卷个数
-		this.caculatePlanQtyNumber(scheduleList, xwyyBigRollMap, standardSize);
-		// 根据原线可破卷数处理计划量
-		this.caculatePlanForOriginalLine(scheduleList, xwyyBigRollMap, standardSize, originalLineMap, noNeedRemaind,
-				defaultBreakRollNum);
+//		this.caculatePlanQtyNumber(scheduleList, xwyyBigRollMap, standardSize);
+		// 根据原线处理计划量，并计算大卷个数
+		this.caculatePlanForOriginalLine(scheduleList, originalLineMap, xwyyBigRollMap, standardSize);
+		// 根据开机班次计算计划量
+		for (XwyyScheduleResultVo resultVo : scheduleList) {
+			this.computePlanQtyByMachineClassShift(resultVo, machineClassShiftMap);
+		}
+	}
+
+
+	/**
+	 * 获取库存数据
+	 * @param stockMap
+	 * @param resultVo
+	 * @return
+	 */
+    private BigDecimal getStock(Map<String, XwyyStockVo> stockMap, XwyyScheduleResultVo resultVo) {
+        XwyyStockVo stockVo = stockMap.get(resultVo.getBigRollCode());
+        // 取出当天库存信息
+        Optional<XwyyStockVo> stockOptional = Optional.ofNullable(stockVo);
+        BigDecimal todayStockQty = stockOptional.map(XwyyStockVo::getTodayStock).orElse(BigDecimal.ZERO);
+        return todayStockQty;
+    }
+    
+	/**
+	 * 根据开机班次计算各班计划量
+	 * @param resultVo 排程结果
+	 * @param machineClassShiftMap 机台班次Map
+	 */
+	private void computePlanQtyByMachineClassShift(XwyyScheduleResultVo resultVo, Map<Long, String> machineClassShiftMap) {
+		String machineIdStr = resultVo.getMachineId();
+		if (StringUtils.isBlank(machineIdStr)) {
+			return;
+		}
+		String[] machineIdArr = machineIdStr.split(",");
+		String openClassShift = "";
+		for (String machine : machineIdArr) {
+			Long machineId = Long.valueOf(machine);
+			if (machineClassShiftMap.containsKey(machineId)) {
+				if (StringUtils.isNotBlank(openClassShift) && !openClassShift.contains(",")) {
+					continue;
+				}
+				openClassShift = machineClassShiftMap.get(machineId);
+			}
+		}
+		Double dayQty = resultVo.getDayPlanQty();
+		Double nightQty = resultVo.getNightPlanQty();
+		double sumPlan = BigDecimalUtil.add(dayQty, nightQty);
+		if (openClassShift.contains(",")) {
+			double divPlan = BigDecimalUtil.div(sumPlan, 2);
+			resultVo.setDayPlanQty(divPlan);
+			resultVo.setNightPlanQty(divPlan);
+		} else if (EngineConstants.NIGHT_CLASS_SHIFT.equals(openClassShift)) {
+			resultVo.setDayPlanQty(sumPlan);
+			resultVo.setNightPlanQty(0D);
+		} else if (EngineConstants.DAY_CLASS_SHIFT.equals(openClassShift)) {
+			resultVo.setDayPlanQty(0D);
+			resultVo.setNightPlanQty(sumPlan);
+		}
 	}
 
 	/**
@@ -435,7 +534,7 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 	 * @param standardSize   默认标准长度
 	 */
 	private void caculatePlanQtyNumber(List<XwyyScheduleResultVo> scheduleList, Map<String, BigDecimal> xwyyBigRollMap,
-			String standardSize) {
+            String standardSize) {
 		BigDecimal standardSizeNum = new BigDecimal(standardSize);
 		for (XwyyScheduleResultVo resultVo : scheduleList) {
 			String bigRollCode = resultVo.getBigRollCode();
@@ -490,6 +589,46 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 					nightLossQty);
 		}
 	}
+	
+	/**
+	 * 根据原线长度重算计划量，计划量等于原线长度的整倍数
+	 * @param scheduleList
+	 * @param originalLineMap
+	 */
+	private void caculatePlanForOriginalLine(List<XwyyScheduleResultVo> scheduleList, Map<String, XwyyOriginalLineSpec> originalLineMap, Map<String, BigDecimal> xwyyBigRollMap, String standardSize) {
+	    // 数据按原线规格分组，并按计划量由大到小排序
+	    Map<String, List<XwyyScheduleResultVo>> originalLineGroupMap = scheduleList.stream().sorted(Comparator.comparing(XwyyScheduleResultVo::getTotalPlan, Comparator.reverseOrder())).collect(Collectors.groupingBy(XwyyScheduleResultVo::getOriginalLineCode));
+	    BigDecimal standardSizeNum = BigDecimalUtils.valueOf(standardSize);
+	    for (Entry<String, List<XwyyScheduleResultVo>> entry: originalLineGroupMap.entrySet()) {
+	        String originalLineCode = entry.getKey();
+	        List<XwyyScheduleResultVo> groupScheduleList = entry.getValue();
+	        XwyyOriginalLineSpec originalLineSpec = originalLineMap.get(originalLineCode); // 原线配置
+	        if (originalLineSpec == null || BigDecimalUtils.valueOf(originalLineSpec.getOriginalLineLength()).compareTo(BigDecimal.ZERO) <= 0) {
+	            continue; // 原线配置不正确的情况下不处理
+	        }
+	        BigDecimal wireCoilLength = originalLineSpec.getOriginalLineLength();
+	        BigDecimal totalPlan = BigDecimalUtils.valueOf(groupScheduleList.stream().map(XwyyScheduleResultVo::getTotalPlan).reduce(0D, (a, b) -> BigDecimalUtil.add(a, b))); // 同一原线总计划量
+	        BigDecimal newTotalPlan = totalPlan.divide(wireCoilLength, 0, RoundingMode.UP).multiply(wireCoilLength);
+	        XwyyScheduleResultVo greatestSchedule = CollectionUtil.firstElement(groupScheduleList);
+	        double diffNum = newTotalPlan.subtract(totalPlan).doubleValue();
+	        greatestSchedule.setDayPlanQty(BigDecimalUtil.add(greatestSchedule.getDayPlanQty(), diffNum));
+	        greatestSchedule.setTotalPlan(BigDecimalUtil.add(greatestSchedule.getTotalPlan(), diffNum));
+	        // 计算整数
+	        for (XwyyScheduleResultVo resultVo : groupScheduleList) {
+                // 大卷个数 = 计划米数 / 标准长度
+	            BigDecimal clothLength = xwyyBigRollMap.getOrDefault(resultVo.getBigRollCode(), standardSizeNum);
+                BigDecimal dayPlanQty = new BigDecimal(resultVo.getDayPlanQty().toString());
+                BigDecimal nightPlanQty = new BigDecimal(resultVo.getNightPlanQty().toString());
+                BigDecimal dayPlanQtyNum = dayPlanQty.divide(clothLength, 0, RoundingMode.UP);
+                BigDecimal nightPlanQtyNum = nightPlanQty.divide(clothLength, 0, RoundingMode.UP);
+                resultVo.setDayPlanQtyNum(dayPlanQtyNum.doubleValue());
+                resultVo.setNightPlanQtyNum(nightPlanQtyNum.doubleValue());
+                resultVo.setTotalPlanNum(dayPlanQtyNum.add(nightPlanQtyNum));
+                resultVo.getParams().put(EngineConstants.ORIGINAL_LINE_LENGTH, wireCoilLength); // 原线长，缓存到params中
+                resultVo.getParams().put(EngineConstants.STANDARD_SIZE, clothLength); // 大卷长度，缓存到params中
+	        }
+	    }
+    }
 
 	/**
 	 * 计算原线代码取整卷的量<br/>
@@ -873,15 +1012,15 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		}
 
 		out: {
-			Double class1Plan = Optional.ofNullable(resultVo.getCxClass1Plan()).orElse(0d);
-			if (class1Plan <= stockQty.subtract(stockConsume).doubleValue()) {
-				// 比较剩余库存与计划量，库存较大说明可以支持本班完成生产，因此可供时长至少能支持8个小时
-				stockConsume = stockConsume.add(new BigDecimal(class1Plan));
-				supplyTime = SUPPLY_TIME_PARAM;
-			} else {
-				remainStock = class1Plan;
-				break out;
-			}
+//			Double class1Plan = Optional.ofNullable(resultVo.getCxClass1Plan()).orElse(0d);
+//			if (class1Plan <= stockQty.subtract(stockConsume).doubleValue()) {
+//				// 比较剩余库存与计划量，库存较大说明可以支持本班完成生产，因此可供时长至少能支持8个小时
+//				stockConsume = stockConsume.add(new BigDecimal(class1Plan));
+//				supplyTime = SUPPLY_TIME_PARAM;
+//			} else {
+//				remainStock = class1Plan;
+//				break out;
+//			}
 
 			Double class2Plan = Optional.ofNullable(resultVo.getCxClass2Plan()).orElse(0d);
 			if (class2Plan <= stockQty.subtract(stockConsume).doubleValue()) {
@@ -944,11 +1083,11 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		List<XwyyStockVo> stockList = xwyyEngineStockMapper.selectXwyyStockQty(scheduleDate, stockLossRate);
 
 		// 取出排产日的库存信息
-		if (isAssistStock) {
-			stockList = xwyyEngineStockMapper.selectXwyyAssistStockQty(scheduleDate);
-		} else {
-			stockList = xwyyEngineStockMapper.selectXwyyStockQty(scheduleDate, stockLossRate);
-		}
+//		if (isAssistStock) {
+//			stockList = xwyyEngineStockMapper.selectXwyyAssistStockQty(scheduleDate);
+//		} else {
+//			stockList = xwyyEngineStockMapper.selectXwyyStockQty(scheduleDate, stockLossRate);
+//		}
 
 		Map<String, Double> stockNumMap = stockList.stream().collect(
 				Collectors.toMap(XwyyStockVo::getBigRollCode, s -> s.getStockQty().doubleValue(), (v1, v2) -> v1));
@@ -1103,5 +1242,23 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		String dayProcessvalue = schedule.getDayProcessValue();
 		dayProcessvalue = dayProcessvalue == null ? processValue : dayProcessvalue + "，" + processValue;
 		schedule.setDayProcessValue(dayProcessvalue);
+	}
+
+	/**
+	 * 取预生产库存倍数Map
+	 * @param codeList 要查询的steelRingCode列表
+	 * @param reserveStockRate 预生产库存倍数
+	 * @return 结果
+	 */
+	private Map<String, BigDecimal> getReserveStockMap(List<String> codeList, Double reserveStockRate) {
+		List<XwyyReserveStockDto> reserveStockList = new ArrayList<>();
+		List<List<String>> splitList = CollectionUtil.splitList(codeList, 500);
+		for (List<String> list : splitList) {
+			reserveStockList.addAll(xwyyEngineStockMapper.listReserveStock(list));
+		}
+		if (CollectionUtils.isEmpty(reserveStockList)) {
+			return Collections.emptyMap();
+		}
+		return reserveStockList.stream().collect(Collectors.toMap(XwyyReserveStockDto::getBigRollCode, XwyyReserveStockDto::getReserveStockRate, (v1, v2) -> v1));
 	}
 }

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('配方信息列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{setting.MesPmtRecipe.machineName}]]：</label>
+                            <input class="form-control" id="machineName" type="text" name="machineName" th:value="${machineName}" readonly/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.MesPmtRecipe.recipeMaterialName}]]：</label>
+                            <input class="form-control" id="recipeMaterialName" type="text" name="recipeMaterialName" th:value="${glue}"
+                                   readonly/>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                [[#{setting.MesPmtRecipe.modelName}]]
+            </div>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueScheduleResult";
+    var productStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+    var id = [[${id}]];
+
+    $(function () {
+        var options = {
+            uniqueId: "id",
+            url: ctx + "setting/MesPmtRecipe/selectMesPmtRecipeByParams",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            singleSelect: true,
+            clickToSelect: true,
+            modalName: [[#{setting.MesPmtRecipe.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            queryParams: queryParams,
+            onLoadSuccess: function(data) {
+                var recipeType = String([[${recipeType}]]);
+                var recipeTypeName = String([[${recipeTypeName}]]);
+                var recipeVersionId = String([[${recipeVersionId}]]);
+                var recipeStage = $.common.isEmpty([[${recipeStage}]]) ? null : String([[${recipeStage}]]);
+                var checkIndex;
+                for (var i = 0; i < data.rows.length; i++) {
+                    var row = data.rows[i];
+                    if (row.recipeType === recipeType && row.recipeTypeName === recipeTypeName &&
+                        row.recipeVersionId === recipeVersionId && row.productStage === recipeStage) {
+                        checkIndex = i;
+                        break;
+                    }
+                }
+                if ($.common.isNotEmpty(checkIndex)) {
+                    $('#' + table.options.id).bootstrapTable('check', checkIndex);
+                }
+            },
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'recipeId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeId}]],
+                },
+                {
+                    field: 'mixArea',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.mixArea}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeEquipCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeEquipCode}]],
+                    visible: false
+                },
+                {
+                    field: 'machineName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.machineName}]],
+                },
+                {
+                    field: 'recipeMaterialCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialCode}]],
+                },
+                {
+                    field: 'recipeMaterialName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialName}]],
+                },
+                {
+                    field: 'recipeVersionId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeVersionId}]],
+                },
+                {
+                    field: 'recipeType',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.recipeType}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeTypeName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeTypeName}]],
+                },
+                {
+                    field: 'productStage',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.productStage}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(productStageData, value);
+                    },
+                },
+                {
+                    field: 'lotTotalWeight',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.lotTotalWeight}]],
+                    visible: false
+                },
+                {
+                    field: 'summerMixTime',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.summerMixTime}]],
+                    visible: false
+                },
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    /**
+     * 查询参数
+     * @param params
+     * @returns {*}
+     */
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        search.machineCode = $('#machineCode').val();
+        search.recipeMaterialName = $('#recipeMaterialName').val();
+        return search;
+    }
+
+    function submitHandler() {
+        var rows = $("#bootstrap-table").bootstrapTable('getSelections');
+        if (rows.length === 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var row = rows[0];
+        let recipeVersionId = row.recipeVersionId;
+        let recipeType = row.recipeType;
+        let recipeTypeName = row.recipeTypeName;
+        let recipeStage = row.productStage;
+        let lotTotalWeight = row.lotTotalWeight;
+        let summerMixTime = row.summerMixTime;
+        var data = {
+            "id": id,
+            "recipeVersionId": recipeVersionId,
+            "recipeType": recipeType,
+            "recipeStage": recipeStage,
+            "formulaWeight": lotTotalWeight,
+            "formulaTime": summerMixTime
+        }
+        var config = {
+            url: prefix + "/changeRecipe",
+            type: "post",
+            dataType: "json",
+            data: data,
+            beforeSend: function () {
+                $.modal.loading(frame.alter.doingWaiting);
+                $.modal.disable();
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var parent = window.parent;
+                    var data = result.data;
+                    for (var i = 0; i < data.length; i++) {
+                        if (data[i].isAddNew && !parent.$("input[name=isFilterNoMachine]").is(":checked")) {
+                            parent.$('#' + parent.table.options.id).bootstrapTable('append', data[i]);
+                        }else {
+                            parent.$("#" + parent.table.options.id).bootstrapTable('updateByUniqueId', {
+                                id: data[i].id,
+                                row: data[i]
+                            });
+                        }
+                    }
+                    parent.$.modal.msgSuccess(result.msg);
+                    $.modal.closeLoading();
+                    $.modal.enable();
+                    $.modal.close();
+                } else {
+                    $.modal.closeLoading();
+                    $.modal.enable();
+                    $.modal.alertWarning(result.msg);
+                }
+            }
+        };
+        var yseStr = [[#{schedule.glueCollectPlan.isFinishing.yes}]];
+        var notStr = [[#{schedule.glueCollectPlan.isFinishing.not}]];
+        
+        var isChangeMasterbatch = parent.$("#isChangeMasterbatch").val() == "1";
+        if (!isChangeMasterbatch) {
+        	// 如果参数配置不启用级联，则直接使用非级联提交即可
+            config.data['isChangeMasterbatch'] = false;
+            $.ajax(config);
+            return;
+        }
+        
+        layer.confirm([[#{ui.message.isChangeMasterbatch}]], {
+            icon: 3,
+            title: frame.title.sysAlter,
+            btn: [yseStr, notStr, frame.btn.cancel]
+            ,btn3: function(index, layero){
+                // 点击取消后回调
+            }
+        }, function (index, layero) {
+            // 点击是后回调
+            config.data['isChangeMasterbatch'] = true;
+            $.ajax(config);
+            layer.close(index);
+        },function (index, layero) {
+            // 点击否后回调
+            config.data['isChangeMasterbatch'] = false;
+            $.ajax(config);
+            layer.close(index);
+        });
+    }
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+</style>
+</html>

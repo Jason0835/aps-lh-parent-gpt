@@ -1,7 +1,9 @@
 package com.zlt.aps.cd15.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.cd15.api.domain.entity.Cd15DayFinishQty;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
@@ -163,4 +165,30 @@ public interface Cd15ScheduleResultService {
      * @return 查询到的数据
      */
     List<Cd15ScheduleResult> selectByScheduleDateAndBigRollCode(Cd15ScheduleResult cd15ScheduleResult);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<Cd15DayFinishQty> list, Long importLogId);
+
+    /**
+     * 查询出对应的施工信息字段
+     *
+     * @param embryoCodeList  施工代码
+     * @param productionStage 仅投产阶段规格排产标识
+     * @return 结果
+     */
+    List<EngineConstructionInfo> listConstruction(List<String> embryoCodeList, String productionStage);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(Cd15ScheduleResult scheduleResult);
 }

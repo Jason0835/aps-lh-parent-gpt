@@ -1,5 +1,6 @@
 package com.zlt.aps.xwyy.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -22,7 +23,7 @@ import java.math.BigDecimal;
 @Data
 @TableName("T_XWYY_BG_RUB_CAR_RELATION")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_XWYY_BG_RUB_CAR_RELATION", clazz = Long.class)
+@KeySequence(value = "SEQ_XWYY_BG_RUB_CAR_RELATION",dbType = DbType.ORACLE)
 public class XwyyBigRollRubberCarRelation extends ApsBaseEntity {
 
 	private static final long serialVersionUID = 1L;

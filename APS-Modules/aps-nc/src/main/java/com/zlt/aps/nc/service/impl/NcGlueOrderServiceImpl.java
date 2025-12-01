@@ -2,6 +2,7 @@ package com.zlt.aps.nc.service.impl;
 
 import com.alibaba.csp.sentinel.util.StringUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -9,6 +10,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.dto.NcGlueGroupOrderDto;
 import com.zlt.aps.nc.api.domain.dto.NcGlueOrderDto;
@@ -23,10 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -92,14 +91,12 @@ public class NcGlueOrderServiceImpl extends ServiceImpl<NcGlueOrderMapper, NcGlu
      * @param ids 多个id逗号分割
      */
     public void deleteGlueOrder(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            NcGlueOrder entity = new NcGlueOrder();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateBy(SecurityUtils.getUsername());
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<NcGlueOrder> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**

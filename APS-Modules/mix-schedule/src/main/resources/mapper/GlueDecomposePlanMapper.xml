@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueDecomposePlanMapper">
+
+    <sql id="column">
+        tgdp.id, tgdp.collect_batch_no, tgdp.batch_no, tgdp.plan_date, tgdp.mix_area, tgdp.glue, tgdp.plan_qty, tgdp.stock_qty,
+        tgdp.safe_stock_qty, tgdp.reserve_stock_rate, tgdp.produce_qty, tgdp.machine_code, tgdp.data_source, tgdp.remark, tgdp.del_flag, tgdp.create_by, tgdp.create_time, tgdp.update_by,
+        tgdp.update_time, tgdp.is_finishing, tgdp.up_glue, tgdp.final_glue_machine, tgdp.up_machine_code
+    </sql>
+
+    <select id="selectGlueDecomposePlanList" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        select * from (
+            select
+            <include refid="column"/>
+            from t_glue_decompose_plan tgdp
+            where tgdp.del_flag = '0'
+            <if test="planDate != null ">and tgdp.plan_date = #{planDate}</if>
+            <if test="mixArea != null  and mixArea != ''">and tgdp.mix_area = #{mixArea}</if>
+            <if test="glue != null  and glue != ''">and INSTR(tgdp.glue, #{glue}) > 0</if>
+            <if test="machineCode != null  and machineCode != ''">and tgdp.machine_code = #{machineCode}</if>
+        ) t
+        <if test="orderStr == null">
+            order by glue
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueDecomposePlanByIds" parameterType="String">
+        update t_glue_decompose_plan set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueDecomposePlanNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, plan_date, mix_area, glue FROM dual
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_glue_decompose_plan m
+        inner join temp_table t on m.plan_date = t.plan_date and m.mix_area = t.mix_area and m.glue = t.glue and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueDecomposePlanInfo">
+        insert into t_glue_decompose_plan
+        (id,collect_batch_no,batch_no,plan_date,mix_area,glue,plan_qty,stock_qty,safe_stock_qty,produce_qty,machine_code,data_source,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueDecomposePlan" separator=" union all ">
+            select
+            #{glueDecomposePlan.collectBatchNo,jdbcType= VARCHAR} collect_batch_no,
+            #{glueDecomposePlan.batchNo,jdbcType= VARCHAR} batch_no, #{glueDecomposePlan.planDate,jdbcType=DATE}
+            plan_date,
+            #{glueDecomposePlan.mixArea,jdbcType= VARCHAR} mix_area, #{glueDecomposePlan.glue,jdbcType= VARCHAR} glue,
+            #{glueDecomposePlan.planQty,jdbcType=DOUBLE} plan_qty, #{glueDecomposePlan.stockQty,jdbcType=DOUBLE}
+            stock_qty, #{glueDecomposePlan.safeStockQty,jdbcType=DOUBLE} safe_stock_qty,
+            #{glueDecomposePlan.produceQty,jdbcType=DOUBLE} produce_qty,
+            #{glueDecomposePlan.machineCode,jdbcType= VARCHAR} machine_code,
+            #{glueDecomposePlan.dataSource,jdbcType= VARCHAR} data_source, #{glueDecomposePlan.remark,jdbcType= VARCHAR}
+            remark, #{glueDecomposePlan.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueDecomposePlan.createBy,jdbcType= VARCHAR} create_by, #{glueDecomposePlan.createTime,jdbcType=DATE}
+            create_time, #{glueDecomposePlan.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueDecomposePlan.updateTime,jdbcType=DATE} update_time from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_glue_decompose_plan a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.collectBatchNo,jdbcType=VARCHAR } collect_batch_no,
+            #{item.batchNo,jdbcType=VARCHAR } batch_no,
+            #{item.planDate, jdbcType=DATE} plan_date, #{item.mixArea,jdbcType=VARCHAR } mix_area,
+            #{item.glue,jdbcType=VARCHAR } glue, #{item.planQty, jdbcType=DOUBLE} plan_qty,
+            #{item.stockQty, jdbcType=DOUBLE} stock_qty, #{item.safeStockQty, jdbcType=DOUBLE} safe_stock_qty,
+            #{item.produceQty, jdbcType=DOUBLE} produce_qty, #{item.machineCode,jdbcType=VARCHAR } machine_code,
+            #{item.dataSource,jdbcType=VARCHAR } data_source, #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag, #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=DATE} create_time, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=DATE} update_time from dual
+        </foreach>
+        ) b ON ( a.plan_date = b.plan_date AND a.mix_area = b.mix_area AND a.glue = b.glue AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.collect_batch_no = b.collect_batch_no, a.batch_no = b.batch_no,
+            a.plan_qty = b.plan_qty, a.stock_qty = b.stock_qty, a.safe_stock_qty = b.safe_stock_qty, a.produce_qty =
+            b.produce_qty,
+            a.machine_code = b.machine_code, a.data_source = b.data_source, a.remark = b.remark, a.update_by =
+            b.create_by,
+            a.update_time = now()
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.collect_batch_no, a.batch_no, a.plan_date, a.mix_area, a.glue, a.plan_qty, a.stock_qty,
+        a.safe_stock_qty, a.produce_qty, a.machine_code, a.data_source, a.remark, a.del_flag, a.create_by, a.create_time
+        )
+        values ( get_sequence_nextval('seq_t_glue_decompose_plan'),
+        b.collect_batch_no, b.batch_no, b.plan_date, b.mix_area, b.glue, b.plan_qty, b.stock_qty,
+        b.safe_stock_qty, b.produce_qty, b.machine_code, b.data_source, b.remark, 0,
+        b.create_by, now()
+        )
+    </update>
+
+    <select id="getStockAndSafeStock" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        select a.STOCK_NUM stockQty, b.SAFE_STOCK safeStockQty from
+        <if test="glueType == 0">T_GLUE_STOCK a</if>
+        <if test="glueType == 1">T_ML_GLUE_STOCK a</if>
+        left join T_GLUE_SAFE_STOCK b on a.MIX_AREA = b.MIX_AREA and a.GLUE = b.GLUE and b.DEL_FLAG = 0
+        where a.DEL_FLAG = 0 and a.STOCK_DATE = #{planDate} and a.MIX_AREA = #{mixArea} and a.glue = #{glue}
+    </select>
+
+    <update id="mergeSafeStock" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        insert into T_GLUE_SAFE_STOCK
+        (
+        id, mix_area, glue, safe_stock, del_flag, create_by, create_time )
+        values
+        (
+            #{id, jdbcType=DOUBLE} , #{mixArea,jdbcType=VARCHAR } ,
+            #{glue,jdbcType=VARCHAR } , #{safeStockQty, jdbcType=DOUBLE} ,
+            #{delFlag,jdbcType=VARCHAR } , #{createBy,jdbcType=VARCHAR } ,
+            #{createTime, jdbcType=DATE} 
+        )
+        on duplicate key
+        update
+        safe_stock = values(safe_stock),
+        update_by = values(create_by),
+        update_time = now()
+    </update>
+
+    <!--Joran 2022-05-24 统计分厂提交计划中密炼机台存在多个或者为空的记录数 start-->
+    <select id="countOfMachineCodeException"  resultType="int">
+        select count(*) from T_GLUE_COLLECT_PLAN t
+        <where>
+            t.del_flag='0'
+            and t.plan_date=str_to_date(#{planDate},'%Y-%m-%d')
+            and t.mix_area=#{mixArea}
+            and (instr(t.MACHINE_CODE,',')>0 or t.MACHINE_CODE is null)
+        </where>
+    </select>
+    <!--Joran 2022-05-24 统计分厂提交计划中密炼机台存在多个或者为空的记录数 end-->
+
+    <update id="mergeById" parameterType="list">
+        with temp_data as(
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.planQty, jdbcType=DOUBLE} plan_qty,#{item.safeStockQty, jdbcType=DOUBLE} safe_stock_qty,
+            #{item.stockQty, jdbcType=DOUBLE} stock_qty, #{item.produceQty, jdbcType=DOUBLE} produce_qty, #{item.machineCode,jdbcType=VARCHAR } machine_code,
+            #{item.remark,jdbcType=VARCHAR } remark, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=DATE} update_time
+        </foreach>
+        )
+        update t_glue_decompose_plan a
+        join temp_data b on a.id = b.id
+        set
+        a.plan_qty = b.plan_qty,a.stock_qty = b.stock_qty,a.safe_stock_qty = b.safe_stock_qty, a.produce_qty = b.produce_qty,
+        a.machine_code = b.machine_code, a.remark = b.remark, a.update_by = b.update_by,
+        a.update_time = now()
+        where a.DEL_FLAG = '0'
+    </update>
+
+    <select id="listGlueSpanSetting" resultType="com.zlt.mix.schedule.api.domain.entity.GlueSpanSend">
+        SELECT #{planDate} AS SCHEDULE_DATE,
+               ENTRUST_MIX_AREA,         /*委托密炼区*/
+               ENTRUSTED_MIX_AREA,       /*被委托密炼区*/
+               a.GLUE,                   /*胶料*/
+               p.PRODUCE_QTY AS SEND_QTY,   /*发送数量*/
+               now() AS SEND_TIME,     /*发送时间*/
+               p.id as SCHEDULE_ID,
+               '0' AS RECEIVE_STATUS,    /*状态：未接收*/
+               '0' AS SOURCE,            /*来源：分解胶料需求量*/
+               '0' AS IS_AUTO,            /*根据跨区设置表生产的发送记录*/
+               p.machine_code as decompose_machine_code   /*分解的机台如果是空，说明跨区后的生产量需要重新计算*/
+        FROM T_GLUE_SPAN_SETTING a
+        INNER JOIN T_GLUE_DECOMPOSE_PLAN p ON a.ENTRUST_MIX_AREA = p.MIX_AREA AND a.GLUE = p.GLUE
+        WHERE a.DEL_FLAG = '0'
+        AND p.DEL_FLAG = '0'
+        AND a.ENTRUST_MIX_AREA = #{mixArea}
+        AND p.plan_date = #{planDate}
+        AND (a.ENTRUSTED_MIX_AREA, a.GLUE) NOT IN ( /*过滤掉自动分解后已经被接收的胶料*/
+                                                   SELECT ENTRUSTED_MIX_AREA,GLUE
+                                                   FROM T_GLUE_SPAN_RECEIVE t
+                                                   where schedule_date = #{planDate}
+                                                   and ENTRUST_MIX_AREA = #{mixArea}
+                                                   and SOURCE ='0'    /*数据来源：分解胶料*/
+                                                   and IS_AUTO = '0'   /*根据跨区设置表生产的发送记录*/
+                                                   and RECEIVE_STATUS = '1' /*已接受*/
+                                                  )
+    </select>
+
+    <update id="deleteAutoNotReceive">
+        UPDATE T_GLUE_SPAN_RECEIVE
+        SET DEL_FLAG ='1'
+        where schedule_date = #{planDate}
+        and ENTRUST_MIX_AREA = #{mixArea}
+        and SOURCE ='0'    /*数据来源：分解胶料*/
+        and IS_AUTO ='0'    /*根据跨区设置表生产的发送记录*/
+        and RECEIVE_STATUS = '0' /*未接收*/
+    </update>
+
+    <update id="deleteAutoNotReceiveSend">
+        UPDATE T_GLUE_SPAN_SEND
+        SET DEL_FLAG ='1'
+        where schedule_date = #{planDate}
+        and ENTRUST_MIX_AREA = #{mixArea}
+        and SOURCE ='0'    /*数据来源：分解胶料*/
+        and IS_AUTO ='0'    /*根据跨区设置表生产的发送记录*/
+        and RECEIVE_STATUS = '0' /*未接收*/
+    </update>
+
+    <update id="matchGlueReceiveMachine">
+        insert into T_GLUE_SPAN_RECEIVE p
+        using (
+                SELECT MIX_AREA, GLUE,
+                       (case when instr(MACHINE_CODE,',') = 0 then MACHINE_CODE else substr(MACHINE_CODE, 1,instr(MACHINE_CODE,',')-1) end) as machine_code  /*如果有多个机台，则只拿第一个机台*/
+                FROM (
+                      SELECT f.MIX_AREA,f.GLUE,
+                             REGEXP_REPLACE(LISTAGG(f.MACHINE_CODE, ',') WITHIN GROUP (ORDER BY f.MACHINE_ORDER),  '([^,]+)(,\1)*(,|$)','\1\3') as MACHINE_CODE  /*机台根据机台顺序升序排序*/
+                       FROM T_FORMULA_MACHINE f
+                       INNER JOIN T_MIX_MACHINE m1 ON f.mix_area=m1.mix_area and f.machine_code = m1.machine_code and m1.status = '0' and m1.del_flag = '0'
+                       WHERE f.DEL_FLAG = '0'
+                       GROUP BY f.MIX_AREA, f.GLUE)
+               ) m
+        on (p.glue = m.glue and p.entrusted_mix_area = m.mix_area and p.del_flag = '0'
+            and p.send_id in <foreach collection="sendIdList" item="sendId" open="(" close=")" separator=",">#{sendId}</foreach>
+            and p.schedule_date = #{planDate})
+        when matched then
+            update
+            set p.MACHINE_CODE = m.MACHINE_CODE
+    </update>
+
+    <update id="matchGlueReceiveSpecialMachine">
+        insert into T_GLUE_SPAN_RECEIVE p
+        using (SELECT d.MIX_AREA,
+                      d.GLUE,
+                      REGEXP_REPLACE(LISTAGG(d.MACHINE_CODE, ',') WITHIN GROUP (ORDER BY d.MACHINE_CODE), '([^,]+)(,\1)+','\1') AS MACHINE_CODE /*密炼机台*/
+               FROM T_MACHINE_GLUE_DECOMPOSE d
+               INNER JOIN T_MIX_MACHINE m on d.machine_code = m.machine_code and m.DEL_FLAG = '0' and m.STATUS='0'
+               WHERE d.DEL_FLAG = '0'
+               GROUP BY d.MIX_AREA, d.GLUE) m
+        on (p.glue = m.glue and p.entrusted_mix_area = m.mix_area and p.del_flag = '0'
+            and p.send_id in <foreach collection="sendIdList" item="sendId" open="(" close=")" separator=",">#{sendId}</foreach>
+            and p.schedule_date = #{planDate})
+        when matched then
+            update
+            set p.MACHINE_CODE = m.MACHINE_CODE
+    </update>
+
+    <select id="selectSpanSendNeedFieldByIds" parameterType="String" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        select id, plan_date, glue, produce_qty,remark, machine_code
+          from t_glue_decompose_plan where del_flag = '0' and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

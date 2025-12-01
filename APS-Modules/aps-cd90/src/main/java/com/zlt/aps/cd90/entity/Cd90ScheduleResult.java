@@ -23,13 +23,13 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_CD90_SCHEDULE_RESULT")
 @ApiModel(value = "Cd90ScheduleResult对象", description = "90度裁断排程结果表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class Cd90ScheduleResult extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "排程日期")

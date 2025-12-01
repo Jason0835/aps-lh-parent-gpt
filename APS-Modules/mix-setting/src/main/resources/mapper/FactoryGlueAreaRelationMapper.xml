@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.FactoryGlueAreaRelationMapper">
+    <sql id="selectFactoryGlueAreaRelationVo">
+        select id, factory, glue, mix_area, remark, del_flag, create_by, create_time, update_by, update_time from t_factory_glue_area_relation
+    </sql>
+
+    <select id="selectFactoryGlueAreaRelationList" parameterType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation" resultType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation">
+        <include refid="selectFactoryGlueAreaRelationVo"/>
+        where del_flag = '0'
+        <if test="factory != null  and factory != ''"> and factory = #{factory}</if>
+        <if test="glue != null  and glue != ''"> and glue = #{glue}</if>
+        <if test="mixArea != null  and mixArea != ''"> and mix_Area = #{mixArea}</if>
+        <if test="searchGlue != null  and searchGlue != ''"> and glue LIKE concat('%',#{searchGlue},'%')</if>
+    </select>
+
+    <select id="selectFactoryGlueAreaRelationById" parameterType="Long" resultType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation">
+        <include refid="selectFactoryGlueAreaRelationVo"/>
+    	where id = #{id}
+    </select>
+
+    <insert id="insertFactoryGlueAreaRelation" parameterType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation">
+                insert into t_factory_glue_area_relation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="factory != null">factory,</if>
+                <if test="glue != null">glue,</if>
+                <if test="mixArea != null">mix_area,</if>
+                <if test="remark != null">remark,</if>
+                <if test="delFlag != null">del_flag,</if>
+                <if test="createBy != null">create_by,</if>
+                <if test="createTime != null">create_time,</if>
+                <if test="updateBy != null">update_by,</if>
+                <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">#{id},</if>
+                <if test="factory != null">#{factory},</if>
+                <if test="glue != null">#{glue},</if>
+                <if test="mixArea != null">#{mixArea},</if>
+                <if test="remark != null">#{remark},</if>
+                <if test="delFlag != null">#{delFlag},</if>
+                <if test="createBy != null">#{createBy},</if>
+                <if test="createTime != null">#{createTime},</if>
+                <if test="updateBy != null">#{updateBy},</if>
+                <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateFactoryGlueAreaRelation" parameterType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation">
+        update t_factory_glue_area_relation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factory != null">factory = #{factory},</if>
+            <if test="glue != null">glue = #{glue},</if>
+            <if test="mixArea != null">mix_area = #{mixArea},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteFactoryGlueAreaRelationById" parameterType="Long">
+        update t_factory_glue_area_relation set del_flag=null where id = #{id}
+    </delete>
+
+    <delete id="deleteFactoryGlueAreaRelationByIds" parameterType="String">
+        update t_factory_glue_area_relation set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <select id="listFactoryGlueAreaRelationNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.factory,jdbcType=VARCHAR} FACTORY, #{data.glue,jdbcType=VARCHAR}
+            GLUE
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_FACTORY_GLUE_AREA_RELATION m
+        inner join temp_table t on m.FACTORY = t.FACTORY and m.GLUE = t.GLUE and
+        m.del_flag ='0'
+    </select>
+    
+    <insert id="batchInsertFactoryGlueAreaRelationInfo">
+        insert into t_factory_glue_area_relation
+        (id,mix_area,glue,factory,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueSafeStock" separator=" union all ">
+            select
+            #{glueSafeStock.mixArea,jdbcType=VARCHAR} mix_area,
+            #{glueSafeStock.glue,jdbcType=VARCHAR} glue,
+            #{glueSafeStock.factory,jdbcType=VARCHAR} factory,
+            #{glueSafeStock.remark,jdbcType=VARCHAR} remark,
+            #{glueSafeStock.delFlag,jdbcType=VARCHAR} del_flag,
+            #{glueSafeStock.createBy,jdbcType=VARCHAR} create_by,
+            #{glueSafeStock.createTime,jdbcType=TIMESTAMP} create_time,
+            #{glueSafeStock.updateBy,jdbcType=VARCHAR} update_by,
+            #{glueSafeStock.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+    
+    <update id="mergeSql" parameterType="list">
+        insert into t_factory_glue_area_relation
+        (
+        factory, glue, mix_area, remark, del_flag, create_by, create_time
+        ) values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.factory,jdbcType=VARCHAR} ,
+            #{item.glue,jdbcType=VARCHAR} ,
+            #{item.mixArea,jdbcType=VARCHAR} ,
+            #{item.remark,jdbcType=VARCHAR} ,
+            #{item.delFlag,jdbcType=VARCHAR} ,
+            #{item.createBy,jdbcType=VARCHAR} ,
+            #{item.createTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        update
+        mix_Area = values(mix_Area),
+        remark = values(remark),
+        update_by = values(update_by),
+        update_time = now()
+    </update>
+</mapper>

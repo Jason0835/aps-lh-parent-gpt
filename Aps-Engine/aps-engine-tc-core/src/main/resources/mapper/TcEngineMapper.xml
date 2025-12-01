@@ -7,19 +7,26 @@
                max(cxr.SCHEDULE_DATE) SCHEDULE_DATE, /*排程日期*/
                max(cxr.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
                ci.SIDEWALL_CODE,   /*胎侧代码*/
-               max(substr(ci.SIDEWALL_RUBBER,1, INSTR(ci.SIDEWALL_RUBBER||'/','/')-1)) GLUE_CODE,  /*胶料,施工信息表取的胶料代码是'/'分割的，默认只需要取第一个胶料*/
+               max(substr(ci.SIDEWALL_RUBBER,1, INSTR(concat(ci.SIDEWALL_RUBBER,'/'),'/')-1)) GLUE_CODE,  /*胶料,施工信息表取的胶料代码是'/'分割的，默认只需要取第一个胶料*/
                max(ci.SIDEWALL_RUBBER) WHOLE_GLUE_CODE,  /*胶料代码(完整没有截取的)*/
                max(ci.SIDEWALL_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
-               nvl(max(ci.SIDEWALL_LENGTH),0) UNIT_CONSUME, /*单耗(胎侧长)*/
-               nvl(ceil(sum(cxr.CLASS1_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS1_PLAN,  /*对应成型一班的胎侧胶计划量=成型计划量*单耗/1000   */
-               nvl(ceil(sum(cxr.CLASS2_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS2_PLAN,  /*对应成型二班的胎侧胶计划量*/
-               nvl(ceil(sum(cxr.CLASS3_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS3_PLAN,  /*对应成型二班的胎侧胶计划量*/
-               nvl(ceil(sum(cxr.CLASS4_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS4_PLAN,  /*对应成型次日一班的胎侧胶计划量*/
-               nvl(ceil(sum(cxr.CLASS5_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS5_PLAN,  /*对应成型次日二班的胎侧胶计划量*/
-               regexp_replace(listagg(cxr.CX_MACHINE_CODE||'$'||cxr.EMBRYO_CODE||'$'||cxr.BOM_DATA_VERSION,',') within group (order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION), '([^,]+)(,\1)+', '\1') as quotaKeys /*机台code$胎胚代码*/
+               IFNULL(max(ci.SIDEWALL_LENGTH),0) UNIT_CONSUME, /*单耗(胎侧长)*/
+        IFNULL(CEILING(sum(cxr.CLASS3_PLANNED_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS1_PLAN,
+        /*对应成型一班的胎侧胶计划量=成型计划量*单耗/1000 */
+               IFNULL(CEILING(sum(cxr.CLASS2_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS2_PLAN,  /*对应成型二班的胎侧胶计划量*/
+               IFNULL(CEILING(sum(cxr.CLASS3_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS3_PLAN,  /*对应成型二班的胎侧胶计划量*/
+               IFNULL(CEILING(sum(cxr.CLASS4_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS4_PLAN,  /*对应成型次日一班的胎侧胶计划量*/
+               IFNULL(CEILING(sum(cxr.CLASS5_PLAN_QTY*ci.SIDEWALL_LENGTH/1000)),0) CX_CLASS5_PLAN,  /*对应成型次日二班的胎侧胶计划量*/
+        GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by
+        cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/,
+        MAX(CASE WHEN cxr.remark = p.param_value THEN 0 ELSE 1 END) CLOSE_OUT_SPEC_FLAG, /*收尾标记*/
+        IFNULL(MIN(CLASS2_SORT), 9) CLASS2_SORT,
+        IFNULL(MIN(CLASS3_SORT), 9) CLASS3_SORT,
+        IFNULL(MIN(CLASS4_SORT), 9) CLASS4_SORT
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
         inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION /*施工信息表*/
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        LEFT join t_tc_params p on p.param_code = 'CLOSE_OUT_SPEC_REMARK'
+        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="productionStage == '1'.toString()">
             and ci.PRODUCTION_STAGE = '0'
         </if>
@@ -42,20 +49,20 @@
                CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE,MARK_CLOSE_OUT_TIP,PRODUCTION_STATUS, REMARK,
                DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,data_source,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME,CLOSE_OUT_SPEC_FLAG
         from T_TC_SCHEDULE_RESULT
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </insert>
 
     <delete id="deleteTcSchedule" parameterType="string">
-        delete from T_TC_SCHEDULE_RESULT where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        delete from T_TC_SCHEDULE_RESULT where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </delete>
 
     <update id="deleteTcAssistSchedule" parameterType="string">
-        update T_TC_ASSIST_SCHEDULE set DEL_FLAG = '1', UPDATE_TIME = SYSDATE where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        update T_TC_ASSIST_SCHEDULE set DEL_FLAG = '1', UPDATE_TIME = NOW() where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </update>
 
     <insert id="createScheduleRecord" parameterType="map">
         insert into T_TC_AUTO_SCHEDULE_RECORD (ID, CX_BATCH_NO, BATCH_NO, STATUS, SCHEDULE_DATE, CREATE_BY, CREATE_TIME, DEL_FLAG)
-        values (SEQ_AUTO_SCHEDULE_RECORD.Nextval, #{cxBatchNo}, #{batchNo}, '0', to_date(#{scheduleDate},'yyyy-mm-dd'), #{userName}, sysdate,  '0')
+        values (NULL, #{cxBatchNo}, #{batchNo}, '0', STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), #{userName}, NOW(),  '0')
     </insert>
 
     <insert id="batchCreateScheduleResult" parameterType="list">
@@ -63,18 +70,20 @@
                                           GLUE_SEQ, MOUTH_PLATE_CODE, UNIT_CONSUME, MACHINE_ID, STOCK_QTY, SUPPLY_TIME, DAY_PLAN_QTY,
                                           DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NIGHT_PLAN_QTY,  NIGHT_PRODUCE_ORDER,
                                           NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, PRE_PLAN_QTY, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN,
-                                          CX_CLASS5_PLAN, IS_RELEASE,MARK_CLOSE_OUT_TIP,PRODUCTION_STATUS, DEL_FLAG, CREATE_BY, CREATE_TIME,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME,REMARK,CLOSE_OUT_SPEC_FLAG)
-        select SEQ_TC_SCHEDULE.NEXTVAL AS ID, x.*
-        from (
-              <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-                   select #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.sidewallCode},#{schedule.glueCode,jdbcType=VARCHAR},#{schedule.wholeGlueCode,jdbcType=VARCHAR},
+        CX_CLASS5_PLAN, IS_RELEASE,MARK_CLOSE_OUT_TIP,PRODUCTION_STATUS, DEL_FLAG, CREATE_BY,
+        CREATE_TIME,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME,REMARK,CLOSE_OUT_SPEC_FLAG,
+        NEXT_DAY_PLAN_QTY, LAST_MID_PLAN_QTY)
+        values
+        <foreach collection="scheduleResultList" item="schedule" separator=",">
+            (
+                          NULL,#{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.sidewallCode},#{schedule.glueCode,jdbcType=VARCHAR},#{schedule.wholeGlueCode,jdbcType=VARCHAR},
                           #{schedule.glueSeq,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},#{schedule.dayPlanQty,jdbcType=DOUBLE},
                           #{schedule.dayProduceOrder,jdbcType=DOUBLE},#{schedule.daySysAnalysis,jdbcType=VARCHAR},#{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.nightPlanQty,jdbcType=DOUBLE},#{schedule.nightProduceOrder,jdbcType=DOUBLE},#{schedule.nightSysAnalysis,jdbcType=VARCHAR},
                           #{schedule.nightHandAnalysis,jdbcType=VARCHAR},#{schedule.prePlanQty,jdbcType=DOUBLE},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.isRelease,jdbcType=VARCHAR},
-                          #{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},nvl(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},#{schedule.remark,jdbcType=VARCHAR},#{schedule.closeOutSpecFlag,jdbcType=VARCHAR}
-                  from dual
-              </foreach>
-        ) x
+            #{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},IFNULL(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},#{schedule.remark,jdbcType=VARCHAR},#{schedule.closeOutSpecFlag,jdbcType=VARCHAR},
+            #{schedule.nextDayPlanQty,jdbcType=DOUBLE}, #{schedule.lastMidPlanQty,jdbcType=DOUBLE}
+            )
+        </foreach>
     </insert>
 
     <insert id="batchCreateAssistScheduleResult" parameterType="list">
@@ -83,17 +92,16 @@
                                           DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NIGHT_PLAN_QTY,  NIGHT_PRODUCE_ORDER,
                                           NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, PRE_PLAN_QTY, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN,
                                           CX_CLASS5_PLAN, IS_RELEASE,MARK_CLOSE_OUT_TIP,PRODUCTION_STATUS, DEL_FLAG, CREATE_BY, CREATE_TIME)
-        select SEQ_TC_SCHEDULE.NEXTVAL AS ID, x.*
-        from (
-              <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-                   select #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.sidewallCode},#{schedule.glueCode,jdbcType=VARCHAR},
+        values
+        <foreach collection="scheduleResultList" item="schedule" separator=",">
+            (
+                          NULL, #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.sidewallCode},#{schedule.glueCode,jdbcType=VARCHAR},
                           #{schedule.glueSeq,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},#{schedule.dayPlanQty,jdbcType=DOUBLE},
                           #{schedule.dayProduceOrder,jdbcType=DOUBLE},#{schedule.daySysAnalysis,jdbcType=VARCHAR},#{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.nightPlanQty,jdbcType=DOUBLE},#{schedule.nightProduceOrder,jdbcType=DOUBLE},#{schedule.nightSysAnalysis,jdbcType=VARCHAR},
                           #{schedule.nightHandAnalysis,jdbcType=VARCHAR},#{schedule.prePlanQty,jdbcType=DOUBLE},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.isRelease,jdbcType=VARCHAR},
                           #{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime}
-                  from dual
-              </foreach>
-        ) x
+            )
+        </foreach>
     </insert>
 
     <select id="listTcParams" resultType="com.zlt.aps.tc.engine.vo.TcParamsVo">
@@ -105,15 +113,15 @@
     <select id="getTcCurrentBatchNo" resultType="string" parameterType="string">
         SELECT MAX(BATCH_NO) BATCH_NO
         FROM t_tc_auto_schedule_record
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </select>
 
     <select id="listTcScheduleBaseInfo" parameterType="string" resultType="com.zlt.aps.tc.engine.vo.TcScheduleBaseInfoVo">
         select c.SIDEWALL_CODE,
-               max(substr(c.SIDEWALL_RUBBER,1, INSTR(c.SIDEWALL_RUBBER||'/','/')-1)) GLUE_CODE,
+               max(substr(c.SIDEWALL_RUBBER,1, INSTR(concat(c.SIDEWALL_RUBBER,'/'),'/')-1)) GLUE_CODE,
                max(c.SIDEWALL_RUBBER) WHOLE_GLUE_CODE,  /*胶料代码(完整没有截取的)*/
                max(c.SIDEWALL_MOUTH_PLATE) MOUTH_PLATE_CODE,
-               nvl(max(c.SIDEWALL_LENGTH),0) UNIT_CONSUME
+               IFNULL(max(c.SIDEWALL_LENGTH),0) UNIT_CONSUME
         from T_CONSTRUCTION_VERSION_INFO c
         where c.Del_Flag = '0'
         <if test="productionStage == '1'.toString()">
@@ -123,72 +131,75 @@
         group by c.SIDEWALL_CODE
     </select>
 
-    <update id="mergeTcScheduleResult">
-        merge into t_tc_schedule_result a USING (
-        <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-            select #{schedule.scheduleDate} schedule_date,
-                   #{schedule.cxBatchNo,jdbcType=VARCHAR} cx_batch_no,
-                   #{schedule.batchNo,jdbcType=VARCHAR} batch_no,
-                   #{schedule.orderNo,jdbcType=VARCHAR} order_no,
-                   #{schedule.sidewallCode,jdbcType=VARCHAR} sidewall_code,
-                   #{schedule.glueCode,jdbcType=VARCHAR} glue_code,
-                   #{schedule.wholeGlueCode,jdbcType=VARCHAR} whole_glue_code,
-                   #{schedule.glueSeq,jdbcType=VARCHAR} glue_seq,
-                   #{schedule.mouthPlateCode,jdbcType=VARCHAR} mouth_plate_code,
-                   #{schedule.unitConsume,jdbcType=DOUBLE} unit_consume,
-                   #{schedule.machineId,jdbcType=VARCHAR} machine_id,
-                   #{schedule.stockQty,jdbcType=DOUBLE} stock_qty,
-                   #{schedule.supplyTime,jdbcType=DOUBLE} supply_time,
-                   #{schedule.dayPlanQty,jdbcType=DOUBLE} day_plan_qty,
-                   #{schedule.dayProduceOrder,jdbcType=DOUBLE} day_produce_order,
-                   #{schedule.daySysAnalysis,jdbcType=VARCHAR} day_sys_analysis,
-                   #{schedule.dayHandAnalysis,jdbcType=VARCHAR} day_hand_analysis,
-                   #{schedule.nightPlanQty,jdbcType=DOUBLE} night_plan_qty,
-                   #{schedule.nightProduceOrder,jdbcType=DOUBLE} night_produce_order,
-                   #{schedule.nightSysAnalysis,jdbcType=VARCHAR} night_sys_analysis,
-                   #{schedule.nightHandAnalysis,jdbcType=VARCHAR} night_hand_analysis,
-                   #{schedule.prePlanQty,jdbcType=DOUBLE} pre_plan_qty,
-                   #{schedule.cxClass1Plan,jdbcType=DOUBLE} cx_class1_plan,
-                   #{schedule.cxClass2Plan,jdbcType=DOUBLE} cx_class2_plan,
-                   #{schedule.cxClass3Plan,jdbcType=DOUBLE} cx_class3_plan,
-                   #{schedule.cxClass4Plan,jdbcType=DOUBLE} cx_class4_plan,
-                   #{schedule.cxClass5Plan,jdbcType=DOUBLE} cx_class5_plan,
-                   #{schedule.isRelease,jdbcType=VARCHAR} is_release,
-                   #{schedule.markCloseOutTip,jdbcType=VARCHAR} mark_close_out_tip,
-                   #{schedule.productionStatus,jdbcType=VARCHAR} production_status,
-                   #{schedule.delFlag,jdbcType=VARCHAR} del_flag,
-                   #{schedule.createBy,jdbcType=VARCHAR} create_by,
-                   #{schedule.createTime} create_time,
-                   #{schedule.remark,jdbcType=VARCHAR} remark,
-                   #{schedule.dataSource,jdbcType=VARCHAR} data_source
-            from dual
+    <insert id="mergeTcScheduleResult">
+        INSERT INTO t_tc_schedule_result (
+        schedule_date, cx_batch_no, batch_no, order_no, sidewall_code, glue_code, whole_glue_code, glue_seq,
+        mouth_plate_code, unit_consume, machine_id, stock_qty, supply_time, day_plan_qty, day_produce_order,
+        day_sys_analysis, day_hand_analysis, night_plan_qty, night_produce_order, night_sys_analysis,
+        night_hand_analysis, pre_plan_qty, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan,
+        cx_class5_plan, is_release, mark_close_out_tip, production_status, del_flag, create_by, create_time,
+        remark, data_source
+        ) VALUES
+        <foreach collection="scheduleResultList" item="schedule" separator=",">
+            (
+            #{schedule.scheduleDate},
+            #{schedule.cxBatchNo,jdbcType=VARCHAR},
+            #{schedule.batchNo,jdbcType=VARCHAR},
+            #{schedule.orderNo,jdbcType=VARCHAR},
+            #{schedule.sidewallCode,jdbcType=VARCHAR},
+            #{schedule.glueCode,jdbcType=VARCHAR},
+            #{schedule.wholeGlueCode,jdbcType=VARCHAR},
+            #{schedule.glueSeq,jdbcType=VARCHAR},
+            #{schedule.mouthPlateCode,jdbcType=VARCHAR},
+            #{schedule.unitConsume,jdbcType=DOUBLE},
+            #{schedule.machineId,jdbcType=VARCHAR},
+            #{schedule.stockQty,jdbcType=DOUBLE},
+            #{schedule.supplyTime,jdbcType=DOUBLE},
+            #{schedule.dayPlanQty,jdbcType=DOUBLE},
+            #{schedule.dayProduceOrder,jdbcType=DOUBLE},
+            #{schedule.daySysAnalysis,jdbcType=VARCHAR},
+            #{schedule.dayHandAnalysis,jdbcType=VARCHAR},
+            #{schedule.nightPlanQty,jdbcType=DOUBLE},
+            #{schedule.nightProduceOrder,jdbcType=DOUBLE},
+            #{schedule.nightSysAnalysis,jdbcType=VARCHAR},
+            #{schedule.nightHandAnalysis,jdbcType=VARCHAR},
+            #{schedule.prePlanQty,jdbcType=DOUBLE},
+            #{schedule.cxClass1Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass2Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass3Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass4Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass5Plan,jdbcType=DOUBLE},
+            #{schedule.isRelease,jdbcType=VARCHAR},
+            #{schedule.markCloseOutTip,jdbcType=VARCHAR},
+            #{schedule.productionStatus,jdbcType=VARCHAR},
+            '0',
+            #{schedule.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{schedule.remark,jdbcType=VARCHAR},
+            #{schedule.dataSource,jdbcType=VARCHAR}
+            )
         </foreach>
-        ) b ON (a.schedule_date = b.schedule_date AND a.sidewall_code = b.sidewall_code AND a.machine_id = b.machine_id AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-            a.day_plan_qty = b.day_plan_qty,
-            a.day_hand_analysis = b.day_hand_analysis,
-            a.night_plan_qty = b.night_plan_qty,
-            a.night_hand_analysis = b.night_hand_analysis,
-            a.update_by = b.create_by,
-            a.update_time = sysdate,
-            a.remark = b.remark,
-            a.data_source = b.data_source,
-            a.cx_class1_plan = b.cx_class1_plan,
-            a.cx_class2_plan = b.cx_class2_plan,
-            a.cx_class3_plan = b.cx_class3_plan,
-            a.cx_class4_plan = b.cx_class4_plan,
-            a.cx_class5_plan = b.cx_class5_plan,
-            a.day_produce_order = b.day_produce_order,
-            a.night_produce_order = b.night_produce_order
-        WHEN NOT MATCHED THEN
-        INSERT (a.id,a.schedule_date,a.remark,a.cx_batch_no,a.batch_no,a.order_no,a.sidewall_code,a.glue_code,a.whole_glue_code,a.glue_seq,a.mouth_plate_code,a.unit_consume,a.machine_id,a.stock_qty,a.supply_time,a.day_plan_qty,a.day_produce_order,a.day_sys_analysis,a.day_hand_analysis,a.night_plan_qty,a.night_produce_order,a.night_sys_analysis,a.night_hand_analysis,a.pre_plan_qty,a.cx_class1_plan,a.cx_class2_plan,a.cx_class3_plan,a.cx_class4_plan,a.cx_class5_plan,a.is_release,a.mark_close_out_tip,a.production_status,a.del_flag,a.create_by,a.create_time,a.data_source) values
-        (SEQ_TC_SCHEDULE.NEXTVAL,b.schedule_date,b.remark,b.cx_batch_no,b.batch_no,b.order_no,b.sidewall_code,b.glue_code,b.whole_glue_code,b.glue_seq,b.mouth_plate_code,b.unit_consume,b.machine_id,b.stock_qty,b.supply_time,b.day_plan_qty,b.day_produce_order,b.day_sys_analysis,b.day_hand_analysis,b.night_plan_qty,b.night_produce_order,b.night_sys_analysis,b.night_hand_analysis,b.pre_plan_qty,b.cx_class1_plan,b.cx_class2_plan,b.cx_class3_plan,b.cx_class4_plan,b.cx_class5_plan,b.is_release,b.mark_close_out_tip,b.production_status,b.del_flag,b.create_by,b.create_time,b.data_source)
-    </update>
+        ON DUPLICATE KEY UPDATE
+        day_plan_qty = VALUES(day_plan_qty),
+        day_hand_analysis = VALUES(day_hand_analysis),
+        night_plan_qty = VALUES(night_plan_qty),
+        night_hand_analysis = VALUES(night_hand_analysis),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark),
+        data_source = VALUES(data_source),
+        cx_class1_plan = VALUES(cx_class1_plan),
+        cx_class2_plan = VALUES(cx_class2_plan),
+        cx_class3_plan = VALUES(cx_class3_plan),
+        cx_class4_plan = VALUES(cx_class4_plan),
+        cx_class5_plan = VALUES(cx_class5_plan),
+        day_produce_order = VALUES(day_produce_order),
+        night_produce_order = VALUES(night_produce_order)
+    </insert>
 
     <select id="listTcNeedConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
-        select cxr.EMBRYO_CODE || ',' ||ci.EMBRYO_CODE EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码*/
-               cxr.BOM_DATA_VERSION || ',' || ci.EMBRYO_VERSION as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本*/
+        select concat(cxr.EMBRYO_CODE , ',' ,ci.EMBRYO_CODE) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码*/
+               concat(cxr.BOM_DATA_VERSION , ',' , ci.EMBRYO_VERSION) as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本*/
                ci.SIDEWALL_CODE,   /*胎侧代码*/
                ci.SIDEWALL_RUBBER,   /*胎侧胶料代码*/
                ci.SIDEWALL_MOUTH_PLATE,   /*胎侧口型板*/
@@ -196,7 +207,7 @@
         from (select EMBRYO_CODE,BOM_DATA_VERSION
               from T_CX_SCHEDULE_RESULT
               where DEL_FLAG = 0
-              and schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+              and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
               group by EMBRYO_CODE, BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
         left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0
@@ -208,17 +219,17 @@
 
     <select id="listTcEnginSchedule" resultType="com.zlt.aps.tc.engine.vo.TcScheduleResultVo">
         select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, SIDEWALL_CODE, GLUE_CODE, WHOLE_GLUE_CODE, GLUE_SEQ, MOUTH_PLATE_CODE, UNIT_CONSUME,
-               MACHINE_ID, STOCK_QTY, SUPPLY_TIME, nvl(DAY_PLAN_QTY,0) DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS,
-               DAY_HAND_ANALYSIS, nvl(NIGHT_PLAN_QTY,0) NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
+               MACHINE_ID, STOCK_QTY, SUPPLY_TIME, IFNULL(DAY_PLAN_QTY,0) DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS,
+               DAY_HAND_ANALYSIS, IFNULL(NIGHT_PLAN_QTY,0) NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
                PRE_PLAN_QTY, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME,
                UPDATE_BY, UPDATE_TIME, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
         from t_tc_schedule_result r
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         and DEL_FLAG = 0
     </select>
 
     <update id="batchUpdateProduceOrder">
-        merge into t_tc_schedule_result r
+        <!--merge into t_tc_schedule_result r
         using (
                 <foreach collection="list" item="schedule" separator=" union ">
                     SELECT #{schedule.id} id,
@@ -235,12 +246,25 @@
                      r.night_produce_order = t.night_produce_order,
                      r.day_plan_qty = t.day_plan_qty,
                      r.night_plan_qty = t.night_plan_qty,
-                     r.IS_RELEASE=decode(r.PUBLISH_SUCCESS_COUNT,0,'0','5')/*如果“发布成功计数器”=0，则状态改成“未发布”；如果“发布成功计数器”>0，则状态改成“待发布”*/
-        where r.schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+                     r.IS_RELEASE=IF(r.PUBLISH_SUCCESS_COUNT,0,'0','5')/*如果“发布成功计数器”=0，则状态改成“未发布”；如果“发布成功计数器”>0，则状态改成“待发布”*/
+        where r.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')-->
+
+        -- 执行批量更新
+        UPDATE T_TC_SCHEDULE_RESULT as result
+        JOIN temp_schedule_result tempTable ON result.id = tempTable.id
+        SET
+        result.day_plan_qty = tempTable.day_plan_qty,
+        result.night_plan_qty = tempTable.night_plan_qty,
+        result.day_produce_order = tempTable.day_produce_order,
+        result.night_produce_order = tempTable.night_produce_order,
+        result.is_release = IF(result.PUBLISH_SUCCESS_COUNT = 0,'0','5'),
+        result.update_by = tempTable.update_by,
+        result.update_time = tempTable.update_time
+        where result.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </update>
 
     <update id="batchUpdatePlanQty">
-        merge into t_tc_schedule_result r
+        <!--merge into t_tc_schedule_result r
         using (
                 <foreach collection="list" item="schedule" separator=" union ">
                     SELECT #{schedule.id} id,
@@ -255,16 +279,75 @@
           update set r.day_plan_qty = t.day_plan_qty,
                      r.night_plan_qty = t.night_plan_qty,
                      r.pre_plan_qty = t.pre_plan_qty,
-                     r.IS_RELEASE=decode(r.PUBLISH_SUCCESS_COUNT,0,'0','5')/*如果“发布成功计数器”=0，则状态改成“未发布”；如果“发布成功计数器”>0，则状态改成“待发布”*/
-        where r.schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+                     r.IS_RELEASE=IF(r.PUBLISH_SUCCESS_COUNT,0,'0','5')/*如果“发布成功计数器”=0，则状态改成“未发布”；如果“发布成功计数器”>0，则状态改成“待发布”*/
+        where r.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')-->
+
+        -- 执行批量更新
+        UPDATE T_TC_SCHEDULE_RESULT as result
+        JOIN temp_schedule_result tempTable ON result.id = tempTable.id
+        SET
+        result.day_plan_qty = tempTable.day_plan_qty,
+        result.night_plan_qty = tempTable.night_plan_qty,
+        result.pre_plan_qty = tempTable.pre_plan_qty,
+        result.is_release = IF(result.PUBLISH_SUCCESS_COUNT = 0,'0','5'),
+        result.update_by = tempTable.update_by,
+        result.update_time = tempTable.update_time
+        where result.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </update>
+
+    <update id="createTempTable">
+        -- 创建临时表用于批量更新
+        CREATE TEMPORARY TABLE temp_schedule_result (
+                                                        id BIGINT PRIMARY KEY NOT NULL,
+                                                        day_plan_qty DOUBLE,
+                                                        day_produce_order INT,
+                                                        night_plan_qty DOUBLE,
+                                                        night_produce_order INT,
+                                                        pre_plan_qty DOUBLE,
+                                                        is_release CHAR(1),
+                                                        update_by VARCHAR(25),
+                                                        update_time DATETIME
+        );
+    </update>
+
+    <insert id="insertTempTable">
+        INSERT INTO temp_schedule_result
+        (id,
+        day_plan_qty,
+        day_produce_order,
+        night_plan_qty,
+        night_produce_order,
+        pre_plan_qty,
+        is_release,
+        update_by,
+        update_time)
+        values
+        <foreach collection="scheduleResultList" item="schedule" separator=",">
+            (
+            #{schedule.id},
+            #{schedule.dayPlanQty,jdbcType = DOUBLE},
+            #{schedule.dayProduceOrder,jdbcType = DOUBLE},
+            #{schedule.nightPlanQty,jdbcType = DOUBLE},
+            #{schedule.nightProduceOrder,jdbcType = DOUBLE},
+            #{schedule.prePlanQty,jdbcType = DOUBLE},
+            #{schedule.isRelease,jdbcType = VARCHAR},
+            #{schedule.updateBy,jdbcType = VARCHAR},
+            #{schedule.updateTime}
+            )
+        </foreach>
+    </insert>
+
+    <delete id="dropTempTable">
+        -- 删除临时表
+        DROP TEMPORARY TABLE temp_schedule_result
+    </delete>
 
     <select id="listAssistSpec" resultType="string">
         select MATERIAL_CODE
         from T_TC_ASSIST_SPEC
         where DEL_FLAG='0'
     </select>
-    
+
     <!-- 查询当天的收尾规格 -->
     <select id="listCloseOutSpec" resultType="string">
           SELECT ci.SIDEWALL_CODE
@@ -283,18 +366,18 @@
 	       /* 仅对投产阶段的规格排产 */
 	       AND CI.PRODUCTION_STAGE = '0'
 		</if>
-           AND (REGEXP_LIKE(NVL(R.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
-           OR REGEXP_LIKE(NVL(R.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
-           
-           AND NOT EXISTS /*同一个施工只看几天内最后一天的排产是否收尾*/
+           AND (REGEXP_LIKE(IFNULL(R.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
+           OR REGEXP_LIKE(IFNULL(R.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
+
+        AND NOT EXISTS /*同一个施工只看几天内最后一天的排产是否收尾*/
          (SELECT 1
                   FROM T_CX_SCHEDULE_RESULT R2
                   LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI2
@@ -318,17 +401,30 @@
                        AND R3.SCHEDULE_DATE > R2.SCHEDULE_DATE
                        AND R3.DEL_FLAG = '0'
                    )
-                   
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
-                 AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
+
+        AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
+                 AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
              GROUP BY CI.SIDEWALL_CODE
     </select>
+
+    <update id="batchUpdateBatchNoAndOrderNo">
+        UPDATE T_TC_SCHEDULE_RESULT as a
+        JOIN (
+        <foreach item="item" collection="list" separator=" UNION ALL ">
+            SELECT #{item.id} AS id, #{item.batchNo} as batch_no, #{item.orderNo} as order_no FROM DUAL
+        </foreach>
+        ) tempTable ON a.id = tempTable.id
+        SET
+        a.batch_no = tempTable.batch_no,
+        a.order_no = tempTable.order_no
+        where a.del_flag = '0'
+    </update>
 </mapper>

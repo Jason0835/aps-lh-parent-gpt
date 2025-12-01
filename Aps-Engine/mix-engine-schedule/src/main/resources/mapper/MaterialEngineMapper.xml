@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.MaterialEngineMapper">
+
+    <select id="listBaseMaterialSchedule" resultType="com.zlt.mix.schedule.engine.vo.MaterialScheduleResultVo">
+        SELECT m.MATERIAL_CODE,  /*物料编号*/
+               m.MATERIAL_CODE RECIPE_MATERIAL_CODE,
+               m.MATERIAL_NAME,  /*物料名称*/
+               g.MIX_AREA,   /*密炼区*/
+               g.BATCH_NO as GLUE_SCHEDULE_BATCH_NO,  /*终炼母炼排程批次号*/
+               g.ORDER_NO as GLUE_SCHEDULE_ORDER_NO,  /*终炼母炼排程工单号*/
+               ifnull(MID_PLAN_QTY,0) + ifnull(NIGHT_PLAN_QTY, 0) + ifnull(DAY_PLAN_QTY, 0) as DEMAND_QTY, /*需求量*/
+               ifnull(g.MID_PLAN_QTY, 0) as MID_PLAN_QTY,       /*中班计划量*/
+               ifnull(g.NIGHT_PLAN_QTY, 0) as NIGHT_PLAN_QTY,         /*夜班计划量*/
+               ifnull(g.DAY_PLAN_QTY, 0) as DAY_PLAN_QTY,          /*白班计划量*/
+               g.MID_EXPECT_START_TIME as GLUE_MID_EXPECT_START_TIME,   /*胶料中班开始预计生产时间*/
+               ifnull(g.MID_PLAN_QTY, 0) as GLUE_MID_PLAN_QTY,       /*胶料中班计划量*/
+               g.NIGHT_EXPECT_START_TIME as GLUE_NIGHT_EXPECT_START_TIME,   /*胶料夜班开始预计生产时间*/
+               ifnull(g.NIGHT_PLAN_QTY, 0) as GLUE_NIGHT_PLAN_QTY,         /*胶料夜班计划量*/
+               g.DAY_EXPECT_START_TIME as GLUE_DAY_EXPECT_START_TIME,   /*胶料白班开始预计生产时间*/
+               ifnull(g.DAY_PLAN_QTY, 0) as GLUE_DAY_PLAN_QTY          /*胶料白班计划量*/
+        FROM T_GLUE_SCHEDULE_RESULT g
+        INNER JOIN T_MIX_MACHINE e on g.MACHINE_CODE = e.MACHINE_CODE
+        INNER JOIN T_MES_PMT_RECIPE r on g.glue = r.RECIPE_MATERIAL_NAME and g.MACHINE_CODE = r.RECIPE_EQUIP_CODE and g.RECIPE_TYPE=r.RECIPE_TYPE and g.RECIPE_VERSION_ID=r.RECIPE_VERSION_ID /*根据物料名称、机台、配方类型、配方版本号关联*/
+        INNER JOIN T_MES_PMT_RECIPE_WEIGHT t on r.RECIPE_ID =  t.FATHER_RECIPE_ID
+        INNER JOIN T_MES_BAS_MATERIAL m on t.RECIPE_MATERIAL_CODE = m.MATERIAL_CODE  /*根据物料编码关联*/
+        WHERE g.SCHEDULE_DATE = #{scheduleDate}
+        AND g.MIX_AREA = #{mixArea}
+        AND g.del_flag = '0'
+        AND r.RECIPE_STATE = '1'   /*配方状态: 再用*/
+        AND r.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+        AND m.MAJOR_TYPE = '2'  /*物料大类为：硫磺辅料*/
+        /*密炼机如果有硫磺称，则终炼胶不需要硫磺排程计划；密炼机如果有辅料成，则母炼胶不需要辅料排程计划*/
+        AND ((e.HAVE_SULFUR_STEELYARD = '0' AND instr(glue,'/') = 0) OR (e.HAVE_MATERIAL_STEELYARD = '0' AND  instr(glue,'/') > 0))
+    </select>
+
+    <sql id="spanReceivedSql">
+         SELECT m.MATERIAL_CODE,  /*物料编号*/
+                m.MATERIAL_CODE RECIPE_MATERIAL_CODE,
+                m.MATERIAL_NAME,
+                g.ENTRUSTED_MIX_AREA as MIX_AREA,
+                'MATERIAL_SPAN' as GLUE_SCHEDULE_BATCH_NO,  /*表示跨区接收*/
+                g.id as GLUE_SCHEDULE_ORDER_NO,   /*接收记录ID*/
+                ifnull(TOTAL_RECEIVE_QTY, 0) as DEMAND_QTY, /*需求量*/
+                ifnull(g.TOTAL_RECEIVE_QTY, 0) as MID_PLAN_QTY,       /*中班计划量*/
+                0 as NIGHT_PLAN_QTY,         /*夜班计划量*/
+                0 as DAY_PLAN_QTY,          /*白班计划量*/
+                ifnull(g.TOTAL_RECEIVE_QTY, 0) as GLUE_MID_PLAN_QTY,       /*胶料中班计划量*/
+                0 as GLUE_NIGHT_PLAN_QTY,         /*胶料夜班计划量*/
+                0 as GLUE_DAY_PLAN_QTY,     /*胶料白班计划量*/
+                g.MACHINE_CODE,         /*机台代号*/
+                g.RECIPE_TYPE,      /*配方类型*/
+                g.RECIPE_VERSION_ID,   /*配方版本号*/
+                g.RECIPE_STAGE,   /*配方阶段*/
+                '3' DATA_SOURCE /*数据来源：跨区接收*/
+        FROM T_MATERIAL_SPAN_RECEIVE g
+        INNER JOIN (SELECT max(MATERIAL_CODE) as MATERIAL_CODE,
+                           MATERIAL_NAME
+                    FROM T_MES_BAS_MATERIAL
+                    WHERE MAJOR_TYPE ='2' /*物料大类为：硫磺辅料*/
+                    group by MATERIAL_NAME) m on m.MATERIAL_NAME=g.MATERIAL_NAME
+        WHERE DEL_FLAG = '0'
+    </sql>
+
+    <select id="listSpanReceive" resultType="com.zlt.mix.schedule.engine.vo.MaterialScheduleResultVo">
+        <include refid="spanReceivedSql" />
+        AND g.RECEIVE_STATUS = '1'  /*已接受*/
+        AND g.SCHEDULE_DATE = #{scheduleDate}
+        AND g.ENTRUSTED_MIX_AREA = #{mixArea}
+    </select>
+
+    <select id="listSpanReceiveByIds" resultType="com.zlt.mix.schedule.engine.vo.MaterialScheduleResultVo">
+        <include refid="spanReceivedSql" />
+        AND g.id in <foreach collection="receiveIds" item="receiveId" separator="," open="(" close=")">#{receiveId}</foreach>
+    </select>
+
+    <select id="listCommonlyUsedMaterial" resultType="string">
+        SELECT MATERIAL_NAME
+        FROM T_MATERIAL_SCHEDULE_RESULT
+        WHERE DEL_FLAG = '0'
+        AND mix_area = #{mixArea}
+        AND schedule_date &lt; #{scheduleDate}
+        AND schedule_date >= #{scheduleDate} - #{commonlyUsedDay}
+        AND MATERIAL_NAME in <foreach collection="areaMaterialList" item="areaMaterial" separator="," open="(" close=")">#{areaMaterial.materialName}</foreach>
+        GROUP BY MATERIAL_NAME
+        having count(distinct schedule_date) = #{commonlyUsedDay}
+    </select>
+
+    <sql id="materialScheduleColumn">
+        ID, GLUE_SCHEDULE_BATCH_NO, BATCH_NO, GLUE_SCHEDULE_ORDER_NO, ORDER_NO, SCHEDULE_DATE, MACHINE_CODE, MIX_AREA, MATERIAL_CODE, MATERIAL_NAME,
+        RECIPE_VERSION_ID, RECIPE_TYPE, RECIPE_STAGE, RECIPE_MATERIAL_CODE, COMMONLY_USED, STOCK_QTY, DEMAND_QTY, DEMAND_PLANNING, TOTAL_PLAN_QTY,
+        TOTAL_SURPLUS, MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_EXPECT_START_TIME,MID_EXPECT_FINISH_TIME, MID_REMARK, NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER,
+        NIGHT_EXPECT_START_TIME,NIGHT_EXPECT_FINISH_TIME, NIGHT_REMARK, DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_EXPECT_START_TIME, DAY_EXPECT_FINISH_TIME, DAY_REMARK, RELEASE_STATUS,
+        PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, DATA_SOURCE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,SAFE_STOCK_QTY,
+        GLUE_MID_EXPECT_START_TIME, GLUE_MID_PLAN_QTY, GLUE_NIGHT_EXPECT_START_TIME, GLUE_NIGHT_PLAN_QTY, GLUE_DAY_EXPECT_START_TIME, GLUE_DAY_PLAN_QTY,
+        CLASS_SHIFT, CAPACITY
+    </sql>
+
+    <sql id="column">
+        r.ID, r.GLUE_SCHEDULE_BATCH_NO, r.BATCH_NO, r.GLUE_SCHEDULE_ORDER_NO, r.ORDER_NO, r.SCHEDULE_DATE, r.MACHINE_CODE, r.MIX_AREA, r.MATERIAL_CODE, r.MATERIAL_NAME, r.RECIPE_VERSION_ID, r.RECIPE_TYPE, r.RECIPE_STAGE, r.RECIPE_MATERIAL_CODE, r.COMMONLY_USED, r.STOCK_QTY, r.DEMAND_QTY, r.DEMAND_PLANNING, r.SAFE_STOCK_QTY, r.TOTAL_PLAN_QTY, r.TOTAL_SURPLUS, r.MID_PLAN_QTY, r.MID_PRODUCE_ORDER, r.MID_EXPECT_START_TIME, r.MID_EXPECT_FINISH_TIME, r.MID_REMARK, r.NIGHT_PLAN_QTY, r.NIGHT_PRODUCE_ORDER, r.NIGHT_EXPECT_START_TIME, r.NIGHT_EXPECT_FINISH_TIME, r.NIGHT_REMARK, r.DAY_PLAN_QTY, r.DAY_PRODUCE_ORDER, r.DAY_EXPECT_START_TIME, r.DAY_EXPECT_FINISH_TIME, r.DAY_REMARK, r.RELEASE_STATUS, r.PUBLISH_SUCCESS_COUNT, r.NEWEST_PUBLISH_TIME, r.DATA_SOURCE, r.REMARK, r.DEL_FLAG, r.CREATE_BY, r.CREATE_TIME, r.UPDATE_BY, r.UPDATE_TIME, r.GLUE_MID_EXPECT_START_TIME, r.GLUE_MID_PLAN_QTY, r.GLUE_NIGHT_EXPECT_START_TIME, r.GLUE_NIGHT_PLAN_QTY, r.GLUE_DAY_EXPECT_START_TIME, r.GLUE_DAY_PLAN_QTY, r.CLASS_SHIFT, r.CAPACITY
+    </sql>
+
+    <select id="listMaterialSchedule" resultType="com.zlt.mix.schedule.engine.vo.MaterialScheduleResultVo">
+        SELECT <include refid="column"/>,
+               (select RECIPE_TYPE_NAME from T_RECIPE_TYPE e where r.RECIPE_TYPE = e.RECIPE_TYPE_CODE AND e.DEL_FLAG='0') as RECIPE_TYPE_NAME,
+               tlf.mid_finish_qty,tlf.night_finish_qty,tlf.day_finish_qty
+        FROM T_MATERIAL_SCHEDULE_RESULT r
+        left join t_lhfl_finish tlf on r.order_no = tlf.order_no and tlf.del_flag = 0
+        WHERE r.DEL_FLAG = '0'
+        AND r.SCHEDULE_DATE = #{schedule.scheduleDate}
+        AND r.mix_area = #{schedule.mixArea}
+        <if test="machineList != null and machineList.size() > 0">
+            AND r.machine_code in <foreach collection="machineList" item="machine" open="(" close=")" separator=",">#{machine}</foreach>
+        </if>
+        <if test="schedule.publishSuccessCount != null and schedule.publishSuccessCount > 0">
+            AND r.PUBLISH_SUCCESS_COUNT > 0
+        </if>
+    </select>
+
+    <select id="maxMachineOrderAndFinishTime" resultType="com.zlt.mix.schedule.api.domain.entity.MaterialScheduleResult" parameterType="com.zlt.mix.schedule.api.domain.entity.MaterialScheduleResult">
+        SELECT ifnull(max(MID_PRODUCE_ORDER), 0) MID_PRODUCE_ORDER,
+               max(MID_EXPECT_FINISH_TIME) MID_EXPECT_FINISH_TIME,
+               ifnull(max(NIGHT_PRODUCE_ORDER),0) NIGHT_PRODUCE_ORDER,
+               max(NIGHT_EXPECT_FINISH_TIME) NIGHT_EXPECT_FINISH_TIME,
+               ifnull(max(DAY_PRODUCE_ORDER), 0) DAY_PRODUCE_ORDER,
+               max(DAY_EXPECT_FINISH_TIME) DAY_EXPECT_FINISH_TIME,
+               machine_code
+        FROM T_MATERIAL_SCHEDULE_RESULT
+        WHERE DEL_FLAG = '0'
+        AND SCHEDULE_DATE = #{scheduleDate}
+        AND MIX_AREA = #{mixArea}
+        AND machine_code=#{machineCode}
+        GROUP BY machine_code
+    </select>
+
+    <insert id="syncMaterialScheduleToLog">
+        insert into T_MATERIAL_SCHEDULE_RESULT_LOG(<include refid="materialScheduleColumn"/>
+        ,MID_PUBLISH_STATUS
+        ,NIGHT_PUBLISH_STATUS
+        ,DAY_PUBLISH_STATUS)
+        SELECT <include refid="materialScheduleColumn"/>
+        ,MID_PUBLISH_STATUS
+        ,NIGHT_PUBLISH_STATUS
+        ,DAY_PUBLISH_STATUS
+        FROM T_MATERIAL_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND mix_area = #{mixArea}
+    </insert>
+
+    <delete id="deleteMaterialSchedule">
+        delete from T_MATERIAL_SCHEDULE_RESULT
+        where SCHEDULE_DATE = #{scheduleDate}
+        and mix_area = #{mixArea}
+    </delete>
+
+    <insert id="syncMaterialScheduleToInitLog">
+        insert into T_MATERIAL_SCHEDULE_INIT_LOG(<include refid="materialScheduleColumn"/>
+        ,MID_PUBLISH_STATUS
+        ,NIGHT_PUBLISH_STATUS
+        ,DAY_PUBLISH_STATUS)
+        SELECT <include refid="materialScheduleColumn"/>
+        ,MID_PUBLISH_STATUS
+        ,NIGHT_PUBLISH_STATUS
+        ,DAY_PUBLISH_STATUS
+        FROM T_MATERIAL_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND mix_area = #{mixArea}
+    </insert>
+
+    <delete id="deleteMaterialInitLog">
+        delete from T_MATERIAL_SCHEDULE_INIT_LOG
+        where SCHEDULE_DATE = #{scheduleDate}
+        and mix_area = #{mixArea}
+    </delete>
+
+    <insert id="batchInsertMaterialSchedule">
+        insert into t_material_schedule_result (<include refid="materialScheduleColumn"/>)
+        select NULL id, x.*
+        from (
+            <foreach collection="list" item="schedule" separator=" union all ">
+                select  #{schedule.glueScheduleBatchNo,jdbcType= VARCHAR} glue_schedule_batch_no, #{schedule.batchNo,jdbcType= VARCHAR} batch_no,
+                        #{schedule.glueScheduleOrderNo,jdbcType= VARCHAR} GLUE_SCHEDULE_ORDER_NO, #{schedule.orderNo,jdbcType= VARCHAR} order_no, #{schedule.scheduleDate,jdbcType=TIMESTAMP} schedule_date,
+                        #{schedule.machineCode,jdbcType= VARCHAR} machine_code, #{schedule.mixArea,jdbcType= VARCHAR} mix_area,
+                        #{schedule.materialCode,jdbcType= VARCHAR} material_code, #{schedule.materialName,jdbcType= VARCHAR} material_name,
+                        #{schedule.recipeVersionId,jdbcType= VARCHAR} recipe_version_id, #{schedule.recipeType,jdbcType= VARCHAR} recipe_type,
+                        #{schedule.recipeStage,jdbcType= VARCHAR} recipe_stage, #{schedule.recipeMaterialCode,jdbcType= VARCHAR} recipe_material_code,
+                        #{schedule.commonlyUsed,jdbcType=DOUBLE} commonly_used, #{schedule.stockQty,jdbcType=DOUBLE} stock_qty,
+                        #{schedule.demandQty,jdbcType=DOUBLE} demand_qty, #{schedule.demandPlanning,jdbcType= VARCHAR} demand_planning,
+                        #{schedule.totalPlanQty,jdbcType=DOUBLE} total_plan_qty, #{schedule.totalSurplus,jdbcType=DOUBLE} total_surplus,
+                        #{schedule.midPlanQty,jdbcType=DOUBLE} mid_plan_qty, #{schedule.midProduceOrder,jdbcType=DOUBLE} mid_produce_order,#{schedule.midExpectStartTime,jdbcType=TIMESTAMP} mid_expect_start_time,
+                        #{schedule.midExpectFinishTime,jdbcType=TIMESTAMP} mid_expect_finish_time,#{schedule.midRemark,jdbcType= VARCHAR} mid_remark, #{schedule.nightPlanQty,jdbcType=DOUBLE} night_plan_qty,
+                        #{schedule.nightProduceOrder,jdbcType=DOUBLE} night_produce_order, #{schedule.nightExpectStartTime,jdbcType=TIMESTAMP} night_expect_start_time,#{schedule.nightExpectFinishTime,jdbcType=TIMESTAMP} night_expect_finish_time,
+                        #{schedule.nightRemark,jdbcType= VARCHAR} night_remark,#{schedule.dayPlanQty,jdbcType=DOUBLE} day_plan_qty, #{schedule.dayProduceOrder,jdbcType=DOUBLE} day_produce_order,
+                        #{schedule.dayExpectStartTime,jdbcType=TIMESTAMP} day_expect_start_time,#{schedule.dayExpectFinishTime,jdbcType=TIMESTAMP} day_expect_finish_time, #{schedule.dayRemark,jdbcType= VARCHAR} day_remark,
+                        #{schedule.releaseStatus,jdbcType= VARCHAR} release_status,#{schedule.publishSuccessCount,jdbcType=DOUBLE} publish_success_count, #{schedule.newestPublishTime,jdbcType=TIMESTAMP} newest_publish_time,
+                        #{schedule.dataSource,jdbcType= VARCHAR} data_source, #{schedule.remark,jdbcType= VARCHAR} remark,#{schedule.delFlag,jdbcType= VARCHAR} del_flag, #{schedule.createBy,jdbcType= VARCHAR} create_by,
+                        #{schedule.createTime,jdbcType=TIMESTAMP} create_time, #{schedule.updateBy,jdbcType= VARCHAR} update_by,#{schedule.updateTime,jdbcType=TIMESTAMP} update_time,
+                        #{schedule.safeStockQty,jdbcType=DOUBLE} safe_stock_qty, #{schedule.glueMidExpectStartTime,jdbcType=TIMESTAMP} GLUE_MID_EXPECT_START_TIME, #{schedule.glueMidPlanQty,jdbcType=DOUBLE} GLUE_MID_PLAN_QTY,
+                        #{schedule.glueNightExpectStartTime,jdbcType=TIMESTAMP} GLUE_NIGHT_EXPECT_START_TIME,#{schedule.glueNightPlanQty,jdbcType=DOUBLE} GLUE_NIGHT_PLAN_QTY,
+                        #{schedule.glueDayExpectStartTime,jdbcType=TIMESTAMP} GLUE_DAY_EXPECT_START_TIME,#{schedule.glueDayPlanQty,jdbcType=DOUBLE} GLUE_DAY_PLAN_QTY,
+                        #{schedule.classShift,jdbcType=DOUBLE} CLASS_SHIFT, #{schedule.capacity,jdbcType=DOUBLE} capacity
+                from dual
+            </foreach>
+        ) x
+    </insert>
+
+    <select id="queryMaterialBatchNo" resultType="string">
+        SELECT max(batch_no) batch_no
+        FROM T_MATERIAL_SCHEDULE_RESULT t
+        WHERE DEL_FLAG = '0'
+        AND SCHEDULE_DATE = #{scheduleDate}
+        AND MIX_AREA = #{mixArea}
+    </select>
+
+    <select id="queryScheduleMachineInfo" resultType="com.zlt.mix.setting.api.domain.entity.LhflMachine">
+        SELECT max(CLASS_SHIFT) AS CLASS_SHIFT, max(CAPACITY) AS CAPACITY
+          FROM T_MATERIAL_SCHEDULE_RESULT
+         WHERE DEL_FLAG = '0'
+         AND mix_area = #{mixArea}
+         AND schedule_date = #{scheduleDate}
+         AND machine_code = #{machineCode}
+    </select>
+    
+    <!-- 查询硫磺辅料安全库存排产信息 -->
+    <select id="listSafeStockMaterialSchedule" resultType="com.zlt.mix.schedule.engine.vo.MaterialScheduleResultVo">
+		SELECT M.MATERIAL_CODE MATERIAL_CODE, /*物料编号*/
+		       M.MATERIAL_CODE RECIPE_MATERIAL_CODE,
+		       M.MATERIAL_NAME, /*物料名称*/
+		       MAX(S.SAFE_STOCK) AS SAFE_STOCK_QTY /*安全库存*/
+		  FROM T_LHFL_SAFE_STOCK S
+		 INNER JOIN (SELECT MAX(MATERIAL_CODE) MATERIAL_CODE, MATERIAL_NAME
+		               FROM T_MES_BAS_MATERIAL M
+		              WHERE M.MAJOR_TYPE = '2' /*物料大类为：硫磺辅料*/
+		                AND M.DEL_FLAG = '0'
+		              GROUP BY MATERIAL_NAME) M
+		    ON S.MATERIAL = M.MATERIAL_NAME /*根据物料名称关联*/
+		 WHERE S.DEL_FLAG = '0'
+		   AND S.MIX_AREA = #{mixArea}
+		   AND S.SAFE_STOCK > 0
+		 GROUP BY M.MATERIAL_NAME, M.MATERIAL_CODE
+    </select>
+</mapper>

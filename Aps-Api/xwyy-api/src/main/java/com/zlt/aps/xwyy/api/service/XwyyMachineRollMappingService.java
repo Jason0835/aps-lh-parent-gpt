@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyMachineRollMappingDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -57,8 +56,8 @@ public interface XwyyMachineRollMappingService {
      *
      * @param dto
      */
-    @GetMapping("/xwyyMachineRollMapping/exportData")
-    List<XwyyMachineRollMappingDto> exportData(@SpringQueryMap XwyyMachineRollMappingDto dto);
+    @PostMapping("/xwyyMachineRollMapping/exportData")
+    List<XwyyMachineRollMappingDto> exportData(@RequestBody XwyyMachineRollMappingDto dto);
 
     /**
      * 导入数据

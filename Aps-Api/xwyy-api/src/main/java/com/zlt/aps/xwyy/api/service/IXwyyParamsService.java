@@ -44,6 +44,6 @@ public interface IXwyyParamsService {
      *
      * @param dto 查询条件
      */
-    @GetMapping("/xwyy/params/exportData")
-    List<XwyyParamsDto> exportData(@SpringQueryMap XwyyParamsDto dto);
+    @PostMapping("/xwyy/params/exportData")
+    List<XwyyParamsDto> exportData(@RequestBody XwyyParamsDto dto);
 }

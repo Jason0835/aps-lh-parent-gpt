@@ -42,53 +42,32 @@
         order by sm.CREATE_TIME desc
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_CD90_MACHINE_ROLL_MAPPING a USING (
-        <foreach collection="list" item="ITEM" separator=" union ">
-            select
-            #{ITEM.bigRollCode,jdbcType=VARCHAR} BIG_ROLL_CODE,
-            #{ITEM.machineId,jdbcType=DECIMAL} machine_id,
-
-            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
-            #{ITEM.createTime,jdbcType=DATE} create_time,
-            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
-            #{ITEM.updateTime,jdbcType=DATE} update_time,
-            #{ITEM.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_CD90_MACHINE_ROLL_MAPPING (
+        BIG_ROLL_CODE, machine_id, create_by, create_time,
+        update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="ITEM" separator=",">
+            (
+            #{ITEM.bigRollCode,jdbcType=VARCHAR},
+            #{ITEM.machineId,jdbcType=DECIMAL},
+            #{ITEM.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{ITEM.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{ITEM.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-          a.BIG_ROLL_CODE = b.BIG_ROLL_CODE
-          and a.machine_id = b.machine_id
-          and a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.BIG_ROLL_CODE,
-        a.machine_id,
-
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.BIG_ROLL_CODE,
-        b.machine_id,
-
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
     <update id="deleteAll">
-        update T_CD90_MACHINE_ROLL_MAPPING set del_flag = '1' where del_flag = '0'
+        update T_CD90_MACHINE_ROLL_MAPPING set del_flag = NULL where del_flag = '0'
     </update>
 
 </mapper>

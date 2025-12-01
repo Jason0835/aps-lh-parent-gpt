@@ -14,25 +14,17 @@ import com.zlt.aps.common.engine.service.*;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
-import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultDto;
 import com.zlt.aps.mps.common.FinishClassEnum;
 import com.zlt.aps.mps.domain.*;
 import com.zlt.aps.mps.mapper.*;
 import com.zlt.aps.mps.service.MesFinishService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -49,9 +41,6 @@ public class MesFinishServiceImpl implements MesFinishService {
     private MpsScheduleResultMapper cxScheduleResultMapper;
     @Resource
     private CxEngineAutoScheduleRecordMapper cxEngineAutoScheduleRecordMapper;
-
-    @Resource
-    private TAutoScheduleRecordMapper autoScheduleRecordMapper;
 
     @Autowired
     private MdmMonthPlanAmountSumService sumService;
@@ -153,61 +142,7 @@ public class MesFinishServiceImpl implements MesFinishService {
      */
     @Override
     public AjaxResult mergeLhFinish(String dataVersion) {
-        List<TMesLhShiftFinishQty> mesList = finishQtyMapper.getMesLhFinishByDataVersion(dataVersion);
-        if (CollectionUtil.isEmpty(mesList)) {
-            return AjaxResult.error(I18nUtil.getMessage("mes.error.message.data.empty"));
-        }
-        List<TLhClassShiftFinishQty> list = new ArrayList<>();
-        for (TMesLhShiftFinishQty mes : mesList) {
-            TLhClassShiftFinishQty lh = new TLhClassShiftFinishQty();
-            BeanUtils.copyProperties(mes, lh);
-            this.setBaseSysValue(lh);
-            list.add(lh);
-        }
-        // 硫化是外胎
-        // 完成量回报
-        ArrayList<String> orderNoList = CollectionUtil.propertiesToList(mesList, TMesLhShiftFinishQty::getOrderNo);
-        List<LhScheduleResultDto> lhScheduleResultDtoList = autoScheduleRecordMapper.getLhBatchNoByOrderNo(orderNoList);
-        if (CollectionUtil.isEmpty(lhScheduleResultDtoList)) {
-            return AjaxResult.error(I18nUtil.getMessage("mes.error.message.lh.schedule"));
-        }
-        // 2021.12.11去掉更新汇总表数据
-//        LhScheduleResultDto lhScheduleResultDto = lhScheduleResultDtoList.get(0);
-        // 更新成型排程结果表的硫化状态
-        for (LhScheduleResultDto dto : lhScheduleResultDtoList) {
-            cxScheduleResultMapper.updateTaskTypeBySapCodeAndLhMachineCodeAndScheduleDate(dto.getSapCode(), dto.getLhMachineCode(), DateUtil.formatDate(dto.getScheduleDate()));
-        }
-        // 更新投产状态
-        cxScheduleResultMapper.updateLhProductionStatusByOrderNoIn(orderNoList);
-//        // 根据工单号查询批次号
-//        List<String> cxBatchNo = autoScheduleRecordMapper.getLhCxBatchNoByOrderNo(lhScheduleResultDto.getBatchNo());
-//        if (CollectionUtil.isEmpty(cxBatchNo)) {
-//            return AjaxResult.error(I18nUtil.getMessage("mes.error.message.lh.auto.schedule"));
-//        }
-//        // 根据批次号获取自动排程记录拿到生产排程版本
-//        CxEngineAutoScheduleRecord record = cxEngineAutoScheduleRecordMapper.selectOneByCxBatch(cxBatchNo.get(0));
-//        if (record == null) {
-//            return AjaxResult.error(I18nUtil.getMessage("mes.error.message.cx.schedule"));
-//        }
-        // 合并
-        finishQtyMapper.mergeLhFinishSql(list);
-//        // 汇总数据到 sapCode和class1FinishQty
-//        String scheduleDate = DateUtil.formatMonth(record.getScheduleDate());
-//        List<TLhClassShiftFinishQty> lhList = finishQtyMapper.selectLhByScheduleDate(scheduleDate);
-//
-//        Map<String, TLhClassShiftFinishQty> lhMap = CollectionUtil.toMap(lhList, TLhClassShiftFinishQty::getSapCode);
-//        // 查询旧数据
-//        List<TCxMonthPlanSurplus> oldList = cxMonthPlanSurplusService.getBySapCodeAndApsVersion(new ArrayList<>(lhMap.keySet()), record.getMonthPlanApsVersion());
-//        if (!CollectionUtil.isEmpty(oldList)) {
-//            for (TCxMonthPlanSurplus old : oldList) {
-//                TLhClassShiftFinishQty lh = lhMap.get(old.getSapCode());
-//                // 因为数据已经汇总到class1FinishQty，所以完成量取class1FinishQty
-//                old.setMonthFinishQty(lh.getClass1FinishQty());
-//                old.setMonthRemainQty(getMonthRemainQty(old));
-//                old.setUpdateTime(new Date());
-//            }
-//            cxMonthPlanSurplusService.mergeSql(oldList);
-//        }
+
         return AjaxResult.success(I18nUtil.getMessage("mes.error.message.lh.finish"));
     }
 

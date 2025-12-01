@@ -1,42 +1,40 @@
 package com.zlt.aps.controller.cx;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
-import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.utils.ImportUtil;
+
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxProductStockLimit;
+import com.zlt.aps.cxlh.cx.api.service.ICxProductStockLimitService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
-import com.ruoyi.api.gateway.system.domain.ExportLog;
-import com.ruoyi.api.gateway.system.service.IExportLogService;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.springframework.beans.factory.annotation.Value;
-import com.zlt.aps.common.utils.ExportUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import org.springframework.web.multipart.MultipartFile;
-import com.ruoyi.api.gateway.system.domain.ImportLog;
-import com.zlt.aps.common.utils.ImportUtil;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
-import java.io.*;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import com.ruoyi.common4ui.utils.file.FileUtils;
-import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-
-import com.zlt.aps.cx.api.domain.entity.CxProductStockLimit;
-import com.zlt.aps.cx.api.service.ICxProductStockLimitService;
 
 /**
  * 成型投产班次库存限定设置Controller

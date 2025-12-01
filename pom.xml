@@ -5,17 +5,16 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.zlt</groupId>
-    <artifactId>LL-APS</artifactId>
+    <artifactId>DC-APS</artifactId>
     <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
     <modules>
         <module>Aps-Api</module>
         <module>Aps-BootUI</module>
+        <module>APS-UI-Modules</module>
         <module>Aps-Common</module>
         <module>Aps-Engine</module>
 		<module>Aps-Modules</module>
-        <module>RuoYi-Cloud</module>
-        <module>RuoYi-BootUI</module>
     </modules>
 
 </project>

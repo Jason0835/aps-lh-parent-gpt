@@ -51,7 +51,7 @@
         select distinct cxr.embryo_code||'$'||cxr.BOM_DATA_VERSION
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
         left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.Embryo_Version and ci.DEL_FLAG = 0 /*施工信息表*/
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        where schedule_date = STR_TO_DATE(#{scheduleDate},'%Y-%m-%d')
         and cxr.DEL_FLAG = 0
         and ci.id is null
         order by cxr.embryo_code||'$'||cxr.BOM_DATA_VERSION
@@ -61,20 +61,9 @@
         select distinct cxr.BEAD_CODE
         from T_TQ_SCHEDULE_RESULT cxr /*胎圈排程结果表*/
         left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.BEAD_CODE = ci.TIRE_RING_CODE and ci.DEL_FLAG = 0 /*施工信息表*/
-        where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+        where schedule_date = STR_TO_DATE(#{scheduleDate},'%Y-%m-%d')
         and cxr.DEL_FLAG = 0
         and ci.id is null
-    </select>
-
-    <!--Joran  2021-09-06 添加硫化工序参数获取-->
-    <select id="selectLhParams" resultType="com.zlt.aps.lh.api.domain.dto.LhParamsDto" parameterType="com.zlt.aps.lh.api.domain.dto.LhParamsDto">
-        select * from t_lh_params
-        <where>
-            del_flag='0'
-            <if test="paramCode!=null and paramCode!=''">
-                and param_code=#{paramCode}
-            </if>
-        </where>
     </select>
 
 </mapper>

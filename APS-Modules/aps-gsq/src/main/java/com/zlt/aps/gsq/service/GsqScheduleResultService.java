@@ -3,6 +3,7 @@ package com.zlt.aps.gsq.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.entity.GsqScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,10 +99,10 @@ public interface GsqScheduleResultService extends IService<GsqScheduleResult> {
      */
     @Transactional(rollbackFor = Exception.class)
     public void publish(GsqScheduleResult scheduleResult, long[] ids, String dataVersion, String factoryCode, String companyCode);
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+     *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
@@ -159,4 +160,21 @@ public interface GsqScheduleResultService extends IService<GsqScheduleResult> {
     int isPublishByIds(long[] ids);
 
     List<GsqScheduleResultDto> selectByIds(List<Long> ids2);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<GsqDayFinishQty> list, Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(GsqScheduleResult scheduleResult);
 }

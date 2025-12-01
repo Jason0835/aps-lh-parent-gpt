@@ -4,7 +4,6 @@ import com.alibaba.csp.sentinel.util.StringUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -12,19 +11,24 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.common.handle.NcSyncDataHandle;
 import com.zlt.aps.nc.engine.service.NcEngineService;
 import com.zlt.aps.nc.service.NcMachineInfoService;
 import com.zlt.aps.nc.service.NcScheduleResultService;
+import com.zlt.bill.common.controller.AbstractBillBizController;
+import com.zlt.bill.common.service.IBillService;
 import com.zlt.sync.povo.SyncParamsVO;
+import io.swagger.annotations.ApiOperation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.poi.ss.usermodel.*;
@@ -54,7 +58,7 @@ import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
  */
 @RestController
 @RequestMapping("/ncScheduleResult")
-public class NcScheduleResultController extends BaseController {
+public class NcScheduleResultController extends AbstractBillBizController<NcScheduleResult> {
 
     @Value("${excelModelPath}")
     public String excelModelPath;
@@ -74,6 +78,7 @@ public class NcScheduleResultController extends BaseController {
     /**
      * 查询内衬排程结果列表
      */
+    @Override
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody NcScheduleResult ncScheduleResult) {
 //        startPage("a.GLUE_SEQ,a.GLUE_CODE asc");
@@ -85,6 +90,7 @@ public class NcScheduleResultController extends BaseController {
     /**
      * 获取内衬排程结果详细信息
      */
+    @Override
     @GetMapping(value = "/{id}")
     public NcScheduleResult getInfo(@PathVariable("id") Long id) {
         return ncScheduleResultService.selectNcScheduleResultById(id);
@@ -555,7 +561,7 @@ public class NcScheduleResultController extends BaseController {
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
      *
-     * @param scheduleDate 排程日期
+     * @param scheduleResult 排程日期
      * @return 查询到的记录数
      */
     @PostMapping("/isReleasingOrTimeoutByDate")
@@ -566,7 +572,7 @@ public class NcScheduleResultController extends BaseController {
     /**
      * 更改发布状态
      *
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Log(title = "ui.data.column.ncScheduleResult.modalName")
@@ -591,5 +597,42 @@ public class NcScheduleResultController extends BaseController {
         }
         ncScheduleResultService.combinationMiddleAndNight(ids, classifiedShift);
         return AjaxResult.success();
+    }
+
+    @Override
+    protected IBillService getBillService() {
+        return ncScheduleResultService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return BillTypeCodeEnums.NC_SCHEDULE_RESULT.getBillTypeCode();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<NcDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return ncScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody NcScheduleResult scheduleResult) {
+        return ncScheduleResultService.getSummaryVo(scheduleResult);
     }
 }

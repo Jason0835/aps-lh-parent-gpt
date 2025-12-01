@@ -21,12 +21,12 @@ public interface ICd15ScheduleAssistService {
      * 查询15度裁断外协排程结果列表
      */
     @ApiOperation("查询15度裁断外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/cd15/assistSchedule/list")
     TableDataInfo list(@RequestBody Cd15ScheduleAssist cd15ScheduleAssist);
 
     /**
      * 导出列表
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/cd15/assistSchedule/export")
     byte[] export(@RequestBody Cd15ScheduleAssist scheduleAssist);
 }

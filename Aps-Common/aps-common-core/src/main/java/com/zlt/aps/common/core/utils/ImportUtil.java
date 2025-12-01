@@ -1,22 +1,25 @@
 package com.zlt.aps.common.core.utils;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.enums.ImportErrorValueEnum;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.ObjectUtils;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.text.ParseException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 导入工具类
@@ -43,7 +46,8 @@ public class ImportUtil {
         Class cls = obj.getClass();
         //得到所有属性
         Field[] fields = cls.getDeclaredFields();
-        dictDataCach.set(new HashMap<>());
+        Map<String, String> haspMap = new HashMap<>();
+        dictDataCach.set(haspMap);
         for (int i = 0; i < fields.length; i++) {//遍历
             try {
                 //得到属性
@@ -58,26 +62,26 @@ public class ImportUtil {
                     continue;
                 }
                 Excel excel = field.getAnnotation(Excel.class);
-                String result ="";
+                String result = "";
                 Class<?> fieldType = field.getType();
                 if (Date.class == fieldType) {
-                    Date date=(Date)value;
+                    Date date = (Date) value;
                     result = validatedDateValue(row, date, validated, excel, obj);
-                }else{
+                } else {
                     //一些过长数字读取时会转为科学计数显示，在此转换为正常的数字
-                    if((Double.class == fieldType || Integer.class == fieldType || Long.class == fieldType || BigDecimal.class == fieldType)
-                        && valueStr.indexOf("E")>=0){
+                    if ((Double.class == fieldType || Integer.class == fieldType || Long.class == fieldType || BigDecimal.class == fieldType)
+                            && valueStr.indexOf("E") >= 0) {
                         //当valueStr值为最大值时，说明解析失败不应转为正常数值，在次进一步过滤
-                        if(!(valueStr.equals(ImportErrorValueEnum.DOUBLE_VALUE.getNumber().toString()) ||
+                        if (!(valueStr.equals(ImportErrorValueEnum.DOUBLE_VALUE.getNumber().toString()) ||
                                 valueStr.equals(ImportErrorValueEnum.INTEGER_VALUE.getNumber().toString()) ||
                                 valueStr.equals(ImportErrorValueEnum.LONG_VALUE.getNumber().toString()) ||
                                 valueStr.equals(ImportErrorValueEnum.FLOAT_VALUE.getNumber().toString()) ||
-                                valueStr.equals(ImportErrorValueEnum.BIGDECIMAL_VALUE.getNumber().toString()))){
-                            BigDecimal realValue=  new BigDecimal(valueStr);
-                            valueStr=realValue.toPlainString();
+                                valueStr.equals(ImportErrorValueEnum.BIGDECIMAL_VALUE.getNumber().toString()))) {
+                            BigDecimal realValue = new BigDecimal(valueStr);
+                            valueStr = realValue.toPlainString();
                         }
                     }
-                     result = validatedValue(row, valueStr, validated, excel, obj);
+                    result = validatedValue(row, valueStr, validated, excel, obj);
                 }
 
                 if (StringUtils.isNotBlank(result)) {
@@ -99,7 +103,7 @@ public class ImportUtil {
      */
     private static String validatedValue(Integer row, String value, ImportValidated validated, Excel excel, Object obj) throws ParseException {
         row = (row == null ? 0 : row);
-        value = (StringUtil.isBlank(value)) ? "" : value.trim();
+        value = (StringUtils.isBlank(value)) ? "" : value.trim();
         String name = validated.name();
         String excelName = excel.name();
         String importName = excel.importName();
@@ -109,10 +113,10 @@ public class ImportUtil {
         name = (StringUtils.isBlank(name) ? "" : I18nUtil.getMessage(name));
 
         //不能为空
-        if (validated.required() && StringUtils.isBlank(value) ) {
+        if (validated.required() && StringUtils.isBlank(value)) {
             //无法解析输入的值
             String dictType = "".equals(validated.dictType()) ? excel.dictType() : validated.dictType();
-            if (StringUtils.isNotEmpty(dictType)){
+            if (StringUtils.isNotEmpty(dictType)) {
                 String message = I18nUtil.getMessage("import.validated.notDict");
                 return String.format(message, row, name);
             }
@@ -163,10 +167,10 @@ public class ImportUtil {
         int maxLength = validated.maxLength();
         if (value.length() > maxLength) {
             String message = I18nUtil.getMessage("import.validated.maxLength");
-            String valueStr=maxLength+"";
-            if(valueStr.indexOf("E")>=0){
-                BigDecimal realValue=  new BigDecimal(maxLength);
-                valueStr=realValue.toPlainString();
+            String valueStr = maxLength + "";
+            if (valueStr.indexOf("E") >= 0) {
+                BigDecimal realValue = new BigDecimal(maxLength);
+                valueStr = realValue.toPlainString();
             }
             return String.format(message, row, name, valueStr);
         }
@@ -184,10 +188,10 @@ public class ImportUtil {
                 return String.format(message, row, name);
             } else if (ApsCommonUtil.isNumber(value) && Double.parseDouble(value) > max) {
                 String message = I18nUtil.getMessage("import.validated.max");
-                String valueStr=max+"";
-                if(valueStr.indexOf("E")>=0){
-                    BigDecimal realValue=  new BigDecimal(max);
-                    valueStr=realValue.toPlainString();
+                String valueStr = max + "";
+                if (valueStr.indexOf("E") >= 0) {
+                    BigDecimal realValue = new BigDecimal(max);
+                    valueStr = realValue.toPlainString();
                 }
                 return String.format(message, row, name, valueStr);
             }
@@ -207,7 +211,7 @@ public class ImportUtil {
         String dictType = "".equals(validated.dictType()) ? excel.dictType() : validated.dictType();
         if (StringUtils.isNotEmpty(dictType)) {
             try {
-                ExcelUtil.convertByDictValue2(dictDataCach, dictType);
+                ExcelUtil.convertByDictValueUseMap4ValueCheck(dictDataCach, dictType);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -219,10 +223,10 @@ public class ImportUtil {
                     String[] values = value.split(",");
                     for (String s : values) {
                         val = dictDataCach.get().get(dictType + SecurityUtils.getUserLang() + s);
-                        msg = StringUtil.isEmpty(val) ? msg : "";
+                        msg = StringUtils.isEmpty(val) ? msg : "";
                     }
                 }
-                return StringUtil.isEmpty(msg) ? null : msg;
+                return StringUtils.isEmpty(msg) ? null : msg;
             }
         }
         return null;
@@ -230,25 +234,26 @@ public class ImportUtil {
 
     /**
      * 是否是最大值
+     *
      * @param value
      * @return
      */
-    private static boolean isMaxValue(String value){
-        boolean isMaxValue=false;
+    private static boolean isMaxValue(String value) {
+        boolean isMaxValue = false;
         if (value.equals(ImportErrorValueEnum.INTEGER_VALUE.getNumber().toString())) {
-            return isMaxValue=true;
+            return isMaxValue = true;
         }
         if (value.equals(ImportErrorValueEnum.DOUBLE_VALUE.getNumber().toString())) {
-            return isMaxValue=true;
+            return isMaxValue = true;
         }
         if (value.equals(ImportErrorValueEnum.LONG_VALUE.getNumber().toString())) {
-            return isMaxValue=true;
+            return isMaxValue = true;
         }
         if (value.equals(ImportErrorValueEnum.FLOAT_VALUE.getNumber().toString())) {
-            return isMaxValue=true;
+            return isMaxValue = true;
         }
         if (value.equals(ImportErrorValueEnum.BIGDECIMAL_VALUE.getNumber().toString())) {
-            return isMaxValue=true;
+            return isMaxValue = true;
         }
         return isMaxValue;
     }
@@ -269,36 +274,38 @@ public class ImportUtil {
             name = StringUtils.isEmpty(importName) ? excelName : importName;
         }
         name = (StringUtils.isBlank(name) ? "" : I18nUtil.getMessage(name));
-        if (validated.required() && value==null ) {
+        if (validated.required() && value == null) {
             String message = I18nUtil.getMessage("import.validated.required");
             return String.format(message, row, name);
         }
-        if(ObjectUtils.isNotEmpty(value)){
-            String dates="";
-            try{
-                dates= DateUtils.parseDateToStr("yyyy-MM-dd",value);
-            }catch (Exception e){ }
-            if("1970-01-01".equals(dates)){
+        if (ObjectUtils.isNotEmpty(value)) {
+            String dates = "";
+            try {
+                dates = DateUtils.parseDateToStr("yyyy-MM-dd", value);
+            } catch (Exception e) {
+            }
+            if ("1970-01-01".equals(dates)) {
                 String message = I18nUtil.getMessage("import.validated.date");
                 return String.format(message, row, name);
             }
         }
-        if (validated.required() && validated.date() ) {
-            String dates="";
-            try{
-                dates= DateUtils.parseDateToStr("yyyy-MM-dd",value);
-            }catch (Exception e){ }
-            if("1970-01-01".equals(dates)){
+        if (validated.required() && validated.date()) {
+            String dates = "";
+            try {
+                dates = DateUtils.parseDateToStr("yyyy-MM-dd", value);
+            } catch (Exception e) {
+            }
+            if ("1970-01-01".equals(dates)) {
                 String message = I18nUtil.getMessage("import.validated.date");
                 return String.format(message, row, name);
             }
-            try{
-               String datestr= DateUtils.parseDateToStr("yyyy/MM/dd",value);
-                if(datestr.split("/")[0].length()>4){
+            try {
+                String datestr = DateUtils.parseDateToStr("yyyy/MM/dd", value);
+                if (datestr.split("/")[0].length() > 4) {
                     String message = I18nUtil.getMessage("import.validated.date");
                     return String.format(message, row, name);
                 }
-            }catch (Exception e){
+            } catch (Exception e) {
                 String message = I18nUtil.getMessage("import.validated.date");
                 return String.format(message, row, name);
             }

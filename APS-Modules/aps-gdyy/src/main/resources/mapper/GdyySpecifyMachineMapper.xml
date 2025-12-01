@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gdyy.mapper.GdyySpecifyMachineMapper">
+
+    <select id="listSpecifyMachine" parameterType="com.zlt.aps.gdyy.api.domain.dto.GdyySpecifyMachineDto"
+            resultType="com.zlt.aps.gdyy.api.domain.dto.GdyySpecifyMachineDto">
+        select * from (
+        select sm.*, m.machine_code, m.machine_name
+        from T_GDYY_SPECIFY_MACHINE sm
+        left join T_GDYY_MACHINE_INFO m on sm.machine_id = m.id
+        where sm.DEL_FLAG = 0
+        and m.DEL_FLAG = 0
+        <if test="bigRollCode != null and bigRollCode != ''">
+            and INSTR(BIG_ROLL_CODE, #{bigRollCode,jdbcType=VARCHAR}) > 0
+        </if>
+        <if test="machineId != null">
+            and MACHINE_ID = #{machineId}
+        </if>
+        <if test="lineType != null and lineType != ''">
+            and LINE_TYPE = #{lineType}
+        </if>
+        <if test="jobType != null and jobType != ''">
+            and JOB_TYPE = #{jobType}
+        </if>
+
+        <if test="orderStr == null">
+            order by sm.CREATE_TIME DESC
+        </if>
+        ) t
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GDYY_SPECIFY_MACHINE (
+        BIG_ROLL_CODE, machine_id, line_type, job_type, create_by, create_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="SpecifyMachine" separator=",">
+            (
+            #{SpecifyMachine.bigRollCode,jdbcType=VARCHAR},
+            #{SpecifyMachine.machineId,jdbcType=DOUBLE},
+            #{SpecifyMachine.lineType,jdbcType=VARCHAR},
+            #{SpecifyMachine.jobType,jdbcType=VARCHAR},
+            #{SpecifyMachine.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{SpecifyMachine.remark,jdbcType=VARCHAR},
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        line_type = VALUES(line_type),
+        job_type = VALUES(job_type),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
+
+    <update id="deleteAllSpecifyMachine">
+        update T_GDYY_SPECIFY_MACHINE set del_flag = NULL where del_flag = '0'
+    </update>
+</mapper>

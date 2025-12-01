@@ -1,9 +1,9 @@
 package com.zlt.aps.controller.gsq;
 
 import com.ruoyi.api.gateway.system.domain.ExportLog;
-import com.ruoyi.api.gateway.system.domain.SysDictData;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;

@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqParamsDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +42,6 @@ public interface IGsqParamsService
      * 导出接口
      * @param dto
      */
-    @GetMapping("/gsq/params/exportData")
-    List<GsqParamsDto> exportData(@SpringQueryMap GsqParamsDto dto);
+    @PostMapping("/gsq/params/exportData")
+    List<GsqParamsDto> exportData(@RequestBody GsqParamsDto dto);
 }

@@ -104,6 +104,6 @@ public class BomInfoDto extends ApsBaseDto {
 
     /** 删除标识 */
     @ApiModelProperty(value = "删除标识")
-    private Long isDelete;
+    private Integer isDelete;
 
 }

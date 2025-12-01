@@ -204,6 +204,9 @@ public class TcLossSettingServiceImpl extends ServiceImpl<TcLossSettingMapper, T
             } else {
                 dto.setMachineId(machineCodeMap.get(machineName));
                 dto.setBaseVale(null);
+                if (StringUtils.isBlank(dto.getSidewallCode())) {
+                    dto.setSidewallCode(null);
+                }
                 newList.add(dto);
             }
         }

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('分厂胶料需求计划列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: bootstrap-editable-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.glueDemandPlan.planDate}]]：</label>
+                            <input type="text" class="time-input" id="planDate"
+                                   th:placeholder="yyyy-mm-dd" name="planDate" th:value="${initDate}"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueDemandPlan.factory}]]：</label>
+                            <select id="factory" class="form-control" name="factory"
+                                    th:with="type=${@dict.getType('FACTORY')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueDemandPlan.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueDemandPlan.glue}]]：</label>
+                            <div class="neat">
+                                <input id="glue" type="text" name="glue" class="GlueNames" autocomplete="off"/>
+                            </div>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('',1050,500)"
+               shiro:hasPermission="schedule:glueDemandPlan:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',1050,500)"
+               shiro:hasPermission="schedule:glueDemandPlan:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="schedule:glueDemandPlan:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-info" onclick="importExcel()"
+               shiro:hasPermission="schedule:glueDemandPlan:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="schedule:glueDemandPlan:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-primary" onclick="rematch()"
+               shiro:hasPermission="schedule:glueDemandPlan:rematch">
+                <i class="fa fa-search"></i> [[#{schedule.glueDemandPlan.btn.rematch}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table" data-reorderable-columns="true"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var factoryDatas = [[${@dict.getType('FACTORY')}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var prefix = ctx + "schedule/glueDemandPlan";
+    var mixAreaDictLabels = Array.from(mixAreaDatas, ({dictLabel}) => dictLabel).join(",");
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            splitUrl: prefix + "/split/{id}",
+            rematchUrl: prefix + "/rematch",
+            modalName: [[#{schedule.glueDemandPlan.modelName}]],
+            pageSize: 50,
+            pageList: [50, 100, 150, 200],
+            onEditableSave: onEditableSave,
+            onEditableShown: function () {
+                setTimeout(function () {
+                    $(".form-control.input-sm").select();
+                }, 100)
+            },
+            onEditableHidden: function () {
+                $(".editable-submit").click()
+            },
+            onLoadSuccess: function (data) {
+                let $select2 = $('.select2-form');
+                $select2.select2({closeOnSelect: false});
+                $select2.on('select2:close', function (e) {
+                    changeMixArea(e);
+                });
+            },
+            columns: [
+                [
+                    {
+                        title: [[#{ui.baseInfo}]],
+                        align: 'center',
+                        colspan: 7
+                    },
+                    {
+                        title: [[#{schedule.common.midClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.common.nightClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.common.dayClass}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'planDate',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDemandPlan.planDate}]],
+                    },
+                    {
+                        field: 'factory',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.glueDemandPlan.factory}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return "";
+                            }
+                            return $.table.selectDictLabel(factoryDatas, value);
+                        }
+                    },
+                    {
+                        field: 'glue',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDemandPlan.glue}]],
+                    },
+                    {
+                        field: 'mixArea',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.glueDemandPlan.mixArea}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return "";
+                            }
+                            if ($.common.isEmpty(mixAreaDatas)) {
+                                return '';
+                            }
+                            var actions = [];
+                            $.each(value.split(','), function (i, val) {
+                                $.each(mixAreaDatas, function (index, dict) {
+                                    if (dict.dictValue == ('' + val)) {
+                                        var listClass = $.common.equals("default", dict.listClass) || $.common.isEmpty(dict.listClass) ? "" : "badge badge-" + dict.listClass;
+                                        actions.push(dict.dictLabel);
+                                    }
+                                });
+                            });
+                            return actions.join(',');
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDemandPlan.mixArea}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 只可输入英文校验
+                                var regu = /^[\x00-\xff]*$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.isCode}]]);
+                                    return [[#{ui.message.editable.isCode}]];
+                                }
+                                var valueArr = value == null ? [] : value.split(',');
+                                // 输入密炼区是否有重复判断
+                                if (isRepeat(valueArr)) {
+                                    layer.msg([[#{ui.message.editable.isRepeat}]]);
+                                    return [[#{ui.message.editable.isRepeat}]];
+                                }
+                                // 密炼区字典校验
+                                for (let i = 0; i < valueArr.length; i++) {
+                                    if (mixAreaDictLabels.indexOf(valueArr[i]) < 0) {
+                                        layer.msg(valueArr[i] + [[#{ui.message.editable.mixAreaNotExist}]]);
+                                        return valueArr[i] + [[#{ui.message.editable.mixAreaNotExist}]];
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'totalPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDemandPlan.totalPlanQty}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDemandPlan.totalPlanQty}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'midPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDemandPlan.midPlanQty}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'midRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDemandPlan.midRemark}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            return $.table.tooltip(value, 20);
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDemandPlan.midRemark}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                if (value.length > 300) {
+                                    layer.msg([[#{ui.message.editable.maxLength}]]);
+                                    return [[#{ui.message.editable.maxLength}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDemandPlan.nightPlanQty}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'nightRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDemandPlan.nightRemark}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value, 20);
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDemandPlan.nightRemark}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                if (value.length > 300) {
+                                    layer.msg([[#{ui.message.editable.maxLength}]]);
+                                    return [[#{ui.message.editable.maxLength}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDemandPlan.dayPlanQty}]],
+                        formatter: function (value, row, index) {
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'dayRemark',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDemandPlan.dayRemark}]],
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value, 20);
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDemandPlan.dayRemark}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                if (value.length > 300) {
+                                    layer.msg([[#{ui.message.editable.maxLength}]]);
+                                    return [[#{ui.message.editable.maxLength}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'remark',
+                        sortable: true,
+                        halign: 'center',
+                        title: [[#{ui.common.column.remark}]],
+                        align: 'left',
+                        visible: false,
+                        formatter: function (value, row, index) {
+                            return $.table.tooltip(value, 20);
+                        },
+                    },
+                ]
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+
+    // 拆分
+    function split(id) {
+        table.set();
+        if ($.common.isEmpty(id)) {
+            var id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+            if (id.length == 0) {
+                $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+                return;
+            }
+        }
+        var mixArea = $.table.selectColumns("mixArea");
+        if (mixArea[0] == null || mixArea[0].indexOf(',') == -1) {
+            //拆分记录的密炼区没有多个，则提示无需拆分
+            $.modal.alertWarning([[#{schedule.glueDemandPlan.split.tip}]]);
+            return;
+        }
+        url = table.options.splitUrl.replace("{id}", id);
+        $.modal.open(table.options.modalName + [[#{schedule.glueDemandPlan.btn.split}]], url, 800, 500);
+    }
+
+    // 重新匹配
+    function rematch() {
+        table.set();
+        var planDate = $("#planDate").val();
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        $.modal.confirm([[#{schedule.glueDemandPlan.btn.makeSureRematch}]], function () {
+            $.operate.post(table.options.rematchUrl, {"planDate": planDate, "ids": rows.join()});
+        })
+    }
+
+    function onEditableSave(field, row, rowIndex, oldValue, $el) {
+        // 密炼区字典转换
+        if (field === 'mixArea') {
+            var actions = [];
+            var arr = row.mixArea.split(",");
+            $.each(mixAreaDatas, function (index, dict) {
+                $.each(arr, function (index, item) {
+                    if (dict.dictLabel == (item)) {
+                        var dictValue = $.common.isEmpty(dict.dictValue) ? "" : dict.dictValue;
+                        actions.push(dictValue);
+                    }
+                })
+            });
+            row.mixArea = actions.join(',');
+        }
+        // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+        if (String(field).indexOf("PlanQty") >= 0) {
+            if (row[field] === '0') {
+                row[field] = null;
+            }
+        }
+        $.operate.updateRow(prefix + "/save", "post", row, rowIndex, function (result) {
+            if (result.code === web_status.FAIL) {
+                $("#" + table.options.id).bootstrapTable('updateCell', {
+                    index: rowIndex,
+                    field: field,
+                    value: oldValue
+                });
+            }
+        });
+        // 解决行内编辑后密炼区下拉渲染失效的问题
+        setTimeout(function () {
+            let $select2 = $('.select2-form');
+            $select2.select2({closeOnSelect: false});
+            $select2.on('select2:close', function (e) {
+                changeMixArea(e);
+            });
+        }, 150)
+    }
+
+    function importExcel() {
+        table.set();
+        var url = table.options.importUrl;
+        $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 500, '', true);
+    }
+
+    // 回显密炼区下拉
+    function transToMixAreaSelect(mixAreaDatas, value, row) {
+        var actions = [];
+        actions.push($.common.sprintf("<div class='col-sm-12'><select row='%s' name='mixArea' class='form-control select2-form' multiple required>", JSON.stringify(row)));
+        $.each(mixAreaDatas, function (index, dict) {
+            if (String(value).indexOf(dict.dictValue) >= 0) {
+                actions.push($.common.sprintf("<option value='%s' selected", dict.dictValue));
+            } else {
+                actions.push($.common.sprintf("<option value='%s'", dict.dictValue));
+            }
+            actions.push($.common.sprintf(">%s</option>", dict.dictLabel));
+        });
+        actions.push('</select></div>');
+        return actions.join('');
+    }
+
+    // 更改密炼区
+    function changeMixArea(e) {
+        var row = JSON.parse(e.target.getAttribute("row"));
+        let val = $(e.target).val();
+        var value = val == null ? null : val.join(",");
+        if (row.mixArea == value) {
+            return;
+        }
+        row.mixArea = value;
+        $.operate.post(prefix + "/save", row, function (result) {
+            if (result.code == web_status.FAIL) {
+                $.table.refresh();
+            }
+        });
+    }
+
+    //  数组内元素是否有重复判断
+    function isRepeat(arr) {
+        var hash = {};
+        for (var i in arr) {
+            if (hash[arr[i]]) {
+                return true;
+            }
+            hash[arr[i]] = true;
+        }
+        return false;
+    }
+</script>
+</body>
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <!--调整文件上传支持国际化-->
+            <input type="button" th:value="#{ui.file.btn.text}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;"
+                   onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport"> [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp; <a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i>
+                [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+</style>
+</html>

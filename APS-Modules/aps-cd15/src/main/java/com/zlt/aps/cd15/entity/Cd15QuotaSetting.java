@@ -22,13 +22,13 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_CD15_QUOTA_SETTING")
 @ApiModel(value = "Cd15QuotaSetting对象", description = "15度裁断定额设定表")
-@KeySequence(value = "SEQ_QUOTA_SETTING", clazz = Long.class)
+//@KeySequence(value = "SEQ_QUOTA_SETTING",dbType = DbType.ORACLE)
 public class Cd15QuotaSetting extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_QUOTA_SETTING")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "钢带代码")

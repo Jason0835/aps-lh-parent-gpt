@@ -1,11 +1,14 @@
 package com.zlt.aps.nc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.dto.NcMouthPlateDto;
 import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
@@ -20,9 +23,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -93,15 +94,13 @@ public class NcMouthPlateServiceImpl extends ServiceImpl<NcMouthPlateMapper, NcM
         if (ids == null) {
             return;
         }
-        List<NcMouthPlate> list = new ArrayList<>();
-        for (Long id : ids) {
-            NcMouthPlate mouthPlate = new NcMouthPlate();
-            mouthPlate.setId(id);
-            mouthPlate.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            mouthPlate.setBaseVale(mouthPlate.getId());
-            list.add(mouthPlate);
-        }
-        updateBatchById(list);
+
+        LambdaUpdateWrapper<NcMouthPlate> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**

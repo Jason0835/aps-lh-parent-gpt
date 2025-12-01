@@ -1,15 +1,15 @@
 package com.zlt.aps.cd15.engine.mapper;
 
-import java.math.BigDecimal;
-import java.util.Date;
-import java.util.List;
-
-import org.apache.ibatis.annotations.Param;
-
 import com.zlt.aps.cd15.api.domain.entity.Cd15LineSideStock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.engine.vo.Cd15ParamsVo;
+import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
 import com.zlt.aps.cd15.engine.vo.Cd15StockVo;
+import org.apache.ibatis.annotations.Param;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 15度裁断库存数据mapper
@@ -57,4 +57,24 @@ public interface Cd15EngineStockMapper {
 	 * @return
 	 */
 	List<Cd15MachineInfo> listCd15MachineInfo();
+
+	/**
+	 * 查询15度的排产参数
+	 * @return
+	 */
+	List<Cd15ParamsVo> listCd15Params();
+	
+	/**
+	 * 查询15度裁断库存量
+	 * @param scheduleDate
+	 * @return
+	 */
+	List<Cd15StockVo> selectCd15StockQty(@Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 查询15度裁断上一天的计划
+     * @param scheduleDate
+     * @return
+     */
+	List<Cd15ScheduleResultVo> listLastDayMidPlan(@Param("scheduleDate") Date scheduleDate);
 }

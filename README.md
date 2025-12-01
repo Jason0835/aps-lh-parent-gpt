@@ -1,4 +1,4 @@
-# JY_APS
+# DC_APS
 
 
 
@@ -15,14 +15,14 @@ Already a pro? Just edit this README.md and make it your own. Want to make it ea
 
 ```
 cd existing_repo
-git remote add origin http://192.168.2.120/jy_program/jy_aps.git
+git remote add origin http://192.168.2.120/dc_program/dc_aps.git
 git branch -M main
 git push -uf origin main
 ```
 
 ## Integrate with your tools
 
-- [ ] [Set up project integrations](http://192.168.2.120/jy_program/jy_aps/-/settings/integrations)
+- [ ] [Set up project integrations](http://192.168.2.120/dc_program/dc_aps/-/settings/integrations)
 
 ## Collaborate with your team
 

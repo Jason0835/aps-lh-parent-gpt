@@ -83,8 +83,8 @@ public class GsqSteelTypeColorController extends BaseController {
 
     @Log(title = "ui.steelRollColor.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<GsqSteelTypeColorDto> exportData(GsqSteelTypeColorDto dto) {
+    @PostMapping("/exportData")
+    public List<GsqSteelTypeColorDto> exportData(@RequestBody GsqSteelTypeColorDto dto) {
         dto.setOrderStr(orderStr());
         List<GsqSteelTypeColorDto> list = gsqSteelTypeColorService.listGsqSteelTypeColor(dto);
         return list;

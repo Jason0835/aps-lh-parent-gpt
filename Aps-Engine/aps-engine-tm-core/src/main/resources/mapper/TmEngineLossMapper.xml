@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.tm.engine.mapper.TmEngineLossMapper">
 
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.tm.engine.vo.TmLossVo">
-        select nvl(machine_id,'') || '#' || nvl(tread_code,'') LOSS_KEY, LOSS_RATE
+        select concat(IFNULL(machine_id,'') , '#' , IFNULL(tread_code,'')) LOSS_KEY, LOSS_RATE
         from T_TM_LOSS_SETTING
         where DEL_FLAG = 0
     </select>

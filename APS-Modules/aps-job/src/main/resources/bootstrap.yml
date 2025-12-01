@@ -1,0 +1,64 @@
+# Tomcat
+server:
+  port: 9203
+
+nacos:
+  server-addr: 192.168.2.93:8848
+  run-group: PLAT
+  cfg-group: DEFAULT_GROUP
+  run-namespace: ""
+  cfg-namespace: ""
+
+#系统标识
+project:
+  project-tag: aps
+  system-tag: aps
+
+# Spring
+spring:
+  application:
+    # 应用名称
+    name: ruoyi-job
+  profiles:
+    # 环境配置
+    active: test
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.run-group}
+        namespace: ${nacos.run-namespace}
+      config:
+        # 配置中心地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.cfg-group}
+        namespace: ${nacos.cfg-namespace}
+        # 配置文件格式
+        file-extension: yml
+        # 共享配置
+        shared-configs:
+          - data-id: application-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: druid_${project.system-tag}_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-frame-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: zipkin-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+        refresh-enabled: true
+
+mybatis:
+    # 搜索指定包别名
+    typeAliasesPackage: com.ruoyi.job.domain,com.ruoyi.job.api.domain,com.zlt.aps
+    # 配置mapper的扫描，找到所有的mapper.xml映射文件
+    mapperLocations: classpath*:mapper/**/*.xml
+    configuration:
+      map-underscore-to-camel-case: true

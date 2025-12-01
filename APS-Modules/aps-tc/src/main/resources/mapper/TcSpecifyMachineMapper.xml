@@ -31,39 +31,34 @@
         </if>
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_TC_SPECIFY_MACHINE a USING (
-        <foreach collection="list" item="SpecifyMachine" separator=" union ">
-            select
-            #{SpecifyMachine.sidewallCode,jdbcType=VARCHAR} SIDEWALL_CODE,
-            #{SpecifyMachine.machineId,jdbcType=DOUBLE} machine_id,
-            #{SpecifyMachine.lineType,jdbcType=VARCHAR} line_type,
-            #{SpecifyMachine.jobType,jdbcType=VARCHAR} job_type,
-            #{SpecifyMachine.createBy,jdbcType=VARCHAR} create_by,
-            #{SpecifyMachine.createTime,jdbcType=DATE} create_time,
-            #{SpecifyMachine.updateBy,jdbcType=VARCHAR} update_by,
-            #{SpecifyMachine.updateTime,jdbcType=DATE} update_time,
-            #{SpecifyMachine.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_TC_SPECIFY_MACHINE (
+        SIDEWALL_CODE, machine_id, line_type, job_type,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="SpecifyMachine" separator=",">
+            (
+            #{SpecifyMachine.sidewallCode,jdbcType=VARCHAR},
+            #{SpecifyMachine.machineId,jdbcType=DOUBLE},
+            #{SpecifyMachine.lineType,jdbcType=VARCHAR},
+            #{SpecifyMachine.jobType,jdbcType=VARCHAR},
+            #{SpecifyMachine.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{SpecifyMachine.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{SpecifyMachine.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.SIDEWALL_CODE = b.SIDEWALL_CODE
-        and b.machine_id = a.machine_id
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.line_type = b.line_type,
-        a.job_type = b.job_type,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.SIDEWALL_CODE, a.machine_id, a.line_type, a.job_type, a.create_by, a.create_time,
-        a.remark,a.del_flag) values
-        (SEQ_PUBLIC.NEXTVAL, b.SIDEWALL_CODE, b.machine_id, b.line_type, b.job_type, b.create_by, sysdate, b.remark,'0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        line_type = VALUES(line_type),
+        job_type = VALUES(job_type),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
     <update id="deleteAllSpecifyMachine">
-        update T_TC_SPECIFY_MACHINE set del_flag = '1' where del_flag = '0'
+        update T_TC_SPECIFY_MACHINE set del_flag = NULL where del_flag = '0'
     </update>
 </mapper>

@@ -87,7 +87,7 @@ public class GdyyQuotaSettingController extends BaseController {
     @Log(title = "ui.data.column.gdyy.quota.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出钢带压延定额设定")
     @PostMapping("/export")
-    public List<GdyyQuotaSettingDto> export(GdyyQuotaSettingDto dto) {
+    public List<GdyyQuotaSettingDto> export(@RequestBody GdyyQuotaSettingDto dto) {
         dto.setOrderStr(orderStr());
         GdyyQuotaSetting setting = new GdyyQuotaSetting();
         BeanUtils.copyProperties(dto, setting);

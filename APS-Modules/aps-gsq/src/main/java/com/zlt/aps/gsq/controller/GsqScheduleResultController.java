@@ -15,6 +15,7 @@ import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.common.handle.GsqSyncDataHandle;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
 import com.zlt.aps.gsq.entity.GsqScheduleResult;
@@ -405,5 +406,34 @@ public class GsqScheduleResultController extends BaseController {
         BeanUtils.copyProperties(entity, gsqScheduleResult);
         gsqScheduleResultService.changeReleaseStatus(gsqScheduleResult);
         return AjaxResult.success();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<GsqDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return gsqScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody GsqScheduleResultDto scheduleResult) {
+        GsqScheduleResult gsqScheduleResult = new GsqScheduleResult();
+        BeanUtils.copyProperties(scheduleResult, gsqScheduleResult);
+        return gsqScheduleResultService.getSummaryVo(gsqScheduleResult);
     }
 }

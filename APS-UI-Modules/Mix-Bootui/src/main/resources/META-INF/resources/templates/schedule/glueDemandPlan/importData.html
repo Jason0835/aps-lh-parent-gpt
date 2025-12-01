@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('导入分厂胶料需求计划')"/>
+    <th:block th:include="include :: select2-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" enctype="multipart/form-data" id="form-import">
+        <div class="form-group">
+            <div class="select-time">
+                <label class="col-sm-3 control-label is-required">[[#{schedule.glueDemandPlan.planDate}]]：</label>
+                <div class="col-sm-8">
+                    <input id="endTime" name="planDate" class="time-input form-control" th:value="${initDate}" placeholder="yyyy-MM-dd" required>
+                    <input type="hidden" id="startTime"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.glueDemandPlan.factory}]]：</label>
+            <div class="col-sm-8">
+                <select id="factory" name="factory" class="form-control" th:with="type=${@dict.getType('FACTORY')}" required>
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{ui.frame.btn.chooseFile}]]：</label>
+            <div class="col-sm-8">
+                <input id="fileName" name="fileName" class="form-control" required readonly
+                       th:placeholder="#{ui.frame.btn.clickChoose}"
+                       onclick="javascript:$('input[name=\'file\']').click();">
+                <input type="file" id="file" name="file" style="display: none;"
+                       onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-8">
+                <label><input type="checkbox" id="isSkip" name="isSkip"> [[#{schedule.glueScheduleResult.import.isSkip}]]</label>
+                &nbsp; <a onclick="importTemplate()" class="btn btn-default btn-xs" style="font-size: 13px"><i
+                        class="fa fa-file-excel-o"></i> [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+        </div>
+        <font color="red" class="pull-left mt10">[[#{ui.biz.alter.onlyExcel}]]</font>
+        <input id="prefix" name="prefix" th:value="${prefix}" type="hidden">
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + $("#prefix").val();
+
+    $(function () {
+        layui.use('laydate', function () {
+            var laydate = layui.laydate;
+            laydate.render({
+                elem: '#startTime',
+                value: new Date(),
+                isInitValue: true,
+            });
+        });
+    })
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+
+    $("#form-glueDemandPlan-import").validate({
+        focusCleanup: true,
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var fileName = $("#fileName").val();
+            if (fileName == '' || (!$.common.endWith(fileName, '.xls') && !$.common.endWith(fileName, '.xlsx')
+                && !$.common.endWith(fileName, '.XLS') && !$.common.endWith(fileName, '.XLSX'))) {
+                $.modal.msgWarning(frame.alter.importExcel);
+                return false;
+            }
+            $.modal.loading(frame.alter.doingWaiting);
+            $.modal.disable();
+            var formData = new FormData();
+            var file = document.querySelector('[type=file]');
+            var planDate = $("#endTime").val();
+            var factory = $("#factory option:selected").val();
+            var isSkip = $("#isSkip").is(":checked");
+            formData.append("file", file.files[0]);
+            formData.append("planDate", planDate);
+            formData.append("factory", factory);
+            formData.append("isSkip", isSkip);
+            $.ajax({
+                url: prefix + "/checkPlanDateAndFactoryExist",
+                type: "post",
+                dataType: "json",
+                async: false,
+                data: {
+                    "planDate": planDate,
+                    "factory": factory
+                },
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        if (result.msg == '1') {
+                            $.modal.closeLoading();
+                            $.modal.enable();
+                            $.modal.confirm([[#{schedule.glueDemandPlan.database.exist.tip}]], function () {
+                                submitData(formData);
+                            })
+                        } else if (result.msg == '0') {
+                            submitData(formData);
+                        }
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                        $.modal.closeLoading();
+                        $.modal.enable();
+                    }
+                }
+            });
+
+        }
+    }
+
+    function submitData(formData) {
+        $.ajax({
+            url: prefix + "/importData",
+            data: formData,
+            cache: false,
+            contentType: false,
+            processData: false,
+            type: 'POST',
+            success: function (result) {
+                if (result.code == web_status.SUCCESS) {
+                    $.modal.alertSuccess(result.msg);
+                } else if (result.code == web_status.WARNING) {
+                    $.modal.alertWarning(result.msg)
+                } else {
+                    $.modal.alertError(result.msg);
+                }
+                //清空父级搜索，并设置日期和分厂
+                window.parent.$('#glue').val('');
+                window.parent.$('#mixArea').val('');
+                window.parent.$("#planDate").val($("#endTime").val());
+                window.parent.$("#factory").val($("#factory").val());
+
+                //设置密炼区目前选中的显示
+                let mixAreaText = window.parent.$('#mixArea').find("option:selected").text();
+                window.parent.$('#select2-mixArea-container').text(mixAreaText);
+
+                //设置分厂目前选中的显示
+                let factoryText = window.parent.$('#factory').find("option:selected").text();
+                window.parent.$('#select2-factory-container').text(factoryText);
+
+                window.parent.$.table.refresh();
+                $.modal.closeLoading();
+                $.modal.enable();
+            }
+        });
+    }
+
+</script>
+</body>
+</html>

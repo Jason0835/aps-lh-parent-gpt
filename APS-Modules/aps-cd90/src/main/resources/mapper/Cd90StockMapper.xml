@@ -11,6 +11,9 @@
         <result property="stockNum" column="stock_num"/>
         <result property="modifyNum" column="modify_num"/>
         <result property="badNum" column="bad_num"/>
+        <result property="rollStockNum" column="roll_stock_num"/>
+        <result property="rollModifyNum" column="roll_modify_num"/>
+        <result property="rollBadNum" column="roll_bad_num"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -20,17 +23,17 @@
     </resultMap>
 
     <sql id="selectStockVo">
-        select id, stock_date, material_code, stock_num, modify_num, bad_num, remark, del_flag, create_by, create_time, update_by, update_time from t_cd90_stock
+        select id, stock_date, material_code, stock_num, modify_num, bad_num, roll_stock_num, roll_modify_num, roll_bad_num, remark, del_flag, create_by, create_time, update_by, update_time from t_cd90_stock
     </sql>
 
     <select id="selectStockList" parameterType="com.zlt.aps.cd90.api.domain.entity.Cd90Stock" resultMap="StockResult">
         <include refid="selectStockVo"/>
         where del_flag='0'
         <if test="startTime != null and startTime !='' ">
-            and stock_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+            and stock_date  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
         <if test="endTime != null and endTime !='' ">
-            and stock_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+            and stock_date  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
         </if>
         <if test="materialCode != null  and materialCode != ''">
             and INSTR(material_code, #{materialCode,jdbcType=VARCHAR}) > 0
@@ -65,9 +68,6 @@
     </select>
 
     <insert id="insertStock" parameterType="com.zlt.aps.cd90.api.domain.entity.Cd90Stock">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_cd90_stock.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_cd90_stock
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -76,6 +76,9 @@
             <if test="stockNum != null">stock_num,</if>
             <if test="modifyNum != null">modify_num,</if>
             <if test="badNum != null">bad_num,</if>
+            <if test="rollStockNum != null">roll_stock_num,</if>
+            <if test="rollModifyNum != null">roll_modify_num,</if>
+            <if test="rollBadNum != null">roll_bad_num,</if>
             <if test="remark != null">remark,</if>
             <if test="delFlag != null">del_flag,</if>
             <if test="createBy != null">create_by,</if>
@@ -90,6 +93,9 @@
             <if test="stockNum != null">#{stockNum},</if>
             <if test="modifyNum != null">#{modifyNum},</if>
             <if test="badNum != null">#{badNum},</if>
+            <if test="rollStockNum != null">#{rollStockNum},</if>
+            <if test="rollModifyNum != null">#{rollModifyNum},</if>
+            <if test="rollBadNum != null">#{rollBadNum},</if>
             <if test="remark != null">#{remark},</if>
             <if test="delFlag != null">#{delFlag},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -107,6 +113,9 @@
             <if test="stockNum != null">stock_num = #{stockNum},</if>
             modify_num = #{modifyNum,jdbcType=DECIMAL},
             bad_num = #{badNum,jdbcType=DECIMAL},
+            <if test="rollStockNum != null">roll_stock_num = #{rollStockNum},</if>
+            roll_modify_num = #{rollModifyNum,jdbcType=DECIMAL},
+            roll_bad_num = #{rollBadNum,jdbcType=DECIMAL},
             <if test="remark != null">remark = #{remark},</if>
             <if test="delFlag != null">del_flag = #{delFlag},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
@@ -118,46 +127,46 @@
     </update>
 
     <delete id="deleteStockByIds" parameterType="String">
-        update t_cd90_stock set del_flag='1' where id in
+        update t_cd90_stock set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_cd90_stock a USING (
-        <foreach collection="list" item="STOCK" separator=" union ">
-            select
-            #{STOCK.stockDate,jdbcType=DATE} stock_date,
-            #{STOCK.materialCode,jdbcType=VARCHAR} material_code,
-            #{STOCK.stockNum,jdbcType=DOUBLE} stock_num,
-            #{STOCK.modifyNum,jdbcType=DOUBLE} modify_num,
-            #{STOCK.badNum,jdbcType=DOUBLE} bad_num,
-            #{STOCK.createBy,jdbcType=VARCHAR} create_by,
-            #{STOCK.createTime,jdbcType=DATE} create_time,
-            #{STOCK.updateBy,jdbcType=VARCHAR} update_by,
-            #{STOCK.updateTime,jdbcType=DATE} update_time,
-            #{STOCK.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_cd90_stock (
+        stock_date, material_code, stock_num, modify_num, bad_num, roll_stock_num, roll_modify_num, roll_bad_num,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="STOCK" separator=",">
+            (
+            #{STOCK.stockDate,jdbcType=DATE},
+            #{STOCK.materialCode,jdbcType=VARCHAR},
+            #{STOCK.stockNum,jdbcType=DOUBLE},
+            #{STOCK.modifyNum,jdbcType=DOUBLE},
+            #{STOCK.badNum,jdbcType=DOUBLE},
+            #{STOCK.rollStockNum,jdbcType=DOUBLE},
+            #{STOCK.rollModifyNum,jdbcType=DOUBLE},
+            #{STOCK.rollBadNum,jdbcType=DOUBLE},
+            #{STOCK.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{STOCK.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{STOCK.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.stock_date = b.stock_date
-        and b.material_code = a.material_code
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.stock_num = b.stock_num,
-        a.modify_num = b.modify_num,
-        a.bad_num = b.bad_num,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
-        a.remark, a.del_flag) values
-        (SEQ_cd90_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
-        b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        stock_num = VALUES(stock_num),
+        modify_num = VALUES(modify_num),
+        bad_num = VALUES(bad_num),
+        roll_stock_num = VALUES(roll_stock_num),
+        roll_modify_num = VALUES(roll_modify_num),
+        roll_bad_num = VALUES(roll_bad_num),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
 </mapper>

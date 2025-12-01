@@ -14,9 +14,15 @@ public class GdyyLossSettingVo {
     /**
      * 大卷编号
      */
+	@Deprecated
 	private String bigRollCode;
 	/**
 	 * 损耗率(百分比)
 	 */
 	private Double lossRate;
+
+	/**
+	 * 损耗率key（大卷编号#机台id）
+	 */
+	private String lossKey;
 }

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.MotherGlueDecomposeMapper">
+
+    <select id="listGlueDecompose" resultType="com.zlt.mix.setting.api.domain.entity.GlueDecompose">
+        SELECT GLUE, SEGMENT, MOTHER_GLUE1, MOTHER_GLUE2, MOTHER_GLUE3, MOTHER_GLUE4, MOTHER_GLUE5, MOTHER_GLUE6, MOTHER_GLUE7, MOTHER_GLUE8, MOTHER_GLUE9
+        FROM T_GLUE_DECOMPOSE
+        WHERE 1=1
+        AND DEL_FLAG = '0'
+        <if test="glueAreaMachineList != null">
+            AND GLUE IN <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator="," open="(" close=")">#{glueAreaMachine.glue}</foreach>
+        </if>
+    </select>
+
+    <select id="listMachineGlueDecompose" resultType="com.zlt.mix.setting.api.domain.entity.MachineGlueDecompose">
+        SELECT MIX_AREA, MACHINE_CODE, GLUE, MOTHER_GLUE1, MOTHER_GLUE2, MOTHER_GLUE3, MOTHER_GLUE4, MOTHER_GLUE5, MOTHER_GLUE6, MOTHER_GLUE7, MOTHER_GLUE8, MOTHER_GLUE9
+        FROM T_MACHINE_GLUE_DECOMPOSE t
+        WHERE 1=1
+        AND DEL_FLAG = '0'
+        <if test="glueAreaMachineList != null">
+            AND (MIX_AREA,MACHINE_CODE,GLUE) IN <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator="," open="(" close=")">(#{glueAreaMachine.mixArea},#{glueAreaMachine.machineCode},#{glueAreaMachine.glue})</foreach>
+        </if>
+    </select>
+
+    <select id="listMotherGlueDecompose" resultType="com.zlt.mix.setting.api.domain.entity.GlueDecompose">
+        SELECT GLUE, SEGMENT, MOTHER_GLUE1, MOTHER_GLUE2, MOTHER_GLUE3, MOTHER_GLUE4, MOTHER_GLUE5, MOTHER_GLUE6, MOTHER_GLUE7, MOTHER_GLUE8, MOTHER_GLUE9
+        FROM T_GLUE_DECOMPOSE
+        WHERE 1=1
+        AND DEL_FLAG = '0'
+        AND (MOTHER_GLUE1 = #{motherGlue} OR MOTHER_GLUE2 = #{motherGlue} OR MOTHER_GLUE3 = #{motherGlue} OR MOTHER_GLUE4 = #{motherGlue}
+             OR MOTHER_GLUE5 = #{motherGlue} OR MOTHER_GLUE6 = #{motherGlue} OR MOTHER_GLUE7 = #{motherGlue} OR MOTHER_GLUE8 = #{motherGlue} OR MOTHER_GLUE9 = #{motherGlue})
+        ORDER BY CREATE_TIME desc
+    </select>
+
+    <select id="listDecomposeRecipe" resultType="com.zlt.mix.schedule.engine.vo.DecomposeRecipeVo">
+        select *
+        from (
+              SELECT r.RECIPE_EQUIP_CODE as MACHINE_CODE, r.RECIPE_MATERIAL_NAME AS GLUE, t.RECIPE_MATERIAL_NAME as SON_GLUE, r.RECIPE_TYPE, r.RECIPE_VERSION_ID, r.PRODUCT_STAGE
+              FROM T_MES_PMT_RECIPE r
+              INNER JOIN T_MES_BAS_MATERIAL m on m.DEL_FLAG = '0' AND m.MATERIAL_NAME=r.RECIPE_MATERIAL_NAME AND m.MAJOR_TYPE in ('4','5')
+              INNER JOIN T_MES_PMT_RECIPE_WEIGHT t ON t.DEL_FLAG='0' AND r.RECIPE_ID=t.FATHER_RECIPE_ID
+              INNER JOIN T_MES_BAS_MATERIAL m1 on m1.DEL_FLAG = '0' AND m1.MATERIAL_NAME=t.RECIPE_MATERIAL_NAME AND m1.MAJOR_TYPE in ('4','5')
+              WHERE r.RECIPE_STATE = '1'
+              AND r.AUDIT_FLAG = '1'
+              AND r.DEL_FLAG = '0'
+             ) t
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+</mapper>

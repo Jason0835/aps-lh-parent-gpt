@@ -9,30 +9,49 @@
 		       null CD15_BATCH_NO,
                MAX(R.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
 		       CI.ARTICLE_CROWN_SPEC BIG_ROLL_CODE, /*钢带规格*/
-		       NVL(ROUND(SUM((nvl(R.CLASS1_PLAN_QTY, 0) + nvl(R.CLASS2_PLAN_QTY, 0) + nvl(R.CLASS3_PLAN_QTY, 0)) * nvl(CI.FIT_DRUM_PERIMETER, 0) * 
-		       	(NVL(CI.BELT_CRAFT1, 0) + NVL(CI.BELT_CRAFT2, 0)) / #{breadth} / 1000 / 1000), 6), 0) CLASS1_PLAN, /*大卷计划量，换算成米*/
-		       NVL(ROUND(SUM((nvl(R.CLASS4_PLAN_QTY, 0) + nvl(R.CLASS5_PLAN_QTY, 0)) * nvl(CI.FIT_DRUM_PERIMETER, 0) * 
-		       	(NVL(CI.BELT_CRAFT1, 0) + NVL(CI.BELT_CRAFT2, 0)) / #{breadth} / 1000 / 1000), 6), 0) CLASS2_PLAN /*大卷计划量*/
+		       IFNULL(ROUND(SUM((IFNULL(R.CLASS3_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		       	(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000), 6), 0) CLASS1_PLAN, /*大卷计划量，换算成米*/
+		       IFNULL(ROUND(SUM((IFNULL(R.CLASS4_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000), 6), 0) CLASS2_PLAN,
+		/*大卷计划量*/
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS1_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS1_PLAN,
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS2_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS2_PLAN,
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS3_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS3_PLAN,
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS4_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS4_PLAN,
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS5_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS5_PLAN,
+		IFNULL(CEILING(SUM((IFNULL(R.CLASS6_PLAN_QTY, 0)) * IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+		(IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / IFNULL(RO.BREADTH, #{breadth}) / 1000 / 1000)), 0) CX_CLASS6_PLAN,
+		MAX(CI.STEEL_LINE_CODE) STEEL_LINE_CODE
 		  FROM T_CX_schedule_RESULT R
 		  LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
 		    ON R.EMBRYO_CODE = CI.EMBRYO_CODE
 		   AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+		  LEFT JOIN T_CD15_BIG_ROLL RO
+		    ON RO.BIG_ROLL_CODE = CI.ARTICLE_CROWN_SPEC
+		   AND RO.DEL_FLAG = '0'
 		 WHERE R.schedule_DATE = #{scheduleDate}
 		   AND R.DEL_FLAG = '0'
 		   AND CI.DEL_FLAG = '0'
+		   AND NOT EXISTS ( /*收尾规格不用备*/
+        SELECT 0 FROM t_gdyy_params p
+              WHERE p.param_code = 'CLOSE_OUT_SPEC_REMARK'
+                AND r.remark = p.param_value
+		   )
 		   <if test="isProductStage">
 		   /* 仅对投产阶段的规格排产 */
 		   AND CI.PRODUCTION_STAGE = '0'
 		   </if>
 		 GROUP BY R.SCHEDULE_DATE, CI.ARTICLE_CROWN_SPEC
 		<!-- 过滤掉成型5个班都没有对应计划量的情况 -->
-		HAVING SUM((NVL(R.CLASS1_PLAN_QTY, 0) 
-		           + NVL(R.CLASS2_PLAN_QTY, 0) 
-		           + NVL(R.CLASS3_PLAN_QTY, 0) 
-		           + NVL(R.CLASS4_PLAN_QTY, 0) 
-		           + NVL(R.CLASS5_PLAN_QTY, 0)) * CI.FIT_DRUM_PERIMETER * (NVL(CI.BELT_CRAFT1, 0) + NVL(CI.BELT_CRAFT2, 0))) != 0
+		HAVING SUM((IFNULL(R.CLASS3_PLAN_QTY, 0)
+		           + IFNULL(R.CLASS4_PLAN_QTY, 0)) * CI.FIT_DRUM_PERIMETER * (IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0))) != 0
     </select>
-    
+
     <!-- 获取当天的施工信息 -->
     <select id="listConstructionInfo" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
 		SELECT CI.EMBRYO_CODE,
@@ -57,18 +76,18 @@
 		           AND R.EMBRYO_CODE = CI.EMBRYO_CODE
 		           AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION)
     </select>
-    
+
 	<!-- 计算纤维压延日用参考量 -->
     <select id="listGdyyDayUsed" resultType="com.zlt.aps.gdyy.engine.vo.GdyyDayUsedVo">
     	WITH temp_tab_BIG_ROLL_CODE AS (
         <foreach collection="bigRollCodeList" item="bigRollCode" separator=" union ">
         	SELECT #{bigRollCode} big_roll_code FROM dual
-        </foreach> 
+        </foreach>
         )
 		SELECT ARTICLE_CROWN_SPEC BIG_ROLL_CODE,
-		       CEIL(SUM(NVL(R.SINGLE_SHIFT_LH_QTY, 0) * 3 *
-		                NVL(CI.FIT_DRUM_PERIMETER, 0) / 1000 *
-		                (NVL(CI.BELT_CRAFT1, 0) + NVL(CI.BELT_CRAFT2, 0)) / 1000) 
+		       CEILING(SUM(IFNULL(R.SINGLE_SHIFT_LH_QTY, 0) * 3 *
+		                IFNULL(CI.FIT_DRUM_PERIMETER, 0) / 1000 *
+		                (IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) / 1000)
 		                / #{breadth}) DAY_USED /*通过成型的单班硫化量计算，每天3个班；施工表的参数计量单位需要换算成“米”，向上取整*/
 		  FROM T_CX_SCHEDULE_RESULT R
 		 INNER JOIN t_cx_auto_schedule_record sr
@@ -95,7 +114,7 @@
         from T_GDYY_PARAMS
         where DEL_FLAG = '0'
     </select>
-    
+
     <!-- 查询当前排程的批次号 -->
     <select id="getCurrentBatchNo" parameterType="date" resultType="string">
         SELECT MAX(BATCH_NO) BATCH_NO
@@ -119,7 +138,7 @@
 	<!-- 新增自动排产记录 -->
     <insert id="insertScheduleRecord" parameterType="com.zlt.aps.gdyy.engine.vo.GdyyScheduleRecordVo">
         insert into T_GDYY_AUTO_SCHEDULE_RECORD (ID, CX_BATCH_NO, BATCH_NO, STATUS, SCHEDULE_DATE, CREATE_BY, CREATE_TIME, DEL_FLAG)
-        values (SEQ_AUTO_SCHEDULE_RECORD.Nextval, #{cxBatchNo}, #{batchNo}, #{status}, #{scheduleDate}, #{createBy}, #{createTime}, #{delFlag})
+        values (NULL, #{cxBatchNo}, #{batchNo}, #{status}, #{scheduleDate}, #{createBy}, #{createTime}, #{delFlag})
     </insert>
 
 	<!-- 批量新增排程结果数据 -->
@@ -134,14 +153,18 @@
 		   DAY_USED,
 		   STOCK_QTY,
 		   CLASS1_PLAN,
+		CLASS1_PRODUCE_ORDER,
 		   CLASS1_PLAN_NO_STOCK,
 		   CLASS1_REMARK,
 		   CLASS2_PLAN,
+		CLASS2_PRODUCE_ORDER,
 		   CLASS2_PLAN_NO_STOCK,
 		   CLASS2_REMARK,
 		   CLASS3_PLAN,
+		CLASS3_PRODUCE_ORDER,
 		   CLASS3_PLAN_NO_STOCK,
 		   CLASS3_REMARK,
+		   MACHINE_CODE,
 		   IS_RELEASE,
 		   PUBLISH_SUCCESS_COUNT,
 		   NEWEST_PUBLISH_TIME,
@@ -155,11 +178,14 @@
 		   CLOSE_OUT_SPEC_FLAG,
            CLASS1_PLAN_NUM,
            CLASS2_PLAN_NUM,
-           CLASS3_PLAN_NUM)
-		  SELECT SEQ_GDYY_SCHEDULE.NEXTVAL AS ID, T.*
-		    FROM (
-              <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-		          SELECT #{schedule.scheduleDate},
+           CLASS3_PLAN_NUM,
+           CX_CLASS3_PLAN,
+           CX_CLASS4_PLAN,
+           STEEL_LINE_CODE)
+		  VALUES
+              <foreach collection="scheduleResultList" item="schedule" separator=",">
+		          (NULL,
+		           		 #{schedule.scheduleDate},
 		                 #{schedule.cd15BatchNo,jdbcType = VARCHAR},
 		                 #{schedule.batchNo,jdbcType = VARCHAR},
 		                 #{schedule.orderNo,jdbcType = VARCHAR},
@@ -167,14 +193,18 @@
 		                 #{schedule.dayUsed,jdbcType = DOUBLE},
 		                 #{schedule.stockQty,jdbcType = DOUBLE},
 		                 #{schedule.class1Plan,jdbcType = DOUBLE},
+				  #{schedule.class1ProduceOrder,jdbcType = DOUBLE},
 		                 #{schedule.class1PlanNoStock,jdbcType = DOUBLE},
 		                 #{schedule.class1Remark,jdbcType = VARCHAR},
 		                 #{schedule.class2Plan,jdbcType = DOUBLE},
+				  #{schedule.class2ProduceOrder,jdbcType = DOUBLE},
 		                 #{schedule.class2PlanNoStock,jdbcType = DOUBLE},
 		                 #{schedule.class2Remark,jdbcType = VARCHAR},
 		                 #{schedule.class3Plan,jdbcType = DOUBLE},
+				  #{schedule.class3ProduceOrder,jdbcType = DOUBLE},
 		                 #{schedule.class3PlanNoStock,jdbcType = DOUBLE},
 		                 #{schedule.class3Remark,jdbcType = VARCHAR},
+		                 #{schedule.machineCode,jdbcType = VARCHAR},
 		                 #{schedule.isRelease,jdbcType = VARCHAR},
 		                 #{schedule.publishSuccessCount,jdbcType = INTEGER},
 		                 #{schedule.newestPublishTime,jdbcType = DATE},
@@ -188,12 +218,14 @@
 		                 #{schedule.closeOutSpecFlag,jdbcType = VARCHAR},
 		                 #{schedule.class1PlanNum,jdbcType = DOUBLE},
 		                 #{schedule.class2PlanNum,jdbcType = DOUBLE},
-		                 #{schedule.class3PlanNum,jdbcType = DOUBLE}
-		            FROM DUAL
+		                 #{schedule.class3PlanNum,jdbcType = DOUBLE},
+                         #{schedule.cxClass3Plan,jdbcType = DOUBLE},
+                         #{schedule.cxClass4Plan,jdbcType = DOUBLE},
+                         #{schedule.steelLineCode,jdbcType = VARCHAR}
+				  )
               </foreach>
-          ) T
     </insert>
-    
+
     <!-- 把排程数据同步到log表，用于备份历史信息 -->
     <insert id="insertGdyyScheduleLog">
 	    INSERT INTO T_GDYY_SCHEDULE_RESULT_LOG
@@ -206,16 +238,20 @@
 	       DAY_USED,
 	       STOCK_QTY,
 	       CLASS1_PLAN,
+		   CLASS1_PRODUCE_ORDER,
 		   CLASS1_PLAN_NO_STOCK,
 	       CLASS1_FINISH,
 	       CLASS1_REMARK,
 	       CLASS2_PLAN,
+		   CLASS2_PRODUCE_ORDER,
 		   CLASS2_PLAN_NO_STOCK,
 	       CLASS2_FINISH,
 	       CLASS2_REMARK,
 	       CLASS3_PLAN,
+		   CLASS3_PRODUCE_ORDER,
 	       CLASS3_FINISH,
 	       CLASS3_REMARK,
+	       MACHINE_CODE,
 	       IS_RELEASE,
 		   PUBLISH_SUCCESS_COUNT,
 		   NEWEST_PUBLISH_TIME,
@@ -241,16 +277,20 @@
 	             DAY_USED,
 	             STOCK_QTY,
 	             CLASS1_PLAN,
+				 CLASS1_PRODUCE_ORDER,
 	             CLASS1_PLAN_NO_STOCK,
 	             CLASS1_FINISH,
 	             CLASS1_REMARK,
 	             CLASS2_PLAN,
+				 CLASS2_PRODUCE_ORDER,
 	             CLASS2_PLAN_NO_STOCK,
 	             CLASS2_FINISH,
 	             CLASS2_REMARK,
 	             CLASS3_PLAN,
+				 CLASS3_PRODUCE_ORDER,
 	             CLASS3_FINISH,
 	             CLASS3_REMARK,
+				 MACHINE_CODE,
 	             IS_RELEASE,
 			     PUBLISH_SUCCESS_COUNT,
 			     NEWEST_PUBLISH_TIME,
@@ -275,18 +315,18 @@
     <delete id="deleteGdyyScheduleResult" parameterType="date">
         DELETE FROM T_GDYY_SCHEDULE_RESULT WHERE SCHEDULE_DATE = #{scheduleDate}
     </delete>
-    
+
     <!-- 逻辑删除指定日期的排程主表记录 -->
     <update id="logicDeleteGdyyScheduleRecord" parameterType="com.zlt.aps.gdyy.engine.vo.GdyyScheduleRecordVo">
-    	UPDATE T_GDYY_AUTO_SCHEDULE_RECORD 
-    	   SET DEL_FLAG = '1', 
-    	       UPDATE_BY = #{createBy}, 
+        UPDATE T_GDYY_AUTO_SCHEDULE_RECORD
+        SET DEL_FLAG  = '1',
+            UPDATE_BY = #{createBy},
     	       UPDATE_TIME = #{createTime}
     	 WHERE schedule_date = #{scheduleDate}
     	   AND DEL_FLAG = '0'
     </update>
-	
-	<!-- 查询在施工信息中 没有对应记录的15度裁断代码 -->
+
+    <!-- 查询在施工信息中 没有对应记录的15度裁断代码 -->
     <select id="listLossConstructionForCd15" resultType="string" parameterType="date">
 		SELECT DISTINCT R.EMBRYO_CODE STEEL_STRIP_CODE
 		  FROM T_CX_SCHEDULE_RESULT R
@@ -297,13 +337,13 @@
 		   AND CI.ID IS NULL
 		   AND R.Del_Flag = '0'
     </select>
-    
+
     <!-- 获取插单需要的信息 -->
     <select id="listInsertOrderBaseInfo" resultType="com.zlt.aps.gdyy.engine.vo.GdyyScheduleResultVo">
     	WITH temp_tab_BIG_ROLL_CODE AS (
         <foreach collection="scheduleResultList" item="schedule" separator=" union ">
         	SELECT #{schedule.bigRollCode} big_roll_code FROM dual
-        </foreach> 
+        </foreach>
         )
         SELECT CI.ARTICLE_CROWN_SPEC bigRollCode,
                MAX(R.CX_BATCH_NO) CX_BATCH_NO
@@ -319,79 +359,112 @@
 	       )
          GROUP BY CI.ARTICLE_CROWN_SPEC
     </select>
-    
+
     <!-- 批量合并排程结果表（根据唯一字段，做更新或新增） -->
-    <update id="mergeGdyyScheduleResult">
-        MERGE INTO T_GDYY_SCHEDULE_RESULT a USING (
-        <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-            SELECT #{schedule.scheduleDate} schedule_Date,
-                   #{schedule.cd15BatchNo,jdbcType = VARCHAR} CD15_BATCH_NO,
-                   #{schedule.batchNo,jdbcType = VARCHAR} BATCH_NO,
-                   #{schedule.orderNo,jdbcType = VARCHAR} order_No,
-                   #{schedule.bigRollCode,jdbcType = VARCHAR} big_Roll_Code,
-                   #{schedule.dayUsed,jdbcType = DOUBLE} day_Used,
-                   #{schedule.stockQty,jdbcType = DOUBLE} STOCK_QTY,
-                   #{schedule.class1Plan,jdbcType = DOUBLE} class1_Plan,
-                   #{schedule.class1PlanNoStock,jdbcType = DOUBLE} CLASS1_PLAN_NO_STOCK,
-                   #{schedule.class1Finish,jdbcType = DOUBLE} class1_Finish,
-                   #{schedule.class1Remark,jdbcType = DOUBLE} class1_Remark,
-                   #{schedule.class2Plan,jdbcType = DOUBLE} class2_Plan,
-                   #{schedule.class2PlanNoStock,jdbcType = DOUBLE} CLASS2_PLAN_NO_STOCK,
-                   #{schedule.class2Finish,jdbcType = DOUBLE} class2_Finish,
-                   #{schedule.class2Remark,jdbcType = DOUBLE} class2_Remark,
-                   #{schedule.class3Plan,jdbcType = DOUBLE} class3_Plan,
-                   #{schedule.class3PlanNoStock,jdbcType = DOUBLE} CLASS3_PLAN_NO_STOCK,
-                   #{schedule.class3Finish,jdbcType = DOUBLE} class3_Finish,
-                   #{schedule.class3Remark,jdbcType = DOUBLE} class3_Remark,
-                   #{schedule.isRelease,jdbcType = VARCHAR} is_Release,
-                   #{schedule.markCloseOutTip,jdbcType = VARCHAR} mark_Close_Out_Tip,
-                   #{schedule.productionStatus,jdbcType = VARCHAR} production_Status,
-                   #{schedule.remark,jdbcType = VARCHAR} remark,
-                   #{schedule.delFlag,jdbcType = VARCHAR} del_Flag,
-                   #{schedule.createBy,jdbcType = VARCHAR} create_By,
-                   #{schedule.createTime} create_Time,
-				   #{schedule.dataSource} data_source,
-		           #{schedule.closeOutSpecFlag,jdbcType = VARCHAR} CLOSE_OUT_SPEC_FLAG,
-	               #{schedule.class1PlanNum,jdbcType = DOUBLE} CLASS1_PLAN_NUM,
-	               #{schedule.class2PlanNum,jdbcType = DOUBLE} CLASS2_PLAN_NUM,
-	               #{schedule.class3PlanNum,jdbcType = DOUBLE} CLASS3_PLAN_NUM
-              from dual
-        </foreach>
-        ) b ON (a.schedule_date = b.schedule_date AND a.big_Roll_Code = b.big_Roll_Code AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-            a.day_Used = b.day_Used ,
-            a.STOCK_QTY = b.STOCK_QTY ,
-            a.class1_Plan = b.class1_Plan ,
-            a.class1_Finish = b.class1_Finish,
-            a.CLASS1_PLAN_NO_STOCK = b.CLASS1_PLAN_NO_STOCK,
-            a.class1_Remark = b.class1_Remark,
-            a.class2_Plan = b.class2_Plan ,
-            a.class2_Finish = b.class2_Finish,
-            a.CLASS2_PLAN_NO_STOCK = b.CLASS2_PLAN_NO_STOCK,
-            a.class2_Remark = b.class2_Remark,
-            a.class3_Plan = b.class3_Plan ,
-            a.CLASS3_PLAN_NO_STOCK = b.CLASS3_PLAN_NO_STOCK,
-            a.class3_Finish = b.class3_Finish,
-            a.class3_Remark = b.class3_Remark,
-            a.mark_Close_Out_Tip = b.mark_Close_Out_Tip,
-            a.production_status = b.production_status,
-            a.remark = b.remark,
-            a.update_by = b.create_By,
-            a.update_time = b.create_Time,
-		    a.data_source = b.data_source,
-			a.CLOSE_OUT_SPEC_FLAG = b.CLOSE_OUT_SPEC_FLAG,
-			a.CLASS1_PLAN_NUM = b.CLASS1_PLAN_NUM,
-			a.CLASS2_PLAN_NUM = b.CLASS2_PLAN_NUM,
-			a.CLASS3_PLAN_NUM = b.CLASS3_PLAN_NUM
-        WHEN NOT MATCHED THEN
-        INSERT (a.id,a.schedule_Date,a.batch_no,a.order_no,a.big_Roll_Code,a.day_Used,a.STOCK_QTY,a.CLASS1_PLAN,a.CLASS1_PLAN_NO_STOCK,a.class1_Finish,a.class1_Remark,a.CLASS2_PLAN,a.CLASS2_PLAN_NO_STOCK,a.class2_Finish,a.class2_Remark,a.CLASS3_PLAN,a.CLASS3_PLAN_NO_STOCK,a.class3_Finish,a.class3_Remark,a.is_release,a.mark_close_out_tip,a.production_status,a.del_flag,a.remark,a.create_by,a.create_time,a.data_source,a.CLOSE_OUT_SPEC_FLAG,a.CLASS1_PLAN_NUM,a.CLASS2_PLAN_NUM,a.CLASS3_PLAN_NUM) values
-        (SEQ_GDYY_SCHEDULE.NEXTVAL,b.schedule_Date,b.batch_no,b.order_no,b.big_Roll_Code,b.day_Used,b.STOCK_QTY,b.CLASS1_PLAN,b.CLASS1_PLAN_NO_STOCK,b.class1_Finish,b.class1_Remark,b.CLASS2_PLAN,b.CLASS2_PLAN_NO_STOCK,b.class2_Finish,b.class2_Remark,b.CLASS3_PLAN,b.CLASS3_PLAN_NO_STOCK,b.class3_Finish,b.class3_Remark,b.is_release,b.mark_close_out_tip,b.production_status,b.del_flag,b.remark,b.create_by,b.create_time,b.data_source,b.CLOSE_OUT_SPEC_FLAG,b.CLASS1_PLAN_NUM,b.CLASS2_PLAN_NUM,b.CLASS3_PLAN_NUM)
-    </update>
-    
+    <insert id="mergeGdyyScheduleResult">
+		INSERT INTO T_GDYY_SCHEDULE_RESULT (
+		schedule_Date, batch_no, order_no, big_Roll_Code, day_Used, STOCK_QTY, CLASS1_PLAN, CLASS1_PRODUCE_ORDER,
+		CLASS1_PLAN_NO_STOCK, class1_Finish, class1_Remark, CLASS2_PLAN, CLASS2_PRODUCE_ORDER, CLASS2_PLAN_NO_STOCK,
+		class2_Finish, class2_Remark, CLASS3_PLAN, CLASS3_PRODUCE_ORDER, CLASS3_PLAN_NO_STOCK, class3_Finish,
+		class3_Remark,
+		machine_code, is_release, mark_close_out_tip, production_status, del_flag, remark, create_by, create_time,
+		data_source, CLOSE_OUT_SPEC_FLAG, CLASS1_PLAN_NUM, CLASS2_PLAN_NUM, CLASS3_PLAN_NUM
+		)
+		VALUES
+		<foreach collection="scheduleResultList" item="schedule" separator=",">
+			(
+			#{schedule.scheduleDate},
+			#{schedule.batchNo,jdbcType=VARCHAR},
+			#{schedule.orderNo,jdbcType=VARCHAR},
+			#{schedule.bigRollCode,jdbcType=VARCHAR},
+			#{schedule.dayUsed,jdbcType=DOUBLE},
+			#{schedule.stockQty,jdbcType=DOUBLE},
+			#{schedule.class1Plan,jdbcType=DOUBLE},
+			#{schedule.class1ProduceOrder,jdbcType = DOUBLE},
+			#{schedule.class1PlanNoStock,jdbcType=DOUBLE},
+			#{schedule.class1Finish,jdbcType=DOUBLE},
+			#{schedule.class1Remark,jdbcType=DOUBLE},
+			#{schedule.class2Plan,jdbcType=DOUBLE},
+			#{schedule.class2ProduceOrder,jdbcType = DOUBLE},
+			#{schedule.class2PlanNoStock,jdbcType=DOUBLE},
+			#{schedule.class2Finish,jdbcType=DOUBLE},
+			#{schedule.class2Remark,jdbcType=DOUBLE},
+			#{schedule.class3Plan,jdbcType=DOUBLE},
+			#{schedule.class3ProduceOrder,jdbcType = DOUBLE},
+			#{schedule.class3PlanNoStock,jdbcType=DOUBLE},
+			#{schedule.class3Finish,jdbcType=DOUBLE},
+			#{schedule.class3Remark,jdbcType=DOUBLE},
+			#{schedule.machineCode,jdbcType=VARCHAR},
+			#{schedule.isRelease,jdbcType=VARCHAR},
+			#{schedule.markCloseOutTip,jdbcType=VARCHAR},
+			#{schedule.productionStatus,jdbcType=VARCHAR},
+			'0',
+			#{schedule.remark,jdbcType=VARCHAR},
+			#{schedule.createBy,jdbcType=VARCHAR},
+			NOW(),
+			#{schedule.dataSource},
+			#{schedule.closeOutSpecFlag,jdbcType=VARCHAR},
+			#{schedule.class1PlanNum,jdbcType=DOUBLE},
+			#{schedule.class2PlanNum,jdbcType=DOUBLE},
+			#{schedule.class3PlanNum,jdbcType=DOUBLE}
+			)
+		</foreach>
+		ON DUPLICATE KEY UPDATE
+		day_Used = VALUES(day_Used),
+		STOCK_QTY = VALUES(STOCK_QTY),
+		class1_Plan = VALUES(class1_Plan),
+		CLASS1_PRODUCE_ORDER = VALUES(CLASS1_PRODUCE_ORDER),
+		class1_Finish = VALUES(class1_Finish),
+		CLASS1_PLAN_NO_STOCK = VALUES(CLASS1_PLAN_NO_STOCK),
+		class1_Remark = VALUES(class1_Remark),
+		class2_Plan = VALUES(class2_Plan),
+		CLASS2_PRODUCE_ORDER = VALUES(CLASS2_PRODUCE_ORDER),
+		class2_Finish = VALUES(class2_Finish),
+		CLASS2_PLAN_NO_STOCK = VALUES(CLASS2_PLAN_NO_STOCK),
+		class2_Remark = VALUES(class2_Remark),
+		class3_Plan = VALUES(class3_Plan),
+		CLASS3_PRODUCE_ORDER = VALUES(CLASS3_PRODUCE_ORDER),
+		CLASS3_PLAN_NO_STOCK = VALUES(CLASS3_PLAN_NO_STOCK),
+		class3_Finish = VALUES(class3_Finish),
+		class3_Remark = VALUES(class3_Remark),
+		mark_Close_Out_Tip = VALUES(mark_Close_Out_Tip),
+		production_status = VALUES(production_status),
+		remark = VALUES(remark),
+		update_by = VALUES(create_by),
+		update_time = NOW(),
+		data_source = VALUES(data_source),
+		CLOSE_OUT_SPEC_FLAG = VALUES(CLOSE_OUT_SPEC_FLAG),
+		CLASS1_PLAN_NUM = VALUES(CLASS1_PLAN_NUM),
+		CLASS2_PLAN_NUM = VALUES(CLASS2_PLAN_NUM),
+		CLASS3_PLAN_NUM = VALUES(CLASS3_PLAN_NUM)
+	</insert>
+
     <select id="selectGdyyScheduleList" resultType="com.zlt.aps.gdyy.engine.vo.GdyyScheduleResultVo">
     	SELECT *
     	  FROM T_GDYY_SCHEDULE_RESULT t
     	 WHERE t.SCHEDULE_DATE = #{scheduleDate}
     </select>
+
+	<select id="listMachineShift" resultType="com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo">
+		SELECT * FROM t_gdyy_machine_info WHERE del_flag = '0'
+		<if test="machineIdList != null and machineIdList.size() > 0">
+			AND ID IN
+			<foreach collection="machineIdList" item="id" open="(" separator="," close=")">
+				#{id}
+			</foreach>
+		</if>
+	</select>
+
+    <update id="batchUpdateBatchNoAndOrderNo">
+        UPDATE T_GDYY_SCHEDULE_RESULT as a
+        JOIN (
+        <foreach item="item" collection="list" separator=" UNION ALL ">
+            SELECT #{item.id} AS id, #{item.batchNo} as batch_no, #{item.orderNo} as order_no FROM DUAL
+        </foreach>
+        ) tempTable ON a.id = tempTable.id
+        SET
+        a.batch_no = tempTable.batch_no,
+        a.order_no = tempTable.order_no
+        where a.del_flag = '0'
+    </update>
 </mapper>

@@ -25,33 +25,31 @@
         </if>
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_GSQ_STEEL_TYPE_COLOR a USING (
-        <foreach collection="list" item="STOCK" separator=" union ">
-            select
-            #{STOCK.steelType,jdbcType=VARCHAR} steel_type,
-            #{STOCK.colorType,jdbcType=VARCHAR} color_type,
-            #{STOCK.colorCode,jdbcType=VARCHAR} color_code,
-            #{STOCK.status,jdbcType=VARCHAR} status,
-            #{STOCK.createBy,jdbcType=VARCHAR} create_by,
-            #{STOCK.createTime,jdbcType=DATE} create_time,
-            #{STOCK.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GSQ_STEEL_TYPE_COLOR (
+        steel_type, color_type, color_code, status,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="STOCK" separator=",">
+            (
+            #{STOCK.steelType,jdbcType=VARCHAR},
+            #{STOCK.colorType,jdbcType=VARCHAR},
+            #{STOCK.colorCode,jdbcType=VARCHAR},
+            #{STOCK.status,jdbcType=VARCHAR},
+            #{STOCK.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{STOCK.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{STOCK.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (a.steel_type = b.steel_type)
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.status = b.status,
-        a.color_type = b.color_type,
-        a.color_code = b.color_code,
-
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.steel_type, a.color_type, a.color_code,a.status, a.create_by, a.create_time,
-        a.remark, a.del_flag) values
-        (SEQ_PUBLIC.NEXTVAL, b.steel_type, b.color_type, b.color_code, b.status, b.create_by, sysdate,
-        b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        status = VALUES(status),
+        color_type = VALUES(color_type),
+        color_code = VALUES(color_code),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

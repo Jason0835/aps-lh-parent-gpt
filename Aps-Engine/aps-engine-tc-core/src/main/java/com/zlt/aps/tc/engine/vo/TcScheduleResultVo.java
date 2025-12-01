@@ -167,6 +167,11 @@ public class TcScheduleResultVo extends ApsBaseDto {
     private Double cxClass5Plan;
 
     /**
+     * 剩余量
+     */
+    private double surplusQty;
+
+    /**
      * 发布成功计数器，每点击一次发布并成功的话，计数器累加
      */
     private Integer publishSuccessCount;
@@ -230,4 +235,83 @@ public class TcScheduleResultVo extends ApsBaseDto {
      * 收尾规格标记，0：收尾1：非收尾
      */
     private String closeOutSpecFlag;
+
+    /**
+     * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
+     */
+    private Double planStockQty;
+
+    /**
+     * 上一天早班计划
+     */
+    private Double lastMidPlanQty;
+
+    /**
+     * 夜班与早班的交接班库存
+     */
+    private double classStock;
+
+    /**
+     * 库存供需比例，交接班库存/成型一天需求量
+     */
+    private double supplyDemandRatio;
+
+    /**
+     * 明日早班计划
+     */
+    private double nextDayPlanQty;
+
+    /**
+     * 早班生产顺序标识
+     */
+    private Integer dayProduceOrderFlag = 99;
+
+    /**
+     * 夜班生产顺序标识
+     */
+    private Integer nightProduceOrderFlag = 99;
+
+    /**
+     * 库存供应成型时长，单位：小时
+     */
+    private Integer supplyTimeSort;
+    /**
+     * 二班计划顺序
+     */
+    @ApiModelProperty(value = "二班计划顺序")
+    private Double class2Sort;
+    /**
+     * 三班计划顺序
+     */
+    @ApiModelProperty(value = "三班计划顺序")
+    private Double class3Sort;
+    /**
+     * 四班计划顺序
+     */
+    @ApiModelProperty(value = "四班计划顺序")
+    private Double class4Sort;
+    
+    /**
+     * 是否固定早班排产规格
+     */
+    private Boolean isDayProductSpec;
+    
+    /**
+     * 是否均分
+     */
+    private Boolean isEqualShare;
+
+    /**
+     * 获取SupplyTime的排序，小于12小时的，优先，否则不改变排序
+     *
+     * @return 结果
+     */
+    public Integer getSupplyTimeSort() {
+        return supplyTime != null && supplyTime < 12 ? 1 : 99;
+    }
+
+    public String printDebugSortLogInfo() {
+        return String.format("胎侧代码：%s，胶料：%s，排序字段：supplyTimeSort=%s, dayProduceOrderFlag=%s, nightProduceOrderFlag=%s, glueSeq=%s, supplyTime=%s",
+                sidewallCode, glueCode, getSupplyTimeSort(), dayProduceOrderFlag, nightProduceOrderFlag, glueSeq, supplyTime);
+    }
 }

@@ -21,12 +21,12 @@ public interface ICd90ScheduleAssistService {
      * 查询90度裁断外协排程结果列表
      */
     @ApiOperation("查询90度裁断外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/cd90/assistSchedule/list")
     TableDataInfo list(@RequestBody Cd90ScheduleAssist cd90ScheduleAssist);
 
     /**
      * 导出列表
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/cd90/assistSchedule/export")
     byte[] export(@RequestBody Cd90ScheduleAssist scheduleAssist);
 }

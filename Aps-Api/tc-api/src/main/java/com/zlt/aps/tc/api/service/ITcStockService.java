@@ -22,7 +22,7 @@ public interface ITcStockService {
      * @param tcStock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/tc/stock/list")
     TableDataInfo list(@RequestBody TcStock tcStock);
 
     /**
@@ -31,7 +31,7 @@ public interface ITcStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/tc/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -40,7 +40,7 @@ public interface ITcStockService {
      * @param tcStock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/tc/stock")
     AjaxResult add(@Validated @RequestBody TcStock tcStock);
 
 
@@ -50,7 +50,7 @@ public interface ITcStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectTcStockById/{id}")
+    @GetMapping(value = "/tc/stock/selectTcStockById/{id}")
     TcStock selectTcStockById(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface ITcStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/tc/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -68,7 +68,7 @@ public interface ITcStockService {
      * @param tcStock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/tc/stock")
     AjaxResult edit(@Validated @RequestBody TcStock tcStock);
 
     /**
@@ -77,13 +77,13 @@ public interface ITcStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/tc/stock/exportList")
     List<TcStock> exportList(@RequestBody TcStock stock);
 
     /**
      * 数据导入
      */
-    @PostMapping("/stock/importData")
+    @PostMapping("/tc/stock/importData")
     AjaxResult importData(@RequestBody List<TcStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 

@@ -19,25 +19,25 @@ public interface ICd90BigRollService {
     /**
      * 根据条件查询帘布大卷信息列表
      */
-    @GetMapping("/bigRoll/listBigRoll")
-    TableDataInfo listBigRoll(@SpringQueryMap Cd90BigRollDto dto);
+    @PostMapping("/cd90/bigRoll/listBigRoll")
+    TableDataInfo listBigRoll(@RequestBody Cd90BigRollDto dto);
 
     /**
      * 根据id查询帘布大卷信息信息
      */
-    @GetMapping("/bigRoll/getBigRoll/{id}")
+    @GetMapping("/cd90/bigRoll/getBigRoll/{id}")
     Cd90BigRollDto getBigRoll(@PathVariable("id") Long id);
 
     /**
      * 保存帘布大卷信息信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/bigRoll/saveBigRoll")
+    @PostMapping("/cd90/bigRoll/saveBigRoll")
     AjaxResult saveBigRoll(@RequestBody Cd90BigRollDto dto);
 
     /**
      * 根据code判断纤维大卷代号是否已经存在
      */
-    @PostMapping("/bigRoll/checkBigRollCodeUnique")
+    @PostMapping("/cd90/bigRoll/checkBigRollCodeUnique")
     String checkBigRollCodeUnique(@RequestBody Cd90BigRollDto dto);
 
     /**
@@ -45,7 +45,7 @@ public interface ICd90BigRollService {
      *
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/bigRoll/deleteBigRoll/{ids}")
+    @PostMapping("/cd90/bigRoll/deleteBigRoll/{ids}")
     AjaxResult deleteBigRoll(@PathVariable("ids") Long[] ids);
 
     /**
@@ -53,12 +53,12 @@ public interface ICd90BigRollService {
      *
      * @param dto
      */
-    @GetMapping("/bigRoll/exportData")
-    List<Cd90BigRollDto> exportData(@SpringQueryMap Cd90BigRollDto dto);
+    @PostMapping("/cd90/bigRoll/exportData")
+    List<Cd90BigRollDto> exportData(@RequestBody Cd90BigRollDto dto);
 
     /**
      * 导入数据
      */
-    @PostMapping("/bigRoll/importData")
+    @PostMapping("/cd90/bigRoll/importData")
     public AjaxResult importData(@RequestBody List<Cd90BigRollDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

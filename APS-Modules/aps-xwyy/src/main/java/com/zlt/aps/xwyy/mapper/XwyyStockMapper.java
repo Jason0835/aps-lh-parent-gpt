@@ -1,7 +1,10 @@
 package com.zlt.aps.xwyy.mapper;
 
 import com.zlt.aps.xwyy.api.domain.entity.XwyyStock;
+import com.zlt.aps.xwyy.api.domain.vo.HalfYyExportDataVo;
+import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -61,4 +64,27 @@ public interface XwyyStockMapper {
      */
     public void mergeSql(List<XwyyStock> list);
 
+    /**
+     * 根据库存日期删除库存信息
+     *
+     * @param scheduleDate 库存日期
+     * @return 删除数量
+     */
+    int deleteStockByDate(@Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 批量新增库存信息
+     *
+     * @param stockList 要新增的库存列表
+     * @return 新增行数
+     */
+    int insertBatch(@Param("list") List<HalfYyExportDataVo> stockList, @Param("subDate") Date subDate);
+
+    /**
+     * 批量新增库存信息
+     *
+     * @param stockList 要新增的库存列表
+     * @return 新增行数
+     */
+    int insertBatchToGdyy(@Param("list") List<HalfYyExportDataVo> stockList, @Param("subDate") Date subDate);
 }

@@ -2,6 +2,7 @@ package com.zlt.aps.template.gsq;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -13,7 +14,7 @@ import java.util.Date;
 
 @Data
 @ApiModel(value="钢丝圈缠绕盘信息导入模板", description="钢丝圈缠绕盘信息导入模板")
-public class GsqTwiningDiscTemp {
+public class GsqTwiningDiscTemp extends BaseEntity {
 
     @ApiModelProperty(value = "编号")
     @Excel(name = "ui.twiningDisc.column.serialNumber")

@@ -4,7 +4,7 @@
 
     <select id="listTmSpecifyMachine" resultType="com.zlt.aps.tm.engine.vo.TmSpecifyMachineVo" >
         select tread_code,
-               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
         from T_TM_SPECIFY_MACHINE sm
         inner join T_TM_MACHINE_INFO m on sm.machine_id = m.id
         where sm.DEL_FLAG = '0'
@@ -18,13 +18,41 @@
 
     <select id="listTmMouthPlateMachine" resultType="com.zlt.aps.tm.engine.vo.TmMouthPlateMachineVo" >
         select mouth_plate_code,
-               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
         from T_TM_MOUTH_PLATE sm
         inner join T_TM_MACHINE_INFO m on sm.machine_id = m.id
         where sm.DEL_FLAG = '0'
-        and sm.status = '0'
+        and sm.status = #{status}
         and m.STATUS = '0'
         and m.DEL_FLAG = '0'
         group by MOUTH_PLATE_CODE
+    </select>
+
+    <select id="listTmMachine" resultType="com.zlt.aps.tm.api.domain.entity.TmMachineInfo">
+        select ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               WIDTH_MIN,
+               WIDTH_MAX,
+               THICK_MIN,
+               THICK_MAX,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               supports_all_mouth_flag,
+               STATUS,
+               REMARK
+        from T_TM_MACHINE_INFO
+        where STATUS = '0'
+          and DEL_FLAG = '0'
+    </select>
+
+    <select id="selectMachineMaintenance" resultType="com.zlt.aps.tm.api.domain.entity.TmMachineMaintenance">
+        SELECT a.*, b.machine_name AS machine_name, b.quata AS quota
+        FROM T_TM_MACHINE_MAINTENANCE a
+                 LEFT JOIN T_TM_MACHINE_INFO b ON a.machine_id = b.id
+        WHERE a.is_delete = 0
+          AND a.STOP_START_TIME <![CDATA[ >= ]]> concat(#{scheduleDate}, ' 19:00:00')
+          AND a.STOP_END_TIME <![CDATA[ < ]]> DATE_ADD(concat(#{scheduleDate}, ' 19:00:00'), INTERVAL 1 DAY)
     </select>
 </mapper>

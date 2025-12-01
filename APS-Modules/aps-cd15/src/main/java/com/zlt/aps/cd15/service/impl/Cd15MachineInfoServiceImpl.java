@@ -2,6 +2,7 @@ package com.zlt.aps.cd15.service.impl;
 
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
@@ -50,6 +51,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
      */
     @Override
     public List<Cd15MachineInfo> selectMachineInfoList(Cd15MachineInfo machineInfo) {
+        machineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
         return machineInfoMapper.selectMachineInfoList(machineInfo);
     }
 
@@ -62,6 +64,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
     @Override
     public int insertMachineInfo(Cd15MachineInfo machineInfo) {
         machineInfo.setBaseVale(null);
+        machineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
         return machineInfoMapper.insertMachineInfo(machineInfo);
     }
 
@@ -74,6 +77,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
     @Override
     public int updateMachineInfo(Cd15MachineInfo machineInfo) {
         machineInfo.setBaseVale(machineInfo.getId());
+        machineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
         return machineInfoMapper.updateMachineInfo(machineInfo);
     }
 
@@ -93,6 +97,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
      */
     @Override
     public String checkMachineCodeUnique(Cd15MachineInfo MachineInfo) {
+        MachineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
         List<Cd15MachineInfo> list = machineInfoMapper.checkMachineCodeUnique(MachineInfo);
         if (CollectionUtils.isNotEmpty(list)) {
             return UserConstants.NOT_UNIQUE;
@@ -101,6 +106,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
     }
 
     public List<Cd15MachineInfo> selectMachineInfoList2(Cd15MachineInfo machineInfo) {
+        machineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
         return machineInfoMapper.selectMachineInfoList2(machineInfo);
     }
 
@@ -128,6 +134,7 @@ public class Cd15MachineInfoServiceImpl implements Cd15MachineInfoService {
 
         for (int i = 0; i < list.size(); i++) {
             Cd15MachineInfo machineInfo = list.get(i);
+            machineInfo.setFactoryCode(SecurityUtils.getUserCurrentFactory());
 
             //重复记录校验
             Long hasValue = groupMap.get(machineInfo.getMachineCode());

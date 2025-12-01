@@ -184,6 +184,9 @@ public class TqLossSettingServiceImpl extends ServiceImpl<TqLossSettingMapper, T
             if (CollectionUtils.isEmpty(validated)) {
                 lossSetting.setMachineId(machineId);
                 lossSetting.setBaseVale(null);
+                if (StringUtils.isBlank(lossSetting.getBeadCode())) {
+                    lossSetting.setBeadCode(null);
+                }
                 importList.add(lossSetting);
             } else {
                 failureNum++;

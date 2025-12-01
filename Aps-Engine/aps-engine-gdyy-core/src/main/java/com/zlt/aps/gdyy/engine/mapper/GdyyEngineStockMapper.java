@@ -1,13 +1,13 @@
 package com.zlt.aps.gdyy.engine.mapper;
 
+import com.zlt.aps.gdyy.api.domain.dto.GdyyReserveStockDto;
+import com.zlt.aps.gdyy.engine.vo.GdyyParamsVo;
+import com.zlt.aps.gdyy.engine.vo.GdyyStockVo;
+import org.apache.ibatis.annotations.Param;
+
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
-
-import org.apache.ibatis.annotations.Param;
-
-import com.zlt.aps.gdyy.engine.vo.GdyyParamsVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyStockVo;
 
 /**
  * 钢带裁断库存数据mapper
@@ -56,4 +56,18 @@ public interface GdyyEngineStockMapper {
 	 */
 	List<String> listCloseOutSpec(@Param("scheduleDate") Date scheduleDate,
 			@Param("isProductStage") boolean isProductStage);
+
+	/**
+	 * 根据规格查询预生产库存倍数
+	 * @param codeList 规格列表
+	 * @return 结果
+	 */
+	List<GdyyReserveStockDto> listReserveStock(@Param("codeList") List<String> codeList);
+	
+	/**
+	 * 预估指定日期的库存，使用前一天的库存与当天的计划进行预估
+	 * @param stockDate
+	 * @return
+	 */
+	int estimateStock(@Param("stockDate") Date stockDate);
 }

@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('硫化辅料日计划排程列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: bootstrap-editable-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.materialScheduleResult.scheduleDate}]]：</label>
+                            <input id="scheduleDate" type="text" class="time-input" placeholder="yyyy-MM-dd"
+                                   th:value="${initDate}" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.materialScheduleResult.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@setting.scheduleMixAreaPermission()}" onchange="changeMixAreaAndDate()">
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.materialScheduleResult.materialName}]]：</label>
+                            <div class="neat">
+                                <input id="materialName" type="text" name="materialName" class="AccessoriesNames"
+                                       autocomplete="off"/>
+                            </div>
+                        </li>
+                        <li>
+                            [[#{schedule.materialScheduleResult.machineName}]]：
+                            <select class="form-control" id="machineCode" name="machineCode">
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.materialScheduleResult.releaseStatus}]]：</label>
+                            <select id="releaseStatus" class="form-control" name="releaseStatus"
+                                    th:with="type=${@dict.getType('MIX_RELEASE_STATUS')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="autoSchedule()"
+               shiro:hasPermission="schedule:materialScheduleResult:autoSchedule">
+                <i class="fa fa-object-group"></i> [[#{schedule.materialScheduleResult.btn.autoSchedule}]]
+            </a>
+            <a class="btn btn-success" onclick="$.operate.addFull()"
+               shiro:hasPermission="schedule:materialScheduleResult:insert">
+                <i class="fa fa-plus"></i> [[#{schedule.materialScheduleResult.btn.insert}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',1050,500)"
+               shiro:hasPermission="schedule:materialScheduleResult:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="changeMachine()"
+               shiro:hasPermission="schedule:materialScheduleResult:changeMachine">
+                <i class="fa fa-arrows-h"></i> [[#{schedule.materialScheduleResult.btn.changeMachine}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="schedule:materialScheduleResult:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-info" onclick="importExcel()"
+               shiro:hasPermission="schedule:materialScheduleResult:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="schedule:materialScheduleResult:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-success multiple disabled" onclick="publish()"
+               shiro:hasPermission="schedule:materialScheduleResult:publish">
+                <i class="fa fa-external-link-square"></i> [[#{schedule.materialScheduleResult.btn.publish}]]
+            </a>
+            <a class="btn btn-warning" onclick="statistics()"
+               shiro:hasPermission="schedule:materialScheduleResult:statistics">
+                <i class="fa fa-object-group"></i> [[#{schedule.materialScheduleResult.btn.statistics}]]
+            </a>
+            <a class="btn btn-warning" onclick="expireWarning()"
+               shiro:hasPermission="schedule:materialScheduleResult:expireWarning">
+                <i class="fa fa-object-group"></i> [[#{schedule.materialScheduleResult.btn.expireWarning}]]
+            </a>
+            <a class="btn btn-success" onclick="sendCrossRegional()"
+               shiro:hasPermission="schedule:materialScheduleResult:materialSpanSend">
+                <i class="fa fa-arrow-up"></i> [[#{schedule.glueScheduleResult.btn.sendCrossRegional}]]
+            </a>
+            <a class="btn btn-success" onclick="receiveCrossRegional()"
+               shiro:hasPermission="schedule:materialScheduleResult:materialSpanReceive">
+                <i class="fa fa-arrow-down"></i> [[#{schedule.glueScheduleResult.btn.receiveCrossRegional}]]
+                <span id="notReceivedQuantity" class="badge">[[${notReceivedQuantity == 0 ? '' : notReceivedQuantity}]]</span>
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js" />
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/materialScheduleResult";
+    var releaseStatusData = [[${@dict.getType('MIX_RELEASE_STATUS')}]];
+    var lhClassShift = [[${@dict.getType('LH_CLASS_SHIFT')}]];
+    var isOrNotData = [[${@dict.getType('IS_HAVE')}]];
+    var recipeStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+    // 各班次的可编辑状态，需要到服务端加载
+    var midEditable=false;
+    var nightEditable=false;
+    var dayEditable=false;
+
+    //获取辅料名称列表
+    var datas = [[${@setting.getAccessoriesNames()}]];
+    $('.AccessoriesNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        // 生成表头文字
+        var mixArea = $("#mixArea").val();
+        var scheduleDate = $("#scheduleDate").val();
+        var tableTitle = [[#{schedule.glueScheduleResult.tableTitle}]];
+        var baseTitle = $.common.sprintf(tableTitle, scheduleDate, mixArea);
+        // 生成表格
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            autoPlanUrl: prefix + "/toAutoPlan",
+            changeMachineUrl: prefix + "/toChangeMachine/{id}",
+            toChangeRecipeUrl: prefix + "/toChangeRecipe",
+            toStatistics: prefix + '/toStatistics',
+            toExpireWarning: prefix + '/toExpireWarning',
+            sendCrossRegionalUrl: prefix + '/toSendCrossRegional',
+            receiveCrossRegionalUrl: prefix + '/toReceiveCrossRegional/{mixArea}',
+            modalName: [[#{schedule.materialScheduleResult.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            fixedColumns: true,
+            fixedNumber: 6,// 冻结列数
+            onEditableSave: onEditableSave,
+            onEditableShown:function(){
+                setTimeout(function (){
+                    $(".form-control.input-sm").select();
+                },100)
+            },
+            onEditableHidden:function () {
+                $(".editable-submit").click()
+            },
+            columns: [
+                [
+                    {
+                        title: baseTitle,
+                        align: 'center',
+                        colspan: 15
+                    },
+                    {
+                        title: [[#{schedule.common.midClass}]],
+                        align: 'center',
+                        colspan: 6
+                    },
+                    {
+                        title: [[#{schedule.common.nightClass}]],
+                        align: 'center',
+                        colspan: 6
+                    },
+                    {
+                        title: [[#{schedule.common.dayClass}]],
+                        align: 'center',
+                        colspan: 6
+                    },
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'machineName',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'left',
+                        title: [[#{schedule.materialScheduleResult.br.machineName}]],
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'mixArea',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.mixArea}]],
+                        visible: false,
+                    },
+                    {
+                        field: 'classShift',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.classShift}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(lhClassShift, value);
+                        },
+                    },
+                    {
+                        field: 'releaseStatus',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.br.releaseStatus}]],
+                        formatter: function (value, row, index) {
+                            var val = $.table.selectDictLabel(releaseStatusData, value);
+                            if ($.common.isEmpty(row.releaseStatusTip)) {
+                                return val;
+                            }
+                            return $.table.hoverValue(row.releaseStatusTip, val, null, 0, '1');
+                        },
+                    },
+                    {
+                        field: 'materialName',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'left',
+                        title: [[#{schedule.materialScheduleResult.materialName}]],
+                    },
+                    {
+                        field: 'recipeTypeName',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.br.recipeTypeName}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = '-';
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="changeRecipe(\'' + row.id + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'recipeVersionId',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.br.recipeVersionId}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = '-';
+                            }
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="changeRecipe(\'' + row.id + '\')">' + value + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'recipeStage',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.br.recipeStage}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = '-';
+                            }
+                            var selectDictLabel = $.table.selectDictLabel(recipeStageData, value);
+                            var dictLabel = $.common.isEmpty(selectDictLabel) ? value : selectDictLabel;
+                            var actions = [];
+                            actions.push('<a href="javascript:void(0)" onclick="changeRecipe(\'' + row.id + '\')">' + dictLabel + '</a> ');
+                            return actions.join('');
+                        },
+                    },
+                    {
+                        field: 'stockQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.stockQty.br}]],
+                    },
+                    {
+                        field: 'safeStockQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.br.safeStockQty}]],
+                    },
+                    {
+                        field: 'demandQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.demandQty}]],
+                    },
+                    {
+                        field: 'demandPlanning',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'left',
+                        visible: false,
+                        title: [[#{schedule.materialScheduleResult.br.demandPlanning}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return '-';
+                            }
+                            return String(value).replaceAll(",", "<br>");
+                        },
+                    },
+                    {
+                        field: 'totalPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.totalPlanQty}]],
+                    },
+                    {
+                        field: 'midProduceOrder',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor1(),
+                        title: [[#{schedule.materialScheduleResult.mid}]]+"<br/>"+[[#{schedule.materialScheduleResult.produceOrder}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.mid}]]+[[#{schedule.materialScheduleResult.produceOrder}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 长白班不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 1) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.longDayShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.longDayShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 6) {
+                                    let message = String([[#{ui.message.editable.maxSeven}]]).replace('9999999', '999999');
+                                    layer.msg(message);
+                                    return message;
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'midPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor2(),
+                        title: [[#{schedule.materialScheduleResult.mid}]]+"<br/>"+[[#{schedule.materialScheduleResult.plan}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.mid}]]+[[#{schedule.materialScheduleResult.plan}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 长白班不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 1) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.longDayShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.longDayShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'midFinishQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.mid}]]+"<br/>"+[[#{schedule.materialScheduleResult.finish}]],
+                        formatter: function (value, row, index) {
+                            // 页面修改中、夜、白三班完成量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'midFinishRate',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.mid}]]+"<br/>"+[[#{schedule.materialScheduleResult.rate}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return "-";
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        },
+                    },
+                    {
+                        field: 'midExpectFinishTime',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.mid}]]+[[#{schedule.materialScheduleResult.br.finishTime}]],
+                    },
+                    {
+                        field: 'midRemark',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.midRemark}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.midRemark}]],
+                            emptytext: '-',
+                            type: 'textarea',
+	                        display: remarkDisplay,
+                            validate: remarkValidate
+                        },
+                    },
+                    {
+                        field: 'nightProduceOrder',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor1(),
+                        title: [[#{schedule.materialScheduleResult.night}]]+"<br/>"+[[#{schedule.materialScheduleResult.produceOrder}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.night}]]+[[#{schedule.materialScheduleResult.produceOrder}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 长白班不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 1) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.longDayShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.longDayShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 6) {
+                                    let message = String([[#{ui.message.editable.maxSeven}]]).replace('9999999', '999999');
+                                    layer.msg(message);
+                                    return message;
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor2(),
+                        title: [[#{schedule.materialScheduleResult.night}]]+"<br/>"+[[#{schedule.materialScheduleResult.plan}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.night}]]+[[#{schedule.materialScheduleResult.plan}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 长白班不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 1) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.longDayShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.longDayShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'nightFinishQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.night}]]+"<br/>"+[[#{schedule.materialScheduleResult.finish}]],
+                        formatter: function (value, row, index) {
+                            // 页面修改中、夜、白三班完成量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'nightFinishRate',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.night}]]+"<br/>"+[[#{schedule.materialScheduleResult.rate}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return "-";
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        },
+                    },
+                    {
+                        field: 'nightExpectFinishTime',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.night}]]+[[#{schedule.materialScheduleResult.br.finishTime}]],
+                    },
+                    {
+                        field: 'nightRemark',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.nightRemark}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.nightRemark}]],
+                            emptytext: '-',
+                            type: 'textarea',
+	                        display: remarkDisplay,
+                            validate: remarkValidate
+                        },
+                    },
+                    {
+                        field: 'dayProduceOrder',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor1(),
+                        title: [[#{schedule.materialScheduleResult.day}]]+"<br/>"+[[#{schedule.materialScheduleResult.produceOrder}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.day}]]+[[#{schedule.materialScheduleResult.produceOrder}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 两班制不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 2) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.twoClassShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.twoClassShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 6) {
+                                    let message = String([[#{ui.message.editable.maxSeven}]]).replace('9999999', '999999');
+                                    layer.msg(message);
+                                    return message;
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        cellStyle: backColor2(),
+                        title: [[#{schedule.materialScheduleResult.day}]]+"<br/>"+[[#{schedule.materialScheduleResult.plan}]],
+                        formatter: function (value, row, index) {
+                            // 3878 【分厂胶料需求计划】页面修改中、夜、白三班计划量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.day}]]+[[#{schedule.materialScheduleResult.plan}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 两班制不可编辑
+                                var id = $(this).parents('tr').data('uniqueid');
+                                var row = $('#' + table.options.id).bootstrapTable('getRowByUniqueId', id);
+                                if (row.classShift === 2) {
+                                    layer.msg([[#{schedule.materialScheduleResult.editable.twoClassShift}]]);
+                                    return [[#{schedule.materialScheduleResult.editable.twoClassShift}]];
+                                }
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'dayFinishQty',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.day}]]+"<br/>"+[[#{schedule.materialScheduleResult.finish}]],
+                        formatter: function (value, row, index) {
+                            // 页面修改中、夜、白三班完成量为0时直接放空处理
+                            if (value === 0) {
+                                return null;
+                            }
+                            return value;
+                        },
+                    },
+                    {
+                        field: 'dayFinishRate',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.materialScheduleResult.day}]]+"<br/>"+[[#{schedule.materialScheduleResult.rate}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return "-";
+                            }
+                            var str = Number(value * 100).toFixed(2);
+                            return str += "%";
+                        },
+                    },
+                    {
+                        field: 'dayExpectFinishTime',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.day}]]+[[#{schedule.materialScheduleResult.br.finishTime}]],
+                    },
+                    {
+                        field: 'dayRemark',
+                        sortable: true,
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.materialScheduleResult.dayRemark}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.materialScheduleResult.dayRemark}]],
+                            emptytext: '-',
+                            type: 'textarea',
+	                        display: remarkDisplay,
+                            validate: remarkValidate
+                        },
+                    },
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH/oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if(total == contentRow +1) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 1.5*oneTr});
+                } else if(total == contentRow +2) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 2.5*oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+                }
+                /*固定表头end*/
+
+                mergeCells(data, "machineName", "classShift", $("#bootstrap-table"));
+                
+                loadClassEditable(); // 每次查询需要重新加载班次编辑状态
+            },
+            onPostBody: function (data) {
+                //解决调量后，固定列会往回滚的问题（start）
+                setTimeout(function () {
+                    var left = $(".fixed-table-body")[1].scrollLeft;
+                    if(left == 0){
+                        $(".fixed-table-body")[1].scrollLeft = left + 1;
+                    }else{
+                        $(".fixed-table-body")[1].scrollLeft = left - 1;
+                    }
+                }, 50);
+                //解决调量后，固定列会往回滚的问题（end）
+            },
+        };
+        $.table.init(options, true);
+
+        changeMixAreaAndDate(true);
+        $("#" + table.options.id).on('reset-view.bs.table', function () {
+            var $table = $("#" + table.options.id);
+            var rows = $table.bootstrapTable('getData');
+            mergeCells({rows: rows}, "machineName", "classShift", $table);
+        })
+        // 添加选择列缓存
+        addColumnsClick();
+    });
+
+    layui.use('laydate', function () {
+        var laydate = layui.laydate;
+
+        laydate.render({
+            elem: '#scheduleDate',
+            done: function (value, date, endDate) {
+                changeMixAreaAndDate()
+            }
+        })
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+        
+    /**
+    * 加载各班次可编辑状态
+    */
+    function loadClassEditable() {
+        var params = {
+            url: prefix + "/getCLassEditableStatus",
+            type: "post",
+            dataType: "json",
+            data: {"scheduleDate": $("#scheduleDate").val()},
+            success: function (result) {
+            	var data = result.data;
+            	// 设置状态
+        		midEditable = data.midEditable;
+        		nightEditable = data.nightEditable;
+        		dayEditable = data.dayEditable;
+        		
+        		// 设置表格编辑
+    			var isMidDisable = data.midEditable? 'enable': 'disable';
+				$("a[data-name='midProduceOrder']").editable(isMidDisable);
+				$("a[data-name='midPlanQty']").editable(isMidDisable);
+    			var isNightDisable = data.nightEditable? 'enable': 'disable';
+				$("a[data-name='nightProduceOrder']").editable(isNightDisable);
+				$("a[data-name='nightPlanQty']").editable(isNightDisable);
+    			var isDayDisable = data.dayEditable? 'enable': 'disable';
+				$("a[data-name='dayProduceOrder']").editable(isDayDisable);
+				$("a[data-name='dayPlanQty']").editable(isDayDisable);
+            }
+        };
+        $.ajax(params);
+    }
+
+    function changeMixAreaAndDate(isInit) {
+        var columns = table.options.columns;
+        let $mixArea = $("#mixArea option:selected");
+        var mixArea = $mixArea.text();
+        if (!isInit) { // 非页面加载的场景，需要刷新表头
+	        var scheduleDate = $("#scheduleDate").val();
+	        var tableTitle = [[#{schedule.materialScheduleResult.tableTitle}]];
+	        var baseInfo = [[#{ui.baseInfo}]];
+	        if ($.common.isEmpty(mixArea) && $.common.isEmpty(scheduleDate)) {
+	            columns[0][0].title = baseInfo;
+	        } else {
+	            if ($.common.isEmpty(mixArea)) {
+	                columns[0][0].title = $.common.sprintf(tableTitle, scheduleDate, '-');
+	            } else if ($.common.isEmpty(scheduleDate)) {
+	                columns[0][0].title = $.common.sprintf(tableTitle, '-', mixArea);
+	            } else {
+	                columns[0][0].title = $.common.sprintf(tableTitle, scheduleDate, mixArea);
+	            }
+	
+	        }
+	        $('#bootstrap-table').bootstrapTable('refreshOptions', {columns: columns});
+        }
+        // 添加选择列缓存
+        addColumnsClick();
+        //设置隐藏按钮点击事件重写
+        var fnc = $("button[name='search']").click;
+        $("button[name='search']").click(function(){
+            fnc;
+            //重置表格高度设置
+            setTimeout(function () {
+                /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+            },1000)
+        });
+        getMachineByMixArea($mixArea.val());
+        updateNotReceivedQuantity();
+    }
+
+    function getMachineByMixArea(mixArea) {
+        if ($.common.isEmpty(mixArea)) {
+            return;
+        }
+        var config = {
+            url: "/setting/lhflMachine/getMachines",
+            type: "post",
+            dataType: "json",
+            data: {"mixArea": mixArea},
+            beforeSend: function () {
+                $.modal.loading(frame.alter.doingWaiting);
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var machines = result.data;
+                    var rSelect = ("<option value = ''>" + [[#{ui.frame.btn.all}]] + "</option>");
+                    for (var i = 0; i < machines.length; i++) {
+                        rSelect += ("<option value = '" + machines[i].machineCode + "'>" + machines[i].machineName + "</option>");
+                    }
+                    var $machineCode = $("#machineCode");
+                    $machineCode.empty();
+                    $machineCode.append(rSelect);
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+                $.modal.closeLoading();
+            }
+        };
+        $.ajax(config)
+    }
+
+    function autoSchedule() {
+        $.modal.open(table.options.modalName, table.options.autoPlanUrl, 400, 500);
+    }
+
+    function publish() {
+        table.set();
+        var selectRows = $("#" + table.options.id).bootstrapTable('getSelections');
+    	if (!midEditable && !nightEditable && !dayEditable) { // 校验班次信息，只要任意一个班可编辑就允许发布
+            $.modal.alertError([[#{ui.scheduleResult.class.error}]]); // 不可编辑则直接提示错误
+        	return;
+        }
+        var scheduleDate = $("#scheduleDate").val();
+        var rows = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        $.modal.confirm([[#{ui.biz.alter.makeSurePublish}]], function () {
+            var config = {
+                url: prefix + "/publishValidate",
+                type: "post",
+                dataType: "json",
+                data: {"scheduleDate": scheduleDate, "ids": rows.join()},
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        $.operate.post(prefix + "/publish", {"scheduleDate": scheduleDate, "ids": rows.join()},
+                            function (result) {
+                                if (result.code === web_status.FAIL) {
+                                    $.table.refresh();
+                                }
+                            }
+                        );
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            };
+            $.ajax(config);
+        })
+    }
+
+    // 转机台
+    function changeMachine() {
+        table.set();
+        var selectList = $("#" + table.options.id).bootstrapTable('getSelections');
+        if (selectList.length === 0) {
+            $.modal.alertWarning(frame.alter.mustChooseOneRecord);
+            return;
+        }
+        var row = selectList[0];
+        if (!checkRowClassEditAble(row)) { // 校验班次信息
+            $.modal.alertError([[#{ui.scheduleResult.class.error}]]); // 不可编辑则直接提示错误
+        	return;
+        }
+        url = table.options.changeMachineUrl.replace("{id}", selectList[0].id);
+        $.modal.open(table.options.modalName, url, 850, 580);
+    }
+
+    function importExcel() {
+        table.set();
+        var url = table.options.importUrl;
+        $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 500, '', true);
+    }
+	/**
+	 *修改配方信息
+	*/
+    function changeRecipe(id) {
+    	if ($.common.isNotEmpty(id)) { // 根据班别校验是否可修改配方信息
+	        var selectRow = $("#bootstrap-table").bootstrapTable('getRowByUniqueId', id);
+	        if (!checkRowClassEditAble(selectRow)) { // 校验班次信息
+	        	return; // 不可编辑则直接返回
+	        }
+    	}
+        let row = $("#" + table.options.id).bootstrapTable('getRowByUniqueId', id);
+        let machineName = encodeURIComponent($.common.isEmpty(row.machineName) ? '' : row.machineName);
+        let materialName = encodeURIComponent($.common.isEmpty(row.materialName) ? '' : row.materialName);
+        var url = table.options.toChangeRecipeUrl + "?machineName=" + machineName + "&materialName=" + materialName + "&id=" + id;
+        $.modal.open(table.options.modalName, url, 800, 500);
+    }
+        
+    /**
+    * 判断行记录班次信息是否可编辑
+    */
+    function checkRowClassEditAble(row) {
+    	if ($.common.isEmpty(row)) {
+    		return false;
+        }
+    	if (!midEditable && row.midPlanQty > 0) {
+    		// 中班有计划量且不可编辑了也同样不可编辑修改配方
+    		return false;
+    	}
+    	if (!nightEditable && row.nightPlanQty > 0) {
+    		// 夜班有计划量且不可编辑了也同样不可编辑修改配方
+    		return false;
+    	}
+    	if (!dayEditable && row.dayPlanQty > 0) {
+    		// 白班有计划量且不可编辑了也同样不可编辑修改配方
+    		return false;
+    	}
+    	return true;
+    }
+
+    function backColor1(){
+        return {css: {'background-color': '#10d3be','color':'#035149'}};
+    }
+    function backColor2(){
+        return {css: {'background-color': '#f4cf01','color':'#735c00'}};
+    }
+
+    function statistics(){
+        table.set();
+        let id = $.common.isEmpty(table.options.uniqueId) ? $.table.selectFirstColumns() : $.table.selectColumns(table.options.uniqueId);
+        let row = $("#" + table.options.id).bootstrapTable('getRowByUniqueId', id);
+        let scheduleDate = $("#scheduleDate").val();
+        let mixArea = $("#mixArea").val();
+        let machineCode = encodeURIComponent(($.common.isEmpty(row)||$.common.isEmpty(row.machineCode)) ? '' : row.machineCode);
+        let url = table.options.toStatistics + "?scheduleDate=" + scheduleDate + "&mixArea=" + mixArea + "&machineCode=" + machineCode;
+
+        var options = {
+            title: table.options.modalName + [[#{schedule.materialScheduleResult.btn.statistics}]],
+            width: 800,
+            height: 500,
+            url: url,
+            // skin: 'layui-layer-gray',
+            btn: ['关闭'],
+            yes: function (index, layero) {
+                layer.close(index);
+            }
+        };
+
+        $.modal.openOptions(options);
+    }
+    
+    /**
+     *超期预警
+     */
+    function expireWarning() {
+        table.set();
+        let mixArea = $("#mixArea").val();
+        let url = table.options.toExpireWarning + "?mixArea=" + mixArea;
+
+        var options = {
+            title: table.options.modalName + [[#{schedule.materialScheduleResult.btn.expireWarning}]],
+            width: 800,
+            height: 500,
+            url: url,
+            // skin: 'layui-layer-gray',
+            btn: ['关闭'],
+            yes: function (index, layero) {
+                layer.close(index);
+            }
+        };
+
+        $.modal.openOptions(options);
+    }
+
+    /**
+     * 合并相同行
+     * @param data 原始数据（在服务端完成排序）
+     * @param fieldName 合并属性数组
+     * @param condition 合并添加（符合前一个condition和当前condition相等才合并），底下设置了同步合并
+     * @param target 目标表格对象
+     */
+    function mergeCells(dataAll, fieldName, condition, target) {
+        var data = dataAll;
+        setTimeout(function () {
+            if (data.rows.length == 0) {
+                return;
+            }
+            var numArr = [];
+            var number = 0;
+            if (data.rows.length > 1) {
+                for (let i = 0; i < data.rows.length; i++) {
+                    if (data.rows[i][fieldName] != '' && data.rows[i][fieldName] != '-') {
+                        if (data.rows[i - 1]) {
+                            if (data.rows[i - 1][fieldName] != '' && data.rows[i - 1][fieldName] != '-') {
+                                if (data.rows[i - 1][fieldName] == data.rows[i][fieldName] && data.rows[i - 1][condition] == data.rows[i][condition]) {
+                                    number++
+                                } else {
+                                    number = number + 1
+                                    numArr.push({index: i - number, number: number, pan: '1'})
+                                    number = 0
+                                }
+                            }
+                        }
+                        if (!data.rows[i + 1]) {
+                            number = number
+                            numArr.push({index: i - number, number: number + 1, pan: '2'})
+                            number = 0
+                        } else {
+                            if (data.rows[i + 1][fieldName] == '' || data.rows[i + 1][fieldName] == '-') {
+                                number = number
+                                numArr.push({index: i - number, number: number + 1, pan: '3'})
+                                number = 0
+                            }
+                        }
+                    } else {
+                        numArr.push({index: i, number: 1, pan: '4'})
+                    }
+                }
+            } else {
+                numArr.push({index: 0, number: 1, pan: '5'})
+            }
+            // console.log(numArr);
+            for (let x = 0; x < numArr.length; x++) {
+                if (x % 2) {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        //  $(target).children('tbody').children('tr').eq(numArr[x]['index']+y).css('background','yellow')
+                    }
+                } else {
+                    for (let y = 0; y < numArr[x]['number']; y++) {
+                        $(target).children('tbody').children('tr').eq(numArr[x]['index'] + y).css('background', '#fff')
+                    }
+                }
+                $(target).bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: fieldName,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+                var find = $(".fixed-columns").find("#bootstrap-table");
+                find.bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: fieldName,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+                //同步修改condition对应的列，也进行合并
+                $(target).bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: condition,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+                find.bootstrapTable('mergeCells', {
+                    index: numArr[x]['index'],
+                    field: condition,
+                    colspan: 1,
+                    rowspan: numArr[x]['number']
+                });
+                // 解决冻结列后合并单元格失效的问题
+                var trChildren = find.children('tbody').children('tr');
+                $($(trChildren[numArr[x]['index']]).children('td')[1]).attr('rowspan', numArr[x]['number']);
+                for (var i = numArr[x]['index'] + 1; i < numArr[x]['index'] + numArr[x]['number']; i++) {
+                    $($(trChildren[i]).children('td')[1]).css('display', 'none');
+                }
+            }
+        })
+    }
+    
+    function remarkValidate(value) {
+    	// 备注行内编辑校验
+        if (value.length > 300) {
+            let message = String([[#{ui.message.editable.maxLength}]]);
+            layer.msg(message);
+            return message;
+        }
+    }
+    
+    function remarkDisplay(value, sourceData) {
+    	// 备注行内编辑展示格式
+        if (value && value.length > 5) {
+            $(this).html(value.substring(0, 5));
+        } else {
+            $(this).html(value);
+        }
+    }
+
+    function onEditableSave(field, row, rowIndex, oldValue, $el) {
+        // 校验修改计划量时，对应的顺序必填
+        if (field === 'midPlanQty' && $.common.isEmpty(row.midProduceOrder)) {
+            row.midPlanQty = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changePlan.produceOrderNull}]], row, field, oldValue);
+            return ;
+        }else if (field === 'nightPlanQty' && $.common.isEmpty(row.nightProduceOrder)){
+            row.nightPlanQty = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changePlan.produceOrderNull}]], row, field, oldValue)
+            return ;
+        }else if (field === 'dayPlanQty' && $.common.isEmpty(row.dayProduceOrder)){
+            row.dayPlanQty = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changePlan.produceOrderNull}]], row, field, oldValue)
+            return ;
+        }
+        // 校验清空顺序时，计划量不能大于0
+        if (field === 'midProduceOrder' && $.common.isEmpty(row.midProduceOrder) && Number(row.midPlanQty) > 0) {
+            row.midProduceOrder = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changeOrder.produceOrderNull}]], row, field, oldValue)
+            return ;
+        }else if (field === 'nightProduceOrder' && $.common.isEmpty(row.nightProduceOrder) && Number(row.nightPlanQty) > 0) {
+            row.nightProduceOrder = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changeOrder.produceOrderNull}]], row, field, oldValue)
+            return ;
+        }else if (field === 'dayProduceOrder' && $.common.isEmpty(row.dayProduceOrder) && Number(row.dayPlanQty) > 0) {
+            row.dayProduceOrder = oldValue === 0 ? null : oldValue;
+            alertMessageRevertValue([[#{schedule.changeOrder.produceOrderNull}]], row, field, oldValue)
+            return ;
+        }
+        let tableData = $("#" + table.options.id).bootstrapTable('getData');
+        // 校验当前机台下，各个班次顺序是否与修改的有重复
+        if (isProduceOrderRepeated(tableData, row)) {
+            $('#' + table.options.id).bootstrapTable('updateCellByUniqueId', {
+                id: row.id,
+                field: field,
+                value: oldValue === 0 ? null : oldValue
+            });
+            return ;
+        }
+        row['totalPlanQty'] = Number(row.midPlanQty) + Number(row.nightPlanQty) + Number(row.dayPlanQty);
+        $.operate.postNotRefresh(prefix + "/save", row, function (result) {
+            if (result.code === web_status.SUCCESS) {
+                var data = result.data;
+                for (var i = 0; i < data.length; i++) {
+                	if (data[i].id == row.id) {
+	                    $('#' + table.options.id).bootstrapTable('updateByUniqueId', {
+	                        id: data[i].id,
+	                        row: data[i]
+	                    });
+                	}
+                }
+            } else if (result.code === web_status.FAIL) {
+                $("#" + table.options.id).bootstrapTable('updateCell', {
+                    index: rowIndex,
+                    field: field,
+                    value: oldValue
+                });
+            }
+        });
+    }
+
+    // 校验当前机台下，各个班次顺序是否与修改的有重复
+    function isProduceOrderRepeated(tableData, row) {
+        let machineName = row.machineName;
+        let id = row.id;
+        let filterData = tableData.filter(item => item.machineName === machineName && item.id != id);
+        let midProduceOrderMap = filterData.map(item => item.midProduceOrder);
+        let midProduceOrder = row.midProduceOrder;
+        if ($.common.isNotEmpty(midProduceOrder)) {
+            for (var i = 0; i < midProduceOrderMap.length; i++) {
+                if (midProduceOrderMap[i] == midProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameMidProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let nightProduceOrderMap = filterData.map(item => item.nightProduceOrder);
+        let nightProduceOrder = row.nightProduceOrder;
+        if ($.common.isNotEmpty(nightProduceOrder)) {
+            for (var i = 0; i < nightProduceOrderMap.length; i++) {
+                if (nightProduceOrderMap[i] == nightProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameNightProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let dayProduceOrderMap = filterData.map(item => item.dayProduceOrder);
+        let dayProduceOrder = row.dayProduceOrder;
+        if ($.common.isNotEmpty(dayProduceOrder)) {
+            for (var i = 0; i < dayProduceOrderMap.length; i++) {
+                if (dayProduceOrderMap[i] == dayProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameDayProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 弹出消息提示，并回滚成旧值
+    function alertMessageRevertValue(message, row, field, oldValue){
+        $.modal.msg(message);
+        $('#' + table.options.id).bootstrapTable('updateCellByUniqueId', {
+            id: row.id,
+            field: field,
+            value: oldValue === 0 ? null : oldValue
+        });
+    }
+
+
+    // 跳转跨区发送
+    function sendCrossRegional() {
+        table.set();
+        var ids = $.table.selectColumns('id');
+        var url = table.options.sendCrossRegionalUrl + "?mixArea=" + $("#mixArea").val();
+        url = ids.length > 0 ? url + "&ids=" + encodeURIComponent(ids.join(",")) : url + "&ids=";
+        $.modal.openTab([[#{schedule.materialSpanSend.modelName}]], url);
+    }
+
+    // 跳转跨区接收
+    function receiveCrossRegional() {
+        table.set();
+        var url = table.options.receiveCrossRegionalUrl.replace("{mixArea}", $("#mixArea").val());
+        $.modal.openTab([[#{schedule.materialSpanReceive.modelName}]], url);
+    }
+
+    // 更改密炼区及排程日期时，发送请求更新未接收的跨区请求数
+    function updateNotReceivedQuantity(){
+        var config = {
+            url: "/schedule/materialSpanReceive/selectUnReceiveCount",
+            type: "post",
+            dataType: "json",
+            data: {
+                "scheduleDate": $("#scheduleDate").val(),
+                "entrustedMixArea": $("#mixArea option:selected").val(),
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    if (result.data === 0) {
+                        $("#notReceivedQuantity").text('');
+                    }else {
+                        $("#notReceivedQuantity").text(result.data);
+                    }
+                }
+            }
+        };
+        $.ajax(config);
+    }
+
+    $(window).resize(function() {
+        /*全屏或者放大缩小屏幕时候重新设置固定表格的高度*/
+        var wh = $(window).height();//ifram容器高度
+        var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+        var bh = wh-(fixTop-50);//基础默认表格高度
+        $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+    });
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+    
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+    
+	.editable-pre-wrapped {
+	   white-space: nowrap;
+	}
+	
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+</style>
+</html>

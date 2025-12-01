@@ -27,12 +27,12 @@
         select
         <include refid="Base_Column_List" />
         from T_MES_CX_PART_FINISH_QTY
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_MES_CX_PART_FINISH_QTY
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty" useGeneratedKeys="true">
         insert into T_MES_CX_PART_FINISH_QTY
@@ -91,11 +91,11 @@
                     IS_DELETE = #{isDelete,jdbcType=DECIMAL},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty">
         update T_MES_CX_PART_FINISH_QTY
-        set 
+        set
             STAT_DATE =  #{statDate,jdbcType=TIMESTAMP},
             EMBRYO_CODE =  #{embryoCode,jdbcType=VARCHAR},
             FINISH_QTY =  #{finishQty,jdbcType=DECIMAL},
@@ -103,7 +103,7 @@
             CREATE_DATE =  #{createDate,jdbcType=TIMESTAMP},
             UPDATE_DATE =  #{updateDate,jdbcType=TIMESTAMP},
             IS_DELETE =  #{isDelete,jdbcType=DECIMAL}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <select id="getAllByDataVersionAndIsDelete" resultMap="BaseResultMap">
         select
@@ -138,11 +138,11 @@
         UPDATE SET
         a.finish_qty = NVL(b.finish_qty, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stat_date, a.embryo_code, a.finish_qty, a.create_by, a.create_time,
         a.remark, a.del_flag, a.bom_data_version) values
-        (SEQ_CX_FINISH_QTY.NEXTVAL, b.stat_date, b.embryo_code, NVL(b.finish_qty, 0), b.create_by, sysdate,
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.stat_date, b.embryo_code, NVL(b.finish_qty, 0), b.create_by, now(),
         b.remark, '0', b.bom_data_version)
     </update>
 </mapper>

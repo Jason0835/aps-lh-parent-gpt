@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"钢丝圈缠绕盘接口"})
 @RestController
-@RequestMapping("/twiningDisc")
+@RequestMapping("/gsq/twiningDisc")
 public class GsqTwiningDiscController extends BaseController {
 
     @Resource
     private GsqTwiningDiscService gsqTwiningDiscService;
 
     @ApiOperation("根据条件查询缠绕盘列表")
-    @GetMapping("/listTwiningDisc")
-    public TableDataInfo listTwiningDisc(GsqTwiningDiscDto dto) {
+    @PostMapping("/listTwiningDisc")
+    public TableDataInfo listTwiningDisc(@RequestBody GsqTwiningDiscDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<GsqTwiningDiscDto> list = gsqTwiningDiscService.listTwiningDisc(dto);
@@ -88,8 +88,8 @@ public class GsqTwiningDiscController extends BaseController {
 
     @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<GsqTwiningDiscDto> exportData(GsqTwiningDiscDto dto) {
+    @PostMapping("/exportData")
+    public List<GsqTwiningDiscDto> exportData(@RequestBody GsqTwiningDiscDto dto) {
         dto.setOrderStr(orderStr());
         List<GsqTwiningDiscDto> list = gsqTwiningDiscService.listTwiningDisc(dto);
         return list;

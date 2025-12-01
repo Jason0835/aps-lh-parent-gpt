@@ -5,35 +5,34 @@
     <select id="selectCd90ScheduleBaseList" resultType="com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo">
 		SELECT MAX(R.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
 		       R.SCHEDULE_DATE, /*排产日期*/
-		       R.BIG_ROLL_CODE, /*帘线规格*/
+		       MAX(R.BIG_ROLL_CODE) BIG_ROLL_CODE, /*帘线规格*/
 		       R.CLOTH_CODE, /*胎体布代号*/
 		       MAX(R.CRAFT) CRAFT,  /*胎体布工艺*/
+		       R.LAYERS, /*层数，开关打开会分层*/
 		       MAX(R.TIRE_FABRIC_SIDE_RUBBER) EDGE_GLUE, /*半钢边胶*/
-		       <!-- 再调整成5个班，4个班的逻辑先注释掉，20220408
-		       暂时回退4个班的逻辑，等需求确认后再修改
-		       SUM((nvl(R.CLASS1_PLAN_QTY, 0) + nvl(R.CLASS2_PLAN_QTY, 0) + nvl(R.CLASS3_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH / 1000) DAY_PLAN_QTY, /*中班计划量*/
-		       SUM((nvl(R.CLASS4_PLAN_QTY, 0) + nvl(R.CLASS5_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH / 1000) NIGHT_PLAN_QTY, /*夜班计划量*/
-		        -->
-		       SUM((nvl(R.CLASS1_PLAN_QTY, 0) + nvl(R.CLASS2_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH / 1000) DAY_PLAN_QTY, /*中班计划量*/
-		       SUM((nvl(R.CLASS3_PLAN_QTY, 0) + nvl(R.CLASS4_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH / 1000) NIGHT_PLAN_QTY, /*夜班计划量*/
-		       NVL(ROUND(AVG(R.SIDEWALL_LENGTH), 3), 0) UNIT_CONSUME, /*单耗*/
-		       NVL(CEIL(SUM(R.CLASS1_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS1_PLAN, /*对应成型一班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS2_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS2_PLAN, /*对应成型二班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS3_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS3_PLAN, /*对应成型三班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS4_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS4_PLAN, /*对应成型次一班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS5_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS5_PLAN /*对应成型次二班的计划量，向上取整*/
+				SUM((IFNULL(R.CLASS3_PLAN_QTY, 0)) * IFNULL(R.SIDEWALL_LENGTH, 0) / 1000) DAY_PLAN_QTY, /*夜班计划量*/
+				SUM((IFNULL(R.CLASS4_PLAN_QTY, 0)) * IFNULL(R.SIDEWALL_LENGTH, 0) / 1000) NIGHT_PLAN_QTY, /*早班计划量*/
+
+		       IFNULL(ROUND(AVG(R.SIDEWALL_LENGTH), 3), 0) UNIT_CONSUME, /*单耗*/
+		       IFNULL(CEILING(SUM(R.CLASS1_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS1_PLAN, /*对应成型一班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS2_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS2_PLAN, /*对应成型二班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS3_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS3_PLAN, /*对应成型三班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS4_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS4_PLAN, /*对应成型次一班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS5_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS5_PLAN, /*对应成型次二班的计划量，向上取整*/
+               COUNT(1) SPEC_COUNT
 		  FROM (SELECT R.CX_BATCH_NO, /*成型批次号*/
 		               R.SCHEDULE_DATE, /*排产日期*/
 		               CI.CORD_SPEC          BIG_ROLL_CODE, /*帘线规格*/
 		               CI.TIRE_FABRIC_CODE1  CLOTH_CODE, /*1#胎体布代号*/
-		               TRUNC(CI.TIRE_FABRIC_CRAFT1) CRAFT, /*1#胎体布工艺*/
+		               TRUNCATE(CI.TIRE_FABRIC_CRAFT1, 0) CRAFT, /*1#胎体布工艺*/
 		               CI.TIRE_FABRIC_SIDE_RUBBER , /*帘布边胶*/
-		               NVL(CI.SIDEWALL_LENGTH, 0) SIDEWALL_LENGTH, /*单耗*/
-		               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-		               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-		               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-		               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-		               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY
+		               IFNULL(CI.TIRE_FABRIC_LENGTH1, 0) SIDEWALL_LENGTH, /*单耗*/
+		               IFNULL(R.CLASS3_PLANNED_QTY, 0) CLASS1_PLAN_QTY,
+		               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+		               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+		               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+		               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+		               1 layers
 		          FROM T_CX_SCHEDULE_RESULT R
 		          LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
 		            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
@@ -41,7 +40,7 @@
 		         WHERE R.SCHEDULE_DATE = #{scheduleDate}
 		           AND R.DEL_FLAG = '0'
 		           AND CI.DEL_FLAG = '0'
-		           AND CI.TIRE_FABRIC_CODE1 IS NOT NULL
+		           AND CI.TIRE_FABRIC_CODE1 != ''
 				   <if test="isProductStage">
 				   /* 仅对投产阶段的规格排产 */
 				   AND CI.PRODUCTION_STAGE = '0'
@@ -51,22 +50,26 @@
 		               R.SCHEDULE_DATE, /*排产日期*/
 		               CI.CORD_SPEC          BIG_ROLL_CODE, /*帘线规格*/
 		               CI.TIRE_FABRIC_CODE2  CLOTH_CODE, /*2#胎体布代号*/
-		               TRUNC(CI.TIRE_FABRIC_CRAFT2) CRAFT, /*2#胎体布工艺*/
+		               TRUNCATE(CI.TIRE_FABRIC_CRAFT2, 0) CRAFT, /*2#胎体布工艺*/
 		               CI.TIRE_FABRIC_SIDE_RUBBER , /*帘布边胶*/
-		               NVL(CI.SIDEWALL_LENGTH, 0) SIDEWALL_LENGTH, /*单耗*/
-		               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-		               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-		               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-		               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-		               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY
+		               IFNULL(CI.TIRE_FABRIC_LENGTH2, 0) SIDEWALL_LENGTH, /*单耗*/
+		               IFNULL(R.CLASS3_PLANNED_QTY, 0) CLASS1_PLAN_QTY,
+		               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+		               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+		               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+		               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+                       CASE WHEN p.PARAM_VALUE = '1' THEN 2 ELSE 1 END layers
 		          FROM T_CX_SCHEDULE_RESULT R
 		          LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
 		            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
 		           AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+                  LEFT JOIN T_CD90_PARAMS p
+                    ON p.DEL_FLAG = '0'
+                   AND p.PARAM_CODE = 'SPLIT_LAYERS_SWITCH'
 		         WHERE R.SCHEDULE_DATE = #{scheduleDate}
 		           AND R.DEL_FLAG = '0'
 		           AND CI.DEL_FLAG = '0'
-		           AND CI.TIRE_FABRIC_CODE2 IS NOT NULL
+		           AND CI.TIRE_FABRIC_CODE2 != ''
 				   <if test="isProductStage">
 				   /* 仅对投产阶段的规格排产 */
 				   AND CI.PRODUCTION_STAGE = '0'
@@ -76,44 +79,48 @@
 		               R.SCHEDULE_DATE, /*排产日期*/
 		               CI.CORD_SPEC          BIG_ROLL_CODE, /*帘线规格*/
 		               CI.TIRE_FABRIC_CODE3  CLOTH_CODE, /*3#胎体布代号*/
-		               TRUNC(CI.TIRE_FABRIC_CRAFT3) CRAFT, /*3#胎体布工艺*/
+		               TRUNCATE(CI.TIRE_FABRIC_CRAFT3, 0) CRAFT, /*3#胎体布工艺*/
 		               CI.TIRE_FABRIC_SIDE_RUBBER , /*帘布边胶*/
-		               NVL(CI.SIDEWALL_LENGTH, 0) SIDEWALL_LENGTH, /*单耗*/
-		               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-		               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-		               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-		               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-		               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY
+		               IFNULL(CI.TIRE_FABRIC_LENGTH3, 0) SIDEWALL_LENGTH, /*单耗*/
+		               IFNULL(R.CLASS3_PLANNED_QTY, 0) CLASS1_PLAN_QTY,
+		               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+		               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+		               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+		               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+                       CASE WHEN p.PARAM_VALUE = '1' THEN 3 ELSE 1 END layers
 		          FROM T_CX_SCHEDULE_RESULT R
 		          LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO CI
 		            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
 		           AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
+                  LEFT JOIN T_CD90_PARAMS p
+                    ON p.DEL_FLAG = '0'
+                   AND p.PARAM_CODE = 'SPLIT_LAYERS_SWITCH'
 		         WHERE R.SCHEDULE_DATE = #{scheduleDate}
 		           AND R.DEL_FLAG = '0'
 		           AND CI.DEL_FLAG = '0'
-		           AND CI.TIRE_FABRIC_CODE3 IS NOT NULL
+		           AND CI.TIRE_FABRIC_CODE3 != ''
 				   <if test="isProductStage">
 				   /* 仅对投产阶段的规格排产 */
 				   AND CI.PRODUCTION_STAGE = '0'
 				   </if>
 		        ) R
-		 GROUP BY R.SCHEDULE_DATE, R.BIG_ROLL_CODE, R.CLOTH_CODE
+		 GROUP BY R.SCHEDULE_DATE, R.CLOTH_CODE, R.LAYERS
 		<!-- 过滤掉成型5个班都没有对应计划量的情况 -->
-		HAVING SUM((NVL(R.CLASS1_PLAN_QTY, 0) 
-		           + NVL(R.CLASS2_PLAN_QTY, 0) 
-		           + NVL(R.CLASS3_PLAN_QTY, 0) 
-		           + NVL(R.CLASS4_PLAN_QTY, 0) 
-		           + NVL(R.CLASS5_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH) != 0
-		 ORDER BY BIG_ROLL_CODE, CLOTH_CODE
+		HAVING SUM((IFNULL(R.CLASS1_PLAN_QTY, 0)
+		           + IFNULL(R.CLASS2_PLAN_QTY, 0)
+		           + IFNULL(R.CLASS3_PLAN_QTY, 0)
+		           + IFNULL(R.CLASS4_PLAN_QTY, 0)
+		           + IFNULL(R.CLASS5_PLAN_QTY, 0)) * R.SIDEWALL_LENGTH) != 0
+		 ORDER BY BIG_ROLL_CODE, CLOTH_CODE, LAYERS
     </select>
-    
+
     <!-- 获取当天的施工信息 -->
     <select id="listConstructionInfo" resultType="com.zlt.aps.common.engine.domain.EngineProductConstructionInfo">
 		SELECT R.EMBRYO_CODE,
 		       R.BOM_DATA_VERSION EMBRYO_VERSION,
 		       CI.CORD_SPEC,
 		       CI.TIRE_FABRIC_CODE1,
-		       CI.SIDEWALL_LENGTH,
+		       CI.TIRE_FABRIC_LENGTH1 SIDEWALL_LENGTH,
 		       CI.ID,
 		       CI.PRODUCTION_STAGE
 		  FROM T_CX_SCHEDULE_RESULT R
@@ -131,7 +138,7 @@
         from T_CD90_PARAMS
         where DEL_FLAG = '0'
     </select>
-    
+
     <!-- 查询当前排程的批次号 -->
     <select id="getCurrentBatchNo" parameterType="date" resultType="string">
         SELECT MAX(BATCH_NO) BATCH_NO
@@ -139,17 +146,17 @@
          WHERE schedule_date = #{scheduleDate}
            AND del_flag = '0'
     </select>
-    
+
     <!-- 获取插单需要的信息 -->
     <select id="listInsertOrderBaseInfo" parameterType="com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult" resultType="com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo">
 		WITH temp_tab_cloth_code AS (
         <foreach collection="scheduleResultList" item="schedule" separator=" union ">
         	SELECT #{schedule.clothCode} cloth_code FROM dual
-        </foreach> 
+		</foreach>
         )
         SELECT CASE
 		         WHEN MAX(CX_BATCH_NO) IS NULL THEN
-		          NVL(ROUND(MAX(UNIT_CONSUME), 3), 0)
+		          IFNULL(ROUND(MAX(UNIT_CONSUME), 3), 0)
 		         ELSE
 		          MAX(CASE
 		                WHEN CX_BATCH_NO IS NOT NULL THEN
@@ -163,24 +170,26 @@
 		       MAX(TIRE_FABRIC_SIDE_RUBBER) EDGE_GLUE, /*半钢边胶*/
                CLOTH_CODE,
                MAX(CX_BATCH_NO) CX_BATCH_NO,
-		       NVL(CEIL(SUM(R.CLASS1_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS1_PLAN, /*对应成型一班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS2_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS2_PLAN, /*对应成型二班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS3_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS3_PLAN, /*对应成型三班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS4_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS4_PLAN, /*对应成型次一班的计划量，向上取整*/
-		       NVL(CEIL(SUM(R.CLASS5_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS5_PLAN /*对应成型次二班的计划量，向上取整*/
+               LAYERS,
+		       IFNULL(CEILING(SUM(R.CLASS1_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS1_PLAN, /*对应成型一班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS2_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS2_PLAN, /*对应成型二班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS3_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS3_PLAN, /*对应成型三班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS4_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS4_PLAN, /*对应成型次一班的计划量，向上取整*/
+		       IFNULL(CEILING(SUM(R.CLASS5_PLAN_QTY * R.SIDEWALL_LENGTH / 1000)), 0) CX_CLASS5_PLAN /*对应成型次二班的计划量，向上取整*/
           FROM (
-	        SELECT CI.SIDEWALL_LENGTH UNIT_CONSUME /*单耗*/,
+	        SELECT CI.TIRE_FABRIC_LENGTH1 UNIT_CONSUME /*单耗*/,
 	               CI.CORD_SPEC BIG_ROLL_CODE,
 	               CI.TIRE_FABRIC_CODE1 CLOTH_CODE,
-		           TRUNC(CI.TIRE_FABRIC_CRAFT1) CRAFT, /*1#胎体布工艺*/
+		           TRUNCATE(CI.TIRE_FABRIC_CRAFT1, 0) CRAFT, /*1#胎体布工艺*/
 		           CI.TIRE_FABRIC_SIDE_RUBBER, /*帘布边胶*/
-	               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-	               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-	               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-	               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-	               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+	               IFNULL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
+	               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+	               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+	               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+	               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
 	               R.CX_BATCH_NO,
-                   CI.SIDEWALL_LENGTH
+                   CI.TIRE_FABRIC_LENGTH1 SIDEWALL_LENGTH,
+                   1 layers
 	          FROM T_PRODUCT_CONSTRUCTION_INFO CI
 	          LEFT JOIN T_CX_SCHEDULE_RESULT R
 	            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
@@ -192,59 +201,67 @@
 	               SELECT cloth_code FROM temp_tab_cloth_code
 	           )
 	         UNION
-	        SELECT CI.SIDEWALL_LENGTH UNIT_CONSUME /*单耗*/,
+	        SELECT CI.TIRE_FABRIC_LENGTH2 UNIT_CONSUME /*单耗*/,
 	               CI.CORD_SPEC BIG_ROLL_CODE,
 	               CI.TIRE_FABRIC_CODE2 CLOTH_CODE,
-		           TRUNC(CI.TIRE_FABRIC_CRAFT2) CRAFT, /*2#胎体布工艺*/
+		           TRUNCATE(CI.TIRE_FABRIC_CRAFT2, 0) CRAFT, /*2#胎体布工艺*/
 		           CI.TIRE_FABRIC_SIDE_RUBBER, /*帘布边胶*/
-	               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-	               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-	               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-	               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-	               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+	               IFNULL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
+	               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+	               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+	               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+	               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
 	               R.CX_BATCH_NO,
-                   CI.SIDEWALL_LENGTH
+                   CI.TIRE_FABRIC_LENGTH2 SIDEWALL_LENGTH,
+                   CASE WHEN p.PARAM_VALUE = '1' THEN 2 ELSE 1 END layers
 	          FROM T_PRODUCT_CONSTRUCTION_INFO CI
 	          LEFT JOIN T_CX_SCHEDULE_RESULT R
 	            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
 	           AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
 		       AND R.DEL_FLAG = '0'
 		       AND R.SCHEDULE_DATE = #{scheduleDate}
+              LEFT JOIN T_CD90_PARAMS p
+                ON p.DEL_FLAG = '0'
+               AND p.PARAM_CODE = 'SPLIT_LAYERS_SWITCH'
 	         WHERE CI.DEL_FLAG = '0'
 	           AND CI.TIRE_FABRIC_CODE2 IN (
 	               SELECT cloth_code FROM temp_tab_cloth_code
 	           )
 	         UNION
-	        SELECT CI.SIDEWALL_LENGTH UNIT_CONSUME /*单耗*/,
+	        SELECT CI.TIRE_FABRIC_LENGTH3 UNIT_CONSUME /*单耗*/,
 	               CI.CORD_SPEC BIG_ROLL_CODE,
 	               CI.TIRE_FABRIC_CODE3 CLOTH_CODE,
-		           TRUNC(CI.TIRE_FABRIC_CRAFT3) CRAFT, /*3#胎体布工艺*/
+		           TRUNCATE(CI.TIRE_FABRIC_CRAFT3, 0) CRAFT, /*3#胎体布工艺*/
 		           CI.TIRE_FABRIC_SIDE_RUBBER, /*帘布边胶*/
-	               NVL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
-	               NVL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
-	               NVL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
-	               NVL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
-	               NVL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
+	               IFNULL(R.CLASS1_PLAN_QTY, 0) CLASS1_PLAN_QTY,
+	               IFNULL(R.CLASS2_PLAN_QTY, 0) CLASS2_PLAN_QTY,
+	               IFNULL(R.CLASS3_PLAN_QTY, 0) CLASS3_PLAN_QTY,
+	               IFNULL(R.CLASS4_PLAN_QTY, 0) CLASS4_PLAN_QTY,
+	               IFNULL(R.CLASS5_PLAN_QTY, 0) CLASS5_PLAN_QTY,
 	               R.CX_BATCH_NO,
-                   CI.SIDEWALL_LENGTH
+                   CI.TIRE_FABRIC_LENGTH3 SIDEWALL_LENGTH,
+                   CASE WHEN p.PARAM_VALUE = '1' THEN 3 ELSE 1 END layers
 	          FROM T_PRODUCT_CONSTRUCTION_INFO CI
 	          LEFT JOIN T_CX_SCHEDULE_RESULT R
 	            ON R.EMBRYO_CODE = CI.EMBRYO_CODE
 	           AND R.BOM_DATA_VERSION = CI.EMBRYO_VERSION
 		       AND R.DEL_FLAG = '0'
 		       AND R.SCHEDULE_DATE = #{scheduleDate}
+		LEFT JOIN T_CD90_PARAMS p
+		ON p.DEL_FLAG = '0'
+		AND p.PARAM_CODE = 'SPLIT_LAYERS_SWITCH'
 	         WHERE CI.DEL_FLAG = '0'
 	           AND CI.TIRE_FABRIC_CODE3 IN (
 	               SELECT cloth_code FROM temp_tab_cloth_code
 	           )
         ) R
-        GROUP BY CLOTH_CODE
+        GROUP BY CLOTH_CODE, LAYERS
     </select>
 
 	<!-- 新增自动排产记录 -->
     <insert id="insertScheduleRecord" parameterType="com.zlt.aps.cd90.engine.vo.Cd90ScheduleRecordVo">
         insert into T_CD90_AUTO_SCHEDULE_RECORD (ID, CX_BATCH_NO, BATCH_NO, STATUS, SCHEDULE_DATE, CREATE_BY, CREATE_TIME, DEL_FLAG)
-        values (SEQ_AUTO_SCHEDULE_RECORD.Nextval, #{cxBatchNo}, #{batchNo}, #{status}, #{scheduleDate}, #{createBy}, #{createTime}, #{delFlag})
+        values (NULL, #{cxBatchNo}, #{batchNo}, #{status}, #{scheduleDate}, #{createBy}, #{createTime}, #{delFlag})
     </insert>
 
 	<!-- 批量新增排程结果数据 -->
@@ -273,6 +290,7 @@
 		   NIGHT_PRODUCE_ORDER,
 		   NIGHT_SYS_ANALYSIS,
 		   NIGHT_HAND_ANALYSIS,
+        NEXT_DAY_PLAN_QTY,
 		   CX_CLASS1_PLAN,
 		   CX_CLASS2_PLAN,
 		   CX_CLASS3_PLAN,
@@ -290,11 +308,13 @@
 		   REMARK,
 		   DEL_FLAG,
 		   CREATE_BY,
-		   CREATE_TIME)
-		  SELECT SEQ_CD90_schedule.NEXTVAL AS ID, T.*
-		    FROM (
-              <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-		          SELECT #{schedule.scheduleDate},
+		   CREATE_TIME,
+		LAYERS,
+		LAST_MID_PLAN_QTY)
+		  values
+		      <foreach collection="scheduleResultList" item="schedule" separator=",">
+                  (NULL,
+                   		 #{schedule.scheduleDate},
 		                 #{schedule.cxBatchNo,jdbcType = VARCHAR},
 		                 #{schedule.batchNo,jdbcType = VARCHAR},
 		                 #{schedule.orderNo,jdbcType = VARCHAR},
@@ -316,6 +336,7 @@
 		                 #{schedule.nightProduceOrder,jdbcType = DOUBLE},
 		                 #{schedule.nightSysAnalysis,jdbcType = VARCHAR},
 		                 #{schedule.nightHandAnalysis,jdbcType = VARCHAR},
+                  #{schedule.nextDayPlanQty,jdbcType = DOUBLE},
 		                 #{schedule.cxClass1Plan,jdbcType = DOUBLE},
 		                 #{schedule.cxClass2Plan,jdbcType = DOUBLE},
 		                 #{schedule.cxClass3Plan,jdbcType = DOUBLE},
@@ -333,10 +354,11 @@
 		                 #{schedule.remark,jdbcType = VARCHAR},
 		                 #{schedule.delFlag,jdbcType = VARCHAR},
 		                 #{schedule.createBy,jdbcType = VARCHAR},
-		                 #{schedule.createTime}
-		            FROM DUAL
+		                 #{schedule.createTime},
+				  #{schedule.layers},
+				  #{schedule.lastMidPlanQty,jdbcType=DOUBLE}
+		            )
               </foreach>
-          ) T
     </insert>
 
 	<!-- 把排程数据同步到log表，用于备份历史信息 -->
@@ -436,85 +458,88 @@
     <delete id="deleteCd90ScheduleResult" parameterType="date">
         DELETE FROM T_CD90_SCHEDULE_RESULT WHERE SCHEDULE_DATE = #{scheduleDate}
     </delete>
-    
+
 	<!-- 逻辑删除指定日期的排程主表记录 -->
     <update id="logicDeleteCd90ScheduleRecord" parameterType="com.zlt.aps.cd90.engine.vo.Cd90ScheduleRecordVo">
-    	UPDATE T_CD90_AUTO_SCHEDULE_RECORD 
-    	   SET DEL_FLAG = '1', 
-    	       UPDATE_BY = #{createBy}, 
+		UPDATE T_CD90_AUTO_SCHEDULE_RECORD
+		SET DEL_FLAG  = '1',
+			UPDATE_BY = #{createBy},
     	       UPDATE_TIME = #{createTime}
     	 WHERE schedule_date = #{scheduleDate}
     	   AND DEL_FLAG = '0'
     </update>
-    
-    <!-- 批量合并排程结果表（根据唯一字段，做更新或新增） -->
-    <update id="mergeCd90ScheduleResult">
-        MERGE INTO T_CD90_SCHEDULE_RESULT a USING (
-        <foreach collection="scheduleResultList" item="schedule" separator=" union ">
-            SELECT #{schedule.scheduleDate} schedule_Date,
-                   #{schedule.cxBatchNo,jdbcType = VARCHAR} CX_BATCH_NO,
-                   #{schedule.batchNo,jdbcType = VARCHAR} BATCH_NO,
-                   #{schedule.orderNo,jdbcType = VARCHAR} order_No,
-                   #{schedule.bigRollCode,jdbcType = VARCHAR} big_Roll_Code,
-                   #{schedule.machineId,jdbcType = VARCHAR} machine_Id,
-                   #{schedule.clothCode,jdbcType = VARCHAR} cloth_code,
-                   #{schedule.unitConsume,jdbcType = DOUBLE} unit_Consume,
-                   #{schedule.stockQty,jdbcType = DOUBLE} stock_Qty,
-                   #{schedule.supplyTime,jdbcType = DOUBLE} supply_Time,
-                   #{schedule.dayPlanQty,jdbcType = DOUBLE} day_Plan_Qty,
-                   #{schedule.dayProduceOrder,jdbcType = DOUBLE} day_Produce_Order,
-                   #{schedule.dayHandAnalysis,jdbcType = VARCHAR} day_Hand_Analysis,
-                   #{schedule.nightPlanQty,jdbcType = DOUBLE} night_Plan_Qty,
-                   #{schedule.nightProduceOrder,jdbcType = DOUBLE} night_Produce_Order,
-                   #{schedule.nightHandAnalysis,jdbcType = VARCHAR} night_Hand_Analysis,
-                   #{schedule.cxClass1Plan,jdbcType = DOUBLE} CX_CLASS1_PLAN,
-                   #{schedule.cxClass2Plan,jdbcType = DOUBLE} CX_CLASS2_PLAN,
-                   #{schedule.cxClass3Plan,jdbcType = DOUBLE} CX_CLASS3_PLAN,
-                   #{schedule.cxClass4Plan,jdbcType = DOUBLE} CX_CLASS4_PLAN,
-                   #{schedule.cxClass5Plan,jdbcType = DOUBLE} CX_CLASS5_PLAN,
-                   #{schedule.isRelease,jdbcType = VARCHAR} is_Release,
-                   #{schedule.markCloseOutTip,jdbcType = VARCHAR} mark_Close_Out_Tip,
-                   #{schedule.craft,jdbcType = VARCHAR} CRAFT,
-                   #{schedule.edgeGlue,jdbcType = VARCHAR} EDGE_GLUE,
-                   #{schedule.remark,jdbcType = VARCHAR} remark,
-                   #{schedule.productionStatus,jdbcType = VARCHAR} production_Status,
-                   #{schedule.delFlag,jdbcType = VARCHAR} del_Flag,
-                   #{schedule.createBy,jdbcType = VARCHAR} create_By,
-                   #{schedule.createTime} create_Time,
-				   #{schedule.dataSource,jdbcType = VARCHAR} data_source
-              from dual
-        </foreach>
-        ) b ON (a.schedule_date = b.schedule_date AND a.big_Roll_Code = b.big_Roll_Code AND a.CLOTH_CODE = b.CLOTH_CODE AND a.machine_id = b.machine_id AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-            a.stock_Qty = b.stock_Qty,
-            a.day_Plan_Qty = b.day_Plan_Qty,
-            a.night_Plan_Qty = b.night_Plan_Qty,
-            a.day_Hand_Analysis = b.day_Hand_Analysis,
-            a.night_Hand_Analysis = b.night_Hand_Analysis,
-            a.mark_Close_Out_Tip = b.mark_Close_Out_Tip,
-            a.remark = b.remark,
-            a.production_status = b.production_status,
-            a.update_by = b.create_By,
-            a.update_time = b.create_Time,
-			a.data_source = b.data_source,
-			a.CX_CLASS1_PLAN = b.CX_CLASS1_PLAN,
-			a.CX_CLASS2_PLAN = b.CX_CLASS2_PLAN,
-			a.CX_CLASS3_PLAN = b.CX_CLASS3_PLAN,
-			a.CX_CLASS4_PLAN = b.CX_CLASS4_PLAN,
-			a.CX_CLASS5_PLAN = b.CX_CLASS5_PLAN,
-			a.craft = b.craft,
-			a.EDGE_GLUE = b.EDGE_GLUE,
-			a.day_Produce_Order = b.day_Produce_Order,
-			a.night_Produce_Order = b.night_Produce_Order
-        WHEN NOT MATCHED THEN
-        INSERT (a.id,a.schedule_Date,a.CX_BATCH_NO,a.batch_no,a.order_no,a.big_Roll_Code,a.machine_Id,a.cloth_code,a.unit_Consume,a.supply_time,a.stock_Qty,a.day_Plan_Qty,a.day_Produce_Order,a.day_Hand_Analysis,a.night_Plan_Qty,a.night_Produce_Order,a.night_Hand_Analysis,a.is_release,a.mark_close_out_tip,a.remark,a.production_status,a.del_flag,a.create_by,a.create_time,a.data_source,a.CX_CLASS1_PLAN,a.CX_CLASS2_PLAN,a.CX_CLASS3_PLAN,a.CX_CLASS4_PLAN,a.CX_CLASS5_PLAN,a.CRAFT,a.EDGE_GLUE) values
-        (SEQ_CD90_SCHEDULE.NEXTVAL,b.schedule_Date,b.CX_BATCH_NO,b.batch_no,b.order_no,b.big_Roll_Code,b.machine_Id,b.cloth_code,b.unit_Consume,b.supply_time,b.stock_Qty,b.day_Plan_Qty,b.day_Produce_Order,b.day_Hand_Analysis,b.night_Plan_Qty,b.night_Produce_Order,b.night_Hand_Analysis,b.is_release,b.mark_close_out_tip,b.remark,b.production_status,b.del_flag,b.create_by,b.create_time,b.data_source,b.CX_CLASS1_PLAN,b.CX_CLASS2_PLAN,b.CX_CLASS3_PLAN,b.CX_CLASS4_PLAN,b.CX_CLASS5_PLAN,b.CRAFT,b.EDGE_GLUE)
-    </update>
-    
-    <!-- 批量更新90度裁断排程量 -->
+
+	<!-- 批量合并排程结果表（根据唯一字段，做更新或新增） -->
+    <insert id="mergeCd90ScheduleResult">
+		INSERT INTO T_CD90_SCHEDULE_RESULT (
+		schedule_Date, CX_BATCH_NO, batch_no, order_no, big_Roll_Code, machine_Id, cloth_code,
+		unit_Consume, supply_time, stock_Qty, day_Plan_Qty, day_Produce_Order, day_Hand_Analysis,
+		night_Plan_Qty, night_Produce_Order, night_Hand_Analysis, is_release, mark_close_out_tip,
+		remark, production_status, del_flag, create_by, create_time, data_source, CX_CLASS1_PLAN,
+		CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CRAFT, EDGE_GLUE
+		)
+		VALUES
+		<foreach collection="scheduleResultList" item="schedule" separator=",">
+			(
+			#{schedule.scheduleDate},
+			#{schedule.cxBatchNo,jdbcType=VARCHAR},
+			#{schedule.batchNo,jdbcType=VARCHAR},
+			#{schedule.orderNo,jdbcType=VARCHAR},
+			#{schedule.bigRollCode,jdbcType=VARCHAR},
+			#{schedule.machineId,jdbcType=VARCHAR},
+			#{schedule.clothCode,jdbcType=VARCHAR},
+			#{schedule.unitConsume,jdbcType=DOUBLE},
+			#{schedule.supplyTime,jdbcType=DOUBLE},
+			#{schedule.stockQty,jdbcType=DOUBLE},
+			#{schedule.dayPlanQty,jdbcType=DOUBLE},
+			#{schedule.dayProduceOrder,jdbcType=DOUBLE},
+			#{schedule.dayHandAnalysis,jdbcType=VARCHAR},
+			#{schedule.nightPlanQty,jdbcType=DOUBLE},
+			#{schedule.nightProduceOrder,jdbcType=DOUBLE},
+			#{schedule.nightHandAnalysis,jdbcType=VARCHAR},
+			#{schedule.isRelease,jdbcType=VARCHAR},
+			#{schedule.markCloseOutTip,jdbcType=VARCHAR},
+			#{schedule.remark,jdbcType=VARCHAR},
+			#{schedule.productionStatus,jdbcType=VARCHAR},
+			'0',
+			#{schedule.createBy,jdbcType=VARCHAR},
+			NOW(),
+			#{schedule.dataSource,jdbcType=VARCHAR},
+			#{schedule.cxClass1Plan,jdbcType=DOUBLE},
+			#{schedule.cxClass2Plan,jdbcType=DOUBLE},
+			#{schedule.cxClass3Plan,jdbcType=DOUBLE},
+			#{schedule.cxClass4Plan,jdbcType=DOUBLE},
+			#{schedule.cxClass5Plan,jdbcType=DOUBLE},
+			#{schedule.craft,jdbcType=VARCHAR},
+			#{schedule.edgeGlue,jdbcType=VARCHAR}
+			)
+		</foreach>
+		ON DUPLICATE KEY UPDATE
+		stock_Qty = VALUES(stock_Qty),
+		day_Plan_Qty = VALUES(day_Plan_Qty),
+		night_Plan_Qty = VALUES(night_Plan_Qty),
+		day_Hand_Analysis = VALUES(day_Hand_Analysis),
+		night_Hand_Analysis = VALUES(night_Hand_Analysis),
+		mark_Close_Out_Tip = VALUES(mark_Close_Out_Tip),
+		remark = VALUES(remark),
+		production_status = VALUES(production_status),
+		update_by = VALUES(create_by),
+		update_time = NOW(),
+		data_source = VALUES(data_source),
+		CX_CLASS1_PLAN = VALUES(CX_CLASS1_PLAN),
+		CX_CLASS2_PLAN = VALUES(CX_CLASS2_PLAN),
+		CX_CLASS3_PLAN = VALUES(CX_CLASS3_PLAN),
+		CX_CLASS4_PLAN = VALUES(CX_CLASS4_PLAN),
+		CX_CLASS5_PLAN = VALUES(CX_CLASS5_PLAN),
+		CRAFT = VALUES(CRAFT),
+		EDGE_GLUE = VALUES(EDGE_GLUE),
+		day_Produce_Order = VALUES(day_Produce_Order),
+		night_Produce_Order = VALUES(night_Produce_Order)
+	</insert>
+
+	<!-- 批量更新90度裁断排程量 -->
     <update id="updateCd90ScheduleResultPlanQty">
-        MERGE INTO T_CD90_SCHEDULE_RESULT a USING (
+        <!--MERGE INTO T_CD90_SCHEDULE_RESULT a USING (
         <foreach collection="scheduleResultList" item="schedule" separator=" union ">
             SELECT #{schedule.dayPlanQty,jdbcType = DOUBLE} day_Plan_Qty,
                    #{schedule.dayProduceOrder,jdbcType = DOUBLE} day_Produce_Order,
@@ -535,9 +560,65 @@
             a.night_Produce_Order = b.night_Produce_Order,
             a.is_Release = b.is_Release,
             a.update_by = b.update_by,
-            a.update_time = b.update_time
+            a.update_time = b.update_time-->
+		-- 执行批量更新
+		UPDATE T_CD90_SCHEDULE_RESULT as result
+		JOIN temp_schedule_result tempTable ON result.id = tempTable.id
+		SET
+		result.day_plan_qty = tempTable.day_plan_qty,
+		result.day_produce_order = tempTable.day_produce_order,
+		result.night_plan_qty = tempTable.night_plan_qty,
+		result.night_produce_order = tempTable.night_produce_order,
+		result.is_release = tempTable.is_release,
+		result.update_by = tempTable.update_by,
+		result.update_time = tempTable.update_time
+		where result.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </update>
-    
+
+	<update id="createTempTable">
+		-- 创建临时表用于批量更新
+		CREATE TEMPORARY TABLE temp_schedule_result (
+			id BIGINT PRIMARY KEY NOT NULL,
+			day_plan_qty DOUBLE,
+			day_produce_order INT,
+			night_plan_qty DOUBLE,
+			night_produce_order INT,
+			is_release CHAR(1),
+			update_by VARCHAR(25),
+			update_time DATETIME
+		);
+	</update>
+
+    <insert id="insertTempTable">
+		INSERT INTO temp_schedule_result
+		(id,
+		day_plan_qty,
+		day_produce_order,
+		night_plan_qty,
+		night_produce_order,
+		is_release,
+		update_by,
+		update_time)
+		values
+		<foreach collection="scheduleResultList" item="schedule" separator=",">
+			(
+			#{schedule.id},
+			#{schedule.dayPlanQty,jdbcType = DOUBLE},
+			#{schedule.dayProduceOrder,jdbcType = DOUBLE},
+			#{schedule.nightPlanQty,jdbcType = DOUBLE},
+			#{schedule.nightProduceOrder,jdbcType = DOUBLE},
+			#{schedule.isRelease,jdbcType = VARCHAR},
+			#{schedule.updateBy,jdbcType = VARCHAR},
+			#{schedule.updateTime}
+			)
+		</foreach>
+	</insert>
+
+	<delete id="dropTempTable">
+		-- 删除临时表
+		DROP TEMPORARY TABLE temp_schedule_result
+	</delete>
+
 	<!-- 获取指定排产日的90度裁断的排程信息 -->
     <select id="selectCd90ScheduleList" resultType="com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo">
         SELECT *
@@ -545,14 +626,14 @@
 		 WHERE R.DEL_FLAG = '0'
 	       AND R.SCHEDULE_DATE = #{scheduleDate}
     </select>
-    
+
 	<!-- 查询90度裁断外协规格清单 -->
     <select id="selectCd90AssistSpecList" resultType="com.zlt.aps.cd90.api.domain.entity.Cd90AssistSpec">
         SELECT *
 		  FROM T_CD90_ASSIST_SPEC R
 		 WHERE R.DEL_FLAG = '0'
     </select>
-    
+
 	<!-- 批量新增外协排程结果数据 -->
     <insert id="insertScheduleAssistList" parameterType="list">
     	INSERT INTO T_CD90_ASSIST_schedule
@@ -584,10 +665,10 @@
 		   DEL_FLAG,
 		   CREATE_BY,
 		   CREATE_TIME)
-		  SELECT SEQ_CD90_schedule.NEXTVAL AS ID, T.*
-		    FROM (
-              <foreach collection="scheduleAssistList" item="schedule" separator=" union ">
-		          SELECT #{schedule.scheduleDate},
+		  	VALUES
+		      <foreach collection="scheduleAssistList" item="schedule" separator=" union ">
+                  (NULL,
+		           		 #{schedule.scheduleDate},
 		                 #{schedule.cxBatchNo,jdbcType = VARCHAR},
 		                 #{schedule.batchNo,jdbcType = VARCHAR},
 		                 #{schedule.orderNo,jdbcType = VARCHAR},
@@ -614,13 +695,25 @@
 		                 #{schedule.delFlag,jdbcType = VARCHAR},
 		                 #{schedule.createBy,jdbcType = VARCHAR},
 		                 #{schedule.createTime}
-		            FROM DUAL
+		            )
               </foreach>
-          ) T
     </insert>
 
 	<!-- 逻辑删除指定日期的外协排程结果数据 -->
     <delete id="deleteCd90ScheduleAssist" parameterType="date">
         UPDATE T_CD90_ASSIST_SCHEDULE SET DEL_FLAG = '1' WHERE SCHEDULE_DATE = #{scheduleDate}
     </delete>
+
+    <update id="batchUpdateBatchNoAndOrderNo">
+        UPDATE T_CD90_SCHEDULE_RESULT as a
+        JOIN (
+        <foreach item="item" collection="list" separator=" UNION ALL ">
+            SELECT #{item.id} AS id, #{item.batchNo} as batch_no, #{item.orderNo} as order_no FROM DUAL
+        </foreach>
+        ) tempTable ON a.id = tempTable.id
+        SET
+        a.batch_no = tempTable.batch_no,
+        a.order_no = tempTable.order_no
+        where a.del_flag = '0'
+    </update>
 </mapper>

@@ -30,15 +30,15 @@ import java.util.List;
  */
 @Api(tags = {"胎侧胶料组别顺序维护接口"})
 @RestController
-@RequestMapping("/glueGroupOrder")
+@RequestMapping("/tc/glueGroupOrder")
 public class TcGlueGroupOrderController extends BaseController {
 
     @Resource
     public TcGlueGroupOrderService tcGlueGroupOrderService;
 
     @ApiOperation("根据条件查询胶料组别顺序列表")
-    @GetMapping("/listGlueGroupOrder")
-    public TableDataInfo listGlueGroupOrder(TcGlueGroupOrderDto dto) {
+    @PostMapping("/listGlueGroupOrder")
+    public TableDataInfo listGlueGroupOrder(@RequestBody TcGlueGroupOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<TcGlueGroupOrderDto> list = tcGlueGroupOrderService.listGlueGroupOrder(dto);
@@ -85,8 +85,8 @@ public class TcGlueGroupOrderController extends BaseController {
 
     @Log(title = "ui.tc.glueGroup.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<TcGlueGroupOrderDto> exportData(TcGlueGroupOrderDto dto) {
+    @PostMapping("/exportData")
+    public List<TcGlueGroupOrderDto> exportData(@RequestBody TcGlueGroupOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<TcGlueGroupOrderDto> list = tcGlueGroupOrderService.listGlueGroupOrder(dto);

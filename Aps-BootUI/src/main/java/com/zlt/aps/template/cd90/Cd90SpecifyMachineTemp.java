@@ -1,6 +1,7 @@
 package com.zlt.aps.template.cd90;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -11,7 +12,7 @@ import java.io.Serializable;
 
 @Data
 @ApiModel(value = "Cd90SpecifyMachine对象", description = "90度裁断定点机台表")
-public class Cd90SpecifyMachineTemp {
+public class Cd90SpecifyMachineTemp extends BaseEntity {
 
     @ApiModelProperty(value = "帘布代码")
     @Excel(name = "ui.common.column.lb.clothCode")

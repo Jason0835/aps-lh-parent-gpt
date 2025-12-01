@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.SizeCapacityConfigurationMapper">
+
+    <select id="getConfigurationList" parameterType="com.zlt.aps.monthplan.api.domain.entity.SizeCapacityConfiguration" resultType="com.zlt.aps.monthplan.api.domain.vo.SizeCapacityConfigurationVo">
+        SELECT tmsc.ID,
+               tmsc.FACTORY_CODE,
+               tmsc.YEAR,
+               tmsc.MONTH,
+               tmsc.PRO_SIZE,
+               tmsc.MOULD_METHOD,
+               tmsc.DAY_CAPACITY,
+               tmsc.NEXT_PRO_SIZE,
+               tmsc.MACHINE_NUMBER,
+               tmsc.REMARK,
+               tmsc.UPDATE_BY,
+               dama.DEMAND_QTY,
+               dama.NET_DEMAND_QTY,
+               dama.STOCK_UP_DEMAND_QTY,
+               tmsc.UPDATE_TIME
+          FROM t_mdm_size_capacity tmsc
+          LEFT JOIN (SELECT sumq.PRO_SIZE,
+                            sumq.DEMAND_QTY,
+                            netq.NET_DEMAND_QTY,
+                            sudq.STOCK_UP_DEMAND_QTY
+                       FROM (SELECT PRO_SIZE,
+                                    SUM(PLAN_QTY) AS DEMAND_QTY
+                               FROM t_mp_product_require_plan
+                              WHERE IFNULL(IS_DELETE, 0) = 0
+                                AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                                AND `YEAR` = #{year,jdbcType=DECIMAL}
+                                AND `MONTH` = #{month,jdbcType=DECIMAL}
+                                AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                              GROUP BY PRO_SIZE) sumq
+                       LEFT JOIN (SELECT PRO_SIZE,
+                                         SUM(PLAN_QTY) AS NET_DEMAND_QTY
+                                    FROM t_mp_product_require_plan
+                                   WHERE IFNULL(IS_DELETE, 0) = 0
+                                     AND IS_STOCK_UP = 0
+                                     AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                                     AND `YEAR` = #{year,jdbcType=DECIMAL}
+                                     AND `MONTH` = #{month,jdbcType=DECIMAL}
+                                     AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                                   GROUP BY PRO_SIZE) netq
+                         ON sumq.PRO_SIZE = netq.PRO_SIZE
+                       LEFT JOIN (SELECT PRO_SIZE,
+                                         SUM(PLAN_QTY) AS STOCK_UP_DEMAND_QTY
+                                    FROM t_mp_product_require_plan
+                                   WHERE IFNULL(IS_DELETE, 0) = 0
+                                     AND IS_STOCK_UP = 1
+                                     AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                                     AND `YEAR` = #{year,jdbcType=DECIMAL}
+                                     AND `MONTH` = #{month,jdbcType=DECIMAL}
+                                     AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                                   GROUP BY PRO_SIZE) sudq
+                         ON sumq.PRO_SIZE = sudq.PRO_SIZE) dama
+            ON tmsc.PRO_SIZE = dama.PRO_SIZE
+         WHERE IFNULL(tmsc.IS_DELETE, 0) = 0
+           AND tmsc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND tmsc.YEAR = #{year,jdbcType=DECIMAL}
+           AND tmsc.MONTH = #{month,jdbcType=DECIMAL}
+        <if test="proSize != null ">
+           AND tmsc.PRO_SIZE = #{proSize,jdbcType=DECIMAL}
+        </if>
+        <if test="mouldMethod != null and mouldMethod != '' ">
+           AND tmsc.MOULD_METHOD = #{mouldMethod,jdbcType=VARCHAR}
+        </if>
+         ORDER BY tmsc.PRO_SIZE,tmsc.UPDATE_TIME DESC
+    </select>
+    
+    <select id="getDemandInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.SizeCapacityConfiguration" resultType="com.zlt.aps.monthplan.api.domain.vo.SizeCapacityConfigurationVo">
+        SELECT sumq.PRO_SIZE,
+               sumq.DEMAND_QTY,
+               netq.NET_DEMAND_QTY,
+               sudq.STOCK_UP_DEMAND_QTY
+        FROM (SELECT PRO_SIZE,
+                     SUM(PLAN_QTY) AS DEMAND_QTY
+                FROM t_mp_product_require_plan
+               WHERE IFNULL(IS_DELETE, 0) = 0
+                 AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                 AND `YEAR` = #{year,jdbcType=DECIMAL}
+                 AND `MONTH` = #{month,jdbcType=DECIMAL}
+                 AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                 AND PRO_SIZE = #{proSize,jdbcType=DECIMAL}
+               GROUP BY PRO_SIZE) sumq
+                LEFT JOIN (SELECT PRO_SIZE,
+                                  SUM(PLAN_QTY) AS NET_DEMAND_QTY
+                             FROM t_mp_product_require_plan
+                            WHERE IFNULL(IS_DELETE, 0) = 0
+                              AND IS_STOCK_UP = 0
+                              AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                              AND `YEAR` = #{year,jdbcType=DECIMAL}
+                              AND `MONTH` = #{month,jdbcType=DECIMAL}
+                              AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                              AND PRO_SIZE = #{proSize,jdbcType=DECIMAL}
+                            GROUP BY PRO_SIZE) netq
+                  ON sumq.PRO_SIZE = netq.PRO_SIZE
+                LEFT JOIN (SELECT PRO_SIZE,
+                                  SUM(PLAN_QTY) AS STOCK_UP_DEMAND_QTY
+                             FROM t_mp_product_require_plan
+                            WHERE IFNULL(IS_DELETE, 0) = 0
+                              AND IS_STOCK_UP = 1
+                              AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                              AND `YEAR` = #{year,jdbcType=DECIMAL}
+                              AND `MONTH` = #{month,jdbcType=DECIMAL}
+                              AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                              AND PRO_SIZE = #{proSize,jdbcType=DECIMAL}
+                            GROUP BY PRO_SIZE) sudq
+                  ON sumq.PRO_SIZE = sudq.PRO_SIZE
+    </select>
+</mapper>

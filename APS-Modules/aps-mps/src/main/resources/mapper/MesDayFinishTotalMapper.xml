@@ -75,7 +75,7 @@
          WHERE DATA_VERSION = #{dataVersion,jdbcType=VARCHAR}
            AND IS_DELETE = 0
     </select>
-    
+
 	<!-- 将胎面日完成量中间表数据同步至业务表 -->
     <update id="mergeTmDayFinish">
 		MERGE INTO T_TM_DAY_FINISH_TOTAL a
@@ -83,7 +83,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.TREAD_CODE = b.TREAD_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -98,7 +98,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.SIDEWALL_CODE = b.SIDEWALL_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -113,7 +113,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.BEAD_CODE = b.BEAD_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -128,7 +128,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.STEEL_RING_CODE = b.STEEL_RING_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -143,7 +143,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.LINING_CODE = b.LINING_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -158,7 +158,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.STEEL_STRIP_CODE = b.STEEL_STRIP_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -173,7 +173,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.CLOTH_CODE = b.CLOTH_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -188,7 +188,7 @@
 		ON (a.SCHEDULE_DATE = b.SCHEDULE_DATE AND a.BIG_ROLL_CODE = b.BIG_ROLL_CODE)
 		WHEN MATCHED THEN
 		  UPDATE
-		     SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = SYSDATE
+              SET a.FINISH_QTY = NVL(b.FINISH_QTY, 0), a.UPDATE_TIME = now()
 		   WHERE a.DEL_FLAG = '0'
 		WHEN NOT MATCHED THEN
 		  INSERT
@@ -196,7 +196,7 @@
 		  VALUES
 		    (SEQ_CX_FINISH_QTY.NEXTVAL, b.SCHEDULE_DATE, b.BIG_ROLL_CODE, b.FINISH_QTY, b.CREATE_DATE, b.IS_DELETE)
     </update>
-    
+
     <!-- 取出胎面整个月的完成量，按物料号统计 -->
     <select id="selectTmByScheduleDate" resultType="com.zlt.aps.mps.domain.TTmDayFinishQty">
         SELECT tread_code, sum(FINISH_QTY) day_finish_qty
@@ -269,7 +269,7 @@
            AND del_flag = '0'
          GROUP BY BIG_ROLL_CODE
     </select>
-    
+
     <!-- 查询各工序班次完成量 -->
     <select id="listMesClassFinishQty" resultType="com.zlt.aps.mps.domain.ClassFinishQty">
     	SELECT PROCEDURE_CODE,
@@ -281,7 +281,7 @@
     	  FROM T_MES_CLASS_FINISH_QTY
          WHERE DATA_VERSION = #{dataVersion,jdbcType=VARCHAR}
     </select>
-    
+
     <!-- 更新查询各工序班次完成量 -->
     <update id="mergeClassFinishQty">
 		MERGE INTO T_CLASS_FINISH_QTY a
@@ -303,11 +303,12 @@
 		     a.CLASS1_FINISH_QTY = nvl(b.CLASS1_FINISH_QTY, a.CLASS1_FINISH_QTY),
 		     a.CLASS2_FINISH_QTY = nvl(b.CLASS2_FINISH_QTY, a.CLASS2_FINISH_QTY),
 		     a.CLASS3_FINISH_QTY = nvl(b.CLASS3_FINISH_QTY, a.CLASS3_FINISH_QTY),
-		     a.UPDATE_TIME = SYSDATE
+        a.UPDATE_TIME = now()
 		WHEN NOT MATCHED THEN
 		  INSERT
 		    (a.ID, a.PROCEDURE_CODE, a.SCHEDULE_DATE, a.MATERIAL_CODE, a.CLASS1_FINISH_QTY, a.CLASS2_FINISH_QTY, a.CLASS3_FINISH_QTY, a.CREATE_TIME, a.DEL_FLAG)
 		  VALUES
-		    (get_sequence_nextval('SEQ_CLASS_FINISH_QTY'), b.PROCEDURE_CODE, b.SCHEDULE_DATE, b.MATERIAL_CODE, b.CLASS1_FINISH_QTY, b.CLASS2_FINISH_QTY, b.CLASS3_FINISH_QTY, SYSDATE, '0')
+        (get_sequence_nextval('SEQ_CLASS_FINISH_QTY'), b.PROCEDURE_CODE, b.SCHEDULE_DATE, b.MATERIAL_CODE,
+        b.CLASS1_FINISH_QTY, b.CLASS2_FINISH_QTY, b.CLASS3_FINISH_QTY, now(), '0')
     </update>
 </mapper>

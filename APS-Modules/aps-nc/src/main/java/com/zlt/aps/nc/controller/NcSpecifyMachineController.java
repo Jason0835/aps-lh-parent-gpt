@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"内衬定点机台接口"})
 @RestController
-@RequestMapping("/specifyMachine")
+@RequestMapping("/nc/specifyMachine")
 public class NcSpecifyMachineController extends BaseController {
 
     @Resource
     private NcSpecifyMachineService NcSpecifyMachineService;
 
     @ApiOperation("根据条件查询定点机台列表")
-    @GetMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(NcSpecifyMachineDto dto) {
+    @PostMapping("/listSpecifyMachine")
+    public TableDataInfo listSpecifyMachine(@RequestBody NcSpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcSpecifyMachineDto> list = NcSpecifyMachineService.listSpecifyMachine(dto);
@@ -80,8 +80,8 @@ public class NcSpecifyMachineController extends BaseController {
 
     @Log(title = "ui.nc.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<NcSpecifyMachineDto> exportData(NcSpecifyMachineDto dto) {
+    @PostMapping("/exportData")
+    public List<NcSpecifyMachineDto> exportData(@RequestBody NcSpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcSpecifyMachineDto> list = NcSpecifyMachineService.listSpecifyMachine(dto);

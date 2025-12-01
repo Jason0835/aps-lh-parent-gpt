@@ -1,15 +1,15 @@
 package com.zlt.aps.xwyy.engine.mapper;
 
-import java.math.BigDecimal;
-import java.util.Date;
-import java.util.List;
-
-import org.apache.ibatis.annotations.Param;
-
+import com.zlt.aps.xwyy.api.domain.dto.XwyyReserveStockDto;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRemind;
 import com.zlt.aps.xwyy.engine.vo.XwyyBigRollVo;
 import com.zlt.aps.xwyy.engine.vo.XwyyParamsVo;
 import com.zlt.aps.xwyy.engine.vo.XwyyStockVo;
+import org.apache.ibatis.annotations.Param;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 纤维压延库存数据mapper
@@ -103,4 +103,19 @@ public interface XwyyEngineStockMapper {
 	 */
 	List<String> listCloseOutSpec(@Param("scheduleDate") Date scheduleDate,
 			@Param("isProductStage") boolean isProductStage);
+
+
+	/**
+	 * 根据规格查询预生产库存倍数
+	 * @param codeList 规格列表
+	 * @return 结果
+	 */
+	List<XwyyReserveStockDto> listReserveStock(@Param("codeList") List<String> codeList);
+
+    /**
+     * 预估指定日期的库存，使用前一天的库存与当天的计划进行预估
+     * @param stockDate
+     * @return
+     */
+    int estimateStock(@Param("stockDate") Date stockDate);
 }

@@ -50,6 +50,6 @@ public interface ITmParamsService
      * 导出接口
      * @param dto
      */
-    @GetMapping("/tm/params/exportData")
-    List<TmParamsDto> exportData(@SpringQueryMap TmParamsDto dto);
+    @PostMapping("/tm/params/exportData")
+    List<TmParamsDto> exportData(@RequestBody TmParamsDto dto);
 }

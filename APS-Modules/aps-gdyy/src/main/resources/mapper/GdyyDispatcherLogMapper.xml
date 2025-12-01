@@ -24,7 +24,7 @@
     </resultMap>
 
     <sql id="selectGdyyDispatcherLogVo">
-        select id, oper_type, schedule_date, material_code, before_mid_plan, before_night_plan, before_day_plan, after_mid_plan, after_night_plan, after_day_plan, remark, del_flag, create_by, create_time, update_by, update_time from t_gdyy_dispatcher_log
+        select id, oper_type, schedule_date, material_code, before_machine_id, before_mid_plan, before_night_plan, before_day_plan, after_machine_id, after_mid_plan, after_night_plan, after_day_plan, remark, del_flag, create_by, create_time, update_by, update_time from t_gdyy_dispatcher_log
     </sql>
 
     <select id="selectGdyyDispatcherLogList" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyDispatcherLog"
@@ -37,10 +37,10 @@
             and INSTR(create_by, #{createBy}) > 0
         </if>
         <if test="startTime != null and startTime !='' ">
-            and create_time  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+            and create_time  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
         <if test="endTime != null and endTime !='' ">
-            and create_time  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+            and create_time  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
         </if>
         <if test="orderStr == null">
             order by create_time desc
@@ -57,9 +57,6 @@
     </select>
 
     <insert id="insertGdyyDispatcherLog" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyDispatcherLog">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT seq_t_gdyy_dispatcher_log.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_gdyy_dispatcher_log
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -67,9 +64,11 @@
             <if test="operType != null">oper_type,</if>
             <if test="scheduleDate != null">schedule_date,</if>
             <if test="materialCode != null">material_code,</if>
+            <if test="beforeMachineId != null">before_machine_id,</if>
             <if test="beforeMidPlan != null">before_mid_plan,</if>
             <if test="beforeDayPlan != null">before_day_plan,</if>
             <if test="beforeNightPlan != null">before_night_plan,</if>
+            <if test="afterMachineId != null">after_machine_id,</if>
             <if test="afterMidPlan != null">after_mid_plan,</if>
             <if test="afterDayPlan != null">after_day_plan,</if>
             <if test="afterNightPlan != null">after_night_plan,</if>
@@ -86,9 +85,11 @@
             <if test="operType != null">#{operType},</if>
             <if test="scheduleDate != null">#{scheduleDate},</if>
             <if test="materialCode != null">#{materialCode},</if>
+            <if test="beforeMachineId != null">#{beforeMachineId},</if>
             <if test="beforeMidPlan != null">#{beforeMidPlan},</if>
             <if test="beforeDayPlan != null">#{beforeDayPlan},</if>
             <if test="beforeNightPlan != null">#{beforeNightPlan},</if>
+            <if test="afterMachineId != null">#{afterMachineId},</if>
             <if test="afterMidPlan != null">#{afterMidPlan},</if>
             <if test="afterDayPlan != null">#{afterDayPlan},</if>
             <if test="afterNightPlan != null">#{afterNightPlan},</if>
@@ -107,8 +108,10 @@
             <if test="operType != null">oper_type = #{operType},</if>
             <if test="scheduleDate != null">schedule_date = #{scheduleDate},</if>
             <if test="materialCode != null">material_code = #{materialCode},</if>
+            <if test="beforeMachineId != null">before_machine_id = #{beforeMachineId},</if>
             <if test="beforeDayPlan != null">before_day_plan = #{beforeDayPlan},</if>
             <if test="beforeNightPlan != null">before_night_plan = #{beforeNightPlan},</if>
+            <if test="afterMachineId != null">after_machine_id = #{afterMachineId},</if>
             <if test="afterDayPlan != null">after_day_plan = #{afterDayPlan},</if>
             <if test="afterNightPlan != null">after_night_plan = #{afterNightPlan},</if>
             <if test="remark != null">remark = #{remark},</if>
@@ -122,11 +125,11 @@
     </update>
 
     <delete id="deleteGdyyDispatcherLogById" parameterType="Long">
-        update t_gdyy_dispatcher_log set del_flag='1' where id = #{id}
+        update t_gdyy_dispatcher_log set del_flag = NULL where id = #{id}
     </delete>
 
     <delete id="deleteGdyyDispatcherLogByIds" parameterType="String">
-        update t_gdyy_dispatcher_log set del_flag='1' where id in
+        update t_gdyy_dispatcher_log set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

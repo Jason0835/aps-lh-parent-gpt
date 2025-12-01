@@ -164,6 +164,11 @@ public class NcScheduleResultVo extends ApsBaseDto {
      * 对应成型次二班的内衬胶计划量
      */
     private Double cxClass5Plan;
+    
+    /**
+     * 剩余量
+     */
+    private double surplusQty;
 
     /**
      * 发布成功计数器，每点击一次发布并成功的话，计数器累加
@@ -229,4 +234,34 @@ public class NcScheduleResultVo extends ApsBaseDto {
      * 收尾规格标记，0：收尾1：非收尾
      */
     private String closeOutSpecFlag;
+
+    /**
+     * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
+     */
+    private Double planStockQty;
+
+    /**
+     * 上一天早班计划
+     */
+    private Double lastMidPlanQty;
+
+    /**
+     * 夜班与早班的交接班库存
+     */
+    private double classStock;
+
+    /**
+     * 库存供需比例，交接班库存/成型一天需求量
+     */
+    private double supplyDemandRatio;
+
+    /**
+     * 明日早班计划
+     */
+    private double nextDayPlanQty;
+    
+    /**
+     * 是否均分
+     */
+    private Boolean isEqualShare;
 }

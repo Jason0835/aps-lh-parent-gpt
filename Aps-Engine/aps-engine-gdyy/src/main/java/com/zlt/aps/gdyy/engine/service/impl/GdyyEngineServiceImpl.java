@@ -1,28 +1,8 @@
 package com.zlt.aps.gdyy.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -31,23 +11,37 @@ import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.engine.mapper.GdyyEngineBigRollMapper;
 import com.zlt.aps.gdyy.engine.mapper.GdyyEngineMapper;
 import com.zlt.aps.gdyy.engine.mapper.GdyyEngineStockMapper;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineMonthSurplusService;
 import com.zlt.aps.gdyy.engine.service.GdyyEnginePlanQtyService;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineService;
-import com.zlt.aps.gdyy.engine.vo.GdyyDayUsedVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyMonthSurplusVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyParamsVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyScheduleRecordVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyScheduleResultVo;
-
+import com.zlt.aps.gdyy.engine.vo.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 钢带压延自动排程服务实现类
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-19 10:36:57
@@ -77,10 +71,14 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 	private GdyyEnginePlanQtyService gdyyEnginePlanQtyService;
 	@Autowired
 	private GdyyEngineMonthSurplusService gdyyEngineMonthSurplusService;
+	@Autowired
+	private GdyyEngineBigRollMapper gdyyEngineBigRollMapper;
 	@Resource
 	private IncrementService incrementService;
 	@Resource
 	private AutoScheduleLogService autoScheduleLogService;
+	@Autowired
+	private GdyyEngineMachineServiceImpl gdyyEngineMachineService;
 	/**
 	 * 生产阶段校验开关状态：打开
 	 */
@@ -88,7 +86,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 自动排程
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-19 11:26:33
@@ -112,14 +110,29 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 		// 判断仅对投产阶段规格排产是否打开
 		boolean isProductStage = PRODUCTION_STAGE_ON
 				.equals(paramsMap.getOrDefault(EngineConstants.PRODUCTION_STAGE_PRODUCE, PRODUCTION_STAGE_ON));
+        // 获取库存损耗率
+        BigDecimal stockLossRate = this.getStockLossRate(paramsMap);
 
 		/* 根据排程日期，从15度裁断排产计划中生成钢带压延排产的信息 */
 		List<GdyyScheduleResultVo> scheduleList = gdyyEngineMapper.selectGdyyScheduleBaseList(scheduleDate, breadth,
 				isProductStage);
+		List<GdyyScheduleResultVo> lastScheduleList = gdyyEngineMapper.selectGdyyScheduleList(DateUtils.addDays(scheduleDate, -1)); // 取上一天计划
+        if (CollectionUtils.isEmpty(scheduleList)) { // 今天没有成型计划的情况下尝试取上一天的计划
+            scheduleList = lastScheduleList;
+            scheduleList.stream().forEach(scheduleVo -> {
+                scheduleVo.setId(null);
+                scheduleVo.setScheduleDate(scheduleDate); // 日期改成今天
+                scheduleVo.setBatchNo(null);
+                scheduleVo.setOrderNo(null);
+                scheduleVo.setUpdateBy(null);
+                scheduleVo.setUpdateTime(null);
+                scheduleVo.setMachineCode(null);
+            });
+        }
 		if (CollectionUtil.isEmpty(scheduleList)) {
-			log.info("根据15度裁断排程记录为空，无法生成钢带压延排产");
+			log.info("根据成型排程记录为空，无法生成钢带压延排产");
 			autoScheduleLogService.insertGdyyScheduleLog(batchNo, "", "自动排程失败",
-					"自动排程失败，原因：15度裁断排程记录为空，或没有在施工信息中找到对应的物料");
+					"自动排程失败，原因：成型排程记录为空，或没有在施工信息中找到对应的物料");
 			throw new RuntimeException(I18nUtil.getMessage("engine.auto.scheule.tip1"));
 		}
 		// 记录日志
@@ -132,7 +145,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 		this.initScheduleReulstList(batchNo, scheduleList, isReleaseMap);
 		// 记录日志
 		if (!isReleaseMap.isEmpty()) {
-			autoScheduleLogService.insertCd90ScheduleLog(batchNo, "", "1.1、存在上次已发布的排程记录", toJSONString(isReleaseMap));
+			autoScheduleLogService.insertGdyyScheduleLog(batchNo, "", "1.1、存在上次已发布的排程记录", toJSONString(isReleaseMap));
 		}
 
 		/**
@@ -151,18 +164,29 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 		autoScheduleLogService.insertGdyyScheduleLog(batchNo, "", "1.2、计算日用参考量",
 				"各大卷的日用参考量：" + toJSONString(dayUsedMap));
 
+		// 选机台
+//		gdyyEngineMachineService.scheduleMachine(scheduleList);
+
 		/**
 		 * 计算计划量相关信息，包括库存量、重算计划量
 		 */
+		List<GdyyStockVo> stockList = gdyyEngineStockMapper.selectGdyyStockQty(scheduleDate, stockLossRate);
+        if (CollectionUtils.isEmpty(stockList) || stockList.stream().allMatch(s -> ApsConstant.STATUS_ENABLE.equals(s.getEstimateStockFlag()))) {// 判断当天是否有库存
+            if (PRODUCTION_STAGE_ON.equals(paramsMap.getOrDefault(EngineConstants.ESTIMATE_STOCK_SWITCH, PRODUCTION_STAGE_ON))) { // 判断预估库存开关
+                gdyyEngineStockMapper.estimateStock(DateUtils.addDays(scheduleDate, -1)); // 根据上一天计划及其对应库存预估当天库存
+            }
+        }
+        // 处理上一天的计划量
+        Map<String, Double> lastPlanQtyMap = lastScheduleList.stream().collect(Collectors.groupingBy(GdyyScheduleResultVo::getBigRollCode, Collectors.summingDouble(GdyyScheduleResultVo::getClass2Plan)));
+        scheduleList.stream().forEach(scheduleVo -> scheduleVo.setLastPlanQty(lastPlanQtyMap.getOrDefault(scheduleVo.getBigRollCode(), 0D)));
 		String stockRatio = paramsMap.get(EngineConstants.STOCK_RATIO);
 		String lossRate = paramsMap.get(EngineConstants.LOSS_RATE);
-		// 库存是否按大卷计算
-		boolean isRoll = EngineConstants.GDYY_STOCK_ROLL_SWITCH_ON
-				.equals(paramsMap.get(EngineConstants.GDYY_STOCK_ROLL_SWITCH));
-		// 获取库存损耗率
-		BigDecimal stockLossRate = this.getStockLossRate(paramsMap);
+        boolean isRoll = EngineConstants.GDYY_STOCK_ROLL_SWITCH_ON
+                .equals(paramsMap.get(EngineConstants.GDYY_STOCK_ROLL_SWITCH)); // 库存是否按大卷计算
 		gdyyEnginePlanQtyService.calculateSchedulePlanQty(scheduleDate, scheduleList, stockRatio, lossRate,
 				stockLossRate, standardSize, isRoll, breadth, isProductStage);
+
+        gdyyEngineMachineService.chooseMachineByCapacity(scheduleList);
 
 		/**
 		 * 根据月度计划量设置收尾备注等信息
@@ -176,6 +200,9 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 			scheduleVo.setBaseVale(null);
 			scheduleList.add(scheduleVo);
 		}
+
+		// 赋值排产顺序
+		this.calculateProduceOrder(scheduleList);
 
 		// 将当天的历史排程记录（上一次的）转移至日志表
 		this.cleanHistoryScheduleResult(scheduleDate);
@@ -193,8 +220,161 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 	}
 
 	/**
+	 * 计算各个班次的排产顺序
+	 *
+	 * @param scheduleList 排程结果
+	 */
+	private void calculateProduceOrder(List<GdyyScheduleResultVo> scheduleList) {
+		// 添加日志
+		String batchNo = CollectionUtil.firstElement(scheduleList).getBatchNo();
+		autoScheduleLogService.insertCd15ScheduleLog(batchNo, "", "3.3、设置生产顺序字段",
+				"按机台、大卷分组，再组内按库存供应时长(从小到大)，设置班次的生产顺序（有计划量的才设置生产顺序）");
+		// 先按机台、大卷分组
+		Map<String, List<GdyyScheduleResultVo>> resultMap = scheduleList.stream()
+				// 过滤掉无机台与多机台的情况
+				.filter(r -> StringUtils.isNotBlank(r.getMachineCode()) && !r.getMachineCode().contains(","))
+				// 按机台ID，大卷编号分组
+				.collect(Collectors.groupingBy(r -> GenerageMapKeyUtils.createMapKey(r.getMachineCode())));
+
+		// 组内单独排序
+		for (List<GdyyScheduleResultVo> resultList : resultMap.values()) {
+			// 排产结果排序
+			List<GdyyScheduleResultVo> sortScheduleList = resultList.stream().sorted(Comparator
+					// 先按供应时长正序排序，没有供应时长（插单）的放最后
+					.comparing(GdyyScheduleResultVo::getStockQty, Comparator.nullsLast(Double::compareTo))
+					// 如果供应时长相等，则按开始班次正序排序
+					.thenComparing(this.createProductClassSorter())
+					// 如果开始班次相等，则按该班次的成型排程量倒序排序
+					.thenComparing(this.createCxPlanNumSorter())).collect(Collectors.toList());
+
+			// 中班与晚班生产顺序分开，初始值为1；
+			long class1SortNumer = 1;
+			long class2SortNumber = 1;
+			long class3SortNumber = 1;
+			for (GdyyScheduleResultVo resultVo : sortScheduleList) {
+				// 只有有排计划量的排程才需要设置生产顺序
+				if (resultVo.getClass1Plan() > 0) {
+					resultVo.setClass1ProduceOrder(class1SortNumer);
+					class1SortNumer++;
+				} else {
+					// 为零的时候需要清空（导入的情况下）
+					resultVo.setClass1ProduceOrder(null);
+				}
+				if (resultVo.getClass2Plan() > 0) {
+					resultVo.setClass2ProduceOrder(class2SortNumber);
+					class2SortNumber++;
+				} else {
+					// 为零的时候需要清空（导入的情况下）
+					resultVo.setClass2ProduceOrder(null);
+				}
+				if (resultVo.getClass3Plan() > 0) {
+					resultVo.setClass3ProduceOrder(class3SortNumber);
+					class3SortNumber++;
+				} else {
+					// 为零的时候需要清空（导入的情况下）
+					resultVo.setClass3ProduceOrder(null);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 获取本规格的开始生产班次
+	 *
+	 * @param result
+	 * @return
+	 */
+	private int getStartClass(GdyyScheduleResultVo result) {
+		int startClass = 1;
+		// 从1班开始遍历每个班次计划量，大于0的即为开始生产班次
+		if (Optional.ofNullable(result.getCxClass1Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass2Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass3Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass4Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		return ++startClass;
+	}
+
+	/**
+	 * 创建查询结果排序器——成产班次<br/>
+	 * 排序规则：按开始班次正序排序
+	 *
+	 * @return
+	 */
+	private Comparator<GdyyScheduleResultVo> createProductClassSorter() {
+		return new Comparator<GdyyScheduleResultVo>() {
+			@Override
+			public int compare(GdyyScheduleResultVo o1, GdyyScheduleResultVo o2) {
+				// 新排程结果的开始班次
+				int startClass1 = getStartClass(o1);
+				// 原排程结果的开始班次
+				int startClass2 = getStartClass(o2);
+				// 开始班次较小的在前
+				return Integer.valueOf(startClass1).compareTo(startClass2);
+			}
+		};
+	}
+
+	/**
+	 * 创建查询结果排序器——成型计划量<br/>
+	 * 排序规则：按同班次的成型计划量倒序排序
+	 *
+	 * @return
+	 */
+	private Comparator<GdyyScheduleResultVo> createCxPlanNumSorter() {
+		return new Comparator<GdyyScheduleResultVo>() {
+			@Override
+			public int compare(GdyyScheduleResultVo o1, GdyyScheduleResultVo o2) {
+				// 新排程结果的开始生产班次的计划量
+				double cxPlanNum1 = getCxPlanNum(o1);
+				// 原排程结果的开始生产班次的计划量
+				double cxPlanNum2 = getCxPlanNum(o2);
+				// 计划量较大的在前
+				return Double.valueOf(cxPlanNum2).compareTo(cxPlanNum1);
+			}
+		};
+	}
+
+	/**
+	 * 获取本规格开始生产那一班的计划量
+	 *
+	 * @param result
+	 * @return
+	 */
+	private double getCxPlanNum(GdyyScheduleResultVo result) {
+		// 从1班开始遍历每个班次计划量，取出第一个计划量大于0的数值
+		double planNum = Optional.ofNullable(result.getCxClass1Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass2Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass3Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass4Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		return Optional.ofNullable(result.getCxClass5Plan()).orElse(0d);
+	}
+
+	/**
 	 * 获取库存损耗率
-	 * 
+     *
 	 * @param paramsMap
 	 * @return
 	 */
@@ -210,7 +390,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 取出当天已经发布过的排程记录
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @return
 	 */
@@ -226,7 +406,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 初始化排程明细
-	 * 
+     *
 	 * @param batchNo      排程批次号
 	 * @param scheduleList 排程明细列表
 	 * @param isReleaseMap 已发布排程列表
@@ -262,7 +442,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 钢带压延度裁断插单
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-28 09:31:42
@@ -295,7 +475,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 批量导入的钢带压延排程记录
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
 	 * @return 导入异常日志
@@ -325,7 +505,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 批量保存钢带压延排程记录
-	 * 
+     *
 	 * @param batchNo         批次号
 	 * @param scheduleDate    排程日志
 	 * @param scheduleList    排程数据
@@ -335,6 +515,9 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 			List<GdyyScheduleResultDto> scheduleList, List<ImportErrorLog> importErrorLogs) {
 		// 加载系统参数
 		Map<String, String> paramsMap = this.getParamsMap();
+		// 获取大卷信息
+		Map<String, BigDecimal> bigRollMap = gdyyEngineBigRollMapper.listCd15BigRoll().stream()
+				.collect(Collectors.toMap(GdyyBigRollVo::getBigRollCode, GdyyBigRollVo::getClothLength));
 		// 月度计划信息
 		Map<String, GdyyMonthSurplusVo> monthSurplusMap = gdyyEngineMonthSurplusService
 				.getMonthSurplusMap(scheduleDate);
@@ -395,12 +578,21 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 			scheduleResult.setDayUsed(dayUsedMap.getOrDefault(bigRollCode, 0D));
 			// 库存直接取当天库存，不从前端接收该数值 20211030
 			scheduleResult.setStockQty(Math.floor(stockMap.getOrDefault(bigRollCode, 0D)));
-			scheduleResult.setClass1Plan(Optional.ofNullable(scheduleResult.getClass1Plan()).orElse(0D));
-			scheduleResult.setClass2Plan(Optional.ofNullable(scheduleResult.getClass2Plan()).orElse(0D));
-			scheduleResult.setClass3Plan(Optional.ofNullable(scheduleResult.getClass3Plan()).orElse(0D));
-			scheduleResult.setClass1PlanNum(Optional.ofNullable(scheduleResult.getClass1PlanNum()).orElse(0D));
-			scheduleResult.setClass2PlanNum(Optional.ofNullable(scheduleResult.getClass2PlanNum()).orElse(0D));
-			scheduleResult.setClass3PlanNum(Optional.ofNullable(scheduleResult.getClass3PlanNum()).orElse(0D));
+			BigDecimal class1Plan = BigDecimal.valueOf(Optional.ofNullable(scheduleResult.getClass1Plan()).orElse(0D));
+			scheduleResult.setClass1Plan(class1Plan.doubleValue());
+			BigDecimal class2Plan = BigDecimal.valueOf(Optional.ofNullable(scheduleResult.getClass2Plan()).orElse(0D));
+			scheduleResult.setClass2Plan(class2Plan.doubleValue());
+			BigDecimal class3Plan = BigDecimal.valueOf(Optional.ofNullable(scheduleResult.getClass3Plan()).orElse(0D));
+			scheduleResult.setClass3Plan(class3Plan.doubleValue());
+			// 大卷标准长度，没有则获取默认长度
+			BigDecimal newStandardSize = bigRollMap.getOrDefault(bigRollCode, BigDecimal.valueOf(standardSize));
+			// 计算大卷数 = 计划量 / 标准长度
+			BigDecimal class1PlanNum = class1Plan.divide(newStandardSize, 1, RoundingMode.UP);
+			BigDecimal class2PlanNum = class2Plan.divide(newStandardSize, 1, RoundingMode.UP);
+			BigDecimal class3PlanNum = class3Plan.divide(newStandardSize, 1, RoundingMode.UP);
+			scheduleResult.setClass1PlanNum(Optional.of(class1PlanNum.doubleValue()).orElse(0D));
+			scheduleResult.setClass2PlanNum(Optional.of(class2PlanNum.doubleValue()).orElse(0D));
+			scheduleResult.setClass3PlanNum(Optional.of(class3PlanNum.doubleValue()).orElse(0D));
 			scheduleResult.setClass1PlanNoStock(Optional.ofNullable(scheduleResult.getClass1PlanNoStock()).orElse(0D));
 			scheduleResult.setClass2PlanNoStock(Optional.ofNullable(scheduleResult.getClass2PlanNoStock()).orElse(0D));
 			scheduleResult.setClass3PlanNoStock(Optional.ofNullable(scheduleResult.getClass3PlanNoStock()).orElse(0D));
@@ -435,7 +627,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 计算各大卷对应的日用参考值
-	 * 
+     *
 	 * @param scheduleDate    排产日期
 	 * @param breadth         幅宽
 	 * @param bigRollCodeList 大卷编号列表
@@ -453,7 +645,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 清理排产日当天的历史排程数据
-	 * 
+     *
 	 * @param scheduleDate 排程日期
 	 */
 	private void cleanHistoryScheduleResult(Date scheduleDate) {
@@ -468,7 +660,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 验证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-	 * 
+     *
 	 * @param scheduleDate   排程日志
 	 * @param batchNo        批次号
 	 * @param isProductStage 仅对投产阶段规格排产
@@ -517,7 +709,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 反馈校验错误信息
-	 * 
+     *
 	 * @param batchNo       排产批次号
 	 * @param embryoCode    胎号
 	 * @param columnNameKey 校验字段名称key（国际化）
@@ -534,7 +726,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 获取工序参数map
-	 * 
+     *
 	 * @return
 	 */
 	private Map<String, String> getParamsMap() {
@@ -544,7 +736,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 创建自动排程记录
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-19 10:54:58
@@ -563,7 +755,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 创建批次号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-19 10:02:41
@@ -577,7 +769,7 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 
 	/**
 	 * 创建工单号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-19 10:02:41
@@ -587,4 +779,26 @@ public class GdyyEngineServiceImpl implements GdyyEngineService {
 	private String createOrderNo(String batchNo) {
 		return incrementService.getSequence4(batchNo);
 	}
+
+    @Override
+    public void batchUpdateBatchNoAndOrderNo(Date scheduleDate) {
+        List<GdyyScheduleResultVo> scheduleResultVoList = gdyyEngineMapper.selectGdyyScheduleList(scheduleDate);
+        //查询当前排程的批次号
+        String batchNo = gdyyEngineMapper.getCurrentBatchNo(scheduleDate);
+        if (StringUtils.isBlank(batchNo)) {
+            //当前的批次号为空，说明还没”自动排程“或者做的批量导入（需要删掉已排的数据），那么自己生成一个排程批次号
+            //排程批次号
+            batchNo = this.createBatchNo(scheduleDate);
+            //创建自动排程记录
+            this.createScheduleRecord(scheduleDate, "", batchNo);
+        }
+        for (GdyyScheduleResultVo scheduleResult : scheduleResultVoList) {
+            //批次号
+            scheduleResult.setBatchNo(batchNo);
+            //工单号
+            String orderNo = this.createOrderNo(batchNo);
+            scheduleResult.setOrderNo(orderNo);
+        }
+        gdyyEngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
+    }
 }

@@ -52,8 +52,8 @@ public interface GdyySteelRollColorService {
      * 导出接口
      * @param dto
      */
-    @GetMapping("/gdyySteelRollColor/exportData")
-    List<GdyySteelRollColorDto> exportData(@SpringQueryMap GdyySteelRollColorDto dto);
+    @PostMapping("/gdyySteelRollColor/exportData")
+    List<GdyySteelRollColorDto> exportData(@RequestBody GdyySteelRollColorDto dto);
 
     @PostMapping("/gdyySteelRollColor/importData")
     @ApiOperation("导入钢带压延库存信息")

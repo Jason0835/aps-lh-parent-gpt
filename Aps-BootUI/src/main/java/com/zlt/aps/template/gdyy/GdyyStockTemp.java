@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gdyy;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -9,7 +10,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "钢带压延库存信息对象", description = "钢带压延库存信息对象")
-public class GdyyStockTemp {
+public class GdyyStockTemp extends BaseEntity {
 
     @Excel(name = "ui.data.column.stock.stockDate")
     @ApiModelProperty(value = "库存日期", position = 20)

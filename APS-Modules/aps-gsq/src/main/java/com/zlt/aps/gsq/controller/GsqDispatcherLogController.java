@@ -17,7 +17,7 @@ import java.util.List;
  * @date 2022-02-25
  */
 @RestController
-@RequestMapping("/dispatcherLog")
+@RequestMapping("/gsq/dispatcherLog")
 public class GsqDispatcherLogController extends BaseController
 {
     @Autowired

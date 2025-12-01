@@ -1,12 +1,8 @@
 package com.zlt.aps.xwyy.engine;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
+import com.ruoyi.common.core.utils.DateUtils;
+import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
+import com.zlt.aps.xwyy.engine.service.XwyyEngineService;
 import com.zlt.aps.xwyy.engine.service.impl.XwyyEnginePlanQtyServiceImpl;
 import com.zlt.aps.xwyy.engine.vo.XwyyScheduleResultVo;
 import org.junit.FixMethodOrder;
@@ -15,14 +11,14 @@ import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import com.ruoyi.common.core.utils.DateUtils;
-import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineService;
-
-import lombok.extern.slf4j.Slf4j;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 @SpringBootTest
-@Slf4j
 @FixMethodOrder(MethodSorters.JVM)
 class ApsEngineXwyyApplicationTests {
 	@Autowired
@@ -34,7 +30,7 @@ class ApsEngineXwyyApplicationTests {
 
 	@Test
 	public void testRun() {
-		String dateStr = "2022-01-06";
+		String dateStr = "2025-04-25";
 		Date scheduleDate = DateUtils.parseDate(dateStr);
 		xwyyEngineService.autoXwyySchedule(scheduleDate);
 	}

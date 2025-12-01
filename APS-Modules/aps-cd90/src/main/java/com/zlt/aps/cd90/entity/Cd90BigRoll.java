@@ -23,13 +23,13 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_CD90_BIG_ROLL")
 @ApiModel(value = "Cd90BigRoll对象", description = "帘布大卷信息维护表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class Cd90BigRoll extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "帘布大卷编号")

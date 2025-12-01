@@ -23,7 +23,7 @@ public interface ICd15StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/cd15/stock/list")
     TableDataInfo list(@RequestBody Cd15Stock stock);
 
     /**
@@ -32,7 +32,7 @@ public interface ICd15StockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/cd15/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface ICd15StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/cd15/stock")
     AjaxResult add(@Validated @RequestBody Cd15Stock stock);
 
 
@@ -51,7 +51,7 @@ public interface ICd15StockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/cd15/stock/selectStockById/{id}")
     Cd15Stock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -60,7 +60,7 @@ public interface ICd15StockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/cd15/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface ICd15StockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/cd15/stock")
     AjaxResult edit(@Validated @RequestBody Cd15Stock stock);
 
     /**
@@ -78,10 +78,10 @@ public interface ICd15StockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/cd15/stock/exportList")
     List<Cd15Stock> exportList(@RequestBody Cd15Stock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/cd15/stock/importData")
     @ApiOperation("导入15度裁断库存信息")
     public AjaxResult importData(@RequestBody List<Cd15Stock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

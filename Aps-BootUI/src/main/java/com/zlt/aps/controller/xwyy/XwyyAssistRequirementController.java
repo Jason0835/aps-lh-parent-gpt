@@ -13,7 +13,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.common4ui.utils.file.FileUtils;
+import com.ruoyi.common4ui.utils.file.FileUtils4UI;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
@@ -23,13 +23,22 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -186,7 +195,7 @@ public class XwyyAssistRequirementController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.common.message.fileNotFound"));
         }
         ExcelUtil.setResponseHeader(response, tempName);
-        FileUtils.writeInputStream(in, response.getOutputStream());
+        FileUtils4UI.writeInputStream(in, response.getOutputStream());
         return AjaxResult.success();
     }
 
@@ -194,7 +203,6 @@ public class XwyyAssistRequirementController extends BaseController {
      * excel数据导入
      *
      * @param file 要导入的文件
-     * @param updateSupport 已存在的记录是否更新
      * @return 结果
      * @throws Exception 异常
      */

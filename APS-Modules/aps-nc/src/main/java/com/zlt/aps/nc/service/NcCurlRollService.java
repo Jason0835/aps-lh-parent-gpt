@@ -1,11 +1,11 @@
 package com.zlt.aps.nc.service;
 
-import java.util.List;
-
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.nc.api.domain.dto.NcCurlRollDto;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
+
+import java.util.List;
 
 /**
  * <p>
@@ -47,4 +47,12 @@ public interface NcCurlRollService extends IService<NcCurlRoll> {
      * 导入数据
      */
     AjaxResult importData(List<NcCurlRollDto> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 根据code查询卷曲长度
+     *
+     * @param curlRoll 查询条件
+     * @return 结果
+     */
+    AjaxResult selectCurlLengthByCode(NcCurlRoll curlRoll);
 }

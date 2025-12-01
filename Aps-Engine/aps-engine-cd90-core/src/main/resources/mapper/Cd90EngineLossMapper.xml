@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.cd90.engine.mapper.Cd90EngineLossMapper">
 	<!-- 查询损耗率配置信息 -->
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.cd90.engine.vo.Cd90LossSettingVo">
-        SELECT nvl(machine_id,'') || '#' || nvl(cloth_code,'') LOSS_KEY, /*组合key，机台id + 帘布编号*/
+        SELECT concat(IFNULL(machine_id,'') , '#' , IFNULL(cloth_code,'')) LOSS_KEY, /*组合key，机台id + 帘布编号*/
                LOSS_RATE
           FROM T_CD90_LOSS_SETTING
          WHERE DEL_FLAG = 0

@@ -23,7 +23,7 @@ import java.util.Date;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_XWYY_ASSIST_REQUIREMENT")
-@KeySequence(value = "SEQ_XWYY_SCHEDULE", clazz = Long.class)
+@KeySequence(value = "SEQ_XWYY_SCHEDULE",dbType = DbType.ORACLE)
 public class XwyyAssistRequirement extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -32,7 +32,7 @@ public class XwyyAssistRequirement extends ApsBaseEntity {
      * 主键ID，对应自增序列为：SEQ_XWYY_SCHEDULE
      */
     @ApiModelProperty(value = "id")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     /**

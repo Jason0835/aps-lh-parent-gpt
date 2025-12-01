@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MixingTimeMapper">
+
+    <select id="selectMixingTimeList" parameterType="com.zlt.mix.setting.api.domain.entity.MixingTime"
+            resultType="com.zlt.mix.setting.api.domain.dto.MixingTimeDto">
+        select tmt.id, tmt.mix_area, tmt.glue, tmm.machine_name,tmm.MACHINE_CODE , tmt.winter_mix_time,
+        tmt.summer_mix_time,
+        tmt.interval_time, tmt.remark, tmt.del_flag,
+        tmt.create_by, tmt.create_time, tmt.update_by, tmt.update_time from t_mixing_time tmt
+        left join T_MIX_MACHINE tmm on tmt.MIX_AREA=tmm.MIX_AREA and tmt.MACHINE_CODE=tmm.MACHINE_CODE and
+        tmm.DEL_FLAG='0'
+        where tmt.del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and tmt.mix_area = #{mixArea}</if>
+        <if test="glue != null  and glue != ''">and INSTR(tmt.glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteMixingTimeByIds" parameterType="String">
+        update t_mixing_time set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listMixingTimeNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR} MIX_AREA,#{data.glue,jdbcType= VARCHAR}
+            GLUE,#{data.machineCode,jdbcType= VARCHAR}
+            MACHINE_CODE,#{data.machineName,jdbcType= VARCHAR} MACHINE_NAME
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_mixing_time m
+        inner join temp_table t on m.MIX_AREA = t.MIX_AREA and m.GLUE = t.GLUE
+        and ((t.MACHINE_NAME is null and m.MACHINE_CODE is null) or ( t.MACHINE_CODE is not null and m.MACHINE_CODE =
+        t.MACHINE_CODE))
+        and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertMixingTimeInfo">
+        insert into t_mixing_time
+        (id,mix_area,glue,machine_code,winter_mix_time,summer_mix_time,interval_time,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="mixingTime" separator=" union all ">
+            select
+            #{mixingTime.mixArea,jdbcType= VARCHAR} mix_area, #{mixingTime.glue,jdbcType= VARCHAR} glue,
+            #{mixingTime.machineCode,jdbcType= VARCHAR} machine_code, #{mixingTime.winterMixTime,jdbcType=DOUBLE}
+            winter_mix_time, #{mixingTime.summerMixTime,jdbcType=DOUBLE} summer_mix_time,
+            #{mixingTime.intervalTime,jdbcType=DOUBLE} interval_time, #{mixingTime.remark,jdbcType= VARCHAR} remark,
+            #{mixingTime.delFlag,jdbcType= VARCHAR} del_flag, #{mixingTime.createBy,jdbcType= VARCHAR} create_by,
+            #{mixingTime.createTime,jdbcType=TIMESTAMP} create_time, #{mixingTime.updateBy,jdbcType= VARCHAR} update_by,
+            #{mixingTime.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_mixing_time a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.mixArea,jdbcType=VARCHAR } mix_area, #{item.glue,jdbcType=VARCHAR }
+            glue, #{item.machineCode,jdbcType=VARCHAR } machine_code, #{item.winterMixTime, jdbcType=DOUBLE}
+            winter_mix_time, #{item.summerMixTime, jdbcType=DOUBLE} summer_mix_time,
+            #{item.intervalTime, jdbcType=DOUBLE} interval_time, #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag, #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) b ON ( a.mix_area=b.mix_area and a.glue=b.glue and ((a.MACHINE_CODE is null and b.MACHINE_CODE is null) or
+        (a.MACHINE_CODE = b.MACHINE_CODE)) AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.winter_mix_time =b.winter_mix_time, a.summer_mix_time = b.summer_mix_time, a.interval_time =
+            b.interval_time, a.remark =
+            b.remark, a.update_by = b.create_by,
+            a.update_time = now()
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.mix_area, a.glue, a.machine_code, a.winter_mix_time, a.summer_mix_time, a.interval_time, a.remark,
+        a.del_flag, a.create_by, a.create_time )
+        values ( get_sequence_nextval('seq_t_mixing_time'), b.mix_area, b.glue, b.machine_code, b.winter_mix_time, b.summer_mix_time,
+        b.interval_time, b.remark, 0, b.create_by, now() )
+    </update>
+
+
+    <select id="listMixMachineCode" resultType="java.lang.String">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber} row_numbers, #{data.mixArea,jdbcType= VARCHAR}
+            MIX_AREA,#{data.machineName,jdbcType= VARCHAR} MACHINE_NAME
+            
+        </foreach>
+        )
+        select m.MACHINE_CODE
+        from T_MIX_MACHINE m
+        right join temp_table t on m.MIX_AREA = t.MIX_AREA and m.MACHINE_NAME = t.MACHINE_NAME
+        and m.del_flag ='0'
+        order by t.row_numbers
+    </select>
+
+</mapper>

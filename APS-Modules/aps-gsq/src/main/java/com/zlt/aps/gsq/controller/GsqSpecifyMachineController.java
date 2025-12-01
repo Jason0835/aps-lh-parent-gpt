@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"钢丝圈定点机台接口"})
 @RestController
-@RequestMapping("/specifyMachine")
+@RequestMapping("/gsq/specifyMachine")
 public class GsqSpecifyMachineController extends BaseController {
 
     @Resource
     private GsqSpecifyMachineService GsqSpecifyMachineService;
 
     @ApiOperation("根据条件查询定点机台列表")
-    @GetMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(GsqSpecifyMachineDto dto) {
+    @PostMapping("/listSpecifyMachine")
+    public TableDataInfo listSpecifyMachine(@RequestBody GsqSpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<GsqSpecifyMachineDto> list = GsqSpecifyMachineService.listSpecifyMachine(dto);
@@ -80,8 +80,8 @@ public class GsqSpecifyMachineController extends BaseController {
 
     @Log(title = "ui.gsq.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<GsqSpecifyMachineDto> exportData(GsqSpecifyMachineDto dto) {
+    @PostMapping("/exportData")
+    public List<GsqSpecifyMachineDto> exportData(@RequestBody GsqSpecifyMachineDto dto) {
         dto.setOrderStr(orderStr());
         List<GsqSpecifyMachineDto> list = GsqSpecifyMachineService.listSpecifyMachine(dto);
         return list;

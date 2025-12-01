@@ -1,0 +1,53 @@
+server:
+  port: 9203
+
+nacos:
+  server-addr: 192.168.10.123:8848
+  run-group: APS_TEST_GROUP
+  cfg-group: APS_TEST_GROUP
+  run-namespace: "dctest"
+  cfg-namespace: "dctest"
+
+
+#系统标识
+project:
+  project-tag: aps
+  system-tag: aps
+
+# Spring
+spring:
+  application:
+    # 应用名称
+    name: ruoyi-job
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.run-group}
+        namespace: ${nacos.run-namespace}
+      config:
+        # 配置中心地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.cfg-group}
+        namespace: ${nacos.cfg-namespace}
+        # 配置文件格式
+        file-extension: yml
+        # 共享配置
+        shared-configs:
+          - data-id: application-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: druid_${project.system-tag}_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-frame-${project.project-tag}-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: zipkin-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+          - data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            group: ${nacos.cfg-group}
+        refresh-enabled: true

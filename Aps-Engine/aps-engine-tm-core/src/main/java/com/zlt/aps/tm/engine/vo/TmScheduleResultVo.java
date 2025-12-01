@@ -1,10 +1,10 @@
 package com.zlt.aps.tm.engine.vo;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
@@ -60,7 +60,7 @@ public class TmScheduleResultVo extends ApsBaseDto {
     /**
      * 胶料序号
      */
-    private String glueSeq;
+    private String glueSeq = "";
 
     /**
      * 口型板代码
@@ -90,7 +90,7 @@ public class TmScheduleResultVo extends ApsBaseDto {
     /**
      * 库存供应成型时长，单位：小时
      */
-    private Double supplyTime;
+    private Double supplyTime = 0D;
 
     /**
      * 中班(12点-24点)计划量
@@ -183,6 +183,11 @@ public class TmScheduleResultVo extends ApsBaseDto {
     private Double cxClass5Plan;
 
     /**
+     * 剩余量
+     */
+    private double surplusQty;
+
+    /**
      * 发布成功计数器，每点击一次发布并成功的话，计数器累加
      */
     private Integer publishSuccessCount;
@@ -243,9 +248,92 @@ public class TmScheduleResultVo extends ApsBaseDto {
      * 数据来源：0>自动排程；1>APS插单；2>导入；
      */
     private String dataSource;
-    
+
     /**
      * 收尾规格标记，0：收尾1：非收尾
      */
     private String closeOutSpecFlag;
+
+    /**
+     * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
+     */
+    private Double planStockQty;
+
+    /**
+     * 上一天早班计划
+     */
+    private Double lastMidPlanQty;
+
+    /**
+     * 夜班与早班的交接班库存
+     */
+    private double classStock;
+
+    /**
+     * 库存供需比例，交接班库存/成型一天需求量
+     */
+    private double supplyDemandRatio;
+
+    /**
+     * 明日早班计划
+     */
+    private double nextDayPlanQty;
+
+    /**
+     * 早班生产顺序标识
+     */
+    private Integer dayProduceOrderFlag = 99;
+
+    /**
+     * 夜班生产顺序标识
+     */
+    private Integer nightProduceOrderFlag = 99;
+
+    /**
+     * 库存供应成型时长，单位：小时
+     */
+    private Integer supplyTimeSort;
+
+    /**
+     * 是否均分
+     */
+    private Boolean isEqualShare;
+
+    /**
+     * 获取SupplyTime的排序，小于12小时的，优先，否则不改变排序
+     *
+     * @return 结果
+     */
+    public Integer getSupplyTimeSort() {
+        return supplyTime != null && supplyTime < 12 ? 1 : 99;
+    }
+
+    public String printDebugSortLogInfo() {
+        return String.format("胎面代码：%s，胶料：%s，排序字段：supplyTimeSort=%s, dayProduceOrderFlag=%s, nightProduceOrderFlag=%s, glueSeq=%s, supplyTime=%s",
+                treadCode, glueCode, getSupplyTimeSort(), dayProduceOrderFlag, nightProduceOrderFlag, glueSeq, supplyTime);
+    }
+
+    /**
+     * 二班计划顺序
+     */
+    @ApiModelProperty(value = "二班计划顺序")
+    private Double class2Sort;
+
+    /**
+     * 三班计划顺序
+     */
+    @ApiModelProperty(value = "三班计划顺序")
+    private Double class3Sort;
+
+    /**
+     * 四班计划顺序
+     */
+    @ApiModelProperty(value = "四班计划顺序")
+    private Double class4Sort;
+
+    /**
+     * 卷曲长度
+     */
+    @ApiModelProperty(value = "卷曲长度")
+    private BigDecimal curlLength;
 }

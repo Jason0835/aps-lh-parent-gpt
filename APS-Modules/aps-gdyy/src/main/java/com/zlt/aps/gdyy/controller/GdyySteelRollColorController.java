@@ -87,8 +87,8 @@ public class GdyySteelRollColorController extends BaseController {
 
     @Log(title = "ui.steelRollColor.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<GdyySteelRollColorDto> exportData(GdyySteelRollColorDto dto) {
+    @PostMapping("/exportData")
+    public List<GdyySteelRollColorDto> exportData(@RequestBody GdyySteelRollColorDto dto) {
         dto.setOrderStr(orderStr());
         List<GdyySteelRollColorDto> list = gdyySteelRollColorService.listGdyySteelRollColor(dto);
         return list;

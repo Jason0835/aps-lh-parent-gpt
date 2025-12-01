@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqExportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,7 @@ import java.util.List;
 @FeignClient(contextId = "IGsqExportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gsq:gsq}")
 public interface IGsqExportLogManagementService
 {
-    
+
     /**
      * 查询纤维压延参数信息列表
      */
@@ -43,6 +42,6 @@ public interface IGsqExportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/gsq/exportLogManagement/exportData")
-    List<GsqExportLogManagementDto> exportData(@SpringQueryMap GsqExportLogManagementDto dto);
+    @PostMapping("/gsq/exportLogManagement/exportData")
+    List<GsqExportLogManagementDto> exportData(@RequestBody GsqExportLogManagementDto dto);
 }

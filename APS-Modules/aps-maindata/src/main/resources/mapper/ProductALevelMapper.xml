@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.ProductALevelMapper">
+
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.ProductALevel" id="DocProductALevelResult">
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
+        <result property="productCode" column="PRODUCT_CODE"/>
+        <result property="aLevel" column="A_LEVEL"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+    </resultMap>
+
+    <sql id="selectDocProductALevelVo">
+        SELECT ID, FACTORY_CODE, PRODUCT_TYPE_CODE, PRODUCT_CODE, A_LEVEL, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY FROM T_MDM_PRODUCT_A_LEVEL
+    </sql>
+
+    <select id="selectDocProductALevelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.ProductALevel" resultMap="DocProductALevelResult">
+        <include refid="selectDocProductALevelVo"/>
+        WHERE IFNULL(IS_DELETE,0) = 0
+        <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="productTypeCode != null  and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
+        <if test="productCode != null  and productCode != ''"> AND PRODUCT_CODE like CONCAT(CONCAT('%',#{productCode,jdbcType=VARCHAR}), '%') </if>
+        ${params.dataScope}
+    </select>
+
+    <select id="selectByUniqueKeyList" parameterType="com.zlt.aps.monthplan.api.domain.entity.ProductALevel" resultMap="DocProductALevelResult">
+        <include refid="selectDocProductALevelVo"/>
+        WHERE IFNULL(IS_DELETE,0) = 0
+        <if test="uniqueKeyList != null">
+            AND CONCAT(FACTORY_CODE, PRODUCT_TYPE_CODE, PRODUCT_CODE) IN
+            <foreach item="item" collection="uniqueKeyList" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getProductALevelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.ProductALevel" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo">
+        SELECT mpl.ID,
+               mpl.FACTORY_CODE,
+               mpl.PRODUCT_TYPE_CODE,
+               mpl.PRODUCT_CODE,
+               mpl.A_LEVEL,
+               mpi.BRAND,
+               mpl.REMARK,
+               mpl.IS_DELETE,
+               mpl.CREATE_TIME,
+               mpl.UPDATE_TIME,
+               mpl.CREATE_BY,
+               mpl.UPDATE_BY
+          FROM T_MDM_PRODUCT_A_LEVEL mpl
+          LEFT JOIN t_mdm_product_info mpi
+            ON mpi.PRODUCT_CODE = mpl.PRODUCT_CODE
+           AND mpi.FACTORY_CODE = mpl.FACTORY_CODE
+         WHERE IFNULL(mpl.IS_DELETE,0) = 0
+        <if test="factoryCode != null  and factoryCode != ''">
+           AND mpl.FACTORY_CODE = #{factoryCode}
+        </if>
+        <if test="productTypeCode != null  and productTypeCode != ''">
+           AND mpl.PRODUCT_TYPE_CODE = #{productTypeCode}
+        </if>
+    </select>
+
+    <update id="updateStockUpPlan">
+        UPDATE t_mdm_stock_up_plan stockUp SET stockUp.STOCK_QTY = 0, stockUp.UPDATE_TIME = NOW()
+        WHERE stockUp.`YEAR` = #{year} AND stockUp.`MONTH` = #{month}
+        AND EXISTS(
+            SELECT 1 FROM T_MDM_PRODUCT_A_LEVEL mpl
+            WHERE mpl.FACTORY_CODE = stockUp.FACTORY_CODE AND mpl.PRODUCT_CODE = stockUp.PRODUCT_CODE
+            <if test="ids != null and ids.size() > 0">
+                AND mpl.ID IN
+                <foreach item="item" collection="ids" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        )
+    </update>
+</mapper>

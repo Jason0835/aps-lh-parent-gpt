@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueDemandPlanInitMapper">
+
+    <select id="selectGlueDemandPlanInitList" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlanInit"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlanInit">
+        select
+        plan_date,
+        glue,
+        sum(ifnull( total_plan_qty, 0 )) as total_plan_qty,
+        sum(ifnull( mid_plan_qty, 0 )) as mid_plan_qty,
+        group_concat(CASE WHEN MID_REMARK_RWN = 1 THEN MID_REMARK END ORDER BY mid_remark SEPARATOR ',' ) AS mid_remark,
+        sum(ifnull( night_plan_qty, 0 )) as night_plan_qty,
+        group_concat(CASE WHEN NIGHT_REMARK_RWN = 1 THEN NIGHT_REMARK END ORDER BY night_remark SEPARATOR ',') AS night_remark,
+        sum(ifnull( day_plan_qty, 0 )) as day_plan_qty,
+        group_concat(CASE WHEN DAY_REMARK_RWN = 1 THEN DAY_REMARK END ORDER BY day_remark SEPARATOR ',') AS day_remark
+        from
+        (
+            SELECT DISTINCT
+            plan_date,
+            glue,
+            total_plan_qty,
+            mid_plan_qty,
+            mid_remark,
+            row_number() over (partition by GLUE,MID_REMARK) as MID_REMARK_RWN,
+            night_plan_qty,
+            night_remark,
+            row_number() over (partition by GLUE,night_remark) as night_remark_RWN,
+            day_plan_qty,
+            day_remark,
+            row_number() over (partition by GLUE,day_remark) as DAY_REMARK_RWN
+            FROM
+            t_glue_demand_plan_init
+            WHERE del_flag = '0'
+            <if test="startTime != null and startTime !=''">
+                and plan_date  <![CDATA[  >=  ]]> str_to_date(#{startTime},'%Y-%m-%d')
+            </if>
+            <if test="endTime != null and endTime !=''">
+                and plan_date  <![CDATA[   <=  ]]> str_to_date(#{endTime},'%Y-%m-%d')
+            </if>
+            <if test="factory != null  and factory != ''">and factory = #{factory}</if>
+            <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        ) t
+        GROUP BY
+            plan_date,
+            GLUE
+        <if test="orderStr == null">
+            order by plan_date, GLUE desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <insert id="backupToGlueDemandPlanInitLog" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlanInit">
+        INSERT INTO T_GLUE_DEMAND_PLAN_INIT_LOG (
+            ID,
+            BATCH_NO,
+            PLAN_DATE,
+            IMPORT_DATE,
+            FACTORY,
+            IMPORT_FACTORY,
+            GLUE,
+            GLUE_NAME,
+            SAP_CODE,
+            STOCK_QTY,
+            DAY_PLAN_SURPLUS,
+            ACTUAL_FINISH,
+            MIX_AREA,
+            VEHICLE_WEIGHT,
+            TOTAL_PLAN_QTY,
+            VEHICLE_DESK,
+            MID_PLAN_QTY,
+            MID_COLLAR,
+            MID_REMARK,
+            NIGHT_PLAN_QTY,
+            NIGHT_COLLAR,
+            NIGHT_REMARK,
+            DAY_PLAN_QTY,
+            DAY_COLLAR,
+            DAY_REMARK,
+            NEXT_MID_PLAN_QTY,
+            NOT_COLLAR,
+            DATA_SOURCE,
+            REMARK,
+            DEL_FLAG,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME
+        ) SELECT
+       ID,
+            BATCH_NO,
+            PLAN_DATE,
+            IMPORT_DATE,
+            FACTORY,
+            IMPORT_FACTORY,
+            GLUE,
+            GLUE_NAME,
+            SAP_CODE,
+            STOCK_QTY,
+            DAY_PLAN_SURPLUS,
+            ACTUAL_FINISH,
+            MIX_AREA,
+            VEHICLE_WEIGHT,
+            TOTAL_PLAN_QTY,
+            VEHICLE_DESK,
+            MID_PLAN_QTY,
+            MID_COLLAR,
+            MID_REMARK,
+            NIGHT_PLAN_QTY,
+            NIGHT_COLLAR,
+            NIGHT_REMARK,
+            DAY_PLAN_QTY,
+            DAY_COLLAR,
+            DAY_REMARK,
+            NEXT_MID_PLAN_QTY,
+            NOT_COLLAR,
+            DATA_SOURCE,
+            REMARK,
+            DEL_FLAG,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME
+        FROM
+            T_GLUE_DEMAND_PLAN_INIT
+        WHERE
+            DEL_FLAG = 0
+            AND PLAN_DATE = #{planDate}
+            AND FACTORY = #{factory}
+    </insert>
+
+    <delete id="deleteByPlanDateAndFactory" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlanInit">
+        delete from t_glue_demand_plan_init where plan_date = #{planDate} and factory = #{factory}
+    </delete>
+
+    <insert id="batchInsertGlueDemandPlanInitInfo" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlanInit">
+        insert into t_glue_demand_plan_init
+        (id,batch_no,plan_date,import_date,factory,import_factory,glue,glue_name,sap_code,stock_qty,day_plan_surplus,actual_finish,mix_area,
+        vehicle_weight,total_plan_qty,vehicle_desk,mid_plan_qty,mid_collar,mid_remark,
+        night_plan_qty,night_collar,night_remark,day_plan_qty,day_collar,day_remark,next_mid_plan_qty,not_collar,data_source,remark,del_flag,create_by,create_time,update_by,update_time)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueDemandPlan" separator=" union all ">
+            select
+            #{glueDemandPlan.batchNo,jdbcType= VARCHAR} batch_no,
+            #{glueDemandPlan.planDate,jdbcType=DATE} plan_date,
+            #{glueDemandPlan.importDate,jdbcType= VARCHAR} import_date,
+            #{glueDemandPlan.factory,jdbcType= VARCHAR} factory,
+            #{glueDemandPlan.importFactory,jdbcType= VARCHAR} import_factory,
+            #{glueDemandPlan.glue,jdbcType=VARCHAR} glue,
+            #{glueDemandPlan.glueName,jdbcType=VARCHAR} glue_name,
+            #{glueDemandPlan.sapCode,jdbcType=VARCHAR} sap_code,
+            #{glueDemandPlan.stockQty,jdbcType=VARCHAR} stock_qty,
+            #{glueDemandPlan.dayPlanSurplus,jdbcType=VARCHAR} day_plan_surplus,
+            #{glueDemandPlan.actualFinish,jdbcType=VARCHAR} actual_finish,
+            #{glueDemandPlan.mixArea,jdbcType= VARCHAR} mix_area,
+            #{glueDemandPlan.vehicleWeight,jdbcType= VARCHAR} vehicle_weight,
+            #{glueDemandPlan.totalPlanQty,jdbcType=DOUBLE}total_plan_qty,
+            #{glueDemandPlan.vehicleDesk,jdbcType= VARCHAR} vehicle_desk,
+            #{glueDemandPlan.midPlanQty,jdbcType=DOUBLE} mid_plan_qty,
+            #{glueDemandPlan.midCollar,jdbcType= VARCHAR} mid_collar,
+            #{glueDemandPlan.midRemark,jdbcType= VARCHAR} mid_remark,
+            #{glueDemandPlan.nightPlanQty,jdbcType=DOUBLE} night_plan_qty,
+            #{glueDemandPlan.nightCollar,jdbcType= VARCHAR} night_collar,
+            #{glueDemandPlan.nightRemark,jdbcType= VARCHAR} night_remark,
+            #{glueDemandPlan.dayPlanQty,jdbcType=DOUBLE} day_plan_qty,
+            #{glueDemandPlan.dayCollar,jdbcType= VARCHAR} day_collar,
+            #{glueDemandPlan.dayRemark,jdbcType= VARCHAR} day_remark,
+            #{glueDemandPlan.nextMidPlanQty,jdbcType= VARCHAR} next_mid_plan_qty,
+            #{glueDemandPlan.notCollar,jdbcType= VARCHAR} not_collar,
+            #{glueDemandPlan.dataSource,jdbcType= VARCHAR} data_source,
+            #{glueDemandPlan.remark,jdbcType= VARCHAR} remark,
+            0,
+            #{glueDemandPlan.createBy,jdbcType= VARCHAR} create_by,
+            #{glueDemandPlan.createTime,jdbcType=DATE} create_time,
+            #{glueDemandPlan.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueDemandPlan.updateTime,jdbcType=DATE} update_time from dual
+        </foreach>
+        ) x
+    </insert>
+</mapper>

@@ -32,11 +32,12 @@ public interface XwyyEnginePlanQtyService {
 	 * @Param stockLossRate 库存损耗率
 	 * @param breadth           幅宽
 	 * @param isProductionStage 仅对投产阶段规格排产
+     * @param isBreak 是否计算破大卷
 	 * @Return
 	 */
 	void calculateSchedulePlanQty(Date scheduleDate, List<XwyyScheduleResultVo> scheduleList,
 			Map<String, XwyyAssistRequirement> assistMap, Map<String, XwyyOriginalLineSpec> originalLineMap,
-			BigDecimal stockLossRate, Double breadth, boolean isProductionStage);
+			BigDecimal stockLossRate, Double breadth, boolean isProductionStage, boolean isBreak);
 
 	/**
 	 * 获取指定日期的半部件库存量

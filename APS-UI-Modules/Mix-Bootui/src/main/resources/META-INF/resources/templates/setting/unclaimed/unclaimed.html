@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('胶料白班待支领列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{setting.unclaimed.mixArea}]]：</label>
+                            <select class="form-control" name="mixArea" th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            [[#{setting.unclaimed.scheduleDate}]]：
+                            <input type="text" class="time-input" id="scheduleDate" th:placeholder="yyyy-mm-dd" name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{setting.unclaimed.glue}]]：</label>
+                            <div class="neat">
+                                <input type="text" name="glue" class="GlueNames" autocomplete="off"/>
+                            </div>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-info" onclick="importExcel()" shiro:hasPermission="setting:unclaimed:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()" shiro:hasPermission="setting:unclaimed:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "setting/unclaimed";
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{setting.unclaimed.modelName}]],
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'mixArea',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.unclaimed.mixArea}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(mixAreaDatas, value);
+                    }
+                },
+                {
+                    field: 'scheduleDate',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.unclaimed.scheduleDate}]],
+                },
+                {
+                    field: 'glue',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.unclaimed.glue}]],
+                },
+                {
+                    field: 'shelfNum1',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.unclaimed.shelfNum1}]],
+                },
+                {
+                    field: 'shelfNum2',
+                    sortable: true,
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.unclaimed.shelfNum2}]],
+                },
+                {
+                    field: 'remark',
+                    sortable: true,
+                    halign: 'center',
+                    title: [[#{ui.common.column.remark}]],
+                    align: 'left',
+                    formatter: function (value, row, index) {
+                        return $.table.tooltip(value, 20);
+                    },
+                }]
+        };
+        $.table.init(options);
+    });
+
+    function importExcel() {
+        table.set();
+        var url = table.options.importUrl;
+        $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 500, '', true);
+    }
+</script>
+</body>
+</html>

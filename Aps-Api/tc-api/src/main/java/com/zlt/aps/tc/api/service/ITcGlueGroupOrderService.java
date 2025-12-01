@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.dto.TcGlueGroupOrderDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,25 +18,25 @@ public interface ITcGlueGroupOrderService {
     /**
      * 根据条件查询胶料组别顺序列表
      */
-    @GetMapping("/glueGroupOrder/listGlueGroupOrder")
-    TableDataInfo listGlueGroupOrder(@SpringQueryMap TcGlueGroupOrderDto dto);
+    @PostMapping("/tc/glueGroupOrder/listGlueGroupOrder")
+    TableDataInfo listGlueGroupOrder(@RequestBody TcGlueGroupOrderDto dto);
 
     /**
      * 根据id查询胶料组别顺序信息
      */
-    @GetMapping("/glueGroupOrder/getGlueGroupOrder/{id}")
+    @GetMapping("/tc/glueGroupOrder/getGlueGroupOrder/{id}")
     TcGlueGroupOrderDto getGlueGroupOrder(@PathVariable("id") Long id);
 
     /**
      * 保存胶料组别顺序信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/glueGroupOrder/saveGlueGroupOrder")
+    @PostMapping("/tc/glueGroupOrder/saveGlueGroupOrder")
     AjaxResult saveGlueGroupOrder(@RequestBody TcGlueGroupOrderDto dto);
 
     /**
      * 根据code判断胶料组号是否已经存在
      */
-    @PostMapping("/glueGroupOrder/checkGlueGroupCodeUnique")
+    @PostMapping("/tc/glueGroupOrder/checkGlueGroupCodeUnique")
     String checkGlueGroupCodeUnique(@RequestBody TcGlueGroupOrderDto dto);
 
     /**
@@ -45,7 +44,7 @@ public interface ITcGlueGroupOrderService {
      *
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/glueGroupOrder/deleteGlueGroupOrder/{ids}")
+    @PostMapping("/tc/glueGroupOrder/deleteGlueGroupOrder/{ids}")
     AjaxResult deleteGlueGroupOrder(@PathVariable("ids") Long[] ids);
 
     /**
@@ -53,13 +52,13 @@ public interface ITcGlueGroupOrderService {
      *
      * @param dto
      */
-    @GetMapping("/glueGroupOrder/exportData")
-    List<TcGlueGroupOrderDto> exportData(@SpringQueryMap TcGlueGroupOrderDto dto);
+    @PostMapping("/tc/glueGroupOrder/exportData")
+    List<TcGlueGroupOrderDto> exportData(@RequestBody TcGlueGroupOrderDto dto);
 
     /**
      * 数据导入
      */
-    @PostMapping("/glueGroupOrder/importData")
+    @PostMapping("/tc/glueGroupOrder/importData")
     AjaxResult importData(@RequestBody List<TcGlueGroupOrderDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 }

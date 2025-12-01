@@ -2,26 +2,34 @@ package com.zlt.aps.cd90.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.cd90.api.domain.entity.Cd90DispatcherLog;
-import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
-import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.*;
 import com.zlt.aps.cd90.common.handle.Cd90SyncDataHandle;
 import com.zlt.aps.cd90.engine.service.Cd90EngineProductOrderService;
 import com.zlt.aps.cd90.engine.service.Cd90EngineService;
+import com.zlt.aps.cd90.entity.Cd90Params;
+import com.zlt.aps.cd90.mapper.Cd90CurlLengthEntityMapper;
+import com.zlt.aps.cd90.mapper.Cd90ParamsMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
 import com.zlt.aps.cd90.service.Cd90DispatcherLogService;
 import com.zlt.aps.cd90.service.Cd90MachineInfoService;
 import com.zlt.aps.cd90.service.Cd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.engine.constants.EngineConstants;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.common.engine.service.FactoryService;
+import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
 import com.zlt.sync.povo.SyncParamsVO;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +37,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -69,6 +79,15 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
     private Cd90DispatcherLogService cd90DispatcherLogService;
 
     /**
+     * 默认标准长度
+     */
+    private static final String DEFAULT_CRIMP_LENGTH = "87";
+    @Autowired
+    private Cd90CurlLengthEntityMapper curlRollMapper;
+    @Autowired
+    private Cd90ParamsMapper paramsMapper;
+
+    /**
      * 查询90度裁断排程结果
      *
      * @param id 90度裁断排程结果ID
@@ -80,6 +99,27 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
     }
 
     /**
+     * 赋值成型消耗量(成型昨日早班消耗量+成型夜班消耗量)、卷曲长度、交接班库存、计划量对应卷数
+     *
+     * @param scheduleResult 排程结果
+     * @param cxConsumeMap   成型消耗量map
+     * @param curlRollMap    卷曲长度map
+     */
+    private static void setLastDayAndCalculate(Cd90ScheduleResult scheduleResult, Map<String, Double> cxConsumeMap,
+                                               Map<String, BigDecimal> curlRollMap, BigDecimal standardLength) {
+        String code = scheduleResult.getClothCode();
+        if (cxConsumeMap.containsKey(code)) {
+            Double cxConsumeQty = cxConsumeMap.get(code);
+            scheduleResult.setCxConsumeQty(cxConsumeQty);
+        }
+        BigDecimal curlRollLength = curlRollMap.getOrDefault(code, standardLength);
+        scheduleResult.setCurlLength(curlRollLength.doubleValue());
+        ReflectUtils.invokeMethodByName(scheduleResult, "calculateTheoreticClassLastDayPlanQty", new Object[]{});
+        // 执行计算卷数方法
+        ReflectUtils.invokeMethodByName(scheduleResult, "calculatePlanQty", new Object[]{});
+    }
+
+    /**
      * 查询90度裁断排程结果列表
      *
      * @param cd90ScheduleResult 90度裁断排程结果
@@ -87,7 +127,58 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
      */
     @Override
     public List<Cd90ScheduleResult> selectCd90ScheduleResultList(Cd90ScheduleResult cd90ScheduleResult) {
-        return cd90ScheduleResultMapper.selectCd90ScheduleResultList(cd90ScheduleResult);
+        List<Cd90ScheduleResult> list = cd90ScheduleResultMapper.selectCd90ScheduleResultList(cd90ScheduleResult);
+        if (CollectionUtils.isEmpty(list)) {
+            return new ArrayList<>();
+        }
+        List<Cd90MachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new Cd90MachineInfo());
+        Map<Long, Cd90MachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(Cd90MachineInfo::getId, Function.identity(), (s1, s2) -> s1));
+        if (CollectionUtils.isNotEmpty(list)) {
+
+            List<String> codeList = list.stream().map(Cd90ScheduleResult::getClothCode).collect(Collectors.toList());
+            cd90ScheduleResult.getParams().put("codeList", codeList);
+            Map<String, Double> cxConsumeMap = new HashMap<>(16);
+            List<Cd90ScheduleResult> cxConsumeList = cd90ScheduleResultMapper.getCxConsume4List(cd90ScheduleResult);
+            if (CollectionUtils.isNotEmpty(cxConsumeList)) {
+                cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(Cd90ScheduleResult::getClothCode, Cd90ScheduleResult::getCxConsumeQty));
+            }
+            LambdaQueryWrapper<Cd90CurlLength> curlLengthWrapper = new LambdaQueryWrapper<>();
+            curlLengthWrapper.in(Cd90CurlLength::getClothCode, codeList);
+            List<Cd90CurlLength> curlRollList = curlRollMapper.selectList(curlLengthWrapper);
+            Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(curlRollList)) {
+                curlRollMap = curlRollList.stream().collect(Collectors.toMap(Cd90CurlLength::getClothCode, Cd90CurlLength::getCurlLength));
+            }
+            LambdaQueryWrapper<Cd90Params> paramWrapper = new LambdaQueryWrapper<>();
+            paramWrapper.eq(Cd90Params::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
+            Cd90Params standardLength = paramsMapper.selectOne(paramWrapper);
+
+            for (Cd90ScheduleResult scheduleResult : list) {
+                String machineIdStr = scheduleResult.getMachineId();
+                if (StringUtils.isNotBlank(machineIdStr)) {
+                    List<String> machineNameList = new ArrayList<>();
+                    String[] machineIdArr = machineIdStr.split(",");
+                    for (String machineId : machineIdArr) {
+                        Long key = null;
+                        try {
+                            key = Long.valueOf(machineId);
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                            continue;
+                        }
+                        if (machineInfoMap.containsKey(key)) {
+                            Cd90MachineInfo machineInfo = machineInfoMap.get(key);
+                            machineNameList.add(machineInfo.getMachineName());
+                        }
+                    }
+                    scheduleResult.setMachineName(String.join(",", machineNameList));
+                }
+                // 赋值卷曲长度、计算计划量对应卷数
+                setLastDayAndCalculate(scheduleResult, cxConsumeMap, curlRollMap,
+                        standardLength == null ? new BigDecimal(DEFAULT_CRIMP_LENGTH) : new BigDecimal(standardLength.getParamValue()));
+            }
+        }
+        return list;
     }
 
     /**
@@ -263,7 +354,8 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
         record.setPublishStatus(ApsConstant.RELEASING);
         record.setDataVersion(dataVersion);
         cd90ScheduleResultMapper.insertPublishRecord(record);
-        return cd90ScheduleResultMapper.batchUpdate(ids, ApsConstant.RELEASING);
+        return cd90ScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), ApsConstant.RELEASING);
     }
 
     /**
@@ -286,7 +378,7 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
 
 	/**
 	 * 给mes发送排程下发通知
-	 * 
+	 *
 	 * @param scheduleDate 排产日
 	 * @param dataVersion  数据版本
 	 */
@@ -309,20 +401,21 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
         //往消息队列发送消息
         cd90SyncDataHandle.syncNotice(syncParamsVO);
 	}
-	
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
 	 */
     @Override
     public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
-        cd90ScheduleResultMapper.batchUpdate(ids, status);
+        cd90ScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), status);
         cd90ScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
     }
-    
+
     /**
      * 校验查询
      */
@@ -418,6 +511,7 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
                 entity.setMachineId(machineCodeMap.get(entity.getMachineId())+"");
                 successNum++;
                 entity.setBaseVale(null);
+                entity.setDataSource(EngineConstants.SCHEDULE_DATA_SOURCE_IMPORT);
                 importList.add(entity);
             }
 
@@ -514,5 +608,147 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
     @Override
     public List<Cd90ScheduleResult> selectByScheduleDateAndCode(Cd90ScheduleResult scheduleResult) {
         return cd90ScheduleResultMapper.selectByScheduleDateAndCode(scheduleResult);
+    }
+
+    @Autowired
+    private BaseFinishQtyImportService baseFinishQtyImportService;
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list        要导入数据
+     * @param importLogId 导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importFinishQty(List<Cd90DayFinishQty> list, Long importLogId) {
+        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.CD90);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @Override
+    public AjaxResult getSummaryVo(Cd90ScheduleResult scheduleResult) {
+        List<Cd90ScheduleResult> tmScheduleResultList = selectCd90ScheduleResultList(scheduleResult);
+        List<Cd90ScheduleResult> lastDayPlanQty4List = cd90ScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+        // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
+        List<String> resultCodeList = tmScheduleResultList.stream().map(Cd90ScheduleResult::getClothCode).collect(Collectors.toList());
+        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(Cd90ScheduleResult::getClothCode)
+                .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
+
+        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(notExistCodeList)) {
+            LambdaQueryWrapper<Cd90CurlLength> lengthParamWrapper = new LambdaQueryWrapper<>();
+            lengthParamWrapper.in(Cd90CurlLength::getClothCode, notExistCodeList);
+            List<Cd90CurlLength> curlRollList = curlRollMapper.selectList(lengthParamWrapper);
+            if (CollectionUtils.isNotEmpty(curlRollList)) {
+                curlRollMap = curlRollList.stream().collect(Collectors.toMap(Cd90CurlLength::getClothCode, Cd90CurlLength::getCurlLength));
+            }
+        }
+
+        LambdaQueryWrapper<Cd90Params> paramWrapper = new LambdaQueryWrapper<>();
+        paramWrapper.eq(Cd90Params::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
+        Cd90Params standardLengthParams = paramsMapper.selectOne(paramWrapper);
+        for (String code : notExistCodeList) {
+            Cd90ScheduleResult result = new Cd90ScheduleResult();
+            result.setClothCode(code);
+            BigDecimal standardLength = standardLengthParams == null ? new BigDecimal(DEFAULT_CRIMP_LENGTH) : new BigDecimal(standardLengthParams.getParamValue());
+            scheduleResult.setCurlLength(curlRollMap.getOrDefault(code, standardLength).doubleValue());
+            tmScheduleResultList.add(result);
+        }
+        Map<String, Cd90ScheduleResult> lastDayPlanMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
+            lastDayPlanMap = lastDayPlanQty4List.stream().collect(Collectors.toMap(Cd90ScheduleResult::getClothCode, Function.identity()));
+        }
+        List<Cd90ScheduleResult> cxConsume4List = cd90ScheduleResultMapper.getCxConsume4List(scheduleResult);
+        Map<String, Cd90ScheduleResult> cxConsumeMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
+            cxConsumeMap = cxConsume4List.stream().collect(Collectors.toMap(Cd90ScheduleResult::getClothCode, Function.identity()));
+        }
+        BigDecimal totalDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalDayPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
+        BigDecimal totalNightPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalStockQty = BigDecimal.ZERO;
+        BigDecimal totalStockQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalLastDayPlanQtyRollNum = BigDecimal.ZERO;
+        BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
+        BigDecimal totalTheoreticClassStockQtyRollNum = BigDecimal.ZERO;
+
+        for (Cd90ScheduleResult result : tmScheduleResultList) {
+            Double nightPlanQty = ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D);
+            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
+            String code = result.getClothCode();
+            if (lastDayPlanMap.containsKey(code)) {
+                Cd90ScheduleResult lastDayResult = lastDayPlanMap.get(code);
+                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
+                result.setLastMidPlanQtyRollNum(lastDayResult.getLastMidPlanQtyRollNum());
+            }
+            if (cxConsumeMap.containsKey(code)) {
+                Cd90ScheduleResult cxConsumeResult = cxConsumeMap.get(code);
+                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
+            }
+            Double lastMidPlanQty = result.getLastMidPlanQty();
+            Double cxConsumeQty = result.getCxConsumeQty();
+            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+            if (lastMidPlanQty != null && cxConsumeQty != null) {
+                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
+            }
+            result.calculatePlanQty();
+
+            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D), totalDayPlanQty);
+            totalDayPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQtyRollNum(), 0D), totalDayPlanQtyRollNum);
+            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D), totalNightPlanQty);
+            totalNightPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQtyRollNum(), 0D), totalNightPlanQtyRollNum);
+            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
+            totalStockQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQtyRollNum(), 0D), totalStockQtyRollNum);
+            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D), totalLastDayPlanQty);
+            totalLastDayPlanQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQtyRollNum(), 0D), totalLastDayPlanQtyRollNum);
+            totalTheoreticClassStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+            totalTheoreticClassStockQtyRollNum = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQtyRollNum(), 0D), totalTheoreticClassStockQtyRollNum);
+        }
+        ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
+        scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
+        scheduleSummaryVo.setDayPlanQtyRollNum(totalDayPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setNightPlanQty(totalNightPlanQty.doubleValue());
+        scheduleSummaryVo.setNightPlanQtyRollNum(totalNightPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
+        scheduleSummaryVo.setStockQtyRollNum(totalStockQtyRollNum.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQtyRollNum(totalLastDayPlanQtyRollNum.doubleValue());
+        scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
+        scheduleSummaryVo.setTheoreticClassStockQtyRollNum(totalTheoreticClassStockQtyRollNum.doubleValue());
+        /*ScheduleSummaryVo summaryVo = cd90ScheduleResultMapper.getSummaryVo(scheduleResult);
+        if (summaryVo == null) {
+            summaryVo = new ScheduleSummaryVo();
+            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
+        }
+        ScheduleSummaryVo lastDayPlanQtySummaryVo = cd90ScheduleResultMapper.getLastDayPlanQty(scheduleResult);
+        Double lastDayPlanQty = null;
+        if (lastDayPlanQtySummaryVo != null) {
+            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
+            summaryVo.setLastDayPlanQty(lastDayPlanQty);
+        }
+        ScheduleSummaryVo cxConsumeSummaryVo = null;
+        Double cxConsumeQty = null;
+        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineId())) {
+            cxConsumeSummaryVo = cd90ScheduleResultMapper.getCxConsume(scheduleResult);
+        }
+        if (cxConsumeSummaryVo != null) {
+            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
+            summaryVo.setCxConsumeQty(cxConsumeQty);
+        }
+        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
+        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
+        if (lastDayPlanQty != null && cxConsumeQty != null) {
+            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
+        }*/
+        return AjaxResult.success(scheduleSummaryVo);
     }
 }

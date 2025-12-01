@@ -21,12 +21,12 @@ public interface ITmAssistScheduleService {
      * 查询胎面外协排程结果列表
      */
     @ApiOperation("查询胎面外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/tm/assistSchedule/list")
     TableDataInfo list(@RequestBody TmAssistScheduleDto tmAssistSchedule);
 
     /**
      * 导出列表
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/tm/assistSchedule/export")
     byte[] export(@RequestBody TmAssistScheduleDto scheduleResult);
 }

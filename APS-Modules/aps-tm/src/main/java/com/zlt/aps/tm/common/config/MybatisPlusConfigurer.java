@@ -16,7 +16,7 @@ public class MybatisPlusConfigurer {
      * @author zhenggc
      * @date 2019/1/2
      */
-    @Bean
+//    @Bean
     public OracleKeyGenerator oracleKeyGenerator() {
         return new OracleKeyGenerator();
     }

@@ -41,10 +41,10 @@
             and INSTR(create_by, #{createBy}) > 0
         </if>
         <if test="startTime != null and startTime !='' ">
-            and create_time  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+            and create_time  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
         <if test="endTime != null and endTime !='' ">
-            and create_time  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+            and create_time  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
         </if>
         <if test="orderStr == null">
             order by create_time desc
@@ -61,9 +61,6 @@
     </select>
 
     <insert id="insertTqDispatcherLog" parameterType="com.zlt.aps.tq.api.domain.entity.TqDispatcherLog">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT seq_t_tq_dispatcher_log.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_tq_dispatcher_log
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -136,11 +133,11 @@
     </update>
 
     <delete id="deleteTqDispatcherLogById" parameterType="Long">
-        update t_tq_dispatcher_log set del_flag='1' where id = #{id}
+        update t_tq_dispatcher_log set del_flag = NULL where id = #{id}
     </delete>
 
     <delete id="deleteTqDispatcherLogByIds" parameterType="String">
-        update t_tq_dispatcher_log set del_flag='1' where id in
+        update t_tq_dispatcher_log set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

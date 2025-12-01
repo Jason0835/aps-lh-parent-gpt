@@ -29,7 +29,7 @@ import java.util.List;
  * @since 2021-06-15
  */
 @RestController
-@RequestMapping("/MachineRollMapping")
+@RequestMapping("/cd15/MachineRollMapping")
 public class Cd15MachineRollMappingController extends BaseController {
     @Resource
     public Cd15MachineRollMappingService machineRollMappingService;
@@ -92,8 +92,8 @@ public class Cd15MachineRollMappingController extends BaseController {
 
     @Log(title = "ui.cd15.MachineRollMapping.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<Cd15MachineRollMappingDto> exportData(Cd15MachineRollMappingDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd15MachineRollMappingDto> exportData(@RequestBody Cd15MachineRollMappingDto dto) {
         dto.setOrderStr(orderStr());
         List<Cd15MachineRollMappingDto> list = machineRollMappingService.listMachineRollMapping(dto);
         return list;

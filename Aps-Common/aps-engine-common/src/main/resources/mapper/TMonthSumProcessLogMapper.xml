@@ -40,7 +40,7 @@
         ,CREATE_BY,CREATE_TIME,UPDATE_BY
         ,UPDATE_TIME,DEL_FLAG,REMARK
         ,LOG_DETAIL)
-        values (SEQ_AUTO_SCHEDULE_LOG.NEXTVAL,#{monthPlanApsVersion,jdbcType=VARCHAR},#{title,jdbcType=VARCHAR}
+        values (NULL,#{monthPlanApsVersion,jdbcType=VARCHAR},#{title,jdbcType=VARCHAR}
         ,#{createBy,jdbcType=VARCHAR},#{createTime,jdbcType=TIMESTAMP},#{updateBy,jdbcType=VARCHAR}
         ,#{updateTime,jdbcType=TIMESTAMP},#{delFlag,jdbcType=CHAR},#{remark,jdbcType=VARCHAR}
         ,#{logDetail,jdbcType=CLOB})

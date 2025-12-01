@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Api(tags = "钢丝圈机台信息维护接口")
 @RestController
-@RequestMapping("/machine")
+@RequestMapping("/gsq/machine")
 public class GsqMachineInfoController extends BaseController {
     @Autowired
     private GsqMachineInfoService machineInfoService;

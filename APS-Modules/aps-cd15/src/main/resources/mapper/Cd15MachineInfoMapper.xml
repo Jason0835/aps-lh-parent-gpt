@@ -12,6 +12,7 @@
         <result property="classShift" column="class_shift"/>
         <result property="openMachineClass" column="open_machine_class"/>
         <result property="status" column="status"/>
+        <result property="isOutTwo" column="is_out_two"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -21,7 +22,22 @@
     </resultMap>
 
     <sql id="selectMachineInfoVo">
-        select id, machine_code, machine_name, quata, class_shift, open_machine_class, status, remark, del_flag, create_by, create_time, update_by, update_time from t_cd15_machine_info
+        select id,
+               machine_code,
+               machine_name,
+               quata,
+               class_shift,
+               open_machine_class,
+               status,
+               is_out_two,
+               steel_strip_width,
+               remark,
+               del_flag,
+               create_by,
+               create_time,
+               update_by,
+               update_time
+        from t_cd15_machine_info
     </sql>
 
     <select id="selectMachineInfoList" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo"
@@ -29,6 +45,9 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             del_flag ='0'
+            <if test="factoryCode != null  and factoryCode != ''">
+                AND factory_code = #{factoryCode}
+            </if>
             <if test="machineCode != null  and machineCode != ''">
                 and INSTR(machine_code, #{machineCode,jdbcType=VARCHAR}) > 0
             </if>
@@ -50,6 +69,7 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             del_flag ='0'
+            AND factory_code = #{factoryCode}
             <if test="id != null  and id != ''">and id != #{id}</if>
             <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
             <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
@@ -61,6 +81,7 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             del_flag ='0'
+            AND factory_code = #{factoryCode}
             <if test="machineCode != null  and machineCode != ''">and machine_code != #{machineCode}</if>
             <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
         </where>
@@ -73,9 +94,6 @@
     </select>
 
     <insert id="insertMachineInfo" parameterType="com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_PUBLIC.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_cd15_machine_info
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -85,12 +103,15 @@
             <if test="classShift != null">class_shift,</if>
             <if test="openMachineClass != null">open_machine_class,</if>
             <if test="status != null">status,</if>
+            <if test="isOutTwo != null">is_out_two,</if>
+            <if test="steelStripWidth != null">steel_strip_width,</if>
             <if test="remark != null">remark,</if>
             <if test="delFlag != null">del_flag,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
+            <if test="factoryCode != null">factory_code,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
@@ -100,12 +121,15 @@
             <if test="classShift != null">#{classShift},</if>
             <if test="openMachineClass != null">#{openMachineClass},</if>
             <if test="status != null">#{status},</if>
+            <if test="isOutTwo != null">#{isOutTwo},</if>
+            <if test="steelStripWidth != null">#{steelStripWidth},</if>
             <if test="remark != null">#{remark},</if>
             <if test="delFlag != null">#{delFlag},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="updateBy != null">#{updateBy},</if>
             <if test="updateTime != null">#{updateTime},</if>
+            <if test="factoryCode != null">#{factoryCode},</if>
         </trim>
     </insert>
 
@@ -118,6 +142,8 @@
             class_shift = #{classShift,jdbcType=VARCHAR},
             open_machine_class = #{openMachineClass,jdbcType=VARCHAR},
             status = #{status,jdbcType=VARCHAR},
+            is_out_two = #{isOutTwo,jdbcType=VARCHAR},
+            steel_strip_width = #{steelStripWidth,jdbcType=DECIMAL},
             remark = #{remark,jdbcType=VARCHAR},
             <if test="delFlag != null">del_flag = #{delFlag,jdbcType=VARCHAR},</if>
             <if test="createBy != null">create_by = #{createBy,jdbcType=VARCHAR},</if>
@@ -129,7 +155,7 @@
     </update>
 
     <delete id="deleteMachineInfoByIds" parameterType="String">
-        UPDATE t_cd15_machine_info SET del_flag ='1' where id in
+        UPDATE t_cd15_machine_info SET del_flag = null where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -142,6 +168,7 @@
             select a.MACHINE_ID as ID,b.MACHINE_CODE,b.MACHINE_NAME from T_CD15_SPECIFY_MACHINE a
             inner JOIN T_CD15_MACHINE_INFO b on a.MACHINE_ID=b.ID and b.STATUS = '0'
             where a.DEL_FLAG='0' and a.JOB_TYPE='0' and a.STEEL_STRIP_CODE=#{machineCode,jdbcType=VARCHAR}
+              and b.factory_code = #{factoryCode,jdbcType=VARCHAR}
         </if>
 
         <if test="id == 2">
@@ -152,6 +179,7 @@
             select MACHINE_ID from T_CD15_SPECIFY_MACHINE where DEL_FLAG='0' and JOB_TYPE='0' and
             STEEL_STRIP_CODE=#{machineCode,jdbcType=VARCHAR}
             )
+              and b.factory_code = #{factoryCode,jdbcType=VARCHAR}
         </if>
 
         <if test="id == 3">
@@ -160,65 +188,64 @@
             and a.ID not in (
             select MACHINE_ID from T_CD15_SPECIFY_MACHINE where DEL_FLAG='0' and JOB_TYPE='0' and
             STEEL_STRIP_CODE=#{machineCode,jdbcType=VARCHAR}
+              and factory_code = #{factoryCode,jdbcType=VARCHAR}
             union
             select MACHINE_ID from T_CD15_MACHINE_ROLL_MAPPING where DEL_FLAG='0' and
             BIG_ROLL_CODE=#{machineName,jdbcType=VARCHAR}
+              and factory_code = #{factoryCode,jdbcType=VARCHAR}
             )
+              and a.factory_code = #{factoryCode,jdbcType=VARCHAR}
         </if>
 
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_cd15_machine_info a USING (
-        <foreach collection="list" item="MACHINE" separator=" union ">
-            select
-            #{MACHINE.machineCode,jdbcType=VARCHAR} machine_code,
-            #{MACHINE.machineName,jdbcType=VARCHAR} machine_name,
-            #{MACHINE.quata,jdbcType=DOUBLE} quata,
-            #{MACHINE.classShift,jdbcType=VARCHAR} class_shift,
-            #{MACHINE.openMachineClass,jdbcType=VARCHAR} open_machine_class,
-            #{MACHINE.status,jdbcType=VARCHAR} status,
-            #{MACHINE.createBy,jdbcType=VARCHAR} create_by,
-            #{MACHINE.createTime,jdbcType=DATE} create_time,
-            #{MACHINE.updateBy,jdbcType=VARCHAR} update_by,
-            #{MACHINE.updateTime,jdbcType=DATE} update_time,
-            #{MACHINE.remark,jdbcType=VARCHAR} remark
-            from dual
-        </foreach>
-        ) b ON (a.machine_code = b.machine_code and a.del_flag = '0')
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.machine_name = b.machine_name,
-        a.quata = b.quata,
-        a.class_shift = b.class_shift,
-        a.open_machine_class = b.open_machine_class,
-        a.status = b.status,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.machine_code,
-        a.machine_name,
-        a.quata ,
-        a.class_shift ,
-        a.open_machine_class ,
-        a.status ,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_cd15_machine_info (
+            machine_code,
+            machine_name,
+            quata,
+            class_shift,
+            open_machine_class,
+            status,
+            is_out_two,
+        steel_strip_width,
+            create_by,
+            create_time,
+            update_by,
+            update_time,
+            remark,
+            del_flag,
+            factory_code
         ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.machine_code,
-        b.machine_name,
-        b.quata,
-        b.class_shift,
-        b.open_machine_class,
-        b.status,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        <foreach collection="list" item="MACHINE" separator=" , ">
+        (
+             #{MACHINE.machineCode,jdbcType=VARCHAR},
+             #{MACHINE.machineName,jdbcType=VARCHAR},
+             #{MACHINE.quata,jdbcType=DOUBLE},
+             #{MACHINE.classShift,jdbcType=VARCHAR},
+             #{MACHINE.openMachineClass,jdbcType=VARCHAR},
+             #{MACHINE.status,jdbcType=VARCHAR},
+             #{MACHINE.isOutTwo,jdbcType=VARCHAR},
+            #{MACHINE.steelStripWidth,jdbcType=DOUBLE},
+             #{MACHINE.createBy,jdbcType=VARCHAR},
+             now(),
+             #{MACHINE.updateBy,jdbcType=VARCHAR},
+             now(),
+             #{MACHINE.remark,jdbcType=VARCHAR},
+             '0',
+             #{MACHINE.factoryCode,jdbcType=VARCHAR}
+         )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        machine_name = VALUES(machine_name),
+        quata = VALUES(quata),
+        class_shift = VALUES(class_shift),
+        open_machine_class = VALUES(open_machine_class),
+        status = VALUES(status),
+        is_out_two = VALUES(is_out_two),
+        steel_strip_width = VALUES(steel_strip_width),
+        update_by = VALUES(create_by),
+        update_time = now(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

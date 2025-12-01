@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueDecomposeMapper">
+
+    <select id="selectGlueDecomposeList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueDecompose"
+            resultType="com.zlt.mix.setting.api.domain.entity.GlueDecompose">
+        select id, glue, segment, mother_glue1, mother_glue2, mother_glue3, mother_glue4, mother_glue5, mother_glue6,
+        mother_glue7, mother_glue8, mother_glue9, remark, del_flag, create_by, create_time, update_by, update_time from
+        t_glue_decompose
+        where del_flag = '0'
+        <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        <if test="segment != null ">and segment = #{segment}</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueDecomposeByIds" parameterType="String">
+        update t_glue_decompose set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueDecomposeNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.glue,jdbcType= VARCHAR} GLUE 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_glue_decompose m
+        inner join temp_table t on m.GLUE = t.GLUE and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueDecomposeInfo">
+        insert into t_glue_decompose
+        (id,glue,segment,mother_glue1,mother_glue2,mother_glue3,mother_glue4,mother_glue5,mother_glue6,mother_glue7,mother_glue8,mother_glue9,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueDecompose" separator=" union all ">
+            select
+            #{glueDecompose.glue,jdbcType= VARCHAR} glue, #{glueDecompose.segment,jdbcType=DOUBLE} segment,
+            #{glueDecompose.motherGlue1,jdbcType= VARCHAR} mother_glue1, #{glueDecompose.motherGlue2,jdbcType= VARCHAR}
+            mother_glue2, #{glueDecompose.motherGlue3,jdbcType= VARCHAR} mother_glue3,
+            #{glueDecompose.motherGlue4,jdbcType= VARCHAR} mother_glue4, #{glueDecompose.motherGlue5,jdbcType= VARCHAR}
+            mother_glue5, #{glueDecompose.motherGlue6,jdbcType= VARCHAR} mother_glue6,
+            #{glueDecompose.motherGlue7,jdbcType= VARCHAR} mother_glue7, #{glueDecompose.motherGlue8,jdbcType= VARCHAR}
+            mother_glue8, #{glueDecompose.motherGlue9,jdbcType= VARCHAR} mother_glue9,
+            #{glueDecompose.remark,jdbcType= VARCHAR} remark, #{glueDecompose.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueDecompose.createBy,jdbcType= VARCHAR} create_by, #{glueDecompose.createTime,jdbcType=TIMESTAMP}
+            create_time, #{glueDecompose.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueDecompose.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_glue_decompose
+        (
+        glue, segment, mother_glue1, mother_glue2, mother_glue3, mother_glue4, mother_glue5,
+        mother_glue6, mother_glue7, mother_glue8, mother_glue9, remark, del_flag, create_by,
+        create_time,UPDATE_BY,UPDATE_TIME )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.glue,jdbcType=VARCHAR } , #{item.segment,} ,
+            #{item.motherGlue1,jdbcType=VARCHAR } , #{item.motherGlue2,jdbcType=VARCHAR } ,
+            #{item.motherGlue3,jdbcType=VARCHAR } , #{item.motherGlue4,jdbcType=VARCHAR } ,
+            #{item.motherGlue5,jdbcType=VARCHAR } , #{item.motherGlue6,jdbcType=VARCHAR } ,
+            #{item.motherGlue7,jdbcType=VARCHAR } , #{item.motherGlue8,jdbcType=VARCHAR } ,
+            #{item.motherGlue9,jdbcType=VARCHAR } , #{item.remark,jdbcType=VARCHAR } ,
+            #{item.delFlag,jdbcType=VARCHAR } , #{item.createBy,jdbcType=VARCHAR } ,
+            #{item.createTime, jdbcType=TIMESTAMP} , #{item.updateBy,jdbcType=VARCHAR } ,
+            #{item.updateTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        UPDATE
+        segment = values(segment), mother_glue1 = values(mother_glue1), mother_glue2 = values(mother_glue2),
+        mother_glue3 = values(mother_glue3), mother_glue4 = values(mother_glue4), mother_glue5 = values(mother_glue5),
+        mother_glue6 = values(mother_glue6), mother_glue7 = values(mother_glue7), mother_glue8 = values(mother_glue8),
+        mother_glue9 = values(mother_glue9), remark = values(remark), update_by = values(create_by),
+        update_time = now()
+    </update>
+</mapper>

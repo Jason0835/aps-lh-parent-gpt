@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"90度裁断定点机台接口"})
 @RestController
-@RequestMapping("/specifyMachine")
+@RequestMapping("/cd90/specifyMachine")
 public class Cd90SpecifyMachineController extends BaseController {
 
     @Resource
     private Cd90SpecifyMachineService Cd90SpecifyMachineService;
 
     @ApiOperation("根据条件查询定点机台列表")
-    @GetMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(Cd90SpecifyMachineDto dto) {
+    @PostMapping("/listSpecifyMachine")
+    public TableDataInfo listSpecifyMachine(@RequestBody Cd90SpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<Cd90SpecifyMachineDto> list = Cd90SpecifyMachineService.listSpecifyMachine(dto);
@@ -80,8 +80,8 @@ public class Cd90SpecifyMachineController extends BaseController {
 
     @Log(title = "ui.cd90.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<Cd90SpecifyMachineDto> exportData(Cd90SpecifyMachineDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd90SpecifyMachineDto> exportData(@RequestBody Cd90SpecifyMachineDto dto) {
         dto.setOrderStr(orderStr());
         List<Cd90SpecifyMachineDto> list = Cd90SpecifyMachineService.listSpecifyMachine(dto);
         return list;

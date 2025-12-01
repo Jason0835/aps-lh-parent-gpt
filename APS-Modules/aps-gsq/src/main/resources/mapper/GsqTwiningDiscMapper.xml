@@ -55,84 +55,51 @@
         where id = #{id}
     </update>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_GSQ_TWINING_DISC a USING (
-        <foreach collection="list" item="twiningDisc" separator=" union ">
-            select
-            #{twiningDisc.serialNumber,jdbcType=VARCHAR} serial_number,
-            #{twiningDisc.name,jdbcType=VARCHAR} name,
-            #{twiningDisc.seq,jdbcType=DOUBLE} seq,
-            #{twiningDisc.purpose,jdbcType=VARCHAR} purpose,
-            #{twiningDisc.spec,jdbcType=VARCHAR} spec,
-            #{twiningDisc.orderWay,jdbcType=VARCHAR} order_way,
-            #{twiningDisc.twiningNum,jdbcType=DOUBLE} twining_num,
-            #{twiningDisc.inTime,jdbcType=DATE} in_time,
-            #{twiningDisc.scrapTime,jdbcType=DATE} scrap_time,
-            #{twiningDisc.scrapReason,jdbcType=VARCHAR} scrap_reason,
-            #{twiningDisc.machineId,jdbcType=DOUBLE} machine_id,
-            #{twiningDisc.createBy,jdbcType=VARCHAR} create_by,
-            #{twiningDisc.createTime,jdbcType=DATE} create_time,
-            #{twiningDisc.updateBy,jdbcType=VARCHAR} update_by,
-            #{twiningDisc.updateTime,jdbcType=DATE} update_time,
-            #{twiningDisc.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GSQ_TWINING_DISC (
+        serial_number, name, seq, purpose, spec,
+        order_way, twining_num, in_time, scrap_time, scrap_reason, machine_id,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="twiningDisc" separator=",">
+            (
+            #{twiningDisc.serialNumber,jdbcType=VARCHAR},
+            #{twiningDisc.name,jdbcType=VARCHAR},
+            #{twiningDisc.seq,jdbcType=DOUBLE},
+            #{twiningDisc.purpose,jdbcType=VARCHAR},
+            #{twiningDisc.spec,jdbcType=VARCHAR},
+            #{twiningDisc.orderWay,jdbcType=VARCHAR},
+            #{twiningDisc.twiningNum,jdbcType=DOUBLE},
+            #{twiningDisc.inTime,jdbcType=DATE},
+            #{twiningDisc.scrapTime,jdbcType=DATE},
+            #{twiningDisc.scrapReason,jdbcType=VARCHAR},
+            #{twiningDisc.machineId,jdbcType=DOUBLE},
+            #{twiningDisc.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{twiningDisc.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{twiningDisc.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.serial_number = b.serial_number
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.name = b.name,
-        a.seq = b.seq,
-        a.purpose = b.purpose,
-        a.spec = b.spec,
-        a.order_way = b.order_way,
-        a.twining_num = b.twining_num,
-        a.in_time = b.in_time,
-        a.scrap_time = b.scrap_time,
-        a.scrap_reason = b.scrap_reason,
-        a.machine_id = b.machine_id,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id,
-        a.name,
-        a.seq,
-        a.purpose,
-        a.spec,
-        a.order_way,
-        a.twining_num,
-        a.in_time,
-        a.scrap_time,
-        a.scrap_reason,
-        a.machine_id,
-        a.update_by,
-        a.update_time,
-        a.remark,
-        a.del_flag
-        ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.name,
-        b.seq,
-        b.purpose,
-        b.spec,
-        b.order_way,
-        b.twining_num,
-        b.in_time,
-        b.scrap_time,
-        b.scrap_reason,
-        b.machine_id,
-        b.create_by,
-        sysdate,
-        b.remark,
-        '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        seq = VALUES(seq),
+        purpose = VALUES(purpose),
+        spec = VALUES(spec),
+        order_way = VALUES(order_way),
+        twining_num = VALUES(twining_num),
+        in_time = VALUES(in_time),
+        scrap_time = VALUES(scrap_time),
+        scrap_reason = VALUES(scrap_reason),
+        machine_id = VALUES(machine_id),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
     <update id="deleteAll">
-        update t_gsq_twining_disc set del_flag = '1' where del_flag = '0'
+        update t_gsq_twining_disc set del_flag = NULL where del_flag = '0'
     </update>
 </mapper>

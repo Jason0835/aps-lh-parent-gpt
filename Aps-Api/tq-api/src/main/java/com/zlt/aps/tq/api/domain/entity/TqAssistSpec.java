@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -20,7 +21,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @TableName("t_tq_assist_spec")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class TqAssistSpec extends ApsBaseEntity {
 
 	private static final long serialVersionUID = 1L;

@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2022-05-11
  */
 @RestController
-@RequestMapping("/bigRollOriginalBrand")
+@RequestMapping("/xwyy/bigRollOriginalBrand")
 public class XwyyBigRollOriginalBrandController extends BaseController {
     @Autowired
     private XwyyBigRollOriginalBrandService xwyyBigRollOriginalBrandService;

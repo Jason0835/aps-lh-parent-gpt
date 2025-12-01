@@ -44,10 +44,10 @@
         <include refid="selectCxMonthStockVo"/>
         where del_flag = '0'
         <if test="beginStockMonth != null and beginStockMonth !='' ">
-            and stock_month  <![CDATA[  >=  ]]> to_date(#{beginStockMonth},'yyyy-MM')
+            and stock_month  <![CDATA[  >=  ]]> STR_TO_DATE(#{beginStockMonth},'%Y-%m')
         </if>
         <if test="endStockMonth != null and endStockMonth !='' ">
-            and stock_month  <![CDATA[   <=  ]]> to_date(#{endStockMonth},'yyyy-MM')
+            and stock_month  <![CDATA[   <=  ]]> STR_TO_DATE(#{endStockMonth},'%Y-%m')
         </if>
         <if test="embryoCode != null  and embryoCode != ''">and embryo_code = #{embryoCode}</if>
         <if test="stockNum != null and stockNum != ''">and stock_num = #{stockNum}</if>
@@ -72,8 +72,8 @@
         )
         <include refid="selectCxMonthStockVo"/>
         where  (embryo_code, bom_data_version) IN ( select embryo_code, bom_data_version from temp_table) and del_flag = '0'
-        AND stock_month BETWEEN to_date(#{stockMonth,jdbcType=VARCHAR}, 'yyyy-MM' )
-        AND last_day( to_date(#{stockMonth,jdbcType=VARCHAR}, 'yyyy-MM' ) )
+        AND stock_month BETWEEN STR_TO_DATE(#{stockMonth,jdbcType=VARCHAR}, '%Y-%m' )
+        AND last_day( STR_TO_DATE(#{stockMonth,jdbcType=VARCHAR}, '%Y-%m' ) )
     </select>
 
 
@@ -99,7 +99,7 @@
         a.stock_num = b.stock_num,
         a.over_time_stock = b.over_time_stock,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -118,7 +118,7 @@
         b.embryo_code,
         b.stock_num,
         b.create_by,
-        sysdate,
+        now(),
         b.remark, '0', b.bom_data_version
         )
     </update>

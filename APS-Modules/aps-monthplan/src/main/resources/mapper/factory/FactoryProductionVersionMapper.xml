@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper">
+
+    <delete id="deletedMonthPlanRequireVersion" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+       DELETE FROM t_mp_product_require_plan
+        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+          AND YEAR = #{year,jdbcType=DECIMAL}
+          AND MONTH = #{month,jdbcType=DECIMAL}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
+       DELETE FROM t_mp_order_plan_allocation
+        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+          AND YEAR = #{year,jdbcType=DECIMAL}
+          AND MONTH = #{month,jdbcType=DECIMAL}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
+       DELETE FROM t_mp_month_require_stock
+        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
+    </delete>
+
+    <delete id="deletedProductionVersion" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+        DELETE FROM t_mp_proc_version
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_proc_month_plan_init
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_proc_no_production_record
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_proc_no_production_plan
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_moulding_day_result
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+       <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+       </if>
+        ;
+        DELETE FROM t_mp_moulding_day_result_detail
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_moulding_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+        DELETE FROM t_mp_production_group_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        <if test="productionVersion != null and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
+        ;
+    </delete>
+
+    <update id="deletedProductionVersionByLast" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+        UPDATE t_mp_proc_version
+           SET PRODUCTION_INIT_VERSION = NULL,
+               PRODUCTION_VERSION = NULL
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_month_plan_init
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_no_production_record
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_no_production_plan
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_day_result
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_day_result_detail
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_production_group_helper
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+    </update>
+</mapper>

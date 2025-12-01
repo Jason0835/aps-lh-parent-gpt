@@ -5,28 +5,29 @@
     <select id="selectGdyyStockQty" resultType="com.zlt.aps.gdyy.engine.vo.GdyyStockVo">
 	    SELECT MATERIAL_CODE BIG_ROLL_CODE /*钢压大卷编号*/,
 		       CASE
-		         WHEN (nvl(STOCK_NUM, 0) + nvl(MODIFY_NUM, 0) - nvl(BAD_NUM, 0)) * #{stockLossRate} > 0 THEN
-		          (nvl(STOCK_NUM, 0) + nvl(MODIFY_NUM, 0) - nvl(BAD_NUM, 0)) * #{stockLossRate}
+		         WHEN (IFNULL(STOCK_NUM, 0) + IFNULL(MODIFY_NUM, 0) - IFNULL(BAD_NUM, 0)) * #{stockLossRate} > 0 THEN
+		          (IFNULL(STOCK_NUM, 0) + IFNULL(MODIFY_NUM, 0) - IFNULL(BAD_NUM, 0)) * #{stockLossRate}
 		         ELSE
 		          0
 		       END STOCK_QTY /*库存量，不能小于0*/,
-		       NVL(STOCK_ROLL_NUM, 0) STOCK_ROLL_QTY /*大卷库存量*/
+		       IFNULL(STOCK_ROLL_NUM, 0) STOCK_ROLL_QTY /*大卷库存量*/,
+               S.ESTIMATE_STOCK_FLAG
 		  FROM T_GDYY_STOCK S
-		 WHERE STOCK_DATE = #{scheduleDate} - 1	/*库存要取排产日上一天的*/
+		 WHERE STOCK_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)	/*库存要取排产日上一天的*/
 		   AND S.DEL_FLAG = '0'
     </select>
     
     <!-- 查询计算15度裁断预计库存的相关信息 -->
     <select id="selectCd15Stock" resultType="com.zlt.aps.gdyy.engine.vo.GdyyStockVo">
     	SELECT CI.ARTICLE_CROWN_SPEC BIG_ROLL_CODE,
-    	       nvl(SUM(S.STOCK_QTY * CI.BELT_CRAFT), 0) STOCK_QTY
+    	       IFNULL(SUM(S.STOCK_QTY * CI.BELT_CRAFT), 0) STOCK_QTY
     	  FROM (
 				SELECT S.MATERIAL_CODE,
 				       CASE
-				         WHEN (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) +
-				              NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} > NVL(T.USE_NUM, 0) THEN
-				          (NVL(S.STOCK_NUM, 0) - NVL(S.BAD_NUM, 0) + NVL(S.MODIFY_NUM, 0)) * #{stockLossRate} -
-				          NVL(T.USE_NUM, 0)
+				         WHEN (IFNULL(S.STOCK_NUM, 0) - IFNULL(S.BAD_NUM, 0) +
+				              IFNULL(S.MODIFY_NUM, 0)) * #{stockLossRate} > IFNULL(T.USE_NUM, 0) THEN
+				          (IFNULL(S.STOCK_NUM, 0) - IFNULL(S.BAD_NUM, 0) + IFNULL(S.MODIFY_NUM, 0)) * #{stockLossRate} -
+				          IFNULL(T.USE_NUM, 0)
 				         ELSE
 				          0
 				       END STOCK_QTY /*16点半部件库存量 公式：(库存量 - 不良数 + 修正数) - 预计消耗量，不能小于0*/
@@ -34,22 +35,21 @@
 				  LEFT JOIN (
 				  		SELECT BELT_CODE BELT_CODE,
 				               SCHEDULE_DATE,
-				               SUM(CLASS3_PLANNED_QTY * UNIT_CONSUME) USE_NUM /*12点后半部件预计消耗量， 公式：（前日成型三班计划量 - 12点成型完成量) * 单耗*/
+				               SUM(CLASS3_PLANNED_QTY) USE_NUM /*12点后半部件预计消耗量， 公式：（前日成型三班计划量 - 12点成型完成量) * 单耗*/
 				          FROM (SELECT CI.BELT_CODE1 BELT_CODE, /*1#钢带编号*/
-				                       R.EMBRYO_CODE,
-		                               CASE
-		                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
-		                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+		                               /*CASE
+		                                 WHEN IFNULL(R.CLASS3_PLANNED_QTY, 0) > IFNULL(F.FINISH_QTY, 0) THEN
+		                                   IFNULL(R.CLASS3_PLANNED_QTY, 0) - IFNULL(F.FINISH_QTY, 0)
 		                                 ELSE
 		                                   0
-		                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
-				                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) UNIT_CONSUME,	/*单耗*/
+		                               END*/
+		IFNULL(R.CLASS3_PLANNED_QTY, 0) * IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0) - IFNULL(F.class2_plan, 0) CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
 				                       R.SCHEDULE_DATE
 				                  FROM (
 					                  	SELECT r.SCHEDULE_DATE, 
 					                  	       r.EMBRYO_CODE, 
 					                  	       r.BOM_DATA_VERSION,
-					                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+					                  	       SUM(r.CLASS3_PLANNED_QTY + R.CLASS2_PLAN_QTY + R.CLASS3_PLAN_QTY) CLASS3_PLANNED_QTY
 					                  	  FROM T_CX_SCHEDULE_RESULT r
 					                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
 					                  	   AND r.DEL_FLAG = '0'
@@ -64,28 +64,36 @@
 								   /* 仅对投产阶段的规格排产 */
 								   AND CI.PRODUCTION_STAGE = '0'
 							   </if>
-				                  LEFT JOIN T_CX_PART_FINISH_QTY F
+
+				                  /*LEFT JOIN T_CX_PART_FINISH_QTY F
 				                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
 				                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
 				                   AND F.DEL_FLAG = '0'
 				                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
-				                 WHERE CI.DEL_FLAG = '0'
+				                 WHERE CI.DEL_FLAG = '0'*/
+
+								LEFT JOIN t_gdyy_schedule_result F
+								ON F.BIG_ROLL_CODE = CI.BELT_CODE1
+								AND F.SCHEDULE_DATE = DATE_SUB(R.SCHEDULE_DATE, INTERVAL 1 DAY)
+								AND F.DEL_FLAG = '0'
+								AND CI.EMBRYO_VERSION = R.BOM_DATA_VERSION
+								WHERE CI.DEL_FLAG = '0'
+
 				                 UNION
 				                SELECT CI.BELT_CODE2 BELT_CODE, /*1#钢带编号*/
-				                       R.EMBRYO_CODE,
-		                               CASE
-		                                 WHEN NVL(R.CLASS3_PLANNED_QTY, 0) > NVL(F.FINISH_QTY, 0) THEN
-		                                   NVL(R.CLASS3_PLANNED_QTY, 0) - NVL(F.FINISH_QTY, 0)
+		                               /*CASE
+		                                 WHEN IFNULL(R.CLASS3_PLANNED_QTY, 0) > IFNULL(F.FINISH_QTY, 0) THEN
+		                                   IFNULL(R.CLASS3_PLANNED_QTY, 0) - IFNULL(F.FINISH_QTY, 0)
 		                                 ELSE
 		                                   0
-		                               END CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
-				                       nvl(CI.FIT_DRUM_PERIMETER / 1000, 0) UNIT_CONSUME,	/*单耗*/
+		                               END*/
+		IFNULL(R.CLASS3_PLANNED_QTY, 0) * IFNULL(CI.FIT_DRUM_PERIMETER / 1000, 0) - IFNULL(F.class2_plan, 0) CLASS3_PLANNED_QTY, /*前日成型三班计划量 - 完成量，计算结果不能小于0*/
 				                       R.SCHEDULE_DATE
 				                  FROM (
 					                  	SELECT r.SCHEDULE_DATE, 
 					                  	       r.EMBRYO_CODE, 
 					                  	       r.BOM_DATA_VERSION,
-					                  	       SUM(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY
+					                  	       SUM(r.CLASS3_PLANNED_QTY + R.CLASS2_PLAN_QTY + R.CLASS3_PLAN_QTY) CLASS3_PLANNED_QTY
 					                  	  FROM T_CX_SCHEDULE_RESULT r
 					                  	 WHERE r.SCHEDULE_DATE = #{scheduleDate}
 					                  	   AND r.DEL_FLAG = '0'
@@ -100,29 +108,38 @@
 								   /* 仅对投产阶段的规格排产 */
 								   AND CI.PRODUCTION_STAGE = '0'
 							   </if>
-				                  LEFT JOIN T_CX_PART_FINISH_QTY F
+
+				                  /*LEFT JOIN T_CX_PART_FINISH_QTY F
 				                    ON F.EMBRYO_CODE = R.EMBRYO_CODE
 				                   AND F.STAT_DATE = R.SCHEDULE_DATE - 1
 				                   AND F.DEL_FLAG = '0'
 				                   AND F.BOM_DATA_VERSION = R.BOM_DATA_VERSION
-				                 WHERE CI.DEL_FLAG = '0'
-				                 )
+				                 WHERE CI.DEL_FLAG = '0'*/
+
+								LEFT JOIN t_gdyy_schedule_result F
+								ON F.BIG_ROLL_CODE = CI.BELT_CODE2
+								AND F.SCHEDULE_DATE = DATE_SUB(R.SCHEDULE_DATE, INTERVAL 1 DAY)
+								AND F.DEL_FLAG = '0'
+								AND CI.EMBRYO_VERSION = R.BOM_DATA_VERSION
+								WHERE CI.DEL_FLAG = '0'
+
+				                 ) temp
 				         GROUP BY BELT_CODE,
 				                  SCHEDULE_DATE) T
 				    ON S.MATERIAL_CODE = T.BELT_CODE
 				 WHERE S.DEL_FLAG = '0'
-				   AND S.STOCK_DATE = #{scheduleDate} - 1
+				   AND S.STOCK_DATE =  DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)
 				    ) S
 				  LEFT JOIN (
 				  		SELECT CI.BELT_CODE1,
-						       AVG(nvl(CI.belt_craft1, 0)) / 1000 / #{breadth} BELT_CRAFT,
+						       AVG(IFNULL(CI.belt_craft1, 0)) / 1000 / #{breadth} BELT_CRAFT,
 						       MAX(ARTICLE_CROWN_SPEC) ARTICLE_CROWN_SPEC
 						  FROM T_PRODUCT_CONSTRUCTION_INFO CI
 						 WHERE CI.DEL_FLAG = '0'
 						 GROUP BY BELT_CODE1
 						 UNION
 				  		SELECT CI.BELT_CODE2,
-						       AVG(nvl(CI.belt_craft2, 0)) / 1000 / #{breadth} BELT_CRAFT,
+						       AVG(IFNULL(CI.belt_craft2, 0)) / 1000 / #{breadth} BELT_CRAFT,
 						       MAX(ARTICLE_CROWN_SPEC) ARTICLE_CROWN_SPEC
 						  FROM T_PRODUCT_CONSTRUCTION_INFO CI
 						 WHERE CI.DEL_FLAG = '0'
@@ -172,16 +189,55 @@
 	                  /* 仅对投产阶段的规格排产 */
 	               AND CI2.PRODUCTION_STAGE = '0'
 		</if>
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
-		           AND NOT REGEXP_LIKE(NVL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS1_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS2_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS3_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS4_ANALYSIS_INPUT, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS, ' '), P.PARAM_VALUE)
+		           AND NOT REGEXP_LIKE(IFNULL(R2.CLASS5_ANALYSIS_INPUT, ' '), P.PARAM_VALUE))
 	         GROUP BY CI.ARTICLE_CROWN_SPEC
     </select>
+
+	<select id="listReserveStock" resultType="com.zlt.aps.gdyy.api.domain.dto.GdyyReserveStockDto">
+		SELECT * FROM t_gdyy_reserve_stock WHERE del_flag = '0'
+		<if test="codeList != null and codeList.size() > 0">
+			AND big_roll_code IN
+			<foreach collection="codeList" item="code" open="(" separator="," close=")">
+				#{code}
+			</foreach>
+		</if>
+	</select>
+	
+	<!-- 预估指定日期的库存，使用前一天的库存与当天的计划进行预估 -->
+	<insert id="estimateStock">
+	   INSERT INTO t_gdyy_stock ( stock_date, material_code, stock_num, del_flag, estimate_stock_flag) 
+	   SELECT s.stock_date,
+              s.material_code,
+              CASE WHEN sum( s.stock_num ) > 0 THEN sum( s.stock_num ) ELSE 0 END,
+              '0' ,
+              '0' 
+        FROM (
+		    SELECT
+		        DATE_ADD( s.stock_date, INTERVAL 1 DAY ) stock_date,
+		        s.material_code,
+		        s.stock_num 
+		    FROM t_gdyy_stock s 
+		    WHERE s.stock_date = DATE_ADD( #{stockDate}, INTERVAL - 1 DAY ) 
+		      AND s.del_flag = '0'
+		    UNION ALL
+		    SELECT
+		        r.schedule_date,
+		        r.big_roll_code,
+		        IFNULL( r.class1_plan, 0 ) + IFNULL( r.class2_plan, 0 ) - IFNULL( r.cx_class3_plan, 0 ) - IFNULL( r.cx_class4_plan, 0 ) 
+		    FROM t_gdyy_schedule_result r 
+		    WHERE r.schedule_date = #{stockDate}
+		      AND r.del_flag = '0' 
+		    ) s 
+		GROUP BY stock_date, material_code
+		ON DUPLICATE KEY UPDATE stock_num = VALUES(stock_num)
+	</insert>
 </mapper>

@@ -9,18 +9,20 @@
     	  FROM T_MES_LH_MOLD_ADJUST_PLAN
          WHERE DATA_VERSION = #{dataVersion}
     </select>
-    
+
     <!-- 删除无效数据 -->
     <update id="deleteData">
 		UPDATE T_LH_MOLD_ADJUST_PLAN A
-		   SET DEL_FLAG = '1', UPDATE_TIME = SYSDATE, UPDATE_BY = NULL
+        SET DEL_FLAG    = '1',
+            UPDATE_TIME = now(),
+            UPDATE_BY   = NULL
 		 WHERE EXISTS (SELECT 1
 		          FROM T_MES_LH_MOLD_ADJUST_PLAN B
 		         WHERE B.DATA_VERSION = #{dataVersion}
 		           AND B.IS_DELETE = 1
 		           AND B.ORDER_NO = A.ORDER_NO)
     </update>
-    
+
 	<!-- 合并有效数据 -->
     <update id="mergeData">
 		MERGE INTO T_LH_MOLD_ADJUST_PLAN A
@@ -60,9 +62,9 @@
 		         A.AUDITOR                = B.AUDITOR,
 		         A.AUDIT_TIME             = B.AUDIT_TIME,
 		         A.AUDIT_SUGGEST          = B.AUDIT_SUGGEST,
-		         
-		         A.REMARK      = B.REMARK,
-		         A.UPDATE_TIME = SYSDATE
+
+              A.REMARK      = B.REMARK,
+              A.UPDATE_TIME = now()
 		WHEN NOT MATCHED THEN
 		  INSERT
 		    (A.ID,
@@ -131,7 +133,7 @@
 		     B.AUDITOR,
 		     B.AUDIT_TIME,
 		     B.AUDIT_SUGGEST,
-		     SYSDATE,
+                now(),
 		     '0',
 		     B.REMARK)
     </update>

@@ -22,15 +22,15 @@ import java.util.List;
 
 @Api(tags = {"胎圈外协规格管理接口"})
 @RestController
-@RequestMapping("/assistSpec")
+@RequestMapping("/tq/assistSpec")
 public class TqAssistSpecController extends BaseController {
 
     @Resource
     private TqAssistSpecService tqAssistSpecService;
 
     @ApiOperation("根据条件查询外协规格管理列表")
-    @GetMapping("/listAssistSpec")
-    public TableDataInfo listAssistSpec(TqAssistSpec dto) {
+    @PostMapping("/listAssistSpec")
+    public TableDataInfo listAssistSpec(@RequestBody TqAssistSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<TqAssistSpec> list = tqAssistSpecService.listAssistSpec(dto);
@@ -77,8 +77,8 @@ public class TqAssistSpecController extends BaseController {
 
     @Log(title = "ui.tq.assistSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<TqAssistSpec> exportData(TqAssistSpec dto) {
+    @PostMapping("/exportData")
+    public List<TqAssistSpec> exportData(@RequestBody TqAssistSpec dto) {
         dto.setOrderStr(orderStr());
         List<TqAssistSpec> list = tqAssistSpecService.listAssistSpec(dto);
         return list;

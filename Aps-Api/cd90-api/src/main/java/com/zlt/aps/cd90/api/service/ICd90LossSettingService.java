@@ -22,54 +22,54 @@ public interface ICd90LossSettingService {
     /**
      * 查询90度裁断损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/cd90/loss/list")
     TableDataInfo list(@RequestBody Cd90LossSettingDto dto);
 
     /**
      * 新增90度裁断损耗率设定
      */
-    @PostMapping("/loss/add")
+    @PostMapping("/cd90/loss/add")
     AjaxResult add(@RequestBody Cd90LossSettingDto dto);
 
     /**
      * 修改90度裁断损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/cd90/loss/edit")
     AjaxResult edit(@RequestBody Cd90LossSettingDto dto);
 
     /**
      * 删除90度裁断损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/cd90/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/cd90/loss/{id}")
     Cd90LossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验90度裁断损耗率设定唯一性
      */
-    @PostMapping("/loss/checkCd90LossSettingUnique")
+    @PostMapping("/cd90/loss/checkCd90LossSettingUnique")
     String checkCd90LossSettingUnique(@RequestBody Cd90LossSettingDto dto);
 
     /**
      * 导出90度裁断损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/cd90/loss/getList")
     List<Cd90LossSettingDto> getList(@RequestBody Cd90LossSettingDto dto);
 
     /**
      * 导入数据
      */
-    @PostMapping("/loss/importData")
+    @PostMapping("/cd90/loss/importData")
     public AjaxResult importData(@RequestBody List<Cd90LossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/cd90/loss/deleteAll")
     AjaxResult deleteAll();
 
 }

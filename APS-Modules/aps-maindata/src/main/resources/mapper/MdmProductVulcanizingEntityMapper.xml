@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmProductVulcanizingEntityMapper">
+
+    <insert id="generateByMonthPlan">
+        insert into T_MDM_PRODUCT_VULCANIZING(factory_code, year, month, vulcanizing_machine_id, product_code, product_type_code, vulcanizing_machine_code,
+                                              mould_code, create_by)
+        select distinct tmmppf.factory_code,
+                        #{generateYear},
+                        #{generateMonth},
+                        tmmppf.vulcanizing_machine_id,
+                        tmmppf.PRODUCT_CODE,
+                        tmmppf.product_type_code,
+                        tmmppf.vulcanizing_machine_code,
+                        tmmppf.MOULD_CODE,
+                        #{username}
+        from t_mp_month_plan_vulcanizing_final tmmppf
+        where tmmppf.IS_DELETE = 0
+          and tmmppf.YEAR = #{fromYear}
+          and tmmppf.month = #{fromMonth}
+          and tmmppf.FACTORY_CODE = #{factoryCode}
+          and IFNULL(tmmppf.${productionDayField}, 0) > 0
+    </insert>
+</mapper>

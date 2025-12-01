@@ -35,7 +35,7 @@
             <if test="orderStr == null">
                 order by a.create_time desc
             </if>
-        )
+        ) t
         <if test="orderStr != null">
             order by ${orderStr}
         </if>
@@ -59,15 +59,11 @@
     </select>
 
     <insert id="insertTqLossSetting" parameterType="com.zlt.aps.tq.entity.TqLossSetting">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_LOSS_SETTING.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_tq_loss_setting
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
-            <if test="beadCode != null">bead_code,</if>
-            <if test="machineId != null">machine_id,</if>
+            <if test="beadCode != null and beadCode != ''">bead_code,</if>
+            <if test="machineId != null and machineId != ''">machine_id,</if>
             <if test="lossRate != null">loss_rate,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -78,8 +74,8 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
-            <if test="beadCode != null">#{beadCode},</if>
-            <if test="machineId != null">#{machineId},</if>
+            <if test="beadCode != null and beadCode != ''">#{beadCode},</if>
+            <if test="machineId != null and machineId != ''">#{machineId},</if>
             <if test="lossRate != null">#{lossRate},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -93,7 +89,8 @@
     <update id="updateTqLossSetting" parameterType="com.zlt.aps.tq.entity.TqLossSetting">
         update t_tq_loss_setting
         <trim prefix="SET" suffixOverrides=",">
-            <if test="beadCode != null">bead_code = #{beadCode},</if>
+            <if test="beadCode != null and beadCode != ''">bead_code = #{beadCode},</if>
+            <if test="beadCode == null or beadCode == ''">bead_code = NULL,</if>
             machine_id = #{machineId,jdbcType=VARCHAR},
             <if test="lossRate != null">loss_rate = #{lossRate},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
@@ -108,64 +105,42 @@
 
     <delete id="deleteTqLossSettingById" parameterType="Long">
         update t_tq_loss_setting
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteTqLossSettingByIds" parameterType="String">
-        update t_tq_loss_setting set del_flag='1' where id in
+        update t_tq_loss_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_tq_loss_setting a USING (
-        <foreach collection="list" item="LossSetting" separator=" union ">
-            select
-            #{LossSetting.beadCode,jdbcType=VARCHAR} bead_code,
-            #{LossSetting.machineId,jdbcType=DOUBLE} machine_id,
-            #{LossSetting.lossRate,jdbcType=DOUBLE} loss_rate,
-            #{LossSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{LossSetting.createTime,jdbcType=DATE} create_time,
-            #{LossSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{LossSetting.updateTime,jdbcType=DATE} update_time,
-            #{LossSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_tq_loss_setting (
+        bead_code, machine_id, loss_rate, create_by, create_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="LossSetting" separator=",">
+            (
+            #{LossSetting.beadCode,jdbcType=VARCHAR},
+            #{LossSetting.machineId,jdbcType=DOUBLE},
+            #{LossSetting.lossRate,jdbcType=DOUBLE},
+            #{LossSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{LossSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.bead_code is null and a.bead_code is null) or (a.bead_code = b.bead_code))
-        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
-        AND a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.loss_rate = b.loss_rate,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.bead_code ,
-        a.machine_id ,
-        a.loss_rate ,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_LOSS_SETTING.NEXTVAL,
-        b.bead_code,
-        b.machine_id,
-        b.loss_rate,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        loss_rate = VALUES(loss_rate),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
     <update id="deleteAll">
-        update t_tq_loss_setting set del_flag = '1' where del_flag = '0'
+        update t_tq_loss_setting set del_flag = NULL where del_flag = '0'
     </update>
 </mapper>

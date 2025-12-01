@@ -5,8 +5,7 @@ import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
+import lombok.Data;
 
 import java.math.BigDecimal;
 
@@ -16,6 +15,7 @@ import java.math.BigDecimal;
  * @author zlt
  * @date 2021-05-28
  */
+@Data
 @ApiModel(value = "15°裁断机台信息对象", description = "15°裁断机台信息对象 ")
 public class Cd15MachineInfo extends ApsBaseEntity {
     private static final long serialVersionUID = 1L;
@@ -74,104 +74,30 @@ public class Cd15MachineInfo extends ApsBaseEntity {
     @ImportValidated(maxLength = 2 ,required = true)
     private String status;
 
+    /**
+     * 是否支持一出二，0支持，1不支持。对应数据字典IS_SUPPORTED
+     */
+    @ApiModelProperty(value = "支持一出二", position = 100)
+    @Excel(name = "ui.data.column.machine.isOutTwo", dictType = "IS_SUPPORTED")
+    @ImportValidated(maxLength = 2 ,required = true)
+    private String isOutTwo;
+
+    /**
+     * 支持的钢带宽度
+     */
+    @ApiModelProperty(value = "支持的钢带宽度", position = 110)
+    @Excel(name = "ui.data.column.machine.steelStripWidth")
+    @ImportValidated(number = true)
+    private Double steelStripWidth;
+
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 300)
     private String remark;
+    
+    private String factoryCode;
 
     /**
      * 删除标识：0--正常，1-删除.对应数据字典DEL_FLAG
      */
     private String delFlag;
-
-    @Override
-    public String getRemark() {
-        return remark;
-    }
-
-    @Override
-    public void setRemark(String remark) {
-        this.remark = remark;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setMachineCode(String machineCode) {
-        this.machineCode = machineCode;
-    }
-
-    public String getMachineCode() {
-        return machineCode;
-    }
-
-    public void setMachineName(String machineName) {
-        this.machineName = machineName;
-    }
-
-    public String getMachineName() {
-        return machineName;
-    }
-
-    public void setQuata(BigDecimal quata) {
-        this.quata = quata;
-    }
-
-    public BigDecimal getQuata() {
-        return quata;
-    }
-
-    public String getClassShift() {
-        return classShift;
-    }
-
-    public void setClassShift(String classShift) {
-        this.classShift = classShift;
-    }
-
-    public void setOpenMachineClass(String openMachineClass) {
-        this.openMachineClass = openMachineClass;
-    }
-
-    public String getOpenMachineClass() {
-        return openMachineClass;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setDelFlag(String delFlag) {
-        this.delFlag = delFlag;
-    }
-
-    public String getDelFlag() {
-        return delFlag;
-    }
-
-    @Override
-    public String toString() {
-        return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
-                .append("id", getId())
-                .append("machineCode", getMachineCode())
-                .append("machineName", getMachineName())
-                .append("classShift", getClassShift())
-                .append("openMachineClass", getOpenMachineClass())
-                .append("status", getStatus())
-                .append("remark", getRemark())
-                .append("delFlag", getDelFlag())
-                .append("createBy", getCreateBy())
-                .append("createTime", getCreateTime())
-                .append("updateBy", getUpdateBy())
-                .append("updateTime", getUpdateTime())
-                .toString();
-    }
 }

@@ -14,6 +14,18 @@ public class TMesConstructionMapping {
 	 * 列名
 	 */
 	private String columnName;
+	
+	private String constructionColumn;
+	
+	private String parentMaterialNameCode;
+	
+	private String childMaterialNameCode;
+	
+	private String paramCode;
+	
+	private String sourceColumn;
+	
+	private String sortCode;
 	/**
 	 * 验证正则表达式
 	 */

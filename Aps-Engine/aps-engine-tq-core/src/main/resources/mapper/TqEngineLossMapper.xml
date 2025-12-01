@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineLossMapper">
 
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqLossVo">
-        select nvl(machine_id,'') || '#' || nvl(BEAD_CODE,'') LOSS_KEY, LOSS_RATE
+        select concat(IFNULL(machine_id,'') , '#' , IFNULL(BEAD_CODE,'')) LOSS_KEY, LOSS_RATE
         from T_TQ_LOSS_SETTING
         where DEL_FLAG = 0
     </select>

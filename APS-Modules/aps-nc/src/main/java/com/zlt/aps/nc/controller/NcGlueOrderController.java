@@ -24,15 +24,15 @@ import java.util.List;
 
 @Api(tags = {"内衬胶料顺序维护接口"})
 @RestController
-@RequestMapping("/glueOrder")
+@RequestMapping("/nc/glueOrder")
 public class NcGlueOrderController extends BaseController {
 
     @Resource
     public NcGlueOrderService NcGlueOrderService;
 
     @ApiOperation("根据条件查询胶料顺序列表")
-    @GetMapping("/listGlueOrder")
-    public TableDataInfo listGlueOrder(NcGlueOrderDto dto) {
+    @PostMapping("/listGlueOrder")
+    public TableDataInfo listGlueOrder(@RequestBody NcGlueOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcGlueOrderDto> list = NcGlueOrderService.listGlueOrder(dto);
@@ -79,8 +79,8 @@ public class NcGlueOrderController extends BaseController {
 
     @Log(title = "ui.nc.glueOrder.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<NcGlueOrderDto> exportData(NcGlueOrderDto dto) {
+    @PostMapping("/exportData")
+    public List<NcGlueOrderDto> exportData(@RequestBody NcGlueOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcGlueOrderDto> list = NcGlueOrderService.listGlueOrder(dto);

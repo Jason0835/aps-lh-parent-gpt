@@ -408,7 +408,7 @@
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.MdmMonthPlanAnalysis">
         update T_MDM_MONTH_PLAN_ANALYSIS
-        set 
+        set
             ID =  #{id,jdbcType=DECIMAL},
             MONTH_PLAN_APS_VERSION =  #{monthPlanApsVersion,jdbcType=VARCHAR},
             MATERIAL_CODE =  #{materialCode,jdbcType=VARCHAR},
@@ -506,7 +506,7 @@
     <delete id="deleteByMonthPlanApsVersion">
         update T_MDM_MONTH_PLAN_ANALYSIS
         set DEL_FLAG = '1',
-            UPDATE_TIME = sysdate
+            UPDATE_TIME = now()
         where month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
     </delete>
 </mapper>

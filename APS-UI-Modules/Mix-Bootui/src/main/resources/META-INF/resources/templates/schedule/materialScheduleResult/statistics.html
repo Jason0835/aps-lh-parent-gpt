@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('统计字段列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId" th:object="${materialScheduleResult}">
+                <input id="scheduleDate" name="scheduleDate" th:value="${#dates.format(materialScheduleResult.scheduleDate,'yyyy-MM-dd')}" type="hidden">
+                <input id="mixArea" name="mixArea" th:field="*{mixArea}" type="hidden">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{schedule.materialScheduleResult.machineName.short}]]：</label>
+                            <select id="machineCode" class="form-control" name="machineCode"
+                                    th:with="type=${machineType}"  onchange="changeMachineName()">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="item : ${type}" th:text="${item.machineName}"
+                                        th:value="${item.machineCode}" th:field="*{machineCode}"></option>
+                            </select>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+
+    var lhClassShift = [[${@dict.getType('LH_CLASS_SHIFT')}]];
+
+    $(function () {
+        var options = {
+            uniqueId: "id",
+            url: ctx + "schedule/materialScheduleResult/statistics",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            singleSelect: true,
+            clickToSelect: true,
+            modalName: [[#{schedule.materialScheduleResult.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            columns: [
+                {
+                    field: 'machineName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.machineName}]],
+                },
+                {
+                    field: 'classShift',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.materialScheduleResult.classShift}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(lhClassShift, value);
+                    },
+                },
+                {
+                    field: 'demandQtyStatistics',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{schedule.materialScheduleResult.demandQty.statistics}]],
+                },
+                {
+                    field: 'totalPlanQtyStatistics',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{schedule.materialScheduleResult.totalPlanQty.statistics}]],
+                },
+                {
+                    field: 'midPlanQtyStatistics',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{schedule.materialScheduleResult.midPlanQty.statistics}]],
+                },
+                {
+                    field: 'nightPlanQtyStatistics',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{schedule.materialScheduleResult.nightPlanQty.statistics}]],
+                },
+                {
+                    field: 'dayPlanQtyStatistics',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{schedule.materialScheduleResult.dayPlanQty.statistics}]],
+                },
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    function changeMachineName(){
+        $.table.refresh();
+    }
+
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+</style>
+</html>

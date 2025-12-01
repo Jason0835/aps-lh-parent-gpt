@@ -87,7 +87,7 @@ public class Cd15QuotaSettingController extends BaseController {
     @Log(title = "ui.data.column.cd15.setting.modelName", businessType = BusinessType.EXPORT)
     //@PreAuthorize(hasPermi = "cd15:setting:export")
     @PostMapping("/export")
-    public List<Cd15QuotaSettingDto> export(Cd15QuotaSettingDto dto) {
+    public List<Cd15QuotaSettingDto> export(@RequestBody Cd15QuotaSettingDto dto) {
         dto.setOrderStr(orderStr());
         Cd15QuotaSetting setting = new Cd15QuotaSetting();
         BeanUtils.copyProperties(dto, setting);

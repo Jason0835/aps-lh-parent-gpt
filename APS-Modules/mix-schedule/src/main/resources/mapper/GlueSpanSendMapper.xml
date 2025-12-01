@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueSpanSendMapper">
+
+    <select id="listGlueSpanSend" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueSpanSend"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueSpanSend">
+        select
+        gss.id,
+        gss.schedule_date,
+        gss.entrust_mix_area,
+        gss.entrusted_mix_area,
+        gss.glue,
+        gss.send_qty,
+        gss.expect_demand_time,
+        gss.send_time,
+        gss.send_person,
+        gss.receive_status,
+        gss.source,
+        gss.create_by,
+        gss.create_time,
+        gss.update_by,
+        gss.update_time,
+        gss.del_flag,
+        gss.remark,
+        gss.is_auto,
+        gss.schedule_id,
+        ifnull(gf.MID_FINISH_QTY, 0) + ifnull(gf.NIGHT_FINISH_QTY, 0) + ifnull(gf.DAY_FINISH_QTY, 0) AS finishQty,
+        gsr.receive_qty
+        from t_glue_span_send gss
+        LEFT JOIN
+        (SELECT SUM(MID_FINISH_QTY) MID_FINISH_QTY,SUM(NIGHT_FINISH_QTY) NIGHT_FINISH_QTY,SUM(DAY_FINISH_QTY) DAY_FINISH_QTY, SCHEDULE_DATE, MIX_AREA, GLUE FROM T_GLUE_FINISH WHERE DEL_FLAG = '0' GROUP BY SCHEDULE_DATE, MIX_AREA, GLUE) gf
+        ON gss.SCHEDULE_DATE = gf.SCHEDULE_DATE AND gss.ENTRUSTED_MIX_AREA = gf.MIX_AREA AND gss.GLUE = gf.GLUE
+        LEFT JOIN t_glue_span_receive gsr on gss.id = gsr.send_id and gsr.del_flag = '0'
+        where gss.del_flag = '0'
+        <if test="scheduleDate != null"> and gss.schedule_date = #{scheduleDate}</if>
+        <if test="entrustMixArea != null and entrustMixArea != ''">and gss.entrust_mix_area = #{entrustMixArea}</if>
+        <if test="entrustedMixArea != null and entrustedMixArea != ''">and gss.entrusted_mix_area = #{entrustedMixArea}</if>
+        <if test="permissionMixAreaList != null and permissionMixAreaList.size() > 0">
+            and gss.entrust_mix_area in
+            <foreach collection="permissionMixAreaList" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="glue != null and glue != ''">and INSTR(gss.glue, #{glue}) > 0</if>
+        <if test="source != null and source != ''">and gss.source = #{source}</if>
+        <if test="orderStr == null">
+            order by gss.receive_status desc, gss.create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <insert id="batchInsertGlueSpanSend">
+        insert into t_glue_span_send (id, schedule_date, entrust_mix_area, entrusted_mix_area, glue, send_qty, expect_demand_time, send_time, send_person, receive_status, source, is_auto, schedule_id, create_by, create_time, update_by, update_time, del_flag, remark)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueSpanSend" separator=" union all ">
+            select #{glueSpanSend.scheduleDate,jdbcType=DATE} schedule_date,
+            #{glueSpanSend.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area, #{glueSpanSend.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area,
+            #{glueSpanSend.glue,jdbcType= VARCHAR} glue, #{glueSpanSend.sendQty,jdbcType=DOUBLE} send_qty,
+            #{glueSpanSend.expectDemandTime,jdbcType=DATE} expect_demand_time, #{glueSpanSend.sendTime,jdbcType=DATE} send_time,
+            #{glueSpanSend.sendPerson,jdbcType=VARCHAR} send_person, #{glueSpanSend.receiveStatus,jdbcType=VARCHAR} receive_status,
+            #{glueSpanSend.source,jdbcType=VARCHAR} source, #{glueSpanSend.isAuto,jdbcType=VARCHAR} is_auto, #{glueSpanSend.scheduleId,jdbcType=DOUBLE} schedule_id,
+            #{glueSpanSend.createBy,jdbcType= VARCHAR} create_by,
+            #{glueSpanSend.createTime,jdbcType=DATE} create_time, #{glueSpanSend.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueSpanSend.updateTime,jdbcType=DATE} update_time, #{glueSpanSend.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueSpanSend.remark,jdbcType= VARCHAR} remark
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeGlueSpanSend" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueSpanReceive">
+        merge into t_glue_span_send a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id,jdbcType=DOUBLE} id, #{item.sendId, jdbcType=DOUBLE} send_id,
+            #{item.receiveStatus,jdbcType=VARCHAR } receive_status,
+            #{item.updateBy,jdbcType=VARCHAR } update_by, #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR } remark from dual
+        </foreach>
+        ) b ON ( a.id = b.send_id AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.receive_status = b.receive_status, a.update_by = b.update_by,
+            a.update_time = b.update_time
+        </set>
+    </update>
+
+    <select id="listGlueSpanSendNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="list" item="data" index="index" separator=" union all ">
+            SELECT #{index} id, #{data.scheduleDate,jdbcType=DATE} schedule_date,#{data.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{data.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area, #{data.glue,jdbcType=VARCHAR} glue
+            FROM dual
+        </foreach>
+        )
+        select t.id errorRow
+        from t_glue_span_send m
+        inner join temp_table t on m.schedule_date = t.schedule_date and m.entrust_mix_area = t.entrust_mix_area
+                        and m.entrusted_mix_area = t.entrusted_mix_area and m.glue = t.glue and m.del_flag = '0'
+    </select>
+
+    <select id="getAlreadyReceivedCount" parameterType="string" resultType="integer">
+        select count(1)
+        from t_glue_span_send
+        where del_flag = '0' and receive_status = '1' and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="deleteByIds">
+        update t_glue_span_send set del_flag = '1'
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+</mapper>

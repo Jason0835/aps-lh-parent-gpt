@@ -18,5 +18,11 @@ public class GsqStockConsumeVo {
     /**
      * 半制品对应成型(8点-12点)完成量的消耗量
      */
+    @Deprecated
     private Double cxFinishConsume;
+
+    /**
+     * 昨日夜班半制品生产量
+     */
+    private Double consume;
 }

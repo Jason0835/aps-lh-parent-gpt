@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('硫磺辅料日计划转机台')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-materialScheduleResult-changeMachine" th:object="${materialScheduleResult}">
+        <input id="id" th:field="*{id}" class="form-control" type="hidden">
+        <input id="mixArea" th:field="*{mixArea}" class="form-control" type="hidden">
+        <input id="materialName" th:field="*{materialName}" class="form-control" type="hidden">
+        <div class="form-group" style="margin-bottom: 0px">
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label is-required">[[#{setting.machine.machineName}]]：</label>
+                        <div class="col-sm-6">
+                            <select id="machineCode" name="machineCode" required class="form-control" onchange="changeMachine()">
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label id="midProduceOrderLabel" class="col-sm-4 control-label">[[#{schedule.materialScheduleResult.midProduceOrder}]]：</label>
+                        <div class="col-sm-6">
+                            <input id="midProduceOrder" name="midProduceOrder" class="form-control" type="text" digits="true" min="0" max="999999" >
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label id="nightProduceOrderLabel" class="col-sm-4 control-label">[[#{schedule.materialScheduleResult.nightProduceOrder}]]：</label>
+                        <div class="col-sm-6">
+                            <input id="nightProduceOrder" name="nightProduceOrder" class="form-control" type="text" digits="true" min="0" max="999999" >
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label id="dayProduceOrderLabel" class="col-sm-4 control-label">[[#{schedule.materialScheduleResult.dayProduceOrder}]]：</label>
+                        <div class="col-sm-6">
+                            <input id="dayProduceOrder" name="dayProduceOrder" class="form-control" type="text" digits="true" min="0" max="999999" >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <input id="recipeType" name="recipeType" th:field="*{recipeType}" type="hidden"/>
+        <input id="recipeTypeName" name="recipeTypeName" th:field="*{recipeTypeName}" type="hidden"/>
+        <input id="recipeVersionId" name="recipeVersionId" th:field="*{recipeVersionId}" type="hidden"/>
+        <input id="recipeStage" name="recipeStage" th:field="*{recipeStage}" type="hidden"/>
+        <input id="oldMachineCode" name="oldMachineCode" th:value="${materialScheduleResult.machineCode}" type="hidden"/>
+        <input id="scheduleDate" name="scheduleDate" th:value="${#dates.format(materialScheduleResult.scheduleDate, 'yyyy-MM-dd')}" type="hidden"/>
+        <!--        <input id="midPlanQty" name="midPlanQty" th:field="*{midPlanQty}" type="text"/>-->
+        <!--        <input id="nightPlanQty" name="nightPlanQty" th:field="*{nightPlanQty}" type="text"/>-->
+        <!--        <input id="dayPlanQty" name="dayPlanQty" th:field="*{dayPlanQty}" type="text"/>-->
+
+
+        <div class="container-div">
+            <div class="row">
+                <div class="col-sm-12 search-collapse">
+                    <form id="formId">
+                        <div class="select-list">
+                            <ul>
+                                <li>
+                                    <label>[[#{setting.MesPmtRecipe.machineName}]]：</label>
+                                    <input class="form-control" id="machineName" type="text" name="machineName" th:value="${materialScheduleResult.machineName}" style="display: inline" readonly/>
+                                </li>
+                                <li>
+                                    <label>[[#{setting.MesPmtRecipe.recipeMaterialName}]]：</label>
+                                    <input class="form-control" id="recipeMaterialName" type="text" name="recipeMaterialName" th:value="${materialScheduleResult.materialName}" style="display: inline" readonly/>
+                                </li>
+                                <li>
+                                    <label>[[#{schedule.materialScheduleResult.mid}]][[#{schedule.materialScheduleResult.plan}]]：</label>
+                                    <input class="form-control" id="midPlanQty" type="text" name="midPlanQty" th:value="${materialScheduleResult.midPlanQty}" style="display: inline" readonly/>
+                                </li>
+                                <li>
+                                    <label>[[#{schedule.materialScheduleResult.night}]][[#{schedule.materialScheduleResult.plan}]]：</label>
+                                    <input class="form-control" id="nightPlanQty" type="text" name="nightPlanQty" th:value="${materialScheduleResult.nightPlanQty}" style="display: inline" readonly/>
+                                </li>
+                                <li>
+                                    <label>[[#{schedule.materialScheduleResult.day}]][[#{schedule.materialScheduleResult.plan}]]：</label>
+                                    <input class="form-control" id="dayPlanQty" type="text" name="dayPlanQty" th:value="${materialScheduleResult.dayPlanQty}" style="display: inline" readonly/>
+                                </li>
+                            </ul>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="btn-group-sm" id="toolbar" role="group">
+                    <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                        [[#{setting.MesPmtRecipe.modelName}]]
+                    </div>
+                </div>
+                <div class="col-sm-12 select-table table-striped">
+                    <table id="bootstrap-table"></table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/materialScheduleResult";
+    var productStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+
+    $("#form-materialScheduleResult-changeMachine").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        getMachines();
+        updateMidPlanQty();  //中班计划量如果大于0，则中班顺序必填
+        updateNightPlanQty();  //夜班计划量如果大于0，则夜班顺序必填
+        updateDayPlanQty();  //白班计划量如果大于0，则白班顺序必填
+        var options = {
+            uniqueId: "id",
+            url: ctx + "setting/MesPmtRecipe/selectMesPmtRecipeByParams",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            singleSelect: true,
+            clickToSelect: true,
+            modalName: [[#{setting.MesPmtRecipe.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            queryParams: queryParams,
+            onCheck: onCheck,
+            onLoadSuccess: function(data) {
+                var recipeType = $("#recipeType").val();
+                var recipeTypeName = $("#recipeTypeName").val();
+                var recipeVersionId = $("#recipeVersionId").val();
+                var recipeStage = $("#recipeStage").val();
+                var checkIndex;
+                for (var i = 0; i < data.rows.length; i++) {
+                    var row = data.rows[i];
+                    if (row.recipeType === recipeType && row.recipeTypeName === recipeTypeName &&
+                        row.recipeVersionId === recipeVersionId && row.productStage ===recipeStage) {
+                        checkIndex = i;
+                        break;
+                    }
+                }
+                if ($.common.isNotEmpty(checkIndex)) {
+                    $('#' + table.options.id).bootstrapTable('check', checkIndex);
+                }
+            },
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'recipeId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeId}]],
+                },
+                {
+                    field: 'mixArea',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.mixArea}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeEquipCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeEquipCode}]],
+                    visible: false
+                },
+                {
+                    field: 'machineName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.machineName}]],
+                },
+                {
+                    field: 'recipeMaterialCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialCode}]],
+                },
+                {
+                    field: 'recipeMaterialName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialName}]],
+                },
+                {
+                    field: 'recipeVersionId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeVersionId}]],
+                },
+                {
+                    field: 'recipeType',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.recipeType}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeTypeName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeTypeName}]],
+                },
+                {
+                    field: 'productStage',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.productStage}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(productStageData, value);
+                    },
+                },
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    /**
+     * 查询参数
+     * @param params
+     * @returns {*}
+     */
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        search.machineCode = $('#machineCode').val();
+        search.recipeMaterialName = $('#recipeMaterialName').val();
+        return search;
+    }
+
+    function onCheck(row, $element) {
+        $("#recipeType").val(row.recipeType);
+        $("#recipeTypeName").val(row.recipeTypeName);
+        $("#recipeVersionId").val(row.recipeVersionId);
+        $("#recipeStage").val(row.productStage);
+    }
+
+    function changeMachine() {
+        let machineName = $("#machineCode option:selected").text();
+        $("#machineName").val(machineName);
+        var classShift = $("#machineCode option:selected").attr('classShift');
+        // updatePlanQty(classShift);
+        // $("#classShift").val(classShift);
+        $.table.search();
+    }
+
+    function submitHandler() {
+        var rows = $("#" + table.options.id).bootstrapTable('getSelections');
+        if (rows.length === 0) {
+            $.modal.alertWarning([[#{ui.message.mustChooseOneRecipe}]]);
+            return;
+        }
+        var serializeArray = $("#form-materialScheduleResult-changeMachine").serializeArray();
+
+        var newMachineCode = $("#machineCode").val();
+        var oldMachineCode = $("#oldMachineCode").val();
+        if(newMachineCode == oldMachineCode) {
+            $.modal.alertWarning("不能转到相同的机台上！");
+            return false;
+        }
+
+        if ($.validate.form()) {
+            $.operate.save(prefix + "/changeMachine", serializeArray);
+        }
+    }
+
+    //获取机台下拉框
+    function getMachines(){
+        var mixArea=$("#mixArea").val();
+        var materialName = $("#materialName").val();
+        var scheduleDate = $("#scheduleDate").val();
+        var noMachineHtml = "<option value='' disabled>" + [[#{ui.message.filterMachine.noMaterialNameMachine}]] + "</option>";
+        if ($.common.isEmpty(materialName) || $.common.isEmpty(mixArea)) {
+            var $machineCode = $("#machineCode");
+            $machineCode.empty();
+            $machineCode.append(noMachineHtml);
+            return ;
+        }
+        var config = {
+            url: "/setting/accessoriesMachine/getAccessoriesMachineList",
+            type: "post",
+            dataType: "json",
+            data: {"mixArea": mixArea, "materialName": materialName, "scheduleDate": scheduleDate},
+            success: function (result) {
+                if (result.code === web_status.SUCCESS){
+                    var machines=result.data;
+                    var rSelect = '';
+                    var select = [[${materialScheduleResult.machineCode}]] + "";
+                    var selets = select.split(",");
+                    for(var i = 0; i < machines.length; i++){
+                        for(var key in selets){
+                            if(selets[key] === machines[i].machineCode){
+                                machines[i].isSelected = true;
+                                // $("#classShift").val(machines[i].classShift);
+                                // updatePlanQty(machines[i].nowClassShift);
+                            }
+                        }
+                    }
+                    for (var j = 0; j < machines.length; j++) {
+                        if (machines[j].isSelected){
+                            rSelect += ("<option  value = '"+machines[j].machineCode+"' classShift = '"+machines[j].nowClassShift+"' selected>"+machines[j].machineName+"</option>");
+                        }else {
+                            rSelect += ("<option value = '"+machines[j].machineCode+"' classShift = '"+machines[j].nowClassShift+"'>"+machines[j].machineName+"</option>");
+                        }
+                    }
+                    if ($.common.isEmpty(rSelect)) {
+                        rSelect = noMachineHtml;
+                    }
+                    var $machineCode = $("#machineCode");
+                    $machineCode.empty();
+                    $machineCode.append(rSelect);
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+            }
+        };
+        $.ajax(config)
+    }
+
+    /**
+     * 更新中班计划量后判断是否要添加顺序必填
+     */
+    function updateMidPlanQty() {
+        var $midProduceOrder = $("#midProduceOrder");
+        var $midProduceOrderLabel = $("#midProduceOrderLabel");
+        $midProduceOrder.removeAttr("required");
+        $midProduceOrderLabel.removeClass("is-required")
+        if ($("#midPlanQty").val() > 0) {
+            $midProduceOrder.attr("required", "true");
+            $midProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    /**
+     * 更新夜班计划量后判断是否要添加顺序必填
+     */
+    function updateNightPlanQty() {
+        var $nightProduceOrder = $("#nightProduceOrder");
+        var $nightProduceOrderLabel = $("#nightProduceOrderLabel");
+        $nightProduceOrder.removeAttr("required");
+        $nightProduceOrderLabel.removeClass("is-required")
+        if ($("#nightPlanQty").val() > 0) {
+            $nightProduceOrder.attr("required", "true");
+            $nightProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    /**
+     * 更新白班计划量后判断是否要添加顺序必填
+     */
+    function updateDayPlanQty() {
+        var $dayProduceOrder = $("#dayProduceOrder");
+        var $dayProduceOrderLabel = $("#dayProduceOrderLabel");
+        $dayProduceOrder.removeAttr("required");
+        $dayProduceOrderLabel.removeClass("is-required")
+        if ($("#dayPlanQty").val() > 0) {
+            $dayProduceOrder.attr("required", "true");
+            $dayProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    function updatePlanQty(classShift) {
+        if(classShift == '1') { //长白班
+            $("#dayProduceOrder").attr("required", "true");
+            $("#dayProduceOrderLabel").addClass("is-required");
+        } else if(classShift == '2') { //两班制
+            $("#midProduceOrder").attr("required", "true");
+            $("#midProduceOrderLabel").addClass("is-required");
+
+            $("#nightProduceOrder").attr("required", "true");
+            $("#nightProduceOrderLabel").addClass("is-required");
+        } else if(classShift == '3') { //三班制
+            $("#midProduceOrder").attr("required", "true");
+            $("#midProduceOrderLabel").addClass("is-required");
+
+            $("#nightProduceOrder").attr("required", "true");
+            $("#nightProduceOrderLabel").addClass("is-required");
+
+            $("#dayProduceOrder").attr("required", "true");
+            $("#dayProduceOrderLabel").addClass("is-required");
+        }
+    }
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+</style>
+</html>

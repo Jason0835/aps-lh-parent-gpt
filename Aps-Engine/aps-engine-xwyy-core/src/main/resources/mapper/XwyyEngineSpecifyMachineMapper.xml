@@ -4,7 +4,7 @@
 	<!-- 查询纤维压延定点机台配置信息 -->
     <select id="selectXwyySpecifyMachineList" resultType="com.zlt.aps.xwyy.engine.vo.XwyySpecifyMachineVo">
 		SELECT M.BIG_ROLL_CODE, 
-		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		       GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
 		  FROM T_XWYY_SPECIFY_MACHINE M
 		  LEFT JOIN T_XWYY_MACHINE_INFO MI
 		    ON MI.ID = M.MACHINE_ID
@@ -15,4 +15,17 @@
 		 GROUP BY M.BIG_ROLL_CODE
     </select>
 
+	<select id="listXwyyMachine" resultType="com.zlt.aps.xwyy.api.domain.entity.XwyyMachineInfo">
+		SELECT ID,
+			   MACHINE_CODE,
+			   MACHINE_NAME,
+			   QUATA,
+			   CLASS_SHIFT,
+			   OPEN_MACHINE_CLASS,
+			   STATUS,
+			   DEL_FLAG
+		FROM T_XWYY_MACHINE_INFO
+		WHERE DEL_FLAG = '0'
+		  AND STATUS = '0'
+	</select>
 </mapper>

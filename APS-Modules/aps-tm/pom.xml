@@ -6,12 +6,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-modules</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.tm</groupId>
     <artifactId>aps-tm</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-tm</name>
     <description>胎面工序模块</description>
 
@@ -24,11 +24,6 @@
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-module-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
-            <version>3.2.0</version>
         </dependency>
         <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
         <dependency>
@@ -56,11 +51,24 @@
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+
+        <!-- 胎侧 -->
+        <dependency>
+            <groupId>com.zlt.aps.tc</groupId>
+            <artifactId>aps-tc</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

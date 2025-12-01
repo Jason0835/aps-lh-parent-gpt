@@ -44,6 +44,6 @@ public interface ICd90ParamsService {
      *
      * @param dto 查询条件
      */
-    @GetMapping("/cd90/params/exportData")
-    List<Cd90ParamsDto> exportData(@SpringQueryMap Cd90ParamsDto dto);
+    @PostMapping("/cd90/params/exportData")
+    List<Cd90ParamsDto> exportData(@RequestBody Cd90ParamsDto dto);
 }

@@ -53,7 +53,7 @@ public class GsqStock extends ApsBaseEntity {
      * 库存量
      */
     @ApiModelProperty(value = "库存量", position = 40)
-    @Excel(name = "ui.data.column.stock.stockNum")
+    @Excel(name = "ui.data.column.stock.num", scale = 1)
     @ImportValidated(required = true, number = true, min = 0, max = 999999, digits = true)
     private BigDecimal stockNum;
 
@@ -61,7 +61,7 @@ public class GsqStock extends ApsBaseEntity {
      * 修正数量
      */
     @ApiModelProperty(value = "修正数量", position = 50)
-    @Excel(name = "ui.data.column.stock.modifyNum")
+    @Excel(name = "ui.data.column.stock.modify")
     @ImportValidated(number = true, min = -999999, max = 999999, digits = true)
     private BigDecimal modifyNum;
 
@@ -69,7 +69,7 @@ public class GsqStock extends ApsBaseEntity {
      * 不良数量
      */
     @ApiModelProperty(value = "不良数量", position = 60)
-    @Excel(name = "ui.data.column.stock.badNum")
+    @Excel(name = "ui.data.column.stock.bad")
     @ImportValidated(number = true, min = 0, max = 999999, digits = true)
     private BigDecimal badNum;
 

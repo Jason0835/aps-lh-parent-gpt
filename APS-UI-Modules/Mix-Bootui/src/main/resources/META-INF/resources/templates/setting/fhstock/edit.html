@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改返回胶库存信息')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: datetimepicker-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-fhstock-edit" th:object="${fhGlueStock}">
+        <input id="id" name="id" th:field="*{id}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.stockDate}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <input name="stockDate" th:value="${#dates.format(fhGlueStock.stockDate, 'yyyy-MM-dd')}"
+                           class="form-control" placeholder="yyyy-MM-dd" type="text" autocomplete="off" required="true">
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.barCode}]]：</label>
+            <div class="col-sm-8">
+                <input name="barCode" th:field="*{barCode}" class="form-control" type="text" required="true"
+                       isCode="true" maxlength="60">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.validTime}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <input id="validTime" name="validTime"
+                           th:value="${#dates.format(fhGlueStock.validTime, 'yyyy-MM-dd HH:mm:ss')}"
+                           class="form-control" placeholder="yyyy-MM-dd HH:mm:ss" type="text" autocomplete="off"
+                           required="true">
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.mixArea}]]：</label>
+            <div class="col-sm-8">
+                <select name="mixArea" class="form-control" th:with="type=${@dict.getType('MIX_AREA')}" required="true">
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}"
+                            th:field="*{mixArea}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.glue}]]：</label>
+            <div class="col-sm-8">
+                <input name="glue" th:field="*{glue}" class="form-control GlueNames" autocomplete="off" type="text"
+                       maxlength="30" required="true">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.stockNum}]]：</label>
+            <div class="col-sm-8">
+                <input name="stockNum" th:field="*{stockNum}" class="form-control" type="text" digits="true" min="0"
+                       max="9999999" required="true">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.fhstock.stockWeightNum}]]：</label>
+            <div class="col-sm-8">
+                <input name="stockWeight" th:field="*{stockWeight}" class="form-control" type="text" required="true"
+                       min="0"
+                       number="true" max="9999999">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: datetimepicker-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "setting/fhstock";
+
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+        items: 7
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            if ($("#id").val() == null || $("#id").val() == '') {
+                $.operate.save(prefix + "/save", $('#form-fhstock-edit').serialize());
+            } else {
+                $.operate.saveUpdateParentRow(prefix + "/save", $('#form-fhstock-edit').serializeArray(), function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        var resData = result.data;
+                        if (resData) {
+                            //根据后台数据更新库存重量
+                            window.parent.$("#" + parent.table.options.id).bootstrapTable('updateByUniqueId', {
+                                id: resData.id,
+                                row: {
+                                    "stockWeight": resData.stockWeight
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    $("#form-fhstock-edit").validate({
+        focusCleanup: true
+    });
+
+    $("input[name='stockDate']").datetimepicker({
+        format: "yyyy-mm-dd",
+        minView: "month",
+        autoclose: true
+    });
+
+    layui.use('laydate', function () {
+        var laydate = layui.laydate;
+
+        laydate.render({
+            elem: '#validTime',
+            type: 'datetime',
+            trigger: 'click'
+        });
+    });
+</script>
+</body>
+</html>

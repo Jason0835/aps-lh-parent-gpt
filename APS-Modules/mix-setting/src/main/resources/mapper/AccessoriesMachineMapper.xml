@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.AccessoriesMachineMapper">
+
+    <select id="selectAccessoriesMachineList" parameterType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine"
+            resultType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine">
+        select max( tam.id ) ID,
+        tam.mix_area mix_area,
+        tam.material_name material_name,
+        listagg ( tlm.MACHINE_NAME, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_NAME,
+        listagg ( tam.MACHINE_CODE, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_CODE,
+        listagg ( tam.machine_order, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_ORDER,
+        max( tam.remark ) remark,
+        max( tam.del_flag ) del_flag,
+        max( tam.create_by ) create_by,
+        max( tam.create_time ) create_time,
+        max( tam.update_by ) update_by,
+        max( tam.update_time ) update_time
+        from
+        t_accessories_machine tam
+        inner join (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = '0' union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = '0') tlm
+        on tam.MIX_AREA=tlm.MIX_AREA and tam.MACHINE_CODE=tlm.machine_code
+        where tam.del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and tam.mix_area = #{mixArea}</if>
+        <if test="materialName != null  and materialName != ''">and INSTR(tam.material_name, #{materialName}) > 0</if>
+        group by tam.MIX_AREA,tam.material_name
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="selectExactAccessoriesMachineList"
+            resultType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine">
+        select max( tam.id ) ID,
+        tam.mix_area mix_area,
+        tam.material_name material_name,
+        listagg ( tlm.MACHINE_NAME, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_NAME,
+        listagg ( tam.MACHINE_CODE, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_CODE,
+        listagg ( tam.machine_order, ',' ) within GROUP ( ORDER BY tam.machine_order ) AS MACHINE_ORDER,
+        max( tam.remark ) remark,
+        max( tam.del_flag ) del_flag,
+        max( tam.create_by ) create_by,
+        max( tam.create_time ) create_time,
+        max( tam.update_by ) update_by,
+        max( tam.update_time ) update_time
+        from
+        t_accessories_machine tam
+        inner join (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = '0' union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = '0') tlm
+        on tam.MIX_AREA=tlm.MIX_AREA and tam.MACHINE_CODE=tlm.machine_code
+        where tam.del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and tam.mix_area = #{mixArea}</if>
+        <if test="materialName != null  and materialName != ''">and tam.material_name=#{materialName}</if>
+        group by tam.MIX_AREA,tam.material_name
+    </select>
+
+    <delete id="deleteAccessoriesMachineByIds" parameterType="String">
+        merge into t_accessories_machine a USING (
+        select mix_area,material_name from t_accessories_machine where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id, jdbcType=DOUBLE}
+        </foreach>
+        ) b ON ( a.mix_area = b.mix_area and a.material_name = b.material_name )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.del_flag='1'
+        </set>
+    </delete>
+
+    <delete id="trueDeleteByMixAreaAndGlue">
+        delete from T_ACCESSORIES_MACHINE
+        where del_flag = '0'
+          and mix_area = #{mixArea,jdbcType=VARCHAR}
+          AND material_name = #{materialName,jdbcType=VARCHAR}
+    </delete>
+
+    <delete id="trueBatchDeleteAccessoriesMachineInfo">
+        delete from T_ACCESSORIES_MACHINE
+        where id in(
+        select id from T_ACCESSORIES_MACHINE a,
+        (
+        <foreach collection="importList" item="item" separator=" union all ">
+            select #{item.mixArea,jdbcType=VARCHAR } mix_area,
+            #{item.materialName,jdbcType=VARCHAR } material_name 
+        </foreach>
+        ) b
+        where a.del_flag='0' and a.mix_area=b.mix_area and a.material_name=b.material_name
+        )
+    </delete>
+
+
+    <insert id="batchInsertAccessoriesMachineInfo">
+        insert into t_accessories_machine
+        (id,mix_area,material_name,machine_code,machine_order,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="accessoriesMachine" separator=" union all ">
+            select
+            #{accessoriesMachine.mixArea,jdbcType= VARCHAR} mix_area,
+            #{accessoriesMachine.materialName,jdbcType= VARCHAR} material_name,
+            #{accessoriesMachine.machineCode,jdbcType= VARCHAR} machine_code,
+            #{accessoriesMachine.machineOrder,jdbcType=VARCHAR} machine_order,
+            #{accessoriesMachine.remark,jdbcType= VARCHAR} remark, #{accessoriesMachine.delFlag,jdbcType= VARCHAR}
+            del_flag, #{accessoriesMachine.createBy,jdbcType= VARCHAR} create_by,
+            #{accessoriesMachine.createTime,jdbcType=TIMESTAMP} create_time, #{accessoriesMachine.updateBy,jdbcType= VARCHAR}
+            update_by, #{accessoriesMachine.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <select id="getAccessoriesMachineList" parameterType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine"
+            resultType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine">
+        select distinct
+            tam.mix_area mix_area,
+            tam.material_name material_name,
+            tam.MACHINE_ORDER,
+            tlm.MACHINE_NAME,
+            tlm.MACHINE_CODE,
+            <if test="scheduleDate != null">ifnull(mcr.class_shift, tlm.class_shift) as now_class_shift, </if>
+            tlm.class_shift
+        from
+            t_accessories_machine tam
+        inner join (select mix_area, machine_code, machine_name, null class_shift from t_mix_machine where del_flag = '0' and status = '0' union select mix_area, machine_code, machine_name, class_shift from t_lhfl_machine where del_flag = '0' and status = '0') tlm
+            on tam.MIX_AREA=tlm.MIX_AREA and tam.MACHINE_CODE=tlm.MACHINE_CODE
+        <if test="scheduleDate != null">
+        left join (SELECT machine_code, max(class_shift) class_shift  FROM t_material_schedule_result where schedule_date = to_date('2022-07-20', 'yyyy-mm-dd') group by machine_code) mcr
+            on tam.machine_code = mcr.machine_code
+        </if>
+        where tam.del_flag = '0'
+        <if test="mixArea != null and mixArea != ''">and tam.mix_area = #{mixArea}</if>
+        <if test="materialName != null and materialName != ''">and tam.material_name = #{materialName}</if>
+    </select>
+    
+    <!-- 根据配方获取机台列表 -->
+    <select id="selectRecipeMachineList" parameterType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine"
+            resultType="com.zlt.mix.setting.api.domain.entity.AccessoriesMachine">
+        SELECT M.MACHINE_CODE, 
+               M.MACHINE_NAME
+		  FROM T_MES_PMT_RECIPE R
+		 INNER JOIN T_LHFL_MACHINE M
+		    ON M.MACHINE_CODE = R.RECIPE_EQUIP_CODE
+		 WHERE R.RECIPE_STATE = '1'
+		   AND R.AUDIT_FLAG = '1'
+		   AND R.DEL_FLAG = '0'
+		   AND R.RECIPE_MATERIAL_NAME = #{materialName,jdbcType= VARCHAR}
+		   AND R.MIX_AREA = #{mixArea,jdbcType= VARCHAR}
+		 GROUP BY M.MACHINE_CODE, M.MACHINE_NAME
+		 ORDER BY MACHINE_NAME
+    </select>
+</mapper>

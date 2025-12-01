@@ -33,7 +33,7 @@ ruoyi:
 
 #nacos服务器
 nacos:
-  server-addr: 127.0.0.1:8848
+  server-addr: 192.168.10.123:8848
 
 # 日志配置
 logging:
@@ -48,10 +48,14 @@ user:
     # 密码错误{maxRetryCount}次锁定10分钟
     maxRetryCount: 5
 
+check:
+  isCheckFirstLogin: false
+  isCheckPWDTimeout: false
+
 # Spring配置
 spring:
   profiles:
-    active: dev
+    active: test
   main:
     allow-bean-definition-overriding: true
   application:
@@ -70,17 +74,17 @@ spring:
   messages:
     # 国际化资源文件路径
     # 包括common包里面的语言，后端同步，20201202 linbn
-    basename: static/i18n/messages,i18n/commonMessages,i18n/apsui,i18n/language
+    basename: static/i18n/messages,i18n/commonMessages,i18n/apsui,i18n/language,i18n/monthplan,i18n/languagemix
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
   # 文件上传
   servlet:
-     multipart:
-       # 单个文件大小
-       max-file-size:  10MB
-       # 设置总上传的文件大小
-       max-request-size:  20MB
+    multipart:
+      # 单个文件大小
+      max-file-size:  10MB
+      # 设置总上传的文件大小
+      max-request-size:  20MB
   # 服务模块
   devtools:
     restart:
@@ -93,17 +97,21 @@ spring:
       discovery:
         # 服务注册地址
         server-addr: ${nacos.server-addr}
+        group: ${nacos.run-group}
+        namespace: ${nacos.run-namespace}
       config:
         # 配置中心地址
         server-addr: ${nacos.server-addr}
+        group: ${nacos.cfg-group}
+        namespace: ${nacos.cfg-namespace}
         # 配置文件格式
         file-extension: yml
         # 共享配置
-#        shared-dataids: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+        #        shared-dataids: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
         shared-configs[0]:
-          data-id: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          data-id: application-aps-test.${spring.cloud.nacos.config.file-extension}
         shared-configs[1]:
-          data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          data-id: system-api-prefix-test.${spring.cloud.nacos.config.file-extension}
         #自动刷新配置文件
         refresh-enabled: true
   #这个不能用共享，它比nacos前注入
@@ -151,7 +159,7 @@ shiro:
     captchaType: math
   cookie:
     # 设置Cookie的域名 默认空，即当前访问的域名
-    domain: 
+    domain:
     # 设置cookie的有效访问路径
     path: /
     # 设置HttpOnly属性
@@ -173,7 +181,7 @@ shiro:
     kickoutAfter: false
 
 # 防止XSS攻击
-xss: 
+xss:
   # 过滤开关
   enabled: true
   # 排除链接（多个用逗号分隔）

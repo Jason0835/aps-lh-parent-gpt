@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.FactoryParamMapper">
+
+
+    <select id="getFacParamList" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam">
+        select * from T_MDM_FACTORY_PARAM
+        where is_delete = 0
+        <if test="factoryCode != null  and factoryCode != ''">and factory_code = #{factoryCode}</if>
+        <if test="productTypeCode != null  and productTypeCode != ''">and product_type_code = #{productTypeCode}</if>
+    </select>
+
+    <select id="getParamByBrandList" resultType="com.zlt.aps.maindata.domain.dto.ProductBrandDto">
+        SELECT DICT_VALUE AS BRAND,
+               DICT_LABEL AS BRAND_NAME
+          FROM sys_dict_data
+         WHERE DICT_TYPE = 'biz_brand_type'
+           AND DICT_LABEL IN
+        <foreach collection="brandNameList" item="brandName" index="index" open="(" separator="," close=")">
+            #{brandName,jdbcType=VARCHAR}
+        </foreach>
+    </select>
+</mapper>

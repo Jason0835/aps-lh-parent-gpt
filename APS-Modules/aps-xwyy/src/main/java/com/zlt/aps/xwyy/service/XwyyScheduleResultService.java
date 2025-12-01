@@ -3,6 +3,8 @@ package com.zlt.aps.xwyy.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyDayFinishQty;
+import com.zlt.aps.xwyy.api.domain.vo.HalfYyExportDataVo;
 import com.zlt.aps.xwyy.entity.XwyyScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,16 +99,16 @@ public interface XwyyScheduleResultService extends IService<XwyyScheduleResult> 
 
 	/**
 	 * 给mes发送排程下发通知
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @param dataVersion  数据版本
 	 * @param rowCount  同步记录数据
 	 */
     void publishNoticeMes(Date scheduleDate, String dataVersion, int rowCount);
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+     *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
@@ -182,4 +184,37 @@ public interface XwyyScheduleResultService extends IService<XwyyScheduleResult> 
      */
     @Transactional(rollbackFor = Exception.class)
     public int combinationMiddleAndNight(long[] ids, String classifiedShift);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<XwyyDayFinishQty> list, Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 将排程数据导出到文件
+     *
+     * @param scheduleDate 排程日期
+     * @return 结果
+     */
+    List<HalfYyExportDataVo> exportDataToList(Date scheduleDate);
+
+    /**
+     * 将线下排程模板的昨日计划、昨日库存，导入到系统
+     *
+     * @param list 要导入的数据
+     * @return 结果
+     */
+    AjaxResult importExcelToLastDayPlanAndStock(List<HalfYyExportDataVo> list);
 }

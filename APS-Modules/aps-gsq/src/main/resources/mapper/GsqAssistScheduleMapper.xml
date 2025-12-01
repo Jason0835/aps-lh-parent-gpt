@@ -56,7 +56,7 @@
     </resultMap>
 
     <sql id="selectGsqAssistScheduleVo">
-        select id, schedule_date, tq_batch_no, batch_no, order_no, steel_type, steel_ring_code, rank, machine_id, unit_consume, stock_qty, supply_time, mid_plan_qty, mid_finish_qty, mid_produce_order, mid_finish_rate, mid_sys_analysis, mid_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_gsq_assist_schedule
+        select id, schedule_date, tq_batch_no, batch_no, order_no, steel_type, steel_ring_code, `RANK`, machine_id, unit_consume, stock_qty, supply_time, mid_plan_qty, mid_finish_qty, mid_produce_order, mid_finish_rate, mid_sys_analysis, mid_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_gsq_assist_schedule
     </sql>
 
     <sql id="column">
@@ -68,7 +68,7 @@
         select * from (
             select
                 <include refid="column"/>
-                (NVL(MID_PLAN_QTY, 0) + NVL(NIGHT_PLAN_QTY, 0) + NVL(DAY_PLAN_QTY, 0)) as daily_total_qty,
+                (IFNULL(MID_PLAN_QTY, 0) + IFNULL(NIGHT_PLAN_QTY, 0) + IFNULL(DAY_PLAN_QTY, 0)) as daily_total_qty,
                 b.MONTH_PLAN_QTY as month_plan,
                 b.MONTH_REMAIN_QTY as month_plan_os,
                 d.DIMENSION,
@@ -94,7 +94,7 @@
             </if>
             <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}</if>
             <if test="machineId != null and machineId != ''">
-                and instr(','||a.machine_id||',', ','||#{machineId}||',')>0
+                and instr(concat(',',a.machine_id,','),  concat(',',#{machineId},','))>0
             </if>
             <if test="isRelease != null and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
             order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.RANK, d.DIMENSION

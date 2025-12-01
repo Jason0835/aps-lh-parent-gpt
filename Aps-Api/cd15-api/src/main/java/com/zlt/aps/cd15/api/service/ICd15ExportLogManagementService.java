@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd15.api.domain.dto.Cd15ExportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,7 @@ import java.util.List;
 @FeignClient(contextId = "ICd15ExportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.cd15:cd15}")
 public interface ICd15ExportLogManagementService
 {
-    
+
     /**
      * 查询纤维压延参数信息列表
      */
@@ -43,6 +42,6 @@ public interface ICd15ExportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/cd15/exportLogManagement/exportData")
-    List<Cd15ExportLogManagementDto> exportData(@SpringQueryMap Cd15ExportLogManagementDto dto);
+    @PostMapping("/cd15/exportLogManagement/exportData")
+    List<Cd15ExportLogManagementDto> exportData(@RequestBody Cd15ExportLogManagementDto dto);
 }

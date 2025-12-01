@@ -205,6 +205,9 @@ public class NcLossSettingServiceImpl extends ServiceImpl<NcLossSettingMapper, N
             } else {
                 lossSetting.setMachineId(machineId);
                 lossSetting.setBaseVale(null);
+                if (StringUtils.isBlank(lossSetting.getLiningCode())) {
+                    lossSetting.setLiningCode(null);
+                }
                 importList.add(lossSetting);
             }
         }

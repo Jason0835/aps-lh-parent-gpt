@@ -1,16 +1,23 @@
 package com.zlt.aps.tq.engine.service.impl;
 
+import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.engine.mapper.TqEngineMachineMapper;
 import com.zlt.aps.tq.engine.service.TqEngineMachineService;
 import com.zlt.aps.tq.engine.vo.TqMouthPlateMachineVo;
 import com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -18,6 +25,15 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
 
     @Resource
     private TqEngineMachineMapper tqEngineMachineMapper;
+    
+    /**
+     * 查询胎圈机台
+     * @return
+     */
+    @Override
+    public List<TqMachineInfo> listTqMachine() {
+        return tqEngineMachineMapper.listTqMachine();
+    }
 
     /**
      * 获得胎圈代码和定点机台的map
@@ -46,5 +62,19 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
         }
 //        Map<String, String> specifyMachineMap = list.stream().collect(Collectors.toMap(TqMouthPlateMachineVo::getMouthPlateCode, TqMouthPlateMachineVo::getMachineIds));
         return mouthPlateMachineMap;
+    }
+    
+
+    /**
+     * 获取上一天规格已排产机台列表
+     * 
+     * @param scheduleDate
+     * @return
+     */
+    @Override
+    public Map<String, Long> getLastDayPlanMachine(Date scheduleDate) {
+        return tqEngineMachineMapper.listLastDayPlanMachine(scheduleDate).stream()
+                .filter(r -> NumberUtils.isDigits(r.getMachineIds()) && StringUtils.isNotEmpty(r.getBeadCode()))
+                .collect(Collectors.toMap(TqSpecifyMachineVo::getBeadCode, r -> new Long(r.getMachineIds())));
     }
 }

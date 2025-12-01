@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.NoticeMapper">
+    <!-- 查询生产结果通知人 -->
+    <select id="queryProductionReminder" resultType="com.zlt.aps.mps.api.domain.ProductionReminderUser">
+        select r.id,
+               r.processes,
+               r.user_name,
+               u.email
+         from t_production_reminder_user r
+         left join sys_user u
+           on u.user_name = r.user_name
+          and u.del_flag = '0'
+        where r.del_flag = '0'
+          and r.processes is not null
+          and r.user_name is not null
+          and u.email is not null
+    </select>
+    
+    <!-- 查询有未完成量的排程信息 -->
+    <select id="queryUnfinishedSchedule" resultType="com.zlt.aps.mps.api.domain.UnfinishedScheduleResult">
+		/** 胎面 **/
+        select s.schedule_date, '2' processes, s.tread_code matrial_code, m.machine_name,
+	        s.day_plan_qty, ifnull(f.day_finish_qty, 0) day_finish_qty, 
+	        concat(case when s.day_plan_qty != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty*100, 2) else 0 end, '%') day_finish_rate, s.day_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0) night_finish_qty, 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%') night_finish_rate,s.night_hand_analysis
+         from t_tm_schedule_result s
+        inner join t_tm_machine_info m on s.machine_id = m.id
+         left join t_tm_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty, 0) > 0
+          and ifnull(s.day_plan_qty, 0) != ifnull(f.day_finish_qty, 0)
+            union all
+        /** 胎侧 **/
+        select s.schedule_date, '3' processes, s.SIDEWALL_CODE matrial_code, m.machine_name,
+	        s.day_plan_qty, ifnull(f.day_finish_qty, 0), 
+	        concat(case when s.day_plan_qty != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty*100, 2) else 0 end, '%'),s.day_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_tc_schedule_result s
+        inner join t_tc_machine_info m on s.machine_id = m.id
+         left join t_tc_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty, 0) > 0
+          and ifnull(s.day_plan_qty, 0) != ifnull(f.day_finish_qty, 0)
+            union all
+        /** 内衬 **/
+        select s.schedule_date, '4' processes, s.LINING_CODE matrial_code, m.machine_name,
+	        s.day_plan_qty, ifnull(f.day_finish_qty, 0), 
+	        concat(case when s.day_plan_qty != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty*100, 2) else 0 end, '%'),s.day_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_nc_schedule_result s
+        inner join t_nc_machine_info m on s.machine_id = m.id
+         left join t_nc_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty, 0) > 0
+          and ifnull(s.day_plan_qty, 0) != ifnull(f.day_finish_qty, 0)
+            union all
+        /** 胎圈 **/
+        select s.schedule_date, '5' processes, s.BEAD_CODE matrial_code, m.machine_name,
+	        s.mid_plan_qty, ifnull(f.mid_finish_qty, 0), 
+	        concat(case when s.mid_plan_qty != 0 and f.mid_finish_qty != 0 then round(f.mid_finish_qty/s.mid_plan_qty*100, 2) else 0 end, '%'),s.mid_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_tq_schedule_result s
+        inner join t_tq_machine_info m on s.machine_id = m.id
+         left join t_tq_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.mid_plan_qty, 0) > 0
+          and ifnull(s.mid_plan_qty, 0) != ifnull(f.mid_finish_qty, 0)
+            union all
+        /** 钢丝圈 **/
+        select s.schedule_date, '6' processes, s.STEEL_RING_CODE matrial_code, m.machine_name,
+	        s.mid_plan_qty, ifnull(f.mid_finish_qty, 0), 
+	        concat(case when s.mid_plan_qty != 0 and f.mid_finish_qty != 0 then round(f.mid_finish_qty/s.mid_plan_qty*100, 2) else 0 end, '%'),s.mid_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_gsq_schedule_result s
+        inner join t_gsq_machine_info m on s.machine_id = m.id
+         left join t_gsq_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.mid_plan_qty, 0) > 0
+          and ifnull(s.mid_plan_qty, 0) != ifnull(f.mid_finish_qty, 0)
+            union all
+        /** 钢丝斜裁 **/
+        select s.schedule_date, '7' processes, ifnull(s.STEEL_STRIP_CODE1, s.STEEL_STRIP_CODE2) matrial_code, m.machine_name,
+	        s.day_plan_qty1, ifnull(f.day_finish_qty, 0), 
+	        concat(case when s.day_plan_qty1 != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty1*100, 2) else 0 end, '%'),s.day_hand_analysis1,
+	        s.night_plan_qty1, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty1 != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty1*100, 2) else 0 end, '%'),s.night_hand_analysis1
+         from t_cd15_schedule_result s
+        inner join t_cd15_machine_info m on s.machine_id = m.id
+         left join t_cd15_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty1, 0) > 0
+          and ifnull(s.day_plan_qty1, 0) != ifnull(f.day_finish_qty, 0)
+            union all
+        /** 纤维直裁 **/
+        select s.schedule_date, '8' processes, s.CLOTH_CODE matrial_code, m.machine_name,
+	        s.day_plan_qty, ifnull(f.day_finish_qty, 0), 
+	        concat(case when s.day_plan_qty != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty*100, 2) else 0 end, '%'),s.day_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_cd90_schedule_result s
+        inner join t_cd90_machine_info m on s.machine_id = m.id
+         left join t_cd90_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty, 0) > 0
+          and ifnull(s.day_plan_qty, 0) != ifnull(f.day_finish_qty, 0)
+            union all
+        /** 钢丝压延 **/
+        select s.schedule_date, '9' processes, s.BIG_ROLL_CODE matrial_code, m.machine_name,
+	        s.class1_plan, ifnull(f.class1_finish_qty, 0), 
+	        concat(case when s.class1_plan != 0 and f.class1_finish_qty != 0 then round(f.class1_finish_qty/s.class1_plan*100, 2) else 0 end, '%'),s.class1_remark,
+	        s.class2_plan, ifnull(f.class2_finish_qty, 0), 
+	        concat(case when s.class2_plan != 0 and f.class2_finish_qty != 0 then round(f.class2_finish_qty/s.class2_plan*100, 2) else 0 end, '%'),s.class2_remark
+         from t_gdyy_schedule_result s
+        inner join t_gdyy_machine_info m on s.machine_code = m.id
+         left join t_gdyy_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.class1_plan, 0) > 0
+          and ifnull(s.class1_plan, 0) != ifnull(f.class1_finish_qty, 0)
+            union all
+        /** 钢丝压延 **/
+        select s.schedule_date, '10' processes, s.BIG_ROLL_CODE matrial_code, m.machine_name,
+	        s.day_plan_qty, ifnull(f.day_finish_qty, 0), 
+	        concat(case when s.day_plan_qty != 0 and f.day_finish_qty != 0 then round(f.day_finish_qty/s.day_plan_qty*100, 2) else 0 end, '%'),s.day_hand_analysis,
+	        s.night_plan_qty, ifnull(f.night_finish_qty, 0), 
+	        concat(case when s.night_plan_qty != 0 and f.night_finish_qty != 0 then round(f.night_finish_qty/s.night_plan_qty*100, 2) else 0 end, '%'),s.night_hand_analysis
+         from t_xwyy_schedule_result s
+        inner join t_xwyy_machine_info m on s.machine_id = m.id
+         left join t_xwyy_day_finish_qty f on f.order_no = s.order_no
+        where s.del_flag = '0' and s.is_release = '1'
+          and s.schedule_date = #{scheduleDate}
+          and ifnull(s.day_plan_qty, 0) > 0
+          and ifnull(s.day_plan_qty, 0) != ifnull(f.day_finish_qty, 0)
+    </select>
+</mapper>

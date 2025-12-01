@@ -23,13 +23,13 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_TQ_SCHEDULE_RESULT")
 @ApiModel(value = "TqScheduleResult对象", description = "胎圈排程结果表")
-@KeySequence(value = "SEQ_TQ_SCHEDULE", clazz = Long.class)
+//@KeySequence(value = "SEQ_TQ_SCHEDULE",dbType = DbType.ORACLE)
 public class TqScheduleResult extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_TQ_SCHEDULE")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "排程日期")

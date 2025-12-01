@@ -9,11 +9,13 @@
     	  FROM T_MES_LH_IN_PRODUCTION_SPEC
          WHERE DATA_VERSION = #{dataVersion}
     </select>
-    
+
     <!-- 删除无效数据 -->
     <update id="deleteData">
 		UPDATE T_LH_IN_PRODUCTION_SPEC A
-		   SET DEL_FLAG = '1', UPDATE_TIME = SYSDATE, UPDATE_BY = NULL
+        SET DEL_FLAG    = '1',
+            UPDATE_TIME = now(),
+            UPDATE_BY   = NULL
 		 WHERE EXISTS (SELECT 1
 		          FROM T_MES_LH_IN_PRODUCTION_SPEC B
 		         WHERE B.DATA_VERSION = #{dataVersion}
@@ -21,7 +23,7 @@
 		           AND B.PRODUCT_DATE = A.PRODUCT_DATE
 		           AND B.LH_MACHINE_CODE = A.LH_MACHINE_CODE)
     </update>
-    
+
 	<!-- 合并有效数据 -->
     <update id="mergeData">
 	    MERGE INTO T_LH_IN_PRODUCTION_SPEC A
@@ -36,7 +38,7 @@
 		        A.SAP_CODE        = B.SAP_CODE,
 		        A.LEFT_RIGHT_MOLD = B.LEFT_RIGHT_MOLD,
 		        A.REMARK          = B.REMARK,
-		        A.UPDATE_TIME     = SYSDATE
+             A.UPDATE_TIME = now()
 		WHEN NOT MATCHED THEN
 		 INSERT
 		   (A.ID,
@@ -55,7 +57,7 @@
 		    B.LH_STREAM_CODE,
 		    B.SAP_CODE,
 		    B.LEFT_RIGHT_MOLD,
-		    SYSDATE,
+               now(),
 		    '0',
 		    B.REMARK)
     </update>

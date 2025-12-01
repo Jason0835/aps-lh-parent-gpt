@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -22,7 +23,7 @@ import java.util.Date;
 @Data
 @TableName("T_CONSTRUCTION_CHECK")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_T_CONSTRUCTION_CHECK", clazz = Long.class)
+@KeySequence(value = "SEQ_T_CONSTRUCTION_CHECK",dbType = DbType.ORACLE)
 public class CxCheckConstruction extends ApsBaseEntity {
 
 	private static final long serialVersionUID = 1L;

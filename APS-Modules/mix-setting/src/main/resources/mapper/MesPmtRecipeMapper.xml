@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MesPmtRecipeMapper">
+
+    <sql id="column">
+        tmpr.id, tmpr.recipe_id, tmpr.mix_area, tmpr.recipe_equip_code, tmpr.recipe_material_code, tmpr.recipe_material_name, tmpr.recipe_version_id, tmpr.recipe_type, tmpr.product_stage, tmpr.summer_mix_time, tmpr.winter_mix_time, tmpr.lot_total_weight, tmpr.recipe_state, tmpr.audit_flag, tmpr.remark, tmpr.del_flag, tmpr.create_by, tmpr.create_time, tmpr.update_by, tmpr.update_time
+    </sql>
+    
+    <insert id="insertBatchById">
+        insert into t_mes_pmt_recipe(
+        id,
+        RECIPE_ID,
+        MIX_AREA,
+        RECIPE_EQUIP_CODE,
+        RECIPE_MATERIAL_CODE,
+        RECIPE_MATERIAL_NAME,
+        RECIPE_VERSION_ID,
+        RECIPE_TYPE,
+        PRODUCT_STAGE,
+        SUMMER_MIX_TIME,
+        WINTER_MIX_TIME,
+        LOT_TOTAL_WEIGHT,
+        RECIPE_STATE,
+        AUDIT_FLAG,
+        REMARK,
+        DEL_FLAG,
+        CREATE_BY,
+        CREATE_TIME,
+        UPDATE_BY,
+        UPDATE_TIME
+        ) values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.id, jdbcType=DOUBLE} ,
+            #{item.recipeId,jdbcType=VARCHAR} ,
+            #{item.mixArea,jdbcType=VARCHAR} ,
+            #{item.recipeEquipCode,jdbcType=VARCHAR} ,
+            #{item.recipeMaterialCode,jdbcType=VARCHAR} ,
+            #{item.recipeMaterialName,jdbcType=VARCHAR} ,
+            #{item.recipeVersionId,jdbcType=VARCHAR} ,
+            #{item.recipeType,jdbcType=VARCHAR} ,
+            #{item.productStage,jdbcType=VARCHAR} ,
+            #{item.summerMixTime, jdbcType=DOUBLE} ,
+            #{item.winterMixTime, jdbcType=DOUBLE} ,
+            #{item.lotTotalWeight, jdbcType=DOUBLE} ,
+            #{item.recipeState,jdbcType=VARCHAR} ,
+            #{item.auditFlag,jdbcType=VARCHAR} ,
+            #{item.remark,jdbcType=VARCHAR} ,
+            #{item.delFlag,jdbcType=VARCHAR} ,
+            #{item.createBy,jdbcType=VARCHAR} ,
+            #{item.createTime, jdbcType=TIMESTAMP} ,
+            #{item.updateBy,jdbcType=VARCHAR} ,
+            #{item.updateTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        update
+        RECIPE_ID = values(RECIPE_ID) ,
+        MIX_AREA = values(MIX_AREA) ,
+        RECIPE_EQUIP_CODE = values(RECIPE_EQUIP_CODE) ,
+        RECIPE_MATERIAL_CODE = values(RECIPE_MATERIAL_CODE) ,
+        RECIPE_MATERIAL_NAME = values(RECIPE_MATERIAL_NAME) ,
+        RECIPE_VERSION_ID = values(RECIPE_VERSION_ID) ,
+        RECIPE_TYPE = values(RECIPE_TYPE) ,
+        PRODUCT_STAGE = values(PRODUCT_STAGE) ,
+        SUMMER_MIX_TIME = values(SUMMER_MIX_TIME) ,
+        WINTER_MIX_TIME = values(WINTER_MIX_TIME) ,
+        LOT_TOTAL_WEIGHT = values(LOT_TOTAL_WEIGHT) ,
+        RECIPE_STATE = values(RECIPE_STATE) ,
+        AUDIT_FLAG = values(AUDIT_FLAG) ,
+        REMARK = values(REMARK) ,
+        DEL_FLAG = values(DEL_FLAG) ,
+        UPDATE_BY = values(CREATE_BY) ,
+        UPDATE_TIME = now()
+    </insert>
+
+    <select id="selectMesPmtRecipeList" parameterType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe"
+            resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+        select
+        <include refid="column"/>,
+        trt.recipe_type_name,
+        tmi.machine_name
+        from t_mes_pmt_recipe tmpr
+        left join t_recipe_type trt on tmpr.recipe_type = trt.recipe_type_code and trt.del_flag = 0
+        left join
+        (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+        on tmpr.recipe_equip_code = tmi.machine_code and tmpr.mix_area = tmi.mix_area
+        where tmpr.del_flag = '0'
+        and INSTR(tmpr.recipe_material_name, #{recipeMaterialName}) > 0
+        <if test="machineName != null and machineName != ''">and INSTR(tmi.machine_name, #{machineName}) > 0</if>
+        <if test="recipeTypeName != null and recipeTypeName != ''">and INSTR(trt.recipe_type_name, #{recipeTypeName}) > 0</if>
+        <if test="recipeState != null and recipeState != ''">and tmpr.recipe_state = #{recipeState}</if>
+        <if test="orderStr == null">order by tmpr.create_time desc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+    
+    <select id="selectMesPmtRecipeByParams" parameterType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe"
+            resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+        select
+        <include refid="column"/>,
+        trt.recipe_type_name,
+        tmi.machine_name
+        from t_mes_pmt_recipe tmpr
+        left join t_recipe_type trt on tmpr.recipe_type = trt.recipe_type_code and trt.del_flag = 0
+        left join
+        (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+        on tmpr.recipe_equip_code = tmi.machine_code and tmpr.mix_area = tmi.mix_area
+        where tmpr.del_flag = 0
+        and tmpr.recipe_material_name = #{recipeMaterialName,jdbcType= VARCHAR}
+        and tmi.machine_name = #{machineName,jdbcType= VARCHAR}
+        and tmpr.RECIPE_STATE = '1'   /*配方状态: 在用*/
+        and tmpr.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+    </select>
+
+    <select id="selectMesPmtRecipeMachine" parameterType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe"
+            resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+        select distinct
+        tmpr.recipe_material_name,
+        tmpr.recipe_equip_code,
+        tmpr.mix_area,
+        tmi.machine_name
+        from t_mes_pmt_recipe tmpr
+        left join
+        (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+        on tmpr.recipe_equip_code = tmi.machine_code and tmpr.mix_area = tmi.mix_area
+        where tmpr.del_flag = 0
+        AND tmpr.RECIPE_STATE = '1'   /*配方状态: 在用*/
+        AND tmpr.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+        <if test="recipeMaterialName != null">and tmpr.recipe_material_name = #{recipeMaterialName,jdbcType= VARCHAR}</if>
+        <if test="mixArea != null">and tmpr.mix_area = #{mixArea,jdbcType= VARCHAR}</if>
+    </select>
+</mapper>

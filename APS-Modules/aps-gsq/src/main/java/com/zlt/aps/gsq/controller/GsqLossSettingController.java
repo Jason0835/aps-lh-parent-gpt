@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2021-07-13
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/gsq/loss")
 public class GsqLossSettingController extends BaseController {
     @Autowired
     private GsqLossSettingService gsqLossSettingService;

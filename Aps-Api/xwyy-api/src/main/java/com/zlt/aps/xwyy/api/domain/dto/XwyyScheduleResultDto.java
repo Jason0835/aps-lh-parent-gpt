@@ -111,6 +111,12 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
     private Double dayPlanQty;
 
     /**
+     * 中班生产顺序
+     */
+    @ApiModelProperty(value = "早班生产顺序")
+    private Integer dayProduceOrder;
+
+    /**
      * 中班计划量个数
      */
     @ImportValidated(number = true,max = 9999999,min = 0)
@@ -155,6 +161,12 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
     private Double nightPlanQty;
 
     /**
+     * 夜班生产顺序
+     */
+    @ApiModelProperty(value = "夜班生产顺序")
+    private Integer nightProduceOrder;
+
+    /**
      * 夜班计划量个数
      */
     @ImportValidated(number = true,max = 9999999,min = 0)
@@ -183,7 +195,7 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
     @Excel(name = "ui.data.column.scheduleResult.nightAnalysis")
     @ApiModelProperty(value = "夜班(0点-12点)手动输入原因分析")
     private String nightHandAnalysis;
-    
+
     /**
      * 夜班排程过程值
      */
@@ -299,7 +311,7 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
      */
     @ApiModelProperty(value = "对应成型次二班的计划量")
     private Double cxClass5Plan;
-	
+
 	/**
 	 * 额外计划量标识：0无，1有额外计划量
 	 */
@@ -364,10 +376,10 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
 
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
-    
+
     @ApiModelProperty(value = "对应的成型批次号")
     private String cxBatchNo;
-    
+
     @ApiModelProperty(value = "标准米长")
     private BigDecimal actClothLength;
 
@@ -461,14 +473,18 @@ public class XwyyScheduleResultDto extends ApsBaseDto {
     @Excel(name = "ui.data.column.bigRollOriginalBrand.brandNum")
     @ApiModelProperty(value = "原线品牌个数")
     private BigDecimal originalBrandNum;
-    
+
     /**
      * 库存+计划量超过日用参考量（4倍）标记，1：已超过，其他未超过
      */
     private String moreThanDayUsedFlag;
-    
+
     /**
      * 总大卷个数
      */
     private BigDecimal totalPlanNum;
+
+    @ApiModelProperty(value = "机台名称")
+    @TableField(exist = false)
+    private String machineName;
 }

@@ -19,19 +19,19 @@ public interface ICd90SpecifyMachineService {
     /**
      * 根据条件查询定点机台列表
      */
-    @GetMapping("/specifyMachine/listSpecifyMachine")
-    TableDataInfo listSpecifyMachine(@SpringQueryMap Cd90SpecifyMachineDto dto);
+    @PostMapping("/cd90/specifyMachine/listSpecifyMachine")
+    TableDataInfo listSpecifyMachine(@RequestBody Cd90SpecifyMachineDto dto);
 
     /**
      * 根据id查询定点机台信息
      */
-    @GetMapping("/specifyMachine/getSpecifyMachine/{id}")
+    @GetMapping("/cd90/specifyMachine/getSpecifyMachine/{id}")
     Cd90SpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id);
 
     /**
      * 保存定点机台信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/specifyMachine/saveSpecifyMachine")
+    @PostMapping("/cd90/specifyMachine/saveSpecifyMachine")
     AjaxResult saveSpecifyMachine(@RequestBody Cd90SpecifyMachineDto dto);
 
     /**
@@ -39,13 +39,13 @@ public interface ICd90SpecifyMachineService {
      *
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/specifyMachine/deleteSpecifyMachine/{ids}")
+    @PostMapping("/cd90/specifyMachine/deleteSpecifyMachine/{ids}")
     AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids);
 
     /**
      * 删除全部定点机台信息(逻辑删)
      */
-    @PostMapping("/specifyMachine/deleteAllSpecifyMachine")
+    @PostMapping("/cd90/specifyMachine/deleteAllSpecifyMachine")
     AjaxResult deleteAllSpecifyMachine();
 
     /**
@@ -53,12 +53,12 @@ public interface ICd90SpecifyMachineService {
      *
      * @param dto
      */
-    @GetMapping("/specifyMachine/exportData")
-    List<Cd90SpecifyMachineDto> exportData(@SpringQueryMap Cd90SpecifyMachineDto dto);
+    @PostMapping("/cd90/specifyMachine/exportData")
+    List<Cd90SpecifyMachineDto> exportData(@RequestBody Cd90SpecifyMachineDto dto);
 
     /**
      * 导入数据
      */
-    @PostMapping("/specifyMachine/importData")
+    @PostMapping("/cd90/specifyMachine/importData")
     public AjaxResult importData(@RequestBody List<Cd90SpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

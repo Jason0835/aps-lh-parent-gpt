@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.service;
 
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.engine.vo.TmScheduleResultVo;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -50,4 +51,20 @@ public interface TmEngineService {
      * @param scheduleDate
      */
     void handGlueMerge(String scheduleDate);
+
+    /**
+     * 批量设置生产顺序
+     *
+     * @param scheduleDate    排程日期
+     * @param targetMachineId 机台ID
+     */
+    void batchSetProduceOrder(String scheduleDate, String targetMachineId);
+
+    /**
+     * 批量设置批次号和订单号
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-mm-dd
+     */
+    @Transactional(rollbackFor = Exception.class)
+    void batchUpdateBatchNoAndOrderNo(String scheduleDate);
 }

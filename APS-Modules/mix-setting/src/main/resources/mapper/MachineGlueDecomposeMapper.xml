@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MachineGlueDecomposeMapper">
+
+
+    <delete id="deleteMachineGlueDecomposeByIds" parameterType="String">
+        update t_machine_glue_decompose set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listMachineGlueDecomposeNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR}
+            MIX_AREA,#{data.machineCode,jdbcType= VARCHAR} MACHINE_CODE,#{data.glue,jdbcType= VARCHAR}
+            GLUE 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_machine_glue_decompose m
+        inner join temp_table t on m.MIX_AREA = t.MIX_AREA and m.MACHINE_CODE = t.MACHINE_CODE and m.GLUE = t.GLUE and
+        m.del_flag ='0'
+    </select>
+
+    <select id="selectMachineGlueDecomposeListCascade"
+            parameterType="com.zlt.mix.setting.api.domain.entity.MachineGlueDecompose"
+            resultType="com.zlt.mix.setting.api.domain.dto.MachineGlueDecomposeDto">
+        SELECT
+        mgd.id,
+        mgd.mix_area,
+        mgd.machine_code,
+        mm.machine_name,
+        glue,
+        mother_glue1,
+        mother_glue2,
+        mother_glue3,
+        mother_glue4,
+        mother_glue5,
+        mother_glue6,
+        mother_glue7,
+        mother_glue8,
+        mother_glue9,
+        mgd.remark,
+        mgd.del_flag,
+        mgd.create_by,
+        mgd.create_time,
+        mgd.update_by,
+        mgd.update_time
+        FROM
+        t_machine_glue_decompose mgd,
+        t_mix_machine mm
+        WHERE
+        mgd.del_flag = '0' and mm.del_flag = '0'
+        AND mgd.mix_area = mm.mix_area
+        AND mgd.machine_code = mm.machine_code
+        <if test="mixArea != null  and mixArea != ''">and mgd.mix_area = #{mixArea}</if>
+        <if test="machineCode != null  and machineCode != ''">and mgd.machine_code = #{machineCode}</if>
+        <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+    <select id="getByIdCascade" resultType="com.zlt.mix.setting.api.domain.dto.MachineGlueDecomposeDto">
+        SELECT mgd.id,
+               mgd.mix_area,
+               mgd.machine_code,
+               mm.machine_name,
+               glue,
+               mother_glue1,
+               mother_glue2,
+               mother_glue3,
+               mother_glue4,
+               mother_glue5,
+               mother_glue6,
+               mother_glue7,
+               mother_glue8,
+               mother_glue9,
+               mgd.remark
+        FROM t_machine_glue_decompose mgd,
+             t_mix_machine mm
+        WHERE mgd.del_flag = '0'
+          AND mm.del_flag = '0'
+          AND mgd.id = #{id}
+          AND mgd.mix_area = mm.mix_area
+          AND mgd.machine_code = mm.machine_code
+    </select>
+
+
+    <select id="selectMachineCodeList" resultType="java.lang.String">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{data.mixArea,jdbcType= VARCHAR} MIX_AREA, #{data.glue,jdbcType=VARCHAR} glue,
+            #{data.machineName,jdbcType= VARCHAR} MACHINE_NAME,#{rowNumber} row_numbers 
+        </foreach>
+        )
+        select m.recipe_equip_code machineCode
+        from (
+            select distinct
+            tmpr.recipe_material_name,
+            tmpr.recipe_equip_code,
+            tmpr.mix_area,
+            tmi.machine_name
+            from t_mes_pmt_recipe tmpr
+            left join
+            (select mix_area, machine_code, machine_name from t_mix_machine where del_flag = 0 union select mix_area, machine_code, machine_name from t_lhfl_machine where del_flag = 0) tmi
+            on tmpr.recipe_equip_code = tmi.machine_code and tmpr.mix_area = tmi.mix_area
+            where tmpr.del_flag = 0
+            AND tmpr.RECIPE_STATE = '1'   /*配方状态: 在用*/
+            AND tmpr.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+            ) m
+        right join temp_table t on m.MIX_AREA=t.MIX_AREA and m.MACHINE_NAME = t.MACHINE_NAME and m.recipe_material_name = t.glue
+        order by t.row_numbers
+    </select>
+
+    <insert id="batchInsertMachineGlueDecomposeInfo">
+        insert into t_machine_glue_decompose
+        (id,mix_area,machine_code,glue,mother_glue1,mother_glue2,mother_glue3,mother_glue4,mother_glue5,mother_glue6,mother_glue7,mother_glue8,mother_glue9,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="machineGlueDecompose" separator=" union all ">
+            select
+            #{machineGlueDecompose.mixArea,jdbcType= VARCHAR} mix_area,
+            #{machineGlueDecompose.machineCode,jdbcType= VARCHAR} machine_code,
+            #{machineGlueDecompose.glue,jdbcType= VARCHAR} glue, #{machineGlueDecompose.motherGlue1,jdbcType= VARCHAR}
+            mother_glue1, #{machineGlueDecompose.motherGlue2,jdbcType= VARCHAR} mother_glue2,
+            #{machineGlueDecompose.motherGlue3,jdbcType= VARCHAR} mother_glue3,
+            #{machineGlueDecompose.motherGlue4,jdbcType= VARCHAR} mother_glue4,
+            #{machineGlueDecompose.motherGlue5,jdbcType= VARCHAR} mother_glue5,
+            #{machineGlueDecompose.motherGlue6,jdbcType= VARCHAR} mother_glue6,
+            #{machineGlueDecompose.motherGlue7,jdbcType= VARCHAR} mother_glue7,
+            #{machineGlueDecompose.motherGlue8,jdbcType= VARCHAR} mother_glue8,
+            #{machineGlueDecompose.motherGlue9,jdbcType= VARCHAR} mother_glue9,
+            #{machineGlueDecompose.remark,jdbcType= VARCHAR} remark, #{machineGlueDecompose.delFlag,jdbcType= VARCHAR}
+            del_flag, #{machineGlueDecompose.createBy,jdbcType= VARCHAR} create_by,
+            #{machineGlueDecompose.createTime,jdbcType=TIMESTAMP} create_time,
+            #{machineGlueDecompose.updateBy,jdbcType= VARCHAR} update_by,
+            #{machineGlueDecompose.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_machine_glue_decompose
+        (
+        mix_area, machine_code, glue, mother_glue1, mother_glue2, mother_glue3, mother_glue4,
+        mother_glue5, mother_glue6, mother_glue7, mother_glue8, mother_glue9, remark, del_flag,
+        create_by, create_time )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.mixArea,jdbcType=VARCHAR } ,
+            #{item.machineCode,jdbcType=VARCHAR } , #{item.glue,jdbcType=VARCHAR } ,
+            #{item.motherGlue1,jdbcType=VARCHAR } , #{item.motherGlue2,jdbcType=VARCHAR } ,
+            #{item.motherGlue3,jdbcType=VARCHAR } , #{item.motherGlue4,jdbcType=VARCHAR } ,
+            #{item.motherGlue5,jdbcType=VARCHAR } , #{item.motherGlue6,jdbcType=VARCHAR } ,
+            #{item.motherGlue7,jdbcType=VARCHAR } , #{item.motherGlue8,jdbcType=VARCHAR } ,
+            #{item.motherGlue9,jdbcType=VARCHAR } , #{item.remark,jdbcType=VARCHAR } ,
+            #{item.delFlag,jdbcType=VARCHAR } , #{item.createBy,jdbcType=VARCHAR } ,
+            #{item.createTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        update
+        mother_glue1 = values(mother_glue1),
+        mother_glue2 = values(mother_glue2), mother_glue3 = values(mother_glue3), mother_glue4 = values(mother_glue4),
+        mother_glue5 = values(mother_glue5), mother_glue6 = values(mother_glue6), mother_glue7 = values(mother_glue7),
+        mother_glue8 = values(mother_glue8), mother_glue9 = values(mother_glue9), remark = values(remark), update_by =
+        values(create_by),
+        update_time = now()
+    </update>
+</mapper>

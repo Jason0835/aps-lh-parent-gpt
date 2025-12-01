@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.MachineEngineMapper">
+
+    <select id="listGlueMachine" resultType="com.zlt.mix.schedule.engine.vo.GlueAreaMachineVo">
+        SELECT f.mix_area, f.glue, f.machine_code
+        FROM T_FORMULA_MACHINE f
+        INNER JOIN T_MIX_MACHINE m ON f.machine_code = m.machine_code and m.status = '0'and m.del_flag = '0'
+          AND (m.mid_status = '0' OR m.night_status = '0' OR m.day_status = '0')
+        WHERE f.DEL_FLAG= '0'
+        <if test="mixArea != null and mixArea != '' ">
+            AND f.MIX_AREA = #{mixArea}
+        </if>
+        order by f.mix_area, f.glue, f.machine_order desc
+    </select>
+
+    <select id="listGlueMachineByGLueList" resultType="com.zlt.mix.schedule.engine.vo.GlueAreaMachineVo">
+        SELECT f.mix_area, f.glue, f.machine_code
+        FROM T_FORMULA_MACHINE f
+        INNER JOIN T_MIX_MACHINE m ON f.machine_code = m.machine_code and m.status = '0'and m.del_flag = '0'
+        AND (m.mid_status = '0' OR m.night_status = '0' OR m.day_status = '0')
+        WHERE f.DEL_FLAG= '0'
+        <if test="mixArea != null and mixArea != '' ">
+            AND f.MIX_AREA = #{mixArea}
+        </if>
+        <if test="glueList != null and glueList.size() > 0 ">
+            and f.GLUE in
+            <foreach collection="glueList" item="item" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        order by f.mix_area, f.glue, f.machine_order desc
+    </select>
+
+    <select id="listMaterialMachine" resultType="com.zlt.mix.schedule.engine.vo.MaterialAreaMachineVo">
+        WITH temp_table AS (
+        <foreach collection="areaMaterialList" item="areaMaterial" separator=" union all ">
+            SELECT #{areaMaterial.mixArea,jdbcType=VARCHAR} mix_area, #{areaMaterial.materialName,jdbcType=VARCHAR} material_name FROM dual
+        </foreach>
+        )
+        SELECT a.mix_area, a.material_name, a.machine_code, m.MID_STATUS, m.NIGHT_STATUS, m.DAY_STATUS
+        FROM T_ACCESSORIES_MACHINE a
+        INNER JOIN t_lhfl_machine m ON a.machine_code = m.machine_code and m.status = '0' and m.del_flag = '0'
+        WHERE a.DEL_FLAG= '0'
+        <if test="areaMaterialList != null">
+            AND a.material_name IN (SELECT material_name FROM temp_table)
+        </if>
+        order by a.mix_area, a.material_name, a.machine_order desc
+    </select>
+
+    <select id="listLhflMachineInfo" resultType="com.zlt.mix.setting.api.domain.entity.LhflMachine">
+        SELECT MIX_AREA, MACHINE_CODE, MACHINE_NAME, CLASS_SHIFT, CAPACITY, STATUS, MID_STATUS, NIGHT_STATUS, DAY_STATUS
+        FROM T_LHFL_MACHINE
+        WHERE DEL_FLAG = '0'
+        AND MIX_AREA = #{mixArea}
+    </select>
+
+	<!-- 查询出密炼机台信息列表 -->
+    <select id="listMixMachineInfo" resultType="com.zlt.mix.setting.api.domain.entity.MixMachine">
+        SELECT MACHINE_CODE,
+               MACHINE_NAME,
+               STATUS,
+               MID_STATUS,
+               NIGHT_STATUS,
+               DAY_STATUS
+          FROM T_MIX_MACHINE
+         WHERE DEL_FLAG = '0'
+         <if test = "mixArea != null and mixArea != ''">
+           AND MIX_AREA = #{mixArea}
+         </if>
+    </select>
+    
+	<!-- 根据密炼区查询配方与机台对应信息，机台必须启用状态 -->
+    <select id="selectFormulaMachineList" resultType="com.zlt.mix.schedule.engine.vo.FormulaMachineVo">
+        SELECT tfm.MIX_AREA,
+	           tfm.GLUE,
+	           tfm.MACHINE_CODE,
+	           tfm.MACHINE_ORDER,
+	           CASE WHEN M.MID_STATUS = '0' THEN 'TRUE' ELSE 'FALSE' END MID_STATUS,
+	           CASE WHEN M.NIGHT_STATUS = '0' THEN 'TRUE' ELSE 'FALSE' END NIGHT_STATUS,
+	           CASE WHEN M.DAY_STATUS = '0' THEN 'TRUE' ELSE 'FALSE' END DAY_STATUS
+          FROM t_formula_machine tfm
+         INNER JOIN t_mix_machine m
+            ON m.machine_code = tfm.machine_code
+           AND m.status = '0'
+           AND m.del_flag = '0'
+         WHERE tfm.del_flag = '0'
+           AND tfm.mix_area = #{mixArea}
+         ORDER BY GLUE, MACHINE_ORDER
+    </select>
+</mapper>

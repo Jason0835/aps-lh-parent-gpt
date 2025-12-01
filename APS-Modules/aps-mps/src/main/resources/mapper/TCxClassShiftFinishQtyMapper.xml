@@ -203,12 +203,12 @@
         select
         <include refid="Base_Column_List" />
         from T_CX_CLASS_SHIFT_FINISH_QTY
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_CX_CLASS_SHIFT_FINISH_QTY
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TCxClassShiftFinishQty" useGeneratedKeys="true">
         insert into T_CX_CLASS_SHIFT_FINISH_QTY
@@ -318,11 +318,11 @@
                     UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TCxClassShiftFinishQty">
         update T_CX_CLASS_SHIFT_FINISH_QTY
-        set 
+        set
             ORDER_NO =  #{orderNo,jdbcType=VARCHAR},
             SCHEDULE_DATE =  #{scheduleDate,jdbcType=TIMESTAMP},
             CX_MACHINE_CODE =  #{cxMachineCode,jdbcType=VARCHAR},
@@ -339,7 +339,7 @@
             CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
             UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
             UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
 
     <select id="getMesCxFinishByDataVersion" resultMap="MesCxClassResultMap">
@@ -410,7 +410,7 @@
         a.class4_finish_qty= b.class4_finish_qty,
         a.class5_finish_qty= b.class5_finish_qty,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -451,7 +451,7 @@
         b.class4_finish_qty,
         b.class5_finish_qty,
         b.create_by,
-        sysdate,
+        now(),
         b.remark, '0'
         )
     </update>
@@ -482,7 +482,7 @@
         WHEN MATCHED THEN
         UPDATE SET
         a.DAY_FINISH_QTY = b.DAY_FINISH_QTY,
-        a.update_date = sysdate,
+        a.update_date = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -550,7 +550,7 @@
         a.class2_finish_qty = b.class2_finish_qty,
         a.class3_finish_qty = b.class3_finish_qty,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -575,7 +575,7 @@
         b.class2_finish_qty,
         b.class3_finish_qty,
         b.create_by,
-        sysdate,
+        now(),
         b.remark, '0'
         )
     </update>
@@ -604,7 +604,7 @@
         WHEN MATCHED THEN
         UPDATE SET
         a.DAY_FINISH_QTY = b.DAY_FINISH_QTY,
-        a.update_date = sysdate,
+        a.update_date = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (

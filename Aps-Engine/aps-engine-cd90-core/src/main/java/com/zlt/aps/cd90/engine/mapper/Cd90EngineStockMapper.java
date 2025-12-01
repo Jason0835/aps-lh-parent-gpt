@@ -1,15 +1,15 @@
 package com.zlt.aps.cd90.engine.mapper;
 
-import java.math.BigDecimal;
-import java.util.Date;
-import java.util.List;
-
-import org.apache.ibatis.annotations.Param;
-
 import com.zlt.aps.cd90.api.domain.entity.Cd90LineSideStock;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.engine.vo.Cd90ParamsVo;
+import com.zlt.aps.cd90.engine.vo.Cd90StockConsumeVo;
 import com.zlt.aps.cd90.engine.vo.Cd90StockVo;
+import org.apache.ibatis.annotations.Param;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 90度裁断库存数据mapper
@@ -65,4 +65,18 @@ public interface Cd90EngineStockMapper {
 	 * @return
 	 */
 	List<Cd90MachineInfo> listCd90MachineInfo();
+
+	/**
+	 * 查询压90度的排产参数
+	 * @return
+	 */
+	List<Cd90ParamsVo> listCd90Params();
+
+    /**
+     * 查询昨日早班计划量
+     *
+     * @param scheduleDate
+     * @return
+     */
+    List<Cd90StockConsumeVo> listLastDayMidPlan(@Param("scheduleDate") Date scheduleDate);
 }

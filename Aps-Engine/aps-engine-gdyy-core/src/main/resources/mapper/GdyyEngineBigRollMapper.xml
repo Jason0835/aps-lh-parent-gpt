@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineBigRollMapper">
     <select id="listCd15BigRoll" resultType="com.zlt.aps.gdyy.engine.vo.GdyyBigRollVo">
         SELECT BIG_ROLL_CODE,
-               NVL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
+               IFNULL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
           FROM T_CD15_BIG_ROLL
          WHERE DEL_FLAG = '0'
          GROUP BY BIG_ROLL_CODE

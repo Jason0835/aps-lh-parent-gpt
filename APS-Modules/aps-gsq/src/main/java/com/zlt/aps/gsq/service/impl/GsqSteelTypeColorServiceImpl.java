@@ -2,13 +2,16 @@ package com.zlt.aps.gsq.service.impl;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.dto.GsqSteelTypeColorDto;
 import com.zlt.aps.gsq.entity.GsqSteelTypeColor;
@@ -18,10 +21,7 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
@@ -63,13 +63,12 @@ public class GsqSteelTypeColorServiceImpl  extends ServiceImpl<GsqSteelTypeColor
      * @param ids 多个id逗号分割
      */
     public void deleteGsqSteelTypeColor(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            GsqSteelTypeColor entity = new GsqSteelTypeColor();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<GsqSteelTypeColor> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**
@@ -163,7 +162,7 @@ public class GsqSteelTypeColorServiceImpl  extends ServiceImpl<GsqSteelTypeColor
                             // 存在，插入错误详细日志
                             failureNum++;
                             addImportErrorLog(importLogId, i + 2,
-                                    I18nUtil.getMessage("ui.color.message.unique"), importErrorLogs);
+                                    I18nUtil.getMessage("ui.color.message.unique.gsq"), importErrorLogs);
                         }
                     }
                 }

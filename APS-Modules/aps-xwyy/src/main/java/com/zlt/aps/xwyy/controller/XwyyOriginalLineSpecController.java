@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"原线规格管理接口"})
 @RestController
-@RequestMapping("/originalLineSpec")
+@RequestMapping("/xwyy/originalLineSpec")
 public class XwyyOriginalLineSpecController extends BaseController {
 
     @Resource
     private XwyyOriginalLineSpecService xwyyOriginalLineSpecService;
 
     @ApiOperation("根据条件查询原线规格管理列表")
-    @GetMapping("/listOriginalLineSpec")
-    public TableDataInfo listOriginalLineSpec(XwyyOriginalLineSpec dto) {
+    @PostMapping("/listOriginalLineSpec")
+    public TableDataInfo listOriginalLineSpec(@RequestBody XwyyOriginalLineSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<XwyyOriginalLineSpec> list = xwyyOriginalLineSpecService.listOriginalLineSpec(dto);
@@ -79,8 +79,8 @@ public class XwyyOriginalLineSpecController extends BaseController {
 
     @Log(title = "ui.xwyy.originalLineSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<XwyyOriginalLineSpec> exportData(XwyyOriginalLineSpec dto) {
+    @PostMapping("/exportData")
+    public List<XwyyOriginalLineSpec> exportData(@RequestBody XwyyOriginalLineSpec dto) {
         dto.setOrderStr(orderStr());
         List<XwyyOriginalLineSpec> list = xwyyOriginalLineSpecService.listOriginalLineSpec(dto);
         return list;

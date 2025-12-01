@@ -20,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "ITmExportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tm:tm}")
 public interface ITmExportLogManagementService
 {
-    
+
     /**
      * 查询纤维压延参数信息列表
      */
@@ -43,6 +43,6 @@ public interface ITmExportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/tm/exportLogManagement/exportData")
-    List<TmExportLogManagementDto> exportData(@SpringQueryMap TmExportLogManagementDto dto);
+    @PostMapping("/tm/exportLogManagement/exportData")
+    List<TmExportLogManagementDto> exportData(@RequestBody TmExportLogManagementDto dto);
 }

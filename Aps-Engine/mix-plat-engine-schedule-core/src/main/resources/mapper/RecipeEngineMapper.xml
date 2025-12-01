@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.RecipeEngineMapper">
+
+    <select id="listGlueWeight" resultType="com.zlt.mix.schedule.engine.vo.GlueAreaMachineVo">
+        WITH temp_table AS (
+        <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator=" union all ">
+            SELECT #{glueAreaMachine.mixArea,jdbcType=VARCHAR} mix_area, #{glueAreaMachine.glue,jdbcType=VARCHAR} glue,
+                   #{glueAreaMachine.machineCode,jdbcType=VARCHAR} machine_code
+            FROM dual
+        </foreach>
+        )
+        SELECT ifnull(MIX_AREA, '') AS MIX_AREA,
+               ifnull(RECIPE_EQUIP_CODE, '') AS MACHINE_CODE,
+               ifnull(RECIPE_MATERIAL_NAME, '') AS GLUE,
+               LOT_TOTAL_WEIGHT AS WEIGHT
+        FROM T_MES_PMT_RECIPE
+        WHERE DEL_FLAG='0'
+        AND RECIPE_STATE = '1' /*配方状态；在用*/
+        AND AUDIT_FLAG = '1'  /*审核标志 ：已审核*/
+        <if test="recipeType != null and recipeType != ''">
+            AND RECIPE_TYPE = #{recipeType}  /*配方类型*/
+        </if>
+        <if test="glueAreaMachineList != null">
+            AND (RECIPE_MATERIAL_NAME) IN (SELECT GLUE FROM temp_table)
+        </if>
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+	
+    <select id="listGlueRecipeWeight" resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+        WITH temp_table AS (
+        <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator=" union all ">
+            SELECT #{glueAreaMachine.mixArea,jdbcType=VARCHAR} mix_area, #{glueAreaMachine.glue,jdbcType=VARCHAR} glue,
+                   #{glueAreaMachine.machineCode,jdbcType=VARCHAR} machine_code
+            FROM dual
+        </foreach>
+        )
+        SELECT ifnull(MIX_AREA, '') AS MIX_AREA,
+               ifnull(RECIPE_EQUIP_CODE, '') AS RECIPE_EQUIP_CODE,
+               ifnull(RECIPE_MATERIAL_NAME, '') AS RECIPE_MATERIAL_NAME,
+               LOT_TOTAL_WEIGHT,
+               RECIPE_TYPE,
+               RECIPE_VERSION_ID
+        FROM T_MES_PMT_RECIPE
+        WHERE DEL_FLAG='0'
+        AND RECIPE_STATE = '1' /*配方状态；在用*/
+        AND AUDIT_FLAG = '1'  /*审核标志 ：已审核*/
+        <if test="recipeType != null and recipeType != ''">
+            AND RECIPE_TYPE = #{recipeType}  /*配方类型*/
+        </if>
+        <if test="glueAreaMachineList != null">
+            AND (RECIPE_MATERIAL_NAME) IN (SELECT GLUE FROM temp_table)
+        </if>
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+
+    <select id="listDecomposeGlueWeight" resultType="com.zlt.mix.schedule.engine.vo.GlueAreaMachineVo">
+        SELECT ifnull(MIX_AREA, '') AS MIX_AREA,
+               ifnull(RECIPE_EQUIP_CODE, '') AS MACHINE_CODE,
+               ifnull(RECIPE_MATERIAL_NAME, '') AS GLUE,
+               LOT_TOTAL_WEIGHT AS WEIGHT
+        FROM T_MES_PMT_RECIPE r
+        WHERE DEL_FLAG='0'
+        AND RECIPE_STATE = '1' /*配方状态；在用*/
+        AND AUDIT_FLAG = '1'  /*审核标志 ：已审核*/
+        <if test="recipeType != null and recipeType != ''">
+            AND RECIPE_TYPE = #{recipeType}  /*配方类型*/
+        </if>
+        AND RECIPE_MATERIAL_NAME IN (SELECT GLUE
+                                     FROM T_GLUE_DECOMPOSE_PLAN
+                                     WHERE plan_date = #{planDate})
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+	
+    <select id="listDecomposeGlueRecipeWeight" resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+		SELECT ifnull(MIX_AREA, '') AS MIX_AREA,
+		       ifnull(RECIPE_EQUIP_CODE, '') AS RECIPE_EQUIP_CODE,
+		       ifnull(RECIPE_MATERIAL_NAME, '') AS RECIPE_MATERIAL_NAME,
+		       LOT_TOTAL_WEIGHT,
+		       RECIPE_TYPE,
+		       RECIPE_VERSION_ID
+        FROM T_MES_PMT_RECIPE r
+        WHERE DEL_FLAG='0'
+        AND RECIPE_STATE = '1' /*配方状态；在用*/
+        AND AUDIT_FLAG = '1'  /*审核标志 ：已审核*/
+        <if test="recipeType != null and recipeType != ''">
+            AND RECIPE_TYPE = #{recipeType}  /*配方类型*/
+        </if>
+        AND RECIPE_MATERIAL_NAME IN (SELECT GLUE
+                                     FROM T_GLUE_DECOMPOSE_PLAN
+                                     WHERE plan_date = #{planDate})
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+
+    <select id="listRecipeVersionInfo" resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipe">
+        SELECT RECIPE_EQUIP_CODE,  RECIPE_MATERIAL_CODE, RECIPE_MATERIAL_NAME, RECIPE_TYPE, RECIPE_VERSION_ID, PRODUCT_STAGE
+        FROM T_MES_PMT_RECIPE
+        WHERE DEL_FLAG = '0'
+        AND RECIPE_STATE = '1' /*配方状态；在用*/
+        AND AUDIT_FLAG = '1'  /*审核标志 ：已审核*/
+        <if test="recipeType != null and recipeType != ''">
+            AND RECIPE_TYPE = #{recipeType}  /*配方类型*/
+        </if>
+        <if test="materialNameList != null and materialNameList.size() > 0">
+            AND RECIPE_MATERIAL_NAME in <foreach collection="materialNameList" item="materialName" separator="," open="(" close=")">#{materialName}</foreach>
+        </if>
+        order by (case when regexp_like(RECIPE_TYPE,'^[0-9]+$') then RECIPE_TYPE + 0 else 9999999 end) desc,
+                 (case when regexp_like(RECIPE_VERSION_ID,'^[0-9]+$') then RECIPE_VERSION_ID + 0 else -1 end)
+    </select>
+    
+    <resultMap id="recipeMap" type="com.zlt.mix.schedule.engine.vo.MesPmtRecipeVo">
+    	<id column="id" property="id"/>
+    	<result column="RECIPE_EQUIP_CODE" property="recipeEquipCode"/>
+    	<result column="RECIPE_MATERIAL_CODE" property="recipeMaterialCode"/>
+    	<result column="RECIPE_MATERIAL_NAME" property="recipeMaterialName"/>
+    	<result column="SAP_MATERIAL_CODE" property="sapMaterialCode"/>
+    	<result column="RECIPE_VERSION_ID" property="recipeVersionId"/>
+    	<result column="RECIPE_TYPE" property="recipeType"/>
+    	<result column="RECIPE_TYPE_NAME" property="recipeTypeName"/>
+    	<result column="PRODUCT_STAGE" property="productStage"/>
+    	<result column="SUMMER_MIX_TIME" property="summerMixTime"/>
+    	<result column="LOT_TOTAL_WEIGHT" property="lotTotalWeight"/>
+    	<result column="MAJOR_TYPE" property="majorType"/>
+    	<result column="MINPARK_TIME" property="minParkTime"/>
+    	<collection property="recipeWeightList" column="RECIPE_ID" javaType="com.zlt.mix.schedule.engine.vo.MesPmtRecipeWeightVo">
+    		<id column="weightId" property="id"/>
+	    	<result column="WEIGHT_MATERIAL_CODE" property="recipeMaterialCode"/>
+	    	<result column="WEIGHT_MATERIAL_NAME" property="recipeMaterialName"/>
+	    	<result column="SET_WEIGHT" property="setWeight"/>
+	    	<result column="WEIGHT_MAJOR_TYPE" property="majorType"/>
+	    	<result column="CONVERSION_RATIO" property="conversionRatio"/>
+    	</collection>
+    </resultMap>
+	<!-- 查询胶料配方信息
+		  CONVERSION_RATIO换算比率，= 母胶单车总重 / 终炼胶单车总重。
+		  	母炼胶配方默认取同一个区的ZZ配方；
+		  	如果没有则取同一个区的配方中最小的一个单车总重；
+		  	如果依然没有则取所有配方中最小的一个单车总重（包括其他区的）
+	 -->
+    <select id="listGlueRecipe" resultMap="recipeMap">
+    	<if test="params.recipeMaterialNameList != null and params.recipeMaterialNameList.size() > 0">
+    	WITH materialName_tab AS (
+        	<foreach collection="params.recipeMaterialNameList" item="name" separator=" union all ">
+    			SELECT #{name} name FROM dual
+    		</foreach>
+    	)
+    	</if>
+    	SELECT R.ID,
+               R.RECIPE_ID,
+    	       R.RECIPE_EQUIP_CODE,
+    	       R.RECIPE_MATERIAL_CODE,
+    	       R.RECIPE_MATERIAL_NAME,
+    	       B.SAP_MATERIAL_CODE,
+    	       R.RECIPE_VERSION_ID,
+    	       R.RECIPE_TYPE,
+    	       T.RECIPE_TYPE_NAME,
+    	       R.PRODUCT_STAGE,
+    	       ifnull(R.SUMMER_MIX_TIME, 0) SUMMER_MIX_TIME,
+    	       ifnull(R.LOT_TOTAL_WEIGHT, 0) LOT_TOTAL_WEIGHT,
+    	       B.MAJOR_TYPE,
+    	       B.MINPARK_TIME,
+    	       W.ID AS WEIGHTID,
+    	       W.SET_WEIGHT,
+    	       W.RECIPE_MATERIAL_CODE AS WEIGHT_MATERIAL_CODE,
+    	       W.RECIPE_MATERIAL_NAME AS WEIGHT_MATERIAL_NAME,
+    	       B2.MAJOR_TYPE AS WEIGHT_MAJOR_TYPE,
+    	       ROUND(ifnull(R2.LOT_TOTAL_WEIGHT/R.LOT_TOTAL_WEIGHT, 1), 4) CONVERSION_RATIO
+    	  FROM T_MES_PMT_RECIPE R
+         INNER JOIN T_RECIPE_TYPE T ON T.RECIPE_TYPE_CODE = R.RECIPE_TYPE
+           AND T.DEL_FLAG = '0'
+          LEFT JOIN T_MES_PMT_RECIPE_WEIGHT W ON R.RECIPE_ID = W.FATHER_RECIPE_ID AND W.Del_Flag = '0' AND W.SET_WEIGHT IS NOT NULL
+          LEFT JOIN T_MES_BAS_MATERIAL B ON B.MATERIAL_CODE = R.RECIPE_MATERIAL_CODE AND B.Del_Flag = '0'
+          LEFT JOIN T_MES_BAS_MATERIAL B2 ON B2.MATERIAL_CODE = W.RECIPE_MATERIAL_CODE AND B2.Del_Flag = '0'
+          LEFT JOIN (SELECT MIN(LOT_TOTAL_WEIGHT) LOT_TOTAL_WEIGHT,
+		                    RECIPE_MATERIAL_CODE
+		               FROM T_MES_PMT_RECIPE R2
+		              WHERE R2.AUDIT_FLAG = '1'
+		                AND R2.RECIPE_STATE = '1'
+		                AND R2.DEL_FLAG = '0'
+		                AND (R2.MIX_AREA = #{params.mixArea} AND
+		                    (R2.RECIPE_TYPE = '1' OR NOT EXISTS
+		                     (SELECT 0
+		                         FROM T_MES_PMT_RECIPE R3
+		                        WHERE R3.RECIPE_MATERIAL_CODE = R2.RECIPE_MATERIAL_CODE
+		                          AND R3.AUDIT_FLAG = '1'
+		                          AND R3.RECIPE_STATE = '1'
+		                          AND R3.RECIPE_TYPE = '1'
+		                          AND R3.DEL_FLAG = '0'
+		                          AND R3.MIX_AREA = R2.MIX_AREA)) OR NOT EXISTS
+		                     (SELECT 0
+		                        FROM T_MES_PMT_RECIPE R3
+		                       WHERE R3.RECIPE_MATERIAL_CODE = R2.RECIPE_MATERIAL_CODE
+		                         AND R3.AUDIT_FLAG = '1'
+		                         AND R3.RECIPE_STATE = '1'
+		                         AND R3.DEL_FLAG = '0'
+		                         AND R3.MIX_AREA = #{params.mixArea}))
+		              GROUP BY RECIPE_MATERIAL_CODE) R2
+    		ON R2.RECIPE_MATERIAL_CODE = W.RECIPE_MATERIAL_CODE
+    	 WHERE R.AUDIT_FLAG = '1'
+    	   AND R.RECIPE_STATE = '1'
+    	   AND R.DEL_FLAG = '0'
+           AND B.DEL_FLAG = '0'
+    	   AND R.mix_area = #{params.mixArea}
+   		<if test="params.recipeMaterialName != null and params.recipeMaterialName != ''">
+   		   AND R.RECIPE_MATERIAL_NAME = #{params.recipeMaterialName}
+   		</if>
+   		<if test="params.recipeEquipCode != null and params.recipeEquipCode != ''">
+   		   AND R.RECIPE_EQUIP_CODE = #{params.recipeEquipCode}
+   		</if>
+   		<if test="params.recipeType != null and params.recipeType != ''">
+   		   AND R.RECIPE_TYPE = #{params.recipeType}
+   		</if>
+   		<if test="params.isModify == null or !params.isModify">
+           AND T.recipe_type_name NOT LIKE '%F%' -- 过滤掉试制的
+   		</if>
+   		<if test="params.isOnlySkip != null and params.isOnlySkip">
+           AND (T.recipe_type_name LIKE '%F%'
+            OR T.recipe_type_name = 'PTZ'
+            )
+   		</if>
+    	<if test="params.recipeMaterialNameList != null and params.recipeMaterialNameList.size() > 0">
+    		AND EXISTS (
+    			SELECT 0
+    			  FROM materialName_tab m
+    			 WHERE m.name = r.RECIPE_MATERIAL_NAME
+    		)
+    	</if>
+    	<!-- 优先选配方版本大的记录 -->
+		order by R.RECIPE_EQUIP_CODE, R.RECIPE_MATERIAL_CODE, R.RECIPE_VERSION_ID desc
+    </select>
+
+    <select id="listBasMaterial" resultType="com.zlt.mix.setting.api.domain.entity.MesBasMaterial">
+        WITH temp_table AS (
+        <foreach collection="materialList" item="material" separator=" union all ">
+            SELECT #{material.materialName,jdbcType=VARCHAR} material_name
+            FROM dual
+        </foreach>
+        )
+        SELECT MATERIAL_CODE, MATERIAL_NAME
+        FROM T_MES_BAS_MATERIAL
+        WHERE 1=1
+        <if test="materialList != null and materialList.size() > 0">
+            AND MATERIAL_NAME IN (SELECT MATERIAL_NAME FROM temp_table)
+        </if>
+          AND DEL_FLAG = '0'
+    </select>
+    
+    <!-- 查询配方类型 -->
+    <select id="listRecipeType" resultType="com.zlt.mix.setting.api.domain.entity.RecipeType">
+		SELECT RECIPE_TYPE_CODE,
+		       MAX(RECIPE_TYPE_NAME) RECIPE_TYPE_NAME
+		  FROM T_RECIPE_TYPE
+		 WHERE DEL_FLAG = '0'
+		 GROUP BY RECIPE_TYPE_CODE
+    </select>
+    
+    <!-- 获取有配置硫磺辅料机台的配方 -->
+    <select id="listLhflMachineRecipe" resultType="com.zlt.mix.schedule.engine.vo.MesPmtRecipeVo">
+        WITH temp_table AS (
+        <foreach collection="materialList" item="item" separator=" union all ">
+            SELECT #{item,jdbcType=VARCHAR} material_name FROM dual
+        </foreach>
+        )
+		SELECT R.ID,
+		       R.RECIPE_ID,
+		       R.RECIPE_EQUIP_CODE,
+		       R.RECIPE_MATERIAL_CODE,
+		       R.RECIPE_MATERIAL_NAME,
+		       R.RECIPE_VERSION_ID,
+		       R.RECIPE_TYPE,
+		       RT.RECIPE_TYPE_NAME,
+		       R.PRODUCT_STAGE,
+		       R.MIX_AREA,
+		       M.MACHINE_NAME
+		  FROM T_MES_PMT_RECIPE R
+		 INNER JOIN T_LHFL_MACHINE M
+		    ON M.MACHINE_CODE = R.RECIPE_EQUIP_CODE
+		   AND M.STATUS = '0'
+		   AND M.DEL_FLAG = '0'
+		 INNER JOIN T_ACCESSORIES_MACHINE AM
+		    ON AM.MACHINE_CODE = M.MACHINE_CODE
+		   AND AM.Material_Name = R.RECIPE_MATERIAL_NAME
+		   AND AM.DEL_FLAG = '0'
+		 INNER JOIN T_RECIPE_TYPE RT
+		    ON RT.RECIPE_TYPE_CODE = R.RECIPE_TYPE
+		   AND RT.DEL_FLAG = 0
+		 WHERE R.RECIPE_STATE = '1'
+		   AND R.AUDIT_FLAG = '1'
+		   AND R.DEL_FLAG = '0'
+		   <if test="mixArea != null and mixArea != ''">
+		   AND R.MIX_AREA = #{mixArea}
+		   </if>
+		   AND R.RECIPE_MATERIAL_NAME in (SELECT material_name FROM temp_table)
+		 ORDER BY r.recipe_material_name, am.machine_order
+    </select>
+	
+	<select id="selectListBasMaterial" resultType="com.zlt.mix.setting.api.domain.entity.MesBasMaterial">
+		SELECT MATERIAL_CODE, MATERIAL_NAME
+		FROM T_MES_BAS_MATERIAL
+		WHERE DEL_FLAG = '0'
+		<if test="isHighConsumption != null and isHighConsumption != ''">
+			and IS_HIGH_CONSUMPTION = #{isHighConsumption}
+		</if>
+	</select>
+
+	<select id="listSLGLueRecipe" resultMap="recipeMap">
+		SELECT R.ID,
+			   R.RECIPE_ID,
+			   R.RECIPE_EQUIP_CODE,
+			   R.RECIPE_MATERIAL_CODE,
+			   R.RECIPE_MATERIAL_NAME,
+			   R.RECIPE_VERSION_ID,
+			   R.RECIPE_TYPE,
+			   R.PRODUCT_STAGE,
+			   ifnull(R.SUMMER_MIX_TIME, 0)                           SUMMER_MIX_TIME,
+			   ifnull(R.LOT_TOTAL_WEIGHT, 0)                          LOT_TOTAL_WEIGHT,
+			   W.ID                   AS                              WEIGHTID,
+			   W.SET_WEIGHT,
+			   W.RECIPE_MATERIAL_CODE AS                              WEIGHT_MATERIAL_CODE,
+			   W.RECIPE_MATERIAL_NAME AS                              WEIGHT_MATERIAL_NAME,
+			   B2.MAJOR_TYPE          AS                              WEIGHT_MAJOR_TYPE,
+			   ROUND(ifnull(W.SET_WEIGHT / R2.LOT_TOTAL_WEIGHT, 1), 4) CONVERSION_RATIO
+		FROM T_MES_PMT_RECIPE R
+				 LEFT JOIN T_MES_PMT_RECIPE_WEIGHT W ON R.RECIPE_ID = W.FATHER_RECIPE_ID AND W.Del_Flag = '0' AND W.SET_WEIGHT IS NOT NULL
+				 LEFT JOIN T_MES_BAS_MATERIAL B2 ON B2.MATERIAL_CODE = W.RECIPE_MATERIAL_CODE AND B2.Del_Flag = '0'
+				 LEFT JOIN (SELECT MIN(LOT_TOTAL_WEIGHT) LOT_TOTAL_WEIGHT,
+								   RECIPE_MATERIAL_CODE
+							FROM T_MES_PMT_RECIPE R2
+							WHERE R2.AUDIT_FLAG = '1'
+							  AND R2.RECIPE_STATE = '1'
+							  AND R2.DEL_FLAG = '0'
+							  AND (R2.MIX_AREA = #{mixArea} AND
+								   (R2.RECIPE_TYPE = '1' OR NOT EXISTS
+									   (SELECT 0
+										FROM T_MES_PMT_RECIPE R3
+										WHERE R3.RECIPE_MATERIAL_CODE = R2.RECIPE_MATERIAL_CODE
+										  AND R3.AUDIT_FLAG = '1'
+										  AND R3.RECIPE_STATE = '1'
+										  AND R3.RECIPE_TYPE = '1'
+										  AND R3.DEL_FLAG = '0'
+										  AND R3.MIX_AREA = R2.MIX_AREA)) OR NOT EXISTS
+									   (SELECT 0
+										FROM T_MES_PMT_RECIPE R3
+										WHERE R3.RECIPE_MATERIAL_CODE = R2.RECIPE_MATERIAL_CODE
+										  AND R3.AUDIT_FLAG = '1'
+										  AND R3.RECIPE_STATE = '1'
+										  AND R3.DEL_FLAG = '0'
+										  AND R3.MIX_AREA = #{mixArea}))
+							GROUP BY RECIPE_MATERIAL_CODE) R2
+						   ON R2.RECIPE_MATERIAL_CODE = W.RECIPE_MATERIAL_CODE
+		WHERE R.AUDIT_FLAG = '1'
+		  AND R.RECIPE_STATE = '1'
+		  AND R.DEL_FLAG = '0'
+		  and B2.MAJOR_TYPE = '3'
+		  AND R.mix_area = #{mixArea}
+		order by R.RECIPE_EQUIP_CODE, R.RECIPE_MATERIAL_CODE, R.RECIPE_VERSION_ID 
+	</select>
+</mapper>

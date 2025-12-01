@@ -23,6 +23,12 @@ public class GdyyLossSettingDto extends ApsBaseEntity{
     @ApiModelProperty(value = "id")
     private Long id;
 
+    /**
+     * 机台id（对应T_GDYY_MACHINE_INFO表id）
+     */
+    @ApiModelProperty(value = "机台id")
+    private Long machineId;
+
     /** 钢带大卷编号 */
     @Excel(name = "ui.data.column.loss.gdyy.bigRollCode", sort = 10)
     @ApiModelProperty(value = "钢带大卷编号")
@@ -34,6 +40,14 @@ public class GdyyLossSettingDto extends ApsBaseEntity{
     @ApiModelProperty(value = "损耗率(百分比)")
     @ImportValidated(name = "ui.data.column.loss.lossRate", number = true, required = true, min = 0,  max = 99.99)
     private Double lossRate;
+
+    /**
+     * 机台名称
+     */
+    @ImportValidated(maxLength = 30)
+    @Excel(name = "ui.data.column.loss.line", sort = 20, importName = "ui.data.column.loss.line")
+    @ApiModelProperty(value = "机台名称")
+    private String machineName;
 
     @Excel(name = "ui.common.column.remark", sort = 40)
     @ApiModelProperty(value = "备注", position = 500)

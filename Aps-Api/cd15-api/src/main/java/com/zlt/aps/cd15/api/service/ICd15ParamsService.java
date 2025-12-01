@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd15.api.domain.dto.Cd15ParamsDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,7 @@ import java.util.List;
 @FeignClient(contextId = "ICd15ParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.cd15:cd15}")
 public interface ICd15ParamsService
 {
-    
+
     /**
      * 查询15度裁断参数信息列表
      */
@@ -43,6 +42,6 @@ public interface ICd15ParamsService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/cd15/params/exportData")
-    List<Cd15ParamsDto> exportData(@SpringQueryMap Cd15ParamsDto dto);
+    @PostMapping("/cd15/params/exportData")
+    List<Cd15ParamsDto> exportData(@RequestBody Cd15ParamsDto dto);
 }

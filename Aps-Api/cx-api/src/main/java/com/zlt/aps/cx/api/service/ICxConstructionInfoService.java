@@ -19,8 +19,8 @@ public interface ICxConstructionInfoService {
     /**
      * 根据条件查询胶料组别顺序列表
      */
-    @GetMapping("/constructionInfo/listConstructionInfo")
-    TableDataInfo listConstructionInfo(@SpringQueryMap ConstructionInfoDto dto);
+    @PostMapping("/constructionInfo/listConstructionInfo")
+    TableDataInfo listConstructionInfo(@RequestBody ConstructionInfoDto dto);
 
     /**
      * 根据id查询胶料组别顺序信息

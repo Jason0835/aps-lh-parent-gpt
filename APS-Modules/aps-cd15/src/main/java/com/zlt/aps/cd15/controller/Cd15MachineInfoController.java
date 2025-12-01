@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Api(tags = "15°裁断机台信息维护接口")
 @RestController
-@RequestMapping("/machine")
+@RequestMapping("/cd15/machine")
 public class Cd15MachineInfoController extends BaseController {
     @Autowired
     private Cd15MachineInfoService machineInfoService;

@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_SAP_IMPORT_BAD_NUMBER")
-@KeySequence(value = "SEQ_SAP_IMPORT_BAD_NUMBER", clazz = Long.class)
+@KeySequence(value = "SEQ_SAP_IMPORT_BAD_NUMBER",dbType = DbType.ORACLE)
 public class SapImportBadNumber extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;

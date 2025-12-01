@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.dto.TcSpecifyMachineDto;
 import com.zlt.aps.tc.api.domain.entity.TcQuotaSetting;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,19 +19,19 @@ public interface ITcSpecifyMachineService {
     /**
      * 根据条件查询定点机台列表
      */
-    @GetMapping("/specifyMachine/listSpecifyMachine")
-    TableDataInfo listSpecifyMachine(@SpringQueryMap TcSpecifyMachineDto dto);
+    @PostMapping("/tc/specifyMachine/listSpecifyMachine")
+    TableDataInfo listSpecifyMachine(@RequestBody TcSpecifyMachineDto dto);
 
     /**
      * 根据id查询定点机台信息
      */
-    @GetMapping("/specifyMachine/getSpecifyMachine/{id}")
+    @GetMapping("/tc/specifyMachine/getSpecifyMachine/{id}")
     TcSpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id);
 
     /**
      * 保存定点机台信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/specifyMachine/saveSpecifyMachine")
+    @PostMapping("/tc/specifyMachine/saveSpecifyMachine")
     AjaxResult saveSpecifyMachine(@RequestBody TcSpecifyMachineDto dto);
 
     /**
@@ -40,13 +39,13 @@ public interface ITcSpecifyMachineService {
      *
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/specifyMachine/deleteSpecifyMachine/{ids}")
+    @PostMapping("/tc/specifyMachine/deleteSpecifyMachine/{ids}")
     AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids);
 
     /**
      * 删除全部定点机台信息(逻辑删)
      */
-    @PostMapping("/specifyMachine/deleteAllSpecifyMachine")
+    @PostMapping("/tc/specifyMachine/deleteAllSpecifyMachine")
     AjaxResult deleteAllSpecifyMachine();
 
     /**
@@ -54,13 +53,13 @@ public interface ITcSpecifyMachineService {
      *
      * @param dto
      */
-    @GetMapping("/specifyMachine/exportData")
-    List<TcSpecifyMachineDto> exportData(@SpringQueryMap TcSpecifyMachineDto dto);
+    @PostMapping("/tc/specifyMachine/exportData")
+    List<TcSpecifyMachineDto> exportData(@RequestBody TcSpecifyMachineDto dto);
 
     /**
      * 数据导入
      */
-    @PostMapping("/specifyMachine/importData")
+    @PostMapping("/tc/specifyMachine/importData")
     AjaxResult importData(@RequestBody List<TcSpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 }

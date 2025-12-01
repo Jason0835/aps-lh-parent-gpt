@@ -23,46 +23,46 @@ public interface INcLossSettingService {
     /**
      * 查询内衬损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/nc/loss/list")
     TableDataInfo list(@RequestBody NcLossSettingDto dto);
 
     /**
      * 新增内衬损耗率设定
      */
-    @PostMapping("/loss/add")
+    @PostMapping("/nc/loss/add")
     AjaxResult add(@RequestBody NcLossSettingDto dto);
 
     /**
      * 修改内衬损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/nc/loss/edit")
     AjaxResult edit(@RequestBody NcLossSettingDto dto);
 
     /**
      * 删除内衬损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/nc/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/nc/loss/{id}")
     NcLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验内衬损耗率设定唯一性
      */
-    @PostMapping("/loss/checkNcLossSettingUnique")
+    @PostMapping("/nc/loss/checkNcLossSettingUnique")
     String checkNcLossSettingUnique(@RequestBody NcLossSettingDto dto);
 
     /**
      * 导出内衬损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/nc/loss/getList")
     List<NcLossSettingDto> getList(@RequestBody NcLossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/nc/loss/importData")
     @ApiOperation("导入内衬损耗率信息")
     public AjaxResult importData(@RequestBody List<NcLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
@@ -70,6 +70,6 @@ public interface INcLossSettingService {
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/nc/loss/deleteAll")
     AjaxResult deleteAll();
 }

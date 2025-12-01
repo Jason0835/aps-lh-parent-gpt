@@ -4,7 +4,7 @@
 	<!-- 查询大卷与机台的映射关系 -->
     <select id="selectXwyyMachineRollMappingList" resultType="com.zlt.aps.xwyy.engine.vo.XwyyMachineRollMappingVo">
 		SELECT M.BIG_ROLL_CODE, 
-		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		       GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
 		  FROM T_XWYY_MACHINE_ROLL_MAPPING M
 		  LEFT JOIN T_XWYY_MACHINE_INFO MI
 		    ON MI.ID = M.MACHINE_ID

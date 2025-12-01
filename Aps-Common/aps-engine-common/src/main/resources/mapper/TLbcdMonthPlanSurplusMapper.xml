@@ -36,12 +36,12 @@
         select
         <include refid="Base_Column_List" />
         from T_CD90_MONTH_PLAN_SURPLUS
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_CD90_MONTH_PLAN_SURPLUS
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TLbcdMonthPlanSurplus" useGeneratedKeys="true">
         insert into T_CD90_MONTH_PLAN_SURPLUS
@@ -146,11 +146,11 @@
                     REMARK = #{remark,jdbcType=VARCHAR},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.TLbcdMonthPlanSurplus">
         update T_CD90_MONTH_PLAN_SURPLUS
-        set 
+        set
             MONTH_PLAN_APS_VERSION =  #{monthPlanApsVersion,jdbcType=VARCHAR},
             MONTH_PLAN_VERSION =  #{monthPlanVersion,jdbcType=VARCHAR},
             YEAR =  #{year,jdbcType=VARCHAR},
@@ -166,7 +166,7 @@
             UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
             DEL_FLAG =  #{delFlag,jdbcType=CHAR},
             REMARK =  #{remark,jdbcType=VARCHAR}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <insert id="insertBatch">
         insert into T_CD90_MONTH_PLAN_SURPLUS
@@ -270,7 +270,7 @@
     <update id="updateDelFlagByMonthPlanApsVersionAndMaterialCodeInAndDelFlag">
         update T_CD90_MONTH_PLAN_SURPLUS
         set del_flag = 1,
-        update_time = sysdate
+        update_time = now()
         where
         month_plan_aps_version = #{monthPlanApsVersion,jdbcType=VARCHAR}
         AND material_code in

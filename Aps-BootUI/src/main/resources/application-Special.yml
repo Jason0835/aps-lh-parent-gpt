@@ -1,0 +1,122 @@
+# Tomcat
+server:
+  max-http-header-size: 1024000
+
+ruoyi:
+  # 名称
+  name: Telecom Frame
+  # 版本
+  version: 4.7.6
+  # 版权年份
+  copyrightYear: 2020
+  # 实例演示开关
+  demoEnabled: false
+  profile: D:/tlt/uploadPath
+  # 获取ip地址开关
+  addressEnabled: false
+  # 跨域开关
+  enableCors: true
+
+url:
+  preview: http://192.168.2.14:8012
+  current: http://192.168.2.14:9066
+# 开发环境配置
+server-port: 9066
+
+#nacos服务器
+nacos:
+  server-addr: 192.168.10.123:8848
+  run-group: APS_TEST_GROUP
+  cfg-group: APS_TEST_GROUP
+  run-namespace: dctest
+  cfg-namespace: dctest
+
+#系统标识
+project:
+  project-tag: aps
+
+
+# Spring配置
+spring-app-name: aps-bootui
+redis-addr: 192.168.2.93
+redis-port: 6379
+redis-password:
+redis-database: 7
+#redis-password:
+zipkin-addr: "http://192.168.2.93:9411/"
+
+shiro-sso-enable: false
+shiro:
+  user:
+    # 验证码开关
+    captchaEnabled: false
+
+  #=============以下不使用，如主干有，失误提交======
+
+  session:
+    # Session超时时间，-1代表永不过期（默认30分钟）
+    expireTime: 30
+    # 同步session到数据库的周期（默认1分钟）
+    dbSyncPeriod: 1
+    # 相隔多久检查一次session的有效性，默认就是10分钟
+    validationInterval: 20
+    # 同一个用户最大会话数，比如2的意思是同一个账号允许最多同时两个人登录（默认-1不限制）
+    maxSession: -1
+    # 踢出之前登录的/之后登录的用户，默认踢出之前登录的用户
+    kickoutAfter: false
+#===============================================================
+sso:
+  cas-addr: http://192.168.2.93:8899/cas
+  #cas-addr: https://casserverpac4j.herokuapp.com
+#网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
+gateway-addr: http://192.168.2.14:8080/
+# Swagger配置
+swagger:
+  # 是否开启swagger
+  enabled: true
+
+
+feign:
+  client:
+    config:
+      default: #默认配置
+        readTimeout: 600000 #读取超时时间
+        connectTimeout: 3000
+
+
+#放前端需要加载的所有国际化语言包路径
+ui:
+  forceLang: AUTO
+  i18n-messages: static/i18n/messages,i18n/commonMessages,i18n/announceMessages,static/i18n/msg,static/i18n/fileui,static/i18n/freeitemui,i18n/aps
+
+# Spring
+spring:
+  redis:
+    database: 7
+  datasource:
+    dynamic:
+      seata: false
+seata:
+  # 默认关闭，如需启用spring.datasource.dynami.seata需要同时开启
+  enabled: false
+
+uploadFilePath:
+  imageFile: D:/Telecom/uploadPath/imagePath
+
+#导入文件是否需要解密
+fileEncryptEnabled: false
+#JVM启动参数：java.compile=none
+fileManage-enable: true
+fileManage-minio-addr: http://192.168.2.111:9000  #对象存储服务的URL
+fileManage-minio-accessKey: uploaduser #Access key账户
+fileManage-minio-secretKey: uploaduser  #Secret key密码
+
+fileManage:
+  enabled: true
+  minio:
+    bucketDefault: jy-scm-upload-file
+#新框架（3.5.1）文件下载路径前缀配置（测试环境）
+filePrefix: http://192.168.2.117/common/fileUpload/downloadFile
+
+binder:
+  autoGrowCollectionLimit: 10000

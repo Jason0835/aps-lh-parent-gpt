@@ -81,7 +81,7 @@
                     <result property="curingTime"    column="curing_time"    />
                     <result property="bomDataVersion"    column="bom_data_version"    />
             </resultMap>
-    
+
     <sql id="selectEngineConstructionInfoVo">
         select id, embryo_code, dimension, spec_desc,section_width, nose_width, flip_disc_diameter, nvl(fit_drum_perimeter, 0) fit_drum_perimeter, chuck_diameter, stretch_width, qualitative_width, embryo_circle, tire_fabric_code1, nvl(tire_fabric_craft1, '0') tire_fabric_craft1, tire_fabric_code2, nvl(tire_fabric_craft2, '0') tire_fabric_craft2, tire_fabric_code3, nvl(tire_fabric_craft3, '0') tire_fabric_craft3, cord_spec, reinforce_seal_glue, inside_rubber, inside_code, inside_craft, sidewall_code, sidewall_craft, sidewall_mouth_plate, sidewall_center, nvl(sidewall_length, 0) sidewall_length, sidewall_rubber, sidewall_weight, sidewall_wearp_rubber_weight, support_code, support_rubber_code, support_length, bead_code, bead_arrange, bead_type, tire_ring_code, apex_code, hexagon_rubber_code, hexagon_mouth_plate, hexagon_rubber_dimension, apex_weight, belt_code1, nvl(belt_craft1, 0) belt_craft1, belt_side_rubber1, belt_rubber1, belt_code2, nvl(belt_craft2, 0) belt_craft2, belt_side_rubber2, belt_rubber2, belt_cutting_angle, article_crown_spec, article_crown_code, tread_code, tread_shoulder_width, tread_shoulder_jwidth, nvl(tread_shoulder_length, 0) tread_shoulder_length, tread_rubber_category, tire_crown_up_width_weight, tire_crown_down_width_weight, tire_wing_width_weight, primer_weight, conducting_resin_weight, tread_mouth_plate, create_by, create_time, update_by, update_time, del_flag, remark, cons_type, clamping_pressure, curing_time,bom_data_version from t_construction_info
     </sql>
@@ -346,7 +346,7 @@
         a.clamping_pressure = b.clamping_pressure ,
         a.curing_time = b.curing_time ,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -494,7 +494,7 @@
         b.curing_time,
 
         b.create_by,
-        sysdate,
+        now(),
         b.remark,
         '0')
     </update>

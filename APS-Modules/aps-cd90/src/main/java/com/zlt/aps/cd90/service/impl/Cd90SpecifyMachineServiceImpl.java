@@ -3,8 +3,10 @@ package com.zlt.aps.cd90.service.impl;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.dto.Cd90SpecifyMachineDto;
@@ -14,6 +16,7 @@ import com.zlt.aps.cd90.mapper.Cd90SpecifyMachineMapper;
 import com.zlt.aps.cd90.service.Cd90MachineInfoService;
 import com.zlt.aps.cd90.service.Cd90SpecifyMachineService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,13 +95,12 @@ public class Cd90SpecifyMachineServiceImpl extends ServiceImpl<Cd90SpecifyMachin
      * @param ids 多个id逗号分割
      */
     public void deleteSpecifyMachine(Long[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            Cd90SpecifyMachine entity = new Cd90SpecifyMachine();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<Cd90SpecifyMachine> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**

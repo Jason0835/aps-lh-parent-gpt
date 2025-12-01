@@ -138,7 +138,14 @@ public class Cd15StockController extends BaseController {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(Cd15Stock stock) {
-        return stockService.edit(stock);
+        AjaxResult ajaxResult = null;
+        //id为空则是新增操作，否则是编辑
+        if (stock.getId() != null) {
+            ajaxResult = stockService.edit(stock);
+        } else {
+            ajaxResult = stockService.add(stock);
+        }
+        return ajaxResult;
     }
 
     @ApiOperation("导出15°裁断库存信息")

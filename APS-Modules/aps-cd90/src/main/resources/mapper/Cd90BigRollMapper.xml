@@ -18,60 +18,32 @@
         </if>
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into T_CD90_BIG_ROLL a USING (
-        <foreach collection="list" item="Cd90BigRoll" separator=" union ">
-            select
-                #{Cd90BigRoll.bigRollCode,jdbcType=VARCHAR} BIG_ROLL_CODE,
-                #{Cd90BigRoll.clothLength,jdbcType=DECIMAL} CLOTH_LENGTH,
-                #{Cd90BigRoll.convertProduceNum,jdbcType=DECIMAL} CONVERT_PRODUCE_NUM,
-                #{Cd90BigRoll.actClothLength,jdbcType=DECIMAL} ACT_CLOTH_LENGTH,
-
-                #{Cd90BigRoll.createBy,jdbcType=VARCHAR} create_by,
-                #{Cd90BigRoll.createTime,jdbcType=DATE} create_time,
-                #{Cd90BigRoll.updateBy,jdbcType=VARCHAR} update_by,
-                #{Cd90BigRoll.updateTime,jdbcType=DATE} update_time,
-                #{Cd90BigRoll.remark,jdbcType=VARCHAR} remark
-            from dual
-        </foreach>
-        ) b ON (
-            a.BIG_ROLL_CODE = b.BIG_ROLL_CODE
-            AND a.del_flag = '0'
-        )WHEN MATCHED THEN
-            UPDATE SET
-                a.CLOTH_LENGTH   = b.CLOTH_LENGTH,
-                a.CONVERT_PRODUCE_NUM   = b.CONVERT_PRODUCE_NUM,
-                a.ACT_CLOTH_LENGTH   = b.ACT_CLOTH_LENGTH,
-
-                a.update_by   = b.create_by,
-                a.update_time = sysdate,
-                a.remark      = b.remark
-        WHEN NOT MATCHED THEN
-            INSERT (
-                a.id          ,
-
-                a.BIG_ROLL_CODE  ,
-                a.CLOTH_LENGTH  ,
-                a.CONVERT_PRODUCE_NUM   ,
-                a.ACT_CLOTH_LENGTH   ,
-
-                a.create_by   ,
-                a.create_time ,
-                a.remark,
-                a.del_flag
-            ) values(
-                SEQ_PUBLIC.NEXTVAL,
-
-                b.BIG_ROLL_CODE  ,
-                b.CLOTH_LENGTH  ,
-                b.CONVERT_PRODUCE_NUM   ,
-                b.ACT_CLOTH_LENGTH   ,
-
-                b.create_by,
-                sysdate,
-                b.remark,
-                '0'
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_CD90_BIG_ROLL (
+        BIG_ROLL_CODE, CLOTH_LENGTH, CONVERT_PRODUCE_NUM, ACT_CLOTH_LENGTH,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="Cd90BigRoll" separator=",">
+            (
+            #{Cd90BigRoll.bigRollCode,jdbcType=VARCHAR},
+            #{Cd90BigRoll.clothLength,jdbcType=DECIMAL},
+            #{Cd90BigRoll.convertProduceNum,jdbcType=DECIMAL},
+            #{Cd90BigRoll.actClothLength,jdbcType=DECIMAL},
+            #{Cd90BigRoll.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{Cd90BigRoll.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{Cd90BigRoll.remark,jdbcType=VARCHAR},
+            '0'
             )
-    </update>
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        CLOTH_LENGTH = VALUES(CLOTH_LENGTH),
+        CONVERT_PRODUCE_NUM = VALUES(CONVERT_PRODUCE_NUM),
+        ACT_CLOTH_LENGTH = VALUES(ACT_CLOTH_LENGTH),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 </mapper>

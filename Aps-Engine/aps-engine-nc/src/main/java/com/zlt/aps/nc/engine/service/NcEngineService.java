@@ -50,4 +50,6 @@ public interface NcEngineService {
      * @param scheduleDate
      */
     void handGlueMerge(String scheduleDate);
+
+    void batchUpdateBatchNoAndOrderNo(String scheduleDate);
 }

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MonthPlanSaleOrderMapper">
+
+    <select id="getNeedInsertProductMinConfigurationList" resultType="com.zlt.aps.monthplan.factory.dto.YearSaleMinProdVo">
+        SELECT a.FACTORY_CODE,
+               a.PRODUCT_CODE,
+               mpi.PRODUCT_DESC
+          FROM (SELECT mhsq.PRODUCT_CODE,
+                       mhsq.FACTORY_CODE
+                  FROM t_mp_history_sale_qty mhsq
+                 WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
+                   AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )
+                   AND IFNULL( mhsq.SALE_QTY, 0 ) >= 0
+                   AND mhsq.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                 GROUP BY mhsq.PRODUCT_CODE,mhsq.FACTORY_CODE
+                HAVING SUM( IFNULL( mhsq.SALE_QTY, 0 ) ) > #{saleTotalQty,jdbcType=DECIMAL}) a
+          LEFT JOIN t_mdm_min_prod mmp
+            ON mmp.FACTORY_CODE = a.FACTORY_CODE
+           AND mmp.PRODUCT_CODE = a.PRODUCT_CODE
+          LEFT JOIN t_mdm_product_info mpi
+            ON mpi.FACTORY_CODE = a.FACTORY_CODE
+           AND mpi.PRODUCT_CODE = a.PRODUCT_CODE
+         WHERE mmp.PRODUCT_CODE is null
+           AND mmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateMinProdUpQtyToOne">
+        UPDATE t_mdm_min_prod mmp
+         INNER JOIN (SELECT mhsq.PRODUCT_CODE,
+                            mhsq.FACTORY_CODE
+                       FROM t_mp_history_sale_qty mhsq
+                      WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
+                        AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR
+                            (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )
+                        AND IFNULL( mhsq.SALE_QTY, 0 ) >= 0
+                        AND mhsq.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                      GROUP BY mhsq.PRODUCT_CODE,mhsq.FACTORY_CODE
+                     HAVING SUM( IFNULL( mhsq.SALE_QTY, 0 ) ) > #{saleTotalQty,jdbcType=DECIMAL}
+                    ) HSC
+            ON mmp.PRODUCT_CODE = HSC.PRODUCT_CODE
+           AND mmp.FACTORY_CODE = HSC.FACTORY_CODE
+           SET mmp.UP_QTY = 1
+         WHERE mmp.PRODUCT_CODE &lt;&gt; '*'
+           AND mmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="updateMinProdUpQtyToDefault">
+        UPDATE t_mdm_min_prod mmp
+         INNER JOIN (SELECT mhsq.PRODUCT_CODE,
+                            mhsq.FACTORY_CODE
+                       FROM t_mp_history_sale_qty mhsq
+                      WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
+                        AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR
+                            (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )
+                        AND IFNULL( mhsq.SALE_QTY, 0 ) >= 0
+                        AND mhsq.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                      GROUP BY mhsq.PRODUCT_CODE,mhsq.FACTORY_CODE
+                     HAVING SUM( IFNULL( mhsq.SALE_QTY, 0 ) ) &lt;= #{saleTotalQty,jdbcType=DECIMAL}
+                    ) HSC
+            ON mmp.PRODUCT_CODE = HSC.PRODUCT_CODE
+           AND mmp.FACTORY_CODE = HSC.FACTORY_CODE
+           SET mmp.UP_QTY = #{defaultQty,jdbcType=DECIMAL}
+         WHERE mmp.PRODUCT_CODE &lt;&gt; '*'
+           AND mmp.UP_QTY = 1
+           AND mmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </update>
+
+    <delete id="deletedByYearAndMonth">
+        DELETE FROM t_mp_month_sale_plan
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+    </delete>
+
+    <update id="updateImportantCustomFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+        UPDATE t_mp_month_sale_plan msp
+          LEFT JOIN t_mdm_customer_info mci
+            ON msp.FACTORY_CODE = mci.FACTORY_CODE
+           AND msp.CUSTOM_CODE = mci.CUSTOM_CODE
+           AND IFNULL(mci.IS_DELETE, 0) = 0
+           SET msp.IS_IMPORTANT_CUSTOM = IFNULL(mci.IS_IMPORTANT_CUSTOM, 0)
+         WHERE msp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND msp.YEAR = #{year,jdbcType=DECIMAL}
+           AND msp.MONTH = #{month,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateEnsurePlan" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+        UPDATE t_mp_month_sale_plan msp
+           SET msp.IS_ENSURE_PLAN = (SELECT COUNT(1) FROM t_mdm_must_finish_plan mfp
+                                      WHERE msp.FACTORY_CODE = mfp.FACTORY_CODE
+                                        AND msp.YEAR = mfp.YEAR
+                                        AND msp.MONTH = mfp.MONTH
+                                        AND msp.CUSTOM_CODE = mfp.CUSTOM_CODE
+                                        AND msp.PRODUCT_CODE = mfp.PRODUCT_CODE
+                                        AND msp.LOCATION_TYPE = mfp.LOCATION_TYPE
+                                    )
+        WHERE msp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+          AND msp.YEAR = #{year,jdbcType=DECIMAL}
+          AND msp.MONTH = #{month,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateProductInfo" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+        UPDATE t_mp_month_sale_plan msp
+          JOIN t_mdm_product_info mpi
+            ON msp.FACTORY_CODE = mpi.FACTORY_CODE
+           AND msp.PRODUCT_CODE = mpi.PRODUCT_CODE
+           AND IFNULL(mpi.IS_DELETE, 0) = 0
+           SET msp.PRODUCT_DESC =  mpi.PRODUCT_DESC,
+               msp.PRO_SIZE = mpi.PRO_SIZE,
+               msp.PRODUCT_TYPE_CODE = mpi.PRODUCT_TYPE_CODE,
+               msp.PRODUCT_TYPE_NAME = mpi.PRODUCT_TYPE_NAME,
+               msp.SPECIFICATIONS = mpi.SPECIFICATIONS,
+               msp.PATTERN = mpi.PATTERN,
+               msp.BRAND = mpi.BRAND,
+               msp.COMMON_TYPE= mpi.COMMON_TYPE,
+               msp.TIRE_TYPE = mpi.TIRE_TYPE,
+               msp.HIERARCHY = mpi.HIERARCHY
+         WHERE msp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND msp.YEAR = #{year,jdbcType=DECIMAL}
+           AND msp.MONTH = #{month,jdbcType=DECIMAL}
+    </update>
+
+    <update id="updateOutSaleOrder">
+        UPDATE t_mp_month_sale_plan msp
+            JOIN t_out_month_sale_plan omsp
+            ON msp.FACTORY_CODE = omsp.FACTORY_CODE
+                AND msp.YEAR = omsp.YEAR
+                AND msp.MONTH = omsp.MONTH
+                AND msp.ORDER_NO = omsp.ORDER_NO
+                AND msp.CUSTOM_CODE = omsp.CUSTOM_CODE
+                AND msp.LOCATION_TYPE = omsp.LOCATION_TYPE
+                AND msp.CHANNEL = omsp.CHANNEL
+                AND msp.PRODUCT_CODE = omsp.PRODUCT_CODE
+        SET msp.PRODUCT_DESC      = omsp.PRODUCT_DESC,
+            msp.PRO_SIZE          = omsp.PRO_SIZE,
+            msp.PRODUCT_TYPE_CODE = omsp.PRODUCT_TYPE_CODE,
+            msp.PRODUCT_TYPE_NAME = omsp.PRODUCT_TYPE_NAME,
+            msp.SPECIFICATIONS    = omsp.SPECIFICATIONS,
+            msp.PATTERN           = omsp.PATTERN,
+            msp.BRAND             = omsp.BRAND,
+            msp.COMMON_TYPE= omsp.COMMON_TYPE,
+            msp.TIRE_TYPE         = omsp.TIRE_TYPE,
+            msp.HIERARCHY         = omsp.HIERARCHY,
+            msp.PLAN_QTY          = omsp.PLAN_QTY
+        WHERE ISNULL(msp.IS_DELETE, 0) = 0
+    </update>
+
+    <insert id="insertOutSaleOrder">
+        INSERT INTO t_mp_month_sale_plan
+        (FACTORY_CODE, ORDER_NO, SOURCE_TYPE, CUSTOM_CODE, CUSTOM_NAME, YEAR, MONTH, LOCATION_TYPE, CHANNEL, BRAND,
+         PRODUCT_CODE,
+         PRODUCT_DESC, PRODUCT_TYPE_CODE, PRODUCT_TYPE_NAME, PRO_SIZE, SPECIFICATIONS, PATTERN, HIERARCHY, TIRE_TYPE,
+         COMMON_TYPE,
+         PLAN_QTY, TRADE_MODE, SALE_PERSON, IS_IMPORTANT_CUSTOM, IS_ENSURE_PLAN, IS_EMERGENCY, CONTRACT_NO, NATION,
+         SUBMISSION_DATE,
+         DELIVERY_DATE_DUE, REMARK, IS_DELETE, CREATE_TIME, CREATE_BY, UPDATE_TIME, UPDATE_BY)
+        SELECT FACTORY_CODE,
+               ORDER_NO,
+               SOURCE_TYPE,
+               CUSTOM_CODE,
+               CUSTOM_NAME,
+               YEAR,
+               MONTH,
+               LOCATION_TYPE,
+               CHANNEL,
+               BRAND,
+               PRODUCT_CODE,
+               PRODUCT_DESC,
+               PRODUCT_TYPE_CODE,
+               PRODUCT_TYPE_NAME,
+               PRO_SIZE,
+               SPECIFICATIONS,
+               PATTERN,
+               HIERARCHY,
+               TIRE_TYPE,
+               COMMON_TYPE,
+               PLAN_QTY,
+               TRADE_MODE,
+               SALE_PERSON,
+               IS_IMPORTANT_CUSTOM,
+               IS_ENSURE_PLAN,
+               IS_EMERGENCY,
+               CONTRACT_NO,
+               NATION,
+               SUBMISSION_DATE,
+               DELIVERY_DATE_DUE,
+               REMARK,
+               IS_DELETE,
+               CREATE_TIME,
+               CREATE_BY,
+               UPDATE_TIME,
+               UPDATE_BY
+        FROM t_out_month_sale_plan
+    </insert>
+</mapper>

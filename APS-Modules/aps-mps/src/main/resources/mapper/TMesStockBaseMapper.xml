@@ -187,11 +187,11 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_TM_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_TM_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, now(),
         b.remark, '0')
     </update>
 
@@ -219,11 +219,11 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_TC_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_TC_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeNcSql" parameterType="list">
@@ -250,11 +250,11 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_NC_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_NC_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeTqSql" parameterType="list">
@@ -281,11 +281,11 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_TQ_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_TQ_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeGsqSql" parameterType="list">
@@ -312,11 +312,11 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_GSQ_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_GSQ_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, now(),
         b.remark, '0')
     </update>
     <update id="mergeGdyySql" parameterType="list">
@@ -343,11 +343,12 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_GDYY_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_GDYY_STOCK.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by,
+        now(),
         b.remark, '0')
     </update>
     <update id="mergeXwyySql" parameterType="list">
@@ -374,11 +375,12 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_XWYY_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_XWYY_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by,
+        now(),
         b.remark, '0')
     </update>
     <update id="mergeCd15Sql" parameterType="list">
@@ -405,11 +407,12 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.material_code, a.stock_num, a.modify_num, a.bad_num, a.create_by, a.create_time,
         a.remark, a.del_flag) values
-        (SEQ_cd15_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by, sysdate,
+        (SEQ_cd15_stock.NEXTVAL, b.stock_date, b.material_code, b.stock_num, b.modify_num, b.bad_num, b.create_by,
+        now(),
         b.remark, '0')
     </update>
     <update id="mergeCd90Sql" parameterType="list">
@@ -436,7 +439,7 @@
         UPDATE SET
         a.stock_num = b.stock_num,
         a.update_by = b.create_by,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id,
                 a.stock_date,
@@ -455,7 +458,7 @@
          b.modify_num,
          b.bad_num,
          b.create_by,
-         sysdate,
+        now(),
          b.remark,
          '0')
     </update>
@@ -479,12 +482,13 @@
         a.stock_num = b.stock_num,
         a.material_code = b.material_code,
         a.machine_code = b.machine_code,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.bar_code, a.material_code, a.machine_code, a.stock_num, a.create_time,
         a.update_time, a.del_flag) values
-        (SEQ_cd15_line_side_stock.NEXTVAL, b.stock_date, b.bar_code, b.material_code, b.machine_code, b.stock_num, sysdate,
-        sysdate, '0')
+        (SEQ_cd15_line_side_stock.NEXTVAL, b.stock_date, b.bar_code, b.material_code, b.machine_code, b.stock_num,
+        now(),
+        now(), '0')
     </update>
     <update id="mergeCd90LineSideSql" parameterType="list">
         merge into t_cd90_line_side_stock a USING (
@@ -506,11 +510,12 @@
         a.stock_num = b.stock_num,
         a.material_code = b.material_code,
         a.machine_code = b.machine_code,
-        a.update_time = sysdate
+        a.update_time = now()
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.stock_date, a.bar_code, a.material_code, a.machine_code, a.stock_num, a.create_time,
         a.update_time, a.del_flag) values
-        (SEQ_cd90_line_side_stock.NEXTVAL, b.stock_date, b.bar_code, b.material_code, b.machine_code, b.stock_num, sysdate,
-        sysdate, '0')
+        (SEQ_cd90_line_side_stock.NEXTVAL, b.stock_date, b.bar_code, b.material_code, b.machine_code, b.stock_num,
+        now(),
+        now(), '0')
     </update>
 </mapper>

@@ -10,6 +10,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DayFinishQty;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.common.handle.Cd90SyncDataHandle;
@@ -22,6 +23,7 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -564,5 +566,32 @@ public class Cd90ScheduleResultController extends BaseController {
         }
         cd90ScheduleResultService.combinationMiddleAndNight(ids, classifiedShift);
         return AjaxResult.success();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<Cd90DayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return cd90ScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody Cd90ScheduleResult scheduleResult) {
+        return cd90ScheduleResultService.getSummaryVo(scheduleResult);
     }
 }

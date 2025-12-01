@@ -56,9 +56,9 @@
         select * from (
             select
             <include refid="column"/>
-            (NVL(day_plan_qty, 0) + NVL(night_plan_qty, 0)) as daily_total_qty,
+            (IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0)) as daily_total_qty,
             b.MONTH_PLAN_QTY as month_plan,
-            ceil(b.MONTH_REMAIN_QTY) as month_plan_os
+            CEILING(b.MONTH_REMAIN_QTY) as month_plan_os
             from t_nc_assist_schedule a
             LEFT JOIN (
                 SELECT MATERIAL_CODE,MONTH_PLAN_QTY,MONTH_REMAIN_QTY
@@ -76,9 +76,9 @@
                 and INSTR(a.glue_code, #{glueCode,jdbcType=VARCHAR}) > 0
             </if>
             <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
-            <if test="machineId != null  and machineId != ''">and instr(','||a.machine_id||',', ','||#{machineId}||',')>0</if>
+            <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),  concat(',',#{machineId},','))>0</if>
             order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,
-            to_number(substr(a.glue_seq,0,instr(a.glue_seq,'.')-1)), to_number(substr(a.glue_seq,instr(a.glue_seq,'.')+1)) asc
+            CAST(substr(a.glue_seq,0,instr(a.glue_seq,'.')-1) AS SIGNED), CAST(substr(a.glue_seq,instr(a.glue_seq,'.')+1) AS SIGNED) asc
         ) t
         <if test="orderStr != null">
             order by ${orderStr}

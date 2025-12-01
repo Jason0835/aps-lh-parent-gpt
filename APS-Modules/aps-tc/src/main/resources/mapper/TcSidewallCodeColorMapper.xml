@@ -55,9 +55,6 @@
     </select>
 
     <insert id="insertTcSidewallCodeColor" parameterType="com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT seq_public.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_tc_sidewall_code_color
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -111,55 +108,46 @@
     </update>
 
     <delete id="deleteTcSidewallCodeColorById" parameterType="Long">
-        update t_tc_sidewall_code_color set del_flag='1' where id = #{id}
+        update t_tc_sidewall_code_color set del_flag = NULL where id = #{id}
     </delete>
 
     <delete id="deleteTcSidewallCodeColorByIds" parameterType="String">
-        update t_tc_sidewall_code_color set del_flag='1' where id in
+        update t_tc_sidewall_code_color set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_tc_sidewall_code_color a USING (
-        <foreach collection="list" item="item" separator=" union ">
-            select
-            #{item.sidewallCode,jdbcType=VARCHAR} sidewall_code,
-            #{item.matchType,jdbcType=VARCHAR} match_type,
-            #{item.colorType,jdbcType=VARCHAR} color_type,
-            #{item.colorCode,jdbcType=VARCHAR} color_code,
-            #{item.regularExpression,jdbcType=VARCHAR} regular_expression,
-            #{item.status,jdbcType=VARCHAR} status,
-
-            #{item.createBy,jdbcType=VARCHAR} create_by,
-            #{item.createTime, jdbcType=DATE} create_time,
-            #{item.updateBy,jdbcType=VARCHAR} update_by,
-            #{item.updateTime, jdbcType=DATE} update_time,
-            #{item.remark,jdbcType=VARCHAR} remark
-            from dual
-
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_tc_sidewall_code_color (
+        sidewall_code, match_type, color_type, color_code, regular_expression, status,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.sidewallCode,jdbcType=VARCHAR},
+            #{item.matchType,jdbcType=VARCHAR},
+            #{item.colorType,jdbcType=VARCHAR},
+            #{item.colorCode,jdbcType=VARCHAR},
+            #{item.regularExpression,jdbcType=VARCHAR},
+            #{item.status,jdbcType=VARCHAR},
+            #{item.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{item.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{item.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.sidewall_code = b.sidewall_code
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-            UPDATE SET
-            a.match_type = b.match_type,
-            a.color_type = b.color_type,
-            a.color_code = b.color_code,
-            a.regular_expression = b.regular_expression,
-            a.status = b.status,
-            a.update_by = b.create_by,
-            a.update_time = sysdate,
-            a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-          a.id, a.sidewall_code, a.match_type, a.color_type, a.color_code, a.regular_expression, a.status,
-          a.remark,a.del_flag, a.create_by, a.create_time)
-        values (
-          SEQ_PUBLIC.NEXTVAL, b.sidewall_code, b.match_type, b.color_type, b.color_code, b.regular_expression, b.status,
-          b.remark, '0', b.create_by, sysdate)
-    </update>
+        ON DUPLICATE KEY UPDATE
+        match_type = VALUES(match_type),
+        color_type = VALUES(color_type),
+        color_code = VALUES(color_code),
+        regular_expression = VALUES(regular_expression),
+        status = VALUES(status),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 </mapper>

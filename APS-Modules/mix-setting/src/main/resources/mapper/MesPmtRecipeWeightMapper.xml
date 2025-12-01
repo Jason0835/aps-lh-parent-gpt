@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.MesPmtRecipeWeightMapper">
+    
+    <insert id="insertBatch">
+        insert into T_MES_PMT_RECIPE_WEIGHT(
+        FATHER_RECIPE_ID,
+        RECIPE_ID,
+        WEIGHT_ORDER,
+        RECIPE_MATERIAL_CODE,
+        RECIPE_MATERIAL_NAME,
+        SET_WEIGHT,
+        ALLOW_ERROR,
+        REMARK,
+        DEL_FLAG,
+        CREATE_BY,
+        CREATE_TIME,
+        UPDATE_BY,
+        UPDATE_TIME
+        ) values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.fatherRecipeId,jdbcType=VARCHAR} ,
+            #{item.recipeId,jdbcType=VARCHAR} ,
+            #{item.weightOrder,} ,
+            #{item.recipeMaterialCode,jdbcType=VARCHAR} ,
+            #{item.recipeMaterialName,jdbcType=VARCHAR} ,
+            #{item.setWeight, jdbcType=DOUBLE} ,
+            #{item.allowError, jdbcType=DOUBLE} ,
+            #{item.remark,jdbcType=VARCHAR} ,
+            #{item.delFlag,jdbcType=VARCHAR} ,
+            #{item.createBy,jdbcType=VARCHAR} ,
+            #{item.createTime, jdbcType=TIMESTAMP} ,
+            #{item.updateBy,jdbcType=VARCHAR} ,
+            #{item.updateTime, jdbcType=TIMESTAMP}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectMesPmtRecipeWeightList" parameterType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipeWeight"
+            resultType="com.zlt.mix.setting.api.domain.entity.MesPmtRecipeWeight">
+        select id, father_recipe_id, recipe_id, weight_order, recipe_material_code, recipe_material_name, set_weight,
+        allow_error, remark, del_flag, create_by, create_time, update_by, update_time from t_mes_pmt_recipe_weight
+        where del_flag = '0' and father_recipe_id = #{fatherRecipeId,jdbcType=VARCHAR}
+        <if test="recipeMaterialName != null  and recipeMaterialName != ''">and INSTR(recipe_material_name, #{recipeMaterialName}) > 0</if>
+        <if test="orderStr == null">order by weight_order asc</if>
+        <if test="orderStr != null">order by ${orderStr}</if>
+    </select>
+</mapper>

@@ -113,7 +113,7 @@ public class TqMouthPlateController extends BaseController {
     @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData")
     @ApiOperation("导出胎面口型板信息")
-    public List<TqMouthPlateDto> exportData(@SpringQueryMap TqMouthPlateDto dto) {
+    public List<TqMouthPlateDto> exportData(@RequestBody TqMouthPlateDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         TqMouthPlate mouthPlate = new TqMouthPlate();

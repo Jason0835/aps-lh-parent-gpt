@@ -31,15 +31,15 @@ import java.util.List;
  */
 @Api(tags = {"胎面胶料组别顺序维护接口"})
 @RestController
-@RequestMapping("/glueGroupOrder")
+@RequestMapping("/tm/glueGroupOrder")
 public class TmGlueGroupOrderController extends BaseController {
 
     @Resource
     public TmGlueGroupOrderService tmGlueGroupOrderService;
 
     @ApiOperation("根据条件查询胶料组别顺序列表")
-    @GetMapping("/listGlueGroupOrder")
-    public TableDataInfo listGlueGroupOrder(TmGlueGroupOrderDto dto) {
+    @PostMapping("/listGlueGroupOrder")
+    public TableDataInfo listGlueGroupOrder(@RequestBody TmGlueGroupOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
         List<TmGlueGroupOrderDto> list = tmGlueGroupOrderService.listGlueGroupOrder(dto);
@@ -86,8 +86,8 @@ public class TmGlueGroupOrderController extends BaseController {
 
     @Log(title = "ui.tm.glueGroup.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<TmGlueGroupOrderDto> exportData(TmGlueGroupOrderDto dto) {
+    @PostMapping("/exportData")
+    public List<TmGlueGroupOrderDto> exportData(@RequestBody TmGlueGroupOrderDto dto) {
         startPage();
         dto.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
         List<TmGlueGroupOrderDto> list = tmGlueGroupOrderService.listGlueGroupOrder(dto);

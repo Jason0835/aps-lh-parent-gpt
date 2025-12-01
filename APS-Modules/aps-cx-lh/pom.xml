@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.zlt.aps</groupId>
+        <artifactId>aps-modules</artifactId>
+        <version>1.0.3-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>aps-cx-lh</artifactId>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+
+        <!-- TLT框架启动包 -->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-module-starter</artifactId>
+        </dependency>
+        <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>swagger-bootstrap-ui</artifactId>
+            <version>1.9.6</version>
+        </dependency>
+        <!-- 月度计划主数据Common包 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-maindata</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-bill-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-busi-common</artifactId>
+        </dependency>
+        <!-- 和客户做接口的jar -->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
+        </dependency>
+        <!-- 操作日志jar -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <!-- APS的API模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-monthplan-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yomahub</groupId>
+            <artifactId>tlog-all-spring-boot-starter</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- 代码混淆编译配置： -->
+   <!--         <plugin>
+                <groupId>com.github.wvengen</groupId>
+                <artifactId>proguard-maven-plugin</artifactId>
+                <version>2.6.0</version>
+                <executions>
+                    &lt;!&ndash; 以下配置说明执行mvn的package命令时候，会执行proguard&ndash;&gt;
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>proguard</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    &lt;!&ndash; 就是输入Jar的名称，我们要知道，代码混淆其实是将一个原始的jar，生成一个混淆后的jar，那么就会有输入输出。 &ndash;&gt;
+                    <injar>${project.build.finalName}.jar</injar>
+                    &lt;!&ndash; 输出jar名称，输入输出jar同名的时候就是覆盖，也是比较常用的配置。 &ndash;&gt;
+                    <outjar>${project.build.finalName}.jar</outjar>
+                    &lt;!&ndash; 是否混淆 默认是true &ndash;&gt;
+                    <obfuscate>true</obfuscate>
+                    &lt;!&ndash; 配置一个文件，通常叫做proguard.cfg,该文件主要是配置options选项，也就是说使用proguard.cfg那么options下的所有内容都可以移到proguard.cfg中 &ndash;&gt;
+                    <proguardInclude>${project.basedir}/proguard.cfg</proguardInclude>
+                    &lt;!&ndash; 额外的jar包，通常是项目编译所需要的jar &ndash;&gt;
+                    <libs>
+                        <lib>${java.home}/lib/rt.jar</lib>
+                        <lib>${java.home}/lib/jce.jar</lib>
+                        <lib>${java.home}/lib/jsse.jar</lib>
+                    </libs>
+                    &lt;!&ndash; 对输入jar进行过滤比如，如下配置就是对META-INFO文件不处理。 &ndash;&gt;
+                    <inLibsFilter>!META-INF/**,!META-INF/versions/9/**.class</inLibsFilter>
+                    &lt;!&ndash; 这是输出路径配置，但是要注意这个路径必须要包括injar标签填写的jar &ndash;&gt;
+                    <outputDirectory>${project.basedir}/target</outputDirectory>
+                    <putLibraryJarsInTempDir>true</putLibraryJarsInTempDir>
+                    &lt;!&ndash;这里特别重要，此处主要是配置混淆的一些细节选项，比如哪些类不需要混淆，哪些需要混淆&ndash;&gt;
+                    <options>
+                        &lt;!&ndash; 可以在此处写option标签配置，不过我上面使用了proguardInclude，故而我更喜欢在proguard.cfg中配置 &ndash;&gt;
+                    </options>
+                </configuration>
+            </plugin>-->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.zlt.aps.ApsCxLhApplication</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+
+        <repository>
+            <id>local-release</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
+        </repository>
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <!-- 默认不下载快照版本，这里开启下载快照版本到本地仓库 -->
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+</project>

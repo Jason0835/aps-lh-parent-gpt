@@ -7,6 +7,7 @@ import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
@@ -121,6 +122,11 @@ public class TqScheduleResultVo extends ApsBaseDto {
     private Double cxClass5Plan;
 
     /**
+     * 剩余量
+     */
+    private double surplusQty;
+    
+    /**
      * 发布成功计数器，每点击一次发布并成功的话，计数器累加
      */
     private Integer publishSuccessCount;
@@ -138,10 +144,38 @@ public class TqScheduleResultVo extends ApsBaseDto {
 
     @ApiModelProperty(value = "生产状态")
     private String productionStatus;
+    
+    /**
+     * 寸口
+     */
+    private BigDecimal dimension;
+    /**
+     * 上一天早班计划
+     */
+    private Double lastMidPlanQty;
+    /**
+     * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
+     */
+    private Double planStockQty;
     /**
      * 机台code$胎胚代码，多个逗号分割， 用来计算成型平均定额使用
      */
     private String quotaKeys;
+    
+    /**
+     * 夜班与早班的交接班库存
+     */
+    private double classStock;
+    
+    /**
+     * 库存供需比例，交接班库存/成型一天需求量
+     */
+    private double supplyDemandRatio;
+    
+    /**
+     * 收尾规格标记，0：收尾1：非收尾
+     */
+    private String closeOutSpecFlag;
 
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;

@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.entity.TcAssistSpec;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,8 +19,8 @@ public interface ITcAssistSpecService {
     /**
      * 根据条件查询外协规格管理列表
      */
-    @GetMapping("/assistSpec/listAssistSpec")
-    TableDataInfo listAssistSpec(@SpringQueryMap TcAssistSpec dto);
+    @PostMapping("/assistSpec/listAssistSpec")
+    TableDataInfo listAssistSpec(@RequestBody TcAssistSpec dto);
 
     /**
      * 根据id查询外协规格管理信息
@@ -52,8 +51,8 @@ public interface ITcAssistSpecService {
      * 导出接口
      * @param dto
      */
-    @GetMapping("/assistSpec/exportData")
-    List<TcAssistSpec> exportData(@SpringQueryMap TcAssistSpec dto);
+    @PostMapping("/assistSpec/exportData")
+    List<TcAssistSpec> exportData(@RequestBody TcAssistSpec dto);
 
     @PostMapping("/assistSpec/importData")
     @ApiOperation("导入胎侧外协规格管理")

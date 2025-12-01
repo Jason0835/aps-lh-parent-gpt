@@ -18,7 +18,7 @@ import java.util.Date;
 @Data
 @TableName("T_PLM_CONSTRUCTION_INFO")
 @ApiModel(value = "PLM施工参数对象", description = "PLM施工参数对象 ")
-@KeySequence(value = "SEQ_PLM_SCHEDULE", clazz = Long.class)
+@KeySequence(value = "SEQ_PLM_SCHEDULE",dbType = DbType.ORACLE)
 public class PlmConstructionInfo {
 
     private static final long serialVersionUID = 1L;

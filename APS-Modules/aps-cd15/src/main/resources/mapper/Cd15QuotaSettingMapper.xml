@@ -66,38 +66,34 @@
     </select>
 
     <delete id="deleteCd15QuotaSettingByIds" parameterType="long">
-        update t_cd15_quota_setting set del_flag = 1 where id in
+        update t_cd15_quota_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_cd15_quota_setting a USING (
-        <foreach collection="list" item="QuotaSetting" separator=" union ">
-            select
-            #{QuotaSetting.steelStripCode,jdbcType=VARCHAR} steel_strip_code,
-            #{QuotaSetting.machineId,jdbcType=DOUBLE} machine_id,
-            #{QuotaSetting.quota,jdbcType=DOUBLE} quota,
-            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
-            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
-            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_cd15_quota_setting (
+        steel_strip_code, machine_id, quota,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="QuotaSetting" separator=",">
+            (
+            #{QuotaSetting.steelStripCode,jdbcType=VARCHAR},
+            #{QuotaSetting.machineId,jdbcType=DOUBLE},
+            #{QuotaSetting.quota,jdbcType=DOUBLE},
+            #{QuotaSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.steel_strip_code is null and a.steel_strip_code is null) or (a.steel_strip_code = b.steel_strip_code))
-        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.quota = b.quota,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.steel_strip_code, a.machine_id, a.quota, a.create_by, a.create_time, a.remark, a.del_flag) values
-        (SEQ_QUOTA_SETTING.NEXTVAL, b.steel_strip_code, b.machine_id, b.quota, b.create_by, sysdate, b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        quota = VALUES(quota),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

@@ -22,15 +22,15 @@ import java.util.List;
 
 @Api(tags = {"90度裁断外协规格管理接口"})
 @RestController
-@RequestMapping("/assistSpec")
+@RequestMapping("/cd90/assistSpec")
 public class Cd90AssistSpecController extends BaseController {
 
     @Resource
     private Cd90AssistSpecService cd90AssistSpecService;
 
     @ApiOperation("根据条件查询外协规格管理列表")
-    @GetMapping("/listAssistSpec")
-    public TableDataInfo listAssistSpec(Cd90AssistSpec dto) {
+    @PostMapping("/listAssistSpec")
+    public TableDataInfo listAssistSpec(@RequestBody Cd90AssistSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<Cd90AssistSpec> list = cd90AssistSpecService.listAssistSpec(dto);
@@ -77,8 +77,8 @@ public class Cd90AssistSpecController extends BaseController {
 
     @Log(title = "ui.cd90.assistSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<Cd90AssistSpec> exportData(Cd90AssistSpec dto) {
+    @PostMapping("/exportData")
+    public List<Cd90AssistSpec> exportData(@RequestBody Cd90AssistSpec dto) {
         dto.setOrderStr(orderStr());
         List<Cd90AssistSpec> list = cd90AssistSpecService.listAssistSpec(dto);
         return list;

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.GlueScheduleStockPlatMapper">
+	<!-- 查询终炼胶库存 -->
+    <select id="listGlueStock" resultType="com.zlt.mix.schedule.engine.vo.GlueStockVo">
+        SELECT stock_Date,
+               glue,
+               ifnull(stock_num, 0) AS stock_num,
+               ifnull(stock_weight, 0) AS stock_weight,
+               valid_time AS valid_time
+          FROM T_GLUE_STOCK p
+         WHERE p.STOCK_DATE = #{stockDate}
+           AND p.del_flag = '0'
+           AND p.mix_area = #{mixArea}
+         ORDER BY valid_time
+    </select>
+	<!-- 查询母炼胶库存 -->
+    <select id="listMlGlueStock" resultType="com.zlt.mix.schedule.engine.vo.GlueStockVo">
+        SELECT stock_Date,
+               glue,
+               ifnull(stock_num, 0) AS stock_num,
+               ifnull(stock_weight, 0) AS stock_weight,
+               valid_time AS valid_time
+          FROM T_ML_GLUE_STOCK p
+         WHERE p.STOCK_DATE = #{stockDate}
+           AND p.del_flag = '0'
+           AND p.mix_area = #{mixArea}
+         ORDER BY valid_time
+    </select>
+	<!-- 查询不合格胶库存 -->
+    <select id="listBhgGlueStock" resultType="com.zlt.mix.schedule.engine.vo.GlueStockVo">
+        SELECT stock_Date,
+               glue,
+               ifnull(stock_num, 0) AS stock_num,
+               ifnull(stock_weight, 0) AS stock_weight,
+               valid_time AS valid_time
+          FROM T_BHG_GLUE_STOCK p
+         WHERE p.STOCK_DATE = #{stockDate}
+           AND p.del_flag = '0'
+           AND p.mix_area = #{mixArea}
+         ORDER BY valid_time
+    </select>
+	<!-- 查询返回胶库存 -->
+    <select id="listFhGlueStock" resultType="com.zlt.mix.schedule.engine.vo.GlueStockVo">
+        SELECT stock_Date,
+               glue,
+               ifnull(stock_num, 0) AS stock_num,
+               ifnull(stock_weight, 0) AS stock_weight,
+               valid_time AS valid_time
+          FROM T_FH_GLUE_STOCK p
+         WHERE p.STOCK_DATE = #{stockDate}
+           AND p.del_flag = '0'
+           AND p.mix_area = #{mixArea}
+         ORDER BY valid_time
+    </select>
+    <!-- 查询安全库存 -->
+    <select id="listSafeStock" resultType="com.zlt.mix.schedule.engine.vo.GlueStockVo">
+        SELECT glue,
+               ifnull(safe_stock, 0) AS Stock_Num
+          FROM T_GLUE_SAFE_STOCK p
+         WHERE p.del_flag = '0'
+           AND p.mix_area = #{mixArea}
+    </select>
+    
+    <!-- 8点到12点已完成计划量 -->
+    <select id="list12AmFinishQty" resultType="com.zlt.mix.schedule.engine.vo.GlueFinishVo">
+    	SELECT f.order_no,
+    		   SUM(f.finish_qty) finish_qty
+    	  FROM T_GLUE_PART_FINISH f
+    	 WHERE f.schedule_date = #{scheduleDate}
+    	   AND f.mix_area = #{mixArea}
+    	   AND f.del_flag = '0'
+    	 GROUP BY f.order_no, f.schedule_date
+    </select>
+    
+    <!-- 胶料待支领量 -->
+    <select id="listGlueUnclaimed" resultType="com.zlt.mix.schedule.engine.vo.GlueUnclaimed">
+    	SELECT MIX_AREA,
+    		   SCHEDULE_DATE,
+    		   GLUE,
+    		   ifnull(SUM(SHELF_NUM1), 0) SHELF_NUM1,
+    		   ifnull(SUM(SHELF_NUM2), 0) SHELF_NUM2
+    	  FROM T_GLUE_UNCLAIMED
+    	 WHERE SCHEDULE_DATE = #{scheduleDate}
+    	   AND MIX_AREA = #{mixArea}
+    	   AND DEL_FLAG = '0'
+    	 GROUP BY MIX_AREA, SCHEDULE_DATE, GLUE
+    </select>
+    
+    <!-- 预计返回胶料量 -->
+    <select id="listDailyReturnGlueStock" resultType="com.zlt.mix.schedule.engine.vo.DailyReturnGlueStockVo">
+    	<![CDATA[
+    	SELECT concat(GLUE , '-F'),
+		       STOCK_WEIGHT,
+               TRUNCATE(STOCK_WEIGHT / 2, 1) NIGHT_STOCK,
+		       STOCK_WEIGHT - TRUNCATE(STOCK_WEIGHT / 2, 1) DAY_STOCK
+		  FROM (SELECT P.GLUE,
+                       TRUNCATE(P.TOTAL_PLAN_QTY * RE.LOT_TOTAL_WEIGHT * R.RETURN_RATE / 100,
+		                     1) STOCK_WEIGHT
+		          FROM T_GLUE_COLLECT_PLAN P
+		         INNER JOIN T_FH_GLUE_RETURN_RATE R
+		            ON R.MIX_AREA = P.MIX_AREA
+		           AND R.GLUE = P.GLUE
+		          LEFT JOIN (SELECT R1.RECIPE_MATERIAL_NAME,
+		                           R1.MIX_AREA,
+		                           MIN(R1.LOT_TOTAL_WEIGHT) LOT_TOTAL_WEIGHT
+		                      FROM T_MES_PMT_RECIPE R1
+		                     INNER JOIN T_MES_BAS_MATERIAL M
+		                        ON M.MATERIAL_CODE = R1.RECIPE_MATERIAL_CODE
+		                       AND M.MAJOR_TYPE = '5'
+		                       AND M.DEL_FLAG = '0'
+		                     INNER JOIN T_RECIPE_TYPE RT
+		                        ON RT.RECIPE_TYPE_CODE = R1.RECIPE_TYPE
+		                       AND RT.DEL_FLAG = '0'
+		                     WHERE R1.AUDIT_FLAG = '1'
+		                       AND R1.RECIPE_STATE = '1'
+		                       AND R1.MIX_AREA = #{mixArea}
+		                       AND NOT EXISTS
+		                     (SELECT 1
+		                              FROM T_MES_PMT_RECIPE R2
+		                             INNER JOIN T_MES_BAS_MATERIAL M2
+		                                ON M2.MATERIAL_CODE = R2.RECIPE_MATERIAL_CODE
+		                               AND M2.MAJOR_TYPE = '5'
+		                               AND M2.DEL_FLAG = '0'
+		                             INNER JOIN T_RECIPE_TYPE RT2
+		                                ON RT2.RECIPE_TYPE_CODE = R2.RECIPE_TYPE
+		                               AND RT2.DEL_FLAG = '0'
+		                             WHERE R2.RECIPE_MATERIAL_NAME =
+		                                   R1.RECIPE_MATERIAL_NAME
+		                               AND R2.RECIPE_EQUIP_CODE =
+		                                   R1.RECIPE_EQUIP_CODE
+		                               AND R2.MIX_AREA = R1.MIX_AREA
+		                               AND R2.AUDIT_FLAG = '1'
+		                               AND R2.RECIPE_STATE = '1'
+		                               AND CASE
+		                                     WHEN RT2.RECIPE_TYPE_NAME LIKE 'C2Z%' THEN
+		                                      1
+		                                     WHEN RT2.RECIPE_TYPE_NAME LIKE 'ZZ%' THEN
+		                                      3
+		                                     WHEN RT2.RECIPE_TYPE_NAME LIKE 'CS%' THEN
+		                                      4
+		                                     WHEN RT2.RECIPE_TYPE_NAME LIKE 'S%' THEN
+		                                      5
+		                                     ELSE
+		                                      2
+		                                   END < CASE
+		                                     WHEN RT.RECIPE_TYPE_NAME LIKE 'C2Z%' THEN
+		                                      1
+		                                     WHEN RT.RECIPE_TYPE_NAME LIKE 'ZZ%' THEN
+		                                      3
+		                                     WHEN RT.RECIPE_TYPE_NAME LIKE 'CS%' THEN
+		                                      4
+		                                     WHEN RT.RECIPE_TYPE_NAME LIKE 'S%' THEN
+		                                      5
+		                                     ELSE
+		                                      2
+		                                   END
+		                            
+		                            )
+		                     GROUP BY R1.RECIPE_MATERIAL_NAME, R1.MIX_AREA) RE
+		            ON RE.RECIPE_MATERIAL_NAME = R.GLUE
+		         WHERE P.DEL_FLAG = '0'
+		           AND P.MIX_AREA = #{mixArea}
+		           AND P.PLAN_DATE = #{scheduleDate}) as GSW
+    	]]>
+    </select>
+</mapper>

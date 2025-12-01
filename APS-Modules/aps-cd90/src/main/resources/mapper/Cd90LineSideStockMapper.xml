@@ -27,10 +27,10 @@
           ) m ON m.machine_code = s.machine_code
          where del_flag='0'
         <if test="startTime != null and startTime !='' ">
-            and stock_date  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+            and stock_date  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
         <if test="endTime != null and endTime !='' ">
-            and stock_date  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-mm-dd hh24:mi:ss')
+            and stock_date  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
         </if>
         <if test="materialCode != null  and materialCode != ''">
             and INSTR(material_code, #{materialCode,jdbcType=VARCHAR}) > 0
@@ -46,9 +46,9 @@
     <!-- 删除90度裁断库存数据 -->
     <update id="deleteCd90LineSideStock">
     	UPDATE t_cd90_line_side_stock
-    	   SET del_flag = '1',
+    	   SET del_flag = NULL,
     	       update_by = #{userName, jdbcType=VARCHAR},
-    	       update_time = sysdate
+    	       update_time = now()
     	 WHERE stock_date = (
 		       SELECT max(STOCK_DATE)
 		  	      FROM MES_CD90_LINESIDE_STOCK@sync_data
@@ -72,16 +72,16 @@
           update_time, 
           del_flag
         ) 
-        SELECT SEQ_cd90_line_side_stock.NEXTVAL,
+        SELECT null,
                STOCK_DATE,
   	           BAR_CODE,
   	           MATERIAL_CODE,
   	           MACHINE_CODE,
   	           AVAILABLE_STOCK,
   	           #{userName, jdbcType=VARCHAR},
-  	           sysdate,
+  	           now(),
   	           #{userName, jdbcType=VARCHAR},
-  	           sysdate,
+  	           now(),
   	           '0'
   	      FROM MES_CD90_LINESIDE_STOCK@sync_data
   	     WHERE DATA_VERSION = #{dataVersion}

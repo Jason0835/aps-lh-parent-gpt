@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('分厂胶料需求计划列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-editable-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-glueDemandPlan-split" th:object="${glueDemandPlan}">
+        <input id="planDate" name="planDate" th:value="${#dates.format(glueDemandPlan.planDate, 'yyyy-MM-dd')}"
+               class="form-control time-input" placeholder="yyyy-MM-dd" type="hidden" disabled>
+        <span style="font-weight: bold;font-size: 13px;">[[#{schedule.glueDemandPlan.split.totalPlanQty}]]：<span style="color:red" th:text="*{@nf.stripZeros(totalPlanQty)}"></span></span>
+        <table id="bootstrap-table" ></table>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js"/>
+<script th:inline="javascript">
+    var factoryDatas = [[${@dict.getType('FACTORY')}]];
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var prefix = ctx + "schedule/glueDemandPlan";
+    var glueDemandPlan = [[${glueDemandPlan}]];
+
+    $(function () {
+        var datas = [];
+        var mixAreaArr = glueDemandPlan.mixArea.split(",");
+        for (var i = 0; i < mixAreaArr.length; i++) {
+            // 计划日期需要从文本框获取，否则会比实际日期少一天
+            datas.push({
+                'index': i,
+                "planDate": $("#planDate").val(),
+                "factory": glueDemandPlan.factory,
+                "batchNo": glueDemandPlan.batchNo,
+                "glue": glueDemandPlan.glue,
+                "mixArea": mixAreaArr[i],
+                "totalPlanQty": ''
+            });
+        }
+        datas.total = mixAreaArr.length;
+        var options = {
+            uniqueId: 'index',
+            modalName: [[#{schedule.glueDemandPlan.modelName}]],
+            data: datas,
+            showToggle: false,
+            showColumns: false,
+            showRefresh: false,
+            showSearch: false,
+            pagination: false,   //是否需要分页
+            onEditableSave: onEditableSave,
+            columns: [
+                {
+                    field: 'index',
+                    title: 'index',
+                    visible: false
+                },
+                {
+                    field: 'planDate',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.glueDemandPlan.planDate}]],
+                },
+                {
+                    field: 'factory',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.glueDemandPlan.factory}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(factoryDatas, value);
+                    }
+                },
+                {
+                    field: 'glue',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.glueDemandPlan.glue}]],
+                },
+                {
+                    field: 'mixArea',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{schedule.glueDemandPlan.mixArea}]],
+                },
+                {
+                    field: 'totalPlanQty',
+                    halign: 'center',
+                    align: 'center',
+                    width: 35,
+                    widthUnit: '%',
+                    title: [[#{schedule.glueDemandPlan.totalPlanQty}]],
+                    editable: {
+                        type: 'text',
+                        title: [[#{schedule.glueDemandPlan.totalPlanQty}]],
+                        emptytext: '-',
+                        mode: 'inline',
+                        showbuttons: false,
+                        onblur: 'submit',
+                        validate: function (value) {
+                            // 输入非负整数正则校验
+                            var regu = /^\d+$/;
+                            if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                layer.msg([[#{ui.message.editable.digits}]]);
+                                return [[#{ui.message.editable.digits}]];
+                            }
+                            if (value.length > 7) {
+                                layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                return [[#{ui.message.editable.maxSeven}]];
+                            }
+                        }
+                    },
+                },
+            ]
+        };
+        $.table.init(options, true);
+        $('#bootstrap-table').bootstrapTable('load', datas);
+    });
+
+    function onEditableSave(field, row, rowIndex, oldValue, $el) {
+    }
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var totalPlanQty = 0;
+            var bootstrapTableData = $('#bootstrap-table').bootstrapTable('getData', {
+                useCurrentPage: true,
+                includeHiddenRows: true
+            });
+            for (var i = 0; i < bootstrapTableData.length; i++) {
+                totalPlanQty = totalPlanQty + Number(bootstrapTableData[i].totalPlanQty);
+            }
+            if (glueDemandPlan.totalPlanQty != null && glueDemandPlan.totalPlanQty != totalPlanQty) {
+                $.modal.confirm([[#{schedule.glueDemandPlan.message.totalPlanQtySumInconsistent}]], function () {
+                    $.operate.save(prefix + "/splitPlan", {
+                        'id': glueDemandPlan.id,
+                        'listStr': JSON.stringify(bootstrapTableData)
+                    });
+                });
+            } else {
+                $.operate.save(prefix + "/splitPlan", {
+                    'id': glueDemandPlan.id,
+                    'listStr': JSON.stringify(bootstrapTableData)
+                });
+            }
+        }
+    }
+</script>
+</body>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+</style>
+</html>

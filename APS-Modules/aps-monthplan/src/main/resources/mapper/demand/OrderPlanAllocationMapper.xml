@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.OrderPlanAllocationMapper">
+
+    <select id="versionList" resultType="java.lang.String">
+        select distinct MONTH_PLAN_VERSION
+        from T_MP_PROC_VERSION
+        where IFNULL(IS_DELETE, 0) = 0
+          and YEAR = #{year}
+          and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and MONTH_PLAN_VERSION is not null
+    </select>
+
+    <select id="getSummaryVo" resultType="com.zlt.aps.monthplan.api.domain.vo.OrderPlanAllocationReportVo">
+        SELECT COUNT(DISTINCT PRODUCT_CODE) AS skuCount,
+               SUM(PLAN_QTY)                AS skuQty,
+               SUM(ALLOCATION_QTY)          AS stockHedgingQty,
+               SUM(PRODUCE_QTY_DUE)         AS gapQty
+        FROM T_MP_ORDER_PLAN_ALLOCATION
+        WHERE IS_DELETE = 0
+          AND `YEAR` = #{year}
+          AND `MONTH` = #{month}
+          AND FACTORY_CODE = #{factoryCode}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion}
+        <if test="productCode != null and productCode != ''">AND PRODUCT_CODE = #{productCode}</if>
+        <if test="productDesc != null and productDesc != ''">AND PRODUCT_DESC = #{productDesc}</if>
+        <if test="locationType != null and locationType != ''">AND LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND CHANNEL = #{channel}</if>
+        <if test="brand != null and brand != ''">AND BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND PRO_SIZE = #{proSize}</if>
+        <if test="specifications != null and specifications != ''">AND SPECIFICATIONS = #{specifications}</if>
+        <if test="pattern != null and pattern != ''">AND PATTERN = #{pattern}</if>
+    </select>
+
+    <select id="selectStockSum" resultType="java.lang.Double">
+        SELECT
+        <if test='locationType != null and locationType == "1"'>SUM(a.DOMESTIC_STOCK_QTY)</if>
+        <if test='locationType != null and locationType == "2"'>SUM(a.FOREIGN_STOCK_QTY)</if>
+        <if test='locationType != null and locationType == "3"'>SUM(a.OE_STOCK_QTY)</if>
+        <if test='locationType == null or locationType == ""'>SUM(a.STOCK_QTY)</if>
+        FROM t_mp_month_require_stock a
+        WHERE a.IS_DELETE = 0
+        AND a.`YEAR` = #{year}
+        AND a.`MONTH` = #{month}
+        AND a.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        <if test="productCode != null and productCode != ''">AND a.PRODUCT_CODE = #{productCode}</if>
+        <if test="productDesc != null and productDesc != ''">AND a.PRODUCT_DESC = #{productDesc}</if>
+        <if test="brand != null and brand != ''">AND a.BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND a.PRO_SIZE = #{proSize}</if>
+        <if test="specifications != null and specifications != ''">AND a.SPECIFICATIONS = #{specifications}</if>
+        <if test="pattern != null and pattern != ''">AND a.PATTERN = #{pattern}</if>
+    </select>
+</mapper>

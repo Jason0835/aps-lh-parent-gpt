@@ -3,6 +3,7 @@ package com.zlt.aps.template.tc;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -15,7 +16,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel(value = "胎侧损耗率设定对象", description = "胎侧损耗率设定对象 ")
-public class TcLossSettingTemp extends ApsBaseDto {
+public class TcLossSettingTemp extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 

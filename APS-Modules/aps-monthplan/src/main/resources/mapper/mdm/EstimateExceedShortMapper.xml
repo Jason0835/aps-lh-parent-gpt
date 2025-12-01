@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.mdm.mapper.EstimateExceedShortMapper">
+
+    <insert id="generateEstimateExceedShort">
+        insert into T_MDM_ESTIMATE_EXCEED_SHORT(YEAR, MONTH, FACTORY_CODE,PRODUCT_CODE, LOCATION_TYPE, PRODUCT_NAME, PRO_SIZE,
+        EXCEED_SHORT_QTY,CREATE_BY)
+        select
+        tb.YEAR,tb.MONTH,tb.FACTORY_CODE,tb.PRODUCT_CODE,tb.LOCATION_TYPE,tmpi.PRODUCT_TYPE_CODE,tmpi.PRO_SIZE,tb.EXCEED_SHORT_QTY,#{username}
+        from (
+        select YEAR,MONTH,FACTORY_CODE,PRODUCT_CODE,max(LOCATION_TYPE) LOCATION_TYPE,ifnull(sum(EXCEED_SHORT_QTY),0) EXCEED_SHORT_QTY
+        from (
+        select tmmppf.YEAR, tmmppf.MONTH, tmmppf.FACTORY_CODE, tmmppf.PRODUCT_CODE, tmmppf.LOCATION_TYPE,
+        <foreach collection="sumFieldList" item="item" separator=" + ">
+            -ifnull(tmmppf.${item},0)
+        </foreach>
+        as EXCEED_SHORT_QTY
+        from T_MP_MONTH_PLAN_PROD_FINAL tmmppf
+        where tmmppf.IS_DELETE = 0
+        and tmmppf.YEAR = #{generateYear}
+        and tmmppf.MONTH = #{generateMonth}
+        and tmmppf.FACTORY_CODE = #{factoryCode}
+        union all
+        select tlmps.YEAR, tlmps.MONTH, tlmps.FACTORY_CODE, tmpmr.PRODUCT_CODE, null, tlmps.MONTH_FINISH_QTY as EXCEED_SHORT_QTY
+        from T_LH_MONTH_PLAN_SURPLUS tlmps
+        left join t_mdm_product_model_relation tmpmr on tmpmr.SPEC_CODE = tlmps.SPEC_CODE
+        where tlmps.IS_DELETE = 0
+        and tlmps.YEAR = #{generateYear}
+        and tlmps.MONTH = #{generateMonth}
+        and tlmps.FACTORY_CODE = #{factoryCode}
+        ) ta
+        group by YEAR,MONTH,FACTORY_CODE,PRODUCT_CODE
+        having ifnull(sum(EXCEED_SHORT_QTY),0) != 0
+        ) tb
+        left join t_mdm_product_info tmpi on tmpi.IS_DELETE = 0 and tb.FACTORY_CODE = tmpi.FACTORY_CODE and tb.PRODUCT_CODE = tmpi.PRODUCT_CODE
+    </insert>
+
+    <select id="selectMonthPlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort">
+        select tmmppf.FACTORY_CODE,
+        tmmppf.PRODUCT_CODE,
+        tmmppf.LOCATION_TYPE,
+        ifnull(sum(
+        <foreach collection="sumFieldList" item="item" separator=" + ">
+            -ifnull(tmmppf.${item},0)
+        </foreach>
+        ),0)
+        as EXCEED_SHORT_QTY
+        from T_MP_MONTH_PLAN_PROD_FINAL tmmppf
+        where tmmppf.IS_DELETE = 0
+        and tmmppf.YEAR = #{generateYear}
+        and tmmppf.MONTH = #{generateMonth}
+        and tmmppf.FACTORY_CODE = #{factoryCode}
+        group by tmmppf.FACTORY_CODE,
+        tmmppf.PRODUCT_CODE,
+        tmmppf.LOCATION_TYPE
+    </select>
+
+    <select id="selectSurplusPlanList"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort">
+        select tlmps.FACTORY_CODE,
+               tlmps.PRODUCT_CODE,
+               IFNULL(sum(tlmps.MONTH_FINISH_QTY), 0) as EXCEED_SHORT_QTY
+        from T_LH_MONTH_PLAN_SURPLUS tlmps
+        where tlmps.IS_DELETE = 0
+          and tlmps.YEAR = #{generateYear}
+          and tlmps.MONTH = #{generateMonth}
+          and tlmps.FACTORY_CODE = #{factoryCode}
+        group by tlmps.FACTORY_CODE,
+                 tlmps.PRODUCT_CODE
+    </select>
+
+</mapper>

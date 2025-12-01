@@ -30,12 +30,12 @@
         select
         <include refid="Base_Column_List" />
         from T_SAP_EMBRYO_BAD_NUMBER
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_SAP_EMBRYO_BAD_NUMBER
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.common.engine.domain.TSapEmbryoBadNumber" useGeneratedKeys="true">
         insert into T_SAP_EMBRYO_BAD_NUMBER
@@ -111,11 +111,11 @@
                     REMARK = #{remark,jdbcType=VARCHAR},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.common.engine.domain.TSapEmbryoBadNumber">
         update T_SAP_EMBRYO_BAD_NUMBER
-        set 
+        set
             BAD_DATE =  #{badDate,jdbcType=TIMESTAMP},
             SAP_CODE =  #{sapCode,jdbcType=VARCHAR},
             EMBRYO_CODE =  #{embryoCode,jdbcType=VARCHAR},
@@ -126,7 +126,7 @@
             UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
             DEL_FLAG =  #{delFlag,jdbcType=CHAR},
             REMARK =  #{remark,jdbcType=VARCHAR}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
 
     <select id="getSapByParams" resultMap="BaseResultMap">
@@ -139,8 +139,8 @@
         <include refid="Base_Column_List"/>
         from T_SAP_EMBRYO_BAD_NUMBER
         where
-        BAD_DATE BETWEEN to_date(#{badDate}, 'yyyy-MM' )
-        AND last_day( to_date(#{badDate}, 'yyyy-MM' ) )
+        BAD_DATE BETWEEN STR_TO_DATE(#{badDate}, '%Y-%m' )
+        AND last_day( STR_TO_DATE(#{badDate}, '%Y-%m' ) )
         AND SAP_CODE in (select SAP_CODE from temp_sap_table) AND
         DEL_FLAG = 0
     </select>
@@ -155,8 +155,8 @@
         <include refid="Base_Column_List"/>
         from T_SAP_EMBRYO_BAD_NUMBER
         where
-        BAD_DATE BETWEEN to_date(#{badDate}, 'yyyy-MM' )
-        AND last_day( to_date(#{badDate}, 'yyyy-MM' ) )
+        BAD_DATE BETWEEN STR_TO_DATE(#{badDate}, '%Y-%m' )
+        AND last_day( STR_TO_DATE(#{badDate}, '%Y-%m' ) )
         AND EMBRYO_CODE in (select embryo_code from temp_embryo_table) AND
         DEL_FLAG = 0
     </select>
@@ -171,8 +171,8 @@
         sum(NVL( BAD_NUM, 0 )) as BAD_NUM, EMBRYO_CODE, BOM_DATA_VERSION
         from T_SAP_EMBRYO_BAD_NUMBER
         where  (embryo_code, bom_data_version) IN ( select embryo_code, bom_data_version from temp_table) and del_flag = '0'
-        AND BAD_DATE BETWEEN to_date(#{badDate,jdbcType=VARCHAR}, 'yyyy-MM' )
-        AND last_day( to_date(#{badDate,jdbcType=VARCHAR}, 'yyyy-MM' ) )
+        AND BAD_DATE BETWEEN STR_TO_DATE(#{badDate,jdbcType=VARCHAR}, '%Y-%m' )
+        AND last_day( STR_TO_DATE(#{badDate,jdbcType=VARCHAR}, '%Y-%m' ) )
         GROUP BY EMBRYO_CODE, BOM_DATA_VERSION
     </select>
 
@@ -188,8 +188,8 @@
             BAD_DATE = #{badDate,jdbcType=TIMESTAMP} AND
         </if>
         <if test="badStartDate != null ">
-            BAD_DATE BETWEEN to_date(#{badStartDate}, 'yyyy-MM' )
-            AND last_day( to_date(#{badStartDate}, 'yyyy-MM' ) )
+            BAD_DATE BETWEEN STR_TO_DATE(#{badStartDate}, '%Y-%m' )
+            AND last_day( STR_TO_DATE(#{badStartDate}, '%Y-%m' ) )
         </if>
         <if test="sapCode != null">
             SAP_CODE = #{sapCode,jdbcType=VARCHAR} AND
@@ -235,11 +235,12 @@
         UPDATE SET
         a.bad_num = NVL(b.bad_num, 0),
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.bad_date, a.sap_code, a.embryo_code, a.bad_num, a.create_by, a.create_time, a.remark,
         a.del_flag, a.bom_data_version) values
-        (T_SAP_EMBRYO_BAD_NUMBER_SEQ.NEXTVAL, b.bad_date, b.sap_code, b.embryo_code, NVL(b.bad_num, 0), b.create_by, sysdate, b.remark, '0', b.bom_data_version)
+        (T_SAP_EMBRYO_BAD_NUMBER_SEQ.NEXTVAL, b.bad_date, b.sap_code, b.embryo_code, NVL(b.bad_num, 0), b.create_by,
+        now(), b.remark, '0', b.bom_data_version)
     </update>
 </mapper>

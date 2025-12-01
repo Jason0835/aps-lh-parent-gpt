@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+		<artifactId>aps-api</artifactId>
+		<groupId>com.zlt.aps</groupId>
+		<version>1.0.3-SNAPSHOT</version>
+    </parent>
+
+	<groupId>com.zlt.aps.mix.setting</groupId>
+    <artifactId>mix-setting-api</artifactId>
+    <name>mix-setting-api</name>
+    <description>排程设置工序api</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+
+        <!--   通用模块 DTO     -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>mix-common-core</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+</project>

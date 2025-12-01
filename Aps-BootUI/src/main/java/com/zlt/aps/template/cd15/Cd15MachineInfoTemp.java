@@ -1,6 +1,7 @@
 package com.zlt.aps.template.cd15;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -11,7 +12,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import java.math.BigDecimal;
 
 @ApiModel(value = "15°裁断机台信息对象", description = "15°裁断机台信息对象 ")
-public class Cd15MachineInfoTemp {
+public class Cd15MachineInfoTemp extends BaseEntity {
 
     @ApiModelProperty(value = "机台编号", position = 20)
     @Excel(name = "ui.data.column.machine.machineCode")

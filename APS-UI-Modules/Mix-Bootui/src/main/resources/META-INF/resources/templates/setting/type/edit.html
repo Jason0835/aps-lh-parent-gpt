@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" >
+<head>
+    <th:block th:include="include :: header('修改配方类型')" />
+    <th:block th:include="include :: select2-css" />
+    <th:block th:include="include :: bootstrap-select-css" />
+</head>
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-type-edit" th:object="${recipeType}">
+            <input id="id" name="id" th:field="*{id}" type="hidden">
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{setting.type.recipeTypeCode}]]：</label>
+                <div class="col-sm-8">
+                    <input id="recipeTypeCode" name="recipeTypeCode" th:field="*{recipeTypeCode}"  class="form-control" type="text"  maxlength="10" isCode="true" required>
+                </div>
+            </div>
+            <div class="form-group">    
+                <label class="col-sm-3 control-label is-required">[[#{setting.type.recipeTypeName}]]：</label>
+                <div class="col-sm-8">
+                    <input id="recipeTypeName" name="recipeTypeName" th:field="*{recipeTypeName}"  class="form-control" type="text"  maxlength="50" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                <div class="col-sm-8">
+                    <textarea name="remark" class="form-control" rows="2" th:field="*{remark}"  maxlength="300"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <th:block th:include="include :: select2-js" />
+    <th:block th:include="include :: bootstrap-select-js" />
+    <script th:inline="javascript">
+        var prefix = ctx + "setting/type";
+        $("#form-type-edit").validate({
+            focusCleanup: true,
+            rules: {
+                recipeTypeCode: {
+                    remote: {
+                        url: prefix + "/checkRecipeTypeUnique",
+                        type: "post",
+                        dataType: "json",
+                        data: {
+                            "id": function () {
+                                return $("#id").val();
+                            },
+                            "recipeTypeCode": function () {
+                                return $.common.trim($("#recipeTypeCode").val());
+                            }
+                        },
+                        dataFilter: function (data, type) {
+                            return $.validate.unique(data);
+                        }
+                    }
+                },
+                recipeTypeName: {
+                    remote: {
+                        url: prefix + "/checkRecipeTypeUnique",
+                        type: "post",
+                        dataType: "json",
+                        data: {
+                            "id": function () {
+                                return $("#id").val();
+                            },
+                            "recipeTypeName": function () {
+                                return $.common.trim($("#recipeTypeName").val());
+                            }
+                        },
+                        dataFilter: function (data, type) {
+                            return $.validate.unique(data);
+                        }
+                    }
+                },
+            },
+            messages: {
+                "recipeTypeCode": {
+                    remote: [[#{setting.type.recipeTypeCode.unique}]]
+                },
+                "recipeTypeName": {
+                    remote: [[#{setting.type.recipeTypeName.unique}]]
+                }
+            },
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                if ($("#id").val() == null || $("#id").val() == '') {
+                    $.operate.save(prefix + "/save", $('#form-type-edit').serialize());
+                } else {
+                    $.operate.saveUpdateParentRow(prefix + "/save", $('#form-type-edit').serializeArray());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

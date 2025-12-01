@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>ruoyi-bootui</artifactId>
+        <groupId>com.ruoyi</groupId>
+        <version>4.7.6-SNAPSHOT</version>
+        <relativePath />
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.zlt</groupId>
+    <version>1.0.3-SNAPSHOT</version>
+    <artifactId>APS-UI-Modules</artifactId>
+    <packaging>pom</packaging>
+    <modules>
+        <module>Mix-Bootui</module>
+    </modules>
+
+    <properties>
+        <aps-api.version>1.0.3-SNAPSHOT</aps-api.version>
+        <ruoyi.version>4.7.6-SNAPSHOT</ruoyi.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-frame-starter</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-freeItem</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-billcode</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-sys-def</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-dataauth</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-message</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-all-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ruoyi.file</groupId>
+            <artifactId>aps-file-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <repositories>
+        <repository>
+            <id>nexus</id>
+            <name>nexus</name>
+            <url>http://192.168.2.95:8081/nexus/content/groups/public/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+
+        <repository>
+            <id>local-release</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
+        </repository>
+
+    </distributionManagement>
+</project>

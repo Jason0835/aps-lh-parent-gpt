@@ -118,4 +118,6 @@ public interface GsqEngineMapper {
      * @return
      */
     List<String> listAssistSpec();
+
+    void batchUpdateBatchNoAndOrderNo(@Param("list") List<GsqScheduleResultVo> scheduleResultVoList);
 }

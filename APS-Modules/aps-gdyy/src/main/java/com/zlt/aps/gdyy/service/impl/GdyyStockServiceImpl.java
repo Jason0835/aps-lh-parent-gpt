@@ -1,6 +1,6 @@
 package com.zlt.aps.gdyy.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;

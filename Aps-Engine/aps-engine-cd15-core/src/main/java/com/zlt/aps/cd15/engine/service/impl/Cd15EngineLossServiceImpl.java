@@ -57,15 +57,16 @@ public class Cd15EngineLossServiceImpl implements Cd15EngineLossService {
 			double paramLossRate) {
 		steelStripCode = (StringUtils.isBlank(steelStripCode) ? "" : steelStripCode);
 		// 如果有没有机台或有多个机台，则耗损率为0
-		if (StringUtils.isBlank(machineIds) || machineIds.indexOf(",") >= 0) {
-			return BigDecimal.ZERO.doubleValue();
+		String machineId = "";
+		if (StringUtils.isNotBlank(machineIds) && machineIds.indexOf(",") < 0) {
+		    machineId = machineIds;
 		}
 		// 第一优先级：机台+钢带编号
-		String key1 = machineIds + "#" + steelStripCode;
+		String key1 = machineId + "#" + steelStripCode;
 		// 第二优先级：钢带编号
 		String key2 = "#" + steelStripCode;
 		// 第三优先级：机台
-		String key3 = machineIds + "#";
+		String key3 = machineId + "#";
 		// 按优先级取出损耗率
 		Double lossRate = lossMap.getOrDefault(key1,
 				lossMap.getOrDefault(key2, lossMap.getOrDefault(key3, paramLossRate)));

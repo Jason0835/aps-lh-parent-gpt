@@ -20,42 +20,42 @@ public interface ITmSpecifyMachineService {
     /**
      * 根据条件查询定点机台列表
      */
-    @GetMapping("/specifyMachine/listSpecifyMachine")
-    TableDataInfo listSpecifyMachine(@SpringQueryMap TmSpecifyMachineDto dto);
+    @PostMapping("/tm/specifyMachine/listSpecifyMachine")
+    TableDataInfo listSpecifyMachine(@RequestBody TmSpecifyMachineDto dto);
 
     /**
      * 根据id查询定点机台信息
      */
-    @GetMapping("/specifyMachine/getSpecifyMachine/{id}")
+    @GetMapping("/tm/specifyMachine/getSpecifyMachine/{id}")
     TmSpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id);
 
     /**
      * 保存定点机台信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/specifyMachine/saveSpecifyMachine")
+    @PostMapping("/tm/specifyMachine/saveSpecifyMachine")
     AjaxResult saveSpecifyMachine(@RequestBody TmSpecifyMachineDto dto);
 
     /**
      * 批量删除定点机台信息(逻辑删)
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/specifyMachine/deleteSpecifyMachine/{ids}")
+    @PostMapping("/tm/specifyMachine/deleteSpecifyMachine/{ids}")
     AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids);
 
     /**
      * 删除全部定点机台信息(逻辑删)
      */
-    @PostMapping("/specifyMachine/deleteAllSpecifyMachine")
+    @PostMapping("/tm/specifyMachine/deleteAllSpecifyMachine")
     AjaxResult deleteAllSpecifyMachine();
 
     /**
      * 导出接口
      * @param dto
      */
-    @GetMapping("/specifyMachine/exportData")
-    List<TmSpecifyMachineDto> exportData(@SpringQueryMap TmSpecifyMachineDto dto);
+    @PostMapping("/tm/specifyMachine/exportData")
+    List<TmSpecifyMachineDto> exportData(@RequestBody TmSpecifyMachineDto dto);
 
-    @PostMapping("/specifyMachine/importData")
+    @PostMapping("/tm/specifyMachine/importData")
     @ApiOperation("导入胎面定点机台信息")
     public AjaxResult importData(@RequestBody List<TmSpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

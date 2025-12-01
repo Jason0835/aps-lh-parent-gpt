@@ -5,12 +5,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-engine</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.gdyy</groupId>
     <artifactId>aps-engine-gdyy</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-engine-gdyy</name>
 
     <properties>
@@ -47,19 +47,19 @@
         <dependency>
             <groupId>com.zlt.aps.gdyy</groupId>
             <artifactId>aps-gdyy-api</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.zlt.aps.common.engine</groupId>
             <artifactId>aps-engine-common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <!--   对应引擎平台的core     -->
         <dependency>
             <groupId>com.zlt.aps.gdyy</groupId>
             <artifactId>aps-plat-engine-gdyy-core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <dependency>

@@ -1,8 +1,10 @@
 package com.zlt.aps.common.core.domain;
 
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import io.swagger.annotations.ApiModelProperty;
 
@@ -12,13 +14,17 @@ import java.util.Date;
 /**
  * entity基类
  */
-public class ApsBaseDto implements Serializable {
+public class ApsBaseDto extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "备注", position = 500)
     private String remark;
 
     @ApiModelProperty(value = "删除标识：0--正常，1-删除", position = 600)
     private String delFlag;
+
+    @ApiModelProperty("删除标识：0--正常，1-删除")
+    @TableField(exist = false)
+    private Integer isDelete = 0;
 
     @ApiModelProperty(value = "创建者", position = 700)
     private String createBy;

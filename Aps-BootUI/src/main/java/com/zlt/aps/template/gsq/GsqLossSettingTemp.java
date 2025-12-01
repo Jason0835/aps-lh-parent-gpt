@@ -1,13 +1,14 @@
 package com.zlt.aps.template.gsq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "钢丝圈损耗率设定导入模板", description = "钢丝圈损耗率设定导入模板 ")
-public class GsqLossSettingTemp {
+public class GsqLossSettingTemp extends BaseEntity {
 
     @Excel(name = "ui.data.column.loss.steelRingCode",sort = 10)
     @ApiModelProperty(value = "钢丝圈代码")

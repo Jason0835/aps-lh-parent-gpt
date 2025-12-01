@@ -3,6 +3,7 @@ package com.zlt.aps.template.tc;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -19,7 +20,7 @@ import java.io.Serializable;
  */
 @Data
 @ApiModel(value="TcSpecifyMachine对象", description="胎侧定点机台表")
-public class TcSpecifyMachineTemp extends ApsBaseDto implements Serializable {
+public class TcSpecifyMachineTemp extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

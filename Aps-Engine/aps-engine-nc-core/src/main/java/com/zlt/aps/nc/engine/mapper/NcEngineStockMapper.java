@@ -17,6 +17,13 @@ public interface NcEngineStockMapper {
     List<NcStockConsumeVo> listCxPlanAndConsume(@Param("scheduleDate") String scheduleDate);
 
     /**
+     * 查询昨日早班计划量
+     * @param scheduleDate
+     * @return
+     */
+    List<NcStockConsumeVo> listLastDayMidPlan(@Param("scheduleDate") String scheduleDate);
+
+    /**
      * 查询指定日期的内衬库存量
      * @param stockDate  日期，格式：yyyy-mm-dd
      * @return

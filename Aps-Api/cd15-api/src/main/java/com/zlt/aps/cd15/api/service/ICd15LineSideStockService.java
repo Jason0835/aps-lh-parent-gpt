@@ -24,7 +24,7 @@ public interface ICd15LineSideStockService {
 	 * @param stock
 	 * @return
 	 */
-	@PostMapping("/lineSideStock/list")
+	@PostMapping("/cd15/lineSideStock/list")
 	TableDataInfo list(@RequestBody Cd15LineSideStock stock);
 
 	/**
@@ -33,7 +33,7 @@ public interface ICd15LineSideStockService {
 	 * @param ids
 	 * @return
 	 */
-	@PostMapping("/lineSideStock/syncStock")
+	@PostMapping("/cd15/lineSideStock/syncStock")
 	AjaxResult syncStock();
 
 	/**
@@ -42,6 +42,6 @@ public interface ICd15LineSideStockService {
 	 * @param stock
 	 * @return
 	 */
-	@PostMapping("/lineSideStock/exportList")
+	@PostMapping("/cd15/lineSideStock/exportList")
 	List<Cd15LineSideStock> exportList(@RequestBody Cd15LineSideStock stock);
 }

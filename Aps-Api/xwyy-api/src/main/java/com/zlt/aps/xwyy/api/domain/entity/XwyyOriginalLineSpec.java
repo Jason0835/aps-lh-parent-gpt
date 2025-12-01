@@ -1,7 +1,6 @@
 package com.zlt.aps.xwyy.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -23,7 +22,7 @@ import org.apache.ibatis.type.JdbcType;
 @Data
 @TableName("T_XWYY_ORIGINAL_LINE_SPEC")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class XwyyOriginalLineSpec extends ApsBaseEntity {
 
 	private static final long serialVersionUID = 1L;
@@ -51,15 +50,22 @@ public class XwyyOriginalLineSpec extends ApsBaseEntity {
 	private String originalLineLength;
 
 	/** 原线长度 */
-	@Excel(name = "ui.data.column.xwyy.spec.breakRollNum")
-	@ImportValidated(number = true, digits = true, min = 0, max = 999999)
+//	@Excel(name = "ui.data.column.xwyy.spec.breakRollNum")
+//	@ImportValidated(number = true, digits = true, min = 0, max = 999999)
 	@TableField(value = "BREAK_ROLL_NUM", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.DOUBLE)
 	@ApiModelProperty(value = "原线可破卷数")
-	private String breakRollNum;
+	private Integer breakRollNum;
 
 	/** 备注 */
 	@Excel(name = "ui.common.column.remark")
 	@ImportValidated(maxLength = 300)
 	@ApiModelProperty(value = "备注")
 	private String remark;
+
+	/**
+	 * 查询编号，用于精确查询
+	 */
+	@ApiModelProperty(value = "查询编号，用于精确查询")
+	@TableField(exist = false)
+	private String queryCode;
 }

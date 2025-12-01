@@ -2,6 +2,7 @@ package com.zlt.aps.gsq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
 import com.zlt.aps.gsq.entity.GsqScheduleResult;
 import org.apache.ibatis.annotations.Param;
@@ -98,7 +99,7 @@ public interface GsqScheduleResultMapper extends BaseMapper<GsqScheduleResult> {
      * @return 影响行数
      */
     public int updatePublishRecord(SchedulePublishRecord schedulePublishRecord);
-    
+
 	/**
 	 * 更新发布日志状态
 	 *
@@ -109,9 +110,9 @@ public interface GsqScheduleResultMapper extends BaseMapper<GsqScheduleResult> {
 
     int checkGsqCodeExist(GsqScheduleResult scheduleResult);
 
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
-    public int deleteByIds(long[] ids);
+    public int deleteByIds(List<Long> ids);
 
     /**
      * 根据id查询未发布记录的条数
@@ -127,4 +128,44 @@ public interface GsqScheduleResultMapper extends BaseMapper<GsqScheduleResult> {
      * @return 查询到的记录
      */
     List<GsqScheduleResult> selectByScheduleDateAndCode(GsqScheduleResult scheduleResult);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(GsqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(GsqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(GsqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量-具体到每个规格
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    List<GsqScheduleResultDto> getLastDayPlanQty4List(GsqScheduleResult scheduleResult);
+
+    /**
+     * 获取成型消耗量-具体到每个规格
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    List<GsqScheduleResultDto> getCxConsume4List(GsqScheduleResult scheduleResult);
 }

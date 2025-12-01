@@ -1,21 +1,17 @@
 package com.zlt.aps.gdyy.engine.mapper;
 
+import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo;
+import com.zlt.aps.gdyy.engine.vo.*;
+import org.apache.ibatis.annotations.Param;
+
 import java.util.Date;
 import java.util.List;
 
-import org.apache.ibatis.annotations.Param;
-
-import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
-import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
-import com.zlt.aps.gdyy.engine.vo.GdyyDayUsedVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyNoteVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyParamsVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyScheduleRecordVo;
-import com.zlt.aps.gdyy.engine.vo.GdyyScheduleResultVo;
-
 /**
  * 钢带压延排产mapper
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-16 11:40:19
@@ -25,7 +21,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 根据排产日期从成型排程获取90度裁断的基础排程信息
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 11:14:06
@@ -39,7 +35,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 根据排产日期从成型排程关联施工信息，用于施工数据校验
-	 * 
+     *
 	 * @param scheduleDate
 	 * @Param isProductStage 仅对投产阶段的规格排产
 	 * @return
@@ -49,7 +45,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 计算纤维压延日用参考量
-	 * 
+     *
 	 * @param scheduleDate    排产日
 	 * @param breadth         幅宽
 	 * @param bigRollCodeList 大卷编号列表
@@ -61,7 +57,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 抓取系统参数
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 11:21:48
@@ -71,7 +67,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 查询当前排程的批次号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-28 10:35:34
@@ -82,7 +78,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 获取钢带压延注意事项
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 16:05:37
@@ -93,7 +89,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 新增自动排产记录
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 11:01:54
@@ -104,7 +100,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 批量新增排程结果数据
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-25 11:11:56
@@ -115,7 +111,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 把排程数据同步到log表，用于备份历史信息
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 15:22:04
@@ -125,7 +121,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 删除指定日期的排程数据
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-16 15:21:52
@@ -135,7 +131,7 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 查询在施工信息中 没有对应记录的15度裁断代码
-	 * 
+     *
 	 * @param scheduleDate 排程日期
 	 * @return
 	 */
@@ -143,14 +139,14 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 批量合并排程结果表（根据唯一字段，做更新或新增）
-	 * 
+     *
 	 * @param scheduleResultList
 	 */
 	int mergeGdyyScheduleResult(@Param("scheduleResultList") List<GdyyScheduleResultDto> scheduleResultList);
 
 	/**
 	 * 获取插单需要的信息
-	 * 
+     *
 	 * @param scheduleResultList 钢带压延排程信息
 	 * @param scheduleDate       排产日
 	 * @return
@@ -161,16 +157,25 @@ public interface GdyyEngineMapper {
 
 	/**
 	 * 逻辑删除指定日期的排程主表
-	 * 
+     *
 	 * @param scheduleDate
 	 */
 	int logicDeleteGdyyScheduleRecord(GdyyScheduleRecordVo recordVo);
 
 	/**
 	 * 查询符合条件的钢带压延记录
-	 * 
+     *
 	 * @param scheduleDate
 	 * @return
 	 */
 	List<GdyyScheduleResultVo> selectGdyyScheduleList(@Param("scheduleDate") Date scheduleDate);
+
+	/**
+	 *
+	 * @param machineIdList
+	 * @return
+	 */
+	List<GdyyMachineInfo> listMachineShift(@Param("machineIdList") List<String> machineIdList);
+
+    void batchUpdateBatchNoAndOrderNo(@Param("list") List<GdyyScheduleResultVo> scheduleResultVoList);
 }

@@ -1,6 +1,6 @@
 package com.zlt.aps.gdyy.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;

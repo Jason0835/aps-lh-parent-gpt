@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.api.domain.dto;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
@@ -7,13 +8,14 @@ import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.ObjectUtils;
 
 import java.util.Date;
 import java.util.List;
 
 /**
  * 胎圈排程结果对象 t_tq_schedule_result
- * 
+ *
  * @author chen
  * @date 2021-06-24
  */
@@ -328,4 +330,40 @@ public class TqScheduleResultDto extends ApsBaseDto
     private Date newestPublishTime;
 
     private transient List<Long> ids2;
+
+    @ApiModelProperty(value = "机台名称")
+    @TableField(exist = false)
+    private String machineName;
+
+    /**
+     * 昨日早班计划量
+     */
+    @ApiModelProperty(value = "昨日早班计划量")
+    @TableField(value = "LAST_MID_PLAN_QTY")
+    private Double lastMidPlanQty = 0D;
+
+    /**
+     * 理论交班库存=成型消耗量
+     */
+    @ApiModelProperty(value = "成型消耗量")
+    @TableField(exist = false)
+    private Double cxConsumeQty = 0D;
+
+    /**
+     * 理论交班库存=昨日早班计划+库存+夜班计划-(成型昨日早班消耗量+成型夜班消耗量)
+     */
+    @ApiModelProperty(value = "理论交班库存")
+    @TableField(exist = false)
+    private Double theoreticClassStockQty = 0D;
+
+    /**
+     * 理论昨日早班计划量
+     */
+    public void calculateTheoreticClassLastDayPlanQty() {
+        Double lastMidPlanQty = ObjectUtils.defaultIfNull(this.lastMidPlanQty, 0D);
+        Double stockQty = ObjectUtils.defaultIfNull(this.stockQty, 0D);
+        Double midPlanQty = ObjectUtils.defaultIfNull(this.midPlanQty, 0D);
+        Double cxConsumeQty = ObjectUtils.defaultIfNull(this.cxConsumeQty, 0D);
+        this.theoreticClassStockQty = lastMidPlanQty + stockQty + midPlanQty - cxConsumeQty;
+    }
 }

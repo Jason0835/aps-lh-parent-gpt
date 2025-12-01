@@ -1,6 +1,7 @@
 package com.zlt.aps.template.nc;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -15,7 +16,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel(value = "内衬损耗率设定对象", description = "内衬损耗率设定对象 ")
-public class NcLossSettingTemp extends ApsBaseDto {
+public class NcLossSettingTemp extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

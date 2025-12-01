@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.nc.engine.mapper.NcEngineLossMapper">
 
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.nc.engine.vo.NcLossVo">
-        select nvl(machine_id,'') || '#' || nvl(lining_code,'') LOSS_KEY, LOSS_RATE
+        select concat(IFNULL(machine_id,'') , '#' , IFNULL(lining_code,'')) LOSS_KEY, LOSS_RATE
         from T_NC_LOSS_SETTING
         where DEL_FLAG = 0
     </select>

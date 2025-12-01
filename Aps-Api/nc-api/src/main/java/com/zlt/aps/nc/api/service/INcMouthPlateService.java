@@ -8,7 +8,6 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -63,7 +62,7 @@ public interface INcMouthPlateService {
      */
     @PostMapping("/nc/mouthPlate/exportData")
     @ApiOperation("导出内衬口型板信息")
-    public List<NcMouthPlateDto> exportData(@SpringQueryMap NcMouthPlateDto dto);
+    public List<NcMouthPlateDto> exportData(@RequestBody NcMouthPlateDto dto);
 
     @PostMapping("/nc/mouthPlate/importData")
     @ApiOperation("导入内衬口型板信息")

@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -63,6 +64,16 @@ public interface IGdyyScheduleResultService {
     @PostMapping("/gdyy/scheduleResult/changeQty")
     @ApiOperation("调量")
     public AjaxResult changeQty(@RequestBody GdyyScheduleResultDto dto);
+
+    /**
+     * 转机台
+     *
+     * @param dto 胎圈排程结果
+     * @return 结果
+     */
+    @PostMapping("/gdyy/scheduleResult/changeMachine")
+    @ApiOperation("转机台")
+    public AjaxResult changeMachine(@RequestBody GdyyScheduleResultDto dto);
 
     /**
      * 删除钢带压延排程结果
@@ -144,4 +155,24 @@ public interface IGdyyScheduleResultService {
      */
     @PostMapping("/gdyy/scheduleResult/changeReleaseStatus")
     public AjaxResult changeReleaseStatus(@RequestBody GdyyScheduleResultDto entity);
+
+    /**
+     * 导入钢带压延完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/gdyy/scheduleResult/importFinishQty")
+    @ApiOperation("导入钢带压延完成量")
+    AjaxResult importFinishQty(@RequestBody List<GdyyDayFinishQty> list, @RequestParam("importLogId") Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/gdyy/scheduleResult/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody GdyyScheduleResultDto scheduleResult);
 }

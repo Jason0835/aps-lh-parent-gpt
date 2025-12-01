@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueSpanSettingMapper">
+
+    <select id="selectGlueSpanSettingList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueSpanSetting"
+            resultType="com.zlt.mix.setting.api.domain.entity.GlueSpanSetting">
+        select id, entrust_mix_area, entrusted_mix_area, glue, create_by, create_time, update_by, update_time, del_flag,
+        remark from t_glue_span_setting
+        where del_flag = '0'
+        <if test="entrustMixArea != null  and entrustMixArea != ''">and entrust_mix_area = #{entrustMixArea}</if>
+        <if test="entrustedMixArea != null  and entrustedMixArea != ''">and entrusted_mix_area = #{entrustedMixArea}
+        </if>
+        <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueSpanSettingByIds" parameterType="String">
+        update t_glue_span_setting set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueSpanSettingNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{data.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area, #{data.glue,jdbcType=VARCHAR} glue
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_glue_span_setting m
+        inner join temp_table t on m.entrust_mix_area = t.entrust_mix_area and m.glue = t.glue and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueSpanSettingInfo">
+        insert into t_glue_span_setting
+        (id,entrust_mix_area,entrusted_mix_area,glue,create_by,create_time,update_by,update_time,del_flag,remark )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueSpanSetting" separator=" union all ">
+            select
+            #{glueSpanSetting.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{glueSpanSetting.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area,
+            #{glueSpanSetting.glue,jdbcType=VARCHAR} glue, #{glueSpanSetting.createBy,jdbcType=VARCHAR} create_by,
+            #{glueSpanSetting.createTime,jdbcType=TIMESTAMP} create_time, #{glueSpanSetting.updateBy,jdbcType=VARCHAR}
+            update_by, #{glueSpanSetting.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{glueSpanSetting.delFlag,jdbcType=VARCHAR} del_flag, #{glueSpanSetting.remark,jdbcType=VARCHAR} remark
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_glue_span_setting a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{item.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area, #{item.glue,jdbcType=VARCHAR} glue,
+            #{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=TIMESTAMP} create_time,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=TIMESTAMP} update_time,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.remark,jdbcType=VARCHAR} remark 
+        </foreach>
+        ) b ON ( a.entrust_mix_area = b.entrust_mix_area and a.glue = b.glue AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.entrusted_mix_area = b.entrusted_mix_area,
+            a.update_by = b.create_by,
+            a.update_time = now(),
+            a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.entrust_mix_area, a.entrusted_mix_area, a.glue, a.create_by, a.create_time,
+        a.del_flag, a.remark )
+        values ( get_sequence_nextval('seq_t_glue_span_setting'),
+        b.entrust_mix_area, b.entrusted_mix_area, b.glue, b.create_by, now(),
+        0,
+        b.remark )
+    </update>
+</mapper>

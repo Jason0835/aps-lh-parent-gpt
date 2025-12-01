@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.RecipeTypeMapper">
+    
+    <select id="selectRecipeTypeList" parameterType="com.zlt.mix.setting.api.domain.entity.RecipeType" resultType="com.zlt.mix.setting.api.domain.entity.RecipeType">
+        select 
+        id, 
+        recipe_type_code, 
+        recipe_type_name, 
+        create_by,
+        create_time,
+        update_by,
+        update_time,
+        del_flag,
+        remark
+        from t_recipe_type
+        <where>
+            del_flag = '0'
+            <if test="recipeTypeCode != null  and recipeTypeCode != '' "> and  instr(recipe_type_code , #{recipeTypeCode})>0 </if>
+            <if test="recipeTypeName != null  and recipeTypeName != ''"> and INSTR(recipe_type_name, #{recipeTypeName}) > 0</if>
+        </where>
+
+        <if test="orderStr == null">
+            order by (case when recipe_type_code regexp '^[0-9]+$' then recipe_type_code + 0 else 9999999 end)
+        </if>
+        <if test="orderStr != null">
+            <choose>
+                <when test="orderStr == 'recipe_type_code desc'">
+                    order by (case when recipe_type_code regexp '^[0-9]+$' then recipe_type_code + 0 else 9999999 end) desc
+                </when>
+                <when test="orderStr == 'recipe_type_code asc'">
+                    order by (case when recipe_type_code regexp '^[0-9]+$' then recipe_type_code + 0 else 9999999 end)
+                </when>
+                <otherwise>
+                    order by ${orderStr}
+                </otherwise>
+            </choose>
+        </if>
+    </select>
+
+    <delete id="deleteRecipeTypeByIds" parameterType="String">
+        update t_recipe_type set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <select id="listRecipeTypeNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.recipeTypeCode} recipe_type_code , #{data.recipeTypeName} recipe_type_name  
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy, now() createTime
+        from t_recipe_type m
+        inner join temp_table t on m.recipe_type_code = t.recipe_type_code  and m.del_flag ='0'
+        union
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy, now() createTime
+        from t_recipe_type m
+        inner join temp_table t on  m.recipe_type_name=t.recipe_type_name  and m.del_flag ='0'
+
+    </select>
+
+    <insert id="batchInsertRecipeTypeInfo">
+        insert into t_recipe_type (
+        id,
+        recipe_type_code,
+        recipe_type_name,
+        create_by,
+        create_time,
+        update_by,
+        update_time,
+        del_flag,
+        remark
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="recipeType" separator=" union all ">
+            select
+            #{recipeType.recipeTypeCode,jdbcType=DOUBLE} recipe_type_code,
+            #{recipeType.recipeTypeName,jdbcType= VARCHAR} recipe_type_name,
+            #{recipeType.createBy,jdbcType= VARCHAR} create_by,
+            #{recipeType.createTime,jdbcType=TIMESTAMP} create_time,
+            #{recipeType.updateBy,jdbcType= VARCHAR} update_by,
+            #{recipeType.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{recipeType.delFlag,jdbcType= VARCHAR} del_flag,
+            #{recipeType.remark,jdbcType= VARCHAR} remark
+            
+        </foreach>
+        ) x
+    </insert>
+
+
+    <select id="listRecipeTypeNameNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.recipeTypeName} recipe_type_name  
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy, now() createTime
+        from t_recipe_type m
+        inner join temp_table t on  m.recipe_type_name=t.recipe_type_name  and m.del_flag ='0'
+
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_recipe_type
+        (
+        recipe_type_code,
+        recipe_type_name,
+        create_by,
+        create_time,
+        del_flag,
+        remark
+        )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.recipeTypeCode, jdbcType=DOUBLE} ,
+            #{item.recipeTypeName,jdbcType=VARCHAR } ,
+            #{item.createBy,jdbcType=VARCHAR } ,
+            #{item.createTime, jdbcType=TIMESTAMP} ,
+            #{item.delFlag,jdbcType=VARCHAR } ,
+            #{item.remark,jdbcType=VARCHAR } 
+            )
+        </foreach>
+        on duplicate key
+        update
+        recipe_type_name=values(recipe_type_name),
+        update_by = values(create_by),
+        update_time = now(),
+        remark = values(remark)
+    </update>
+</mapper>

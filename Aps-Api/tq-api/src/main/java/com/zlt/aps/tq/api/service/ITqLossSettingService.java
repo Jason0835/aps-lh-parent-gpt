@@ -23,52 +23,52 @@ public interface ITqLossSettingService {
     /**
      * 查询胎圈损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/tq/loss/list")
     TableDataInfo list(@RequestBody TqLossSettingDto dto);
 
     /**
      * 新增胎圈损耗率设定
      */
-    @PostMapping("/loss/add")
+    @PostMapping("/tq/loss/add")
     AjaxResult add(@RequestBody TqLossSettingDto dto);
 
     /**
      * 修改胎圈损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/tq/loss/edit")
     AjaxResult edit(@RequestBody TqLossSettingDto dto);
 
     /**
      * 删除胎圈损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/tq/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/tq/loss/{id}")
     TqLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验胎圈损耗率设定唯一性
      */
-    @PostMapping("/loss/checkTqLossSettingUnique")
+    @PostMapping("/tq/loss/checkTqLossSettingUnique")
     String checkTqLossSettingUnique(@RequestBody TqLossSettingDto dto);
 
     /**
      * 导出胎圈损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/tq/loss/getList")
     List<TqLossSettingDto> getList(@RequestBody TqLossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/tq/loss/importData")
     @ApiOperation("导入胎圈损耗率信息")
     public AjaxResult importData(@RequestBody List<TqLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/tq/loss/deleteAll")
     AjaxResult deleteAll();
 }

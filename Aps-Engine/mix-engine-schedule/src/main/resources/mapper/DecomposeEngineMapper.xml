@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.DecomposeEngineMapper">
+
+    <sql id="decomposeColumn">
+        ID, COLLECT_BATCH_NO, BATCH_NO, PLAN_DATE, MIX_AREA, GLUE, PLAN_QTY, STOCK_QTY, SAFE_STOCK_QTY, RESERVE_STOCK_RATE, PRODUCE_QTY,MACHINE_CODE, DATA_SOURCE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_FINISHING, FINAL_GLUE_MACHINE,UP_GLUE,UP_MACHINE_CODE,DAY_FLAG
+    </sql>
+
+    <select id="listWaitForDecomposePlan" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        SELECT p.BATCH_NO AS COLLECT_BATCH_NO,  /*汇总胶料计划批次号*/
+               p.PLAN_DATE,  /*计划日期*/
+               p.MIX_AREA,  /*密炼区*/
+               p.GLUE,      /*胶料号*/
+               ifnull(p.PRODUCE_QTY,0) PLAN_QTY,  /*计划量*/
+               p.MACHINE_CODE,   /*密炼机台编号*/
+               p.IS_FINISHING,    /*收尾计划标识(1-是，准备收尾；0--否)*/
+               concat(p.glue, '-', p.MACHINE_CODE) finalGlueMachine,
+               p.IS_FINISHING   /*收尾计划标识(1-是，准备收尾；0--否)*/
+        FROM T_GLUE_COLLECT_PLAN p
+        WHERE DEL_FLAG = '0'
+        AND p.PLAN_DATE = #{planDate}
+        AND p.PRODUCE_QTY > 0
+        <if test="mixArea != null and mixArea != ''">AND p.MIX_AREA=#{mixArea}</if>
+    </select>
+
+    <select id="listRetrySpanProductQty" resultType="com.zlt.mix.schedule.engine.vo.GlueDecomposeSpanVo">
+        SELECT t.*, r.id as receive_id, r.send_id, r.ENTRUSTED_MIX_AREA, r.machine_code as receive_machine_code
+        FROM T_GLUE_DECOMPOSE_PLAN t
+        LEFT JOIN T_GLUE_SPAN_RECEIVE r on t.mix_area = r.ENTRUST_MIX_AREA and t.plan_date = r.schedule_date
+                                           and t.glue = r.glue and r.del_flag='0'
+                                           and r.id in <foreach collection="retryReceiveIdList" item="receiveId" open="(" close=")" separator=",">#{receiveId}</foreach>
+        where plan_date = #{planDate}
+         and mix_area = #{mixArea}
+         and t.del_flag='0'
+         and t.final_glue_machine in (SELECT t1.final_glue_machine
+                                      FROM T_GLUE_DECOMPOSE_PLAN t1
+                                      INNER JOIN T_GLUE_SPAN_RECEIVE r1 on t1.id = r1.schedule_id and t1.plan_date=r1.schedule_date
+                                                                           and t1.plan_date=#{planDate}
+                                      WHERE r1.id in <foreach collection="retryReceiveIdList" item="receiveId" open="(" close=")" separator=",">#{receiveId}</foreach>
+                                      )
+        order by t.final_glue_machine, (case when instr(t.glue,'/')=0 then 'ZZZ' else t.glue end) desc
+    </select>
+
+    <insert id="synclueDecomposePlanToLog">
+        insert into T_GLUE_DECOMPOSE_PLAN_LOG(<include refid="decomposeColumn"/>)
+        SELECT <include refid="decomposeColumn"/>
+        FROM T_GLUE_DECOMPOSE_PLAN
+        WHERE plan_date = #{planDate}
+        AND mix_area = #{mixArea}
+    </insert>
+
+    <delete id="deleteGlueDecomposePlan">
+        delete from t_glue_decompose_plan
+        where plan_date = #{planDate}
+        and mix_area = #{mixArea}
+    </delete>
+
+    <insert id="batchInsertGlueDecomposePlan">
+        insert into t_glue_decompose_plan (<include refid="decomposeColumn"/>)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueDecomposePlan" separator=" union all ">
+            select #{glueDecomposePlan.collectBatchNo,jdbcType= VARCHAR} collect_batch_no, #{glueDecomposePlan.batchNo,jdbcType= VARCHAR} batch_no,
+                   #{glueDecomposePlan.planDate,jdbcType=TIMESTAMP} plan_date, #{glueDecomposePlan.mixArea,jdbcType= VARCHAR} mix_area,
+                   #{glueDecomposePlan.glue,jdbcType= VARCHAR} glue, #{glueDecomposePlan.planQty,jdbcType=DOUBLE} plan_qty,
+                   #{glueDecomposePlan.stockQty,jdbcType=DOUBLE} stock_qty, #{glueDecomposePlan.safeStockQty,jdbcType=DOUBLE} safe_stock_qty, #{glueDecomposePlan.reserveStockRate,jdbcType=DOUBLE} reserve_stock_rate,
+                   #{glueDecomposePlan.produceQty,jdbcType=DOUBLE} produce_qty, #{glueDecomposePlan.machineCode,jdbcType= VARCHAR} machine_code,
+                   #{glueDecomposePlan.dataSource,jdbcType= VARCHAR} data_source, #{glueDecomposePlan.remark,jdbcType= VARCHAR} remark,
+                   #{glueDecomposePlan.delFlag,jdbcType= VARCHAR} del_flag, #{glueDecomposePlan.createBy,jdbcType= VARCHAR} create_by,
+                   #{glueDecomposePlan.createTime,jdbcType=TIMESTAMP} create_time, #{glueDecomposePlan.updateBy,jdbcType= VARCHAR} update_by,
+                   #{glueDecomposePlan.updateTime,jdbcType=TIMESTAMP} update_time,
+                   #{glueDecomposePlan.isFinishing,jdbcType= VARCHAR} is_finishing,
+                   #{glueDecomposePlan.finalGlueMachine,jdbcType= VARCHAR} FINAL_GLUE_MACHINE,
+                   #{glueDecomposePlan.upGlue,jdbcType= VARCHAR} UP_GLUE,
+                   #{glueDecomposePlan.upMachineCode,jdbcType= VARCHAR} UP_MACHINE_CODE,
+                   #{glueDecomposePlan.dayFlag,jdbcType= VARCHAR} DAY_FLAG
+            from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="updateDecomposePlanDelFlag">
+        UPDATE t_glue_decompose_plan
+        SET DEL_FLAG = '1'
+        WHERE 1=1
+        AND (PLAN_DATE, MIX_AREA, GLUE) IN <foreach collection="list" item="plan" open="(" close=")" separator=",">(#{plan.planDate}, #{plan.mixArea}, #{plan.glue})</foreach>
+    </update>
+
+    <select id="listSameFinalGlueDecomposePlan" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        SELECT *
+        FROM t_glue_decompose_plan t
+        where plan_date = #{planDate}
+        and final_glue_machine = #{finalGlueMachine}
+        order by glue
+    </select>
+
+    <select id="queryDecomposePlanBatchNo" resultType="java.lang.String">
+        SELECT MAX(BATCH_NO) BATCH_NO
+        FROM T_GLUE_DECOMPOSE_PLAN
+        WHERE DEL_FLAG = '0'
+        AND PLAN_DATE = #{planDate}
+        AND MIX_AREA = #{mixArea}
+    </select>
+
+    <select id="querySonDecompose" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        SELECT *
+        FROM T_GLUE_DECOMPOSE_PLAN
+        WHERE DEL_FLAG = '0'
+        AND PLAN_DATE = #{planDate}
+        AND mix_area = #{mixArea}
+        and (UP_GLUE = #{upGlue}
+                 or UP_GLUE like concat(#{upGlue}, ',%')
+                 or UP_GLUE like concat('%,', #{upGlue})
+                 or UP_GLUE like concat('%,', #{upGlue}, ',%'))
+<!--        <if test="finalGlueMachine != null and finalGlueMachine != ''">-->
+<!--            and final_glue_machine = #{finalGlueMachine}-->
+<!--        </if>-->
+
+    </select>
+
+    <select id="queryDecompose" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        SELECT *
+        FROM T_GLUE_DECOMPOSE_PLAN
+        WHERE DEL_FLAG = '0'
+        AND PLAN_DATE = #{planDate}
+        AND mix_area = #{mixArea}
+        and Glue = #{upGlue}
+    </select>
+    
+    <select id="selectHistoryListByPlanList"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        select * from t_glue_decompose_plan 
+        WHERE DEL_FLAG = '0'
+        AND (PLAN_DATE, MIX_AREA, GLUE) IN
+        <foreach collection="list" item="plan" open="(" close=")" separator=",">(#{plan.planDate}, #{plan.mixArea}, #{plan.glue})</foreach>
+    </select>
+    
+    <select id="selectDecomposeList" resultType="com.zlt.mix.schedule.api.domain.entity.GlueDecomposePlan">
+        select * from t_glue_decompose_plan
+        WHERE DEL_FLAG = '0'
+          and MIX_AREA = #{mixArea}
+          and PLAN_DATE = #{planDate}
+    </select>
+</mapper>

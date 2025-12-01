@@ -21,7 +21,7 @@ import java.util.Date;
 @Data
 @TableName("T_CX_STOCK")
 @ApiModel(value = "CxStock对象", description = "成型库存信息")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class CxStock extends ApsBaseEntity {
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
@@ -40,8 +40,8 @@ public class CxStock extends ApsBaseEntity {
     /**
      * 施工版本信息
      */
-    @Excel(name = "ui.data.column.productStatus.bomDataVersion")
-    @ImportValidated(required = true,maxLength = 30)
+    //@Excel(name = "ui.data.column.productStatus.bomDataVersion")
+    // @ImportValidated(required = true,maxLength = 30)
     private  String bomDataVersion;
 
     @ApiModelProperty(value = "胎胚代码")
@@ -53,7 +53,7 @@ public class CxStock extends ApsBaseEntity {
     /**
      * 排程使用库存
      */
-    @Excel(name = "ui.data.column.stock.scheduleUseStock")
+    @Excel(name = "ui.data.column.stock.scheduleUseStock",type = Excel.Type.EXPORT)
     private Long scheduleUseStock;
 
     @ApiModelProperty(value = "库存量(可用)")
@@ -67,8 +67,8 @@ public class CxStock extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "不可用库存")
     @TableField("UNAVAILABLE_STOCK")
-    @ImportValidated(digits = true, min = 0, max = 999999)
-    @Excel(name = "ui.data.column.stock.unavailableStock")
+  // @ImportValidated(digits = true, min = 0, max = 999999)
+  // @Excel(name = "ui.data.column.stock.unavailableStock")
     private Long unavailableStock;
 
     @ApiModelProperty(value = "超期库存")

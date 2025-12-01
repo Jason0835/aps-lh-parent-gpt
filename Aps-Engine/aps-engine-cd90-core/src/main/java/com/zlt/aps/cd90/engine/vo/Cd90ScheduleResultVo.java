@@ -1,16 +1,16 @@
 package com.zlt.aps.cd90.engine.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
+import lombok.Data;
+
 import java.math.BigDecimal;
 import java.util.Date;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.zlt.aps.common.core.domain.ApsBaseDto;
-
-import lombok.Data;
-
 /**
  * 90度裁断排程结果值对象
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-14 10:56:49
@@ -133,21 +133,79 @@ public class Cd90ScheduleResultVo extends ApsBaseDto {
 	 * 工艺
 	 */
 	private String craft;
-	
+
 	/**
 	 * 半钢边胶
 	 */
 	private String edgeGlue;
-	
+
 	/**
 	 * 总计划量
 	 */
 	private BigDecimal totalPlanQty;
-    
-    /**
+
+	/**
      * 收尾规格标记，0：收尾1：非收尾
      */
     private String closeOutSpecFlag;
+
+    /**
+     * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
+     */
+    private Double planStockQty;
+
+    /**
+     * 上一天早班计划
+     */
+    private Double lastMidPlanQty;
+
+    /**
+     * 夜班与早班的交接班库存
+     */
+    private double classStock;
+
+    /**
+     * 库存供需比例，交接班库存/成型一天需求量
+     */
+    private double supplyDemandRatio;
+
+    /**
+	 * 次日夜班计划
+     */
+    private double nextDayPlanQty;
+
+	/**
+     * 剩余量
+     */
+    private double surplusQty;
+
+	/**
+     * 层数
+     */
+    private Integer layers;
+
+	/**
+     * 供应成型规格数
+     */
+    private Integer specCount;
+
+	/**
+     * 是否夜班生产规格
+     */
+    private Boolean isNightSpec;
+
+	/**
+     * 是否大需求量规格
+     */
+    private Boolean isLargeDemandSpec;
+
+    /**
+     * 隔天程序需求量，虚拟字段，用于排序
+     * @return
+     */
+    public Double getNextDayCxPlanQty() {
+        return BigDecimalUtil.add(this.cxClass3Plan, this.cxClass4Plan);
+    }
 
 	@Override
 	public String toString() {

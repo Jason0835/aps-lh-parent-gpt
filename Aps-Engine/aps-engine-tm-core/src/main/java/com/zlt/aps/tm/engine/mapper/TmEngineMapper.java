@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.mapper;
 
 
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.engine.vo.TmParamsVo;
 import com.zlt.aps.tm.engine.vo.TmScheduleBaseInfoVo;
 import com.zlt.aps.tm.engine.vo.TmScheduleResultVo;
@@ -119,6 +120,12 @@ public interface TmEngineMapper {
      */
     List<String> listAssistSpec();
 
+    int createTempTable();
+
+    int dropTempTable();
+
+    int insertTempTable(@Param("scheduleResultList") List<TmScheduleResultVo> scheduleResultList);
+
     /**
      * 批量更新各班的计划量
      * @param scheduleDate 排程日期
@@ -128,11 +135,27 @@ public interface TmEngineMapper {
 
 	/**
 	 * 查询当天的收尾规格
-	 * 
+     *
 	 * @param scheduleDate   排程日期
 	 * @param closeOutDays   收尾判断天数，
 	 * @param isProductStage 是否投产规格
 	 */
 	List<String> listCloseOutSpec(@Param("scheduleDate") Date scheduleDate, @Param("closeOutDays") int closeOutDays,
 			@Param("isProductStage") boolean isProductStage);
+
+    /**
+     * 查询成型消耗量
+     *
+     * @param scheduleDate 排程日期
+     * @return 结果
+     */
+    List<TmScheduleResult> getCxConsume4List(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 根据ID批量更新对应的批次号及工单号
+     *
+     * @param tmScheduleResultList 排程列表
+     * @return 影响行数
+     */
+    int batchUpdateBatchNoAndOrderNo(@Param("list") List<TmScheduleResultVo> tmScheduleResultList);
 }

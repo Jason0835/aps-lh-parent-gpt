@@ -27,7 +27,7 @@ import java.util.List;
  */
 @Api(tags = "胎面库存信息维护接口")
 @RestController
-@RequestMapping("/stock")
+@RequestMapping("/tm/stock")
 public class TmStockController extends BaseController {
     @Autowired
     private TmStockService tTmStockService;
@@ -95,7 +95,7 @@ public class TmStockController extends BaseController {
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.DELETE)
     @ApiOperation("根据id批量删除胎面库存信息")
     @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids", paramType = "remove")
+            @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids", paramType = "body")
     })
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids) {

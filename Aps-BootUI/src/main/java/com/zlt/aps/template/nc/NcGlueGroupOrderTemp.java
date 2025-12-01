@@ -1,6 +1,7 @@
 package com.zlt.aps.template.nc;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
@@ -16,7 +17,7 @@ import java.io.Serializable;
  */
 @Data
 @ApiModel(value = "NcGlueGroupOrder对象", description = "内衬胶料组别顺序维护")
-public class NcGlueGroupOrderTemp extends ApsBaseDto implements Serializable {
+public class NcGlueGroupOrderTemp extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1110056585174675869L;
 

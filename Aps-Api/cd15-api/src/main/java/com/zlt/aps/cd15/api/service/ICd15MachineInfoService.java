@@ -23,7 +23,7 @@ public interface ICd15MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/cd15/machine/list")
     TableDataInfo list(@RequestBody Cd15MachineInfo machineInfo);
 
     /**
@@ -32,7 +32,7 @@ public interface ICd15MachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/cd15/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface ICd15MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/cd15/machine")
     AjaxResult add(@Validated @RequestBody Cd15MachineInfo machineInfo);
 
     /**
@@ -50,7 +50,7 @@ public interface ICd15MachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/cd15/machine/{id}")
     Cd15MachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface ICd15MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/cd15/machine")
     AjaxResult edit(@Validated @RequestBody Cd15MachineInfo machineInfo);
 
     /**
@@ -68,7 +68,7 @@ public interface ICd15MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/cd15/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody Cd15MachineInfo machineInfo);
 
     /**
@@ -77,7 +77,7 @@ public interface ICd15MachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/cd15/machine/exportList")
     List<Cd15MachineInfo> exportList(@RequestBody Cd15MachineInfo machineInfo);
 
     /**
@@ -86,10 +86,10 @@ public interface ICd15MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list2")
+    @PostMapping("/cd15/machine/list2")
     List<Cd15MachineInfo> list2(@RequestBody Cd15MachineInfo machineInfo);
 
-    @PostMapping("/machine/importData")
+    @PostMapping("/cd15/machine/importData")
     @ApiOperation("导入15度裁断机台信息")
     public AjaxResult importData(@RequestBody List<Cd15MachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

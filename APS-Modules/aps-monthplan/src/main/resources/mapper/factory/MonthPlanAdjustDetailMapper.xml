@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.factory.mapper.MonthPlanAdjustDetailMapper">
+
+    <select id="getNoticeDetail" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanAdjustDetailVo">
+        SELECT mpad.PRODUCTION_NO,
+               mpad.FACTORY_CODE,
+               mpad.YEAR,
+               mpad.MONTH,
+               mpad.PRODUCT_CODE,
+               mpad.PRODUCT_DESC,
+               mpad.START_DATE,
+               mpad.ADJUST_TYPE,
+               mpad.ADJUST_QTY,
+               mppf.PRO_SIZE,
+               mppf.CHANNEL,
+               mppf.LOCATION_TYPE
+          FROM t_mp_month_plan_adjust_detail mpad
+          LEFT JOIN t_mp_month_plan_prod_final mppf
+            ON mpad.PRODUCTION_NO = mppf.PRODUCTION_NO
+           AND mpad.FACTORY_CODE = mppf.FACTORY_CODE
+           AND mpad.YEAR = mppf.YEAR
+           AND mpad.MONTH = mppf.MONTH
+         WHERE IFNULL(mpad.IS_DELETE, 0) = 0
+           AND mpad.NOTICE_NO = #{noticeNo,jdbcType=VARCHAR}
+         ORDER BY mpad.ADJUST_QTY DESC,mpad.PRODUCTION_NO
+    </select>
+</mapper>

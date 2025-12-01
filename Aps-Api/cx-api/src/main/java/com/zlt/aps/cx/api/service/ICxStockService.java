@@ -15,7 +15,7 @@ import java.util.List;
  *
  * @author Joran.Zhang
  */
-@FeignClient(contextId = "cxStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
+@FeignClient(contextId = "cxStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:cxlh}")
 public interface ICxStockService {
 
     /**
@@ -24,7 +24,7 @@ public interface ICxStockService {
      * @param cxStock
      * @return
      */
-    @PostMapping("/cx/stock/list")
+    @PostMapping("/cxStock/list")
     TableDataInfo list(@RequestBody CxStock cxStock);
 
     /**
@@ -33,8 +33,8 @@ public interface ICxStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/cx/stock/remove/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @DeleteMapping("/cxStock/remove")
+    AjaxResult remove(@RequestBody Long[] ids);
 
     /**
      * 新增成型库存信息
@@ -42,7 +42,7 @@ public interface ICxStockService {
      * @param cxStock
      * @return
      */
-    @PostMapping("/cx/stock/add")
+    @PostMapping("/cxStock/add")
     AjaxResult add(@Validated @RequestBody CxStock cxStock);
 
 
@@ -52,18 +52,8 @@ public interface ICxStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/cx/stock/selectCxStockById/{id}")
-    CxStock selectCxStockById(@PathVariable("id") Long id);
-
-
-    /**
-     * 根据ID获取详细信息
-     *
-     * @param id
-     * @return
-     */
-    @GetMapping(value = "/cx/stock/getInfo/{id}")
-    AjaxResult getInfo(@PathVariable("id") Long id);
+    @GetMapping(value = "/cxStock/{billId}")
+    CxStock selectCxStockById(@PathVariable("billId") Long id);
 
     /**
      * 修改成型库存信息
@@ -71,7 +61,7 @@ public interface ICxStockService {
      * @param cxStock
      * @return
      */
-    @PutMapping("/cx/stock/edit")
+    @PutMapping("/cxStock/edit")
     AjaxResult edit(@Validated @RequestBody CxStock cxStock);
 
     /**
@@ -80,20 +70,12 @@ public interface ICxStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/cx/stock/exportList")
+    @PostMapping("/cxStock/exportList")
     List<CxStock> exportList(@RequestBody CxStock stock);
 
     /**
      * 导入数据
      */
-    @PostMapping("/cx/stock/importData")
+    @PostMapping("/cxStock/importData")
     public AjaxResult importData(@RequestBody List<CxStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
-    /**
-     * 释放不可用库存
-     * @param ids 待释放库存ID列表
-     * @return
-     */
-    @PostMapping("/cx/stock/releaseStock")
-    AjaxResult releaseStock(@RequestBody Long[] ids);
 }

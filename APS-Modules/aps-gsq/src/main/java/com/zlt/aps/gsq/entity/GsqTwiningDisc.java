@@ -22,13 +22,13 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_GSQ_TWINING_DISC")
 @ApiModel(value = "GsqTwiningDisc对象", description = "钢丝圈缠绕盘信息表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class GsqTwiningDisc extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "编号，描述对应的缠绕盘所在信息对应内部编号信息，编号规则为唯一不可重复，每个缠绕盘都存在对应的唯一编号信息。")

@@ -3,7 +3,7 @@
 <mapper namespace="com.zlt.aps.tm.engine.mapper.TmEngineMonthSurplusMapper">
 
     <select id="listTmMonthPlanSurplus" parameterType="string" resultType="com.zlt.aps.tm.engine.vo.TmMonthSurplusVo">
-        SELECT MATERIAL_CODE, nvl(MONTH_FINISH_QTY, 0) MONTH_FINISH_QTY, nvl(MONTH_REMAIN_QTY, 0) MONTH_REMAIN_QTY
+        SELECT MATERIAL_CODE, IFNULL(MONTH_FINISH_QTY, 0) MONTH_FINISH_QTY, IFNULL(MONTH_REMAIN_QTY, 0) MONTH_REMAIN_QTY
         FROM T_TM_MONTH_PLAN_SURPLUS
         where DEL_FLAG = '0'
         and YEAR = #{year}

@@ -8,7 +8,6 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -73,7 +72,7 @@ public interface ICd15QuotaSettingService {
      */
     @PostMapping("/cd15/quota/export")
     @ApiOperation("导出15度裁断定额设定信息")
-    public List<Cd15QuotaSettingDto> exportData(@SpringQueryMap Cd15QuotaSettingDto dto);
+    public List<Cd15QuotaSettingDto> exportData(@RequestBody Cd15QuotaSettingDto dto);
 
     @PostMapping("/cd15/quota/importData")
     @ApiOperation("导入15度裁断定额设定信息")

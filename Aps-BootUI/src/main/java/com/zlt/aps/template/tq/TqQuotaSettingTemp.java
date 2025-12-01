@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "胎圈定额设定导入模板", description = "胎圈定额设定导入模板 ")
-public class TqQuotaSettingTemp {
+public class TqQuotaSettingTemp extends ApsBaseEntity {
 
     @Excel(name = "ui.data.column.quota.beadCode")
     @ApiModelProperty(value = "胎圈代码")

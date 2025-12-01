@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.FhGlueStockMapper">
+
+    <select id="selectFhGlueStockList" parameterType="com.zlt.mix.setting.api.domain.entity.FhGlueStock"
+            resultType="com.zlt.mix.setting.api.domain.entity.FhGlueStock">
+        <![CDATA[
+        select s.id, 
+               s.stock_date, 
+               s.mix_area, 
+               s.glue, 
+               s.stock_num, 
+               s.remark, 
+               s.del_flag, 
+               s.create_by, 
+               s.create_time, 
+               s.update_by,
+               s.update_time,
+               s.bar_code,
+               s.valid_time,
+               s.stock_weight,
+               p.RETURN_WEIGHT
+          from t_fh_glue_stock s
+          LEFT JOIN (SELECT concat(P.GLUE, '-F') glue,
+		                    TRUNCATE(P.TOTAL_PLAN_QTY * RE.LOT_TOTAL_WEIGHT *
+		                          R.RETURN_RATE / 100,
+		                          1) RETURN_WEIGHT,
+		                    P.PLAN_DATE,
+		                    P.MIX_AREA
+		               FROM T_GLUE_COLLECT_PLAN P
+		              INNER JOIN T_FH_GLUE_RETURN_RATE R
+		                 ON R.MIX_AREA = P.MIX_AREA
+		                AND R.GLUE = P.GLUE
+		               LEFT JOIN (SELECT R1.RECIPE_MATERIAL_NAME,
+		                                R1.MIX_AREA,
+		                                MIN(R1.LOT_TOTAL_WEIGHT) LOT_TOTAL_WEIGHT
+		                           FROM T_MES_PMT_RECIPE R1
+		                          INNER JOIN T_MES_BAS_MATERIAL M
+		                             ON M.MATERIAL_CODE = R1.RECIPE_MATERIAL_CODE
+		                            AND M.MAJOR_TYPE = '5'
+		                            AND M.DEL_FLAG = '0'
+		                          INNER JOIN T_RECIPE_TYPE RT
+		                             ON RT.RECIPE_TYPE_CODE = R1.RECIPE_TYPE
+		                            AND RT.DEL_FLAG = '0'
+		                          WHERE R1.AUDIT_FLAG = '1'
+		                            AND R1.RECIPE_STATE = '1'
+		                            AND NOT EXISTS
+		                                (SELECT 1
+		                                   FROM T_MES_PMT_RECIPE R2
+		                                  INNER JOIN T_MES_BAS_MATERIAL M2
+		                                     ON M2.MATERIAL_CODE =
+		                                        R2.RECIPE_MATERIAL_CODE
+		                                    AND M2.MAJOR_TYPE = '5'
+		                                    AND M2.DEL_FLAG = '0'
+		                                  INNER JOIN T_RECIPE_TYPE RT2
+		                                     ON RT2.RECIPE_TYPE_CODE = R2.RECIPE_TYPE
+		                                    AND RT2.DEL_FLAG = '0'
+		                                  WHERE R2.RECIPE_MATERIAL_NAME =
+		                                        R1.RECIPE_MATERIAL_NAME
+		                                    AND R2.RECIPE_EQUIP_CODE =
+		                                        R1.RECIPE_EQUIP_CODE
+		                                    AND R2.MIX_AREA = R1.MIX_AREA
+		                                    AND R2.AUDIT_FLAG = '1'
+		                                    AND R2.RECIPE_STATE = '1'
+		                                    AND CASE
+		                                          WHEN RT2.RECIPE_TYPE_NAME LIKE
+		                                               'C2Z%' THEN
+		                                           1
+		                                          WHEN RT2.RECIPE_TYPE_NAME LIKE 'ZZ%' THEN
+		                                           3
+		                                          WHEN RT2.RECIPE_TYPE_NAME LIKE 'CS%' THEN
+		                                           4
+		                                          WHEN RT2.RECIPE_TYPE_NAME LIKE 'S%' THEN
+		                                           5
+		                                          ELSE
+		                                           2
+		                                        END < CASE
+		                                          WHEN RT.RECIPE_TYPE_NAME LIKE 'C2Z%' THEN
+		                                           1
+		                                          WHEN RT.RECIPE_TYPE_NAME LIKE 'ZZ%' THEN
+		                                           3
+		                                          WHEN RT.RECIPE_TYPE_NAME LIKE 'CS%' THEN
+		                                           4
+		                                          WHEN RT.RECIPE_TYPE_NAME LIKE 'S%' THEN
+		                                           5
+		                                          ELSE
+		                                           2
+		                                        END
+		                                 )
+		                          GROUP BY R1.RECIPE_MATERIAL_NAME, R1.MIX_AREA) RE
+		                 ON RE.RECIPE_MATERIAL_NAME = R.GLUE
+		                AND RE.MIX_AREA = R.MIX_AREA
+		              WHERE P.DEL_FLAG = '0'
+		             ) P
+		    ON P.GLUE = S.GLUE
+		   AND P.PLAN_DATE = DATE_ADD(S.STOCK_DATE, INTERVAL 1 DAY)
+		   AND P.MIX_AREA = S.MIX_AREA
+        where s.del_flag = '0'
+        ]]>
+        <if test="stockDate != null ">and s.stock_date = #{stockDate}</if>
+        <if test="mixArea != null  and mixArea != ''">and s.mix_area = #{mixArea}</if>
+        <if test="glue != null  and glue != ''">and INSTR(s.glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by stock_date desc,valid_time asc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteFhGlueStockByIds" parameterType="String">
+        update t_fh_glue_stock set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listFhGlueStockNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber} row_numbers, #{data.stockDate,jdbcType=TIMESTAMP} STOCK_DATE,
+            #{data.barCode,jdbcType= VARCHAR} bar_code
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_fh_glue_stock m
+        inner join temp_table t on m.STOCK_DATE = t.STOCK_DATE and m.bar_code = t.bar_code and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertFhGlueStockInfo">
+        insert into t_fh_glue_stock
+        (id,stock_date,mix_area,glue,stock_num,remark,del_flag,create_by,create_time,update_by,update_time,bar_code,valid_time,stock_weight)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="fhGlueStock" separator=" union all ">
+            select
+            #{fhGlueStock.stockDate,jdbcType=TIMESTAMP} stock_date, #{fhGlueStock.mixArea,jdbcType= VARCHAR} mix_area,
+            #{fhGlueStock.glue,jdbcType= VARCHAR} glue, #{fhGlueStock.stockNum,jdbcType=DOUBLE} stock_num,
+            #{fhGlueStock.remark,jdbcType= VARCHAR} remark, #{fhGlueStock.delFlag,jdbcType= VARCHAR} del_flag,
+            #{fhGlueStock.createBy,jdbcType= VARCHAR} create_by, #{fhGlueStock.createTime,jdbcType=TIMESTAMP} create_time,
+            #{fhGlueStock.updateBy,jdbcType= VARCHAR} update_by, #{fhGlueStock.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{fhGlueStock.barCode,jdbcType=VARCHAR} bar_code,#{fhGlueStock.validTime, jdbcType=TIMESTAMP} valid_time,
+            #{fhGlueStock.stockWeight,jdbcType=DOUBLE} stock_weight
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_fh_glue_stock a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.stockDate, jdbcType=TIMESTAMP} stock_date,
+            #{item.mixArea,jdbcType=VARCHAR } mix_area, #{item.glue,jdbcType=VARCHAR } glue,
+            #{item.stockNum, jdbcType=DECIMAL} stock_num, #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag, #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time,
+            #{item.barCode,jdbcType=VARCHAR } bar_code,#{item.validTime, jdbcType=TIMESTAMP} valid_time,
+            #{item.stockWeight,jdbcType=DOUBLE} stock_weight
+            
+        </foreach>
+        ) b ON ( a.stock_date = b.stock_date and a.bar_code=b.bar_code AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.stock_num = b.stock_num, a.remark =
+            b.remark, a.update_by = b.create_by,
+            a.update_time = now(),
+            a.mix_area = b.mix_area,a.glue = b.glue,a.valid_time=b.valid_time,
+            a.stock_weight=b.stock_weight
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.stock_date, a.mix_area, a.glue, a.stock_num, a.remark, a.del_flag, a.create_by,
+        a.create_time,a.bar_code,a.valid_time,a.stock_weight)
+        values ( get_sequence_nextval('seq_t_fh_glue_stock'), b.stock_date, b.mix_area, b.glue, b.stock_num, b.remark,
+        0, b.create_by,
+        now(),b.bar_code,b.valid_time,
+        b.stock_weight
+        )
+    </update>
+</mapper>

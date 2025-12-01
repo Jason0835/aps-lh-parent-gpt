@@ -1,7 +1,10 @@
 package com.zlt.aps.tm.mapper;
 
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -14,7 +17,7 @@ import java.util.Map;
  * @author zlt
  * @date 2021-06-17
  */
-public interface TmScheduleResultMapper {
+public interface TmScheduleResultMapper extends CommBaseMapper<TmScheduleResult> {
     /**
      * 查询胎面排程结果
      *
@@ -73,7 +76,7 @@ public interface TmScheduleResultMapper {
      *
      * @param ids
      */
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
     /**
      * 保存发布日志
@@ -115,7 +118,7 @@ public interface TmScheduleResultMapper {
 
     /**
      * 更改发布状态
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     public int changeReleaseStatus(TmScheduleResult entity);
@@ -126,7 +129,7 @@ public interface TmScheduleResultMapper {
      * @return 影响行数
      */
     public int updatePublishRecord(SchedulePublishRecord schedulePublishRecord);
-    
+
 	/**
 	 * 更新发布日志状态
 	 *
@@ -158,4 +161,69 @@ public interface TmScheduleResultMapper {
      * @return 查询到的记录
      */
     List<TmScheduleResult> selectByScheduleDateAndCode(TmScheduleResult scheduleResult);
+
+    /**
+     * 查询出对应的施工信息字段
+     *
+     * @param embryoCodeList  施工代码
+     * @param productionStage 仅投产阶段规格排产标识
+     * @return 结果
+     */
+    List<EngineConstructionInfo> listConstruction(@Param("embryoCodeList") List<String> embryoCodeList, @Param("productionStage") String productionStage);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 获取昨日早班计划量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<TmScheduleResult> getLastDayPlanQty4List(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 获取成型消耗量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<TmScheduleResult> getCxConsume4List(TmScheduleResult tmScheduleResult);
+
+    /**
+     * 根据原机台id和班次计划量查询排程结果
+     *
+     * @param scheduleResult 机台ID、班次
+     * @return 排程结果
+     */
+    List<TmScheduleResult> selectBySourceMachineIdAndShiftPlanQty(TmScheduleResult scheduleResult);
+
+    /**
+     * 根据目标机台id查询排程结果
+     *
+     * @param scheduleResult 目标机台ID、排程日期
+     * @return 排程结果
+     */
+    List<TmScheduleResult> selectByTargetMachineIdAndShiftPlanQty(TmScheduleResult scheduleResult);
 }

@@ -30,6 +30,7 @@ public class XwyyBigRollRemind extends ApsBaseEntity{
     private String bigRollCode;
 
     /** 提醒标识 */
+    @ImportValidated(required = true)
     @Excel(name = "ui.data.column.bigRollRemind.remindFlag", dictType = "ISORNOT")
     @ApiModelProperty(value = "提醒标识")
     private String remindFlag;

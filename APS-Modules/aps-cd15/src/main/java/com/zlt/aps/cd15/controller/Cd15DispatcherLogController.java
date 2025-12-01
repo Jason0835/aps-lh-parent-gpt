@@ -17,7 +17,7 @@ import java.util.List;
  * @date 2022-02-25
  */
 @RestController
-@RequestMapping("/dispatcherLog")
+@RequestMapping("/cd15/dispatcherLog")
 public class Cd15DispatcherLogController extends BaseController
 {
     @Autowired

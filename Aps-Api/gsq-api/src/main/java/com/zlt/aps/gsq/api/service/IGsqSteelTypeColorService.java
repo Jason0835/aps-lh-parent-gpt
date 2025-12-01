@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqSteelTypeColorDto;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -52,8 +51,8 @@ public interface IGsqSteelTypeColorService {
      * 导出接口
      * @param dto
      */
-    @GetMapping("/gsqSteelTypeColor/exportData")
-    List<GsqSteelTypeColorDto> exportData(@SpringQueryMap GsqSteelTypeColorDto dto);
+    @PostMapping("/gsqSteelTypeColor/exportData")
+    List<GsqSteelTypeColorDto> exportData(@RequestBody GsqSteelTypeColorDto dto);
 
     @PostMapping("/gsqSteelTypeColor/importData")
     @ApiOperation("导入钢丝圈颜色信息")

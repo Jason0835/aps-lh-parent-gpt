@@ -6,12 +6,12 @@
     <parent>
         <artifactId>aps-modules</artifactId>
         <groupId>com.zlt.aps</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.mps</groupId>
     <artifactId>aps-mps</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-mps</name>
     <description>对接主计划相关接口模块</description>
 
@@ -33,7 +33,7 @@
         <dependency>
             <groupId>com.zlt.aps.mps</groupId>
             <artifactId>aps-mps-api</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <!-- APS公共模块 -->
@@ -44,14 +44,14 @@
         <dependency>
             <groupId>com.zlt.aps.common.engine</groupId>
             <artifactId>aps-engine-common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
 
         <dependency>

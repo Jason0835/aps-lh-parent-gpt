@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper">
+    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo">
+        <id property="id" column="ID" jdbcType="DECIMAL"/>
+        <result property="productCode" column="PRODUCT_CODE" jdbcType="VARCHAR"/>
+        <result property="proSize" column="PRO_SIZE" jdbcType="DECIMAL"/>
+        <result property="productGroupCode" column="PRODUCT_GROUP_CODE" jdbcType="VARCHAR"/>
+        <result property="productTypeName" column="PRODUCT_TYPE_NAME" jdbcType="VARCHAR"/>
+        <result property="mouldCategory" column="MOULD_CATEGORY" jdbcType="VARCHAR"/>
+        <result property="curingTime" column="CURING_TIME" jdbcType="DECIMAL"/>
+        <result property="mouldCapacity" column="MOULD_CAPACITY" jdbcType="DECIMAL"/>
+        <result property="specifications" column="SPECIFICATIONS" jdbcType="VARCHAR"/>
+        <result property="pattern" column="PATTERN" jdbcType="VARCHAR"/>
+        <result property="brand" column="BRAND" jdbcType="VARCHAR"/>
+        <result property="hierarchy" column="HIERARCHY" jdbcType="VARCHAR"/>
+        <result property="replaceGroup" column="REPLACE_GROUP" jdbcType="VARCHAR"/>
+        <result property="cantProduce" column="CANT_PRODUCE" jdbcType="DECIMAL"/>
+        <result property="noDelivery" column="NO_DELIVERY" jdbcType="DECIMAL"/>
+        <result property="speed" column="SPEED" jdbcType="VARCHAR"/>
+        <result property="ability" column="ABILITY" jdbcType="VARCHAR"/>
+        <result property="environmentProtection" column="ENVIRONMENT_PROTECTION" jdbcType="VARCHAR"/>
+        <result property="authentication" column="AUTHENTICATION" jdbcType="VARCHAR"/>
+        <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+        <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+        <result property="forbidTag" column="FORBID_TAG" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByProductCode" resultMap="BaseResultMap">
+            select
+              ID,
+              FACTORY_CODE,
+              PRODUCT_CODE,
+              PRODUCT_DESC,
+              PRO_SIZE,
+              PRODUCT_TYPE_CODE,
+              PRODUCT_TYPE_NAME,
+              MOULD_CATEGORY,
+              CURING_TIME,
+              HYDRAULIC_PRESSURE_CURING_TIME,
+              MOULD_CAPACITY,
+              SPECIFICATIONS,
+              PATTERN,
+              BRAND,
+              TIRE_TYPE,
+              COMMON_TYPE,
+              HIERARCHY,
+              REPLACE_GROUP,
+              CANT_PRODUCE,
+              NO_DELIVERY,
+              SPEED,
+              ABILITY,
+              ENVIRONMENT_PROTECTION,
+              AUTHENTICATION,
+              PRODUCT_GROUP_CODE,
+              FORBID_TAG,
+              SINGLE_TIRE_WEIGHT,
+              MOULD_CLAMPING_PRESSURE,
+              GROSS_RATE_JSON,
+              REMARK
+            from T_MDM_PRODUCT_INFO
+            where PRODUCT_CODE = #{productCode,jdbcType=VARCHAR}
+            and IS_DELETE = '0'
+            limit 1
+    </select>
+
+    <select id="selectByPlanVersion" resultMap="BaseResultMap">
+        select
+        *
+        from T_MDM_PRODUCT_INFO
+        where PRODUCT_TYPE_NAME = #{productTypeName,jdbcType=VARCHAR}
+        AND PRODUCT_CODE IN (SELECT PRODUCT_CODE FROM T_RECEIVE_MAIN_PLAN WHERE YEAR = #{year} AND MONTH = #{month} AND VERSION = #{planVersion} AND PRODUCT_TYPE_NAME = #{productTypeName})
+    </select>
+
+    <select id="getProductInfoList" resultType="com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo" parameterType="com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo">
+        SELECT tmpi.ID,
+               tmpi.FACTORY_CODE,
+               tmpi.PRODUCT_CODE,
+               mmmr.MOULD_NO,
+               mmmr.SPEC_CODE,
+               mmmr.MOULD_NUMBER,
+               mmpc.EMBRYO_CODE,
+               mmpc.CONSTRUCTION_SPEC_CODE,
+               mmpc.CONSTRUCTION_CODE,
+               tmpi.PRODUCT_DESC,
+               tmpi.PRO_SIZE,
+               tmpi.PRODUCT_TYPE_CODE,
+               tmpi.PRODUCT_TYPE_NAME,
+               tmpi.MOULD_CATEGORY,
+               tmpi.CURING_TIME,
+               tmpi.HYDRAULIC_PRESSURE_CURING_TIME,
+               tmpi.MOULD_CAPACITY,
+               tmpi.SPECIFICATIONS,
+               tmpi.PATTERN,
+               tmpi.BRAND,
+               tmpi.TIRE_TYPE,
+               tmpi.COMMON_TYPE,
+               tmpi.HIERARCHY,
+               tmpi.REPLACE_GROUP,
+               tmpi.CANT_PRODUCE,
+               tmpi.NO_DELIVERY,
+               tmpi.SPEED,
+               tmpi.ABILITY,
+               tmpi.ENVIRONMENT_PROTECTION,
+               tmpi.AUTHENTICATION,
+               tmpi.PRODUCT_GROUP_CODE,
+               tmpi.FORBID_TAG,
+               tmpi.SINGLE_TIRE_WEIGHT,
+               tmpi.MOULD_CLAMPING_PRESSURE,
+               tmpi.GROSS_RATE_JSON,
+               tmpi.REMARK,
+               tmpi.IS_DELETE,
+               tmpi.CREATE_TIME,
+               tmpi.UPDATE_TIME,
+               tmpi.CREATE_BY,
+               tmpi.UPDATE_BY
+          FROM t_mdm_product_info tmpi
+          LEFT JOIN (SELECT mpmr.FACTORY_CODE,
+                            mpmr.PRODUCT_CODE,
+                            GROUP_CONCAT( DISTINCT(tmmi.MOULD_NO) )  AS MOULD_NO,
+                            GROUP_CONCAT( DISTINCT(mpmr.SPEC_CODE) )  AS SPEC_CODE,
+                            COUNT( DISTINCT(tmmi.MOULD_CODE) ) AS MOULD_NUMBER
+                       FROM t_mdm_product_model_relation mpmr
+                       LEFT JOIN t_mdm_model_info tmmi
+                         ON tmmi.MOULD_CODE = mpmr.MOULD_CODE
+                        AND tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
+                      WHERE 1=1
+                    <if test="factoryCode != null  and factoryCode != ''">
+                        AND mpmr.FACTORY_CODE = #{factoryCode}
+                    </if>
+                      GROUP BY mpmr.FACTORY_CODE, mpmr.PRODUCT_CODE
+               ) mmmr
+            ON tmpi.FACTORY_CODE = mmmr.FACTORY_CODE
+           AND tmpi.PRODUCT_CODE = mmmr.PRODUCT_CODE
+          LEFT JOIN(SELECT tmpc.FACTORY_CODE,
+                           tmpc.PRODUCT_CODE,
+                           GROUP_CONCAT( DISTINCT(tmpc.EMBRYO_CODE) )  AS EMBRYO_CODE,
+                           GROUP_CONCAT( DISTINCT(tmpc.SPEC_CODE) )  AS CONSTRUCTION_SPEC_CODE,
+                           GROUP_CONCAT( DISTINCT(tmpc.CONSTRUCTION_CODE) )  AS CONSTRUCTION_CODE
+                      FROM t_mdm_product_construction tmpc
+                     WHERE IFNULL(tmpc.IS_DELETE,0) = 0
+                    <if test="factoryCode != null  and factoryCode != ''">
+                       AND tmpc.FACTORY_CODE = #{factoryCode}
+                    </if>
+                     GROUP BY tmpc.FACTORY_CODE, tmpc.PRODUCT_CODE
+               ) mmpc
+            ON tmpi.FACTORY_CODE = mmpc.FACTORY_CODE
+           AND tmpi.PRODUCT_CODE = mmpc.PRODUCT_CODE
+         WHERE tmpi.IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">
+           AND tmpi.FACTORY_CODE = #{factoryCode}
+        </if>
+        <if test="productCode != null and productCode != ''">
+           AND tmpi.PRODUCT_CODE = #{productCode}
+        </if>
+        <if test="productDesc != null and productDesc != ''">
+           AND tmpi.PRODUCT_DESC = #{productDesc}
+        </if>
+        <if test="specifications != null and specifications != ''">
+           AND tmpi.SPECIFICATIONS LIKE #{specifications} || '%'
+        </if>
+        <if test="pattern != null and pattern != ''">
+           AND tmpi.PATTERN LIKE #{pattern} || '%'
+        </if>
+        <if test="brand != null and brand != ''">
+           AND tmpi.BRAND = #{brand}
+        </if>
+        <if test="tireType != null and tireType != ''">
+           AND tmpi.TIRE_TYPE = #{tireType}
+        </if>
+        <if test="commonType != null and commonType != ''">
+           AND tmpi.COMMON_TYPE = #{commonType}
+        </if>
+        <if test="embryoCode != null and embryoCode != ''">
+           AND mmpc.EMBRYO_CODE LIKE CONCAT(#{embryoCode}, '%')
+        </if>
+        <if test="mouldNo != null and mouldNo != ''">
+           AND mmmr.MOULD_NO LIKE CONCAT(#{mouldNo}, '%')
+        </if>
+        <if test="isTireTypeNullData != null and isTireTypeNullData == 1 ">
+           AND (tmpi.TIRE_TYPE IS NULL OR tmpi.TIRE_TYPE = '')
+        </if>
+        <if test="isMouldNullData != null and isMouldNullData == 1 ">
+           AND (mmmr.MOULD_NO IS NULL OR mmmr.MOULD_NO = '')
+        </if>
+        <if test="isCommonTypeNullData !=null and isCommonTypeNullData == 1 ">
+           AND (tmpi.COMMON_TYPE IS NULL OR tmpi.COMMON_TYPE = '')
+        </if>
+        <if test="isBrandNullData != null and isBrandNullData == 1 ">
+           AND (tmpi.BRAND IS NULL OR tmpi.BRAND = '')
+        </if>
+        <if test="isConstructionNullData != null and isConstructionNullData == 1 ">
+           AND (mmpc.EMBRYO_CODE IS NULL OR mmpc.EMBRYO_CODE = '')
+        </if>
+    </select>
+
+    <select id="selectReplaceProductInfoList" resultMap="BaseResultMap">
+        select
+        *
+        from T_MDM_PRODUCT_INFO
+        where replace_group = (SELECT replace_group FROM t_product_info WHERE PRODUCT_CODE= #{productCode,jdbcType=VARCHAR} )
+    </select>
+
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo">
+        select *
+        from T_MDM_PRODUCT_INFO
+        where CONCAT(FACTORY_CODE, "|", PRODUCT_CODE) in
+        <foreach item="item" collection="list" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+
+
+    <select id="queryByFactoryCodeAndProductCodes"  resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo">
+        SELECT
+        *
+        FROM T_MDM_PRODUCT_INFO
+        WHERE IS_DELETE = 0
+        AND FACTORY_CODE = #{factoryCode}
+        AND PRODUCT_CODE IN
+        <foreach item="productCode" collection="productCodes" open="(" separator="," close=")">
+            #{productCode}
+        </foreach>
+    </select>
+</mapper>

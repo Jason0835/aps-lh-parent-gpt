@@ -42,4 +42,8 @@ public class XwyyStockVo {
 	 * 成型16点预计消耗量
 	 */
 	private BigDecimal cxUseQty;
+	/**
+	 * 预估库存标记，0为预估库存，其余为正式
+	 */
+	private String estimateStockFlag;
 }

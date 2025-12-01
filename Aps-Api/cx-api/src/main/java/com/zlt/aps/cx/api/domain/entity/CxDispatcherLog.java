@@ -23,7 +23,7 @@ import java.util.Map;
 @Data
 @TableName("t_cx_dispatcher_log")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_T_CX_DISPATCHER_LOG", clazz = Long.class)
+@KeySequence(value = "SEQ_T_CX_DISPATCHER_LOG")
 public class CxDispatcherLog extends ApsBaseEntity{
 
     private static final long serialVersionUID = 1L;

@@ -22,52 +22,52 @@ public interface ITmLossSettingService {
     /**
      * 查询胎面损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/tm/loss/list")
     TableDataInfo list(@RequestBody TmLossSettingDto dto);
 
     /**
     * 新增胎面损耗率设定
     */
-    @PostMapping("/loss/add")
+    @PostMapping("/tm/loss/add")
     AjaxResult add(@RequestBody TmLossSettingDto dto);
 
     /**
      * 修改胎面损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/tm/loss/edit")
     AjaxResult edit(@RequestBody TmLossSettingDto dto);
 
     /**
      * 删除胎面损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/tm/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/tm/loss/{id}")
     TmLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验胎面损耗率设定唯一性
      */
-    @PostMapping("/loss/checkTmLossSettingUnique")
+    @PostMapping("/tm/loss/checkTmLossSettingUnique")
     String checkTmLossSettingUnique(@RequestBody TmLossSettingDto dto);
 
     /**
      * 导出胎面损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/tm/loss/getList")
     List<TmLossSettingDto> getList(@RequestBody TmLossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/tm/loss/importData")
     @ApiOperation("导入胎面损耗率信息")
     public AjaxResult importData(@RequestBody List<TmLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/tm/loss/deleteAll")
     AjaxResult deleteAll();
 }

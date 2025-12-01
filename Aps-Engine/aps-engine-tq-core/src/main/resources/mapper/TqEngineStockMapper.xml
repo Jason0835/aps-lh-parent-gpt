@@ -4,27 +4,36 @@
 
     <select id="listCxPlanAndConsume" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
         select cxr.TIRE_RING_CODE beadCode,   /*胎圈代码*/
-               nvl(sum(cxr.CLASS3_PLANNED_QTY*2),0) CX_CLASS3_PLAN_CONSUME,  /*半制品对应成型(8点-16点)计划量的消耗量 一个胎对应2个胎圈*/
-               nvl(sum(cf.FINISH_QTY*2), 0) CX_FINISH_CONSUME  /*半制品对应成型(8点-12点)完成量的消耗量 一个胎对应2个胎圈*/
+               IFNULL(sum(cxr.CLASS1_PLAN_QTY),0) CX_CLASS1_PLAN_CONSUME,  /*半制品对应成型(7点-7点)计划量的消耗量 一个胎对应1副胎圈*/
+               IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN_CONSUME  /*半制品对应成型(7点-19点)计划量的消耗量 一个胎对应1副胎圈*/
         from (
                select r.EMBRYO_CODE,
                       r.BOM_DATA_VERSION,
                       max(ci.TIRE_RING_CODE) TIRE_RING_CODE, /*胎圈代码*/
-                      sum(CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY /*8点-16点成型计划量*/
+                      sum(IFNULL(CLASS3_PLANNED_QTY, 0)) CLASS1_PLAN_QTY, /*7点-隔天7点成型计划量*/
+                      sum(IFNULL(CLASS2_PLAN_QTY, 0)) CLASS2_PLAN_QTY /*7点-19点成型计划量*/
                from T_CX_SCHEDULE_RESULT r
                inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
-               where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd') 
+               where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
                and r.DEL_FLAG = 0
                group by r.EMBRYO_CODE,r.BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
-        left join T_CX_PART_FINISH_QTY cf on cf.stat_date = to_date(#{scheduleDate},'yyyy-mm-dd')-1 /*排程日期 要减1天，才是对应8-12点完成量日期*/ and cf.DEL_FLAG = 0 and cf.embryo_code = cxr.embryo_code and cf.BOM_DATA_VERSION = cxr.BOM_DATA_VERSION
         group by cxr.TIRE_RING_CODE
     </select>
 
     <select id="listTqStock" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
-        select MATERIAL_CODE beadCode, (nvl(STOCK_NUM,0)+nvl(MODIFY_NUM,0)-nvl(BAD_NUM,0)) STOCK_NUM
+        select MATERIAL_CODE beadCode, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_TQ_STOCK
-        where STOCK_DATE = to_date(#{stockDate},'yyyy-mm-dd') - 1 /*排程日期 要减1天，才是对应库存日期*/
+        where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 day) /*排程日期 要减1天，才是对应库存日期*/
         and DEL_FLAG = '0'
+        GROUP BY MATERIAL_CODE 
     </select>
+
+    <select id="listLastDayMidPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
+    SELECT BEAD_CODE, IFNULL(SUM(night_plan_qty), 0) consume
+    FROM T_TQ_SCHEDULE_RESULT
+    WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
+      AND DEL_FLAG = '0'
+    GROUP BY BEAD_CODE
+</select>
 </mapper>

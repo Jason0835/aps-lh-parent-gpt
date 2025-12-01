@@ -24,15 +24,15 @@ import java.util.List;
 
 @Api(tags = {"胎面胶料顺序维护接口"})
 @RestController
-@RequestMapping("/glueOrder")
+@RequestMapping("/tm/glueOrder")
 public class TmGlueOrderController extends BaseController {
 
     @Resource
     public TmGlueOrderService tmGlueOrderService;
 
     @ApiOperation("根据条件查询胶料顺序列表")
-    @GetMapping("/listGlueOrder")
-    public TableDataInfo listGlueOrder(TmGlueOrderDto dto) {
+    @PostMapping("/listGlueOrder")
+    public TableDataInfo listGlueOrder(@RequestBody TmGlueOrderDto dto) {
         startPage();  //分页并排序
         dto.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
         List<TmGlueOrderDto> list = tmGlueOrderService.listGlueOrder(dto);
@@ -79,8 +79,8 @@ public class TmGlueOrderController extends BaseController {
 
     @Log(title = "ui.tm.glueOrder.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<TmGlueOrderDto> exportData(TmGlueOrderDto dto) {
+    @PostMapping("/exportData")
+    public List<TmGlueOrderDto> exportData(@RequestBody TmGlueOrderDto dto) {
         dto.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
         List<TmGlueOrderDto> list = tmGlueOrderService.listGlueOrder(dto);
         return list;

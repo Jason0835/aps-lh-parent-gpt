@@ -22,12 +22,12 @@ public interface INcAssistScheduleService {
      * 查询内衬胶外协排程结果列表
      */
     @ApiOperation("查询内衬胶外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/nc/assistSchedule/list")
     TableDataInfo list(@RequestBody NcAssistSchedule ncAssistSchedule);
 
     /**
      * 导出列表
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/nc/assistSchedule/export")
     byte[] export(@RequestBody NcAssistSchedule ncAssistSchedule);
 }

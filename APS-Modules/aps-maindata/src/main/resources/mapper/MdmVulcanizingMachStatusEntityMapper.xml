@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmVulcanizingMachStatusEntityMapper">
+    <sql id="Base_Column">
+        <!--@mbg.generated-->
+        ID, FACTORY_CODE, "YEAR", "MONTH", VULCANIZING_MACHINE_ID, "STATUS",
+        REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY
+    </sql>
+
+    <select id="selectDocVulcanizingMachStatusEntityList"
+            parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MdmVulcanizingMachStatusVo">
+        select a.*,b.PRODUCT_TYPE_CODE,b.VULCANIZING_MACHINE_CODE from T_MDM_VULCANIZING_MACH_STATUS a
+        left join t_mdm_vulcanizing_machine b
+        on a.vulcanizing_machine_id = b.id
+        where ifnull(a.is_delete, 0) = 0
+        <if test="year != null">
+            and a.year = #{year}
+        </if>
+        <if test="month != null">
+            and a.month = #{month}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">and a.factory_code = #{factoryCode}</if>
+        <if test="vulcanizingMachineId != null ">and a.vulcanizing_machine_id = #{vulcanizingMachineId}</if>
+        <if test="status != null">and a.status = #{status}</if>
+        ${params.dataScope}
+        order by a.factory_code,b.product_type_code,
+        REGEXP_REPLACE(b.VULCANIZING_MACHINE_CODE,'[^0-9]',''),
+        ifnull(REGEXP_REPLACE(b.VULCANIZING_MACHINE_CODE,'[0-9]',''),'0') asc
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus" resultType="int">
+        select count(1) from T_MDM_VULCANIZING_MACH_STATUS a
+        where a.is_delete = '0'
+        and a.year = #{year}
+        and a.month = #{month}
+        <if test="factoryCode != null  and factoryCode != ''">and a.factory_code = #{factoryCode}</if>
+        <if test="vulcanizingMachineId != null ">and a.vulcanizing_machine_id = #{vulcanizingMachineId}</if>
+        <if test="id != null">and a.id != #{id}</if>
+    </select>
+
+    <select id="selectGenerateListByMachine"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus">
+        SELECT
+        FACTORY_CODE,
+        #{generateToYear,jdbcType=DECIMAL} year,
+        #{generateToMonth,jdbcType=DECIMAL} month,
+        id AS VULCANIZING_MACHINE_ID,
+        1 status,
+        remark,
+        0 as IS_DELETE,
+        now() as CREATE_TIME
+        FROM
+        t_mdm_vulcanizing_machine
+        WHERE
+        IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">
+            and factory_code = #{factoryCode,jdbcType=VARCHAR}
+        </if>
+        ${params.dataScope}
+
+    </select>
+
+    <update id="updateDocVulcanizingMachStatusListById" parameterType="list">
+        update T_MDM_VULCANIZING_MACH_STATUS
+        set status = #{status}
+        where ID in
+        <foreach close=")" collection="list" item="item" open="(" separator=", ">
+            #{item,jdbcType=DECIMAL}
+        </foreach>
+    </update>
+
+    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.monthplan.api.domain.vo.CopyParamVo">
+        update T_MDM_VULCANIZING_MACH_STATUS
+        set IS_DELETE = 1
+        where
+        YEAR = #{copyToYear}
+        and MONTH = #{copyToMonth}
+        <if test="factoryCode != null and factoryCode != ''">
+            and factory_code = #{factoryCode,jdbcType=VARCHAR}
+        </if>
+        ${params.dataScope}
+    </delete>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_MDM_VULCANIZING_MACH_STATUS a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            SELECT
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.factoryCode,jdbcType=VARCHAR} factory_code,#{item.year, jdbcType=DECIMAL}
+            year,#{item.month, jdbcType=DECIMAL} month,
+            #{item.vulcanizingMachineId,jdbcType=VARCHAR} VULCANIZING_MACHINE_ID,
+            #{item.status,jdbcType=VARCHAR} status,#{item.remark,jdbcType=VARCHAR} remark,
+            #{item.isDelete, jdbcType=DOUBLE} is_delete, #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateTime, jdbcType=DATE} update_time, #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.updateBy,jdbcType=VARCHAR} update_by from dual
+        </foreach>
+        ) b ON (
+        a.year = b.year
+        and a.month = b.month
+        and a.FACTORY_CODE = b.FACTORY_CODE
+        and a.VULCANIZING_MACHINE_ID = b.VULCANIZING_MACHINE_ID
+        and a.is_delete = 0 )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.UPDATE_TIME = now(),
+            a.status = b.status,
+            a.remark = b.remark,
+            a.update_by = b.create_by
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.ID, a.FACTORY_CODE, a.YEAR, a.MONTH, a.VULCANIZING_MACHINE_ID, a.STATUS, a.REMARK,
+        a.IS_DELETE, a.CREATE_TIME, a.CREATE_BY
+        ) values(
+        VULCANIZING_MACH_STATUS_SEQ.nextval, b.FACTORY_CODE, b.YEAR, b.MONTH, b.VULCANIZING_MACHINE_ID,
+        b.STATUS, b.REMARK,
+        b.IS_DELETE, b.CREATE_TIME, b.CREATE_BY
+        )
+    </update>
+
+</mapper>

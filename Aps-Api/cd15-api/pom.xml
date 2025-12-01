@@ -5,13 +5,13 @@
     <parent>
         <artifactId>aps-api</artifactId>
         <groupId>com.zlt.aps</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.zlt.aps.cd15</groupId>
     <artifactId>aps-cd15-api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>cd15-api</name>
     <description>15度裁断工序api</description>
 
@@ -33,7 +33,7 @@
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.3-SNAPSHOT</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.zlt</groupId>

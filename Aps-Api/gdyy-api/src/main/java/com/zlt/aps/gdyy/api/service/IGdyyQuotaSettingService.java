@@ -74,7 +74,7 @@ public interface IGdyyQuotaSettingService {
      */
     @PostMapping("/gdyy/quota/export")
     @ApiOperation("导出钢带压延定额设定信息")
-    public List<GdyyQuotaSettingDto> exportData(@SpringQueryMap GdyyQuotaSettingDto dto);
+    public List<GdyyQuotaSettingDto> exportData(@RequestBody GdyyQuotaSettingDto dto);
 
 
     @PostMapping("/gdyy/quota/importData")

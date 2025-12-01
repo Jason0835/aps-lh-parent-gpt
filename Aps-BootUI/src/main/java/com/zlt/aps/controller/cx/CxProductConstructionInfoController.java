@@ -1,7 +1,11 @@
 package com.zlt.aps.controller.cx;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -9,39 +13,33 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.core.domain.CxSelect;
-import com.zlt.aps.cx.api.service.IConstructionExportLogService;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.utils.ImportUtil;
+import com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo;
+import com.zlt.aps.cx.api.service.ICxProductConstructionInfoService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
-import com.ruoyi.api.gateway.system.domain.ExportLog;
-import com.ruoyi.api.gateway.system.service.IExportLogService;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.springframework.beans.factory.annotation.Value;
-import com.zlt.aps.common.utils.ExportUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import org.springframework.web.multipart.MultipartFile;
-import com.ruoyi.api.gateway.system.domain.ImportLog;
-import com.zlt.aps.common.utils.ImportUtil;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.io.*;
-import com.ruoyi.common4ui.utils.file.FileUtils;
-import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-
-import com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo;
-import com.zlt.aps.cx.api.service.ICxProductConstructionInfoService;
 
 /**
  * 投产施工信息Controller
+ *
  * @author zlt
  * @date 2021-12-02
  */
@@ -51,6 +49,7 @@ import com.zlt.aps.cx.api.service.ICxProductConstructionInfoService;
 @RequestMapping("/cx/productConstruction")
 public class CxProductConstructionInfoController extends BaseController {
 
+    private final String prefix = "cx/productConstruction";
     @Autowired
     private ICxProductConstructionInfoService iCxProductConstructionInfoService;
     @Autowired
@@ -59,8 +58,6 @@ public class CxProductConstructionInfoController extends BaseController {
     private IImportErrorLogService iImportErrorLogService;
     @Autowired
     private IImportLogService iImportLogService;
-
-    private final String prefix = "cx/productConstruction";
 
     /**
      * 跳转至主页面
@@ -77,7 +74,7 @@ public class CxProductConstructionInfoController extends BaseController {
     @GetMapping("/add")
     public String add(ModelMap mmap) {
         mmap.put("cxProductConstructionInfo", new CxProductConstructionInfo());
-        List<CxProductConstructionInfo> pcList= new ArrayList<>();
+        List<CxProductConstructionInfo> pcList = new ArrayList<>();
         mmap.put("embryoVersions", pcList);
         return prefix + "/add";
     }
@@ -122,21 +119,21 @@ public class CxProductConstructionInfoController extends BaseController {
      */
     @GetMapping("/edit1/{idAndQueryType}")
     public String edit1(@PathVariable("idAndQueryType") String idAndQueryType, ModelMap mmap) {
-        String idStr=idAndQueryType.split("&")[0];
-        String queryType=idAndQueryType.split("&")[1];
-        Long id= Long.valueOf(idStr);
-        CxProductConstructionInfo cxProductConstructionInfo= iCxProductConstructionInfoService.getInfo(id);
+        String idStr = idAndQueryType.split("&")[0];
+        String queryType = idAndQueryType.split("&")[1];
+        Long id = Long.valueOf(idStr);
+        CxProductConstructionInfo cxProductConstructionInfo = iCxProductConstructionInfoService.getInfo(id);
         cxProductConstructionInfo.setQueryType(queryType);
         mmap.put("cxProductConstructionInfo", cxProductConstructionInfo);
-        List<CxProductConstructionInfo> pcList=null;
-        try{
-            pcList=iCxProductConstructionInfoService.getPartVersions(cxProductConstructionInfo);
-        }catch (Exception e){
+        List<CxProductConstructionInfo> pcList = null;
+        try {
+            pcList = iCxProductConstructionInfoService.getPartVersions(cxProductConstructionInfo);
+        } catch (Exception e) {
             log.info("Error:get part product constructionInfo error.");
         }
 
-        if(CollectionUtils.isEmpty(pcList)){
-            pcList=new ArrayList<CxProductConstructionInfo>();
+        if (CollectionUtils.isEmpty(pcList)) {
+            pcList = new ArrayList<CxProductConstructionInfo>();
         }
         mmap.put("versions", pcList);
         return prefix + "/edit";
@@ -162,18 +159,10 @@ public class CxProductConstructionInfoController extends BaseController {
     @ResponseBody
     public AjaxResult editSave1(CxProductConstructionInfo cxProductConstructionInfo) {
         AjaxResult ajaxResult = null;
-        //唯一性校验
-//        if( UserConstants.NOT_UNIQUE.equals(iCxProductConstructionInfoService.checkCxProductConstructionInfoUnique(cxProductConstructionInfo))){
-//            return AjaxResult.error(I18nUtil.getMessage("ui.construction.isEmbryoCodeExist"));
-//        }
-        if (cxProductConstructionInfo.getId() != null){
+        if (cxProductConstructionInfo.getId() != null) {
             ajaxResult = iCxProductConstructionInfoService.edit1(cxProductConstructionInfo);
-        } else{
-            List<CxProductConstructionInfo> pcList = iCxProductConstructionInfoService.getEmbryoVersions(cxProductConstructionInfo);
-            CxProductConstructionInfo pc=pcList.get(0);
-            pc.setId(null);
-            pc.setBaseVale(null);
-            ajaxResult = iCxProductConstructionInfoService.add(pc);
+        } else {
+            ajaxResult = iCxProductConstructionInfoService.add(cxProductConstructionInfo);
         }
         return ajaxResult;
     }
@@ -188,12 +177,12 @@ public class CxProductConstructionInfoController extends BaseController {
     public AjaxResult editSave(CxProductConstructionInfo cxProductConstructionInfo) {
         AjaxResult ajaxResult = null;
         //唯一性校验
-        if( UserConstants.NOT_UNIQUE.equals(iCxProductConstructionInfoService.checkCxProductConstructionInfoUnique(cxProductConstructionInfo))){
+        if (UserConstants.NOT_UNIQUE.equals(iCxProductConstructionInfoService.checkCxProductConstructionInfoUnique(cxProductConstructionInfo))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.construction.isEmbryoCodeExist"));
         }
-        if (cxProductConstructionInfo.getId() != null){
+        if (cxProductConstructionInfo.getId() != null) {
             ajaxResult = iCxProductConstructionInfoService.edit(cxProductConstructionInfo);
-        } else{
+        } else {
             List<CxProductConstructionInfo> pcList = iCxProductConstructionInfoService.getEmbryoVersions(cxProductConstructionInfo);
             CxProductConstructionInfo pc=pcList.get(0);
             pc.setId(null);
@@ -208,7 +197,7 @@ public class CxProductConstructionInfoController extends BaseController {
      */
     @GetMapping("/updateProductionStage/{id}")
     public String updateStage(@PathVariable("id") Long id, ModelMap mmap) {
-        CxProductConstructionInfo cxProductConstructionInfo= iCxProductConstructionInfoService.getInfo(id);
+        CxProductConstructionInfo cxProductConstructionInfo = iCxProductConstructionInfoService.getInfo(id);
         mmap.put("cxProductConstructionInfo", cxProductConstructionInfo);
         return prefix + "/updateStage";
     }
@@ -254,12 +243,12 @@ public class CxProductConstructionInfoController extends BaseController {
     @RequiresPermissions("cx:productConstruction:export")
     @GetMapping("/export")
     @ResponseBody
-    public void export(HttpServletResponse response,CxProductConstructionInfo cxProductConstructionInfo) throws IOException {
+    public void export(HttpServletResponse response, CxProductConstructionInfo cxProductConstructionInfo) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.productConstruction.modelName");
         List<CxProductConstructionInfo> list = iCxProductConstructionInfoService.getList(cxProductConstructionInfo);
-        ExcelUtil<CxProductConstructionInfo> util = new ExcelUtil<>(CxProductConstructionInfo. class);
+        ExcelUtil<CxProductConstructionInfo> util = new ExcelUtil<>(CxProductConstructionInfo.class);
         Workbook workbook = util.exportExcel2(response, list, fileName);
-        ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, cxProductConstructionInfo.toString(),"ApsConstant.PROCEDURE_CODE_XXX");
+        ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, cxProductConstructionInfo.toString(), "ApsConstant.PROCEDURE_CODE_XXX");
         iExportLogService.add(exportLog);
     }
 
@@ -282,7 +271,7 @@ public class CxProductConstructionInfoController extends BaseController {
     /**
      * excel数据导入
      *
-     * @param file 要导入的文件
+     * @param file          要导入的文件
      * @param updateSupport 已存在的记录是否更新
      * @return 结果
      * @throws Exception 异常
@@ -291,11 +280,11 @@ public class CxProductConstructionInfoController extends BaseController {
     @ApiOperation("excel数据导入")
     @PostMapping("/importData")
     @ResponseBody
-    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         //文件解密
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, "ApsConstant.PROCEDURE_CODE_XXX",
-                I18nUtil.getMessage("ui.data.column.productConstruction.modelName"),file.getOriginalFilename());
+        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ApsConstant.PROCEDURE_CODE_CX,
+                I18nUtil.getMessage("ui.data.column.productConstruction.modelName"), file.getOriginalFilename());
         importLog = iImportLogService.add(importLog);
         ExcelUtil<CxProductConstructionInfo> util = new ExcelUtil<>(CxProductConstructionInfo.class);
         InputStream in = new ByteArrayInputStream(data);

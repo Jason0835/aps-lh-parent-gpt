@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmDeviceMaintenancePlanEntityMapper">
+
+    <select id="getMonthMaintenanceMould" resultType="com.zlt.aps.maindata.domain.dto.MouldMonthUseDto">
+        SELECT mdmp.MACHINE_CODE AS MOULD_CODE,
+               mmi.MOULD_NO
+          FROM t_mdm_device_maintenance_plan mdmp
+          LEFT JOIN T_MDM_MODEL_INFO mmi
+            ON mdmp.FACTORY_CODE = mmi.FACTORY_CODE
+           AND mdmp.MACHINE_CODE = mmi.MOULD_CODE
+           AND mdmp.MACHINE_TYPE = 2
+           AND mdmp.PLAN_TYPE = 1
+         WHERE mdmp.MACHINE_TYPE = 2
+           AND mdmp.PLAN_TYPE = 1
+           AND mdmp.YEAR = #{year,jdbcType=DECIMAL}
+           AND mdmp.MONTH = #{month,jdbcType=DECIMAL}
+           AND mdmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mdmp.MACHINE_CODE IN
+        <foreach collection="mouldCodeList" item="mouldCode" open="(" separator="," close=")">
+            #{mouldCode,jdbcType=VARCHAR}
+        </foreach>
+    </select>
+</mapper>

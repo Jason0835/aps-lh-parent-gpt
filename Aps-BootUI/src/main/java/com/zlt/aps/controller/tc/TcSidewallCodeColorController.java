@@ -1,5 +1,10 @@
 package com.zlt.aps.controller.tc;
 
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -7,33 +12,32 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.utils.ImportUtil;
+import com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor;
+import com.zlt.aps.tc.api.service.ITcSidewallCodeColorService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.lang.StringUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import com.ruoyi.api.gateway.system.domain.ExportLog;
-import com.ruoyi.api.gateway.system.service.IExportLogService;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.springframework.beans.factory.annotation.Value;
-import com.zlt.aps.common.utils.ExportUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import com.ruoyi.api.gateway.system.domain.ImportLog;
-import com.zlt.aps.common.utils.ImportUtil;
-import javax.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.io.*;
-import com.ruoyi.common4ui.utils.file.FileUtils;
-import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 
-import com.zlt.aps.tc.api.domain.entity.TcSidewallCodeColor;
-import com.zlt.aps.tc.api.service.ITcSidewallCodeColorService;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 /**
  * 胎侧代码前缀颜色设定Controller

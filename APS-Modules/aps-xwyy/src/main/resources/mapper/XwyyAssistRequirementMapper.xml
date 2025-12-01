@@ -45,10 +45,6 @@
     </select>
 
     <insert id="insertXwyyAssistRequirement" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyAssistRequirement">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_XWYY_SCHEDULE.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_xwyy_assist_requirement
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -116,63 +112,51 @@
 
     <delete id="deleteXwyyAssistRequirementById" parameterType="Long">
         update t_xwyy_assist_requirement
-        set del_flag = 1
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteXwyyAssistRequirementByIds" parameterType="String">
-        update t_xwyy_assist_requirement set del_flag='1' where id in
+        update t_xwyy_assist_requirement set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_xwyy_assist_requirement a USING (
-        <foreach collection="list" item="item" separator=" union ">
-            select
-            #{item.scheduleDate, jdbcType=DATE} schedule_date,
-            #{item.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{item.dayPlanQty, jdbcType=DOUBLE} day_plan_qty,
-            #{item.nightPlanQty, jdbcType=DOUBLE} night_plan_qty,
-            #{item.todayStock, jdbcType=DOUBLE} today_stock,
-            #{item.dayOut, jdbcType=DOUBLE} day_Out,
-            #{item.fac5Class1Plan, jdbcType=DOUBLE} fac5_class1_plan,
-            #{item.fac5Class2Plan, jdbcType=DOUBLE} fac5_class2_plan,
-            #{item.fac5Class3Plan, jdbcType=DOUBLE} fac5_class3_plan,
-            #{item.remark,jdbcType=VARCHAR} remark,
-            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.createBy,jdbcType=VARCHAR} create_by,
-            #{item.createTime, jdbcType=DATE} create_time, #{item.updateBy,jdbcType=VARCHAR} update_by,
-            #{item.updateTime, jdbcType=DATE} update_time from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_xwyy_assist_requirement (
+        schedule_date, big_roll_code, day_plan_qty, night_plan_qty, today_stock, day_Out, fac5_class1_plan, fac5_class2_plan, fac5_class3_plan, remark, del_flag, create_by, create_time
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.scheduleDate, jdbcType=DATE},
+            #{item.bigRollCode,jdbcType=VARCHAR},
+            #{item.dayPlanQty, jdbcType=DOUBLE},
+            #{item.nightPlanQty, jdbcType=DOUBLE},
+            #{item.todayStock, jdbcType=DOUBLE},
+            #{item.dayOut, jdbcType=DOUBLE},
+            #{item.fac5Class1Plan, jdbcType=DOUBLE},
+            #{item.fac5Class2Plan, jdbcType=DOUBLE},
+            #{item.fac5Class3Plan, jdbcType=DOUBLE},
+            #{item.remark,jdbcType=VARCHAR},
+            '0',
+            #{item.createBy,jdbcType=VARCHAR},
+            NOW()
+            )
         </foreach>
-        ) b ON (
-        a.schedule_date = b.schedule_date
-        AND a.big_roll_code = b.big_roll_code
-        AND a.del_flag = 0 )
-        WHEN MATCHED THEN
-        UPDATE
-        <set>
-            a.day_plan_qty = b.day_plan_qty,
-            a.night_plan_qty = b.night_plan_qty,
-            a.today_stock = b.today_stock,
-            a.day_Out = b.day_Out,
-            a.fac5_class1_plan = b.fac5_class1_plan,
-            a.fac5_class2_plan = b.fac5_class2_plan,
-            a.fac5_class3_plan = b.fac5_class3_plan,
-            a.remark = b.remark,
-            a.update_by = b.create_by,
-            a.update_time = sysdate
-        </set>
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id, a.schedule_date, a.big_roll_code, a.day_plan_qty, a.night_plan_qty, a.today_stock, a.day_Out, a.fac5_class1_plan, a.fac5_class2_plan, a.fac5_class3_plan, a.remark, a.del_flag, a.create_by,
-        a.create_time
-        )
-        values (
-        SEQ_XWYY_SCHEDULE.NEXTVAL, b.schedule_date, b.big_roll_code, b.day_plan_qty, b.today_stock, b.day_Out, b.fac5_class1_plan, b.fac5_class2_plan, b.fac5_class3_plan, b.night_plan_qty, b.remark, 0,
-        b.create_by, sysdate
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        day_plan_qty = VALUES(day_plan_qty),
+        night_plan_qty = VALUES(night_plan_qty),
+        today_stock = VALUES(today_stock),
+        day_Out = VALUES(day_Out),
+        fac5_class1_plan = VALUES(fac5_class1_plan),
+        fac5_class2_plan = VALUES(fac5_class2_plan),
+        fac5_class3_plan = VALUES(fac5_class3_plan),
+        remark = VALUES(remark),
+        update_by = VALUES(create_by),
+        update_time = NOW();
+    </insert>
 
     <select id="checkUnique" parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyAssistRequirement"
             resultType="int">
@@ -184,7 +168,7 @@
     </select>
 
     <update id="deleteAll" parameterType="date">
-        update t_xwyy_assist_requirement set del_flag = 1
+        update t_xwyy_assist_requirement set del_flag = NULL
         where del_flag = 0 and schedule_date = #{scheduleDate}
     </update>
 </mapper>

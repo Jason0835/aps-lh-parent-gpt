@@ -1,8 +1,8 @@
 package com.zlt.aps.config;
 
-import com.ruoyi.common.utils.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import springfox.documentation.builders.PathSelectors;
 import springfox.documentation.builders.RequestHandlerSelectors;
 import springfox.documentation.service.ApiInfo;
 import springfox.documentation.service.Contact;
@@ -60,6 +60,8 @@ public class SCMSwaggerConfig {
                 new ArrayList<>());
     }
 
+
+
     /**
      * 每个新模块就新建立一个Docket
      * 每个模块单独分组
@@ -70,14 +72,7 @@ public class SCMSwaggerConfig {
     public Docket createRestApiForBD() {
         return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
                 .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.cx"))
-                .paths((s) -> {
-                    for (String pathPrefix : excludedPathPrefix) {
-                        if (StringUtils.endsWith(s, pathPrefix)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }).build().groupName("cx").pathMapping("/");
+                .build().groupName("cx").pathMapping("/");
     }
 
 
@@ -91,14 +86,66 @@ public class SCMSwaggerConfig {
     public Docket createRestApiForIN() {
         return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
                 .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.lh"))
-                .paths((s) -> {
-                    for (String pathPrefix : excludedPathPrefix) {
-                        if (StringUtils.endsWith(s, pathPrefix)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }).build().groupName("lh").pathMapping("/");
+                .build().groupName("lh").pathMapping("/");
     }
 
+    /**
+     * 每个新模块就新建立一个Docket
+     * 每个模块单独分组
+     *
+     * @return PathSelectors.any()
+     */
+    @Bean
+    public Docket createRestApiForTm() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.tm")
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.tc")))
+                .paths(PathSelectors.any()).build().groupName("胎面").pathMapping("/");
+    }
+
+    /**
+     * 每个新模块就新建立一个Docket
+     * 每个模块单独分组
+     *
+     * @return PathSelectors.any()
+     */
+    @Bean
+    public Docket createRestApiForMonthData() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.maindata"))
+                .paths(PathSelectors.any()).build().groupName("主数据").pathMapping("/");
+    }
+
+    /**
+     * 每个新模块就新建立一个Docket
+     * 每个模块单独分组
+     *
+     * @return PathSelectors.any()
+     */
+    @Bean
+    public Docket createRestApiForCd15() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.cd15")
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.cd90"))
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.nc"))
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.tq"))
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.gsq"))
+                )
+                .paths(PathSelectors.any()).build().groupName("cd15").pathMapping("/");
+    }
+
+    /**
+     * 每个新模块就新建立一个Docket
+     * 每个模块单独分组
+     *
+     * @return PathSelectors.any()
+     */
+    @Bean
+    public Docket createRestApiForXwyy() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.xwyy")
+                        .or(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.gdyy"))
+                )
+                .paths(PathSelectors.any()).build().groupName("xwyy").pathMapping("/");
+    }
 }

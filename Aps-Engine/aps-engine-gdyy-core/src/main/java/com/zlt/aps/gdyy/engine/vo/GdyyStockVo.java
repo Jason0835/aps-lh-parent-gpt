@@ -25,4 +25,8 @@ public class GdyyStockVo {
 	 * 大卷库存量
 	 */
 	private BigDecimal stockRollQty;
+    /**
+     * 预估库存标记，0为预估库存，其余为正式
+     */
+    private String estimateStockFlag;
 }

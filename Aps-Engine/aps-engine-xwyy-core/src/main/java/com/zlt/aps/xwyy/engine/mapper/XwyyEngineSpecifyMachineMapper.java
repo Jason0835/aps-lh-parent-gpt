@@ -1,10 +1,10 @@
 package com.zlt.aps.xwyy.engine.mapper;
 
-import java.util.List;
-
+import com.zlt.aps.xwyy.api.domain.entity.XwyyMachineInfo;
+import com.zlt.aps.xwyy.engine.vo.XwyySpecifyMachineVo;
 import org.apache.ibatis.annotations.Param;
 
-import com.zlt.aps.xwyy.engine.vo.XwyySpecifyMachineVo;
+import java.util.List;
 
 /**
  * 纤维压延定点机台表数据mapper
@@ -22,4 +22,11 @@ public interface XwyyEngineSpecifyMachineMapper {
 	 * @return
 	 */
 	List<XwyySpecifyMachineVo> selectXwyySpecifyMachineList(@Param("jobType") String jobType);
+
+    /**
+     * 纤维压延机台表
+     *
+     * @return 结果
+     */
+    List<XwyyMachineInfo> listXwyyMachine();
 }

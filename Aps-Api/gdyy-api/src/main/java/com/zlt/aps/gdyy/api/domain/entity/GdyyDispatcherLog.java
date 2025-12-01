@@ -1,5 +1,6 @@
 package com.zlt.aps.gdyy.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -23,7 +24,7 @@ import java.util.Map;
 @Data
 @TableName("t_gdyy_dispatcher_log")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_T_GDYY_DISPATCHER_LOG", clazz = Long.class)
+@KeySequence(value = "SEQ_T_GDYY_DISPATCHER_LOG",dbType = DbType.ORACLE)
 public class GdyyDispatcherLog extends ApsBaseEntity{
 
     private static final long serialVersionUID = 1L;
@@ -52,6 +53,11 @@ public class GdyyDispatcherLog extends ApsBaseEntity{
     private String materialCode;
 
     /** 操作前白班计划量 */
+    @Excel(name = "ui.data.column.gdyy.dispatcherlog.beforeMachineId")
+    @ApiModelProperty(value = "操作前机台ID")
+    private String beforeMachineId;
+
+    /** 操作前白班计划量 */
     @Excel(name = "ui.data.column.gdyy.dispatcherlog.beforeMidPlan")
     @ApiModelProperty(value = "操作前中班计划量")
     private Double beforeMidPlan;
@@ -65,6 +71,11 @@ public class GdyyDispatcherLog extends ApsBaseEntity{
     @Excel(name = "ui.data.column.gdyy.dispatcherlog.beforeNightPlan")
     @ApiModelProperty(value = "操作前夜班计划量")
     private Double beforeNightPlan;
+
+    /** 操作后中班计划量 */
+    @Excel(name = "ui.data.column.gdyy.dispatcherlog.afterMachineId")
+    @ApiModelProperty(value = "操作后机台ID")
+    private String afterMachineId;
 
     /** 操作后中班计划量 */
     @Excel(name = "ui.data.column.gdyy.dispatcherlog.afterMidPlan")

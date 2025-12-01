@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.SchedulePublishEngineMapper">
+	<!-- 生成排程发布记录ID -->
+    <select id="getPublishRecordId" resultType="Long">
+    	SELECT MAX(ID) + 1 FROM T_MIX_SCHEDULE_PUBLISH_RECORD
+    </select>
+    <!-- 保存排程发布记录 -->
+    <insert id="savePublishRecord">
+	    INSERT INTO T_MIX_SCHEDULE_PUBLISH_RECORD
+		  (ID,
+		   SCHEDULE_TYPE,
+		   SCHEDULE_DATE,
+		   CREATE_BY,
+		   CREATE_TIME
+		  )
+		  VALUES
+		  (#{record.id,jdbcType= VARCHAR},
+		   #{record.scheduleType,jdbcType= VARCHAR},
+		   #{record.scheduleDate,jdbcType= TIMESTAMP},
+		   #{record.createBy,jdbcType=VARCHAR},
+		   #{record.createTime,jdbcType= TIMESTAMP}
+		  )
+    </insert>
+
+    <!-- 保存排程发布日志 -->
+    <insert id="savePublishLog">
+	    INSERT INTO T_SCHEDULE_PUBLISH_LOG
+		  (ID,
+		   RECORD_ID,
+		   SCHEDULE_DATE,
+		   ORDER_NO,
+		   MACHINE_CODE,
+		   RECIPE_MATERIAL_CODE,
+		   RECIPE_VERSION_ID,
+		   RECIPE_TYPE,
+		   PLAN_QTY,
+		   SHIFT_CLASS_ID,
+		   PRODUCE_ORDER,
+		   INVOKE_RESULT,
+		   PUBLISH_RESULT,
+		   MIX_AREA,
+		   REMARK,
+		   CREATE_BY,
+		   CREATE_TIME
+		  )
+        SELECT NULL id, t.*
+          FROM (
+        <foreach collection="logList" item="log" separator=" union all ">
+        	SELECT #{log.recordId,jdbcType= NUMERIC} RECORD_ID,
+			       #{log.scheduleDate,jdbcType= VARCHAR} SCHEDULE_DATE,
+			       #{log.orderNo,jdbcType= VARCHAR} ORDER_NO,
+			       #{log.machineCode,jdbcType= VARCHAR} MACHINE_CODE,
+			       #{log.recipeMaterialCode,jdbcType= VARCHAR} RECIPE_MATERIAL_CODE,
+			       #{log.recipeVersionId,jdbcType= INTEGER} RECIPE_VERSION_ID,
+			       #{log.recipeType,jdbcType= INTEGER} RECIPE_TYPE,
+			       #{log.planQty,jdbcType= INTEGER} PLAN_QTY,
+			       #{log.shiftClassId,jdbcType= INTEGER} SHIFT_CLASS_ID,
+			       #{log.produceOrder,jdbcType= INTEGER} PRODUCE_ORDER,
+			       hex(#{log.invokeResult,jdbcType= VARCHAR}) INVOKE_RESULT,
+			       #{log.publishResult,jdbcType= VARCHAR} PUBLISH_RESULT,
+			       #{log.mixArea,jdbcType= VARCHAR} MIX_AREA,
+			       #{log.remark,jdbcType= VARCHAR} REMARK,
+			       #{log.createBy,jdbcType= VARCHAR} CREATE_BY,
+			       #{log.createTime,jdbcType= TIMESTAMP} CREATE_TIME
+        	  FROM dual
+        </foreach>
+          ) T
+    </insert>
+
+	<!-- 更新排程记录发布状态 -->
+    <update id="updateScheduleReleseState">
+		with temp_data as(
+		<foreach collection="scheduleList" item="schedule" separator=" union all ">
+			SELECT #{schedule.id, jdbcType = NUMERIC} ID,
+			#{schedule.releaseStatus, jdbcType = VARCHAR} RELEASE_STATUS,
+			#{schedule.midPublishStatus, jdbcType = VARCHAR} MID_PUBLISH_STATUS,
+			#{schedule.nightPublishStatus, jdbcType = VARCHAR} NIGHT_PUBLISH_STATUS,
+			#{schedule.dayPublishStatus, jdbcType = VARCHAR} DAY_PUBLISH_STATUS,
+			#{schedule.publishSuccessCount, jdbcType = INTEGER} PUBLISH_SUCCESS_COUNT,
+			#{schedule.newestPublishTime, jdbcType = DATE} NEWEST_PUBLISH_TIME,
+			#{schedule.updateBy, jdbcType = VARCHAR}	UPDATE_BY,
+			#{schedule.updateTime, jdbcType = DATE}	UPDATE_TIME
+		</foreach>
+		)
+		update T_GLUE_SCHEDULE_RESULT a
+		join temp_data b on a.id = b.id
+		SET a.RELEASE_STATUS = '1',
+		a.MID_PUBLISH_STATUS = b.MID_PUBLISH_STATUS,
+		a.NIGHT_PUBLISH_STATUS = b.NIGHT_PUBLISH_STATUS,
+		a.DAY_PUBLISH_STATUS = b.DAY_PUBLISH_STATUS,
+		a.PUBLISH_SUCCESS_COUNT = b.PUBLISH_SUCCESS_COUNT,
+		a.NEWEST_PUBLISH_TIME = b.NEWEST_PUBLISH_TIME,
+		a.UPDATE_BY = b.UPDATE_BY,
+		a.UPDATE_TIME = b.UPDATE_TIME
+		where a.id = b.id
+    </update>
+
+	<!-- 查询最新一次的排程发布日志 -->
+    <select id="listLatestPublishLog" resultType="com.zlt.mix.schedule.engine.vo.SchedulePublishLogVo">
+    	SELECT RECORD_ID,
+		       L.SCHEDULE_DATE,
+		       ORDER_NO,
+		       MACHINE_CODE,
+		       RECIPE_MATERIAL_CODE,
+		       RECIPE_VERSION_ID,
+		       RECIPE_TYPE,
+		       PLAN_QTY,
+		       SHIFT_CLASS_ID,
+		       PRODUCE_ORDER,
+		       PUBLISH_RESULT,
+		       L.REMARK
+		  FROM T_SCHEDULE_PUBLISH_LOG L
+		 INNER JOIN T_MIX_SCHEDULE_PUBLISH_RECORD R
+		    ON R.ID = L.RECORD_ID
+		   AND R.DEL_FLAG = '0'
+		 WHERE L.SCHEDULE_DATE = #{scheduleDate,jdbcType= VARCHAR}
+		   AND L.MIX_AREA = #{mixArea,jdbcType= VARCHAR}
+		   AND R.SCHEDULE_TYPE = #{scheduleType,jdbcType= VARCHAR}
+		   AND NOT EXISTS
+		 (SELECT 0
+		          FROM T_SCHEDULE_PUBLISH_LOG T
+		         INNER JOIN T_MIX_SCHEDULE_PUBLISH_RECORD RT
+		            ON RT.ID = T.RECORD_ID
+		           AND RT.DEL_FLAG = '0'
+		         WHERE T.SCHEDULE_DATE = L.SCHEDULE_DATE
+		           AND T.MIX_AREA = L.MIX_AREA
+		           AND T.ORDER_NO = L.ORDER_NO
+		           AND T.PUBLISH_RESULT = L.PUBLISH_RESULT
+		           AND RT.SCHEDULE_TYPE = R.SCHEDULE_TYPE
+		           AND T.DEL_FLAG = '0'
+		           AND (T.CREATE_TIME > L.CREATE_TIME OR
+		               T.CREATE_TIME = L.CREATE_TIME AND T.ID > L.ID))
+		   AND L.PUBLISH_RESULT = #{publishResult,jdbcType= VARCHAR}
+		   AND L.DEL_FLAG = '0'
+    </select>
+
+	<insert id="publishToMes">
+    INSERT INTO MES_MIX_GLUE_SCHEDULE_RESULT(
+            SCHEDULE_DATE,
+		    BATCH_NO,
+		    ORDER_NO,
+		    MATER_CODE,
+		    RECIPE_TYPE,
+		    RECIPE_EQUIP_CODE,
+		    RECIPE_CODE,
+		    RECIPE_VERSION,
+		    NIGHT_PLAN_QTY,
+		    NIGHT_PRODUCE_ORDER,
+		    DAY_PLAN_QTY,
+		    DAY_PRODUCE_ORDER,
+		    DATA_VERSION,
+		    COMPANY_CODE,
+		    FACTORY_CODE )
+        SELECT
+            r.SCHEDULE_DATE             ,
+            r.BATCH_NO                  ,
+            r.ORDER_NO                  ,
+            r.glue MATER_CODE           ,
+            RECIPE_TYPE                 ,
+            r.MACHINE_CODE              ,
+            r.glue RECIPE_CODE          ,
+            r.RECIPE_VERSION_ID         ,
+            MID_PLAN_QTY NIGHT_PLAN_QTY ,
+            MID_PRODUCE_ORDER NIGHT_PRODUCE_ORDER,
+            NIGHT_PLAN_QTY DAY_PLAN_QTY          ,
+            NIGHT_PRODUCE_ORDER DAY_PRODUCE_ORDER,
+            #{dataVersion} DATA_VERSION          ,
+            #{factoryCode}                       ,
+            #{companyCode}
+        FROM T_GLUE_SCHEDULE_RESULT r
+        WHERE r.id in <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    </insert>
+</mapper>

@@ -6,8 +6,8 @@
 
 	<!-- 查询施工表字段映射配置列表 -->
     <select id="selectTPlmBomConstructionMapping" resultType="com.zlt.aps.common.engine.domain.TMesConstructionMapping">
-		SELECT T.CONSTRUCTION_COLUMN COLUMN_NAME, 
-		       T.REGULAR_EXPRESSION, 
+        SELECT T.CONSTRUCTION_COLUMN COLUMN_NAME,
+        T.REGULAR_EXPRESSION,
 		       T.ERROR_TIPS
 		  FROM T_PLM_BOM_CONSTRUCTION_MAPPING T
 		 WHERE IS_DELETE = '0'
@@ -18,7 +18,7 @@
 		   'CLAMPING_PRESSURE', 'CURING_TIME'
 		   )
     </select>
-    
+
 	<!-- 解析bom表，关联plm参数表与施工表字段映射配置表，抓取本次同步需要更新施工表哪个胎胚号的数据 -->
 	<!-- 由于一条胎胚的更新数据有可能分成几个版本发送过来，如果胎胚层（第一层）延迟发送会导致先发送过来的栏位更新会被忽略掉
 		  因此每次更新都将该胎胚的所有字段刷新一边 -->
@@ -95,7 +95,7 @@
 		          AND PRIOR T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
 		           OR PRIOR T.CHILD_MATERIAL_NAME_CODE != 'EMBRYO'
 		         )
-		) 
+        )
 		<!--============================树解析end=========================-->
 		SELECT T1.EMBRYO_CODE, 		<!--胎号-->
 		       T1.EMBRYO_VERSION,	<!--胎胚版本-->
@@ -130,7 +130,7 @@
 				              T1.CHILD_MATERIAL_VERSION,
 				              NULL)
         <if test="enable">
-		       END 
+            END
         </if>
 		       COLUMN_VALUE,
 		       T1.CHILD_MATERIAL_CODE,
@@ -148,7 +148,7 @@
 		       M.MATERIAL_TYPE
 		  FROM TEMP_TAB T1
 		 INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
-		    ON T1.CHILD_MATERIAL_NAME_CODE || ':' || T1.PARENT_MATERIAL_NAME_CODE = 
+        ON T1.CHILD_MATERIAL_NAME_CODE || ':' || T1.PARENT_MATERIAL_NAME_CODE =
 		       M.CHILD_MATERIAL_NAME_CODE || ':' || M.PARENT_MATERIAL_NAME_CODE
 		   AND M.CONSTRUCTION_COLUMN NOT IN (
 		   <!-- 胎号、版本不允许修改，直接过滤掉 -->
@@ -176,7 +176,7 @@
 	             AND (NVL(PP.UPDATE_DATE, PP.CREATE_DATE) > NVL(P.UPDATE_DATE, P.CREATE_DATE) OR
 	                 NVL(PP.UPDATE_DATE, PP.CREATE_DATE) = NVL(P.UPDATE_DATE, P.CREATE_DATE) AND PP.ID > P.ID))
     </select>
-    
+
     <!-- 获取月计划中的版本对应的施工信息 -->
     <select id="listEmbryoVersion" resultType="com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo">
 	    WITH TEMP AS
@@ -196,7 +196,7 @@
 		   AND C.DEL_FLAG = '0'
 		 GROUP BY T.EMBRYO_CODE, T.EMBRYO_VERSION
     </select>
-    
+
     <!-- 获取指定胎胚的单版本的投产施工信息版本信息，如果有多个版本，则不要返回 -->
     <select id="selectSingleVersionConstruction" resultType="com.zlt.aps.cx.api.domain.entity.CxProductConstructionInfo">
 	    WITH TEMP AS
@@ -212,7 +212,7 @@
 		 GROUP BY T.EMBRYO_CODE
 		HAVING COUNT(1) = 1
     </select>
-    
+
     <!-- 初始化投产施工表
     	更新逻辑：投产施工有相同版本相同胎胚的施工则跳过，没有则新增，不会更新已有记录
     -->
@@ -418,9 +418,9 @@
 	              conducting_resin_weight,
 	              tread_mouth_plate,
 	              create_by,
-	              sysdate create_time,
+        now() create_time,
 	              update_by,
-	              sysdate update_time,
+        now() update_time,
 	              del_flag,
 	              remark,
 	              production_stage,
@@ -435,16 +435,16 @@
 	                  AND tt.del_flag = '0'
 	                  AND (nvl(tt.update_time, tt.create_time) > nvl(t.update_time, t.create_time) or
 	                      nvl(tt.update_time, tt.create_time) = nvl(t.update_time, t.create_time) and tt.id > t.id))
-	          AND NOT EXISTS 
-	        (SELECT 1 
+        AND NOT EXISTS
+        (SELECT 1
 	                 FROM t_product_construction_info tt
 			        WHERE tt.embryo_code = t.embryo_code
 			          AND tt.embryo_version = t.embryo_version
 			          AND tt.del_flag = '0'
 			      )
-	          AND t.del_flag = '0'  
+        AND t.del_flag = '0'
     </update>
-    
+
     <!-- 获取最近一次月度计划版本中选择的版本信息，但是如果该版本已经废止则依然要过滤掉 -->
     <select id="selectLatestProdPlanBomDataVersionList" resultType="com.zlt.aps.common.engine.domain.MdmMonthProdPlan">
 	    <![CDATA[

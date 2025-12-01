@@ -1,6 +1,7 @@
 package com.zlt.aps.nc.engine.mapper;
 
 
+import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.engine.vo.NcSpecifyMachineVo;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,5 +16,10 @@ public interface NcEngineMachineMapper {
      */
     List<NcSpecifyMachineVo> listNcSpecifyMachine(@Param("jobType") String jobType);
 
-
+    /**
+     * 查询内衬机台信息
+     *
+     * @return 结果
+     */
+    List<NcMachineInfo> listNcMachine();
 }

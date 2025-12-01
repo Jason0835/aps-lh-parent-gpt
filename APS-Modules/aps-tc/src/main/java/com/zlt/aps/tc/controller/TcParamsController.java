@@ -79,8 +79,8 @@ public class TcParamsController extends BaseController {
 
     @Log(title = "ui.data.column.tc.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出胎侧参数信息")
-    @GetMapping("/exportData")
-    public List<TcParamsDto> export(@SpringQueryMap TcParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<TcParamsDto> export(@RequestBody TcParamsDto dto) {
         TcParams params = new TcParams();
         BeanUtils.copyProperties(dto, params);
         startPage();

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.common.engine.mapper.BaseFinishQtyImportMapper">
+
+    <delete id="removeDayFinishQtyByDate">
+        UPDATE ${tableName}
+        SET del_flag = '1'
+        WHERE schedule_date = #{scheduleDate}
+    </delete>
+
+    <insert id="saveDayFinishQtyList">
+        INSERT INTO ${tableName}
+        (id,
+        schedule_date,
+        order_no,
+        <if test="codeColumn != null and codeColumn != ''">${codeColumn},</if>
+        <if test="codeColumn1 != null and codeColumn1 != ''">${codeColumn1},</if>
+        ${class1FinishQtyColumn},
+        ${class2FinishQtyColumn},
+        remark,
+        del_flag,
+        create_by,
+        create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.id},
+            #{item.scheduleDate},
+            #{item.orderNo,jdbcType=VARCHAR},
+            <if test="codeColumn != null and codeColumn != ''">#{item.codeField},</if>
+            <if test="codeColumn1 != null and codeColumn1 != ''">#{item.codeField1},</if>
+            #{item.class1FinishQty,jdbcType = DOUBLE},
+            #{item.class2FinishQty,jdbcType = DOUBLE},
+            #{item.remark,jdbcType=VARCHAR},
+            '0',
+            #{item.createBy,jdbcType = VARCHAR},
+            #{item.createTime}
+            )
+        </foreach>
+    </insert>
+
+    <insert id="saveDayFinishQtyTotalByDayFinish">
+        INSERT INTO ${totalTableName} (
+            SCHEDULE_DATE,
+            <if test="codeColumn != null and codeColumn != ''">${codeColumn},</if>
+            <if test="codeColumn1 != null and codeColumn1 != ''">${codeColumn1},</if>
+            FINISH_QTY,
+            REMARK,
+            DEL_FLAG,
+            CREATE_BY,
+            CREATE_TIME
+        )
+        SELECT
+            SCHEDULE_DATE,
+            <if test="codeColumn != null and codeColumn != ''">${codeColumn},</if>
+            <if test="codeColumn1 != null and codeColumn1 != ''">${codeColumn1},</if>
+            SUM(${class1FinishQtyColumn} + ${class2FinishQtyColumn}) AS FINISH_QTY,
+            MIN(REMARK),
+            MIN(DEL_FLAG),
+            MIN(CREATE_BY),
+            MIN(CREATE_TIME)
+            FROM ${tableName}
+            WHERE DEL_FLAG = '0'
+            GROUP BY SCHEDULE_DATE
+            <if test="codeColumn != null and codeColumn != ''">,${codeColumn}</if>
+            <if test="codeColumn1 != null and codeColumn1 != ''">,${codeColumn1}</if>
+    </insert>
+</mapper>

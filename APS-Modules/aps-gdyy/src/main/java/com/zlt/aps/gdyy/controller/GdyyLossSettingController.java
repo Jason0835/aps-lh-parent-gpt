@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2021-07-19
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/gdyy/loss")
 public class GdyyLossSettingController extends BaseController {
     @Autowired
     private GdyyLossSettingService gdyyLossSettingService;

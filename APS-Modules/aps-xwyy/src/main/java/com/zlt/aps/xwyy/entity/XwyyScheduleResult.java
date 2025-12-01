@@ -1,6 +1,9 @@
 package com.zlt.aps.xwyy.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -23,13 +26,13 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_XWYY_SCHEDULE_RESULT")
 @ApiModel(value = "XwyyScheduleResult对象", description = "纤维压延排程结果表")
-@KeySequence(value = "SEQ_XWYY_SCHEDULE", clazz = Long.class)
+//@KeySequence(value = "SEQ_XWYY_SCHEDULE",dbType = DbType.ORACLE)
 public class XwyyScheduleResult extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID",type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "排程日期")
@@ -68,6 +71,13 @@ public class XwyyScheduleResult extends ApsBaseEntity {
     @TableField("DAY_PLAN_QTY")
     private Double dayPlanQty;
 
+    /**
+     * 中班生产顺序
+     */
+    @ApiModelProperty(value = "早班生产顺序")
+    @TableField("DAY_PRODUCE_ORDER")
+    private Integer dayProduceOrder;
+
     @ApiModelProperty(value = "中班计划量个数")
     @TableField("DAY_PLAN_QTY_NUM")
     private Double dayPlanQtyNum;
@@ -91,6 +101,13 @@ public class XwyyScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "夜班(0点-12点)计划量")
     @TableField("NIGHT_PLAN_QTY")
     private Double nightPlanQty;
+
+    /**
+     * 夜班生产顺序
+     */
+    @ApiModelProperty(value = "夜班生产顺序")
+    @TableField("NIGHT_PRODUCE_ORDER")
+    private Integer nightProduceOrder;
 
     @ApiModelProperty(value = "夜班计划量个数")
     @TableField("NIGHT_PLAN_QTY_NUM")

@@ -38,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
              del_flag = 0
             <if test="cxOrderNo != null  and cxOrderNo != ''">and CX_ORDER_NO = #{cxOrderNo}</if>
             <if test="scheduleDate != null "> and  schedule_date = #{scheduleDate}</if>
-            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = STR_TO_DATE(#{scheduleDateStr},'%Y-%m-%d')</if>
             <if test="dataSource != null and dataSource!='' "> and  data_source = #{dataSource}</if>
         </where>
     </select>
@@ -56,7 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             clm.del_flag='0'
             and lmi.del_flag='0'
             <if test="cxOrderNo != null  and cxOrderNo != ''">and clm.CX_ORDER_NO = #{cxOrderNo}</if>
-            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  clm.schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  clm.schedule_date = STR_TO_DATE(#{scheduleDateStr},'%Y-%m-%d')</if>
             <if test="dataSource != null and dataSource!='' "> and  clm.data_source = #{dataSource}</if>
         </where>
         group by clm.cx_order_no
@@ -68,7 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             del_flag='0'
             <if test="cxOrderNo != null  and cxOrderNo != ''">and CX_ORDER_NO = #{cxOrderNo}</if>
-            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = to_date(#{scheduleDateStr},'yyyyMMdd')</if>
+            <if test="scheduleDateStr != null and scheduleDateStr!='' "> and  schedule_date = STR_TO_DATE(#{scheduleDateStr},'%Y-%m-%d')</if>
             <if test="dataSource != null and dataSource!='' "> and  data_source = #{dataSource}</if>
         </where>
     </delete>

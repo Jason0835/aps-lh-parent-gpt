@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gdyy;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -10,7 +11,7 @@ import java.io.Serializable;
 
 @Data
 @ApiModel(value="钢带大卷颜色提示信息导入模板", description="钢带大卷颜色提示信息导入模板")
-public class GdyySteelRollColorTemp {
+public class GdyySteelRollColorTemp extends BaseEntity {
 
     @ApiModelProperty(value = "钢压大卷代号")
     @Excel(name = "ui.steelRollColor.column.bigRollCode")

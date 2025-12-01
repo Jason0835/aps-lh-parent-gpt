@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -15,7 +16,7 @@ import java.util.Date;
 @Data
 @TableName("T_CX_CHANGE_LH_MACHINE")
 @EqualsAndHashCode(callSuper = false)
-@KeySequence(value = "SEQ_CX_CHANGE_LH_MACHINE", clazz = Long.class)
+@KeySequence(value = "SEQ_CX_CHANGE_LH_MACHINE",dbType = DbType.ORACLE)
 public class CxChangeLhMachine extends ApsBaseEntity {
     /** 主键ID，对应自增序列为：SEQ_CX_CHANGE_LH_MACHINE */
     @ApiModelProperty(value = "id")

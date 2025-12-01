@@ -85,8 +85,8 @@ public class Cd15ParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.cd15.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出15度裁断参数信息")
-    @GetMapping("/exportData")
-    public List<Cd15ParamsDto> export(@SpringQueryMap Cd15ParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd15ParamsDto> export(@RequestBody Cd15ParamsDto dto) {
         dto.setOrderStr(orderStr());
         Cd15Params params = new Cd15Params();
         BeanUtils.copyProperties(dto, params);

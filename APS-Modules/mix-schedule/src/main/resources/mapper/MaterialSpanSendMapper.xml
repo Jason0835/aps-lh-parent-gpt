@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.MaterialSpanSendMapper">
+
+    <select id="listMaterialSpanSend" parameterType="com.zlt.mix.schedule.api.domain.entity.MaterialSpanSend"
+            resultType="com.zlt.mix.schedule.api.domain.entity.MaterialSpanSend">
+        select
+            mss.id,
+            mss.schedule_date,
+            mss.entrust_mix_area,
+            mss.entrusted_mix_area,
+            mss.material_name,
+            mss.mid_send_qty,
+            mss.mid_expect_demand_time,
+            mss.night_send_qty,
+            mss.night_expect_demand_time,
+            mss.day_send_qty,
+            mss.day_expect_demand_time,
+            mss.send_time,
+            mss.send_person,
+            mss.receive_status,
+            mss.is_auto,
+            mss.create_by,
+            mss.create_time,
+            mss.update_by,
+            mss.update_time,
+            mss.del_flag,
+            mss.remark,
+            ifnull(lf.MID_FINISH_QTY, 0) + ifnull(lf.NIGHT_FINISH_QTY, 0) + ifnull(lf.DAY_FINISH_QTY, 0) AS finishQty,
+            msr.mid_receive_qty,
+            msr.night_receive_qty,
+            msr.day_receive_qty,
+            mss.total_send_qty,
+            msr.total_receive_qty
+        from t_material_span_send mss
+        LEFT JOIN
+        (SELECT SUM(MID_FINISH_QTY) MID_FINISH_QTY,SUM(NIGHT_FINISH_QTY) NIGHT_FINISH_QTY,SUM(DAY_FINISH_QTY) DAY_FINISH_QTY, SCHEDULE_DATE, MIX_AREA, MATERIAL_NAME FROM T_LHFL_FINISH WHERE DEL_FLAG = '0' GROUP BY SCHEDULE_DATE, MIX_AREA, MATERIAL_NAME) lf
+        ON mss.SCHEDULE_DATE = lf.SCHEDULE_DATE AND mss.ENTRUSTED_MIX_AREA = lf.MIX_AREA AND mss.MATERIAL_NAME = lf.MATERIAL_NAME
+        LEFT JOIN t_material_span_receive msr on mss.id = msr.send_id and msr.del_flag = '0'
+        where mss.del_flag = '0'
+        <if test="scheduleDate != null"> and mss.schedule_date = #{scheduleDate}</if>
+        <if test="entrustMixArea != null and entrustMixArea != ''">and mss.entrust_mix_area = #{entrustMixArea}</if>
+        <if test="entrustedMixArea != null and entrustedMixArea != ''">and mss.entrusted_mix_area = #{entrustedMixArea}</if>
+        <if test="permissionMixAreaList != null and permissionMixAreaList.size() > 0">
+            and mss.entrust_mix_area in
+            <foreach collection="permissionMixAreaList" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="materialName != null and materialName != ''">and INSTR(mss.material_name, #{materialName}) > 0</if>
+        <if test="orderStr == null">
+            order by mss.receive_status desc, mss.create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <insert id="batchInsertMaterialSpanSend">
+        insert into t_material_span_send (id,schedule_date,entrust_mix_area,entrusted_mix_area,material_name,mid_send_qty,mid_expect_demand_time,night_send_qty,night_expect_demand_time,day_send_qty,day_expect_demand_time,send_time,send_person,receive_status,is_auto,create_by,create_time,update_by,update_time,del_flag,remark )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="materialSpanSend" separator=" union all ">
+            select
+            #{materialSpanSend.scheduleDate,jdbcType=DATE} schedule_date,
+            #{materialSpanSend.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{materialSpanSend.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area,
+            #{materialSpanSend.materialName,jdbcType=VARCHAR} material_name,
+            #{materialSpanSend.midSendQty,jdbcType=DOUBLE} mid_send_qty,
+            #{materialSpanSend.midExpectDemandTime,jdbcType=DATE} mid_expect_demand_time,
+            #{materialSpanSend.nightSendQty,jdbcType=DOUBLE} night_send_qty,
+            #{materialSpanSend.nightExpectDemandTime,jdbcType=DATE} night_expect_demand_time,
+            #{materialSpanSend.daySendQty,jdbcType=DOUBLE} day_send_qty,
+            #{materialSpanSend.dayExpectDemandTime,jdbcType=DATE} day_expect_demand_time,
+            #{materialSpanSend.sendTime,jdbcType=DATE} send_time, #{materialSpanSend.sendPerson,jdbcType= VARCHAR}
+            send_person, #{materialSpanSend.receiveStatus,jdbcType= VARCHAR} receive_status,
+            #{materialSpanSend.isAuto,jdbcType= VARCHAR} is_auto, #{materialSpanSend.createBy,jdbcType= VARCHAR}
+            create_by, #{materialSpanSend.createTime,jdbcType=DATE} create_time,
+            #{materialSpanSend.updateBy,jdbcType= VARCHAR} update_by, #{materialSpanSend.updateTime,jdbcType=DATE}
+            update_time, #{materialSpanSend.delFlag,jdbcType= VARCHAR} del_flag,
+            #{materialSpanSend.remark,jdbcType= VARCHAR} remark from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeMaterialSpanSend" parameterType="com.zlt.mix.schedule.api.domain.entity.MaterialSpanSend">
+        merge into t_material_span_send a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id,jdbcType=DOUBLE} id, #{item.sendId,jdbcType=DOUBLE} send_id,
+            #{item.receiveStatus,jdbcType=VARCHAR} receive_status,
+            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime,jdbcType=DATE} update_time,
+            #{item.remark,jdbcType=VARCHAR} remark from dual
+        </foreach>
+        ) b ON ( a.id = b.send_id AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.receive_status = b.receive_status, a.update_by = b.update_by,
+            a.update_time = b.update_time
+        </set>
+    </update>
+
+    <select id="listMaterialSpanSendNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="list" item="data" index="index" separator=" union all ">
+            SELECT #{index} id, #{data.scheduleDate,jdbcType=DATE} schedule_date,#{data.entrustMixArea,jdbcType=VARCHAR} entrust_mix_area,
+            #{data.entrustedMixArea,jdbcType=VARCHAR} entrusted_mix_area, #{data.materialName,jdbcType=VARCHAR} material_name
+            FROM dual
+        </foreach>
+        )
+        select t.id errorRow
+        from t_material_span_send m
+        inner join temp_table t on m.schedule_date = t.schedule_date and m.entrust_mix_area = t.entrust_mix_area
+        and m.entrusted_mix_area = t.entrusted_mix_area and m.material_name = t.material_name and m.del_flag = '0'
+    </select>
+
+    <select id="getAlreadyReceivedCount" parameterType="string" resultType="integer">
+        select count(1)
+        from t_material_span_send
+        where del_flag = '0' and receive_status = '1' and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="deleteByIds">
+        update t_material_span_send set del_flag = '1'
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="deleteNotReceived">
+        UPDATE T_MATERIAL_SPAN_SEND
+        SET DEL_FLAG = '1'
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND ENTRUST_MIX_AREA = #{mixArea}
+        AND IS_AUTO = '0'
+        AND RECEIVE_STATUS = '0'
+    </update>
+</mapper>

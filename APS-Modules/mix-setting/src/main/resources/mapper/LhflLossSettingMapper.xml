@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.LhflLossSettingMapper">
+    
+    <select id="selectLhflLossSettingList" parameterType="com.zlt.mix.setting.api.domain.entity.LhflLossSetting" resultType="com.zlt.mix.setting.api.domain.entity.LhflLossSetting">
+        select
+        lls.id,
+        lls.mix_area,
+        lls.material_name,
+        lls.machine_code,
+        lm.machine_name,
+        lls.loss_rate,
+        lls.remark,
+        lls.del_flag,
+        lls.create_by,
+        lls.create_time,
+        lls.update_by,
+        lls.update_time
+        from t_lhfl_lossrate_setting lls left join T_LHFL_MACHINE lm
+        on lls.mix_area=lm.mix_area and lls.machine_code=lm.machine_code and lm.del_flag='0'
+        <where>
+            lls.del_flag = '0'
+            <if test="mixArea != null  and mixArea != ''"> and lls.mix_area = #{mixArea}</if>
+            <if test="materialName != null  and materialName != ''">and instr(lls.material_name , #{materialName})>0
+            </if>
+            <if test="machineCode != null  and machineCode != ''"> and lls.machine_code = #{machineCode}</if>
+        </where>
+
+        <if test="orderStr == null">
+            order by lls.create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteLhflLossSettingByIds" parameterType="String">
+        update t_lhfl_lossrate_setting set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <select id="listLhflLossSettingNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers , #{data.mixArea,jdbcType= VARCHAR}
+            mix_area,#{data.materialName,jdbcType= VARCHAR} material_name,#{data.machineCode,jdbcType= VARCHAR}
+            machine_code 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_lhfl_lossrate_setting m
+        inner join temp_table t on m.mix_area=t.mix_area and ifnull(m.material_name,'GLUE_EMPTY') =
+        ifnull(t.material_name,'GLUE_EMPTY') and ifnull(m.machine_code,'MACHINE_EMPTY')=ifnull(t.machine_code,'MACHINE_EMPTY')
+        and m.del_flag ='0'
+
+    </select>
+
+    <insert id="batchInsertLhflLossSettingInfo">
+        insert into t_lhfl_lossrate_setting
+        (id,mix_area,material_name,machine_code,loss_rate,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="lhflLossrateSetting" separator=" union all ">
+            select
+            #{lhflLossrateSetting.mixArea,jdbcType= VARCHAR} mix_area,
+            #{lhflLossrateSetting.materialName,jdbcType= VARCHAR} material_name,
+            #{lhflLossrateSetting.machineCode,jdbcType= VARCHAR} machine_code,
+            #{lhflLossrateSetting.lossRate,jdbcType=DOUBLE} loss_rate,
+            #{lhflLossrateSetting.remark,jdbcType= VARCHAR} remark,
+            #{lhflLossrateSetting.delFlag,jdbcType= VARCHAR} del_flag,
+            #{lhflLossrateSetting.createBy,jdbcType= VARCHAR} create_by,
+            #{lhflLossrateSetting.createTime,jdbcType=TIMESTAMP} create_time,
+            #{lhflLossrateSetting.updateBy,jdbcType= VARCHAR} update_by,
+            #{lhflLossrateSetting.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lhfl_lossrate_setting a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.mixArea,jdbcType=VARCHAR } mix_area,
+            #{item.materialName,jdbcType=VARCHAR } material_name,
+            #{item.machineCode,jdbcType=VARCHAR } machine_code,
+            #{item.lossRate, jdbcType=DECIMAL} loss_rate,
+            #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag,
+            #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time,
+            #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) b ON ( a.mix_area=b.mix_area and ifnull(a.material_name,'GLUE_EMPTY')=ifnull(b.material_name,'GLUE_EMPTY') and
+        ifnull(a.machine_code,'MACHINE_EMPTY')=ifnull(b.machine_code,'MACHINE_EMPTY') AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.loss_rate = b.loss_rate,
+            a.update_by = b.create_by,
+            a.update_time = now(),
+            a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id,
+        a.mix_area,
+        a.material_name,
+        a.machine_code,
+        a.loss_rate,
+        a.remark,
+        a.del_flag,
+        a.create_by,
+        a.create_time
+        )
+        values (
+        get_sequence_nextval('seq_lhfl_lossrate_setting'),
+        b.mix_area,
+        b.material_name,
+        b.machine_code,
+        b.loss_rate,
+        b.remark,
+        0,
+        b.create_by,
+        now()
+        )
+    </update>
+
+    <select id="selectMachineCodeList" resultType="java.lang.String">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{data.mixArea,jdbcType= VARCHAR} MIX_AREA,
+            #{data.machineName,jdbcType= VARCHAR} MACHINE_NAME,#{rowNumber} row_numbers 
+        </foreach>
+        )
+        select m.MACHINE_CODE machineCode
+        from T_LHFL_MACHINE m
+        right join temp_table t on m.MIX_AREA=t.MIX_AREA and m.MACHINE_NAME = t.MACHINE_NAME and m.del_flag ='0'
+        order by t.row_numbers
+    </select>
+</mapper>

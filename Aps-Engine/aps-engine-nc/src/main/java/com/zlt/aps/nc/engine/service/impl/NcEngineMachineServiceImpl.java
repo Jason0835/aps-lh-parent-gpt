@@ -1,5 +1,6 @@
 package com.zlt.aps.nc.engine.service.impl;
 
+import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.engine.mapper.NcEngineMachineMapper;
 import com.zlt.aps.nc.engine.service.NcEngineMachineService;
 import com.zlt.aps.nc.engine.vo.NcSpecifyMachineVo;
@@ -30,5 +31,15 @@ public class NcEngineMachineServiceImpl implements NcEngineMachineService {
             specifyMachineMap.put(specifyMachineVo.getLiningCode(), specifyMachineVo.getMachineIds());
         }
         return specifyMachineMap;
+    }
+
+    /**
+     * 获得内衬机台列表
+     *
+     * @return 结果
+     */
+    @Override
+    public List<NcMachineInfo> listNcMachine() {
+        return ncEngineMachineMapper.listNcMachine();
     }
 }

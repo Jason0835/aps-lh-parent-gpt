@@ -1,17 +1,14 @@
 package com.zlt.aps.template.tq;
 
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.annotation.ImportValidated;
-import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-
 @Data
 @ApiModel(value="胎圈导入模板", description="胎圈导入模板")
-public class TqMouthPlateTemp {
+public class TqMouthPlateTemp extends ApsBaseEntity {
 
     @Excel(name = "ui.data.column.mouthPlateCode", sort = 10)
     @ApiModelProperty(value = "口型板编号。", position = 20)

@@ -16,7 +16,7 @@ import java.util.List;
  * @author zlt
  * @date 2022-01-20
  */
-@FeignClient(contextId = "ICxHalfPartConversionService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
+@FeignClient(contextId = "ICxHalfPartConversionService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:/cxlh}")
 public interface ICxHalfPartConversionService {
 
     /**

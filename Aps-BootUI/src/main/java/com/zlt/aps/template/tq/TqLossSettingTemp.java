@@ -3,13 +3,14 @@ package com.zlt.aps.template.tq;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "胎圈损耗率设定导入模板", description = "胎圈损耗率设定导入模板 ")
-public class TqLossSettingTemp {
+public class TqLossSettingTemp extends ApsBaseEntity {
 
     @Excel(name = "ui.data.column.loss.beadCode",sort = 10)
     @ApiModelProperty(value = "胎圈代码")

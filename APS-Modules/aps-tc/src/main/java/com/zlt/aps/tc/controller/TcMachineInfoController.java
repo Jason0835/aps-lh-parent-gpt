@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Api(tags = "胎侧机台信息维护接口")
 @RestController
-@RequestMapping("/machine")
+@RequestMapping("/tc/machine")
 public class TcMachineInfoController extends BaseController {
     @Autowired
     private TcMachineInfoService machineInfoService;

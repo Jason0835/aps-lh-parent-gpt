@@ -4,7 +4,6 @@ import com.alibaba.csp.sentinel.util.StringUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -12,19 +11,25 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.common.handle.TmSyncDataHandle;
 import com.zlt.aps.tm.engine.service.TmEngineService;
 import com.zlt.aps.tm.service.TmMachineInfoService;
 import com.zlt.aps.tm.service.TmScheduleResultService;
+import com.zlt.bill.common.controller.AbstractBillBizController;
+import com.zlt.bill.common.service.IBillService;
 import com.zlt.sync.povo.SyncParamsVO;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.poi.ss.usermodel.*;
@@ -52,9 +57,10 @@ import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
  * @author zlt
  * @date 2021-06-17
  */
+@Api(tags = "胎面排程结果")
 @RestController
 @RequestMapping("/tmScheduleResult")
-public class TmScheduleResultController extends BaseController {
+public class TmScheduleResultController extends AbstractBillBizController<TmScheduleResult> {
     @Value("${excelModelPath}")
     public String excelModelPath;
     @Autowired
@@ -75,6 +81,7 @@ public class TmScheduleResultController extends BaseController {
      * 查询胎面排程结果列表
      */
     @PostMapping("/list")
+    @Override
     public TableDataInfo list(@RequestBody TmScheduleResult tmScheduleResult) {
 //        startPage("a.GLUE_SEQ,a.GLUE_CODE asc");
         tmScheduleResult.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
@@ -86,6 +93,7 @@ public class TmScheduleResultController extends BaseController {
      * 获取胎面排程结果详细信息
      */
     @GetMapping(value = "/{id}")
+    @Override
     public TmScheduleResult getInfo(@PathVariable("id") Long id) {
         return tmScheduleResultService.selectTmScheduleResultById(id);
     }
@@ -253,7 +261,7 @@ public class TmScheduleResultController extends BaseController {
                 row.createCell(n++).setCellValue(scheduleResult.getWholeGlueCode() == null ? "" : scheduleResult.getWholeGlueCode());
 //                row.createCell(n++).setCellValue(scheduleResult.getWholeGlueCode() == null ? "" : scheduleResult.getWholeGlueCode());
 //                row.createCell(n++).setCellValue(scheduleResult.getReinforceSealGlue() == null ? "" : scheduleResult.getReinforceSealGlue());
-                row.createCell(n++).setCellValue(scheduleResult.getGlueSeq() == null ? 0 : Double.parseDouble(scheduleResult.getGlueSeq()));
+                row.createCell(n++).setCellValue(StringUtils.isBlank(scheduleResult.getGlueSeq()) ? 0 : Double.parseDouble(scheduleResult.getGlueSeq()));
                 row.createCell(n++).setCellValue(scheduleResult.getMouthPlateCode() == null ? "" : scheduleResult.getMouthPlateCode());
 //                row.createCell(n++).setCellValue(scheduleResult.getUnitConsume() == null ? 0 : scheduleResult.getUnitConsume());
 
@@ -448,7 +456,8 @@ public class TmScheduleResultController extends BaseController {
         tmScheduleResult.setMonth(DateFormatUtils.format(tmScheduleResult.getScheduleDate(), "MM"));
         // 过滤未发布及发布失败的数据
         List<TmScheduleResult> list = tmScheduleResultService.selectTmScheduleResultList(tmScheduleResult).stream()
-                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
+                .filter(item -> (ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease()))
+                        && StringUtils.isNotBlank(item.getMouthPlateCode())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
         }
@@ -573,7 +582,7 @@ public class TmScheduleResultController extends BaseController {
 
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     * @param scheduleDate 排程日期
+     * @param tmScheduleResult 排程日期
      * @return 查询到的记录数
      */
     @PostMapping("/isReleasingOrTimeoutByDate")
@@ -583,7 +592,7 @@ public class TmScheduleResultController extends BaseController {
 
     /**
      * 更改发布状态
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Log(title = "ui.data.column.tmScheduleResult.modalName", businessType = BusinessType.BALANCE)
@@ -608,5 +617,54 @@ public class TmScheduleResultController extends BaseController {
         }
         tmScheduleResultService.combinationMiddleAndNight(ids, classifiedShift);
         return AjaxResult.success();
+    }
+
+    @Override
+    protected IBillService getBillService() {
+        return tmScheduleResultService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return BillTypeCodeEnums.TM_SCHEDULE_RESULT.getBillTypeCode();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<TmDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return tmScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody TmScheduleResult tmScheduleResult) {
+        return tmScheduleResultService.getSummaryVo(tmScheduleResult);
+    }
+
+    /**
+     * 批量转机台
+     *
+     * @param scheduleResult 排程结果
+     * @return 结果
+     */
+    @PostMapping("/batchChangeMachine")
+    @ApiOperation("批量转机台")
+    public AjaxResult batchChangeMachine(@RequestBody TmScheduleResult scheduleResult) {
+        return tmScheduleResultService.batchChangeMachine(scheduleResult);
     }
 }

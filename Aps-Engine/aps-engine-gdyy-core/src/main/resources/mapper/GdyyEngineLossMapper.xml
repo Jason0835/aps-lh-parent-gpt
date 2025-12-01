@@ -3,7 +3,8 @@
 <mapper namespace="com.zlt.aps.gdyy.engine.mapper.GdyyEngineLossMapper">
 	<!-- 查询损耗率配置信息 -->
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.gdyy.engine.vo.GdyyLossSettingVo">
-        select BIG_ROLL_CODE, LOSS_RATE
+        select concat(IFNULL(machine_id,'') , '#' , IFNULL(big_roll_code,'')) LOSS_KEY, /*组合key，机台id + 大卷编号*/
+               LOSS_RATE
         from T_GDYY_LOSS_SETTING
         where DEL_FLAG = 0
     </select>

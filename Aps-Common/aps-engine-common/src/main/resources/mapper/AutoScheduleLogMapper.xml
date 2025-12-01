@@ -3,9 +3,6 @@
 <mapper namespace="com.zlt.aps.common.engine.mapper.AutoScheduleLogMapper">
 
     <insert id="insertAutoScheduleLog" parameterType="com.zlt.aps.common.engine.domain.AutoScheduleLog">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_AUTO_SCHEDULE_LOG.NEXTVAL as id FROM DUAL
-        </selectKey>
         insert into t_auto_schedule_log
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>

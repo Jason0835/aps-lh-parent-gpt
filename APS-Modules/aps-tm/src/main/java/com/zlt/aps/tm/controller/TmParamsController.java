@@ -85,8 +85,8 @@ public class TmParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.tm.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出胎面参数信息")
-    @GetMapping("/exportData")
-    public List<TmParamsDto> export(@SpringQueryMap TmParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<TmParamsDto> export(@RequestBody TmParamsDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         TmParams tmParams = new TmParams();

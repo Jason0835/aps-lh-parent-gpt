@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmMouldUseStatusEntityMapper">
+
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus" id="MouldUseStatusResult">
+        <result property="id" column="id"/>
+        <result property="year" column="year"/>
+        <result property="month" column="month"/>
+        <result property="mouldCode" column="mould_code"/>
+        <result property="factoryCode" column="factory_code"/>
+        <result property="mouldStatus" column="mould_status"/>
+        <result property="specifications" column="specifications"/>
+        <result property="pattern" column="pattern"/>
+        <result property="mouldType" column="mould_type"/>
+        <result property="owerFactoryCode" column="ower_factory_code"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="remark" column="remark"/>
+
+        <result property="specificationsPattern" column="specifications_pattern"/>
+    </resultMap>
+
+    <sql id="selectMouldUseStatusVo">
+        select id, year, month, mould_code,factory_code, mould_status, specifications, pattern, mould_type, ower_factory_code, create_time, update_time, create_by, update_by,remark from T_MDM_MOULD_USE_STATUS
+    </sql>
+    
+    <sql id="selectSqlMouldUseStatusList">
+        select t.id,
+        t.year,
+        t.month,
+        t.factory_code,
+        t.mould_code,
+        t.mould_status,
+        CONCAT_WS('', m.specifications, m.pattern) as specifications_pattern,
+        m.factory_code as ower_factory_code,
+        m.specifications,
+        m.pattern,
+        m.mould_type,
+        t.create_time,
+        t.update_time,
+        t.create_by,
+        t.update_by,
+        t.remark
+        from T_MDM_MOULD_USE_STATUS t
+        left join T_MDM_MODEL_INFO m on t.mould_code=m.mould_code
+        <where>
+            <if test="year != null ">and t.year = #{year}</if>
+            <if test="month != null ">and t.month = #{month}</if>
+            <if test="factoryCode != null  and factoryCode != ''">and t.factory_code = #{factoryCode}</if>
+            <if test="mouldStatus != null ">and t.mould_status = #{mouldStatus}</if>
+            <if test="mouldCode != null  and mouldCode != ''">and t.mould_code like concat('%',#{mouldCode},'%')</if>
+            <if test="specificationsPattern != null  and specificationsPattern != ''">
+                and CONCAT_WS('', m.specifications, m.pattern) like concat(#{specificationsPattern},'%')
+            </if>
+            <if test="params.mouldCodeList != null and params.mouldCodeList.size() > 0">
+                and (1, t.mould_code) in
+                <foreach collection="params.mouldCodeList" open="(" close=")" separator="," item="item">
+                    (1, #{item})
+                </foreach>
+            </if>
+            <!-- 数据范围过滤 -->
+            ${params.dataScope}
+        </where>
+    </sql>
+    
+    <sql id="selectSqlMouldUseStatusListForProductCode">
+        SELECT * FROM (SELECT t2.id,T.MOULD_CODE,#{year} year,#{month} month,
+        t2.factory_code,
+        t2.mould_status,
+        t2.specifications_pattern,
+        t2.ower_factory_code,
+        t2.specifications,
+        t2.pattern,
+        t2.mould_type,
+        t2.create_time,
+        t2.update_time,
+        t2.create_by,
+        t2.update_by,
+        t2.remark
+        FROM t_mdm_product_model_relation T
+        left JOIN
+        (
+        select t.id,
+        t.year,
+        t.month,
+        t.factory_code,
+        t.mould_code,
+        t.mould_status,
+        CONCAT_WS('', m.specifications, m.pattern) as specifications_pattern,
+        m.factory_code ower_factory_code,
+        m.specifications,
+        m.pattern,
+        m.mould_type,
+        t.create_time,
+        t.update_time,
+        t.create_by,
+        t.update_by,
+        t.remark
+        from T_MDM_MOULD_USE_STATUS t
+        left join T_MDM_MODEL_INFO m on t.mould_code=m.mould_code
+        <where>
+            <if test="year != null ">and t.year = #{year}</if>
+            <if test="month != null ">and t.month = #{month}</if>
+            <if test="factoryCode != null  and factoryCode != ''">and t.factory_code = #{factoryCode}</if>
+            <if test="mouldStatus != null ">and t.mould_status = #{mouldStatus}</if>
+            <if test="specificationsPattern != null  and specificationsPattern != ''">
+                and CONCAT_WS('', m.specifications, m.pattern) like concat(#{specificationsPattern},'%')
+            </if>
+            <!-- 数据范围过滤 -->
+            ${params.dataScope}
+        </where>
+        ) T2 ON T.MOULD_CODE=T2.MOULD_CODE
+        WHERE T.PRODUCT_CODE=#{productCode}
+        <if test="mouldCode != null  and mouldCode != ''">and t.mould_code like concat(#{mouldCode},'%')</if>
+        ) as t
+    </sql>
+
+    <select id="selectMouldUseStatusList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus"
+            resultMap="MouldUseStatusResult">
+        <include refid="selectSqlMouldUseStatusList"/>
+    </select>
+    
+    <select id="checkMouldUseStatusUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus"
+            resultMap="MouldUseStatusResult">
+        <include refid="selectMouldUseStatusVo"/>
+        <where>
+            <if test="id != null ">and id != #{id}</if>
+            <if test="year != null ">and year = #{year}</if>
+            <if test="month != null ">and month = #{month}</if>
+            <if test="mouldCode != null  and mouldCode != ''">and mould_code = #{mouldCode}</if>
+            <if test="factoryCode != null  and factoryCode != ''">and FACTORY_CODE = #{factoryCode}</if>
+            <if test="params.mouldCodeList != null and params.mouldCodeList.size() > 0">
+                and (1, mould_code) in
+                <foreach collection="params.mouldCodeList" open="(" close=")" separator="," item="item">
+                    (1, #{item})
+                </foreach>
+            </if>
+            <!-- 数据范围过滤 -->
+            ${params.dataScope}
+        </where>
+    </select>
+
+    <select id="selectMouldUseStatusListForProductCode" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus"
+            resultMap="MouldUseStatusResult">
+        <include refid="selectSqlMouldUseStatusListForProductCode"/>
+    </select>
+
+    <select id="selectCountMouldUseStatusListForProductCode" resultType="java.lang.Integer">
+        select count(1) from (
+        <include refid="selectSqlMouldUseStatusListForProductCode"/>
+        ) t
+    </select>
+
+    <select id="selectCountMouldUseStatusList" resultType="java.lang.Integer">
+        select count(1) from (
+        <include refid="selectSqlMouldUseStatusList"/>
+        ) t
+    </select>
+
+    <delete id="deleteMouldUseStatusByTime">
+        delete from T_MDM_MOULD_USE_STATUS
+        where
+        year=#{year,jdbcType=DECIMAL} and month=#{month,jdbcType=DECIMAL}
+        <if test="factoryCode != null  and factoryCode != ''">
+            and factory_code = #{factoryCode}
+        </if>
+    </delete>
+
+
+    <delete id="deleteModelUseStatusByMouldCode" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus">
+        delete from T_MDM_MOULD_USE_STATUS where MOULD_CODE = #{mouldCode}
+                                   AND FACTORY_CODE = #{factoryCode}
+                                   AND YEAR = #{year}
+                                   AND MONTH = #{month}
+    </delete>
+
+    <select id="queryByFactoryCodeYearMonth" parameterType="map" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus">
+        SELECT
+        t1.ID,
+        t1.YEAR                AS year,
+        t1.MONTH               AS month,
+        t1.FACTORY_CODE        AS factoryCode,
+        t1.MOULD_STATUS        AS mouldStatus,
+        t1.MOULD_CODE          AS mouldCode,
+        t1.OWER_FACTORY_CODE   AS owerFactoryCode,
+        t1.SPECIFICATIONS      AS specifications,
+        t1.PATTERN             AS pattern,
+        t1.MOULD_TYPE          AS mouldType,
+        t1.REMARK              AS remark
+        FROM T_MDM_MOULD_USE_STATUS t1
+        LEFT JOIN T_MDM_MODEL_INFO t2 ON t1.MOULD_CODE = t2.MOULD_CODE AND t1.FACTORY_CODE = t2.FACTORY_CODE
+        WHERE t1.FACTORY_CODE = #{factoryCode}
+        AND t1.YEAR = #{year}
+        AND t1.MONTH = #{month}
+        AND t2.MOULD_STATUS = 1
+        <if test="mouldCodes != null and mouldCodes.size() > 0">
+            AND t1.MOULD_CODE IN
+            <foreach collection="mouldCodes" item="mouldCode" open="(" separator="," close=")">
+                #{mouldCode}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getMonthUsedMould" resultType="com.zlt.aps.maindata.domain.dto.MouldMonthUseDto">
+        SELECT mmus.MOULD_CODE,
+               mmi.MOULD_NO
+          FROM T_MDM_MOULD_USE_STATUS mmus
+          LEFT JOIN T_MDM_MODEL_INFO mmi
+            ON mmus.MOULD_CODE = mmi.MOULD_CODE
+           AND mmus.FACTORY_CODE = mmi.FACTORY_CODE
+         WHERE mmi.MOULD_STATUS = 1
+           AND mmus.MOULD_STATUS = 1
+           AND mmus.YEAR = #{year,jdbcType=DECIMAL}
+           AND mmus.MONTH = #{month,jdbcType=DECIMAL}
+           AND mmus.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mmus.MOULD_CODE IN
+        <foreach collection="mouldCodeList" item="mouldCode" open="(" separator="," close=")">
+            #{mouldCode,jdbcType=VARCHAR}
+        </foreach>
+    </select>
+
+</mapper>

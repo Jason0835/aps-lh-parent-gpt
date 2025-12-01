@@ -23,7 +23,7 @@ public interface INcMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/nc/machine/list")
     TableDataInfo list(@RequestBody NcMachineInfo machineInfo);
 
     /**
@@ -32,7 +32,7 @@ public interface INcMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/nc/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface INcMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/nc/machine")
     AjaxResult add(@Validated @RequestBody NcMachineInfo machineInfo);
 
     /**
@@ -50,7 +50,7 @@ public interface INcMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/nc/machine/{id}")
     NcMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -59,7 +59,7 @@ public interface INcMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/nc/machine")
     AjaxResult edit(@Validated @RequestBody NcMachineInfo machineInfo);
 
     /**
@@ -68,7 +68,7 @@ public interface INcMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/nc/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody NcMachineInfo machineInfo);
 
     /**
@@ -77,7 +77,7 @@ public interface INcMachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/nc/machine/exportList")
     List<NcMachineInfo> exportList(@RequestBody NcMachineInfo machineInfo);
 
     /**
@@ -85,10 +85,10 @@ public interface INcMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list2")
+    @PostMapping("/nc/machine/list2")
     List<NcMachineInfo> list2(@RequestBody NcMachineInfo machineInfo);
 
-    @PostMapping("/machine/importData")
+    @PostMapping("/nc/machine/importData")
     @ApiOperation("导入内衬机台信息")
     public AjaxResult importData(@RequestBody List<NcMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

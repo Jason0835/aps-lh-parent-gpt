@@ -1,32 +1,5 @@
 package com.zlt.aps.xwyy.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -34,12 +7,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.common.engine.mapper.CommonMapper;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyAssistSpec;
 import com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollOriginalBrand;
@@ -47,26 +22,30 @@ import com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollRubberCarRelation;
 import com.zlt.aps.xwyy.engine.common.XwyyConstants;
 import com.zlt.aps.xwyy.engine.mapper.XwyyEngineMapper;
 import com.zlt.aps.xwyy.engine.mapper.XwyyEngineStockMapper;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineLossService;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineMachineService;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineMonthSurplusService;
-import com.zlt.aps.xwyy.engine.service.XwyyEnginePlanQtyService;
-import com.zlt.aps.xwyy.engine.service.XwyyEngineService;
-import com.zlt.aps.xwyy.engine.vo.XwyyAssistRequirement;
-import com.zlt.aps.xwyy.engine.vo.XwyyBigRollVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyDayUsedVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyMonthSurplusVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyOriginalLineSpec;
-import com.zlt.aps.xwyy.engine.vo.XwyyParamsVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyScheduleRecordVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyScheduleResultVo;
-import com.zlt.aps.xwyy.engine.vo.XwyyStockVo;
-
+import com.zlt.aps.xwyy.engine.service.*;
+import com.zlt.aps.xwyy.engine.vo.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.*;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 纤维压延自动排程服务实现类
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-22 10:36:57
@@ -117,10 +96,11 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 	 * 一百，用于百分比 -> 小数的单位换算
 	 */
 	private final static BigDecimal ONE_HUNDRED = new BigDecimal("100");
+    private final static String DEFAULT_MACHINE_QUATA_HOUR = "12"; // 机台产能时长
 
 	/**
 	 * 纤维压延自动排程
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-22 11:26:33
@@ -141,10 +121,27 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 		// 判断仅对投产阶段规格排产是否打开
 		boolean isProductStage = PRODUCTION_STAGE_ON
 				.equals(paramsMap.getOrDefault(EngineConstants.PRODUCTION_STAGE_PRODUCE, PRODUCTION_STAGE_ON));
+        boolean isBreak = PRODUCTION_STAGE_ON.equals(paramsMap.get("IS_BREAK_ROLL")); // 判断是否打开破大卷计算
+        BigDecimal machineQuataHour = BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.MACHINE_QUATA_HOUR, DEFAULT_MACHINE_QUATA_HOUR)); // 机台产能时长
+        String standardSize = paramsMap.get(EngineConstants.STANDARD_SIZE); // 标准长度
 
 		/* 根据排程日期，从90度裁断排产计划中生成钢带压延排产的信息 */
 		List<XwyyScheduleResultVo> scheduleList = xwyyEngineMapper.selectXwyyScheduleBaseList(scheduleDate, breadth,
 				isProductStage);
+		List<XwyyScheduleResultVo> lastScheduleList = xwyyEngineMapper.selectXwyyScheduleList(DateUtils.addDays(scheduleDate, -1)); // 取上一天计划
+		if (CollectionUtils.isEmpty(scheduleList)) { // 今天没有成型计划的情况下尝试取上一天的计划
+		    scheduleList = lastScheduleList;
+		    scheduleList.stream().forEach(scheduleVo -> {
+		        scheduleVo.setId(null);
+		        scheduleVo.setScheduleDate(scheduleDate); // 日期改成今天
+		        scheduleVo.setBatchNo(null);
+		        scheduleVo.setOrderNo(null);
+		        scheduleVo.setUpdateBy(null);
+                scheduleVo.setUpdateTime(null);
+                scheduleVo.setMachineId(null);
+		    });
+		}
+
 //		List<XwyyScheduleResultVo> scheduleList = new ArrayList<>();
 		// 查询本日外厂需求规格信息
 		Map<String, XwyyAssistRequirement> assistMap = xwyyEngineMapper.selectAssistRequirement(scheduleDate).stream()
@@ -152,9 +149,9 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 		// 添加额外的外厂需求记录
 		this.addExtraAssistPlan(scheduleDate, batchNo, scheduleList, assistMap);
 		if (CollectionUtil.isEmpty(scheduleList)) {
-			log.info("根据90度裁断排程记录为空，无法生成纤维压延排产");
+			log.info("根据成型排程记录为空，无法生成纤维压延排产");
 			autoScheduleLogService.insertXwyyScheduleLog(batchNo, "", "自动排程失败",
-					"自动排程失败，原因：90度裁断排程记录为空，或没有在施工信息中找到对应的物料");
+					"自动排程失败，原因：成型排程记录为空，或没有在施工信息中找到对应的物料");
 			throw new RuntimeException(I18nUtil.getMessage("engine.auto.scheule.tip1"));
 		}
 		// 返回值为本次排产的外协规格，需要生成对应的外协计划
@@ -223,12 +220,22 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 			/**
 			 * 将纤维压延排程安排到具体生产线上
 			 */
-			xwyyEngineMachineService.scheduleMachine(scheduleList);
+//			xwyyEngineMachineService.scheduleMachine(scheduleList);
 
-			// 获取库存损耗率
-			BigDecimal stockLossRate = this.getStockLossRate(paramsMap);
+	        /**
+             * 计算计划量相关信息，包括库存量、重算计划量
+	         */
+			BigDecimal stockLossRate = this.getStockLossRate(paramsMap); // 获取库存损耗率
+			List<XwyyStockVo> stockList = xwyyEngineStockMapper.selectXwyyStockQty(scheduleDate, stockLossRate);
+            if (CollectionUtils.isEmpty(stockList) || stockList.stream().allMatch(s -> ApsConstant.STATUS_ENABLE.equals(s.getEstimateStockFlag()))) {// 判断当天是否有库存，或者全部库存都是预估库存的
+                if (PRODUCTION_STAGE_ON.equals(paramsMap.getOrDefault(EngineConstants.ESTIMATE_STOCK_SWITCH, PRODUCTION_STAGE_ON))) { // 判断预估库存开关
+                    xwyyEngineStockMapper.estimateStock(DateUtils.addDays(scheduleDate, -1)); // 根据上一天计划及其对应库存预估当天库存
+                }
+            }
+            Map<String, Double> lastPlanQtyMap = lastScheduleList.stream().collect(Collectors.groupingBy(XwyyScheduleResultVo::getBigRollCode, Collectors.summingDouble(XwyyScheduleResultVo::getDayPlanQty)));
+            scheduleList.stream().forEach(scheduleVo -> scheduleVo.setLastPlanQty(lastPlanQtyMap.getOrDefault(scheduleVo.getBigRollCode(), 0D)));
 			xwyyEnginePlanQtyService.calculateSchedulePlanQty(scheduleDate, scheduleList, assistMap, originalLineMap,
-					stockLossRate, breadth, isProductStage);
+					stockLossRate, breadth, isProductStage, isBreak);
 
 			/**
 			 * 根据月度计划量设置收尾备注等信息
@@ -241,10 +248,14 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 			// 设置原线品牌数
 			this.caculateOriginalLineBrandNum(scheduleList, originalLineMap);
 			// 计算原线卷数
-			Long defaultBreakRoll = new Long(
-					paramsMap.getOrDefault(EngineConstants.XWYY_BREAK_ROLL_NUM, DEFAULT_BREAK_ROLL_NUM)); // 原线默认可破大卷数
-			this.caculateOriginalLineQtyNumAuto(scheduleList, originalLineMap, defaultBreakRoll);
+//			Long defaultBreakRoll = new Long(
+//					paramsMap.getOrDefault(EngineConstants.XWYY_BREAK_ROLL_NUM, DEFAULT_BREAK_ROLL_NUM)); // 原线默认可破大卷数
+//			this.caculateOriginalLineQtyNumAuto(scheduleList, originalLineMap, defaultBreakRoll);
 		}
+
+		// 根据机台产能选择机台
+		xwyyEngineMachineService.chooseMachineByCapacity(scheduleList, machineQuataHour);
+
 		// 如果还存在上次已发布的规格但本次没有排程的规格，直接将这些规格的排程信息复制到本次排程中
 		for (XwyyScheduleResultVo scheduleVo : isReleaseMap.values()) {
 			scheduleVo.setBatchNo(batchNo);
@@ -254,6 +265,9 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 		// 处理一个已发布规格有多个排程的情况
 		this.removeGroupSchedule(batchNo, scheduleList, isReleaseGroup);
+
+		// 赋值排产顺序
+		this.calculateProduceOrder(scheduleList);
 
 		// 将当天的历史排程记录（上一次的）转移至日志表
 		this.cleanHistoryScheduleResult(scheduleDate);
@@ -284,8 +298,153 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 	}
 
 	/**
+	 * 计算各个班次的排产顺序
+	 *
+	 * @param scheduleList 排程结果
+	 */
+	private void calculateProduceOrder(List<XwyyScheduleResultVo> scheduleList) {
+		// 添加日志
+		String batchNo = CollectionUtil.firstElement(scheduleList).getBatchNo();
+		autoScheduleLogService.insertCd15ScheduleLog(batchNo, "", "设置生产顺序字段",
+				"按机台、大卷分组，再组内按库存供应时长(从小到大)，设置班次的生产顺序（有计划量的才设置生产顺序）");
+		// 先按机台、大卷分组
+		Map<String, List<XwyyScheduleResultVo>> resultMap = scheduleList.stream()
+				// 过滤掉无机台与多机台的情况
+				.filter(r -> StringUtils.isNotBlank(r.getMachineId()) && !r.getMachineId().contains(","))
+				// 按机台ID，大卷编号分组
+				.collect(Collectors.groupingBy(r -> GenerageMapKeyUtils.createMapKey(r.getMachineId())));
+
+		// 组内单独排序
+		for (List<XwyyScheduleResultVo> resultList : resultMap.values()) {
+			// 排产结果排序
+			List<XwyyScheduleResultVo> sortScheduleList = resultList.stream().sorted(Comparator
+					// 先按供应时长正序排序，没有供应时长（插单）的放最后
+					.comparing(XwyyScheduleResultVo::getSupplyTime, Comparator.nullsLast(Double::compareTo))
+					// 如果供应时长相等，则按开始班次正序排序
+					.thenComparing(this.createProductClassSorter())
+					// 如果开始班次相等，则按该班次的成型排程量倒序排序
+					.thenComparing(this.createCxPlanNumSorter())).collect(Collectors.toList());
+
+			// 中班与晚班生产顺序分开，初始值为1；
+			int daySortNumer = 1;
+			int nightSortNumber = 1;
+			for (XwyyScheduleResultVo resultVo : sortScheduleList) {
+				// 只有有排计划量的排程才需要设置生产顺序
+				if (resultVo.getDayPlanQty() != null && resultVo.getDayPlanQty() > 0) {
+					resultVo.setDayProduceOrder(daySortNumer);
+					daySortNumer++;
+				} else {
+					// 为零的时候需要清空（导入的情况下）
+					resultVo.setDayProduceOrder(null);
+				}
+				if (resultVo.getNightFinishQty() != null && resultVo.getNightFinishQty() > 0) {
+					resultVo.setNightProduceOrder(nightSortNumber);
+					nightSortNumber++;
+				} else {
+					// 为零的时候需要清空（导入的情况下）
+					resultVo.setNightProduceOrder(null);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 获取本规格的开始生产班次
+	 *
+	 * @param result
+	 * @return
+	 */
+	private int getStartClass(XwyyScheduleResultVo result) {
+		int startClass = 1;
+		// 从1班开始遍历每个班次计划量，大于0的即为开始生产班次
+		if (Optional.ofNullable(result.getCxClass1Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass2Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass3Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		startClass++;
+		if (Optional.ofNullable(result.getCxClass4Plan()).orElse(0d) > 0) {
+			return startClass;
+		}
+		return ++startClass;
+	}
+
+	/**
+	 * 创建查询结果排序器——成产班次<br/>
+	 * 排序规则：按开始班次正序排序
+	 *
+	 * @return
+	 */
+	private Comparator<XwyyScheduleResultVo> createProductClassSorter() {
+		return new Comparator<XwyyScheduleResultVo>() {
+			@Override
+			public int compare(XwyyScheduleResultVo o1, XwyyScheduleResultVo o2) {
+				// 新排程结果的开始班次
+				int startClass1 = getStartClass(o1);
+				// 原排程结果的开始班次
+				int startClass2 = getStartClass(o2);
+				// 开始班次较小的在前
+				return Integer.valueOf(startClass1).compareTo(startClass2);
+			}
+		};
+	}
+
+	/**
+	 * 创建查询结果排序器——成型计划量<br/>
+	 * 排序规则：按同班次的成型计划量倒序排序
+	 *
+	 * @return
+	 */
+	private Comparator<XwyyScheduleResultVo> createCxPlanNumSorter() {
+		return new Comparator<XwyyScheduleResultVo>() {
+			@Override
+			public int compare(XwyyScheduleResultVo o1, XwyyScheduleResultVo o2) {
+				// 新排程结果的开始生产班次的计划量
+				double cxPlanNum1 = getCxPlanNum(o1);
+				// 原排程结果的开始生产班次的计划量
+				double cxPlanNum2 = getCxPlanNum(o2);
+				// 计划量较大的在前
+				return Double.valueOf(cxPlanNum2).compareTo(cxPlanNum1);
+			}
+		};
+	}
+
+	/**
+	 * 获取本规格开始生产那一班的计划量
+	 *
+	 * @param result
+	 * @return
+	 */
+	private double getCxPlanNum(XwyyScheduleResultVo result) {
+		// 从1班开始遍历每个班次计划量，取出第一个计划量大于0的数值
+		double planNum = Optional.ofNullable(result.getCxClass1Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass2Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass3Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		planNum = Optional.ofNullable(result.getCxClass4Plan()).orElse(0d);
+		if (planNum > 0) {
+			return planNum;
+		}
+		return Optional.ofNullable(result.getCxClass5Plan()).orElse(0d);
+	}
+
+	/**
 	 * 获取库存损耗率
-	 * 
+     *
 	 * @param paramsMap
 	 * @return
 	 */
@@ -301,7 +460,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 处理一个已发布规格有多个排程的情况
-	 * 
+     *
 	 * @param batchNo        排程批次号
 	 * @param scheduleList   排程明细列表
 	 * @param isReleaseGroup 已发布多笔的规格排程列表
@@ -331,7 +490,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 取出当天已经发布过的排程记录
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @return
 	 */
@@ -348,7 +507,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 初始化排程明细
-	 * 
+     *
 	 * @param batchNo      排程批次号
 	 * @param scheduleList 排程明细列表
 	 * @param isReleaseMap 已发布排程列表
@@ -388,7 +547,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 校验原线相关信息
-	 * 
+     *
 	 * @param batchNo      批次号
 	 * @param scheduleList 排程记录
 	 */
@@ -409,7 +568,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 添加额外的外厂需求记录
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @param batchNo      批次好
 	 * @param scheduleList 排产记录，调用前只有6厂的记录
@@ -446,7 +605,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 纤维压延插单
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-29 09:31:42
@@ -481,7 +640,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 批量导入纤维压延排程记录
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
 	 * @return 导入异常日志
@@ -511,7 +670,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 批量保存纤维压延排程记录
-	 * 
+     *
 	 * @param batchNo         批次号
 	 * @param scheduleDate    排程日志
 	 * @param scheduleList    排程数据
@@ -638,6 +797,9 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 				scheduleResult.setCxClass3Plan(scheduleVo.getCxClass3Plan());
 				scheduleResult.setCxClass4Plan(scheduleVo.getCxClass4Plan());
 				scheduleResult.setCxClass5Plan(scheduleVo.getCxClass5Plan());
+				// 赋值计划量，避免成型无计划量时查询的计划量也为空的情况
+				scheduleVo.setDayPlanQty(scheduleResult.getDayPlanQty());
+				scheduleVo.setNightPlanQty(scheduleResult.getNightPlanQty());
 				// 成型可供时长
 				BigDecimal supplyTime = xwyyEnginePlanQtyService.caculateSuppliyTime(scheduleVo, stockVo);
 				scheduleResult.setSupplyTime(supplyTime.doubleValue());
@@ -698,7 +860,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 获取日计划量个数
-	 * 
+     *
 	 * @param scheduleResult
 	 * @param clothLength
 	 * @return
@@ -717,7 +879,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 获取日计划量个数
-	 * 
+     *
 	 * @param scheduleResult
 	 * @param clothLength
 	 * @return
@@ -736,7 +898,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 计算胶料车数
-	 * 
+     *
 	 * @param scheduleList
 	 */
 	private void caculateRubberCarNumber(List<XwyyScheduleResultVo> scheduleList) {
@@ -758,7 +920,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 批量保存时计算胶料车数
-	 * 
+     *
 	 * @param scheduleList
 	 */
 	private void caculateRubberCarNumberBatchSave(List<XwyyScheduleResultDto> scheduleList) {
@@ -781,7 +943,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 计算原线品牌数
-	 * 
+     *
 	 * @param scheduleList    排产计划
 	 * @param originalLineMap 原线规格配置
 	 */
@@ -845,7 +1007,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 插单时计算原线品牌数
-	 * 
+     *
 	 * @param XwyyScheduleResultDto 排产计划
 	 * @param originalLineMap       原线规格配置
 	 */
@@ -891,14 +1053,17 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 				}
 			}
 			if (!updateScheduleList.isEmpty()) {
-				xwyyEngineMapper.updateScheduleResultOriginalBrand(updateScheduleList);
+				xwyyEngineMapper.createTempTable();
+				xwyyEngineMapper.insertTempTable(updateScheduleList);
+				xwyyEngineMapper.updateScheduleResultOriginalBrand(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleResult.getScheduleDate()), updateScheduleList);
+//				xwyyEngineMapper.dropTempTable();
 			}
 		}
 	}
 
 	/**
 	 * 导入时计算原线品牌数
-	 * 
+     *
 	 * @param scheduleList    排产计划
 	 * @param originalLineMap 原线规格配置
 	 */
@@ -923,7 +1088,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 构建原线代码与品牌的key，用于统计原线卷数
-	 * 
+     *
 	 * @param originalLineCode
 	 * @param brand
 	 * @return
@@ -934,7 +1099,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 自动排程时计算原线卷数
-	 * 
+     *
 	 * @param scheduleList    排产计划
 	 * @param originalLineMap 原线规格配置
 	 */
@@ -959,7 +1124,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 计算原线卷数
-	 * 
+     *
 	 * @param scheduleList    排产计划
 	 * @param originalLineMap 原线规格配置
 	 */
@@ -1000,7 +1165,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 纤维压延转机台
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-29 11:32:01
@@ -1018,9 +1183,9 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 	}
 
 	/**
-	 * 
+     *
 	 * 确认机台
-	 * 
+     *
 	 * @param scheduleResult 确认后的排产记录
 	 */
 	@Transactional
@@ -1064,7 +1229,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 计算各大卷对应的日用参考值
-	 * 
+     *
 	 * @param scheduleDate    排产日期
 	 * @param breadth         幅宽
 	 * @param bigRollCodeList 大卷编号列表
@@ -1082,7 +1247,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 清理排产日当天的历史排程数据
-	 * 
+     *
 	 * @param scheduleDate 排程日期
 	 */
 	private void cleanHistoryScheduleResult(Date scheduleDate) {
@@ -1097,7 +1262,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 验证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param batchNo      批次号
 	 * @Param isProductStage 仅对投产阶段的规格排产
@@ -1190,7 +1355,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 反馈校验错误信息
-	 * 
+     *
 	 * @param batchNo       排产批次号
 	 * @param embryoCode    胎号
 	 * @param columnNameKey 校验字段名称key（国际化）
@@ -1207,7 +1372,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 生成外协计划列表
-	 * 
+     *
 	 * @param scheduleDate   排产日
 	 * @param isProductStage 是否只排生产阶段
 	 * @param scheduleList   原排产计划
@@ -1251,7 +1416,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 将正常排程计划中的外协规格转移出来
-	 * 
+     *
 	 * @param scheduleList  原排产计划
 	 * @param assistSpecMap 外协规格清单map
 	 * @return
@@ -1272,7 +1437,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 返回错误信息（抛出异常）
-	 * 
+     *
 	 * @param errorMsg
 	 */
 	private void returnErrorMessage(String errorMsg) {
@@ -1283,7 +1448,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 获取工序参数map
-	 * 
+     *
 	 * @return
 	 */
 	private Map<String, String> getParamsMap() {
@@ -1293,7 +1458,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 创建自动排程记录
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-22 10:54:58
@@ -1312,7 +1477,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 创建批次号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-22 10:02:41
@@ -1326,7 +1491,7 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 
 	/**
 	 * 创建工单号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-22 10:02:41
@@ -1336,4 +1501,26 @@ public class XwyyEngineServiceImpl implements XwyyEngineService {
 	private String createOrderNo(String batchNo) {
 		return incrementService.getSequence4(batchNo);
 	}
+
+    @Override
+    public void batchUpdateBatchNoAndOrderNo(Date scheduleDate) {
+        List<XwyyScheduleResultVo> scheduleResultVoList = xwyyEngineMapper.selectXwyyScheduleList(scheduleDate);
+        //查询当前排程的批次号
+        String batchNo = xwyyEngineMapper.getCurrentBatchNo(scheduleDate);
+        if (StringUtils.isBlank(batchNo)) {
+            //当前的批次号为空，说明还没”自动排程“或者做的批量导入（需要删掉已排的数据），那么自己生成一个排程批次号
+            //排程批次号
+            batchNo = this.createBatchNo(scheduleDate);
+            //创建自动排程记录
+            this.createScheduleRecord(scheduleDate, "", batchNo);
+        }
+        for (XwyyScheduleResultVo scheduleResult : scheduleResultVoList) {
+            //批次号
+            scheduleResult.setBatchNo(batchNo);
+            //工单号
+            String orderNo = this.createOrderNo(batchNo);
+            scheduleResult.setOrderNo(orderNo);
+        }
+        xwyyEngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
+    }
 }

@@ -23,13 +23,13 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_GDYY_SCHEDULE_RESULT")
 @ApiModel(value = "GdyyScheduleResult对象", description = "钢带压延排程结果表")
-@KeySequence(value = "SEQ_GDYY_SCHEDULE", clazz = Long.class)
+//@KeySequence(value = "SEQ_GDYY_SCHEDULE",dbType = DbType.ORACLE)
 public class GdyyScheduleResult extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID",type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "排程日期")
@@ -174,4 +174,13 @@ public class GdyyScheduleResult extends ApsBaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "最新发布时间")
     private Date newestPublishTime;
+
+    /**
+     * 机台ID
+     */
+    @TableField(value = "MACHINE_CODE")
+    private String machineCode;
+
+    @TableField(exist = false)
+    private String machineName;
 }

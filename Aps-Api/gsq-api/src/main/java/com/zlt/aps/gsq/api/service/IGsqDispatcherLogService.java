@@ -24,20 +24,20 @@ public interface IGsqDispatcherLogService {
      * 查询调度员排程操作日志列表
      */
     @ApiOperation("查询调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/list")
+    @PostMapping("/gsq/dispatcherLog/list")
     TableDataInfo list(@RequestBody GsqDispatcherLog gsqDispatcherLog);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/dispatcherLog/{id}")
+    @GetMapping(value = "/gsq/dispatcherLog/{id}")
     GsqDispatcherLog getInfo(@PathVariable("id") Long id);
 
     /**
      * 导出调度员排程操作日志列表
      */
     @ApiOperation("导出调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/export")
+    @PostMapping("/gsq/dispatcherLog/export")
     public byte[] export(@RequestBody GsqDispatcherLog dispatcherLog);
 }

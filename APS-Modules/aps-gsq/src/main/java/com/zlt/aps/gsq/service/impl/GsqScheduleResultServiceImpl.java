@@ -6,17 +6,23 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
+import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
+import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
@@ -40,6 +46,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
@@ -68,6 +75,21 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
 
 
     /**
+     * 赋值成型消耗量(成型昨日早班消耗量+成型夜班消耗量)、交接班库存、计划量对应卷数
+     *
+     * @param scheduleResult 排程结果
+     * @param cxConsumeMap   成型消耗量map
+     */
+    private static void setLastDayAndCalculate(GsqScheduleResultDto scheduleResult, Map<String, Double> cxConsumeMap) {
+        String code = scheduleResult.getSteelRingCode();
+        if (cxConsumeMap.containsKey(code)) {
+            Double cxConsumeQty = cxConsumeMap.get(code);
+            scheduleResult.setCxConsumeQty(cxConsumeQty);
+        }
+        ReflectUtils.invokeMethodByName(scheduleResult, "calculateTheoreticClassLastDayPlanQty", new Object[]{});
+    }
+
+    /**
      * 查询钢丝圈排程结果信息维护列表
      *
      * @param scheduleResult 钢丝圈排程结果信息维护
@@ -75,7 +97,47 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
      */
     @Override
     public List<GsqScheduleResultDto> selectScheduleResultList(GsqScheduleResult scheduleResult) {
-        return gsqScheduleResultMapper.selectScheduleResultList(scheduleResult);
+        List<GsqScheduleResultDto> list = gsqScheduleResultMapper.selectScheduleResultList(scheduleResult);
+        if (CollectionUtils.isEmpty(list)) {
+            return new ArrayList<>();
+        }
+        List<GsqMachineInfo> machineInfoList = gsqMachineInfoService.selectMachineInfoList(new GsqMachineInfo());
+        Map<Long, GsqMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(GsqMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
+        if (CollectionUtils.isNotEmpty(list)) {
+
+            List<String> codeList = list.stream().map(GsqScheduleResultDto::getSteelRingCode).collect(Collectors.toList());
+            scheduleResult.getParams().put("codeList", codeList);
+            Map<String, Double> cxConsumeMap = new HashMap<>(16);
+            List<GsqScheduleResultDto> cxConsumeList = gsqScheduleResultMapper.getCxConsume4List(scheduleResult);
+            if (CollectionUtils.isNotEmpty(cxConsumeList)) {
+                cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(GsqScheduleResultDto::getSteelRingCode, GsqScheduleResultDto::getCxConsumeQty));
+            }
+
+            for (GsqScheduleResultDto dto : list) {
+                String machineIdStr = dto.getMachineId();
+                if (StringUtils.isNotBlank(machineIdStr)) {
+                    List<String> machineNameList = new ArrayList<>();
+                    String[] machineIdArr = machineIdStr.split(",");
+                    for (String machineId : machineIdArr) {
+                        Long key = null;
+                        try {
+                            key = Long.valueOf(machineId);
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                            continue;
+                        }
+                        if (machineInfoMap.containsKey(key)) {
+                            GsqMachineInfo machineInfo = machineInfoMap.get(key);
+                            machineNameList.add(machineInfo.getMachineName());
+                        }
+                    }
+                    dto.setMachineName(String.join(",", machineNameList));
+                }
+                // 赋值卷曲长度、计算计划量对应卷数
+                setLastDayAndCalculate(dto, cxConsumeMap);
+            }
+        }
+        return list;
     }
 
     /**
@@ -236,7 +298,9 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
      */
     @Override
     public void deleteScheduleResultByIds(long[] ids) {
-        gsqScheduleResultMapper.deleteByIds(ids);
+        gsqScheduleResultMapper.deleteByIds(Arrays.stream(ids)
+                .boxed()
+                .collect(Collectors.toList()));
     }
 
     /**
@@ -341,7 +405,7 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
                 }
                 row.createCell(cellNum++).setCellValue(nightAnly);
                 row.createCell(cellNum++).setCellValue(scheduleResult.getDayPlanQty() == null ? 0 : scheduleResult.getDayPlanQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getDayFinishQty() == null ? 0 : scheduleResult.getDayFinishQty());
+                /*row.createCell(cellNum++).setCellValue(scheduleResult.getDayFinishQty() == null ? 0 : scheduleResult.getDayFinishQty());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getDayFinishRate() == null ? "" : df.format(scheduleResult.getDayFinishRate()));
                 row.createCell(cellNum++).setCellValue(scheduleResult.getDayProduceOrder() == null ? 0 : scheduleResult.getDayProduceOrder());
                 String sysAnaly = scheduleResult.getDaySysAnalysis();
@@ -357,7 +421,7 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
                         anly = handAnaly;
                     }
                 }
-                row.createCell(cellNum++).setCellValue(anly);
+                row.createCell(cellNum++).setCellValue(anly);*/
                 row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass1Plan() == null ? 0 : scheduleResult.getCxClass1Plan());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass2Plan() == null ? 0 : scheduleResult.getCxClass2Plan());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass3Plan() == null ? 0 : scheduleResult.getCxClass3Plan());
@@ -385,9 +449,11 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
             String baseInfo=I18nUtil.getMessage("ui.data.column.scheduleResult.gsq.baseInfo");
             String class1Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.zhongban");
             String class2Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.yeban");
-            String class3Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.baiban");
+//            String class3Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.baiban");
             String totalQty=I18nUtil.getMessage("ui.data.column.scheduleResult.totalQty");
-            String planInfo = '：'+class1Plan+'：'+midPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class2Plan+'：'+nightPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class3Plan+'：'+dayPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+totalQty+'：'+(midPlan.add(nightPlan).add(dayPlan)).setScale(0,BigDecimal.ROUND_HALF_UP);
+            String planInfo = '：'+class1Plan+'：'+midPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class2Plan+'：'+nightPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
+//                    +class3Plan+'：'+dayPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
+                    + totalQty+'：'+(midPlan.add(nightPlan).add(dayPlan)).setScale(0,BigDecimal.ROUND_HALF_UP);
             baseInfo=dateStr+baseInfo+planInfo;
             Cell cell0=sheet.getRow(0).getCell(0);
             CellStyle cellStyle0=cell0.getCellStyle();
@@ -462,26 +528,28 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
             gsqScheduleResultMapper.publishAll(scheduleResult);
         }
         // ids不为空，发布指定记录，需求暂未变更，变更后测试
-        gsqScheduleResultMapper.batchUpdate(ids, ApsConstant.RELEASING);
+        gsqScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), ApsConstant.RELEASING);
     }
-    
+
 	/**
 	 * 更新指定相关数据记录的发布状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @param ids         排程ID列表
 	 * @param status      更新的状态
 	 */
     @Override
     public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
-        gsqScheduleResultMapper.batchUpdate(ids, status);
+        gsqScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), status);
         gsqScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
     }
 
     /**
      * 发布排程数据到中间库,并通知 MES
      * @param ids 发布的排程记录id
-     * @param scheduleDate 排产日期
+     * @param dataVersion 版本
      */
     private void deployScheduleToMid(long[] ids, String dataVersion, String factoryCode, String companyCode) {
         if(ids == null) {
@@ -681,7 +749,7 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
     /**
      * 更改发布状态
      *
-     * @param scheduleDate 排程日期
+     * @param entity 排程日期
      * @return 结果
      */
     @Override
@@ -714,5 +782,117 @@ public class GsqScheduleResultServiceImpl extends ServiceImpl<GsqScheduleResultM
         d1 = ObjectUtils.isEmpty(d1) ? 0D : d1;
         d2 = ObjectUtils.isEmpty(d2) ? 0D : d2;
         return d1.equals(d2);
+    }
+
+    @Autowired
+    private BaseFinishQtyImportService baseFinishQtyImportService;
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list        要导入数据
+     * @param importLogId 导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importFinishQty(List<GsqDayFinishQty> list, Long importLogId) {
+        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.GSQ);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @Override
+    public AjaxResult getSummaryVo(GsqScheduleResult scheduleResult) {
+        List<GsqScheduleResultDto> list = selectScheduleResultList(scheduleResult);
+        List<GsqScheduleResultDto> lastDayPlanQty4List = gsqScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+        // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
+        List<String> resultCodeList = list.stream().map(GsqScheduleResultDto::getSteelRingCode).collect(Collectors.toList());
+        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(GsqScheduleResultDto::getSteelRingCode)
+                .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
+        for (String code : notExistCodeList) {
+            GsqScheduleResultDto result = new GsqScheduleResultDto();
+            result.setSteelRingCode(code);
+            list.add(result);
+        }
+        Map<String, GsqScheduleResultDto> lastDayPlanMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
+            lastDayPlanMap = lastDayPlanQty4List.stream().collect(Collectors.toMap(GsqScheduleResultDto::getSteelRingCode, Function.identity()));
+        }
+        List<GsqScheduleResultDto> cxConsume4List = gsqScheduleResultMapper.getCxConsume4List(scheduleResult);
+        Map<String, GsqScheduleResultDto> cxConsumeMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
+            cxConsumeMap = cxConsume4List.stream().collect(Collectors.toMap(GsqScheduleResultDto::getSteelRingCode, Function.identity()));
+        }
+        BigDecimal totalDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
+        BigDecimal totalNextDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalStockQty = BigDecimal.ZERO;
+        BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
+
+        for (GsqScheduleResultDto result : list) {
+            Double nightPlanQty = ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D);
+            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
+            String code = result.getSteelRingCode();
+            if (lastDayPlanMap.containsKey(code)) {
+                GsqScheduleResultDto lastDayResult = lastDayPlanMap.get(code);
+                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
+            }
+            if (cxConsumeMap.containsKey(code)) {
+                GsqScheduleResultDto cxConsumeResult = cxConsumeMap.get(code);
+                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
+            }
+            Double lastMidPlanQty = result.getLastMidPlanQty();
+            Double cxConsumeQty = result.getCxConsumeQty();
+            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+            if (lastMidPlanQty != null && cxConsumeQty != null) {
+                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
+            }
+
+            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getMidPlanQty(), 0D), totalDayPlanQty);
+            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D), totalNightPlanQty);
+            totalNextDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D), totalNightPlanQty);
+            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
+            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D), totalLastDayPlanQty);
+            totalTheoreticClassStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+        }
+        ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
+        scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
+        scheduleSummaryVo.setNightPlanQty(totalNightPlanQty.doubleValue());
+        scheduleSummaryVo.setNextDayPlanQty(totalNextDayPlanQty.doubleValue());
+        scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
+        scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
+        /*ScheduleSummaryVo summaryVo = gsqScheduleResultMapper.getSummaryVo(scheduleResult);
+        if (summaryVo == null) {
+            summaryVo = new ScheduleSummaryVo();
+            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
+        }
+        ScheduleSummaryVo lastDayPlanQtySummaryVo = gsqScheduleResultMapper.getLastDayPlanQty(scheduleResult);
+        Double lastDayPlanQty = null;
+        if (lastDayPlanQtySummaryVo != null) {
+            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
+            summaryVo.setLastDayPlanQty(lastDayPlanQty);
+        }
+        ScheduleSummaryVo cxConsumeSummaryVo = null;
+        Double cxConsumeQty = null;
+        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineId())) {
+            cxConsumeSummaryVo = gsqScheduleResultMapper.getCxConsume(scheduleResult);
+        }
+        if (cxConsumeSummaryVo != null) {
+            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
+            summaryVo.setCxConsumeQty(cxConsumeQty);
+        }
+        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 昨日早班胎圈计划 - 当天夜班胎圈计划
+        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
+        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
+        if (lastDayPlanQty != null && cxConsumeQty != null) {
+            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
+        }*/
+        return AjaxResult.success(scheduleSummaryVo);
     }
 }

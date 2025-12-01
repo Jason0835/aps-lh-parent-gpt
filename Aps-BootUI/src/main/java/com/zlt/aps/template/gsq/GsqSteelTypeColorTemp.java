@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gsq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -8,7 +9,7 @@ import lombok.Data;
 
 @Data
 @ApiModel(value="钢带大卷颜色提示信息导入模板", description="钢带大卷颜色提示信息导入模板")
-public class GsqSteelTypeColorTemp {
+public class GsqSteelTypeColorTemp extends BaseEntity {
 
     @ApiModelProperty(value = "钢丝类型")
     @Excel(name = "ui.data.column.scheduleResult.steelType")

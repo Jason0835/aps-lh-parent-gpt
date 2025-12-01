@@ -21,7 +21,7 @@ import java.util.List;
 @FeignClient(contextId = "ITqImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tq:tq}")
 public interface ITqImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +50,6 @@ public interface ITqImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/tq/importLogManagement/importData")
-    List<TqImportLogManagementDto> importData(@SpringQueryMap TqImportLogManagementDto dto);
+    @PostMapping("/tq/importLogManagement/importData")
+    List<TqImportLogManagementDto> importData(@RequestBody TqImportLogManagementDto dto);
 }

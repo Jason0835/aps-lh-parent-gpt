@@ -1,49 +1,17 @@
 package com.zlt.aps.cd90.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd90.api.domain.entity.Cd90AssistSpec;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineMapper;
-import com.zlt.aps.cd90.engine.service.Cd90EngineEquilibriumService;
-import com.zlt.aps.cd90.engine.service.Cd90EngineLossService;
-import com.zlt.aps.cd90.engine.service.Cd90EngineMachineService;
-import com.zlt.aps.cd90.engine.service.Cd90EngineMonthSurplusService;
-import com.zlt.aps.cd90.engine.service.Cd90EnginePlanQtyService;
-import com.zlt.aps.cd90.engine.service.Cd90EngineProductOrderService;
-import com.zlt.aps.cd90.engine.service.Cd90EngineService;
-import com.zlt.aps.cd90.engine.vo.Cd90MonthSurplusVo;
-import com.zlt.aps.cd90.engine.vo.Cd90ParamsVo;
-import com.zlt.aps.cd90.engine.vo.Cd90ScheduleRecordVo;
-import com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo;
-import com.zlt.aps.cd90.engine.vo.Cd90StockVo;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineMonthSurplusMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineStockMapper;
+import com.zlt.aps.cd90.engine.service.*;
+import com.zlt.aps.cd90.engine.vo.*;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.engine.constants.EngineConstants;
@@ -52,12 +20,30 @@ import com.zlt.aps.common.engine.mapper.CommonMapper;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
-
+import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 90度裁断自动排程服务实现类
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-14 10:36:57
@@ -68,6 +54,8 @@ import lombok.extern.slf4j.Slf4j;
 public class Cd90EngineServiceImpl implements Cd90EngineService {
 	@Autowired
 	private Cd90EngineMapper cd90EngineMapper;
+    @Autowired
+    private Cd90EngineMonthSurplusMapper cd90EngineMonthSurplusMapper;
 	@Autowired
 	private Cd90EngineMachineService cd90EngineMachineService;
 	@Autowired
@@ -86,6 +74,8 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 	private AutoScheduleLogService autoScheduleLogService;
 	@Resource
 	private CommonMapper commonMapper;
+	@Resource
+	private Cd90EngineStockMapper cd90EngineStockMapper;
 	/**
 	 * 生产阶段校验开关状态：打开
 	 */
@@ -99,9 +89,9 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 	 */
 	private final static BigDecimal ONE_HUNDRED = new BigDecimal("100");
 	/**
-	 * 卷曲长度默认值：500
+	 * 卷曲长度默认值：87
 	 */
-	private final static BigDecimal DEFAULT_CRIMP_LENGTH = new BigDecimal("500");
+	private final static BigDecimal DEFAULT_CRIMP_LENGTH = new BigDecimal("87");
 	/**
 	 * 裁断最小取整卷数默认值：0.3
 	 */
@@ -109,7 +99,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 90度裁断自动排程
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-14 13:37:28
@@ -168,11 +158,12 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 			/**
 			 * 将90度裁断排程安排到具体生产线上
 			 */
-			cd90EngineMachineService.scheduleMachine(scheduleList);
+//			cd90EngineMachineService.scheduleMachine(scheduleList);
 
 			/**
 			 * 计算计划量信息，包括库存量、重算计划量、计算可用时长
 			 */
+			this.loadMonthSurplus(scheduleDate, scheduleList); // 加载月度计划剩余量
 			String lossRate = paramsMap.get(EngineConstants.LOSS_RATE);
 			// 获取库存损耗率
 			BigDecimal stockLossRate = this.getStockLossRate(paramsMap);
@@ -183,7 +174,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 			BigDecimal minRoundRollNum = Optional.ofNullable(paramsMap.get(EngineConstants.MIN_ROUND_ROLL_NUM))
 					.map(p -> new BigDecimal(p)).orElse(DEFAULT_MIN_ROUND_ROLL_NUM);
 			cd90EnginePlanQtyService.calculateSchedulePlanQty(scheduleDate, scheduleList, lossRate, stockLossRate,
-					isProductStage, crimpLength, minRoundRollNum);
+					isProductStage, crimpLength, minRoundRollNum, paramsMap);
 
 			/**
 			 * 根据月度计划量重新调整计划量，包括收尾与计划量整卷取整
@@ -199,6 +190,9 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 			String equalShareThreshold = paramsMap.get(EngineConstants.EQUAL_SHARE_THRESHOLD);
 			cd90EngineEquilibriumService.scheduleEquilibrium(scheduleList, planDifferenceRate, supplyTimePass,
 					equalShareThreshold);
+
+			// 根据机台产能选择机台
+			cd90EngineMachineService.chooseMachineByCapacity(scheduleList);
 
 			/**
 			 * 计算排产结果的生产顺序
@@ -247,8 +241,26 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 	}
 
 	/**
+	 *  加载月度计划剩余量
+	 * @param scheduleDate
+	 * @param scheduleList
+	 */
+    private void loadMonthSurplus(Date scheduleDate, List<Cd90ScheduleResultVo> scheduleList) {
+        String year = DateUtils.parseDateToStr("yyyy", scheduleDate);
+        String month = DateUtils.parseDateToStr("MM", scheduleDate);
+        List<Cd90MonthSurplusVo> monthSurplusList = cd90EngineMonthSurplusMapper.listCd90MonthPlanSurplus(year, month);
+        Map<String, Cd90MonthSurplusVo> monthSurplus = monthSurplusList.stream()
+                .collect(Collectors.toMap(s -> GenerageMapKeyUtils.createMapKey(s.getMaterialCode(), s.getRemark()),
+                        Function.identity(), (v1, v2) -> v2)); // 按帘布+层级分组
+        scheduleList.stream()
+                .forEach(s -> s.setSurplusQty(Optional
+                        .ofNullable(monthSurplus.get(GenerageMapKeyUtils.createMapKey(s.getClothCode(), String.valueOf(s.getLayers()))))
+                        .map(Cd90MonthSurplusVo::getMonthRemainQty).orElse(0D))); // 按帘布+层级获取剩余量
+    }
+
+	/**
 	 * 获取库存损耗率
-	 * 
+     *
 	 * @param paramsMap
 	 * @return
 	 */
@@ -264,7 +276,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 处理一个已发布规格有多个排程的情况
-	 * 
+     *
 	 * @param batchNo        排程批次号
 	 * @param scheduleList   排程明细列表
 	 * @param isReleaseGroup 已发布多笔的规格排程列表
@@ -296,7 +308,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 取出当天已经发布过的排程记录
-	 * 
+     *
 	 * @param scheduleDate 排产日
 	 * @return
 	 */
@@ -313,7 +325,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 初始化排程明细
-	 * 
+     *
 	 * @param batchNo      排程批次号
 	 * @param scheduleList 排程明细列表
 	 * @param isReleaseMap 已发布排程列表
@@ -351,7 +363,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 90度裁断插单
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-25 09:31:42
@@ -386,7 +398,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 批量导入90度裁断排程记录
-	 * 
+     *
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
 	 */
@@ -417,7 +429,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 批量保存90度裁断排程记录
-	 * 
+     *
 	 * @param batchNo      批次号
 	 * @param scheduleDate 排程日志
 	 * @param scheduleList 排程数据
@@ -512,9 +524,9 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 	}
 
 	/**
-	 * 
+     *
 	 * 90度裁断转机台
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-25 11:32:01
@@ -532,9 +544,9 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 	}
 
 	/**
-	 * 
+     *
 	 * 确认机台
-	 * 
+     *
 	 * @param scheduleResult 确认后的排产记录
 	 */
 	@Transactional
@@ -576,7 +588,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 将指定日期的15度裁断排产结果做平衡处理
-	 * 
+     *
 	 * @param scheduleDate 排产日期
 	 */
 	@Transactional
@@ -613,7 +625,10 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 		// 计算生产顺序
 		cd90EngineProductOrderService.calculateProduceOrder(scheduleList);
 		// 更新排程数据至数据库
-		cd90EngineMapper.updateCd90ScheduleResultPlanQty(scheduleList);
+		cd90EngineMapper.createTempTable();
+		cd90EngineMapper.insertTempTable(scheduleList);
+		cd90EngineMapper.updateCd90ScheduleResultPlanQty(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), scheduleList);
+//		cd90EngineMapper.dropTempTable();
 		// 记录日志
 		String logdetail = logSplit("平衡前排程数据：" + oldScheduleResult, "平衡后排产数据：" + toJSONString(scheduleList));
 		autoScheduleLogService.insertCd90ScheduleLog(batchNo, null, "手工平衡中夜班产量", logdetail);
@@ -621,7 +636,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 清理排产日当天的历史排程数据
-	 * 
+     *
 	 * @param scheduleDate 排程日期
 	 */
 	private void cleanHistoryScheduleResult(Date scheduleDate) {
@@ -637,7 +652,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 验证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-	 * 
+     *
 	 * @param scheduleDate   排程日志
 	 * @param batchNo        批次号
 	 * @param isProductStage 仅对投产阶段规格排产
@@ -685,12 +700,12 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 			}
 			validate: {
 				// 帘线规格
-				if (StringUtil.isEmpty(constructionInfo.getCordSpec())) {
-					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.cordSpec");
-				}
-				if (StringUtils.isNotEmpty(errorMsg)) {
-					break validate;
-				}
+//				if (StringUtil.isEmpty(constructionInfo.getCordSpec())) {
+//					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.cordSpec");
+//				}
+//				if (StringUtils.isNotEmpty(errorMsg)) {
+//					break validate;
+//				}
 				// 胎侧长度
 				if (constructionInfo.getSidewallLength() == null || constructionInfo.getSidewallLength() == 0) {
 					errorMsg = this.returnValidatedErrorMsg(batchNo, embryoCode, "ui.construction.sidewallLength");
@@ -711,7 +726,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 生成外协计划列表
-	 * 
+     *
 	 * @param scheduleDate   排产日
 	 * @param isProductStage 是否只排生产阶段
 	 * @param scheduleList   原排产计划
@@ -753,7 +768,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 将正常排程计划中的外协规格转移出来
-	 * 
+     *
 	 * @param scheduleList  原排产计划
 	 * @param assistSpecMap 外协规格清单map
 	 * @return
@@ -774,7 +789,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 返回错误信息（抛出异常）
-	 * 
+     *
 	 * @param errorMsg
 	 */
 	private void returnErrorMessage(String errorMsg) {
@@ -785,7 +800,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 反馈校验错误信息
-	 * 
+     *
 	 * @param batchNo       排产批次号
 	 * @param embryoCode    胎号
 	 * @param columnNameKey 校验字段名称key（国际化）
@@ -802,7 +817,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 创建自动排程记录
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-14 10:54:58
@@ -821,7 +836,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 创建批次号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-14 10:02:41
@@ -835,7 +850,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 创建工单号
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-14 10:02:41
@@ -848,7 +863,7 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 
 	/**
 	 * 获取工序参数map
-	 * 
+     *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-8-10 16:09:34
@@ -858,4 +873,29 @@ public class Cd90EngineServiceImpl implements Cd90EngineService {
 		return cd90EngineMapper.listCd90Params().stream()
 				.collect(Collectors.toMap(Cd90ParamsVo::getParamCode, Cd90ParamsVo::getParamValue, (v1, v2) -> v2));
 	}
+
+    @Override
+    public void batchUpdateBatchNoAndOrderNo(Date scheduleDate) {
+        List<Cd90ScheduleResultVo> scheduleResultVoList = cd90EngineMapper.selectCd90ScheduleList(scheduleDate);
+        //查询当前排程的批次号
+        String batchNo = cd90EngineMapper.getCurrentBatchNo(scheduleDate);
+        if (StringUtils.isBlank(batchNo)) {
+            //当前的批次号为空，说明还没”自动排程“或者做的批量导入（需要删掉已排的数据），那么自己生成一个排程批次号
+            //排程批次号
+            batchNo = this.createBatchNo(scheduleDate);
+            //创建自动排程记录
+            this.createScheduleRecord(scheduleDate, "", batchNo);
+        }
+        for (Cd90ScheduleResultVo scheduleResult : scheduleResultVoList) {
+            //批次号
+            scheduleResult.setBatchNo(batchNo);
+            //工单号
+            String orderNo = this.createOrderNo(batchNo);
+            scheduleResult.setOrderNo(orderNo);
+        }
+
+		if (org.apache.commons.collections.CollectionUtils.isNotEmpty(scheduleResultVoList)) {
+			cd90EngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
+		}
+    }
 }

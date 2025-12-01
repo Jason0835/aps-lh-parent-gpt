@@ -1,9 +1,19 @@
 package com.zlt.aps.xwyy.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.pagehelper.util.StringUtil;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
@@ -14,10 +24,16 @@ import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.BeanConverUtil;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyDayFinishQty;
+import com.zlt.aps.xwyy.api.domain.vo.HalfYyExportDataVo;
 import com.zlt.aps.xwyy.common.handle.XwyySyncDataHandle;
 import com.zlt.aps.xwyy.engine.service.XwyyEngineService;
+import com.zlt.aps.xwyy.entity.XwyyParams;
 import com.zlt.aps.xwyy.entity.XwyyScheduleResult;
+import com.zlt.aps.xwyy.mapper.XwyyParamsMapper;
 import com.zlt.aps.xwyy.service.XwyyScheduleResultService;
+import com.zlt.common.utils.ExcelReadUtils;
+import com.zlt.common.utils.ImportExcelUtils;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -26,12 +42,22 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.util.List;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +78,14 @@ public class XwyyScheduleResultController extends BaseController {
     private XwyySyncDataHandle xwyySyncDataHandle;
 	@Resource
 	private SyncDataLogsService syncDataLogsService;
+    @Autowired
+    private IExportLogService iExportLogService;
+    @Autowired
+    private IImportLogService iImportLogService;
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
+    @Autowired
+    private XwyyParamsMapper xwyyParamsMapper;
 
     /**
      * 查询纤维压延排程结果列表
@@ -87,7 +121,7 @@ public class XwyyScheduleResultController extends BaseController {
     /**
      * 修改纤维压延排程结果
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.INSERT_OR_UPDATE)
     @PostMapping("/edit")
     @ApiOperation("修改纤维压延排程结果（id为空则新增，id不为空则修改）")
     public AjaxResult edit(@RequestBody XwyyScheduleResultDto dto) {
@@ -142,7 +176,7 @@ public class XwyyScheduleResultController extends BaseController {
     /**
      * 调量
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.CHANGE_QTY)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.CHANGE_QTY)
     @PostMapping("/changeQty")
     @ApiOperation("调量")
     public AjaxResult changeQty(@RequestBody XwyyScheduleResultDto dto) {
@@ -188,7 +222,7 @@ public class XwyyScheduleResultController extends BaseController {
     /**
      * 删除纤维压延排程结果
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.DELETE)
     @PostMapping("/remove")
     @ApiOperation("删除纤维压延排程结果信息")
     public AjaxResult remove(@RequestBody List<XwyyScheduleResultDto> removeList) {
@@ -208,7 +242,7 @@ public class XwyyScheduleResultController extends BaseController {
     /**
      * 导出纤维压延排程结果列表
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.EXPORT)
     @ApiOperation("导出纤维压延排程结果列表")
     @PostMapping("/export")
     public byte[] export(@RequestBody XwyyScheduleResultDto dto) {
@@ -234,7 +268,7 @@ public class XwyyScheduleResultController extends BaseController {
     /**
      * 查询纤维压延排程结果列表
      */
-    @Log(title = "ui.data.column.xwyy.ScheduleResult.modalName", businessType = BusinessType.PUBLISH)
+    @Log(title = "ui.data.column.xwyy.ScheduleResult.modalName", businessType = com.ruoyi.common.log.enums.BusinessType.PUBLISH)
     @ApiOperation("发布排程")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody XwyyScheduleResultDto dto) {
@@ -242,7 +276,7 @@ public class XwyyScheduleResultController extends BaseController {
     	if (syncDataLogsService.checkPublishLocking("xwyy:publish:lock", dto.getIds())) {
     		return AjaxResult.success(); // 如果已经被锁定了，则直接返回
     	}
-    	
+
         XwyyScheduleResult scheduleResult = new XwyyScheduleResult();
         BeanUtils.copyProperties(dto, scheduleResult);
         int releasingOrTimeoutByDate = xwyyScheduleResultService.isReleasingOrTimeoutByIds(ArrayUtils.toPrimitive(scheduleResult.getIds()));
@@ -271,11 +305,14 @@ public class XwyyScheduleResultController extends BaseController {
 			// 发布排程记录
 			xwyyScheduleResultService.publish(scheduleResult, arr, dataVersion);
 
-	        xwyyScheduleResultService.publishNoticeMes(dto.getScheduleDate(), dataVersion, arr.length);
+            xwyyScheduleResultService.publishNoticeMes(dto.getScheduleDate(), dataVersion, arr.length);
 
 			// 取回mes的反馈结果
-			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-			String status = logs.getStatus();
+            SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
+//            SyncDataLogs logs = new SyncDataLogs();
+//            logs.setStatus("2");
+//            logs.setMsg("测试");
+            String status = logs.getStatus();
 			// 更新状态
 			xwyyScheduleResultService.updateRelaseStatus(dataVersion, arr, status);
 			if (ApsConstant.IS_RELEASE.equals(status)) {
@@ -289,14 +326,14 @@ public class XwyyScheduleResultController extends BaseController {
 			log.error(e.getMessage(), e);
 			return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
 		}
-        
+
         return ajaxResult;
     }
 
     /**
      * 自动排程
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.AUTOPLAN)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.AUTOPLAN)
     @ApiOperation("自动排程")
     @PostMapping("/autoPlan")
     public AjaxResult autoPlan(@RequestBody XwyyScheduleResultDto dto) {
@@ -331,7 +368,7 @@ public class XwyyScheduleResultController extends BaseController {
         return xwyyScheduleResultService.checkUnique(xwyyScheduleResult);
     }
 
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入纤维压延排程结果信息")
     public AjaxResult importData(@RequestBody List<XwyyScheduleResultDto> list, @RequestParam("importLogId") Long importLogId, @RequestParam("scheduleDate") String scheduleDate) {
@@ -359,7 +396,7 @@ public class XwyyScheduleResultController extends BaseController {
      * @param scheduleDate 排程日期
      * @return 结果
      */
-    @Log(title = "ui.data.column.xwyyScheduleResult.modalName", businessType = BusinessType.BALANCE)
+    @Log(title = "ui.data.column.xwyyScheduleResult.modalName", businessType = com.ruoyi.common.log.enums.BusinessType.BALANCE)
     @PostMapping("/changeReleaseStatus")
     public AjaxResult changeReleaseStatus(@RequestBody XwyyScheduleResultDto dto){
         XwyyScheduleResult scheduleResult = new XwyyScheduleResult();
@@ -384,7 +421,7 @@ public class XwyyScheduleResultController extends BaseController {
      * @param ids             id
      * @param classifiedShift 合并班次
      */
-    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = BusinessType.CONSOLIDATION)
+    @Log(title = "ui.data.column.xwyy.scheduleResult.modelName", businessType = com.ruoyi.common.log.enums.BusinessType.CONSOLIDATION)
     @PostMapping("/combinationMiddleAndNight/{ids}")
     public AjaxResult combinationMiddleAndNight(@PathVariable("ids")long[] ids, @RequestParam("classifiedShift") String classifiedShift) {
         int releasingOrTimeoutByDate = xwyyScheduleResultService.isReleasingOrTimeoutByIds(ids);
@@ -393,5 +430,307 @@ public class XwyyScheduleResultController extends BaseController {
         }
         xwyyScheduleResultService.combinationMiddleAndNight(ids, classifiedShift);
         return AjaxResult.success();
+    }
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/importFinishQty")
+    @ApiOperation("导入完成量")
+    public AjaxResult importFinishQty(@RequestBody List<XwyyDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        return xwyyScheduleResultService.importFinishQty(list, importLogId);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody XwyyScheduleResultDto scheduleResult) {
+        return xwyyScheduleResultService.getSummaryVo(scheduleResult);
+    }
+
+    /**
+     * 将排程数据导出到文件
+     *
+     * @param importContext 导入上下文
+     * @return 结果
+     */
+    @Log(title = "ui.data.column.HalfYyExportData.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("将排程数据导出到文件")
+    @PostMapping("/importExcelToListAndExport")
+    public byte[] importExcelToListAndExport(@RequestBody ImportContext importContext, HttpServletResponse response) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
+        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        String fileName = I18nUtil.getMessage("ui.data.column.halfYyExportData.modelName");
+        Workbook workbook = this.importExcelToListAndExport("", is, response, fileName);
+        byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
+    }
+
+    /**
+     * 将排程数据导出到文件
+     *
+     * @param sheetName 页签名
+     * @param is        输入流
+     * @param response  结果
+     * @param fileName  文件名
+     * @return 结果
+     * @throws Exception 异常
+     */
+    public Workbook importExcelToListAndExport(String sheetName, InputStream is, HttpServletResponse response, String fileName) throws Exception {
+        // 设置更低的压缩率阈值（例如 0.005），避免Zip bomb detected! 报错
+        ZipSecureFile.setMinInflateRatio(0.005);
+
+        Workbook wb = WorkbookFactory.create(is);
+        List<HalfYyExportDataVo> list = new LinkedList<>();
+        List<HalfYyExportDataVo> nextDayList = new LinkedList<>();
+        Sheet sheet = null;
+        if (StringUtils.isNotEmpty(sheetName)) {
+            sheet = wb.getSheet(sheetName);
+        } else {
+            sheet = wb.getSheetAt(0);
+        }
+
+        if (sheet == null) {
+            throw new IOException(I18nUtil.getMessage("common.error.util.file.sheet.noexist"));
+        } else {
+            Object scheduleDateStr = getCellValue(sheet.getRow(0), 0);
+            String dateStr = scheduleDateStr.toString().substring(0, 10);
+            Date scheduleDate = DateUtils.parseDate(dateStr.trim(), "yyyy年MM月dd日");
+            scheduleDate = DateUtils.addDays(scheduleDate, 1);
+            // 重算计划用量公式
+            FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
+            Map<String, HalfYyExportDataVo> exportDataVoMap = new HashMap<>(16);
+            List<HalfYyExportDataVo> resultList = xwyyScheduleResultService.exportDataToList(scheduleDate);
+            if (CollectionUtils.isNotEmpty(resultList)) {
+                exportDataVoMap = resultList.stream().collect(Collectors.toMap(HalfYyExportDataVo::getCode, Function.identity()));
+            }
+            List<String> continueFieldNameList = Arrays.asList("code", "qty", "scrq", "scheduleDate");
+            // 将列表数据导出到excel
+            int startRow = 3;
+            int endRow = 19;
+            int headRow = 1;
+            int headStartCol = 7;
+            int headEndCol = 22;
+            // 日期开始时间是scheduleDate的前一天，偏移量比开始列号大1
+            int dateCellOffset = 8;
+            List<Field> classField = getClassField(HalfYyExportDataVo.class);
+            for (int i = headStartCol; i <= headEndCol; i++) {
+                Row row = sheet.getRow(headRow);
+                Date date = DateUtils.addDays(scheduleDate, i - dateCellOffset);
+                Cell cell = row.getCell(i);
+                if (cell != null) {
+                    cell.setCellValue(DateUtils.parseDateToStr("MM-dd", date));
+                }
+            }
+
+            for (int i = startRow; i < endRow; i++) {
+                Row row = sheet.getRow(i);
+                String cellValueCode = getCellValue(row, 0).toString();
+                if (exportDataVoMap.containsKey(cellValueCode)) {
+                    HalfYyExportDataVo halfYyExportDataVo = exportDataVoMap.get(cellValueCode);
+                    for (int j = 0; j < classField.size(); j++) {
+                        Field field = classField.get(j);
+                        String fieldName = field.getName();
+                        if (continueFieldNameList.contains(fieldName)) {
+                            continue;
+                        }
+                        Object fieldValue = ReflectUtils.getFieldValue(halfYyExportDataVo, fieldName);
+                        if (Objects.nonNull(fieldValue)) {
+                            double cellValue = Double.parseDouble(fieldValue.toString());
+                            Cell cell = row.getCell(j);
+                            // 原有单元格有值，重新写入值可能未覆盖，这里需要清空原有值
+                            cell.setBlank();
+                            if (cellValue > 0) {
+                                cell.setCellValue(cellValue);
+                            }
+                        } else {
+                            Cell cell = row.getCell(j);
+                            if (cell != null) {
+                                cell.setBlank();
+                            }
+                        }
+                    }
+                }
+            }
+            evaluator.clearAllCachedResultValues();
+            evaluator.evaluateAll();
+        }
+        return wb;
+    }
+
+    public Object getCellValue(Row row, int column) {
+        if (row == null) {
+            return row;
+        } else {
+            Object val = "";
+
+            try {
+                Cell cell = row.getCell(column);
+                if (StringUtils.isNotNull(cell)) {
+                    if (cell.getCellType() != CellType.NUMERIC && cell.getCellType() != CellType.FORMULA) {
+                        if (cell.getCellType() == CellType.STRING) {
+                            val = cell.getStringCellValue();
+                        } else if (cell.getCellType() == CellType.BOOLEAN) {
+                            val = cell.getBooleanCellValue();
+                        } else if (cell.getCellType() == CellType.ERROR) {
+                            val = cell.getErrorCellValue();
+                        }
+                    } else {
+                        val = cell.getNumericCellValue();
+                        if (DateUtil.isCellDateFormatted(cell)) {
+                            val = DateUtils.getJavaDate((Double) val, TimeZone.getDefault());
+                        } else if ((Double) val % 1.0 != 0.0) {
+                            val = new BigDecimal(val.toString());
+                        } else {
+                            val = (new DecimalFormat("0")).format(val);
+                        }
+                    }
+                }
+
+                return val;
+            } catch (Exception var5) {
+                return val;
+            }
+        }
+    }
+
+    public List<Field> getClassField(Class<? super HalfYyExportDataVo> tClass) {
+        List<Field> tempFields = new ArrayList<>();
+
+        while (tClass != null) {
+            tempFields.addAll(Arrays.asList(tClass.getDeclaredFields()));
+            tClass = tClass.getSuperclass();
+            if (StringUtils.equals(tClass.getSimpleName(), BaseEntity.class.getSimpleName())) {
+                break;
+            }
+        }
+
+        return tempFields;
+    }
+
+    /**
+     * 将线下排程模板的昨日计划、昨日库存，导入到系统
+     *
+     * @param importContext 导入数据
+     * @return 结果
+     */
+    @Log(title = "ui.data.column.HalfYyExportData.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("将线下排程模板的昨日计划、昨日库存，导入到系统")
+    @PostMapping("/importExcelToLastDayPlanAndStock")
+    public AjaxResult importExcelToLastDayPlanAndStock(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        List<HalfYyExportDataVo> list = this.importExcel("", is, 3, 18);
+        AjaxResult ajaxResult = xwyyScheduleResultService.importExcelToLastDayPlanAndStock(list);
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        return ajaxResult;
+    }
+
+    public List<HalfYyExportDataVo> importExcel(String sheetName, InputStream is, Integer dataStartRowNum, Integer lastRowNum) throws Exception {
+        // 设置更低的压缩率阈值（例如 0.005），避免Zip bomb detected! 报错
+        ZipSecureFile.setMinInflateRatio(0.005);
+
+        Workbook wb = WorkbookFactory.create(is);
+        List<HalfYyExportDataVo> list = new LinkedList<>();
+        Sheet sheet = null;
+        if (StringUtils.isNotEmpty(sheetName)) {
+            sheet = wb.getSheet(sheetName);
+        } else {
+            sheet = wb.getSheetAt(0);
+        }
+
+        if (sheet == null) {
+            throw new IOException(I18nUtil.getMessage("common.error.util.file.sheet.noexist"));
+        } else {
+            int scheduleDateRowNum = 0;
+
+            LambdaQueryWrapper<XwyyParams> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(XwyyParams::getParamCode, "XWYY_IMPORT_DATE_ROW_NUM");
+            XwyyParams xwyyParams = xwyyParamsMapper.selectOne(wrapper);
+            if (xwyyParams != null) {
+                try {
+                    scheduleDateRowNum = Integer.parseInt(xwyyParams.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.error("XWYY_IMPORT_DATE_ROW_NUM参数错误，取默认值0");
+                }
+            }
+            Object scheduleDateStr = getCellValue(sheet.getRow(scheduleDateRowNum), 0);
+            String dateStr = scheduleDateStr.toString().substring(0, 11);
+            Date scheduleDate = DateUtils.parseDate(dateStr.trim(), "yyyy年MM月dd日");
+
+            int stockColumn = 3;
+            int findDateRowNum = scheduleDateRowNum + 1;
+            int planColumnNum = 7;
+            Row dateRow = sheet.getRow(findDateRowNum);
+            while (true) {
+                Object cellValue = getCellValue(dateRow, planColumnNum);
+                if (cellValue instanceof Date) {
+                    if (scheduleDate.compareTo((Date) cellValue) == 0
+                            // 避免死循环
+                            || planColumnNum > 99999) {
+                        break;
+                    }
+                }
+                planColumnNum++;
+            }
+
+            for (int i = dataStartRowNum; i < sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                Object cellValue = getCellValue(row, 0);
+                if ("合计".equals(cellValue)) {
+                    break;
+                }
+                if (StringUtils.isNotBlank(cellValue.toString())) {
+                    HalfYyExportDataVo halfYyExportDataVo = new HalfYyExportDataVo();
+                    halfYyExportDataVo.setCode(cellValue.toString());
+                    halfYyExportDataVo.setScheduleDate(scheduleDate);
+                    Object stockCellValue = getCellValue(row, stockColumn);
+                    try {
+                        halfYyExportDataVo.setStockQty(Double.parseDouble(stockCellValue.toString()));
+                    } catch (NumberFormatException e) {
+                        log.error("库存列，数值转换异常：{}", e.getMessage());
+                    }
+                    Object planCellValue = getCellValue(row, planColumnNum);
+                    try {
+                        halfYyExportDataVo.setDay0(Double.parseDouble(planCellValue.toString()));
+                    } catch (NumberFormatException e) {
+                        log.error("计划量列，数值转换异常：{}", e.getMessage());
+                        halfYyExportDataVo.setDay0(0D);
+                    }
+                    list.add(halfYyExportDataVo);
+                }
+            }
+            return list;
+        }
     }
 }

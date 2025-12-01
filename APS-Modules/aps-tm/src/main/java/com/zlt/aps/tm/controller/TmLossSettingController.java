@@ -24,7 +24,7 @@ import java.util.List;
  * @date 2021-07-12
  */
 @RestController
-@RequestMapping("/loss")
+@RequestMapping("/tm/loss")
 public class TmLossSettingController extends BaseController {
     @Autowired
     private TmLossSettingService tmLossSettingService;

@@ -1,27 +1,6 @@
 package com.zlt.aps.controller.tm;
 
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
@@ -40,10 +19,24 @@ import com.zlt.aps.template.tm.TmCurlRollTemp;
 import com.zlt.aps.tm.api.domain.entity.TmCurlRoll;
 import com.zlt.aps.tm.api.service.ITmCurlRollService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Api(tags = {"胎面卷曲信息接口"})
 @Controller
@@ -176,7 +169,7 @@ public class TmCurlRollController extends BaseController {
 			expotItem.setRemark(item.getRemark());
 			return expotItem;
 		}).collect(Collectors.toList());
-        
+
         AjaxResult ajaxResult = iTmCurlRollService.importData(importList, updateSupport, importLog.getId());
         // 更新日志记录成功数，失败数
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
@@ -184,4 +177,16 @@ public class TmCurlRollController extends BaseController {
         return ajaxResult;
     }
 
+    /**
+     * 根据编号查询卷曲长度
+     *
+     * @param curlRoll 查询条件
+     * @return 结果
+     */
+    @ApiOperation("根据编号查询卷曲长度")
+    @PostMapping("/selectCurlLengthByCode")
+    @ResponseBody
+    public AjaxResult selectCurlLengthByCode(TmCurlRoll curlRoll) {
+        return iTmCurlRollService.selectCurlLengthByCode(curlRoll);
+    }
 }

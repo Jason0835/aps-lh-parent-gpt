@@ -15,6 +15,15 @@
             </div>
         </div>
         <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.data.column.loss.line}]]：</label>
+            <div class="col-sm-8">
+                <select name="machineId" class="form-control"  th:with="type=${@gdyy.getMachineInfo()}">
+                    <option value="">[[#{ui.data.column.selectMachineName}]]</option>
+                    <option  th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}" th:field="*{machineId}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
             <label class="col-sm-3 control-label is-required">[[#{ui.data.column.loss.lossRate}]]：</label>
             <div class="col-sm-8">
                 <input name="lossRate" th:field="*{lossRate}" class="form-control" type="number" min="0" max="99.99"

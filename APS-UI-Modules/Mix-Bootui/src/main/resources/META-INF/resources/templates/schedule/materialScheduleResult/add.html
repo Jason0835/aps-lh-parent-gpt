@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改硫化辅料日计划排程')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-materialScheduleResult-edit" th:object="${materialScheduleResult}">
+        <input id="id" name="id" th:field="*{id}" type="hidden">
+        <input name="publishSuccessCount" th:value="${materialScheduleResult.publishSuccessCount == null ? 0 : materialScheduleResult.publishSuccessCount}" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.scheduleDate}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group date">
+                    <input name="scheduleDate" id="scheduleDate"
+                           th:value="${#dates.format(materialScheduleResult.scheduleDate, 'yyyy-MM-dd')}"
+                           class="time-input form-control" placeholder="yyyy-MM-dd" type="text" required>
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.mixArea}]]：</label>
+            <div class="col-sm-8">
+                <select id="mixArea" class="form-control" name="mixArea"
+                        th:with="type=${@setting.scheduleMixAreaPermission()}" onchange="getMachines()" required>
+                    <option value=""></option>
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                            th:value="${dict.dictValue}" th:field="*{mixArea}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.materialName}]]：</label>
+            <div class="col-sm-8">
+                <input id="materialName" name="materialName" th:field="*{materialName}" class="form-control AccessoriesNames" autocomplete="off"
+                       type="text" maxlength="30" onchange="getMachines()">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.machineName}]]：</label>
+            <div class="col-sm-8">
+                <select id="machineCode" name="machineCode" class="form-control" onchange="disableByMachineShift(false)" required>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required"><a onclick="toChooseRecipeType()">[[#{setting.MesPmtRecipe.modelName}]]：</a></label>
+            <div class="col-sm-2">
+                <input id="recipeType" name="recipeType" class="form-control" type="hidden" readonly required>
+                <input id="recipeTypeName" name="recipeTypeName" class="form-control" type="text"
+                       th:placeholder="#{schedule.materialScheduleResult.recipeTypeName}" onclick="toChooseRecipeType()" readonly required>
+            </div>
+            <div class="col-sm-2">
+                <input id="recipeVersionId" name="recipeVersionId" class="form-control" type="text"
+                       th:placeholder="#{schedule.materialScheduleResult.recipeVersionId}" onclick="toChooseRecipeType()" readonly required>
+            </div>
+            <div class="col-sm-2">
+                <input id="recipeStage" name="recipeStage" class="form-control" type="hidden" readonly>
+                <input id="recipeStageDictLabel" class="form-control" type="text"
+                       th:placeholder="#{schedule.materialScheduleResult.recipeStage}" onclick="toChooseRecipeType()" readonly>
+            </div>
+        </div>
+        <div class="form-group midPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midPlanQty}]]：</label>
+            <div class="col-sm-8">
+                <input id="midPlanQty" name="midPlanQty" th:field="*{midPlanQty}" class="form-control midPlanInput" type="text" digits="true" min="0"
+                       max="9999999" onchange="updateMidPlanQty()">
+            </div>
+        </div>
+        <div class="form-group midPlan">
+            <label id="midProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midProduceOrder}]]：</label>
+            <div class="col-sm-8">
+                <input id="midProduceOrder" name="midProduceOrder" th:field="*{midProduceOrder}" class="form-control midPlanInput" type="text" digits="true" min="0"
+                       max="999999">
+            </div>
+        </div>
+        <div class="form-group midPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midRemark}]]：</label>
+            <div class="col-sm-8">
+                <textarea id="midRemark" name="midRemark" th:field="*{midRemark}" class="form-control midPlanInput" type="text"
+                          maxlength="300"></textarea>
+            </div>
+        </div>
+        <div class="form-group nightPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightPlanQty}]]：</label>
+            <div class="col-sm-8">
+                <input id="nightPlanQty" name="nightPlanQty" th:field="*{nightPlanQty}" class="form-control nightPlanInput" type="text" digits="true"
+                       min="0" max="9999999" onchange="updateNightPlanQty()">
+            </div>
+        </div>
+        <div class="form-group nightPlan">
+            <label id="nightProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightProduceOrder}]]：</label>
+            <div class="col-sm-8">
+                <input id="nightProduceOrder" name="nightProduceOrder" th:field="*{nightProduceOrder}" class="form-control nightPlanInput" type="text" digits="true" min="0"
+                       max="999999">
+            </div>
+        </div>
+        <div class="form-group nightPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightRemark}]]：</label>
+            <div class="col-sm-8">
+                <textarea id="nightRemark" name="nightRemark" th:field="*{nightRemark}" class="form-control nightPlanInput" type="text"
+                          maxlength="300"></textarea>
+            </div>
+        </div>
+        <div class="form-group dayPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayPlanQty}]]：</label>
+            <div class="col-sm-8">
+                <input id="dayPlanQty" name="dayPlanQty" th:field="*{dayPlanQty}" class="form-control dayPlanInput" type="text" digits="true" min="0"
+                       max="9999999" onchange="updateDayPlanQty()">
+            </div>
+        </div>
+        <div class="form-group dayPlan">
+            <label id="dayProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.glueScheduleResult.dayProduceOrder}]]：</label>
+            <div class="col-sm-8">
+                <input id="dayProduceOrder" name="dayProduceOrder" th:field="*{dayProduceOrder}" class="form-control dayPlanInput" type="text" digits="true" min="0"
+                       max="999999">
+            </div>
+        </div>
+        <div class="form-group dayPlan">
+            <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayRemark}]]：</label>
+            <div class="col-sm-8">
+                <textarea id="dayRemark" name="dayRemark" th:field="*{dayRemark}" class="form-control dayPlanInput" type="text"
+                          maxlength="300"></textarea>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+            <div class="col-sm-8">
+                <textarea name="remark" class="form-control" rows="2" th:field="*{remark}" maxlength="300"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/materialScheduleResult";
+
+    //获取辅料名称列表
+    var datas = [[${@setting.getAccessoriesNames()}]];
+    $('.AccessoriesNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $("#form-materialScheduleResult-edit").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        var mixArea = window.parent.$("#mixArea").val();
+        let selectObj = $("#mixArea")
+        selectObj.val([mixArea]).trigger("change");
+        selectObj.find("option:first").remove();
+        loadClassEditable(); // 初始化各班次可编辑状态
+    });
+    
+    /**
+    * 渲染排程日期
+    */
+    layui.use('laydate', function () {
+        var laydate = layui.laydate;
+        laydate.render({
+            elem: '#scheduleDate',
+            min: [[${minDate}]],
+            done: function (value, date, endDate) {
+            	loadClassEditable(); // 切换日期重新加载各班次可编辑状态
+            }
+        })
+    });
+    
+    /**
+    * 加载各班次可编辑状态
+    */
+    function loadClassEditable() {
+        var params = {
+            url: prefix + "/getCLassEditableStatus",
+            type: "post",
+            dataType: "json",
+            data: {"scheduleDate": $("#scheduleDate").val()},
+            success: function (result) {
+            	var data = result.data;
+            	// 设置各班计划输入框状态
+		       	$("#midProduceOrder").attr('disabled', !data.midEditable);
+		       	$("#midPlanQty").attr('disabled', !data.midEditable);
+		       	$("#nightProduceOrder").attr('disabled', !data.nightEditable);
+		       	$("#nightPlanQty").attr('disabled', !data.nightEditable);
+		       	$("#dayProduceOrder").attr('disabled', !data.dayEditable);
+		       	$("#dayPlanQty").attr('disabled', !data.dayEditable);
+            }
+        };
+        $.ajax(params);
+    }
+
+    function submitHandler() {
+        // 提交前校验
+        updateMidPlanQty();
+        updateNightPlanQty();
+        updateDayPlanQty();
+        if ($.validate.form()) {
+            var parent = window.parent;
+            let tableData = parent.$("#" + parent.table.options.id).bootstrapTable('getData');
+            // 校验当前机台下，各个班次顺序是否与修改的有重复
+            let isRepeated = isProduceOrderRepeated(tableData);
+            if (isRepeated) {
+                return ;
+            }
+            $.operate.save(prefix + "/save", $('#form-materialScheduleResult-edit').serialize());
+        }
+    }
+
+    //获取机台下拉框
+    function getMachines(){
+        var mixArea=$("#mixArea").val();
+        var materialName = $("#materialName").val();
+        resetRecipeType();
+        if ($.common.isEmpty(materialName) || $.common.isEmpty(mixArea)) {
+            var $machineCode = $("#machineCode");
+            $machineCode.empty();
+            $machineCode.append("<option value='' disabled>" + [[#{ui.message.filterMachine.mixAreaAndMaterialNameNotNull}]] + "</option>");
+            return ;
+        }
+        var config = {
+            url: "/setting/accessoriesMachine/getRecipeMachineList",
+            type: "post",
+            dataType: "json",
+            data: {"mixArea": mixArea, "materialName": materialName},
+            success: function (result) {
+                if (result.code === web_status.SUCCESS){
+                    var machines=result.data;
+                    var rSelect = '';
+                    var select = [[${materialScheduleResult.machineCode}]] + "";
+                    var selets = select.split(",");
+                    for(var i = 0; i < machines.length; i++){
+                        for(var key in selets){
+                            if(selets[key] === machines[i].machineCode){
+                                machines[i].isSelected = true;
+                            }
+                        }
+                    }
+                    for (var j = 0; j < machines.length; j++) {
+                        if (machines[j].isSelected){
+                            rSelect += ("<option classShift='" + machines[j].classShift + "' value='"+machines[j].machineCode+"' selected>"+machines[j].machineName+"</option>");
+                        }else {
+                            rSelect += ("<option classShift='" + machines[j].classShift + "' value='"+machines[j].machineCode+"'>"+machines[j].machineName+"</option>");
+                        }
+                    }
+                    if ($.common.isEmpty(rSelect)) {
+                        rSelect = "<option value='' disabled>" + [[#{ui.message.filterMachine.noMaterialNameMachine}]] + "</option>";
+                    }
+                    var $machineCode = $("#machineCode");
+                    $machineCode.empty();
+                    $machineCode.append(rSelect);
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+                disableByMachineShift(true);
+            }
+        };
+        $.ajax(config)
+    }
+
+    /**
+     * 选择配方版本
+     */
+    function toChooseRecipeType() {
+        var materialName = $("#materialName").val();
+        var $machineCode = $("#machineCode option:selected");
+        var machineCode = $machineCode.val();
+        if ($.common.isEmpty(materialName) || $.common.isEmpty(machineCode)) {
+            $.modal.alertWarning([[#{ui.message.getRecipeType.glueOrMachineNull}]]);
+            return ;
+        }
+        var machineName = $machineCode.text();
+        let machineNameParam = encodeURIComponent($.common.isEmpty(machineName) ? '' : machineName);
+        let materialNameParam = encodeURIComponent($.common.isEmpty(materialName) ? '' : materialName);
+        var url = prefix + "/toChooseRecipeType?machineName=" + machineNameParam + "&materialName=" + materialNameParam;
+        $.modal.open(window.parent.table.options.modalName, url, 800, 500);
+    }
+
+    // 根据机台班制，禁用其他班次计划量文本框
+    function disableByMachineShift(isGetMachine) {
+        resetRecipeType();
+        var $midPlan = $(".midPlan");
+        var $midPlanInput = $(".midPlanInput");
+        $midPlanInput.removeAttr("disabled");
+        $midPlan.show();
+        var $nightPlan = $(".nightPlan");
+        var $nightPlanInput = $(".nightPlanInput");
+        $nightPlanInput.removeAttr("disabled");
+        $nightPlan.show();
+        var $dayPlan = $(".dayPlan");
+        let $dayPlanInput = $(".dayPlanInput");
+        $dayPlanInput.removeAttr("disabled");
+        $dayPlan.show();
+        var classShift;
+        if (isGetMachine) {
+            classShift = $("#machineCode option").attr("classShift");
+        }else {
+            classShift = $("#machineCode option:selected").attr("classShift");
+        }
+        if (classShift === "1") {
+            // 长白班
+            $midPlanInput.attr("disabled", "disable");
+            $midPlan.hide();
+            $nightPlanInput.attr("disabled", "disable");
+            $nightPlan.hide();
+        }else if (classShift === "2") {
+            // 两班制
+            $dayPlanInput.attr("disabled", "disable");
+            $dayPlan.hide();
+        }
+    }
+
+    /**
+     * 重置配方信息
+     */
+    function resetRecipeType() {
+        $("#recipeTypeName").val('');
+        $("#recipeType").val('');
+        $("#recipeVersionId").val('');
+        $("#recipeStage").val('');
+        $("#recipeStageDictLabel").val('');
+    }
+
+    /**
+     * 更新中班计划量后判断是否要添加顺序必填
+     */
+    function updateMidPlanQty() {
+        var $midProduceOrder = $("#midProduceOrder");
+        var $midProduceOrderLabel = $("#midProduceOrderLabel");
+        $midProduceOrder.removeAttr("required");
+        $midProduceOrderLabel.removeClass("is-required")
+        if ($("#midPlanQty").val() > 0) {
+            $midProduceOrder.attr("required", "true");
+            $midProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    /**
+     * 更新夜班计划量后判断是否要添加顺序必填
+     */
+    function updateNightPlanQty() {
+        var $nightProduceOrder = $("#nightProduceOrder");
+        var $nightProduceOrderLabel = $("#nightProduceOrderLabel");
+        $nightProduceOrder.removeAttr("required");
+        $nightProduceOrderLabel.removeClass("is-required")
+        if ($("#nightPlanQty").val() > 0) {
+            $nightProduceOrder.attr("required", "true");
+            $nightProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    /**
+     * 更新白班计划量后判断是否要添加顺序必填
+     */
+    function updateDayPlanQty() {
+        var $dayProduceOrder = $("#dayProduceOrder");
+        var $dayProduceOrderLabel = $("#dayProduceOrderLabel");
+        $dayProduceOrder.removeAttr("required");
+        $dayProduceOrderLabel.removeClass("is-required")
+        if ($("#dayPlanQty").val() > 0) {
+            $dayProduceOrder.attr("required", "true");
+            $dayProduceOrderLabel.addClass("is-required");
+        }
+    }
+
+    // 校验当前机台下，各个班次顺序是否与修改的有重复
+    function isProduceOrderRepeated(tableData) {
+        let machineName = $("#machineCode option:selected").text();
+        let filterData = tableData.filter(item => item.machineName === machineName);
+        let midProduceOrderMap = filterData.map(item => item.midProduceOrder);
+        let midProduceOrder = $("#midProduceOrder").val();
+        if ($.common.isNotEmpty(midProduceOrder)) {
+            for (var i = 0; i < midProduceOrderMap.length; i++) {
+                if (midProduceOrderMap[i] == midProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameMidProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let nightProduceOrderMap = filterData.map(item => item.nightProduceOrder);
+        let nightProduceOrder = $("#nightProduceOrder").val();
+        if ($.common.isNotEmpty(nightProduceOrder)) {
+            for (var i = 0; i < nightProduceOrderMap.length; i++) {
+                if (nightProduceOrderMap[i] == nightProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameNightProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let dayProduceOrderMap = filterData.map(item => item.dayProduceOrder);
+        let dayProduceOrder = $("#dayProduceOrder").val();
+        if ($.common.isNotEmpty(dayProduceOrder)) {
+            for (var i = 0; i < dayProduceOrderMap.length; i++) {
+                if (dayProduceOrderMap[i] == dayProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameDayProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+    }
+</script>
+</body>
+</html>

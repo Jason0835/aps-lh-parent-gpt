@@ -75,7 +75,7 @@
         <result property="specialRequirements" column="special_requirements"/>
         <result property="toProduct" column="to_product"/>
     </resultMap>
-    
+
     <sql id="selectCxEngineLastDaySupplePlanVo">
         select * from t_cx_last_day_supple_plan
     </sql>
@@ -362,7 +362,7 @@
 
     <!--Joran 2022-03-03 根据增补计划日期进行增补计划删除 start -->
     <delete id="deleteCxEngineLastDaySupplePlanBySuppleDate" parameterType="String">
-        update t_cx_last_day_supple_plan set del_flag='1',update_time = sysdate
+        update t_cx_last_day_supple_plan set del_flag='1',update_time = now()
         <where>
             del_flag='0'
             <if test="suppleDate != null  and suppleDate != ''">

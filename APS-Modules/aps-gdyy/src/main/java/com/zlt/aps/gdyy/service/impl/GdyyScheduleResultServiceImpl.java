@@ -1,5 +1,7 @@
 package com.zlt.aps.gdyy.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -11,22 +13,35 @@ import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.CxTCd15BigRoll;
 import com.zlt.aps.common.engine.domain.CxTCd15Params;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.common.engine.service.CxTCd15BigRollService;
 import com.zlt.aps.common.engine.service.CxTCd15ParamsService;
+import com.zlt.aps.common.engine.service.FactoryService;
+import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyDispatcherLog;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo;
+import com.zlt.aps.gdyy.common.handle.GdyySyncDataHandle;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineService;
+import com.zlt.aps.gdyy.engine.vo.GdyyBigRollVo;
+import com.zlt.aps.gdyy.entity.GdyyParams;
 import com.zlt.aps.gdyy.entity.GdyyScheduleResult;
+import com.zlt.aps.gdyy.mapper.GdyyMachineInfoMapper;
+import com.zlt.aps.gdyy.mapper.GdyyParamsMapper;
 import com.zlt.aps.gdyy.mapper.GdyyScheduleResultMapper;
 import com.zlt.aps.gdyy.service.GdyyDispatcherLogService;
 import com.zlt.aps.gdyy.service.GdyyScheduleResultService;
+import com.zlt.sync.povo.SyncParamsVO;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.poi.ss.usermodel.*;
@@ -39,7 +54,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
@@ -69,6 +86,26 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
     @Resource
     private GdyyDispatcherLogService gdyyDispatcherLogService;
 
+    @Autowired
+    private GdyyMachineInfoMapper gdyyMachineInfoMapper;
+
+    @Autowired
+    private GdyyParamsMapper gdyyParamsMapper;
+
+    @Autowired
+    private FactoryService factoryService;
+
+    @Resource
+    private GdyySyncDataHandle gdyySyncDataHandle;
+
+    /**
+     * 大卷标准长度默认值：600
+     */
+    private final static Double DEFAULT_STANDARD_SIZE = new Double("600");
+
+    @Autowired
+    private BaseFinishQtyImportService baseFinishQtyImportService;
+
     /**
      * 查询钢带压延排程结果信息维护列表
      *
@@ -78,13 +115,17 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
     @Override
     public List<GdyyScheduleResultDto> selectScheduleResultList(GdyyScheduleResult scheduleResult) {
         List<GdyyScheduleResultDto> list = gdyyScheduleResultMapper.selectScheduleResultList(scheduleResult);
-        if (CollectionUtil.isEmpty(list)) {
+        if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
         }
         // 大卷信息
         List<String> bigRollCodeList = CollectionUtil.propertiesToList(list, GdyyScheduleResultDto::getBigRollCode);
         List<CxTCd15BigRoll> cd15BigRollList = cd15BigRollService.getByBeltSpecList(bigRollCodeList);
         Map<String, CxTCd15BigRoll> cd15BigRollMap = CollectionUtil.toMap(cd15BigRollList, CxTCd15BigRoll::getBigRollCode);
+
+        List<GdyyMachineInfo> machineInfoList = gdyyMachineInfoMapper.selectMachineInfoList(new GdyyMachineInfo());
+        Map<Long, GdyyMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(GdyyMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
+
         // 大卷默认信息
         CxTCd15Params cd15Params = cd15ParamsService.getByParamCode(EngineConstants.STANDARD_SIZE);
         // 分别计算每条钢带压延无库存个数
@@ -95,19 +136,39 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
             BigDecimal class3NoStockNum = BigDecimal.ZERO;
             dto.setActClothLength(BigDecimal.ZERO);
             if (cd15BigRoll != null && cd15BigRoll.getActClothLength() != null && !cd15BigRoll.getActClothLength().equals(BigDecimal.ZERO)) {
-                class1NoStockNum = BigDecimal.valueOf(dto.getClass1PlanNoStock()).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
-                class2NoStockNum = BigDecimal.valueOf(dto.getClass2PlanNoStock()).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
-                class3NoStockNum = BigDecimal.valueOf(dto.getClass3PlanNoStock()).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
+                class1NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass1PlanNoStock(), 0d)).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
+                class2NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass2PlanNoStock(), 0d)).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
+                class3NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass3PlanNoStock(), 0d)).divide(cd15BigRoll.getActClothLength(), 1, BigDecimal.ROUND_UP);
                 dto.setActClothLength(cd15BigRoll.getActClothLength());
             } else if (cd15Params != null && StringUtils.isNotBlank(cd15Params.getParamValue()) && !Double.valueOf(cd15Params.getParamValue()).equals(0d)) {
-                class1NoStockNum = BigDecimal.valueOf(dto.getClass1PlanNoStock()).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
-                class2NoStockNum = BigDecimal.valueOf(dto.getClass2PlanNoStock()).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
-                class3NoStockNum = BigDecimal.valueOf(dto.getClass3PlanNoStock()).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
+                class1NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass1PlanNoStock(), 0d)).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
+                class2NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass2PlanNoStock(), 0d)).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
+                class3NoStockNum = BigDecimal.valueOf(ObjectUtils.defaultIfNull(dto.getClass3PlanNoStock(), 0d)).divide(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())), 1, BigDecimal.ROUND_UP);
                 dto.setActClothLength(BigDecimal.valueOf(Double.parseDouble(cd15Params.getParamValue())));
             }
             dto.setClass1PlanNoStockNum(class1NoStockNum.doubleValue());
             dto.setClass2PlanNoStockNum(class2NoStockNum.doubleValue());
             dto.setClass3PlanNoStockNum(class3NoStockNum.doubleValue());
+
+            String machineIdStr = dto.getMachineCode();
+            if (StringUtils.isNotBlank(machineIdStr)) {
+                List<String> machineNameList = new ArrayList<>();
+                String[] machineIdArr = machineIdStr.split(",");
+                for (String machineId : machineIdArr) {
+                    Long key = null;
+                    try {
+                        key = Long.valueOf(machineId);
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                        continue;
+                    }
+                    if (machineInfoMap.containsKey(key)) {
+                        GdyyMachineInfo machineInfo = machineInfoMap.get(key);
+                        machineNameList.add(machineInfo.getMachineName());
+                    }
+                }
+                dto.setMachineName(String.join(",", machineNameList));
+            }
         }
         return list;
     }
@@ -138,6 +199,8 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
                 scheduleResult.setIsRelease(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
             }
             scheduleResult.setBaseVale(scheduleResult.getId());
+            // 根据计划量计算对应个数
+            this.calculatePlanNum(scheduleResult);
             saveOrUpdate(scheduleResult);
         } else {
             // 插单操作，直接调用引擎插单接口
@@ -148,6 +211,34 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
             gdyyEngineService.insertGdyyOrder(scheduleResultDto);
             this.insetDispatcherLogInsertOrder(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResults, scheduleResult);
         }
+    }
+
+    /**
+     * 根据计划量计算对应个数
+     * @param scheduleResult 计划量
+     */
+    private void calculatePlanNum(GdyyScheduleResult scheduleResult) {
+        // 标准大卷长度默认值
+        LambdaQueryWrapper<GdyyParams> paramsWrapper = new LambdaQueryWrapper<>();
+        List<GdyyParams> gdyyParamsList = gdyyParamsMapper.selectList(paramsWrapper);
+        Map<String, String> paramsMap = gdyyParamsList.stream().collect(Collectors.toMap(GdyyParams::getParamCode, GdyyParams::getParamValue, (v1, v2) -> v2));
+        Double standardSize = getDoubleOrDefault(paramsMap.get(EngineConstants.STANDARD_SIZE), DEFAULT_STANDARD_SIZE);
+        String bigRollCode = scheduleResult.getBigRollCode();
+        // 获取大卷信息
+        Map<String, BigDecimal> bigRollMap = gdyyScheduleResultMapper.listCd15BigRoll().stream()
+                .collect(Collectors.toMap(GdyyBigRollVo::getBigRollCode, GdyyBigRollVo::getClothLength));
+        // 大卷标准长度，没有则获取默认长度
+        BigDecimal newStandardSize = bigRollMap.getOrDefault(bigRollCode, BigDecimal.valueOf(standardSize));
+        BigDecimal class1Plan = BigDecimalUtil.getValue(scheduleResult.getClass1Plan());
+        BigDecimal class2Plan = BigDecimalUtil.getValue(scheduleResult.getClass2Plan());
+        BigDecimal class3Plan = BigDecimalUtil.getValue(scheduleResult.getClass3Plan());
+        // 计算大卷数 = 计划量 / 标准长度
+        BigDecimal class1PlanNum = class1Plan.divide(newStandardSize, 1, RoundingMode.UP);
+        BigDecimal class2PlanNum = class2Plan.divide(newStandardSize, 1, RoundingMode.UP);
+        BigDecimal class3PlanNum = class3Plan.divide(newStandardSize, 1, RoundingMode.UP);
+        scheduleResult.setClass1PlanNum(class1PlanNum.doubleValue());
+        scheduleResult.setClass2PlanNum(class2PlanNum.doubleValue());
+        scheduleResult.setClass3PlanNum(class3PlanNum.doubleValue());
     }
 
     /**
@@ -169,10 +260,12 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
         log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
         log.setMaterialCode(newSchedule.getBigRollCode());    //钢压大卷编号
         //操作前的信息赋值
+        log.setBeforeMachineId(oldSchedule.getMachineCode());
         log.setBeforeMidPlan(oldSchedule.getClass1Plan());
         log.setBeforeNightPlan(oldSchedule.getClass2Plan());
         log.setBeforeDayPlan(oldSchedule.getClass3Plan());
         //操作后的信息赋值
+        log.setAfterMachineId(newSchedule.getMachineCode());
         log.setAfterMidPlan(newSchedule.getClass1Plan());
         log.setAfterNightPlan(newSchedule.getClass2Plan());
         log.setAfterDayPlan(newSchedule.getClass3Plan());
@@ -203,12 +296,14 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
             Optional<GdyyScheduleResult> max = scheduleResults.stream().max(Comparator.comparing(GdyyScheduleResult::getCreateTime));
             if (max.isPresent()) {
                 GdyyScheduleResult scheduleResult = max.get();
+                log.setBeforeMachineId(scheduleResult.getMachineCode());
                 log.setBeforeMidPlan(scheduleResult.getClass1Plan());
                 log.setBeforeNightPlan(scheduleResult.getClass2Plan());
                 log.setBeforeDayPlan(scheduleResult.getClass3Plan());
             }
         }
         //操作后的信息赋值
+        log.setAfterMachineId(newSchedule.getMachineCode());
         log.setAfterMidPlan(newSchedule.getClass1Plan());
         log.setAfterNightPlan(newSchedule.getClass2Plan());
         log.setAfterDayPlan(newSchedule.getClass3Plan());
@@ -228,13 +323,55 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
     }
 
     /**
+     * 给mes发送排程下发通知
+     *
+     * @param scheduleDate 排产日
+     * @param dataVersion  数据版本
+     * @param rowCount     同步记录数据
+     */
+    @Override
+    public void publishNoticeMes(Date scheduleDate, String dataVersion, int rowCount) {
+        // 厂别、分公司编号
+        String factoryCode = factoryService.getFactoryCode();
+        String companyCode = factoryService.getCompanyCode();
+        //数据同步到中间库后，往mq中发送消息通知MES去取数据
+        SyncParamsVO syncParamsVO = new SyncParamsVO();
+        syncParamsVO.setSyncKey(ApsConstant.GDYY_DEPLOY_SYNC_KEY);
+        syncParamsVO.setDataVersion(dataVersion);
+        // 请求参数
+        JSONObject params = new JSONObject();
+        params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+        params.put("rowCount", rowCount);
+        syncParamsVO.setParams(params);
+        syncParamsVO.setFactoryCode(factoryCode);
+        syncParamsVO.setCompanyCode(companyCode);
+        gdyySyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
+    }
+
+    /**
+     * 更新指定相关数据记录的发布状态
+     *
+     * @param dataVersion 数据版本
+     * @param ids         排程ID列表
+     * @param status      更新的状态
+     */
+    @Override
+    public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
+        gdyyScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                .boxed().collect(Collectors.toList()), status);
+        gdyyScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
+    }
+
+    /**
      * 批量删除钢带压延排程结果信息维护
      *
      * @param ids 需要删除的钢带压延排程结果信息维护ID
      */
     @Override
     public void deleteScheduleResultByIds(long[] ids) {
-        gdyyScheduleResultMapper.deleteByIds(ids);
+        gdyyScheduleResultMapper.deleteByIds(Arrays.stream(ids)
+                .boxed()
+                .collect(Collectors.toList()));
     }
 
     /**
@@ -279,6 +416,7 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
                 Row row = sheet.createRow(i + 2);
 //                row.createCell(cellNum++).setCellValue(DateFormatUtils.format(scheduleResult.getScheduleDate(), "yyyy-MM-dd"));
                 row.createCell(cellNum++).setCellValue(scheduleResult.getBigRollCode());
+                row.createCell(cellNum++).setCellValue(scheduleResult.getMachineName());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getDayUsed() == null ? 0 : scheduleResult.getDayUsed());
 //                row.createCell(cellNum++).setCellValue(scheduleResult.getMonthPlan() == null ? "" : scheduleResult.getMonthPlan());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getMonthPlanOs() == null ? 0 : Double.parseDouble(scheduleResult.getMonthPlanOs()));
@@ -298,12 +436,12 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass2PlanNoStockNum() == null ? 0 : scheduleResult.getClass2PlanNoStockNum());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass2Finish() == null ? 0 : scheduleResult.getClass2Finish());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass2Remark() == null ? "" : scheduleResult.getClass2Remark());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getClass3Plan() == null ? 0 : scheduleResult.getClass3Plan());
+                /*row.createCell(cellNum++).setCellValue(scheduleResult.getClass3Plan() == null ? 0 : scheduleResult.getClass3Plan());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass3PlanNum() == null ? 0 : scheduleResult.getClass3PlanNum());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass3PlanNoStock() == null ? 0 : scheduleResult.getClass3PlanNoStock());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass3PlanNoStockNum() == null ? 0 : scheduleResult.getClass3PlanNoStockNum());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getClass3Finish() == null ? 0 : scheduleResult.getClass3Finish());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getClass3Remark() == null ? "" : scheduleResult.getClass3Remark());
+                row.createCell(cellNum++).setCellValue(scheduleResult.getClass3Remark() == null ? "" : scheduleResult.getClass3Remark());*/
                 row.createCell(cellNum).setCellValue(scheduleResult.getRemark() == null ? "" : scheduleResult.getRemark());
                 setCellStyle(row, row.getPhysicalNumberOfCells(), cellStyle);
             }
@@ -326,9 +464,11 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
             String baseInfo=I18nUtil.getMessage("ui.data.column.scheduleResult.gdyy.baseInfo");
             String class1Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.zhongban");
             String class2Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.yeban");
-            String class3Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.baiban");
+//            String class3Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.baiban");
             String totalQty=I18nUtil.getMessage("ui.data.column.scheduleResult.totalQty");
-            String planInfo = '：'+class1Plan+'：'+midPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class2Plan+'：'+nightPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class3Plan+'：'+dayPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+totalQty+'：'+(midPlan.add(nightPlan).add(dayPlan)).setScale(0,BigDecimal.ROUND_HALF_UP);
+            String planInfo = '：'+class1Plan+'：'+midPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class2Plan+'：'+nightPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
+//                    +class3Plan+'：'+dayPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
+                    +totalQty+'：'+(midPlan.add(nightPlan).add(dayPlan)).setScale(0,BigDecimal.ROUND_HALF_UP);
             baseInfo=dateStr+baseInfo+planInfo;
             Cell cell0=sheet.getRow(0).getCell(0);
             CellStyle cellStyle0=cell0.getCellStyle();
@@ -397,7 +537,7 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
      * @param ids            要发布的排程结果id
      */
     @Override
-    public void publish(GdyyScheduleResult scheduleResult, long[] ids) {
+    public void publish(GdyyScheduleResult scheduleResult, long[] ids, String dataVersion) {
         //保存发布日志
         SchedulePublishRecord record = new SchedulePublishRecord();
         record.setBaseVale(null);
@@ -405,6 +545,7 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
         record.setScheduleDate(scheduleResult.getScheduleDate());
         record.setPublishStatus(ApsConstant.IS_RELEASE);
         gdyyScheduleResultMapper.insertPublishRecord(record);
+        this.deployGdyyScheduleToMid(scheduleResult.getScheduleDate(), ids, dataVersion);
 
         if (ids == null || ids.length == 0) {
             //设置更新人和更新时间
@@ -413,8 +554,25 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
             gdyyScheduleResultMapper.publishAll(scheduleResult);
         } else {
             // ids不为空，发布指定记录，需求暂未变更，变更后测试
-            gdyyScheduleResultMapper.batchUpdate(ids, ApsConstant.IS_RELEASE);
+            gdyyScheduleResultMapper.batchUpdate(Arrays.stream(ids)
+                    .boxed().collect(Collectors.toList()), ApsConstant.IS_RELEASE);
         }
+    }
+
+
+    /**
+     * 把排程数据发布到中间库
+     *
+     * @param scheduleDate 排程日期
+     * @param ids          排程id
+     */
+    private void deployGdyyScheduleToMid(Date scheduleDate, long[] ids, String dataVersion) {
+        // 厂别、分公司编号
+        String factoryCode = factoryService.getFactoryCode();
+        String companyCode = factoryService.getCompanyCode();
+        // 把排程数据同步到接口中间库中
+        gdyyScheduleResultMapper.deployGdyyScheduleToMid(dataVersion, scheduleDate, ids, factoryCode, companyCode,
+                DateUtils.getNowDate());
     }
 
     /**
@@ -458,8 +616,25 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
         List<GdyyScheduleResultDto> importList = new ArrayList<>();
 
         try {
+            //将机台名称转为机台code
+            GdyyMachineInfo gdyyMachineInfo = new GdyyMachineInfo();
+            gdyyMachineInfo.setStatus("0");
+            List<GdyyMachineInfo> machineInfoList = gdyyMachineInfoMapper.selectMachineInfoList(gdyyMachineInfo);
+            if (CollectionUtils.isEmpty(machineInfoList)) {
+                // 未查询到机台信息
+                String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
+                addImportErrorLog(importLogId, null, message, importErrorLogs);
+                return AjaxResult.error(message, importErrorLogs);
+            }
+            //根据机台名称去重
+            TreeSet<GdyyMachineInfo> treeSet = new TreeSet<>(Comparator.comparing(GdyyMachineInfo::getMachineName));
+            treeSet.addAll(machineInfoList);
+            machineInfoList = new ArrayList<>(treeSet);
+
+            Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(GdyyMachineInfo::getMachineName, GdyyMachineInfo::getId));
+
             //按业务主键分组
-            Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(GdyyScheduleResultDto::getBigRollCode, Collectors.counting()));
+            Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(item -> String.join("|", item.getBigRollCode(), item.getMachineCode()), Collectors.counting()));
             for (int i = 0; i < list.size(); i++) {
                 GdyyScheduleResultDto scheduleResultDto = list.get(i);
                 scheduleResultDto.setDataSource("2");
@@ -467,10 +642,20 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
                 int errorNum = i + 3;
                 List<ImportErrorLog> validated = ImportUtil.validated(importLogId, errorNum, scheduleResultDto);
 
-                if (groupMap.get(scheduleResultDto.getBigRollCode()) > 1) {
+                if (groupMap.get(String.join("|", scheduleResultDto.getBigRollCode(), scheduleResultDto.getMachineCode())) > 1) {
                     // 代表重复的记录
                     String message = I18nUtil.getMessage("ui.data.column.scheduleResult.conflictRecord");
                     addImportErrorLog(importLogId, errorNum, message, validated);
+                }
+
+                // 机台code 转为机台id
+                if (scheduleResultDto.getMachineCode() != null && scheduleResultDto.getMachineCode().indexOf(",") > 0) {
+                    String message = I18nUtil.getMessage("ui.data.column.machine.produceLineValidate");
+                    message = String.format(message, i + 3, I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine"));
+                    addImportErrorLog(importLogId, i + 3, message, validated);
+                }
+                if (machineCodeMap.get(scheduleResultDto.getMachineCode()) == null) {
+                    addImportErrorLog(importLogId, i + 3, I18nUtil.getMessage("ui.error.message.column.produceLineNotExist"), validated);
                 }
 
                 if (CollectionUtils.isNotEmpty(validated)) {
@@ -478,7 +663,9 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
                     importErrorLogs.addAll(validated);
                 } else {
                     successNum++;
+                    scheduleResultDto.setMachineCode(machineCodeMap.get(scheduleResultDto.getMachineCode()) + "");
                     scheduleResultDto.setBaseVale(null);
+                    scheduleResultDto.setDataSource(EngineConstants.SCHEDULE_DATA_SOURCE_IMPORT);
                     importList.add(scheduleResultDto);
                 }
 
@@ -500,7 +687,7 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
 					failureNum += engineImportErrorLogs.size();
 				}
 			}
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             // 执行sql失败，插入导入失败记录
@@ -614,5 +801,54 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
         d1 = ObjectUtils.isEmpty(d1) ? 0D : d1;
         d2 = ObjectUtils.isEmpty(d2) ? 0D : d2;
         return d1.equals(d2);
+    }
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list        要导入数据
+     * @param importLogId 导入日志id
+     * @return 导入后提示信息
+     */
+    @Override
+    public AjaxResult importFinishQty(List<GdyyDayFinishQty> list, Long importLogId) {
+        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.GDYY);
+    }
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @Override
+    public AjaxResult getSummaryVo(GdyyScheduleResultDto scheduleResult) {
+        ScheduleSummaryVo summaryVo = gdyyScheduleResultMapper.getSummaryVo(scheduleResult);
+        if (summaryVo == null) {
+            summaryVo = new ScheduleSummaryVo();
+            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
+        }
+        ScheduleSummaryVo lastDayPlanQtySummaryVo = gdyyScheduleResultMapper.getLastDayPlanQty(scheduleResult);
+        Double lastDayPlanQty = null;
+        if (lastDayPlanQtySummaryVo != null) {
+            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
+            summaryVo.setLastDayPlanQty(lastDayPlanQty);
+        }
+        ScheduleSummaryVo cxConsumeSummaryVo = null;
+        Double cxConsumeQty = null;
+        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineCode())) {
+            cxConsumeSummaryVo = gdyyScheduleResultMapper.getCxConsume(scheduleResult);
+        }
+        if (cxConsumeSummaryVo != null) {
+            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
+            summaryVo.setCxConsumeQty(cxConsumeQty);
+        }
+        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
+        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
+        if (lastDayPlanQty != null && cxConsumeQty != null) {
+            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
+        }
+        return AjaxResult.success(summaryVo);
     }
 }

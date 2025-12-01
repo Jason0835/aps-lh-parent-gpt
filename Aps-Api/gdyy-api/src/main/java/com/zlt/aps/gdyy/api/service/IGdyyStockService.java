@@ -23,7 +23,7 @@ public interface IGdyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/gdyy/stock/list")
     TableDataInfo list(@RequestBody GdyyStock stock);
 
     /**
@@ -32,7 +32,7 @@ public interface IGdyyStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/gdyy/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface IGdyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/gdyy/stock")
     AjaxResult add(@Validated @RequestBody GdyyStock stock);
 
 
@@ -51,7 +51,7 @@ public interface IGdyyStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/gdyy/stock/selectStockById/{id}")
     GdyyStock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -60,7 +60,7 @@ public interface IGdyyStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/gdyy/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface IGdyyStockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/gdyy/stock")
     AjaxResult edit(@Validated @RequestBody GdyyStock stock);
 
     /**
@@ -78,15 +78,15 @@ public interface IGdyyStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/gdyy/stock/exportList")
     List<GdyyStock> exportList(@RequestBody GdyyStock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/gdyy/stock/importData")
     @ApiOperation("导入钢带压延库存信息")
     public AjaxResult importData(@RequestBody List<GdyyStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 
-    @GetMapping("/stock/isRollStock")
+    @GetMapping("/gdyy/stock/isRollStock")
     @ApiOperation("判断是否按大卷计算库存")
     public Boolean isRollStock();
 }

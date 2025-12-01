@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"胎面定点机台接口"})
 @RestController
-@RequestMapping("/specifyMachine")
+@RequestMapping("/tc/specifyMachine")
 public class TcSpecifyMachineController extends BaseController {
 
     @Resource
     private TcSpecifyMachineService tcSpecifyMachineService;
 
     @ApiOperation("根据条件查询定点机台列表")
-    @GetMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(TcSpecifyMachineDto dto) {
+    @PostMapping("/listSpecifyMachine")
+    public TableDataInfo listSpecifyMachine(@RequestBody TcSpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<TcSpecifyMachineDto> list = tcSpecifyMachineService.listSpecifyMachine(dto);
@@ -80,8 +80,8 @@ public class TcSpecifyMachineController extends BaseController {
 
     @Log(title = "ui.tc.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<TcSpecifyMachineDto> exportData(TcSpecifyMachineDto dto) {
+    @PostMapping("/exportData")
+    public List<TcSpecifyMachineDto> exportData(@RequestBody TcSpecifyMachineDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<TcSpecifyMachineDto> list = tcSpecifyMachineService.listSpecifyMachine(dto);

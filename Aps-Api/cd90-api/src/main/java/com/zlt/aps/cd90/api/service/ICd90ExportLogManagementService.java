@@ -44,6 +44,6 @@ public interface ICd90ExportLogManagementService {
      *
      * @param dto 查询条件
      */
-    @GetMapping("/cd90/exportLogManagement/exportData")
-    List<Cd90ExportLogManagementDto> exportData(@SpringQueryMap Cd90ExportLogManagementDto dto);
+    @PostMapping("/cd90/exportLogManagement/exportData")
+    List<Cd90ExportLogManagementDto> exportData(@RequestBody Cd90ExportLogManagementDto dto);
 }

@@ -1,12 +1,11 @@
 package com.zlt.aps.gsq.engine.vo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
@@ -131,10 +130,69 @@ public class GsqScheduleResultVo extends ApsBaseDto {
     private Date newestPublishTime;
 
     /**
+     * 寸口
+     */
+    private BigDecimal dimension;
+
+    /**
+     * 前日早班计划
+     */
+    private Double LastMidTqPlanQty;
+
+    /**
+     * 前日胎圈夜班计划
+     */
+    private Double lastNightTqPlanQty;
+
+    /**
+     * 前日胎圈早班计划
+     */
+    private Double LastMidPlanQty;
+
+    /**
      * 不需要参与生产顺序排程tag。值不为空，表示不需要参与排序
      */
     private Integer notOrderTag;
 
+    /**
+     * 第二天胎圈早班计划
+     */
+    private Double tqClass1PlanQty;
+
+    /**
+     * 第二天胎圈夜班计划
+     */
+    private Double tqClass2PlanQty;
+
+
+    /**
+     * 交接班库存
+     */
+    private Double classStock;
+
+    /**
+     * 库存供需比例，交接班库存/胎圈一天需求量
+     */
+    private Double SupplyDemandRatio;
+
+    /**
+     * 预计库存
+     */
+    private Double planStockQty;
+
+    /**
+     * 收尾规格
+     */
+    private String closeOutSpecFlag;
+
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
+
+    /**
+     * 虚拟字段，用于排序
+     * @return
+     */
+    public Double getNextDayTotalQty() {
+        return BigDecimalUtil.add(this.nightPlanQty, this.dayPlanQty);
+    }
 }

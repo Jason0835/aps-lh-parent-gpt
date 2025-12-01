@@ -1,8 +1,8 @@
 package com.zlt.aps.cd90.engine.vo;
 
-import java.math.BigDecimal;
-
 import lombok.Data;
+
+import java.math.BigDecimal;
 
 /**
  * 排产均衡值对象
@@ -22,6 +22,10 @@ public class Cd90EquilibriumVo {
 	 */
 	private BigDecimal nightPlanQty;
 	/**
+     * 次日早班计划总计值
+     */
+    private BigDecimal nextDayPlanQty;
+    /**
 	 * 差异率
 	 */
 	private BigDecimal differenceRate;

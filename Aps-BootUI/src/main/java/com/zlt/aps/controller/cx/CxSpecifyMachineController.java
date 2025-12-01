@@ -39,7 +39,7 @@ import java.util.List;
  * 定点机台Controller
  *
  * @author zlt
- * @date 2021-07-21
+ * @date 2025-02-25
  */
 @Api(tags = "定点机台")
 @Controller
@@ -47,7 +47,7 @@ import java.util.List;
 public class CxSpecifyMachineController extends BaseController {
 
     @Autowired
-    private ICxSpecifyMachineService iCxSpecifyMachine1Service;
+    private ICxSpecifyMachineService cxSpecifyMachineService;
 
     @Autowired
     private IImportLogService iImportLogService;
@@ -58,36 +58,6 @@ public class CxSpecifyMachineController extends BaseController {
     @Autowired
     private IImportErrorLogService iImportErrorLogService;
 
-
-    private String prefix = "cx/cxSpecifyMachine";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("cx:cxSpecifyMachine:view")
-    @GetMapping()
-    public String operlog() {
-        return prefix + "/cxSpecifyMachine";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("cxSpecifyMachine1", new CxSpecifyMachine());
-        return prefix + "/edit";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("cxSpecifyMachine1", iCxSpecifyMachine1Service.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询定点机台列表
      */
@@ -96,7 +66,7 @@ public class CxSpecifyMachineController extends BaseController {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(CxSpecifyMachine entity) {
-        return iCxSpecifyMachine1Service.list(entity);
+        return cxSpecifyMachineService.list(entity);
     }
 
     /**
@@ -108,13 +78,13 @@ public class CxSpecifyMachineController extends BaseController {
     @ResponseBody
     public AjaxResult editSave(CxSpecifyMachine cxSpecifyMachine) {
         AjaxResult ajaxResult = null;
-        if (UserConstants.NOT_UNIQUE.equals(iCxSpecifyMachine1Service.checkCxSpecifyMachine1Unique(cxSpecifyMachine))) {
+        if (UserConstants.NOT_UNIQUE.equals(cxSpecifyMachineService.checkCxSpecifyMachine1Unique(cxSpecifyMachine))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cx.cxSpecifyMachine.UniqueCheck"));
         }
         if (cxSpecifyMachine.getId() != null) {
-            ajaxResult = iCxSpecifyMachine1Service.edit(cxSpecifyMachine);
+            ajaxResult = cxSpecifyMachineService.edit(cxSpecifyMachine);
         } else {
-            ajaxResult = iCxSpecifyMachine1Service.add(cxSpecifyMachine);
+            ajaxResult = cxSpecifyMachineService.add(cxSpecifyMachine);
         }
         return ajaxResult;
     }
@@ -128,7 +98,7 @@ public class CxSpecifyMachineController extends BaseController {
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iCxSpecifyMachine1Service.remove(arr);
+        return cxSpecifyMachineService.remove(arr);
     }
 
     /**
@@ -139,7 +109,7 @@ public class CxSpecifyMachineController extends BaseController {
     @GetMapping("/export")
     @ResponseBody
     public void export(HttpServletResponse response, CxSpecifyMachine cxSpecifyMachine) throws IOException {
-        List<CxSpecifyMachine> list = iCxSpecifyMachine1Service.getList(cxSpecifyMachine);
+        List<CxSpecifyMachine> list = cxSpecifyMachineService.getList(cxSpecifyMachine);
         ExcelUtil<CxSpecifyMachine> util = new ExcelUtil(CxSpecifyMachine.class);
         String fileName = I18nUtil.getMessage("ui.cx.cxSpecifyMachine.export.fileName");
         Workbook workbook = util.exportExcel2(response, list, fileName);
@@ -177,12 +147,10 @@ public class CxSpecifyMachineController extends BaseController {
 
         ExcelUtil<CxSpecifyMachine> util = new ExcelUtil<>(CxSpecifyMachine.class);
         List<CxSpecifyMachine> list = util.importExcel(in);
-        AjaxResult ajaxResult = iCxSpecifyMachine1Service.importData(list, updateSupport, importLog.getId());
+        AjaxResult ajaxResult = cxSpecifyMachineService.importData(list, updateSupport, importLog.getId());
         // 更新日志记录成功数，失败数
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
         ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
         return ajaxResult;
     }
-
-
 }

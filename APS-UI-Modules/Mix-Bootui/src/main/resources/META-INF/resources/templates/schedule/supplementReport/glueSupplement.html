@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('胶料生产补量历史记录')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.scheduleReport.scheduleDate}]]：</label>
+                            <input id="scheduleDate" type="text" class="time-input" placeholder="yyyy-MM-dd"
+                                   th:value="${initDate}" name="scheduleDate" required="true"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleReport.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@setting.scheduleMixAreaPermission()}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="searchData()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="exportData()" shiro:hasPermission="schedule:glueSupplementReport:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueSupplementReport";
+    var recipeStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+
+    $(function () {
+        var baseTitle = getBaseTitle(); // 表头文字
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            modalName: [[#{schedule.glueScheduleResult.supplement.glueReport}]],
+            pageSize: 10000,
+            pageList: [10000],
+            queryParams: queryParams,
+            columns: [
+                [
+                    {
+                        title: baseTitle,
+                        align: 'center',
+                        colspan: 7
+                    },
+                    {
+                        title: [[#{schedule.glueScheduleResult.mid}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.glueScheduleResult.night}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                    {
+                        title: [[#{schedule.glueScheduleResult.day}]],
+                        align: 'center',
+                        colspan: 2
+                    },
+                ],
+                [
+                    {
+                        field: 'id',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'machineName',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.glueScheduleResult.br.machineName}]]
+                    },
+                    {
+                        field: 'glue',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'left',
+                        title: [[#{schedule.glueScheduleResult.glue}]],
+                    },
+                    {
+                        field: 'recipeTypeName',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.glueScheduleResult.br.recipeTypeName}]],
+                    },
+                    {
+                        field: 'recipeVersionId',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.glueScheduleResult.br.recipeVersionId}]],
+                    },
+                    {
+                        field: 'recipeStage',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.glueScheduleResult.br.recipeStage}]],
+                        formatter: function (value, row, index) {
+                        	return $.table.selectDictLabel(recipeStageData, value);
+                        },
+                    },
+                    {
+                        field: 'totalPlanQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.total.br}]],
+                    },
+                    {
+                        field: 'midCapacity',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.capacity.br}]],
+                    },
+                    {
+                        field: 'midPlanQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.plan}]],
+                    },
+                    {
+                        field: 'nightCapacity',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.capacity.br}]],
+                    },
+                    {
+                        field: 'nightPlanQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.plan}]],
+                    },
+                    {
+                        field: 'dayCapacity',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.capacity.br}]],
+                    },
+                    {
+                        field: 'dayPlanQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'right',
+                        title: [[#{schedule.glueScheduleResult.supplement.plan}]],
+                    }
+                ]
+            ]
+        };
+        $.table.init(options, true);
+    });
+    
+    /* 生成表头文字*/
+    function getBaseTitle() {
+        var mixArea = $("#mixArea").val();
+        var scheduleDate = $("#scheduleDate").val();
+        var tableTitle = [[#{schedule.glueScheduleResult.tableTitle}]];
+        
+        var title
+        if ($.common.isEmpty(mixArea) && $.common.isEmpty(scheduleDate)) {
+            title = baseInfo;
+        } else {
+            if ($.common.isEmpty(mixArea)) {
+                title = $.common.sprintf(tableTitle, scheduleDate, '-');
+            } else if ($.common.isEmpty(scheduleDate)) {
+                title = $.common.sprintf(tableTitle, '-', mixArea);
+            } else {
+                title = $.common.sprintf(tableTitle, scheduleDate, mixArea);
+            }
+
+        }
+        return title;
+    }
+    
+    /**
+     * 查询参数
+     * @param params
+     * @returns {*}
+     */
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        search.mixArea = $('#mixArea').val();
+        search.scheduleDate = $('#scheduleDate').val();
+        return search;
+    }
+
+    function searchData() {
+    	// 查询前校验查询条件
+    	if (validateCondition()) {
+    		//$.table.search();
+    		var columns = table.options.columns;
+        	columns[0][0].title = getBaseTitle();
+        	$('#bootstrap-table').bootstrapTable('refreshOptions', {columns: columns});
+    	}
+    }
+    
+    function exportData() {
+    	// 导出前校验查询条件
+    	if (validateCondition()) {
+    		$.table.exportUiExcel();
+    	}
+    }
+    
+    // 查询条件校验
+    function validateCondition() {
+    	var scheduleDate = $("#scheduleDate").val();
+    	if ($.common.isEmpty(scheduleDate)) {
+			$.modal.msgWarning([[#{schedule.scheduleReport.scheduleDate.notEmpty}]]);
+			return false;
+    	}
+    	return true;
+    }
+</script>
+</body>
+<style>
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+    .pagination-detail{margin-top: 0px !important;margin-bottom: 0px !important;}
+    .select-table{padding-bottom: 0px !important;}
+    button.btn.btn-default.btn-sm.editable-cancel {display: none}
+</style>
+</html>

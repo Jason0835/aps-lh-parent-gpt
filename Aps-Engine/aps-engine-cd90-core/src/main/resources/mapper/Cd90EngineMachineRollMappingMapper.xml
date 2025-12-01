@@ -4,7 +4,7 @@
 	<!-- 查询大卷与机台的映射配置信息 -->
     <select id="selectCd90MachineRollMappingList" resultType="com.zlt.aps.cd90.engine.vo.Cd90MachineRollMappingVo">
 		SELECT big_roll_code,
-		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		       GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
 		  FROM T_CD90_MACHINE_ROLL_MAPPING M
 		  LEFT JOIN T_CD90_MACHINE_INFO MI
 		    ON MI.ID = M.MACHINE_ID

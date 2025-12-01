@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('日计划每日报表统计')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.scheduleReport.scheduleDate}]]：</label>
+                            <input id="queryStartDate" type="text" class="time-input" placeholder="yyyy-MM-dd"
+                                   th:value="${initDate}" name="queryStartDate" required="true"/>
+                            <span style='color: black;'>-</span>
+                            <input id="queryEndDate" type="text" class="time-input" placeholder="yyyy-MM-dd"
+                                   th:value="${initDate}" name="queryEndDate" required="true"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleReport.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@setting.scheduleMixAreaPermission()}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleReport.procedure}]]：</label>
+                            <select id="procedure" class="form-control" name="procedure"
+                                    th:with="type=${@dict.getType('REPORT_PROCEDURE_CODE')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleOrderReport.summaryType}]]：</label>
+                            <select id="summaryType" class="form-control" name="summaryType"
+                                    th:with="type=${@dict.getType('SUMMARY_TYPE')}">
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="searchData()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="exportData()" shiro:hasPermission="schedule:scheduleReport:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-fixed-columns-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/scheduleOrderReport";
+    var mixAreaDatas = [[${@dict.getType('MIX_AREA')}]];
+    var majorDatas = [[${@dict.getType('REPORT_PROCEDURE_CODE')}]];
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{schedule.scheduleOrderReport.modelName}]],
+            fixedColumns: true,
+            pageSize: 10000,
+            pageList: [10000],
+            columns: [
+                    {
+                        field: 'scheduleDate',
+                        sortable: true,
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleReport.scheduleDate}]]
+                    },
+                    {
+                        field: 'mixArea',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleReport.mixArea}]]
+                    },
+                    {
+                        field: 'procedure',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleReport.procedure}]],
+	                    formatter: function (value, row, index) {
+	                        return $.table.selectDictLabel(majorDatas, value);
+	                    }
+                    },
+                    {
+                        field: 'orderQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOrderReport.orderQty}]],
+                    },
+                    {
+                        field: 'planSpec',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOrderReport.planSpec}]],
+                    },
+                    {
+                        field: 'planQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOrderReport.planQty}]],
+                    },
+                    {
+                        field: 'finishQty',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOrderReport.finishQty}]],
+                    },
+                    {
+                        field: 'finishRate',
+                        halign: 'center',
+                        valign: 'middle',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOrderReport.finishRate}]],
+                    },
+            ]
+        };
+        $.table.init(options, true);
+    });
+    
+    function searchData() {
+    	// 查询前校验查询条件
+    	if (validateCondition()) {
+    		$.table.search();
+    	}
+    }
+    
+    function exportData() {
+    	// 导出前校验查询条件
+    	if (validateCondition()) {
+    		$.table.exportUiExcel();
+    	}
+    }
+    
+    // 查询条件校验
+    function validateCondition() {
+    	var startDate = $("#queryStartDate").val();
+    	var endDate = $("#queryEndDate").val();
+    	if ($.common.isEmpty(startDate) || $.common.isEmpty(endDate)) {
+			$.modal.msgWarning([[#{schedule.scheduleReport.scheduleDate.notEmpty}]]);
+			return false;
+    	}
+		var startTime = new Date(startDate).getTime();
+		var endTime = new Date(endDate).getTime();
+		if (startTime > endTime) {
+			$.modal.msgWarning([[#{schedule.scheduleReport.scheduleDate.late}]]);
+			return false;
+		} else {
+			var time = parseInt((endTime - startTime) / (1000 * 60 * 60 * 24))
+			if (time >= 31) {
+				$.modal.msgWarning([[#{schedule.scheduleReport.scheduleDate.large}]]);
+				return false;
+			}
+		}
+    	return true;
+    }
+    
+</script>
+</body>
+<style>
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+    .pagination-detail{margin-top: 0px !important;margin-bottom: 0px !important;}
+    .select-table{padding-bottom: 0px !important;}
+    button.btn.btn-default.btn-sm.editable-cancel {display: none}
+</style>
+</html>

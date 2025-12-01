@@ -23,55 +23,55 @@ public interface IXwyyAssistRequirementService {
      * 查询纤维压延外厂需求列表
      */
     @ApiOperation("查询纤维压延外厂需求列表")
-    @PostMapping("/assistRequirement/list")
+    @PostMapping("/xwyy/assistRequirement/list")
     TableDataInfo list(@RequestBody XwyyAssistRequirement xwyyAssistRequirement);
 
     /**
     * 新增纤维压延外厂需求
     */
     @ApiOperation("新增纤维压延外厂需求")
-    @PostMapping("/assistRequirement/add")
+    @PostMapping("/xwyy/assistRequirement/add")
     AjaxResult add(@RequestBody XwyyAssistRequirement xwyyAssistRequirement);
 
     /**
      * 修改纤维压延外厂需求
      */
     @ApiOperation("修改纤维压延外厂需求")
-    @PostMapping("/assistRequirement/edit")
+    @PostMapping("/xwyy/assistRequirement/edit")
     AjaxResult edit(@RequestBody XwyyAssistRequirement xwyyAssistRequirement);
 
     /**
      * 删除纤维压延外厂需求
      */
     @ApiOperation("删除纤维压延外厂需求")
-    @DeleteMapping("/assistRequirement/{ids}")
+    @DeleteMapping("/xwyy/assistRequirement/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/assistRequirement/{id}")
+    @GetMapping(value = "/xwyy/assistRequirement/{id}")
     XwyyAssistRequirement getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验纤维压延外厂需求唯一性
      */
     @ApiOperation("校验纤维压延外厂需求唯一性")
-    @PostMapping("/assistRequirement/checkXwyyAssistRequirementUnique")
+    @PostMapping("/xwyy/assistRequirement/checkXwyyAssistRequirementUnique")
     String checkXwyyAssistRequirementUnique(@RequestBody XwyyAssistRequirement xwyyAssistRequirement);
 
     /**
      * 导出纤维压延外厂需求列表
      */
     @ApiOperation("导出纤维压延外厂需求列表")
-    @PostMapping("/assistRequirement/getList")
+    @PostMapping("/xwyy/assistRequirement/getList")
     List<XwyyAssistRequirement> getList(@RequestBody XwyyAssistRequirement xwyyAssistRequirement);
 
     /**
      * 导入纤维压延外厂需求数据
      */
     @ApiOperation("导入纤维压延外厂需求")
-    @PostMapping("/assistRequirement/importData")
+    @PostMapping("/xwyy/assistRequirement/importData")
     public AjaxResult importData(@RequestBody List<XwyyAssistRequirement> list, @RequestParam("importLogId") Long importLogId, @RequestParam("scheduleDate")String scheduleDate);
 }

@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyBigRollColorDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -53,8 +52,8 @@ public interface XwyyBigRollColorService {
      *
      * @param dto
      */
-    @GetMapping("/xwyyBigRollColor/exportData")
-    List<XwyyBigRollColorDto> exportData(@SpringQueryMap XwyyBigRollColorDto dto);
+    @PostMapping("/xwyyBigRollColor/exportData")
+    List<XwyyBigRollColorDto> exportData(@RequestBody XwyyBigRollColorDto dto);
 
     /**
      * 导入数据

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.LhMonthPlanSurplusEntityMapper">
+
+    <update id="updateMonthPlanQty">
+        update T_LH_MONTH_PLAN_SURPLUS a
+        set MONTH_PLAN_QTY = (select ifnull(sum(PRODUCTION_QTY), 0)
+                              from t_lh_month_plan_surplus_detail b
+                              where IS_DELETE = 0
+                                and b.YEAR = a.YEAR
+                                and b.MONTH = a.MONTH
+                                and b.FACTORY_CODE = a.FACTORY_CODE
+                                and b.PRODUCT_CODE = a.PRODUCT_CODE
+                                and b.SPEC_CODE = a.SPEC_CODE),
+            MONTH_REMAIN_QTY = greatest(0, ifnull(MONTH_PLAN_QTY, 0) - ifnull(MONTH_FINISH_QTY, 0))
+        where IS_DELETE = 0
+        <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
+        and (YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE) in
+        <foreach collection="collection" item="item" open="(" separator="," close=")">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.productCode}, #{item.specCode})
+        </foreach>
+    </update>
+
+    <select id="queryByFactoryAndSpecCodes" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus">
+        SELECT
+        ID,
+        MONTH_PLAN_APS_VERSION   AS monthPlanApsVersion,
+        MONTH_PLAN_VERSION       AS monthPlanVersion,
+        YEAR,
+        MONTH,
+        FACTORY_CODE             AS factoryCode,
+        PRODUCT_CODE             AS productCode,
+        SPEC_CODE                AS specCode,
+        MONTH_PLAN_QTY           AS monthPlanQty,
+        LAST_MONTH_STOCK         AS lastMonthStock,
+        SPEC_BAD_QTY             AS specBadQty,
+        MONTH_FINISH_QTY         AS monthFinishQty,
+        MONTH_REMAIN_QTY         AS monthRemainQty,
+        DATA_SOURCE              AS dataSource
+        FROM T_LH_MONTH_PLAN_SURPLUS
+        WHERE FACTORY_CODE = #{factoryCode}
+        AND YEAR = #{year}
+        AND MONTH = #{month}
+        AND SPEC_CODE IN
+        <foreach collection="specCodes" item="specCode" open="(" separator="," close=")">
+            #{specCode}
+        </foreach>
+    </select>
+
+    <select id="selectParamList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus">
+        select *
+        from T_LH_MONTH_PLAN_SURPLUS
+        where IS_DELETE = 0
+        <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
+        and (YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.productCode}, #{item.specCode})
+        </foreach>
+    </select>
+</mapper>

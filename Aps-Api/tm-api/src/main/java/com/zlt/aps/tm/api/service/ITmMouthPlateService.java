@@ -64,7 +64,7 @@ public interface ITmMouthPlateService {
      */
     @PostMapping("/tm/mouthPlate/exportData")
     @ApiOperation("导出胎面口型板信息")
-    public List<TmMouthPlateDto> exportData(@SpringQueryMap TmMouthPlateDto dto);
+    public List<TmMouthPlateDto> exportData(@RequestBody TmMouthPlateDto dto);
 
     @PostMapping("/tm/mouthPlate/importData")
     @ApiOperation("导入胎面口型板信息")

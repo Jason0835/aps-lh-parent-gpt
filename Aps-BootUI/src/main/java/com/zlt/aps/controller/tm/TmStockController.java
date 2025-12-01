@@ -46,7 +46,7 @@ public class TmStockController extends BaseController {
     private String prefix = "tm/stock";
 
     @Autowired
-    private ITmStockService tTmStockService;
+    private ITmStockService stockService;
 
     @Autowired
     private IExportLogService iExportLogService;
@@ -79,7 +79,7 @@ public class TmStockController extends BaseController {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("tmStock", tTmStockService.selectTmStockById(id));
+        mmap.put("tmStock", stockService.selectTmStockById(id));
         mmap.put("editType", "1");
         return prefix + "/edit";
     }
@@ -89,7 +89,7 @@ public class TmStockController extends BaseController {
      */
     @GetMapping("/modifyStock/{id}")
     public String modifyStock(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("tmStock", tTmStockService.selectTmStockById(id));
+        mmap.put("tmStock", stockService.selectTmStockById(id));
         mmap.put("editType", "2");
         return prefix + "/edit";
     }
@@ -102,7 +102,7 @@ public class TmStockController extends BaseController {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TmStock tTmStock) {
-        return tTmStockService.list(tTmStock);
+        return stockService.list(tTmStock);
     }
 
     /**
@@ -114,7 +114,7 @@ public class TmStockController extends BaseController {
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return tTmStockService.remove(arr);
+        return stockService.remove(arr);
     }
 
     /**
@@ -125,7 +125,7 @@ public class TmStockController extends BaseController {
     @PostMapping("/add")
     @ResponseBody
     public AjaxResult addSave(TmStock stock) {
-        return tTmStockService.add(stock);
+        return stockService.add(stock);
     }
 
     /**
@@ -136,7 +136,14 @@ public class TmStockController extends BaseController {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(TmStock stock) {
-        return tTmStockService.edit(stock);
+        AjaxResult ajaxResult = null;
+        //id为空则是新增操作，否则是编辑
+        if (stock.getId() != null) {
+            ajaxResult = stockService.edit(stock);
+        } else {
+            ajaxResult = stockService.add(stock);
+        }
+        return ajaxResult;
     }
 
     @ApiOperation("导出胎面库存信息")
@@ -145,7 +152,7 @@ public class TmStockController extends BaseController {
     @ResponseBody
     public void export(HttpServletResponse response, TmStock stock) throws Exception {
         String fileName = I18nUtil.getMessage("ui.tm.stock.export.fileName");
-        List<TmStock> list = tTmStockService.exportList(stock);
+        List<TmStock> list = stockService.exportList(stock);
         ExcelUtil<TmStock> util = new ExcelUtil(TmStock.class);
         Workbook workbook = util.exportExcel2(response, list, fileName);
         ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, stock.toString(), ApsConstant.PROCEDURE_CODE_TM);
@@ -190,7 +197,7 @@ public class TmStockController extends BaseController {
         InputStream in = new ByteArrayInputStream(data);
         ExcelUtil<TmStock> util = new ExcelUtil<>(TmStock.class);
         List<TmStock> list = util.importExcel(in);
-        AjaxResult ajaxResult = tTmStockService.importData(list, updateSupport, importLog.getId());
+        AjaxResult ajaxResult = stockService.importData(list, updateSupport, importLog.getId());
         // 更新日志记录成功数，失败数
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
         ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);

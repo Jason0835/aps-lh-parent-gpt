@@ -21,13 +21,13 @@ public interface IXwyyScheduleAssistService {
      * 查询纤维压延外协排程结果列表
      */
     @ApiOperation("查询纤维压延外协排程结果列表")
-    @PostMapping("/assistSchedule/list")
+    @PostMapping("/xwyy/assistSchedule/list")
     TableDataInfo list(@RequestBody XwyyScheduleAssist xwyyScheduleAssist);
 
     /**
      * 导出纤维压延外协排程结果信息
      */
-    @PostMapping("/assistSchedule/export")
+    @PostMapping("/xwyy/assistSchedule/export")
     @ApiOperation("导出纤维压延外协排程结果信息")
     public byte[] export(@RequestBody XwyyScheduleAssist scheduleAssist);
 }

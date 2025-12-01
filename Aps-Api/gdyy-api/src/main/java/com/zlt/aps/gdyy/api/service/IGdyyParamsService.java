@@ -42,6 +42,6 @@ public interface IGdyyParamsService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/gdyy/params/exportData")
-    List<GdyyParamsDto> exportData(@SpringQueryMap GdyyParamsDto dto);
+    @PostMapping("/gdyy/params/exportData")
+    List<GdyyParamsDto> exportData(@RequestBody GdyyParamsDto dto);
 }

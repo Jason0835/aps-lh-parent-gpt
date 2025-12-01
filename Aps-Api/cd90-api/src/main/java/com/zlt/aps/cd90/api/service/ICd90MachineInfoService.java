@@ -22,7 +22,7 @@ public interface ICd90MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/cd90/machine/list")
     TableDataInfo list(@RequestBody Cd90MachineInfo machineInfo);
 
     /**
@@ -31,7 +31,7 @@ public interface ICd90MachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/cd90/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -40,7 +40,7 @@ public interface ICd90MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/cd90/machine")
     AjaxResult add(@Validated @RequestBody Cd90MachineInfo machineInfo);
 
     /**
@@ -49,7 +49,7 @@ public interface ICd90MachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/cd90/machine/{id}")
     Cd90MachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -58,7 +58,7 @@ public interface ICd90MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/cd90/machine")
     AjaxResult edit(@Validated @RequestBody Cd90MachineInfo machineInfo);
 
     /**
@@ -67,7 +67,7 @@ public interface ICd90MachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/cd90/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody Cd90MachineInfo machineInfo);
 
     /**
@@ -76,16 +76,16 @@ public interface ICd90MachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/cd90/machine/exportList")
     List<Cd90MachineInfo> exportList(@RequestBody Cd90MachineInfo machineInfo);
 
-    @PostMapping("/machine/list2")
+    @PostMapping("/cd90/machine/list2")
     List<Cd90MachineInfo> list2(@RequestBody Cd90MachineInfo machineInfo);
 
     /**
      * 导入数据
      */
-    @PostMapping("/machine/importData")
+    @PostMapping("/cd90/machine/importData")
     public AjaxResult importData(@RequestBody List<Cd90MachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 }

@@ -6,12 +6,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-modules</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.tc</groupId>
     <artifactId>aps-tc</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-tc</name>
     <description>胎侧工序模块</description>
 
@@ -20,22 +20,17 @@
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>com.zlt</groupId>
-            <artifactId>zlt-module-starter</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.zlt</groupId>-->
+<!--            <artifactId>zlt-module-starter</artifactId>-->
+<!--        </dependency>-->
         <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
-        <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>swagger-bootstrap-ui</artifactId>
-            <version>1.9.6</version>
-        </dependency>
-        <!--mybatis-plus-->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
-            <version>3.2.0</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.github.xiaoymin</groupId>-->
+<!--            <artifactId>swagger-bootstrap-ui</artifactId>-->
+<!--            <version>1.9.6</version>-->
+<!--        </dependency>-->
+
         <dependency>
             <groupId>com.zlt.aps.tc</groupId>
             <artifactId>aps-tc-api</artifactId>
@@ -55,54 +50,60 @@
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
-    <build>
-        <finalName>${project.artifactId}</finalName>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
+<!--    <build>-->
+<!--        <finalName>${project.artifactId}</finalName>-->
+<!--        <plugins>-->
+<!--            <plugin>-->
+<!--                <groupId>org.springframework.boot</groupId>-->
+<!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <goals>-->
+<!--                            <goal>repackage</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--        </plugins>-->
+<!--    </build>-->
 
-    <distributionManagement>
-        <snapshotRepository>
-            <id>local-snapshot</id>
-            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>
-        </snapshotRepository>
+<!--    <distributionManagement>-->
+<!--        <snapshotRepository>-->
+<!--            <id>local-snapshot</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>-->
+<!--        </snapshotRepository>-->
 
-        <repository>
-            <id>local-release</id>
-            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
-        </repository>
-    </distributionManagement>
+<!--        <repository>-->
+<!--            <id>local-release</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>-->
+<!--        </repository>-->
+<!--    </distributionManagement>-->
 
-    <repositories>
-        <repository>
-            <id>local-snapshot</id>
-            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <!-- 默认不下载快照版本，这里开启下载快照版本到本地仓库 -->
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>local-snapshot</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>-->
+<!--            <releases>-->
+<!--                <enabled>true</enabled>-->
+<!--            </releases>-->
+<!--            <snapshots>-->
+<!--                &lt;!&ndash; 默认不下载快照版本，这里开启下载快照版本到本地仓库 &ndash;&gt;-->
+<!--                <enabled>true</enabled>-->
+<!--            </snapshots>-->
+<!--        </repository>-->
+<!--    </repositories>-->
 </project>

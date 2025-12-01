@@ -29,7 +29,7 @@
         select
         <include refid="Base_Column_List" />
         from T_SERVICE_SYNC_LOG
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </select>
     <select id="checkMpsExist" resultType="java.lang.Integer">
         select case when exists(
@@ -46,7 +46,7 @@
 
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
         delete from T_SERVICE_SYNC_LOG
-        where  ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </delete>
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog" useGeneratedKeys="true">
         insert into T_SERVICE_SYNC_LOG
@@ -122,11 +122,11 @@
                     REMARK = #{remark,jdbcType=VARCHAR},
                 </if>
         </set>
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
     <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog">
         update T_SERVICE_SYNC_LOG
-        set 
+        set
             SERVICE_TYPE =  #{serviceType,jdbcType=CHAR},
             SERVICE_STATUS =  #{serviceStatus,jdbcType=CHAR},
             SERVICE_PARAMS =  #{serviceParams,jdbcType=VARCHAR},
@@ -137,7 +137,7 @@
             UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
             DEL_FLAG =  #{delFlag,jdbcType=CHAR},
             REMARK =  #{remark,jdbcType=VARCHAR}
-        where   ID = #{id,jdbcType=DECIMAL} 
+        where ID = #{id,jdbcType=DECIMAL}
     </update>
 
     <update id="mergeSql" parameterType="list">
@@ -167,11 +167,12 @@
         a.SERVICE_STATUS = b.SERVICE_STATUS,
         a.SERVICE_PARAMS = b.SERVICE_PARAMS,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (a.id, a.SERVICE_TYPE, a.SERVICE_STATUS, a.SERVICE_PARAMS, a.SERVICE_RESULT, a.CREATE_BY, a.CREATE_TIME, a.UPDATE_BY, a.UPDATE_TIME, a.DEL_FLAG, a.REMARK)
          values
-        (SEQ_SERVICE_SYNC_LOG.NEXTVAL, b.SERVICE_TYPE, b.SERVICE_STATUS, b.SERVICE_PARAMS, b.SERVICE_RESULT, b.CREATE_BY, b.CREATE_TIME, b.UPDATE_BY, sysdate, '0', b.REMARK)
+        (SEQ_SERVICE_SYNC_LOG.NEXTVAL, b.SERVICE_TYPE, b.SERVICE_STATUS, b.SERVICE_PARAMS, b.SERVICE_RESULT,
+        b.CREATE_BY, b.CREATE_TIME, b.UPDATE_BY, now(), '0', b.REMARK)
     </update>
 </mapper>

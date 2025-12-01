@@ -22,51 +22,51 @@ public interface IGsqLossSettingService {
     /**
      * 查询钢丝圈损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/gsq/loss/list")
     TableDataInfo list(@RequestBody GsqLossSettingDto dto);
 
     /**
     * 新增钢丝圈损耗率设定
     */
-    @PostMapping("/loss/add")
+    @PostMapping("/gsq/loss/add")
     AjaxResult add(@RequestBody GsqLossSettingDto dto);
 
     /**
      * 修改钢丝圈损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/gsq/loss/edit")
     AjaxResult edit(@RequestBody GsqLossSettingDto dto);
 
     /**
      * 删除钢丝圈损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/gsq/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/gsq/loss/{id}")
     GsqLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验钢丝圈损耗率设定唯一性
      */
-    @PostMapping("/loss/checkGsqLossSettingUnique")
+    @PostMapping("/gsq/loss/checkGsqLossSettingUnique")
     String checkGsqLossSettingUnique(@RequestBody GsqLossSettingDto dto);
 
     /**
      * 导出钢丝圈损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/gsq/loss/getList")
     List<GsqLossSettingDto> getList(@RequestBody GsqLossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/gsq/loss/importData")
     @ApiOperation("导入钢丝圈损耗率信息")
     public AjaxResult importData(@RequestBody List<GsqLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/gsq/loss/deleteAll")
     AjaxResult deleteAll();
 }

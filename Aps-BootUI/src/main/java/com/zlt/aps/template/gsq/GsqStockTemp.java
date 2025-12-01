@@ -1,6 +1,7 @@
 package com.zlt.aps.template.gsq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -9,7 +10,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "钢丝圈库存信息导入模板", description = "钢丝圈库存信息导入模板")
-public class GsqStockTemp {
+public class GsqStockTemp extends BaseEntity {
 
     @Excel(name = "ui.data.column.stock.stockDate", width = 30)
     @ApiModelProperty(value = "库存日期", position = 20)

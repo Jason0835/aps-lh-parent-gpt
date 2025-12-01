@@ -94,7 +94,7 @@ public class Cd90QuotaSettingController extends BaseController {
     @ApiOperation("导出90度裁断定额设定")
     //@PreAuthorize(hasPermi = "cd90:quota:export")
     @PostMapping("/export")
-    public List<Cd90QuotaSettingDto> export(Cd90QuotaSettingDto dto) {
+    public List<Cd90QuotaSettingDto> export(@RequestBody Cd90QuotaSettingDto dto) {
         dto.setOrderStr(orderStr());
         Cd90QuotaSetting setting = new Cd90QuotaSetting();
         BeanUtils.copyProperties(dto, setting);

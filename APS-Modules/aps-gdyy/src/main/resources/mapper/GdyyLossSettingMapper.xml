@@ -8,6 +8,8 @@
         <result property="id" column="id"/>
         <result property="bigRollCode" column="big_roll_code"/>
         <result property="lossRate" column="loss_rate"/>
+        <result property="machineId" column="machine_id"/>
+        <result property="machineName" column="machine_name"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>
@@ -17,19 +19,24 @@
     </resultMap>
 
     <sql id="selectGdyyLossSettingVo">
-        select id, big_roll_code, loss_rate, create_by, create_time, update_by, update_time, del_flag, remark from t_gdyy_loss_setting
+        select id, big_roll_code, machine_id, loss_rate, create_by, create_time, update_by, update_time, del_flag, remark from t_gdyy_loss_setting
     </sql>
 
     <select id="selectGdyyLossSettingList" parameterType="com.zlt.aps.gdyy.entity.GdyyLossSetting"
             resultMap="GdyyLossSettingResult">
-        <include refid="selectGdyyLossSettingVo"/>
-        where del_flag = '0'
+        select * from (
+        select a.*,b.machine_name
+        from t_gdyy_loss_setting a
+        left join T_GDYY_MACHINE_INFO b
+        on a.machine_id = b.id and b.del_flag = '0'
+        where a.del_flag = '0'
         <if test="bigRollCode != null  and bigRollCode != ''">
             and INSTR(big_roll_code, #{bigRollCode,jdbcType=VARCHAR}) > 0</if>
-        <if test="lossRate != null ">and loss_rate = #{lossRate}</if>
+        <if test="machineId != null ">and a.machine_id = #{machineId}</if>
         <if test="orderStr == null">
-            order by CREATE_TIME desc
+            order by a.CREATE_TIME desc
         </if>
+        ) t
         <if test="orderStr != null">
             order by ${orderStr}
         </if>
@@ -47,18 +54,17 @@
         where del_flag = '0'
         <if test="bigRollCode != null  and bigRollCode != ''">and big_roll_code = #{bigRollCode}</if>
         <if test="bigRollCode == null  or bigRollCode == ''">and big_roll_code is null</if>
+        <if test="machineId != null  and machineId != ''">and machine_id = #{machineId}</if>
+        <if test="machineId == null  or machineId == ''">and machine_id is null</if>
         <if test="id != null and id != ''">and id != #{id}</if>
     </select>
 
     <insert id="insertGdyyLossSetting" parameterType="com.zlt.aps.gdyy.entity.GdyyLossSetting">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_LOSS_SETTING.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_gdyy_loss_setting
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
-            <if test="bigRollCode != null">big_roll_code,</if>
+            <if test="bigRollCode != null and bigRollCode != ''">big_roll_code,</if>
+            <if test="machineId != null and machineId != ''">machine_id,</if>
             <if test="lossRate != null">loss_rate,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -69,7 +75,8 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
-            <if test="bigRollCode != null">#{bigRollCode},</if>
+            <if test="bigRollCode != null and bigRollCode != ''">#{bigRollCode},</if>
+            <if test="machineId != null and machineId != ''">#{machineId},</if>
             <if test="lossRate != null">#{lossRate},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -83,7 +90,9 @@
     <update id="updateGdyyLossSetting" parameterType="com.zlt.aps.gdyy.entity.GdyyLossSetting">
         update t_gdyy_loss_setting
         <trim prefix="SET" suffixOverrides=",">
-            <if test="bigRollCode != null">big_roll_code = #{bigRollCode},</if>
+            <if test="bigRollCode != null and bigRollCode != ''">big_roll_code = #{bigRollCode},</if>
+            <if test="bigRollCode == null or bigRollCode == ''">big_roll_code = NULL,</if>
+            machine_id = #{machineId,jdbcType=VARCHAR},
             <if test="lossRate != null">loss_rate = #{lossRate},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
@@ -97,46 +106,43 @@
 
     <delete id="deleteGdyyLossSettingById" parameterType="Long">
         update t_gdyy_loss_setting
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteGdyyLossSettingByIds" parameterType="String">
-        update t_gdyy_loss_setting set del_flag='1' where id in
+        update t_gdyy_loss_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_gdyy_loss_setting a USING (
-        <foreach collection="list" item="QuotaSetting" separator=" union ">
-            select
-            #{QuotaSetting.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{QuotaSetting.lossRate,jdbcType=DOUBLE} loss_rate,
-            #{QuotaSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{QuotaSetting.createTime,jdbcType=DATE} create_time,
-            #{QuotaSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{QuotaSetting.updateTime,jdbcType=DATE} update_time,
-            #{QuotaSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_gdyy_loss_setting (
+        big_roll_code, loss_rate,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="QuotaSetting" separator=",">
+            (
+            #{QuotaSetting.bigRollCode,jdbcType=VARCHAR},
+            #{QuotaSetting.lossRate,jdbcType=DOUBLE},
+            #{QuotaSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{QuotaSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.big_roll_code is null and a.big_roll_code is null) or (a.big_roll_code = b.big_roll_code))
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.loss_rate = b.loss_rate,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (a.id, a.big_roll_code, a.loss_rate, a.create_by, a.create_time, a.remark, a.del_flag) values
-        (SEQ_QUOTA_SETTING.NEXTVAL, b.big_roll_code, b.loss_rate, b.create_by, sysdate, b.remark, '0')
-    </update>
+        ON DUPLICATE KEY UPDATE
+        loss_rate = VALUES(loss_rate),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
     <update id="deleteAll">
-        update t_gdyy_loss_setting set del_flag = '1' where del_flag = '0'
+        update t_gdyy_loss_setting set del_flag = NULL where del_flag = '0'
     </update>
 </mapper>

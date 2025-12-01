@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.engine.mapper.StockEngineMapper">
+
+    <select id="listGlueSafeStock" resultType="com.zlt.mix.setting.api.domain.entity.GlueSafeStock">
+        WITH temp_table AS (
+        <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator=" union all ">
+            SELECT #{glueAreaMachine.mixArea,jdbcType=VARCHAR} mix_area, #{glueAreaMachine.glue,jdbcType=VARCHAR} glue FROM dual
+        </foreach>
+        )
+        SELECT MIX_AREA, GLUE, ifnull(SAFE_STOCK, 0) SAFE_STOCK, ifnull(RESERVE_STOCK_RATE, 0) as RESERVE_STOCK_RATE
+        FROM T_GLUE_SAFE_STOCK
+        WHERE DEL_FLAG= '0'
+        <if test="glueAreaMachineList != null">
+            AND (MIX_AREA, GLUE) IN (SELECT MIX_AREA, GLUE FROM temp_table)
+        </if>
+    </select>
+
+    <select id="listFinalGlueStock" resultType="com.zlt.mix.setting.api.domain.entity.GlueStock">
+        WITH temp_table AS (
+        <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator=" union all ">
+            SELECT #{glueAreaMachine.mixArea,jdbcType=VARCHAR} mix_area, #{glueAreaMachine.glue,jdbcType=VARCHAR} glue FROM dual
+        </foreach>
+        )
+        SELECT STOCK_DATE, MIX_AREA, GLUE, ifnull(sum(STOCK_NUM), 0) STOCK_NUM, ifnull(sum(STOCK_WEIGHT), 0) STOCK_WEIGHT
+        FROM T_GLUE_STOCK
+        WHERE DEL_FLAG= '0'
+        AND STOCK_DATE = #{planDate}
+        <if test="glueAreaMachineList != null">
+            AND (MIX_AREA, GLUE) IN (SELECT MIX_AREA, GLUE FROM temp_table)
+        </if>
+        GROUP BY STOCK_DATE, MIX_AREA, GLUE
+    </select>
+
+    <select id="listFinalGlueStockByMixArea" resultType="com.zlt.mix.setting.api.domain.entity.GlueStock">
+        SELECT STOCK_DATE,
+               MIX_AREA,
+               GLUE,
+               ifnull(sum(STOCK_NUM), 0)    STOCK_NUM,
+               ifnull(sum(STOCK_WEIGHT), 0) STOCK_WEIGHT
+        FROM T_GLUE_STOCK
+        WHERE DEL_FLAG = '0'
+          AND STOCK_DATE = #{planDate}
+          AND MIX_AREA = #{mixArea}
+        GROUP BY STOCK_DATE, MIX_AREA, GLUE
+    </select>
+
+    <select id="listLastGlueDayPlan" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        SELECT mix_area, GLUE, recipe_type, sum(ifnull(NIGHT_PLAN_QTY,0)) as DAY_PLAN_QTY
+        FROM T_GLUE_SCHEDULE_RESULT
+        WHERE del_flag ='0'
+        AND schedule_date = #{planDate}
+        AND mix_area = #{mixArea}
+        group by mix_area, glue, recipe_type
+    </select>
+
+    <select id="listLastGlueDayPlanAndMachine" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        SELECT mix_area,GLUE, machine_code, sum(ifnull(NIGHT_PLAN_QTY,0)) as DAY_PLAN_QTY, max(FORMULA_WEIGHT) as formula_weight
+        FROM T_GLUE_SCHEDULE_RESULT
+        WHERE del_flag ='0'
+        AND schedule_date = #{planDate}
+        AND mix_area = #{mixArea}
+        AND NIGHT_PLAN_QTY > 0
+        group by mix_area, glue, machine_code
+    </select>
+
+    <select id="listLastGlueUnclaimed" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        SELECT mix_area, GLUE,
+               ifnull(sum(TOTAL_PLAN_QTY), 0) as SHELF_NUM 
+        FROM T_GLUE_COLLECT_PLAN
+        WHERE mix_area = #{mixArea}
+          AND plan_date = #{planDate}
+          AND del_flag = '0'
+        group by mix_area, glue
+    </select>
+
+    <select id="listMotherGlueStock" resultType="com.zlt.mix.setting.api.domain.entity.MlGlueStock">
+        WITH temp_table AS (
+        <foreach collection="glueAreaMachineList" item="glueAreaMachine" separator=" union all ">
+            SELECT #{glueAreaMachine.mixArea,jdbcType=VARCHAR} mix_area, #{glueAreaMachine.glue,jdbcType=VARCHAR} glue FROM dual
+        </foreach>
+        )
+        SELECT STOCK_DATE, MIX_AREA, GLUE, ifnull(sum(STOCK_NUM), 0) STOCK_NUM, ifnull(sum(STOCK_WEIGHT), 0) STOCK_WEIGHT
+        FROM T_ML_GLUE_STOCK
+        WHERE DEL_FLAG= '0'
+        AND STOCK_DATE = DATE_SUB(#{planDate}, INTERVAL 1 DAY)   /*排程日期 要减1天，才是对应库存日期*/
+        <if test="glueAreaMachineList != null">
+            AND (MIX_AREA, GLUE) IN (SELECT MIX_AREA, GLUE FROM temp_table)
+        </if>
+        GROUP BY STOCK_DATE, MIX_AREA, GLUE
+    </select>
+
+    <select id="listGlueLast8And16Plan" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        SELECT MIX_AREA,     /*密炼区*/
+               GLUE,        /*胶料名称*/
+               ifnull(sum(NIGHT_PLAN_QTY), 0) as DAY_PLAN_QTY
+        FROM T_GLUE_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_SUB(#{planDate}, INTERVAL 1 DAY)  /*昨日排程*/
+        AND MIX_AREA = #{mixArea}
+        AND DEL_FLAG = '0'
+        group by MIX_AREA, GLUE
+    </select>
+
+    <select id="listGlue8And112Finsih" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        SELECT MIX_AREA, GLUE,
+               ifnull(sum(FINISH_QTY), 0) as FINISH_QTY
+        FROM T_GLUE_PART_FINISH
+        WHERE DEL_FLAG = '0'
+        AND MIX_AREA = #{mixArea}
+        AND SCHEDULE_DATE = DATE_SUB(#{planDate}, INTERVAL 1 DAY)  /*昨日排程*/
+        group by MIX_AREA, GLUE
+    </select>
+
+    <select id="listMaterialStock" resultType="com.zlt.mix.setting.api.domain.entity.LhflGlueStock">
+        WITH temp_table AS (
+        <foreach collection="areaMaterialList" item="areaMaterial" separator=" union all ">
+            SELECT #{areaMaterial.mixArea,jdbcType=VARCHAR} mix_area, #{areaMaterial.materialName,jdbcType=VARCHAR} material_name FROM dual
+        </foreach>
+        )
+        SELECT STOCK_DATE, MIX_AREA, material_name, ifnull(sum(STOCK_NUM), 0) STOCK_NUM, ifnull(sum(STOCK_WEIGHT), 0) STOCK_WEIGHT
+        FROM T_LHFL_GLUE_STOCK
+        WHERE DEL_FLAG= '0'
+        AND STOCK_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)  /*排程日期 要减1天，才是对应库存日期*/
+        <if test="areaMaterialList != null">
+            AND (MIX_AREA, MATERIAL_NAME) IN (SELECT MIX_AREA, MATERIAL_NAME FROM temp_table)
+        </if>
+        GROUP BY STOCK_DATE, MIX_AREA, MATERIAL_NAME
+    </select>
+
+    <select id="listGlueLastDayPlan" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        WITH temp_table AS (
+        <foreach collection="areaMaterialList" item="areaMaterial" separator=" union all ">
+            SELECT #{areaMaterial.mixArea,jdbcType=VARCHAR} mix_area, #{areaMaterial.materialName,jdbcType=VARCHAR} material_name FROM dual
+        </foreach>
+        )
+        SELECT m.MATERIAL_NAME,  /*物料名称*/
+               g.MIX_AREA,   /*密炼区*/
+               ifnull(sum(g.NIGHT_PLAN_QTY), 0) as DAY_PLAN_QTY          /*白班计划量*/
+        FROM T_GLUE_SCHEDULE_RESULT g
+        INNER JOIN T_MIX_MACHINE e on g.MACHINE_CODE = e.MACHINE_CODE
+        INNER JOIN T_MES_PMT_RECIPE r on g.glue = r.RECIPE_MATERIAL_NAME and g.MACHINE_CODE = r.RECIPE_EQUIP_CODE and g.RECIPE_TYPE=r.RECIPE_TYPE and g.RECIPE_VERSION_ID=r.RECIPE_VERSION_ID /*根据物料名称、机台、配方类型、配方版本号关联*/
+        INNER JOIN T_MES_PMT_RECIPE_WEIGHT t on r.RECIPE_ID =  t.FATHER_RECIPE_ID
+        INNER JOIN T_MES_BAS_MATERIAL m on t.RECIPE_MATERIAL_CODE = m.MATERIAL_CODE  /*根据物料编码关联*/
+        WHERE g.SCHEDULE_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)  /*昨日排程*/
+        <if test="areaMaterialList != null">
+            AND (g.mix_area, m.material_name) IN (SELECT MIX_AREA, MATERIAL_NAME FROM temp_table)
+        </if>
+        AND g.del_flag = '0'
+        AND r.RECIPE_STATE = '1'   /*配方状态: 再用*/
+        AND r.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+        AND m.MAJOR_TYPE = '2'  /*物料大类为：硫磺辅料*/
+        AND e.HAVE_SULFUR_STEELYARD = '0'     /*密炼机上 没有硫磺秤*/
+        AND e.HAVE_MATERIAL_STEELYARD = '0'  /*密炼机上 没有辅料秤*/
+        group by g.MIX_AREA, m.MATERIAL_NAME
+    </select>
+
+    <select id="listGlueLastDayFinish" resultType="com.zlt.mix.schedule.engine.vo.GlueConsumeVo">
+        WITH temp_table AS (
+        <foreach collection="areaMaterialList" item="areaMaterial" separator=" union all ">
+            SELECT #{areaMaterial.mixArea,jdbcType=VARCHAR} mix_area, #{areaMaterial.materialName,jdbcType=VARCHAR} material_name FROM dual
+        </foreach>
+        )
+        SELECT m.MATERIAL_NAME,  /*物料名称*/
+               g.MIX_AREA,   /*密炼区*/
+               ifnull(sum(FINISH_QTY), 0) as FINISH_QTY  /*完成量*/
+        FROM T_GLUE_PART_FINISH f
+        INNER JOIN T_GLUE_SCHEDULE_RESULT g on f.order_no = g.order_no
+        INNER JOIN T_MES_PMT_RECIPE r on g.glue = r.RECIPE_MATERIAL_NAME and g.MACHINE_CODE = r.RECIPE_EQUIP_CODE and g.RECIPE_TYPE=r.RECIPE_TYPE and g.RECIPE_VERSION_ID=r.RECIPE_VERSION_ID /*根据物料名称、机台、配方类型、配方版本号关联*/
+        INNER JOIN T_MES_PMT_RECIPE_WEIGHT t on r.RECIPE_ID =  t.FATHER_RECIPE_ID
+        INNER JOIN T_MES_BAS_MATERIAL m on t.RECIPE_MATERIAL_CODE = m.MATERIAL_CODE  /*根据物料编码关联*/
+        WHERE g.SCHEDULE_DATE = DATE_SUB(#{scheduleDate}, INTERVAL 1 DAY)  /*昨日排程*/
+        <if test="areaMaterialList != null">
+            AND (g.mix_area, m.material_name) IN (SELECT MIX_AREA, MATERIAL_NAME FROM temp_table)
+        </if>
+        AND g.del_flag = '0'
+        AND r.RECIPE_STATE = '1'   /*配方状态: 再用*/
+        AND r.AUDIT_FLAG = '1'     /*审核标志： 已审核*/
+        AND m.MAJOR_TYPE = '2'  /*物料大类为：硫磺辅料*/
+        group by g.MIX_AREA, m.MATERIAL_NAME
+    </select>
+    
+    <!-- 查询硫磺辅料安全库存 -->
+    <select id="listMaterialSafeStock" resultType = "com.zlt.mix.setting.api.domain.entity.LhflSafeStock">
+    	SELECT MATERIAL,
+    	       ifnull(SAFE_STOCK, 0) SAFE_STOCK
+    	  FROM T_LHFL_SAFE_STOCK
+    	 WHERE MIX_AREA = #{mixArea}
+    	   AND DEL_FLAG = '0'
+    </select>
+</mapper>

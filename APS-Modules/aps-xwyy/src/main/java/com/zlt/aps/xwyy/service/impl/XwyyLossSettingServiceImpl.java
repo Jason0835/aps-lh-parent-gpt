@@ -204,6 +204,9 @@ public class XwyyLossSettingServiceImpl extends ServiceImpl<XwyyLossSettingMappe
                 BeanUtils.copyProperties(dto, newEntity);
                 newEntity.setMachineId(machineCodeMap.get(machineName));
                 newEntity.setBaseVale(null);
+                if (StringUtils.isBlank(newEntity.getBigRollCode())) {
+                    newEntity.setBigRollCode(null);
+                }
                 newList.add(newEntity);
             }
         }

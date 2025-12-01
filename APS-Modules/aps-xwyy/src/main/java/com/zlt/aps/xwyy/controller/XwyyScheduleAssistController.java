@@ -22,7 +22,7 @@ import java.util.List;
  * @date 2022-02-16
  */
 @RestController
-@RequestMapping("/assistSchedule")
+@RequestMapping("/xwyy/assistSchedule")
 public class XwyyScheduleAssistController extends BaseController {
     @Autowired
     private XwyyScheduleAssistService xwyyScheduleAssistService;

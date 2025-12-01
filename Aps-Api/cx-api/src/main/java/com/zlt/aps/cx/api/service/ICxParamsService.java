@@ -7,9 +7,7 @@ import com.zlt.aps.cx.api.domain.dto.CxParamsDto;
 import com.zlt.aps.cx.api.domain.dto.CxShowDeDto;
 import com.zlt.aps.cx.api.domain.dto.LhShowDeDto;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +20,7 @@ import java.util.List;
  *
  * @author Joran.Zhang
  */
-@FeignClient(contextId = "ICxParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
+@FeignClient(contextId = "ICxParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:cxlh}")
 public interface ICxParamsService {
 
     /**
@@ -48,8 +46,8 @@ public interface ICxParamsService {
      *
      * @param dto
      */
-    @GetMapping("/cx/params/exportData")
-    List<CxParamsDto> exportData(@SpringQueryMap CxParamsDto dto);
+    @PostMapping("/cx/params/exportData")
+    List<CxParamsDto> exportData(@RequestBody CxParamsDto dto);
 
 
     @ApiOperation("查询成型定额信息列表")

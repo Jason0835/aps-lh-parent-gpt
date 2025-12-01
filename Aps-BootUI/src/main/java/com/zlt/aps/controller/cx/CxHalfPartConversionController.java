@@ -6,13 +6,16 @@ import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.service.ICd15ScheduleResultService;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.service.ICd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxHalfPartConversion;
+import com.zlt.aps.cx.api.domain.entity.CxMatchingSpecifyMachineList;
 import com.zlt.aps.cx.api.service.ICxHalfPartConversionService;
+import com.zlt.aps.cx.api.service.ICxMatchingSpecifyMachineService;
 import com.zlt.aps.cx.api.service.ICxScheduleResultService;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
 import com.zlt.aps.gdyy.api.service.IGdyyScheduleResultService;
@@ -41,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 半部件规格换算Controller
@@ -53,6 +57,7 @@ import java.util.*;
 @RequestMapping("/cx/conversion")
 public class CxHalfPartConversionController extends BaseController {
 
+    private final String prefix = "cx/conversion";
     @Autowired
     private ICxHalfPartConversionService iCxHalfPartConversionService;
     @Autowired
@@ -75,8 +80,8 @@ public class CxHalfPartConversionController extends BaseController {
     private ICd90ScheduleResultService iCd90ScheduleResultService;
     @Autowired
     private IXwyyScheduleResultService iXwyyScheduleResultService;
-
-    private final String prefix = "cx/conversion";
+    @Autowired
+    private ICxMatchingSpecifyMachineService iCxMatchingSpecifyMachineService;
 
     /**
      * 跳转至主页面
@@ -89,7 +94,7 @@ public class CxHalfPartConversionController extends BaseController {
     }
 
     @GetMapping("/toChooseMachine")
-    public String toChooseMachine(String halfPartType, String machineId, ModelMap modelMap){
+    public String toChooseMachine(String halfPartType, String machineId, ModelMap modelMap) {
         modelMap.put("halfPartType", halfPartType);
         modelMap.put("machineId", machineId);
         CxHalfPartConversion queryParams = new CxHalfPartConversion();
@@ -97,6 +102,20 @@ public class CxHalfPartConversionController extends BaseController {
         List<CxHalfPartConversion> machineInfoList = iCxHalfPartConversionService.getMachineInfoListByHalfPartType(queryParams);
         modelMap.put("machineInfoList", machineInfoList);
         return prefix + "/chooseMachine";
+    }
+
+    @ApiOperation(value = "跳转至转机台页面", notes = "跳转至转机台页面")
+    @PostMapping("/toChooseMachine/info")
+    @ResponseBody
+    public AjaxResult toChooseMachineInfo(String halfPartType, String machineId) {
+        Map<String, Object> modelMap = new HashMap<>();
+        modelMap.put("halfPartType", halfPartType);
+        modelMap.put("machineId", machineId);
+        CxHalfPartConversion queryParams = new CxHalfPartConversion();
+        queryParams.setHalfPartType(halfPartType);
+        List<CxHalfPartConversion> machineInfoList = iCxHalfPartConversionService.getMachineInfoListByHalfPartType(queryParams);
+        modelMap.put("machineInfoList", machineInfoList);
+        return AjaxResult.success(modelMap);
     }
 
     /**
@@ -107,8 +126,22 @@ public class CxHalfPartConversionController extends BaseController {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(CxHalfPartConversion entity) {
+        AjaxResult ajaxResult = iCxMatchingSpecifyMachineService.viewList(new CxMatchingSpecifyMachineList());
+        List<CxMatchingSpecifyMachineList> viewList = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), CxMatchingSpecifyMachineList.class);
+        Map<String, String> cxMachineInfoListMap = viewList.stream().filter(item -> StringUtils.isNotEmpty(item.getMachineName()) && StringUtils.isNotEmpty(item.getMachineId())).collect(Collectors.toMap(item -> item.getProcedureCode() + "|" + item.getMachineId(), CxMatchingSpecifyMachineList::getMachineName));
 
-        return iCxHalfPartConversionService.list(entity);
+        TableDataInfo dataInfo = iCxHalfPartConversionService.list(entity);
+        List<CxHalfPartConversion> rows = JSON.parseArray(JSON.toJSONString(dataInfo.getRows()), CxHalfPartConversion.class);
+
+        for (CxHalfPartConversion cxHalfPartConversion : rows) {
+            String halfPartType = cxHalfPartConversion.getHalfPartType();
+            if (StringUtils.isNotEmpty(halfPartType)
+                    && StringUtils.isNotEmpty(cxHalfPartConversion.getMachineId()) && cxMachineInfoListMap.containsKey(cxHalfPartConversion.getMachineId())) {
+                cxHalfPartConversion.setMachineName(cxMachineInfoListMap.get(halfPartType + "|" + cxHalfPartConversion.getMachineId()));
+            }
+        }
+
+        return dataInfo;
     }
 
     /**
@@ -246,8 +279,9 @@ public class CxHalfPartConversionController extends BaseController {
 
     /**
      * 保存排程记录
-     * @param entity 要保存的半部件换算记录
-     * @param id 半部件换算记录对应排程id
+     *
+     * @param entity       要保存的半部件换算记录
+     * @param id           半部件换算记录对应排程id
      * @param scheduleDate 排程日期
      * @param halfPartType 半部件类型
      * @return 结果
@@ -504,8 +538,9 @@ public class CxHalfPartConversionController extends BaseController {
 
     /**
      * 发布排程记录
-     * @param entity 要发布的半部件规格记录
-     * @param id 半部件规格记录对应排程id
+     *
+     * @param entity       要发布的半部件规格记录
+     * @param id           半部件规格记录对应排程id
      * @param scheduleDate 排程日期
      * @return 结果
      */
@@ -586,5 +621,31 @@ public class CxHalfPartConversionController extends BaseController {
                 break;
         }
         return ajaxResult.put(AjaxResult.DATA_TAG, id);
+    }
+
+    /**
+     * 根据半部件类型获取机台信息
+     *
+     * @param queryParams 参数
+     * @return 结果
+     */
+    @ApiOperation("根据半部件类型获取机台信息")
+    @PostMapping("/getMachineInfoListByHalfPartType")
+    @ResponseBody
+    public AjaxResult getMachineInfoListByHalfPartType(CxHalfPartConversion queryParams) {
+        List<CxHalfPartConversion> machineInfoList = iCxHalfPartConversionService.getMachineInfoListByHalfPartType(queryParams);
+        return AjaxResult.success(machineInfoList);
+    }
+
+    /**
+     * 半部件规格换算机台列表
+     *
+     * @return 结果
+     */
+    @ApiOperation("半部件规格换算机台列表")
+    @PostMapping("/viewList")
+    @ResponseBody
+    public AjaxResult viewList() {
+        return iCxMatchingSpecifyMachineService.viewList(new CxMatchingSpecifyMachineList());
     }
 }

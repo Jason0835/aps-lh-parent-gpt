@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DayFinishQty;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -165,4 +166,21 @@ public interface Cd90ScheduleResultService {
      * @return 查询到的数据
      */
     List<Cd90ScheduleResult> selectByScheduleDateAndCode(Cd90ScheduleResult scheduleResult);
+
+    /**
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
+     */
+    AjaxResult importFinishQty(List<Cd90DayFinishQty> list, Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    AjaxResult getSummaryVo(Cd90ScheduleResult scheduleResult);
 }

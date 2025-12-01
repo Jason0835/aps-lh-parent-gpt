@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tc.api.domain.dto.TcImportErrorLogManagementDto;
 import com.zlt.aps.tc.api.domain.dto.TcImportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "ITcImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tc:tc}")
 public interface ITcImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +49,6 @@ public interface ITcImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/tc/importLogManagement/importData")
-    List<TcImportLogManagementDto> importData(@SpringQueryMap TcImportLogManagementDto dto);
+    @PostMapping("/tc/importLogManagement/importData")
+    List<TcImportLogManagementDto> importData(@RequestBody TcImportLogManagementDto dto);
 }

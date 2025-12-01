@@ -22,7 +22,7 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/xwyy/machine/list")
     TableDataInfo list(@RequestBody XwyyMachineInfo machineInfo);
 
     /**
@@ -31,7 +31,7 @@ public interface IXwyyMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/xwyy/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -40,7 +40,7 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/xwyy/machine")
     AjaxResult add(@Validated @RequestBody XwyyMachineInfo machineInfo);
 
     /**
@@ -49,7 +49,7 @@ public interface IXwyyMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/xwyy/machine/{id}")
     XwyyMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -58,7 +58,7 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/xwyy/machine")
     AjaxResult edit(@Validated @RequestBody XwyyMachineInfo machineInfo);
 
     /**
@@ -67,7 +67,7 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/xwyy/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody XwyyMachineInfo machineInfo);
 
     /**
@@ -76,7 +76,7 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/xwyy/machine/exportList")
     List<XwyyMachineInfo> exportList(@RequestBody XwyyMachineInfo machineInfo);
 
     /**
@@ -85,12 +85,12 @@ public interface IXwyyMachineInfoService {
      * @param machineInfo 帘布大卷信息
      * @return 查询到的机台信息
      */
-    @PostMapping("/machine/listMachineInfo")
+    @PostMapping("/xwyy/machine/listMachineInfo")
     List<XwyyMachineInfo> listMachineInfo(@RequestBody XwyyMachineInfo machineInfo);
 
     /**
      * 导入数据
      */
-    @PostMapping("/machine/importData")
+    @PostMapping("/xwyy/machine/importData")
     public AjaxResult importData(@RequestBody List<XwyyMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

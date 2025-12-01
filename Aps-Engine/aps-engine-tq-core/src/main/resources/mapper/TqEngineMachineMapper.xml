@@ -2,9 +2,25 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineMachineMapper">
 
+    <select id="listTqMachine" resultType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo" >
+        select ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               EFFICIENCY,
+               TOOLING_INFO,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               STATUS,
+               REMARK
+         from T_TQ_MACHINE_INFO
+        where STATUS = '0'
+          and DEL_FLAG = '0'
+    </select>
+
     <select id="listTqSpecifyMachine" resultType="com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo" >
         select BEAD_CODE,
-               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
         from T_TQ_SPECIFY_MACHINE sm
         inner join T_TQ_MACHINE_INFO m on sm.machine_id = m.id
         where sm.DEL_FLAG = '0'
@@ -18,7 +34,7 @@
 
     <select id="listTqMouthPlateMachine" resultType="com.zlt.aps.tq.engine.vo.TqMouthPlateMachineVo" >
         select mouth_plate_code,
-               listagg(sm.MACHINE_ID,',') within group (order by sm.MACHINE_ID) as machine_ids
+               GROUP_CONCAT(sm.MACHINE_ID ORDER BY sm.MACHINE_ID SEPARATOR ',') as machine_ids
         from T_TQ_MOUTH_PLATE sm
         inner join T_TQ_MACHINE_INFO m on sm.machine_id = m.id
         where sm.DEL_FLAG = '0'
@@ -26,5 +42,15 @@
         and m.STATUS = '0'
         and m.DEL_FLAG = '0'
         group by MOUTH_PLATE_CODE
+    </select>
+    
+        
+    <select id="listLastDayPlanMachine" resultType="com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo">
+        SELECT BEAD_CODE, max(MACHINE_ID) machine_ids
+        FROM T_TQ_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+          AND NIGHT_PLAN_QTY > 0
+        GROUP BY BEAD_CODE
     </select>
 </mapper>

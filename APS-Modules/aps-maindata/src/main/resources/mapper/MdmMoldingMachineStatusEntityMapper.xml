@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmMoldingMachineStatusEntityMapper">
+    <select id="selectDocMoldingMachineStatusList"
+            parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MdmMoldingMachineStatusVo">
+        select a.*,
+        c.MOLDING_MACHINE_CLASS_NAME,
+        c.MOULD_METHOD moldingMethod,
+        b.CLASSES,
+        b.PRODUCT_TYPE_CODE,
+        b.MOLDING_MACHINE_CODE
+        from t_mdm_molding_machine_status a
+        left join t_mdm_molding_machine b
+        on a.MOLDING_MACHINE_ID = b.id and ifnull(b.is_delete, 0) = 0
+        left join t_mdm_molding_machine_CLS c
+        on b.MOLDING_MACHINE_CLASS_ID = c.id and c.is_delete = 0
+        where ifnull(a.is_delete, 0) = 0
+        <if test="year != null">
+            and a.year = #{year}
+        </if>
+        <if test="month != null">
+            and a.month = #{month}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">and a.factory_code = #{factoryCode}</if>
+        <if test="status != null">and a.status = #{status}</if>
+        <if test="productTypeCode != null and productTypeCode != ''">and b.PRODUCT_TYPE_CODE = #{productTypeCode}</if>
+        ${params.dataScope}
+        order by a.factory_code,b.product_type_code,
+        REGEXP_REPLACE(b.MOLDING_MACHINE_CODE,'[^0-9]',''),
+        ifnull(REGEXP_REPLACE(b.MOLDING_MACHINE_CODE,'[0-9]',''),'0') asc
+    </select>
+    
+    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.monthplan.api.domain.vo.CopyParamVo">
+        update t_mdm_molding_machine_status
+        set IS_DELETE = 1
+        where
+        YEAR = #{copyToYear,jdbcType=DECIMAL} and MONTH = #{copyToMonth,jdbcType=DECIMAL}
+        <if test="factoryCode != null and factoryCode != ''">
+            and factory_code = #{factoryCode,jdbcType=VARCHAR}
+        </if>
+
+        ${params.dataScope}
+    </delete>
+
+
+    <update id="updateMoldingMachineStatusListById" parameterType="list">
+        update t_mdm_molding_machine_status
+        set status = #{status}
+        where ID in
+        <foreach collection="list" item="item" open="(" separator=", " close=")">
+            #{item,jdbcType=DECIMAL}
+        </foreach>
+    </update>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus" resultType="int">
+        select count(1)
+        from t_mdm_molding_machine_status a
+        where a.is_delete = 0
+        <if test="year != null">
+            and a.year = #{year}
+        </if>
+        <if test="month != null">
+            and a.month = #{month}
+        </if>
+        <if test="factoryCode != null  and factoryCode != ''">and a.factory_code = #{factoryCode}</if>
+        <if test="moldingMachineId != null  and moldingMachineId != ''">and a.molding_machine_id = #{moldingMachineId}
+        </if>
+        <if test="id != null">and a.id != #{id}</if>
+    </select>
+
+    <select id="selectGenerateListByMachine"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus">
+        SELECT
+        FACTORY_CODE,
+        #{generateToYear,jdbcType=DECIMAL} year,
+        #{generateToMonth,jdbcType=DECIMAL} month,
+        id AS MOLDING_MACHINE_ID,
+        1 status,
+        remark,
+        0 as IS_DELETE,
+        now() as CREATE_TIME
+        FROM
+        t_mdm_molding_machine
+        WHERE
+        IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">
+            and factory_code = #{factoryCode,jdbcType=VARCHAR}
+        </if>
+        ${params.dataScope}
+    </select>
+
+</mapper>

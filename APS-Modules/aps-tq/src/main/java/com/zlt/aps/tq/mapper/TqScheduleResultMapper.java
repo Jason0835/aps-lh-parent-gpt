@@ -2,6 +2,7 @@ package com.zlt.aps.tq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
 import com.zlt.aps.tq.entity.TqScheduleResult;
 import org.apache.ibatis.annotations.Param;
@@ -98,7 +99,7 @@ public interface TqScheduleResultMapper extends BaseMapper<TqScheduleResult> {
      * @return 影响行数
      */
     public int updatePublishRecord(SchedulePublishRecord schedulePublishRecord);
-    
+
 	/**
 	 * 更新发布日志状态
 	 *
@@ -109,9 +110,9 @@ public interface TqScheduleResultMapper extends BaseMapper<TqScheduleResult> {
 
     int checkTqCodeExist(TqScheduleResultDto dto);
 
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
-    public int deleteByIds(long[] ids);
+    public int deleteByIds(List<Long> ids);
 
     /**
      * 根据id查询未发布记录的条数
@@ -127,4 +128,44 @@ public interface TqScheduleResultMapper extends BaseMapper<TqScheduleResult> {
      * @return 查询到的记录
      */
     List<TqScheduleResult> selectByScheduleDateAndCode(TqScheduleResult scheduleResult);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(TqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(TqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(TqScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量-具体到每个规格
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    List<TqScheduleResultDto> getLastDayPlanQty4List(TqScheduleResult scheduleResult);
+
+    /**
+     * 获取成型消耗量-具体到每个规格
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    List<TqScheduleResultDto> getCxConsume4List(TqScheduleResult scheduleResult);
 }

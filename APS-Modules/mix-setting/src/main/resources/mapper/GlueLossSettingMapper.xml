@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueLossSettingMapper">
+    
+    <select id="selectGlueLossSettingList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueLossSetting" resultType="com.zlt.mix.setting.api.domain.entity.GlueLossSetting">
+        select
+        gls.id,
+        gls.mix_area,
+        gls.glue,
+        gls.machine_code,
+        ma.machine_name,
+        gls.loss_rate,
+        gls.create_by,
+        gls.create_time,
+        gls.update_by,
+        gls.update_time,
+        gls.del_flag,
+        gls.remark
+        from t_glue_loss_setting gls left join T_MIX_MACHINE ma
+        on gls.mix_area=ma.mix_area and gls.machine_code=ma.machine_code and ma.del_flag='0'
+        <where>
+            gls.del_flag = '0'
+         <if test="mixArea != null  and mixArea != ''"> and gls.mix_area = #{mixArea}</if>
+         <if test="glue != null  and glue != ''"> and instr(gls.glue , #{glue})>0</if>
+         <if test="machineCode != null  and machineCode != ''"> and gls.machine_code = #{machineCode}</if>
+        </where>
+        <if test="orderStr == null">
+            order by gls.create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueLossSettingByIds" parameterType="String">
+        update t_glue_loss_setting set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <select id="listGlueLossSettingNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR}  mix_area,#{data.glue,jdbcType= VARCHAR} glue,#{data.machineCode,jdbcType= VARCHAR} machine_code 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy, now() createTime
+        from t_glue_loss_setting m
+        inner join temp_table t on m.mix_area=t.mix_area and ifnull(m.glue,'GLUE_EMPTY') = ifnull(t.glue,'GLUE_EMPTY') and ifnull(m.machine_code,'MACHINE_EMPTY')=ifnull(t.machine_code,'MACHINE_EMPTY') and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueLossSettingInfo">
+        insert into t_glue_loss_setting (id,mix_area,glue,machine_code,loss_rate,create_by,create_time,update_by,update_time,del_flag,remark )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueLossSetting" separator=" union all ">
+            select
+            #{glueLossSetting.mixArea,jdbcType= VARCHAR} mix_area,
+            #{glueLossSetting.glue,jdbcType= VARCHAR} glue,
+            #{glueLossSetting.machineCode,jdbcType= VARCHAR} machine_code,
+            #{glueLossSetting.lossRate,jdbcType=DOUBLE} loss_rate,
+            #{glueLossSetting.createBy,jdbcType= VARCHAR} create_by,
+            #{glueLossSetting.createTime,jdbcType=TIMESTAMP} create_time,
+            #{glueLossSetting.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueLossSetting.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{glueLossSetting.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueLossSetting.remark,jdbcType= VARCHAR} remark
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_glue_loss_setting a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+           select
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.mixArea,jdbcType=VARCHAR } mix_area,
+            #{item.glue,jdbcType=VARCHAR } glue,
+            #{item.machineCode,jdbcType=VARCHAR } machine_code,
+            #{item.lossRate, jdbcType=DECIMAL} loss_rate,
+            #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time,
+            #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag,
+            #{item.remark,jdbcType=VARCHAR } remark
+            from dual
+        </foreach>
+        ) b ON ( a.mix_area=b.mix_area and ifnull(a.glue,'GLUE_EMPTY')=ifnull(b.glue,'GLUE_EMPTY') and ifnull(a.machine_code,'MACHINE_EMPTY')=ifnull(b.machine_code,'MACHINE_EMPTY') AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.loss_rate = b.loss_rate,
+            a.update_by = b.create_by,
+            a.update_time = now(),
+            a.remark = b.remark
+        </set>
+        WHEN NOT MATCHED THEN
+         INSERT (
+            a.id,
+            a.mix_area,
+            a.glue,
+            a.machine_code,
+            a.loss_rate,
+            a.create_by,
+            a.create_time,
+            a.del_flag,
+            a.remark
+            )
+            values (
+            get_sequence_nextval('SEQ_GLUE_LOSS_SETTING'),
+            b.mix_area,
+            b.glue,
+            b.machine_code,
+            b.loss_rate,
+            b.create_by,
+            now(),
+            0,
+            b.remark
+            )
+    </update>
+
+    <select id="selectMachineCodeList" resultType="java.lang.String">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{data.mixArea,jdbcType= VARCHAR} MIX_AREA,
+            #{data.machineName,jdbcType= VARCHAR} MACHINE_NAME,#{rowNumber} row_numbers 
+        </foreach>
+        )
+        select m.MACHINE_CODE machineCode
+        from T_MIX_MACHINE m
+        right join temp_table t on m.MIX_AREA=t.MIX_AREA and m.MACHINE_NAME = t.MACHINE_NAME and m.del_flag ='0'
+        order by t.row_numbers
+    </select>
+</mapper>

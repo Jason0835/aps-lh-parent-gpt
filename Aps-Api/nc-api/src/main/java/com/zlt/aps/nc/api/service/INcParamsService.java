@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.nc.api.domain.dto.NcParamsDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +42,6 @@ public interface INcParamsService
      * 导出接口
      * @param dto
      */
-    @GetMapping("/nc/params/exportData")
-    List<NcParamsDto> exportData(@SpringQueryMap NcParamsDto dto);
+    @PostMapping("/nc/params/exportData")
+    List<NcParamsDto> exportData(@RequestBody NcParamsDto dto);
 }

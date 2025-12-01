@@ -1,13 +1,13 @@
 package com.zlt.aps.xwyy.engine.vo;
 
-import java.math.BigDecimal;
-import java.util.Date;
-
-import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 纤维压延排程结果值对象
@@ -58,8 +58,11 @@ public class XwyyScheduleResultVo extends ApsBaseDto {
 	/** 日用参考 */
 	private Double dayUsed;
 
-    /** 当日库存*/
+    /** 当日预计库存*/
     private Double todayStock;
+
+    /** 当日库存*/
+    private BigDecimal todayStockQty;
 
     /** 前日库存*/
     private Double yesStock;
@@ -174,4 +177,20 @@ public class XwyyScheduleResultVo extends ApsBaseDto {
      * 大卷标准长度
      */
     private BigDecimal rollStandardSize;
+
+    @ApiModelProperty(value = "早班生产顺序")
+    private Integer dayProduceOrder;
+
+    @ApiModelProperty(value = "夜班生产顺序")
+    private Integer nightProduceOrder;
+    
+    /**
+     * 库存用量比例
+     */
+    private BigDecimal stockPlanRate;
+    
+    /**
+     * 上一天计划量
+     */
+    private Double lastPlanQty;
 }

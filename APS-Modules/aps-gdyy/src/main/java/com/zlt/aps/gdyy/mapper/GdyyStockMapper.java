@@ -1,7 +1,9 @@
 package com.zlt.aps.gdyy.mapper;
 
 import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
+import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -62,4 +64,12 @@ public interface GdyyStockMapper {
      * @param list 要合并的集合
      */
     public void mergeSql(List<GdyyStock> list);
+
+    /**
+     * 根据库存日期删除库存信息
+     *
+     * @param scheduleDate 库存日期
+     * @return 删除数量
+     */
+    int deleteStockByDate(@Param("scheduleDate") Date scheduleDate);
 }

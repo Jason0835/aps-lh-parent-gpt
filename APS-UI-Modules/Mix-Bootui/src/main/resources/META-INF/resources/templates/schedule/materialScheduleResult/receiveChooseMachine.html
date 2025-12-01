@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('跨区接收选机台')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-materialScheduleResult-chooseMachine" th:object="${materialSpanReceive}">
+        <input id="id" th:field="*{id}" class="form-control" type="hidden">
+        <input id="mixArea" th:field="*{entrustedMixArea}" class="form-control" type="hidden">
+        <input id="materialName" th:field="*{materialName}" class="form-control" type="hidden">
+        <input id="originMachineName" th:value="${materialSpanReceive.machineName}" class="form-control" type="hidden">
+        <input id="scheduleDate" th:value="${#dates.format(materialSpanReceive.scheduleDate, 'yyyy-MM-dd HH:mm:ss')}" class="form-control" placeholder="yyyy-MM-dd" type="hidden">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{setting.machine.machineName}]]：</label>
+            <div class="col-sm-8">
+                <select id="machineCode" name="machineCode" required class="form-control" onchange="changeMachine()">
+                </select>
+            </div>
+        </div>
+        <input id="recipeType" name="recipeType" th:field="*{recipeType}" type="hidden"/>
+        <input id="recipeTypeName" name="recipeTypeName" th:field="*{recipeTypeName}" type="hidden"/>
+        <input id="recipeVersionId" name="recipeVersionId" th:field="*{recipeVersionId}" type="hidden"/>
+        <input id="recipeStage" name="recipeStage" th:field="*{recipeStage}" type="hidden"/>
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label qtyBold">[[#{schedule.receiveCrossRegional.midClassTotalQty}]]：</label>
+            <div class="col-sm-3 qtyBold" style="width: 12%;min-width: 75px;padding-top: 7px;">
+                <span id="totalMidPlanQty"></span>
+            </div>
+            <label class="col-sm-3 control-label qtyBold" style="width: 15%;min-width: 75px;">[[#{schedule.receiveCrossRegional.nightClassTotalQty}]]：</label>
+            <div class="col-sm-3 qtyBold" style="width: 12%;min-width: 75px;padding-top: 7px;">
+                <span id="totalNightPlanQty"></span>
+            </div>
+            <label class="col-sm-3 control-label qtyBold" style="width: 15%;min-width: 75px;">[[#{schedule.receiveCrossRegional.dayClassTotalQty}]]：</label>
+            <div class="col-sm-3 qtyBold" style="width: 12%;min-width: 75px;padding-top: 7px;">
+                <span id="totalDayPlanQty"></span>
+            </div>
+        </div>
+
+        <div class="container-div">
+            <div class="row">
+                <div class="col-sm-12 search-collapse">
+                    <form id="formId">
+                        <div class="select-list">
+                            <ul>
+                                <li>
+                                    <label>[[#{setting.MesPmtRecipe.machineName}]]：</label>
+                                    <input class="form-control" id="machineName" type="text" name="machineName" th:value="${materialSpanReceive.machineName}" style="display: inline" readonly/>
+                                </li>
+                                <li>
+                                    <label>[[#{setting.MesPmtRecipe.recipeMaterialName}]]：</label>
+                                    <input class="form-control" id="recipeMaterialName" type="text" name="recipeMaterialName" th:value="${materialSpanReceive.materialName}" style="display: inline" readonly/>
+                                </li>
+                            </ul>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="btn-group-sm" id="toolbar" role="group">
+                    <div style="font-size: 12px;display: inline-block;text-indent: 2rem;font-weight: bold;">
+                        [[#{setting.MesPmtRecipe.modelName}]]
+                    </div>
+                </div>
+                <div class="col-sm-12 select-table table-striped">
+                    <table id="bootstrap-table"></table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/materialScheduleResult";
+    var productStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+
+    $("#form-materialScheduleResult-chooseMachine").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        getMachines();
+        var options = {
+            uniqueId: "id",
+            url: ctx + "setting/MesPmtRecipe/selectMesPmtRecipeByParams",
+            showSearch: false,
+            showRefresh: false,
+            showToggle: false,
+            showColumns: false,
+            singleSelect: true,
+            clickToSelect: true,
+            modalName: [[#{setting.MesPmtRecipe.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            queryParams: queryParams,
+            onCheck: onCheck,
+            onLoadSuccess: function(data) {
+                var recipeType = $("#recipeType").val();
+                var recipeVersionId = $("#recipeVersionId").val();
+                var originMachineName = $("#originMachineName").val();
+                var checkIndex;
+                for (var i = 0; i < data.rows.length; i++) {
+                    var row = data.rows[i];
+                    if (row.machineName === originMachineName && row.recipeType === recipeType && row.recipeVersionId === recipeVersionId) {
+                        checkIndex = i;
+                        break;
+                    }
+                }
+                if ($.common.isNotEmpty(checkIndex)) {
+                    $('#' + table.options.id).bootstrapTable('check', checkIndex);
+                }
+            },
+            columns: [
+                {
+                    checkbox: true
+                },
+                {
+                    field: 'id',
+                    title: 'id',
+                    visible: false
+                },
+                {
+                    field: 'recipeId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeId}]],
+                },
+                {
+                    field: 'mixArea',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.mixArea}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeEquipCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeEquipCode}]],
+                    visible: false
+                },
+                {
+                    field: 'machineName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.machineName}]],
+                },
+                {
+                    field: 'recipeMaterialCode',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialCode}]],
+                },
+                {
+                    field: 'recipeMaterialName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeMaterialName}]],
+                },
+                {
+                    field: 'recipeVersionId',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeVersionId}]],
+                },
+                {
+                    field: 'recipeType',
+                    halign: 'center',
+                    align: 'right',
+                    title: [[#{setting.MesPmtRecipe.recipeType}]],
+                    visible: false
+                },
+                {
+                    field: 'recipeTypeName',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.recipeTypeName}]],
+                },
+                {
+                    field: 'productStage',
+                    halign: 'center',
+                    align: 'center',
+                    title: [[#{setting.MesPmtRecipe.productStage}]],
+                    formatter: function (value, row, index) {
+                        return $.table.selectDictLabel(productStageData, value);
+                    },
+                },
+            ]
+        };
+        $.table.init(options, false);
+        getSumPlanQtyByMachine();
+    });
+
+    /**
+     * 查询参数
+     * @param params
+     * @returns {*}
+     */
+    function queryParams(params) {
+        var search = $.table.queryParams(params);
+        var $machineCode = $('#machineCode option:selected');
+        search.machineCode = $machineCode.val();
+        search.machineName = $machineCode.text();
+        search.recipeMaterialName = $('#recipeMaterialName').val();
+        return search;
+    }
+
+    function onCheck(row, $element) {
+        $("#recipeType").val(row.recipeType);
+        $("#recipeTypeName").val(row.recipeTypeName);
+        $("#recipeVersionId").val(row.recipeVersionId);
+        $("#recipeStage").val(row.productStage);
+    }
+
+    function changeMachine() {
+        let machineName = $("#machineCode option:selected").text();
+        $("#machineName").val(machineName);
+        $.table.search();
+        getSumPlanQtyByMachine();
+    }
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var rows = $("#" + table.options.id).bootstrapTable('getSelections');
+            if (rows.length === 0) {
+                $.modal.alertWarning([[#{ui.message.mustChooseOneRecipe}]]);
+                return;
+            }
+            var id = $("#id").val();
+            var parentTableData = getParentTableData('bootstrap-table');
+            var parentRow = parentTableData.filter(item => item.id == id);
+            var parent = window.parent;
+            var $machineCode = $("#machineCode option:selected");
+            parentRow[0].row['machineCode'] = $machineCode.val();
+            parentRow[0].row['machineName'] = $machineCode.text();
+            parentRow[0].row['recipeType'] = $("#recipeType").val();
+            parentRow[0].row['recipeTypeName'] = $("#recipeTypeName").val();
+            parentRow[0].row['recipeVersionId'] = $("#recipeVersionId").val();
+            parentRow[0].row['recipeStage'] = $("#recipeStage").val();
+            var loadParentData = [];
+            for (var i = 0; i < parentTableData.length; i++) {
+                loadParentData.push(parentTableData[i].row);
+            }
+            parent.$("#bootstrap-table").bootstrapTable('load', loadParentData);
+            $.modal.close();
+        }
+    }
+
+    // 获取父表格的数据，包括文本框内填写的值
+    function getParentTableData(tableId) {
+        var parent = window.parent;
+        var currentId = $.common.isEmpty(tableId) ? table.options.id : tableId;
+        var cols = parent.$('#' + currentId).bootstrapTable('getVisibleColumns');
+        var dataColumns = [];
+        dataColumns.push({checkbox: true, width: '3', widthUnit: '%'});
+        for (var columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+            dataColumns.push(cols[columnIndex]);
+        }
+        var params = new Array();
+        var data = parent.$("#" + currentId).bootstrapTable('getData');
+        var count = data.length;
+        for (var dataIndex = 0; dataIndex < count; dataIndex++) {
+            var columns = parent.$('#' + currentId + ' tr[data-index="' + dataIndex + '"] td');
+            var obj = new Object();
+            for (var i = 0; i < columns.length; i++) {
+                var inputValue = parent.$(columns[i]).find('input');
+                var selectValue = parent.$(columns[i]).find('select');
+                var textareaValue = parent.$(columns[i]).find('textarea');
+                var key = dataColumns[i].field;
+                if ($.common.isNotEmpty(inputValue.val())) {
+                    obj[key] = inputValue.val();
+                } else if ($.common.isNotEmpty(selectValue.val())) {
+                    obj[key] = selectValue.val();
+                } else if ($.common.isNotEmpty(textareaValue.val())) {
+                    obj[key] = textareaValue.val();
+                } else {
+                    obj[key] = "";
+                }
+                obj['isChooseMachine'] = true;
+            }
+            var item = data[dataIndex];
+            var extendObj = $.extend({}, item, obj);
+            params.push({id: extendObj.id, row: extendObj});
+        }
+        return params;
+    }
+
+    //获取机台下拉框
+    function getMachines(){
+        var mixArea=$("#mixArea").val();
+        var materialName = $("#materialName").val();
+        var noMachineHtml = "<option value='' disabled>" + [[#{ui.message.filterMachine.noMaterialNameMachine}]] + "</option>";
+        if ($.common.isEmpty(materialName) || $.common.isEmpty(mixArea)) {
+            var $machineCode = $("#machineCode");
+            $machineCode.empty();
+            $machineCode.append(noMachineHtml);
+            return ;
+        }
+        var config = {
+            url: "/setting/accessoriesMachine/getAccessoriesMachineList",
+            type: "post",
+            dataType: "json",
+            async: false,
+            data: {"mixArea": mixArea, "materialName": materialName},
+            beforeSend: function () {
+                $.modal.loading(frame.alter.doingWaiting);
+                $.modal.disable();
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS){
+                    var machines=result.data;
+                    var rSelect = '';
+                    var select = [[${materialSpanReceive.machineCode}]] + "";
+                    var selets = select.split(",");
+                    for(var i = 0; i < machines.length; i++){
+                        for(var key in selets){
+                            if(selets[key] === machines[i].machineCode){
+                                machines[i].isSelected = true;
+                            }
+                        }
+                    }
+                    for (var j = 0; j < machines.length; j++) {
+                        if (machines[j].isSelected){
+                            rSelect += ("<option value = '"+machines[j].machineCode+"' selected>"+machines[j].machineName+"</option>");
+                        }else {
+                            rSelect += ("<option value = '"+machines[j].machineCode+"'>"+machines[j].machineName+"</option>");
+                        }
+                    }
+                    if ($.common.isEmpty(rSelect)) {
+                        rSelect = noMachineHtml;
+                    }
+                    var $machineCode = $("#machineCode");
+                    $machineCode.empty();
+                    $machineCode.append(rSelect);
+                    let $machineName = $("#machineName");
+                    if ($.common.isEmpty($machineName.val())) {
+                        $machineName.val($($machineCode.find('option')[0]).text());
+                    }
+                } else {
+                    $.modal.alertWarning(result.msg);
+                }
+                $.modal.closeLoading();
+                $.modal.enable();
+            }
+        };
+        $.ajax(config)
+    }
+
+    // 根据机台查询对应班次计划总量
+    function getSumPlanQtyByMachine() {
+        var config = {
+            url: prefix + "/getSumQtyByMachineCode",
+            type: "post",
+            dataType: "json",
+            data: {
+                "scheduleDate": $("#scheduleDate").val(),
+                "mixArea": $("#mixArea").val(),
+                "machineCode": $("#machineCode option:selected").val(),
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    $("#totalMidPlanQty").text(result.data.totalMidPlanQty);
+                    $("#totalNightPlanQty").text(result.data.totalNightPlanQty);
+                    $("#totalDayPlanQty").text(result.data.totalDayPlanQty);
+                }
+            }
+        };
+        $.ajax(config);
+    }
+</script>
+</body>
+<style>
+    .container-div {
+        height: auto;
+    }
+    .qtyBold {
+        font-size: 12px;
+        display: inline-block;
+        text-indent: 2rem;
+        font-weight: bold;
+    }
+</style>
+</html>

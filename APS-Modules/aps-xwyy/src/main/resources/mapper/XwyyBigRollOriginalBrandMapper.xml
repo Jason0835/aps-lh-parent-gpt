@@ -38,10 +38,6 @@
 
     <insert id="insertXwyyBigRollOriginalBrand"
             parameterType="com.zlt.aps.xwyy.api.domain.entity.XwyyBigRollOriginalBrand">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_PUBLIC.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_xwyy_big_roll_original_brand
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -85,44 +81,35 @@
 
     <delete id="deleteXwyyBigRollOriginalBrandById" parameterType="Long">
         update t_xwyy_big_roll_original_brand
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteXwyyBigRollOriginalBrandByIds" parameterType="String">
-        update t_xwyy_big_roll_original_brand set del_flag='1' where id in
+        update t_xwyy_big_roll_original_brand set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_xwyy_big_roll_original_brand a USING (
-        <foreach collection="list" item="item" separator=" union ">
-            select
-            #{item.id, jdbcType=DOUBLE} id, #{item.bigRollCode,jdbcType=VARCHAR} big_roll_code,
-            #{item.brand,jdbcType=VARCHAR} brand, #{item.delFlag,jdbcType=VARCHAR} del_flag,
-            #{item.createBy,jdbcType=VARCHAR} create_by, #{item.createTime, jdbcType=DATE} create_time,
-            #{item.updateBy,jdbcType=VARCHAR} update_by, #{item.updateTime, jdbcType=DATE} update_time,
-            #{item.remark,jdbcType=VARCHAR} remark from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_xwyy_big_roll_original_brand (
+        big_roll_code, brand, del_flag, create_by, create_time, remark
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.bigRollCode,jdbcType=VARCHAR},
+            #{item.brand,jdbcType=VARCHAR},
+            '0',
+            #{item.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{item.remark,jdbcType=VARCHAR}
+            )
         </foreach>
-        ) b ON (
-        a.big_roll_code = b.big_roll_code
-        AND a.brand = b.brand
-        AND a.del_flag = '0' )
-        WHEN MATCHED THEN
-        UPDATE
-        <set>
-            a.update_by = b.create_by
-            , a.update_time = sysdate
-            , a.remark = b.remark
-        </set>
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id, a.big_roll_code, a.brand, a.del_flag, a.create_by, a.create_time, a.remark
-        )
-        values (
-        SEQ_PUBLIC.NEXTVAL, b.big_roll_code, b.brand, 0, b.create_by, sysdate, b.remark
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

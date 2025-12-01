@@ -25,9 +25,31 @@ public interface TMesConstructionInfoMapper {
 	 * @return
 	 */
 	List<TMesConstructionMapping> selectTPlmBomConstructionMapping();
-
-	List<TMesPlmBomInfo> selectModifyPlmBomInfo(@Param("bomDataVersion") String bomDataVersion,
-			@Param("plmDataVersion") String plmDataVersion);
+	
+	/**
+	 * 取出所有BOM记录
+	 * @return
+	 */
+	List<TMesPlmBomInfo> selectBomInfo();
+    
+    /**
+     * 检查是否已存在施工记录
+     * @param param
+     * @return
+     */
+    Integer checkConstructionInfo(TMesConstructionParam param);
+    /**
+     * 更新施工记录
+     * @param param
+     * @return
+     */
+    int updateConstructionInfo(TMesConstructionParam param);
+    /**
+     * 新增施工记录
+     * @param param
+     * @return
+     */
+    int insertConstructionInfo(TMesConstructionParam param);
 
 	/**
 	 * 删除bom已废止的胎胚对应的施工版本记录
@@ -36,14 +58,6 @@ public interface TMesConstructionInfoMapper {
 	 * @return
 	 */
 	int deleteConstructionVersionInfo(@Param("dataVersion") String dataVersion);
-
-	/**
-	 * 查询中间库的施工表数据，需要根据bom版本或者plm参数版本查询需要更新的数据
-	 * 
-	 * @param ids 本次更新的BOM表胎胚ID
-	 * @return
-	 */
-	List<TMesConstructionInfo> selectTMesConstructionInfo(@Param("ids") List<Long> ids);
 
 	/**
 	 * 将中间库数据合并至施工表
@@ -78,8 +92,10 @@ public interface TMesConstructionInfoMapper {
 	 * 
 	 * @param bomIdList
 	 */
-	void mergeProductConstructionInfo(@Param("currentDate") Date currentDate);
+//	void mergeProductConstructionInfo(@Param("currentDate") Date currentDate);
 //	void mergeProductConstructionInfo(@Param("bomIdList") List<Long> bomIdList);
+	void updateProductConstructionInfo();
+    void addNewProductConstructionInfo();
 
 	/**
 	 * 清除掉已废止的投产施工记录

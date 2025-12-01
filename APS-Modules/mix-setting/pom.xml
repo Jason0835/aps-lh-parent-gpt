@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.zlt.aps</groupId>
+        <artifactId>aps-modules</artifactId>
+        <version>1.0.3-SNAPSHOT</version>
+    </parent>
+
+    <groupId>com.zlt.aps.mix.setting</groupId>
+    <artifactId>mix-setting</artifactId>
+    <name>mix-setting</name>
+    <description>排程设置工序模块</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+<!--        <dependency>-->
+<!--            <groupId>com.zlt</groupId>-->
+<!--            <artifactId>zlt-module-starter</artifactId>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.nacos</groupId>
+            <artifactId>nacos-client</artifactId>
+<!--            <version>2.0.4</version>-->
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-alibaba-commons</artifactId>
+<!--            <version>2021.1</version>-->
+        </dependency>
+        
+        <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
+<!--        <dependency>-->
+<!--            <groupId>com.github.xiaoymin</groupId>-->
+<!--            <artifactId>swagger-bootstrap-ui</artifactId>-->
+<!--        </dependency>-->
+
+        <dependency>
+            <groupId>com.zlt.aps.mix.setting</groupId>
+            <artifactId>mix-setting-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <!-- MIX公共模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>mix-common-core</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <!-- 和客户做接口的jar -->
+        <!--        <dependency>-->
+        <!--            <groupId>com.zlt</groupId>-->
+        <!--            <artifactId>zlt-sync-data</artifactId>-->
+        <!--        </dependency>-->
+        <!-- 操作日志jar -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+    </dependencies>
+
+<!--    <build>-->
+<!--        <finalName>${project.artifactId}</finalName>-->
+<!--        <plugins>-->
+<!--            <plugin>-->
+<!--                <groupId>org.springframework.boot</groupId>-->
+<!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <goals>-->
+<!--                            <goal>repackage</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--        </plugins>-->
+<!--    </build>-->
+
+<!--    <distributionManagement>-->
+<!--        <snapshotRepository>-->
+<!--            <id>local-snapshot</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>-->
+<!--        </snapshotRepository>-->
+
+<!--        <repository>-->
+<!--            <id>local-release</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>-->
+<!--        </repository>-->
+
+<!--    </distributionManagement>-->
+
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>local-snapshot</id>-->
+<!--            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>-->
+<!--            <releases>-->
+<!--                <enabled>true</enabled>-->
+<!--            </releases>-->
+<!--            <snapshots>-->
+<!--                &lt;!&ndash; 默认不下载快照版本，这里开启下载快照版本到本地仓库 &ndash;&gt;-->
+<!--                <enabled>true</enabled>-->
+<!--            </snapshots>-->
+<!--        </repository>-->
+<!--    </repositories>-->
+
+</project>

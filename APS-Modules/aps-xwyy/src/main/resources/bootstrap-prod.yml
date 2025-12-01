@@ -2,39 +2,50 @@ server:
   port: 9009
 
 nacos:
-  server-addr: 192.168.3.112:9917,192.168.3.115:9917,192.168.3.122:9917
-#  server-addr: 127.0.0.1:8848
+  server-addr: 10.135.55.216:8848
+  run-group: APS_PROD_GROUP
+  cfg-group: APS_PROD_GROUP
+  run-namespace: prod
+  cfg-namespace: prod
 
-# Spring
+## Spring
 spring:
   cloud:
     nacos:
       discovery:
         # 服务注册地址
-        namespace: prod
-        group: APS_PROD_GROUP
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.run-group}
+        namespace: ${nacos.run-namespace}
       config:
+        # 配置中心地址
+        server-addr: ${nacos.server-addr}
+        group: ${nacos.cfg-group}
+        namespace: ${nacos.cfg-namespace}
+        # 配置文件格式
+        file-extension: yml
         shared-configs[0]:
           data-id: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
         shared-configs[1]:
           data-id: druid_aps_${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
         shared-configs[2]:
           data-id: system-frame-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
         shared-configs[3]:
           data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
         shared-configs[4]:
           data-id: zipkin-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
         shared-configs[5]:
           data-id: sync-data-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: PROD_GROUP
+          group: ${nacos.cfg-group}
+        shared-configs[6]:
+          data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          group: ${nacos.cfg-group}
         refresh-enabled: true
-        namespace: prod
-        group: PROD_GROUP
 mq:
   scheduleLog:
     queue: prod.xwyy.schedule.log.queue

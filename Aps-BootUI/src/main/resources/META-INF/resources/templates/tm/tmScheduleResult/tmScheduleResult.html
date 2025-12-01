@@ -28,7 +28,7 @@
                         </li>
                         <li>
                             [[#{ui.data.column.scheduleResult.glueCode}]]：
-                            <input type="text" name="glueCode"/>
+                            <input type="text" name="wholeGlueCode"/>
                         </li>
                         <li>
                             [[#{ui.data.column.scheduleResult.mouthPlateCode}]]：
@@ -112,8 +112,8 @@
                shiro:hasPermission="tm:tmScheduleResult:export">
                 <i class="fa fa-upload"></i> [[#{ui.frame.btn.export}]]
             </a>
-            <a class="btn btnPutAway btn-info" onclick="$.operate.importScheduleData2()" shiro:hasPermission="tm:tmScheduleResult:import2">
-                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import2}]]
+            <a class="btn btnPutAway btn-info" onclick="importData2()" shiro:hasPermission="tm:tmScheduleResult:import2">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.name.import}]]2
             </a>
             <a class="btn btnPutAway btn-primary" onclick="changeReleaseStatus()" shiro:hasRole="admin">
                 <i class="fa fa-edit"></i> [[#{ui.data.column.scheduleResult.changeReleaseStatus}]]
@@ -958,6 +958,12 @@
     //点击显示更多按钮
     var moreBtns = function () {
         $("#moreBtnPanl").show();
+    }
+
+    function importData2() {
+        table.set();
+        var url = table.options.importUrl2;
+        $.modal.open(frame.btn.import + table.options.modalName + frame.title.data, url, 420, 450, '', true);
     }
 </script>
 </body>

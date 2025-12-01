@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('汇总胶料需求计划')"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-glueCollectPlan-summaryPlan">
+        <div class="form-group">
+            <label class="col-sm-3 control-label is-required">[[#{schedule.glueCollectPlan.planDate}]]：</label>
+            <div class="col-sm-8">
+                <div class="input-group">
+                    <input id="planDate" name="planDate" class="form-control time-input" placeholder="yyyy-MM-dd"
+                           type="text"
+                           th:value="${initDate}" required>
+                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/glueCollectPlan";
+    $("#form-glueCollectPlan-summaryPlan").validate({
+        focusCleanup: true
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            $.ajax({
+                url: prefix + "/checkPlanDateExist",
+                type: "post",
+                dataType: "json",
+                data: {
+                    "planDate": $("#planDate").val()
+                },
+                success: function (result) {
+                    if (result.code == web_status.SUCCESS) {
+                        if (result.msg == '1') {
+                            $.modal.confirm([[#{schedule.glueCollectPlan.database.exist.tip}]], function () {
+                                submitData();
+                            })
+                        } else if (result.msg == '0') {
+                            submitData();
+                        }
+                    } else {
+                        $.modal.alertWarning(result.msg);
+                    }
+                }
+            });
+        }
+    }
+
+    function submitData() {
+        //清空父级搜索，并设置日期
+        window.parent.$('#glue').val('');
+        window.parent.$('#mixArea').val('');
+        window.parent.$("#planDate").val($("#planDate").val());
+
+        //设置密炼区目前选中的显示
+        let mixAreaText = window.parent.$('#mixArea').find("option:selected").text();
+        window.parent.$('#select2-mixArea-container').text(mixAreaText);
+
+        $.operate.save(prefix + "/summaryPlan", $('#form-glueCollectPlan-summaryPlan').serialize());
+    }
+</script>
+</body>
+</html>

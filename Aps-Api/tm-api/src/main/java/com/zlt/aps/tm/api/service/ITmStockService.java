@@ -22,7 +22,7 @@ public interface ITmStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/tm/stock/list")
     TableDataInfo list(@RequestBody TmStock stock);
 	
 	/**
@@ -30,7 +30,7 @@ public interface ITmStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/tm/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 	
 	/**
@@ -38,7 +38,7 @@ public interface ITmStockService {
      * @param tTmStock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/tm/stock")
     AjaxResult add(@Validated @RequestBody TmStock tTmStock);
 
 
@@ -47,13 +47,13 @@ public interface ITmStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectTmStockById/{id}")
+    @GetMapping(value = "/tm/stock/selectTmStockById/{id}")
     TmStock selectTmStockById(@PathVariable("id") Long id);
 	
 	/**
      * 导出胎面库存信息
      */
-  /*  @PostMapping("/stock/export")
+  /*  @PostMapping("/tm/stock/export")
     void export(HttpServletResponse response, TTmStock tTmStock) throws IOException;*/
 
     /**
@@ -61,7 +61,7 @@ public interface ITmStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/tm/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface ITmStockService {
      * @param tTmStock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/tm/stock")
     AjaxResult edit(@Validated @RequestBody TmStock tTmStock);
 
     /**
@@ -77,10 +77,10 @@ public interface ITmStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/tm/stock/exportList")
     List<TmStock> exportList(@RequestBody TmStock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/tm/stock/importData")
     @ApiOperation("导入胎面定点机台信息")
     public AjaxResult importData(@RequestBody List<TmStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

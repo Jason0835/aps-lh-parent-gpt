@@ -755,7 +755,7 @@
 
     <!--根据排程日期进行排程结果记录删除-->
     <delete id="deleteScheduleStopInfoByScheduleDate" parameterType="String">
-        update T_CX_SCHEDULE_STOP_INFO set del_flag='1',update_time = sysdate
+        update T_CX_SCHEDULE_STOP_INFO set del_flag='1',update_time = now()
         <where>
            del_flag='0'
             <if test="scheduleDate!=null">
@@ -768,7 +768,7 @@
     </delete>
 
     <!--Joran 2022-03-31 自动排程时停排信息记录end-->
-    
+
     <!-- 查询多版本施工版本信息，用于成型计划导入。
     如果7天内有成型排产记录会打标记，但是只需要到排产日前一天，当天成型排程会在导入之后全部清除掉，因此不纳入考虑范围 -->
     <select id="listMultipleVersionConstruction" resultType="com.zlt.aps.cx.api.domain.dto.CxProductConstructionInfoDto">
@@ -777,10 +777,10 @@
 			SELECT #{embryoCode} EMBRYO_CODE FROM dual
 		</foreach>
 		)
-		SELECT C.EMBRYO_CODE, 
-		       C.EMBRYO_VERSION, 
+        SELECT C.EMBRYO_CODE,
+        C.EMBRYO_VERSION,
 		       C.CREATE_TIME,
-		       C.id, 
+        C.id,
 		       CASE WHEN R.ID IS NOT NULL THEN 'TRUE'
 		            ELSE 'FALSE'
 		        END IS_SCHEDULE_FLAG

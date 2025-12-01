@@ -20,13 +20,13 @@ import java.io.Serializable;
 @Getter
 @TableName("T_TC_GLUE_GROUP_ORDER")
 @ApiModel(value = "TcGlueGroupOrder对象", description = "胎侧胶料组别顺序维护")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class TcGlueGroupOrder extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1110056585174675869L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC", position = 10)
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "胶料组别code", position = 20)

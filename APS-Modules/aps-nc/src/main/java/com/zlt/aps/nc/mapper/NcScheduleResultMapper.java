@@ -1,7 +1,9 @@
 package com.zlt.aps.nc.mapper;
 
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -14,7 +16,7 @@ import java.util.Map;
  * @author zlt
  * @date 2021-06-24
  */
-public interface NcScheduleResultMapper {
+public interface NcScheduleResultMapper extends CommBaseMapper<NcScheduleResult> {
     /**
      * 查询内衬排程结果
      *
@@ -26,26 +28,26 @@ public interface NcScheduleResultMapper {
     /**
      * 查询内衬排程结果列表
      *
-     * @param tcScheduleResult 内衬排程结果
+     * @param NcScheduleResult 内衬排程结果
      * @return 内衬排程结果集合
      */
-    public List<NcScheduleResult> selectNcScheduleResultList(NcScheduleResult tcScheduleResult);
+    public List<NcScheduleResult> selectNcScheduleResultList(NcScheduleResult NcScheduleResult);
 
     /**
      * 新增内衬排程结果
      *
-     * @param tcScheduleResult 内衬排程结果
+     * @param NcScheduleResult 内衬排程结果
      * @return 结果
      */
-    public int insertNcScheduleResult(NcScheduleResult tcScheduleResult);
+    public int insertNcScheduleResult(NcScheduleResult NcScheduleResult);
 
     /**
      * 修改内衬排程结果
      *
-     * @param tcScheduleResult 内衬排程结果
+     * @param NcScheduleResult 内衬排程结果
      * @return 结果
      */
-    public int updateNcScheduleResult(NcScheduleResult tcScheduleResult);
+    public int updateNcScheduleResult(NcScheduleResult NcScheduleResult);
 
     /**
      * 删除内衬排程结果
@@ -68,7 +70,7 @@ public interface NcScheduleResultMapper {
      *
      * @param ids
      */
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
     /**
      * 保存发布日志
@@ -127,7 +129,7 @@ public interface NcScheduleResultMapper {
      * @return 影响行数
      */
     public int updatePublishRecord(SchedulePublishRecord schedulePublishRecord);
-    
+
 	/**
 	 * 更新发布日志状态
 	 *
@@ -159,4 +161,44 @@ public interface NcScheduleResultMapper {
      * @return 查询到的记录
      */
     List<NcScheduleResult> selectByScheduleDateAndCode(NcScheduleResult scheduleResult);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(NcScheduleResult scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(NcScheduleResult scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(NcScheduleResult scheduleResult);
+
+    /**
+     * 获取昨日早班计划量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<NcScheduleResult> getLastDayPlanQty4List(NcScheduleResult tmScheduleResult);
+
+    /**
+     * 获取成型消耗量-具体到每个规格
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    List<NcScheduleResult> getCxConsume4List(NcScheduleResult tmScheduleResult);
 }

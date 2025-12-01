@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueStockMapper">
+
+    <select id="selectGlueStockList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueStock"
+            resultType="com.zlt.mix.setting.api.domain.dto.GlueStockDto">
+        select gs.id, gs.stock_date, gs.mix_area, gs.glue, gs.stock_num,
+        s.SAFE_STOCK,
+        gs.remark,
+        gs.del_flag,
+        gs.create_by,
+        gs.create_time,
+        gs.update_by,
+        gs.update_time,
+        gs.bar_code,
+        gs.valid_time,
+        gs.stock_weight
+        from t_glue_stock gs
+        left join t_glue_safe_stock s on gs.mix_area=s.mix_area and gs.glue=s.glue and s.del_flag = '0'
+        where gs.del_flag = '0'
+        <if test="stockDate != null ">and gs.stock_date = #{stockDate}</if>
+        <if test="mixArea != null  and mixArea != ''">and gs.mix_area = #{mixArea}</if>
+        <if test="glue != null  and glue != ''">and INSTR(gs.glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by stock_date desc,valid_time asc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueStockByIds" parameterType="String">
+        update t_glue_stock set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueStockNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber} row_numbers, #{data.stockDate,jdbcType=TIMESTAMP}
+            STOCK_DATE,#{data.barCode,jdbcType=VARCHAR}
+            BAR_CODE
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_glue_stock m
+        inner join temp_table t on m.STOCK_DATE = t.STOCK_DATE and m.BAR_CODE = t.BAR_CODE and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueStockInfo">
+        insert into t_glue_stock
+        (id,stock_date,mix_area,glue,stock_num,remark,del_flag,create_by,create_time,update_by,update_time,bar_code,valid_time,stock_weight
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="tGlueStock" separator=" union all ">
+            select
+            #{tGlueStock.stockDate,jdbcType=TIMESTAMP} stock_date, #{tGlueStock.mixArea,jdbcType=VARCHAR} mix_area,
+            #{tGlueStock.glue,jdbcType=VARCHAR} glue, #{tGlueStock.stockNum,jdbcType=DOUBLE} stock_num,
+            #{tGlueStock.remark,jdbcType=VARCHAR} remark, #{tGlueStock.delFlag,jdbcType=VARCHAR} del_flag,
+            #{tGlueStock.createBy,jdbcType=VARCHAR} create_by, #{tGlueStock.createTime,jdbcType=TIMESTAMP} create_time,
+            #{tGlueStock.updateBy,jdbcType=VARCHAR} update_by, #{tGlueStock.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{tGlueStock.barCode,jdbcType=VARCHAR} BAR_CODE,#{tGlueStock.validTime,jdbcType=TIMESTAMP} VALID_TIME,
+            #{tGlueStock.stockWeight,jdbcType=DOUBLE} stock_weight
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_glue_stock a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.stockDate, jdbcType=TIMESTAMP} stock_date,
+            #{item.mixArea,jdbcType=VARCHAR} mix_area, #{item.glue,jdbcType=VARCHAR} glue,
+            #{item.stockNum, jdbcType=DOUBLE} stock_num, #{item.remark,jdbcType=VARCHAR} remark,
+            #{item.delFlag,jdbcType=VARCHAR} del_flag, #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time, #{item.updateBy,jdbcType=VARCHAR} update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time,
+            #{item.barCode, jdbcType=VARCHAR} bar_code,
+            #{item.validTime, jdbcType=TIMESTAMP} valid_time,
+            #{item.stockWeight, jdbcType=DOUBLE} stock_weight
+            from dual
+        </foreach>
+        ) b ON ( a.stock_date = b.stock_date AND a.bar_code = b.bar_code AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.stock_num = b.stock_num, a.remark =
+            b.remark, a.update_by = b.create_by,
+            a.update_time = now(),
+            a.mix_area = b.mix_area,
+            a.glue = b.glue,
+            a.valid_time = b.valid_time,
+            a.stock_weight = b.stock_weight
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.stock_date, a.mix_area, a.glue, a.stock_num, a.remark, a.del_flag, a.create_by,
+        a.create_time,a.bar_code,a.valid_time,a.stock_weight)
+        values ( get_sequence_nextval('seq_t_glue_stock'), b.stock_date, b.mix_area, b.glue, b.stock_num, b.remark, 0,
+        b.create_by,now(),
+        b.bar_code,b.valid_time,b.stock_weight)
+    </update>
+</mapper>

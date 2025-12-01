@@ -1,13 +1,14 @@
 package com.zlt.aps.template.tq;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "胎圈定点机台导入模板", description = "胎圈定点机台导入模板")
-public class TqSpecifyMachineTemp {
+public class TqSpecifyMachineTemp extends ApsBaseEntity {
 
     @ApiModelProperty(value = "胎圈代码")
     @Excel(name = "ui.tq.specifyMachine.column.beadCode")

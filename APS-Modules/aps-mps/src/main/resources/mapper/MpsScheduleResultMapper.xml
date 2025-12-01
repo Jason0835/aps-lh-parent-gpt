@@ -152,7 +152,7 @@
     		USING (
         <foreach collection="statusList" item="status" separator=" union ">
         	<if test="status.isModify">
-			   SELECT #{status.productionStatus} PRODUCTION_STATUS, 
+                SELECT #{status.productionStatus} PRODUCTION_STATUS,
 			   		  #{status.markCloseOutTip} MARK_CLOSE_OUT_TIP,
 			   		  #{status.orderNo} ORDER_NO
 		         FROM DUAL
@@ -175,7 +175,7 @@
     </update>
     <update id="updateProductionStatusByOrderNoIn">
         update t_cx_schedule_result
-        set production_status = '1', UPDATE_TIME = sysdate
+        set production_status = '1', UPDATE_TIME = now()
         where
         production_status = '0'
         and
@@ -186,7 +186,7 @@
     </update>
     <update id="updateLhProductionStatusByOrderNoIn">
         update T_LH_SCHEDULE_RESULT
-        set production_status = '3', UPDATE_TIME = SYSDATE
+        set production_status = '3', UPDATE_TIME = now()
         where
         production_status = '2'
         and

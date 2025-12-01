@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.SettingScheduleParamsMapper">
+
+
+    <select id="selectParamsList"
+            parameterType="com.zlt.mix.setting.api.domain.entity.SettingScheduleParams"
+            resultType="com.zlt.mix.setting.api.domain.entity.SettingScheduleParams">
+        select id, MIX_AREA, PARAM_CODE, PARAM_NAME,PARAM_VALUE,REGULAR_EXPRESSION,ERROR_TIPS, remark, del_flag,
+        create_by, create_time, update_by, update_time from
+        T_SCHEDULE_PARAMS
+        where del_flag = '0'
+        <if test="paramCode != null  and paramCode != ''">and INSTR(PARAM_CODE, #{paramCode}) > 0</if>
+        <if test="paramName != null  and paramName != ''">and INSTR(PARAM_NAME, #{paramName}) > 0</if>
+        <if test="mixArea != null  and mixArea != '' ">and MIX_AREA=#{mixArea}</if>
+        <if test="orderStr == null">
+            order by mix_area
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+    
+    <!-- 加载指定密炼区的胶料排程参数设置 -->
+    <select id="selectParamsListMixArea" resultType="com.zlt.mix.setting.api.domain.entity.SettingScheduleParams">
+	    SELECT DISTINCT
+		  PARAM_CODE, PARAM_VALUE, PARAM_NAME 
+		FROM (
+		  SELECT CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_CODE ELSE a.PARAM_CODE END PARAM_CODE,
+		         CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_NAME ELSE a.PARAM_NAME END PARAM_NAME,
+		         CASE WHEN b.PARAM_CODE IS NOT NULL THEN b.PARAM_VALUE ELSE a.PARAM_VALUE END PARAM_VALUE
+		    
+		    LEFT JOIN T_SCHEDULE_PARAMS A
+		      ON a.mix_area = '0'
+		     AND a.DEL_FLAG = '0'
+		    LEFT JOIN T_SCHEDULE_PARAMS B
+		      ON A.Param_Code = b.param_code
+		     AND b.mix_area = #{mixArea, jdbcType=VARCHAR}
+		     AND b.del_flag = 0
+		) WHERE PARAM_CODE IS NOT NULL
+            <if test="paramCode != null  and paramCode != ''">AND PARAM_CODE = #{paramCode}</if>
+    </select>
+</mapper>

@@ -110,4 +110,6 @@ public interface TqEngineMapper {
      * @return
      */
     List<String> listAssistSpec();
+
+    int batchUpdateBatchNoAndOrderNo(@Param("list") List<TqScheduleResultVo> scheduleResultVoList);
 }

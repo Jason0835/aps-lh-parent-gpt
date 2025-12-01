@@ -8,11 +8,10 @@ import lombok.Data;
 @Data
 public class TcTotalPlanQtyVo {
 
-    public TcTotalPlanQtyVo() {
-        this.totalDayPlanQty = 0D;
-        this.totalNightPlanQty = 0D;
-        this.totalPlanQty = 0D;
-    }
+    /**
+     * 次日早班总计划量
+     */
+    private Double totalNextDayPlanQty;
 
     /**
      * 中班总计划量
@@ -23,6 +22,13 @@ public class TcTotalPlanQtyVo {
      * 夜班总计划量
      */
     private Double totalNightPlanQty;
+
+    public TcTotalPlanQtyVo() {
+        this.totalDayPlanQty = 0D;
+        this.totalNightPlanQty = 0D;
+        this.totalPlanQty = 0D;
+        this.totalNextDayPlanQty = 0D;
+    }
 
     /**
      * 总计划量

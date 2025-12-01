@@ -32,10 +32,6 @@
     </select>
 
     <insert id="insertImportErrorLog" parameterType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_IMPORT_LOG.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_import_error_log
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
@@ -81,12 +77,12 @@
 
     <delete id="deleteImportErrorLogById" parameterType="Long">
         update t_import_error_log
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteImportErrorLogByIds" parameterType="String">
-        update t_import_error_log set del_flag='1' where id in
+        update t_import_error_log set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -94,17 +90,16 @@
 
     <insert id="insertImportErrorLogList" parameterType="list">
         insert into t_import_error_log (id, import_log_id, error_row, error_detail, remark, create_by, create_time)
-        select SEQ_IMPORT_LOG.NEXTVAL AS ID, x.*
-        from (
-        <foreach collection="list" item="importErrorLog" separator=" union ">
-            select #{importErrorLog.importLogId  ,jdbcType=DOUBLE} as import_log_id,
+        VALUES
+        <foreach collection="list" item="importErrorLog" separator=",">
+            (NULL,
+            #{importErrorLog.importLogId  ,jdbcType=DOUBLE} as import_log_id,
             #{importErrorLog.errorRow      ,jdbcType=DOUBLE} as error_row,
             #{importErrorLog.errorDetail   ,jdbcType=VARCHAR} as error_detail,
             #{importErrorLog.remark         ,jdbcType=VARCHAR} as remark,
             #{importErrorLog.createBy      ,jdbcType=VARCHAR} as create_by,
-            sysdate as create_time
-            from dual
+            now() as create_time
+            )
         </foreach>
-        ) x
     </insert>
 </mapper>

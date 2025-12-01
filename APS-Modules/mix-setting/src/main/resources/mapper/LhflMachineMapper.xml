@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.LhflMachineMapper">
+
+    <select id="selectLhflMachineList" parameterType="com.zlt.mix.setting.api.domain.entity.LhflMachine"
+            resultType="com.zlt.mix.setting.api.domain.entity.LhflMachine">
+        select id, mix_area, machine_code, machine_name, class_shift, capacity, remark,status, del_flag, create_by,
+        create_time, update_by, update_time, mid_status, night_status, day_status from t_lhfl_machine
+        where del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and mix_area = #{mixArea}</if>
+        <if test="status != null  and status != ''">and status = #{status}</if>
+        <if test="machineName != null  and machineName != ''">and INSTR(machine_name, #{machineName}) > 0</if>
+        <if test="orderStr == null">
+            order by machine_name
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteLhflMachineByIds" parameterType="String">
+        update t_lhfl_machine set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listLhflMachineNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR}
+            mix_area,#{data.machineCode,jdbcType= VARCHAR}
+            machine_code 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_lhfl_machine m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_code = t.machine_code and m.del_flag ='0'
+    </select>
+
+    <select id="listLhflMachineNotUnique2" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR} mix_area,
+            #{data.machineName,jdbcType= VARCHAR} machine_name 
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_lhfl_machine m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_name = t.machine_name and m.del_flag ='0'
+    </select>
+
+    <select id="listLhflMachineNotUnique3" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType= VARCHAR} mix_area,
+            #{data.machineName,jdbcType= VARCHAR} machine_name,
+            #{data.machineCode,jdbcType= VARCHAR} machine_code
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_lhfl_machine m
+        inner join temp_table t on m.mix_area = t.mix_area and m.machine_name = t.machine_name  and m.machine_code!=t.machine_code and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertLhflMachineInfo">
+        insert into t_lhfl_machine
+        (id,mix_area,machine_code,machine_name,class_shift,capacity,remark,status,mid_status, night_status, day_status,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="lhflMachine" separator=" union all ">
+            select
+            #{lhflMachine.mixArea,jdbcType= VARCHAR} mix_area, #{lhflMachine.machineCode,jdbcType= VARCHAR}
+            machine_code, #{lhflMachine.machineName,jdbcType= VARCHAR} machine_name,
+            #{lhflMachine.classShift,jdbcType=DOUBLE} class_shift, #{lhflMachine.capacity,jdbcType=DOUBLE} capacity,
+            #{lhflMachine.remark,jdbcType= VARCHAR} remark,
+            #{lhflMachine.status,jdbcType=VARCHAR} status,
+            #{mixMachine.midStatus,jdbcType=VARCHAR} mid_status,
+            #{mixMachine.nightStatus,jdbcType=VARCHAR} night_status,
+            #{mixMachine.dayStatus,jdbcType=VARCHAR} day_status,
+            #{lhflMachine.delFlag,jdbcType= VARCHAR} del_flag,
+            #{lhflMachine.createBy,jdbcType= VARCHAR} create_by, #{lhflMachine.createTime,jdbcType=TIMESTAMP} create_time,
+            #{lhflMachine.updateBy,jdbcType= VARCHAR} update_by, #{lhflMachine.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lhfl_machine a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.mixArea,jdbcType=VARCHAR } mix_area,
+            #{item.machineCode,jdbcType=VARCHAR } machine_code, #{item.machineName,jdbcType=VARCHAR } machine_name,
+            #{item.classShift,} class_shift, #{item.capacity, jdbcType=DOUBLE} capacity,
+            #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.status,jdbcType=VARCHAR} status, 
+            #{item.midStatus,jdbcType=VARCHAR} mid_status,
+            #{item.nightStatus,jdbcType=VARCHAR} night_status,
+            #{item.dayStatus,jdbcType=VARCHAR} day_status,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag,
+            #{item.createBy,jdbcType=VARCHAR } create_by, #{item.createTime, jdbcType=TIMESTAMP} create_time,
+            #{item.updateBy,jdbcType=VARCHAR } update_by, #{item.updateTime, jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) b ON ( a.mix_area = b.mix_area and a.machine_code = b.machine_code and
+        a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.machine_name = b.machine_name，
+            a.class_shift = b.class_shift, a.capacity = b.capacity, a.remark = b.remark,a.status=b.status, 
+            a.mid_status = b.mid_status,
+            a.night_status = b.night_status,
+            a.day_status = b.day_status,
+            a.update_by = b.create_by,
+            a.update_time = now()
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.mix_area, a.machine_code, a.machine_name, a.class_shift, a.capacity, a.remark,a.status,a.mid_status,a.night_status,a.day_status,a.del_flag, a.create_by,
+        a.create_time )
+        values ( get_sequence_nextval('seq_t_lhfl_machine'),b.mix_area, b.machine_code, b.machine_name, b.class_shift, b.capacity,
+        b.remark,b.status,b.mid_status,b.night_status,b.day_status, 0, b.create_by, now()
+        )
+    </update>
+</mapper>

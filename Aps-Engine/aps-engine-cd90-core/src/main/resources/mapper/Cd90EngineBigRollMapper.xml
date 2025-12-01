@@ -4,9 +4,17 @@
 	<!-- 查询帘线大卷配置信息 -->
     <select id="listCd90BigRoll" resultType="com.zlt.aps.cd90.engine.vo.Cd90BigRollVo">
         SELECT BIG_ROLL_CODE,
-               NVL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
+               IFNULL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
           FROM T_CD90_BIG_ROLL
          WHERE DEL_FLAG = '0'
          GROUP BY BIG_ROLL_CODE
+    </select>
+
+    <select id="listCd90CurlLength" resultType="com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength">
+        SELECT CLOTH_CODE,
+               IFNULL(MAX(CURL_LENGTH), 0) CURL_LENGTH
+          FROM T_CD90_CURL_LENGTH
+         WHERE IS_DELETE = 0
+         GROUP BY CLOTH_CODE
     </select>
 </mapper>

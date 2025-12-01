@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.LhMonthPlanSurplusDetailMapper">
+
+    <select id="selectParamDetailList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail">
+        select * from T_LH_MONTH_PLAN_SURPLUS_DETAIL
+        where IS_DELETE = 0
+        <!-- 目前能保证六个字段都不能为空，暂不考虑拼接的方式 -->
+        and (YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE, LOCATION_TYPE) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.productCode}, #{item.specCode}, #{item.locationType})
+        </foreach>
+    </select>
+    
+    <select id="selectParamList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail">
+        select * from T_LH_MONTH_PLAN_SURPLUS_DETAIL
+        where IS_DELETE = 0
+        <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
+        and (YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.productCode}, #{item.specCode})
+        </foreach>
+        order by id desc
+    </select>
+    
+    <select id="selectDetailList" resultType="com.zlt.aps.monthplan.api.domain.vo.LhMonthPlanSurplusDetailVo">
+        SELECT
+        FACTORY_CODE,
+        PRODUCT_CODE,
+        LOCATION_TYPE,
+        START_DATE beginDay,
+        END_DATE endDay,
+        PRODUCTION_QTY planQty,
+        COMPLETE_QTY finishQty
+        FROM T_LH_MONTH_PLAN_SURPLUS_DETAIL
+        WHERE IS_DELETE = 0
+        <if test="year !=null">
+            and year = #{year}
+        </if>
+        <if test="month != null">
+            and month = #{month}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">
+            and factory_code = #{factoryCode}
+        </if>
+        <if test="productCode != null and productCode != ''">
+            and product_code like concat(concat('%', #{productCode}), '%')
+        </if>
+    </select>
+    
+</mapper>

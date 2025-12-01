@@ -23,15 +23,15 @@ import java.util.List;
 
 @Api(tags = {"90度裁断帘布大卷信息接口"})
 @RestController
-@RequestMapping("/bigRoll")
+@RequestMapping("/cd90/bigRoll")
 public class Cd90BigRollController extends BaseController {
 
     @Resource
     private Cd90BigRollService Cd90BigRollService;
 
     @ApiOperation("根据条件查询帘布大卷信息列表")
-    @GetMapping("/listBigRoll")
-    public TableDataInfo listBigRoll(Cd90BigRollDto dto) {
+    @PostMapping("/listBigRoll")
+    public TableDataInfo listBigRoll(@RequestBody Cd90BigRollDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<Cd90BigRollDto> list = Cd90BigRollService.listBigRoll(dto);
@@ -78,8 +78,8 @@ public class Cd90BigRollController extends BaseController {
 
     @Log(title = "ui.cd90.bigRoll.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<Cd90BigRollDto> exportData(Cd90BigRollDto dto) {
+    @PostMapping("/exportData")
+    public List<Cd90BigRollDto> exportData(@RequestBody Cd90BigRollDto dto) {
         dto.setOrderStr(orderStr());
         List<Cd90BigRollDto> list = Cd90BigRollService.listBigRoll(dto);
         return list;

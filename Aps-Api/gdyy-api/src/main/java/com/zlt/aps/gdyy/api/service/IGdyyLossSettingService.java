@@ -22,52 +22,52 @@ public interface IGdyyLossSettingService {
     /**
      * 查询钢带压延损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/gdyy/loss/list")
     TableDataInfo list(@RequestBody GdyyLossSettingDto dto);
 
     /**
     * 新增钢带压延损耗率设定
     */
-    @PostMapping("/loss/add")
+    @PostMapping("/gdyy/loss/add")
     AjaxResult add(@RequestBody GdyyLossSettingDto dto);
 
     /**
      * 修改钢带压延损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/gdyy/loss/edit")
     AjaxResult edit(@RequestBody GdyyLossSettingDto dto);
 
     /**
      * 删除钢带压延损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/gdyy/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/gdyy/loss/{id}")
     GdyyLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验钢带压延损耗率设定唯一性
      */
-    @PostMapping("/loss/checkGdyyLossSettingUnique")
+    @PostMapping("/gdyy/loss/checkGdyyLossSettingUnique")
     String checkGdyyLossSettingUnique(@RequestBody GdyyLossSettingDto dto);
 
     /**
      * 导出钢带压延损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/gdyy/loss/getList")
     List<GdyyLossSettingDto> getList(@RequestBody GdyyLossSettingDto dto);
 
-    @PostMapping("/loss/importData")
+    @PostMapping("/gdyy/loss/importData")
     @ApiOperation("导入钢带压延损耗率设定")
     public AjaxResult importData(@RequestBody List<GdyyLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/gdyy/loss/deleteAll")
     AjaxResult deleteAll();
 
 }

@@ -3,6 +3,7 @@ package com.zlt.aps.tc.api.domain.dto;
 import java.math.BigDecimal;
 
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 
 import io.swagger.annotations.ApiModel;
@@ -11,7 +12,7 @@ import lombok.Data;
 
 @Data
 @ApiModel(value = "胎侧卷曲信息维护导入模板", description = "胎侧卷曲信息维护导入模板")
-public class TcCurlRollDto {
+public class TcCurlRollDto extends BaseEntity {
 	
 	private Long id;
 

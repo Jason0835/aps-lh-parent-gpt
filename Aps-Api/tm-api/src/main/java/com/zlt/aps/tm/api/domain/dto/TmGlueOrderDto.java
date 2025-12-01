@@ -23,37 +23,45 @@ public class TmGlueOrderDto extends ApsBaseDto implements Serializable {
 
     private static final long serialVersionUID = 1110056585174675869L;
 
-    @ApiModelProperty(value = "主键ID", position = 10)
+    @ApiModelProperty(value = "主键ID", position = 10,hidden = true)
     private Long id;
 
-    @ApiModelProperty(value = "胶料组别id", position = 20)
+    @ApiModelProperty(value = "胶料组别id", position = 20,hidden = true)
     private Long glueGroupId;
 
-    @ApiModelProperty(value = "胶料组别代码", position = 21)
+    @ApiModelProperty(value = "胶料组别代码", position = 21,hidden = true)
     @Excel(name = "ui.glueGroup.column.glueGroupCode")
     @ImportValidated(required = true, isCode = true, maxLength = 30)
     private String glueGroupCode;
 
-    @ApiModelProperty(value = "胶料组别名称", position = 22)
+    @ApiModelProperty(value = "胶料组别名称", position = 22,hidden = true)
     @Excel(name = "ui.glueGroup.column.glueGroupName")
     private String glueGroupName;
 
-    @ApiModelProperty(value = "胶料编号", position = 30)
+    @ApiModelProperty(value = "胶料编号", position = 30,hidden = true)
     @Excel(name = "ui.glueOrder.column.glueCode")
     @ImportValidated(name = "ui.glueOrder.column.glueCode", required = true, isCode = true, maxLength = 30)
     private String glueCode;
 
-    @ApiModelProperty(value = "胶料生产顺序", position = 40)
+    @ApiModelProperty(value = "胶料生产顺序", position = 40,hidden = true)
     @Excel(name = "ui.glueOrder.column.orderNum")
     @ImportValidated(name = "ui.glueOrder.column.orderNum", required = true, digits = true,min=0, max = 999)
     private Integer orderNum;
 
-    @ApiModelProperty(value = "组别胶料生产顺序", position = 41)
+    @ApiModelProperty(value = "机台ID", position = 40, hidden = true)
+    private Long machineId;
+
+    @ApiModelProperty(value = "组别胶料生产顺序", position = 41,hidden = true)
     @Excel(name = "组别胶料生产顺序")
     private String glueGroupOrderNum;
 
-    @ApiModelProperty(value = "备注", position = 50)
+    @ApiModelProperty(value = "备注", position = 50,hidden = true)
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(name = "ui.common.column.remark", maxLength = 300)
     private String remark;
+
+    @ApiModelProperty(value = "机台名称", position = 40, hidden = true)
+//    @Excel(name = "ui.data.column.machine.machineName")
+    @ImportValidated(required = true)
+    private String machineName;
 }

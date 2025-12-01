@@ -60,15 +60,11 @@
     </select>
 
     <insert id="insertGsqLossSetting" parameterType="com.zlt.aps.gsq.entity.GsqLossSetting">
-        <selectKey keyProperty="id" resultType="long" order="BEFORE">
-            SELECT SEQ_LOSS_SETTING.NEXTVAL as id
-            FROM DUAL
-        </selectKey>
         insert into t_gsq_loss_setting
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
-            <if test="steelRingCode != null">steel_ring_code,</if>
-            <if test="machineId != null">machine_id,</if>
+            <if test="steelRingCode != null and steelRingCode != ''">steel_ring_code,</if>
+            <if test="machineId != null and machineId != ''">machine_id,</if>
             <if test="lossRate != null">loss_rate,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -79,8 +75,8 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
-            <if test="steelRingCode != null">#{steelRingCode},</if>
-            <if test="machineId != null">#{machineId},</if>
+            <if test="steelRingCode != null and steelRingCode != ''">#{steelRingCode},</if>
+            <if test="machineId != null and machineId != ''">#{machineId},</if>
             <if test="lossRate != null">#{lossRate},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -94,7 +90,8 @@
     <update id="updateGsqLossSetting" parameterType="com.zlt.aps.gsq.entity.GsqLossSetting">
         update t_gsq_loss_setting
         <trim prefix="SET" suffixOverrides=",">
-            <if test="steelRingCode != null">steel_ring_code = #{steelRingCode},</if>
+            <if test="steelRingCode != null and steelRingCode != ''">steel_ring_code = #{steelRingCode},</if>
+            <if test="steelRingCode == null or steelRingCode == ''">steel_ring_code = NULL,</if>
             machine_id = #{machineId,jdbcType=VARCHAR},
             <if test="lossRate != null">loss_rate = #{lossRate},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
@@ -109,64 +106,44 @@
 
     <delete id="deleteGsqLossSettingById" parameterType="Long">
         update t_gsq_loss_setting
-        set del_flag='1'
+        set del_flag = NULL
         where id = #{id}
     </delete>
 
     <delete id="deleteGsqLossSettingByIds" parameterType="String">
-        update t_gsq_loss_setting set del_flag='1' where id in
+        update t_gsq_loss_setting set del_flag = NULL where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_gsq_loss_setting a USING (
-        <foreach collection="list" item="LossSetting" separator=" union ">
-            select
-            #{LossSetting.steelRingCode,jdbcType=VARCHAR} steel_ring_code,
-            #{LossSetting.machineId,jdbcType=DOUBLE} machine_id,
-            #{LossSetting.lossRate,jdbcType=DOUBLE} loss_rate,
-            #{LossSetting.createBy,jdbcType=VARCHAR} create_by,
-            #{LossSetting.createTime,jdbcType=DATE} create_time,
-            #{LossSetting.updateBy,jdbcType=VARCHAR} update_by,
-            #{LossSetting.updateTime,jdbcType=DATE} update_time,
-            #{LossSetting.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_gsq_loss_setting (
+        steel_ring_code, machine_id, loss_rate,
+        create_by, create_time, update_by, update_time, remark, del_flag
+        ) VALUES
+        <foreach collection="list" item="LossSetting" separator=",">
+            (
+            #{LossSetting.steelRingCode,jdbcType=VARCHAR},
+            #{LossSetting.machineId,jdbcType=DOUBLE},
+            #{LossSetting.lossRate,jdbcType=DOUBLE},
+            #{LossSetting.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{LossSetting.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            #{LossSetting.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        ((b.steel_ring_code is null and a.steel_ring_code is null) or (a.steel_ring_code = b.steel_ring_code))
-        and ((b.machine_id is null and a.machine_id is null) or(b.machine_id = a.machine_id))
-        AND a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.loss_rate = b.loss_rate,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.steel_ring_code ,
-        a.machine_id ,
-        a.loss_rate ,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_LOSS_SETTING.NEXTVAL,
-        b.steel_ring_code,
-        b.machine_id,
-        b.loss_rate,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        loss_rate = VALUES(loss_rate),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 
 
     <update id="deleteAll">
-        update t_gsq_loss_setting set del_flag = '1' where del_flag = '0'
+        update t_gsq_loss_setting set del_flag = NULL where del_flag = '0'
     </update>
 </mapper>

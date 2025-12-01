@@ -1,0 +1,8 @@
+.neat {
+    float: left;
+    position: relative;
+}
+
+.typeahead.dropdown-menu li {
+    float: none;
+}

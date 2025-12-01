@@ -20,7 +20,7 @@ import java.util.Date;
 @Data
 @TableName("T_BOM_INFO")
 @ApiModel(value = "BomInfo对象", description = "BOM信息表")
-@KeySequence(value = "SEQ_BOM_INFO", clazz = Long.class)
+@KeySequence(value = "SEQ_BOM_INFO",dbType = DbType.ORACLE)
 public class BomInfo implements Serializable {
 
     private static final long serialVersionUID = 1L;

@@ -2,6 +2,7 @@ package com.zlt.aps.template.gdyy;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -12,7 +13,7 @@ import java.util.Date;
 
 @Data
 @ApiModel(value="GdyyMattersAttention对象", description="钢带大卷注意事项信息表")
-public class GdyyMattersAttentionTemp {
+public class GdyyMattersAttentionTemp extends BaseEntity {
 
     @ApiModelProperty(value = "钢带大卷编号")
     @Excel(name = "ui.common.column.gy.bigRollCode")

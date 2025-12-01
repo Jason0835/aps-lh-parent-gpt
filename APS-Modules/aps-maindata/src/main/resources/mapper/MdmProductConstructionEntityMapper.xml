@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper">
+
+    <select id="selectMdmProductConstructionList"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT t.*
+        FROM t_mdm_product_construction t
+                 INNER JOIN (SELECT DISTINCT a.ID
+                             FROM t_mdm_product_construction a
+                                      INNER JOIN (SELECT PRODUCT_CODE, MOULD_METHOD
+                                                  FROM t_mdm_product_construction
+                                                  WHERE IS_DELETE = 0
+                                                    AND MOULD_METHOD IS NOT NULL
+                                                  GROUP BY PRODUCT_CODE, MOULD_METHOD
+                                                  HAVING COUNT(1) > 1) g1
+                                                 ON a.PRODUCT_CODE = g1.PRODUCT_CODE AND a.MOULD_METHOD = g1.MOULD_METHOD
+                             WHERE a.IS_DELETE = 0
+
+                             UNION
+
+                             SELECT DISTINCT b.ID
+                             FROM t_mdm_product_construction b
+                                      INNER JOIN (SELECT SPEC_CODE
+                                                  FROM t_mdm_product_construction
+                                                  WHERE IS_DELETE = 0
+                                                    AND PRODUCT_CODE != ''
+                                                  GROUP BY SPEC_CODE
+                                                  HAVING COUNT(DISTINCT PRODUCT_CODE) > 1) g2
+                                                 ON b.SPEC_CODE = g2.SPEC_CODE
+                             WHERE b.IS_DELETE = 0
+
+                             UNION
+
+                             SELECT DISTINCT c.ID
+                             FROM t_mdm_product_construction c
+                                      INNER JOIN (SELECT EMBRYO_CODE
+                                                  FROM t_mdm_product_construction
+                                                  WHERE IS_DELETE = 0
+                                                    AND MOULD_METHOD IS NOT NULL
+                                                  GROUP BY EMBRYO_CODE
+                                                  HAVING COUNT(DISTINCT MOULD_METHOD) > 1) g3
+                                                 ON c.EMBRYO_CODE = g3.EMBRYO_CODE
+                             WHERE c.IS_DELETE = 0) ids ON t.ID = ids.ID
+            ${ew.customSqlSegment}
+    </select>
+
+    <select id="queryByFactoryCodeAndSpecCodes" resultType="com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO">
+        SELECT
+        TPC.FACTORY_CODE       AS factoryCode,
+        TPC.PRODUCT_CODE       AS productCode,
+        TPC.SPEC_CODE          AS specCode,
+        TPC.CONSTRUCTION_CODE  AS constructionCode,
+        TPC.EMBRYO_CODE        AS embryoCode,
+        TPC.PRODUCTION_VERSION AS productionVersion,
+        TPC.MOULD_METHOD       AS mouldMethod,
+        TPC.BOM_VERSION        AS bomVersion,
+        TPC.CURING_TIME        AS curingTime,
+        TPC.CURING_TIME2        AS curingTime2,
+        TPC.HYDRAULIC_PRESSURE_CURING_TIME        AS hydraulicPressureCuringTime,
+        TPC.HYDRAULIC_PRESSURE_CURING_TIME2        AS hydraulicPressureCuringTime2,
+        TPC.MOLD_CAVITY        AS moldCavity,
+        TPC.MOULD_CLAMPING_PRESSURE AS mouldClampingPressure
+        FROM T_MDM_PRODUCT_CONSTRUCTION TPC
+        WHERE 1=1
+        <if test="factoryCode != null and factoryCode != ''">
+            AND TPC.FACTORY_CODE = #{factoryCode}
+        </if>
+        AND (TPC.PRODUCT_CODE, TPC.SPEC_CODE) IN
+        <foreach item="specStr" collection="specCodes" open="(" separator="," close=")">
+            (SUBSTRING_INDEX(#{specStr}, '_', 1), SUBSTRING_INDEX(#{specStr}, '_', -1))
+        </foreach>
+    </select>
+
+    <select id="queryByFactoryCodeAndSpecCodes2" resultType="com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO">
+        SELECT
+        TPC.FACTORY_CODE       AS factoryCode,
+        TPC.PRODUCT_CODE       AS productCode,
+        TPC.SPEC_CODE          AS specCode,
+        TPC.CONSTRUCTION_CODE  AS constructionCode,
+        TPC.EMBRYO_CODE        AS embryoCode,
+        TPC.PRODUCTION_VERSION AS productionVersion,
+        TPC.MOULD_METHOD       AS mouldMethod,
+        TPC.BOM_VERSION        AS bomVersion,
+        TPC.CURING_TIME        AS curingTime,
+        TPC.CURING_TIME2        AS curingTime2,
+        TPC.HYDRAULIC_PRESSURE_CURING_TIME        AS hydraulicPressureCuringTime,
+        TPC.HYDRAULIC_PRESSURE_CURING_TIME2        AS hydraulicPressureCuringTime2,
+        TPC.MOLD_CAVITY        AS moldCavity,
+        TPC.MOULD_CLAMPING_PRESSURE AS mouldClampingPressure
+        FROM T_MDM_PRODUCT_CONSTRUCTION TPC
+        WHERE 1=1
+        <if test="factoryCode != null and factoryCode != ''">
+            AND TPC.FACTORY_CODE = #{factoryCode}
+        </if>
+        AND TPC.SPEC_CODE IN
+        <foreach item="specStr" collection="specCodes" open="(" separator="," close=")">
+            #{specStr}
+        </foreach>
+    </select>
+
+
+    <select id="queryBySpecCodeAndProductCode"  resultType="com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO">
+
+        select pc.EMBRYO_CODE as embryoCode,
+               pc.PRODUCT_CODE as productCode,
+               pi.PRODUCT_DESC as productDesc,
+               pc.SPEC_CODE as specCode from t_mdm_product_construction pc
+            left join t_mdm_product_info pi on pc.PRODUCT_CODE = pi.PRODUCT_CODE  WHERE pc.IS_DELETE = '0'
+        <if test="factoryCode != null and factoryCode != ''">
+            AND pc.FACTORY_CODE = #{factoryCode}
+        </if>
+        AND pc.SPEC_CODE IN
+        <foreach item="specStr" collection="specCodes" open="(" separator="," close=")">
+            #{specStr}
+        </foreach>
+    </select>
+
+
+    <select id="queryByProductCodeAndSpecCodes"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT
+        TPC.FACTORY_CODE AS factoryCode,
+        TPC.PRODUCT_CODE AS productCode,
+        TPC.SPEC_CODE AS specCode,
+        TPC.CONSTRUCTION_CODE AS constructionCode,
+        TPC.EMBRYO_CODE AS embryoCode,
+        TPC.PRODUCTION_VERSION AS productionVersion,
+        TPC.MOULD_METHOD AS mouldMethod,
+        TPC.BOM_VERSION AS bomVersion,
+        TPC.MOLD_CAVITY AS moldCavity,
+        TPC.MOULD_CLAMPING_PRESSURE AS mouldClampingPressure
+        FROM T_MDM_PRODUCT_CONSTRUCTION TPC
+        WHERE 1=1
+        <if test="factoryCode != null and factoryCode != ''">
+            AND TPC.FACTORY_CODE = #{factoryCode}
+        </if>
+        AND (TPC.PRODUCT_CODE, TPC.SPEC_CODE) IN
+        <foreach item="specStr" collection="uniqueKeyList" open="(" separator="," close=")">
+            (SUBSTRING_INDEX(#{specStr}, '|', 1), SUBSTRING_INDEX(#{specStr}, '|', -1))
+        </foreach>
+    </select>
+
+    <select id="selectExistData" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT
+        TPC.ID AS id,
+        TPC.FACTORY_CODE AS factoryCode,
+        TPC.PRODUCT_CODE AS productCode,
+        TPC.SPEC_CODE AS specCode,
+        TPC.CONSTRUCTION_CODE AS constructionCode,
+        TPC.EMBRYO_CODE AS embryoCode,
+        '' AS productionVersion,
+        TPC.MOULD_METHOD AS mouldMethod,
+        1 AS bomVersion,
+        TEMP.CURING_TIME AS curingTime,
+        TEMP.CURING_TIME2 AS curingTime2,
+        TEMP.HYDRAULIC_PRESSURE_CURING_TIME AS hydraulicPressureCuringTime,
+        TEMP.HYDRAULIC_PRESSURE_CURING_TIME2 AS hydraulicPressureCuringTime2,
+        TEMP.MOLD_CAVITY AS moldCavity,
+        TEMP.MOULD_CLAMPING_PRESSURE AS mouldClampingPressure
+        FROM T_MDM_PRODUCT_CONSTRUCTION TPC
+        INNER JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.specCode} AS SPEC_CODE,
+            #{item.embryoCode} AS EMBRYO_CODE,
+            #{item.curingTime} AS CURING_TIME,
+            #{item.curingTime2} AS CURING_TIME2,
+            #{item.hydraulicPressureCuringTime} AS HYDRAULIC_PRESSURE_CURING_TIME,
+            #{item.hydraulicPressureCuringTime2} AS HYDRAULIC_PRESSURE_CURING_TIME2,
+            #{item.moldCavity} AS MOLD_CAVITY,
+            #{item.mouldClampingPressure} AS MOULD_CLAMPING_PRESSURE,
+            '' AS PRODUCTION_VERSION
+        </foreach>
+        ) TEMP ON TPC.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND TPC.SPEC_CODE = TEMP.SPEC_CODE
+        AND TPC.EMBRYO_CODE = TEMP.EMBRYO_CODE
+        WHERE TPC.IS_DELETE = 0
+    </select>
+
+    <update id="batchUpdate4OfflineData">
+
+    </update>
+
+    <insert id="batchInsert4OfflineData">
+        INSERT INTO T_MDM_PRODUCT_CONSTRUCTION
+        (FACTORY_CODE, PRODUCT_CODE, SPEC_CODE, CONSTRUCTION_CODE, EMBRYO_CODE, PRODUCTION_VERSION, MOULD_METHOD,
+        BOM_VERSION, MOLD_CAVITY, MOULD_CLAMPING_PRESSURE, HYDRAULIC_PRESSURE_CURING_TIME,
+        HYDRAULIC_PRESSURE_CURING_TIME2, CURING_TIME2, MOLD_CAVITY)
+        VALUES
+        <foreach item="item" index="index" collection="list" separator=",">
+            (#{item.factoryCode}, #{item.productCode}, #{item.specCode}, #{item.constructionCode}, #{item.embryoCode},
+            #{item.productionVersion}, #{item.mouldMethod}, #{item.bomVersion}, #{item.moldCavity},
+            #{item.mouldClampingPressure}, #{item.hydraulicPressureCuringTime}, #{item.hydraulicPressureCuringTime2},
+            #{item.curingTime2}, #{item.moldCavity})
+        </foreach>
+    </insert>
+
+    <sql id="tableName">
+        t_mdm_product_construction
+    </sql>
+
+    <select id="selectMaxTime" resultType="java.lang.String">
+        select ifnull(max(t.CREATE_TIME), '1970-01-01') as last_time
+        from <include refid="tableName"/> t
+        WHERE t.create_by = 'MES'
+    </select>
+
+    <select id="selectByProductCodeAndMethod" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT
+        TPC.*
+        FROM <include refid="tableName"/> TPC
+        INNER JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.productCode} AS PRODUCT_CODE,
+            #{item.mouldMethod} AS MOULD_METHOD
+        </foreach>
+        ) TEMP ON TPC.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND TPC.PRODUCT_CODE = TEMP.PRODUCT_CODE
+        AND TPC.MOULD_METHOD = TEMP.MOULD_METHOD
+        WHERE TPC.IS_DELETE = 0
+    </select>
+
+    <select id="selectByEmbryoCode" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT
+        TPC.*
+        FROM <include refid="tableName"/> TPC
+        INNER JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.embryoCode} AS EMBRYO_CODE
+        </foreach>
+        ) TEMP ON TPC.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND TPC.EMBRYO_CODE = TEMP.EMBRYO_CODE
+        WHERE TPC.IS_DELETE = 0 AND TPC.PRODUCT_CODE NOT LIKE 'T%'
+        AND TPC.CURING_TIME IS NOT NULL
+    </select>
+
+    <select id="selectBySpecCode" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SELECT
+        TPC.*
+        FROM <include refid="tableName"/> TPC
+        INNER JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.specCode} AS SPEC_CODE
+        </foreach>
+        ) TEMP ON TPC.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND TPC.SPEC_CODE = TEMP.SPEC_CODE
+        WHERE TPC.IS_DELETE = 0
+    </select>
+
+    <update id="updateSpecConsVersionByProductCodeAndMethod">
+        UPDATE <include refid="tableName"/> A
+        JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.productCode} AS PRODUCT_CODE,
+            #{item.mouldMethod} AS MOULD_METHOD,
+            #{item.specCode} AS SPEC_CODE,
+            #{item.constructionCode} AS CONSTRUCTION_CODE,
+            #{item.productionVersion} AS PRODUCTION_VERSION,
+            #{item.bomVersion} AS BOM_VERSION,
+            #{item.updateBy} AS UPDATE_BY,
+            #{item.updateTime} AS UPDATE_TIME
+        </foreach>
+        ) TEMP ON A.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND A.PRODUCT_CODE = TEMP.PRODUCT_CODE
+        AND A.MOULD_METHOD = TEMP.MOULD_METHOD
+
+        SET A.SPEC_CODE = TEMP.SPEC_CODE,
+            A.CONSTRUCTION_CODE = TEMP.CONSTRUCTION_CODE,
+            A.PRODUCTION_VERSION = TEMP.PRODUCTION_VERSION,
+            A.BOM_VERSION = TEMP.BOM_VERSION,
+            A.UPDATE_BY = TEMP.UPDATE_BY,
+            A.UPDATE_TIME = TEMP.UPDATE_TIME
+        WHERE A.IS_DELETE = 0
+    </update>
+
+    <update id="updateCuringTimeByEmbryoCodeList">
+        UPDATE <include refid="tableName"/> A
+        JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.factoryCode} AS FACTORY_CODE,
+            #{item.embryoCode} AS EMBRYO_CODE,
+            #{item.curingTime} AS CURING_TIME,
+            #{item.curingTime2} AS CURING_TIME2,
+            #{item.hydraulicPressureCuringTime} AS HYDRAULIC_PRESSURE_CURING_TIME,
+            #{item.hydraulicPressureCuringTime2} AS HYDRAULIC_PRESSURE_CURING_TIME2,
+            #{item.moldCavity} AS MOLD_CAVITY,
+            #{item.mouldClampingPressure} AS MOULD_CLAMPING_PRESSURE,
+            #{item.updateBy} AS UPDATE_BY,
+            #{item.updateTime} AS UPDATE_TIME
+        </foreach>
+        ) TEMP ON A.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND A.EMBRYO_CODE = TEMP.EMBRYO_CODE
+
+        SET A.CURING_TIME = TEMP.CURING_TIME,
+        A.CURING_TIME2 = TEMP.CURING_TIME2,
+        A.HYDRAULIC_PRESSURE_CURING_TIME = TEMP.HYDRAULIC_PRESSURE_CURING_TIME,
+        A.HYDRAULIC_PRESSURE_CURING_TIME2 = TEMP.HYDRAULIC_PRESSURE_CURING_TIME2,
+        A.MOLD_CAVITY = TEMP.MOLD_CAVITY,
+        A.MOULD_CLAMPING_PRESSURE = TEMP.MOULD_CLAMPING_PRESSURE,
+        A.UPDATE_BY = TEMP.UPDATE_BY,
+        A.UPDATE_TIME = TEMP.UPDATE_TIME
+        WHERE A.IS_DELETE = 0
+    </update>
+
+    <update id="updateProductCodeById">
+        UPDATE <include refid="tableName"/> A
+        JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT #{item.id} AS ID,
+            #{item.factoryCode} AS FACTORY_CODE,
+            #{item.productCode} AS PRODUCT_CODE,
+            #{item.mouldMethod} AS MOULD_METHOD,
+            #{item.constructionCode} AS CONSTRUCTION_CODE,
+            #{item.productionVersion} AS PRODUCTION_VERSION,
+            #{item.bomVersion} AS BOM_VERSION,
+            #{item.embryoCode} AS EMBRYO_CODE,
+            #{item.updateBy} AS UPDATE_BY,
+            #{item.updateTime} AS UPDATE_TIME
+        </foreach>
+        ) TEMP ON A.FACTORY_CODE = TEMP.FACTORY_CODE
+        AND A.ID = TEMP.ID
+
+        SET A.PRODUCT_CODE = TEMP.PRODUCT_CODE,
+        A.MOULD_METHOD = TEMP.MOULD_METHOD,
+        A.CONSTRUCTION_CODE = TEMP.CONSTRUCTION_CODE,
+        A.PRODUCTION_VERSION = TEMP.PRODUCTION_VERSION,
+        A.BOM_VERSION = TEMP.BOM_VERSION,
+        A.EMBRYO_CODE = TEMP.EMBRYO_CODE,
+        A.UPDATE_BY = TEMP.UPDATE_BY,
+        A.UPDATE_TIME = TEMP.UPDATE_TIME
+        WHERE A.IS_DELETE = 0
+    </update>
+
+    <insert id="insertBatch">
+        INSERT INTO <include refid="tableName"/>
+        (FACTORY_CODE, PRODUCT_CODE, SPEC_CODE, CONSTRUCTION_CODE, EMBRYO_CODE, PRODUCTION_VERSION, MOULD_METHOD,
+        BOM_VERSION, MOULD_CLAMPING_PRESSURE, CURING_TIME, CURING_TIME2, HYDRAULIC_PRESSURE_CURING_TIME,
+        HYDRAULIC_PRESSURE_CURING_TIME2, MOLD_CAVITY, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE)
+        VALUES
+        <foreach item="item" index="index" collection="list" separator=",">
+            (#{item.factoryCode}, #{item.productCode}, #{item.specCode}, #{item.constructionCode},
+            #{item.embryoCode}, #{item.productionVersion}, #{item.mouldMethod}, #{item.bomVersion},
+            #{item.mouldClampingPressure}, #{item.curingTime}, #{item.curingTime2},
+            #{item.hydraulicPressureCuringTime}, #{item.hydraulicPressureCuringTime2}, #{item.moldCavity},
+            #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, 0)
+        </foreach>
+    </insert>
+
+    <update id="batchUpdateCuringTime">
+        UPDATE <include refid="tableName"/> a JOIN (
+            SELECT EMBRYO_CODE, MOULD_CLAMPING_PRESSURE, MOLD_CAVITY, CURING_TIME, CURING_TIME2, HYDRAULIC_PRESSURE_CURING_TIME, HYDRAULIC_PRESSURE_CURING_TIME2 FROM (
+                SELECT a.*, ROW_NUMBER() OVER (
+                PARTITION BY a.EMBRYO_CODE
+                ORDER BY a.ID DESC
+                ) AS rn
+                FROM <include refid="tableName"/> a
+                INNER JOIN (
+                    SELECT EMBRYO_CODE, MAX(UPDATE_TIME) UPDATE_TIME FROM <include refid="tableName"/> WHERE CURING_TIME IS NOT NULL AND IS_DELETE = 0 AND PRODUCT_CODE NOT LIKE 'T%' GROUP BY EMBRYO_CODE
+                ) b ON a.EMBRYO_CODE = b.EMBRYO_CODE AND a.UPDATE_TIME = b.UPDATE_TIME
+                WHERE a.IS_DELETE = 0
+            ) temp where rn = 1
+            ) b ON a.EMBRYO_CODE = b.EMBRYO_CODE SET a.CURING_TIME = b.CURING_TIME,
+            a.CURING_TIME2 = b.CURING_TIME2,
+            a.HYDRAULIC_PRESSURE_CURING_TIME = b.HYDRAULIC_PRESSURE_CURING_TIME,
+            a.HYDRAULIC_PRESSURE_CURING_TIME2 = b.HYDRAULIC_PRESSURE_CURING_TIME2,
+            a.MOLD_CAVITY = b.MOLD_CAVITY,
+            a.MOULD_CLAMPING_PRESSURE = b.MOULD_CLAMPING_PRESSURE,
+            a.UPDATE_BY = #{updateBy},
+            a.UPDATE_TIME = NOW()
+        WHERE a.IS_DELETE = 0 AND a.PRODUCT_CODE NOT LIKE 'T%'
+    </update>
+</mapper>

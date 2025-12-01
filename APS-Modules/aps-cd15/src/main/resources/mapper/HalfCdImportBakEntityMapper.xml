@@ -1,0 +1,729 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cd15.mapper.HalfCdImportBakEntityMapper">
+
+    <delete id="deleteTqStock">
+        delete
+        from t_tq_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertTqStock">
+        insert into t_tq_stock (stock_date, material_code, stock_num, del_flag)
+        select schedule_date, tq1, sum(tq3), '0'
+        from half_cd_import_bak
+        where schedule_date = #{scheduleDate}
+          and tq1 is not null
+          and tq1 != '0'
+        group by schedule_date, tq1
+        having sum(tq3) > 0
+    </insert>
+
+    <delete id="deleteGsqStock">
+        delete
+        from t_gsq_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertGsqStock">
+        insert into t_gsq_stock (stock_date, material_code, stock_num, del_flag)
+        select schedule_date, gsq1, sum(gsq2), '0'
+        from half_cd_import_bak
+        where schedule_date = #{scheduleDate}
+          and gsq1 is not null
+          and gsq1 != '0'
+        group by schedule_date, gsq1
+        having sum(gsq2) > 0
+    </insert>
+
+    <delete id="deleteNcStock">
+        delete
+        from t_nc_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertNcStock">
+        insert into t_nc_stock (stock_date, material_code, stock_num, roll_stock_num, del_flag)
+        select schedule_date, nc1, round(sum(nc4 * nc3)), round(sum(nc4), 1), '0'
+        from half_cd_import_bak
+        where schedule_date = #{scheduleDate}
+          and nc1 is not null
+          and nc1 != '0'
+        group by schedule_date, nc1
+        having round(sum(nc4 * nc3)) > 0
+    </insert>
+
+    <delete id="deleteCd90Stock">
+        delete
+        from t_cd90_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertCd90Stock">
+        insert into t_cd90_stock (stock_date, material_code, stock_num, roll_stock_num, del_flag, layers)
+        select schedule_date, lb1, round(sum(lb4 * lb3), 0), round(sum(lb4), 1), '0', layers
+        from (select schedule_date, lb1, lb4, lb3, 1 layers
+              from half_cd_import_bak
+              where schedule_date = #{scheduleDate}
+                and lb1 is not null
+                and lb1 != '0'
+              union all
+              select schedule_date, lbt1, lbt4, lbt3, 2 layers
+              from half_cd_import_bak
+              where schedule_date = #{scheduleDate}
+                and lbt1 is not null
+                and lbt1 != '0') t
+        group by schedule_date, lb1, layers
+        having sum(lb4 * lb3) > 0
+    </insert>
+
+    <delete id="deleteCd15Stock">
+        delete
+        from t_cd15_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertCd15Stock">
+        insert into t_cd15_stock (stock_date, material_code, stock_num, roll_stock_num, del_flag)
+        select schedule_date, gd1, round(sum(gd4 * gd3), 0), round(sum(gd4), 1), '0'
+        from (select schedule_date, gd1, gd4, gd3
+              from half_cd_import_bak
+              where schedule_date = #{scheduleDate}
+                and gd1 is not null
+                and gd1 != '0'
+              union all
+              select schedule_date, gdt1, gdt4, gdt3
+              from half_cd_import_bak
+              where schedule_date = #{scheduleDate}
+                and gdt1 is not null
+                and gdt1 != '0') t
+        group by schedule_date, gd1
+        having sum(gd4 * gd3) > 0
+    </insert>
+
+    <update id="updateTqScheduleResult">
+        update t_tq_schedule_result r
+            join (select i.tq1                                      BEAD_CODE,
+                         sum(IFNULL(i.tq8, 0) + IFNULL(i.tq9, 0) + IFNULL(i.tq10, 0) + IFNULL(i.tq11, 0) +
+                             IFNULL(i.tq12, 0) + IFNULL(i.tq13, 0) + IFNULL(i.tq14, 0) + IFNULL(i.tq15, 0) +
+                             IFNULL(i.tq16, 0) + IFNULL(i.tq17, 0)) night_plan_qty,
+                         max(case
+                                 when i.tq8 > 0 then 1648803
+                                 when i.tq9 > 0 then 1648804
+                                 when i.tq10 > 0 then 1648805
+                                 when i.tq11 > 0 then 1648806
+                                 when i.tq12 > 0 then 1648807
+                                 when i.tq13 > 0 then 1648809
+                                 when i.tq14 > 0 then 1648810
+                                 when i.tq15 > 0 then 1648811
+                                 when i.tq16 > 0 then 1648814
+                                 when i.tq17 > 0 then 1648815
+                                 else null end)                     machine_id
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and i.tq1 is not null
+                    and i.tq1 != '0'
+                  group by i.tq1) i on r.BEAD_CODE = i.BEAD_CODE
+        set r.night_plan_qty = i.night_plan_qty,
+            r.machine_id     = ifnull(i.machine_id, r.machine_id)
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertTqScheduleResult">
+        insert into t_tq_schedule_result (schedule_date, BEAD_CODE, DEL_FLAG, NIGHT_PLAN_QTY, machine_id)
+        select i.schedule_date,
+               i.tq1,
+               '0',
+               sum(IFNULL(i.tq8, 0) + IFNULL(i.tq9, 0) + IFNULL(i.tq10, 0) + IFNULL(i.tq11, 0) + IFNULL(i.tq12, 0) +
+                   IFNULL(i.tq13, 0) + IFNULL(i.tq14, 0) + IFNULL(i.tq15, 0) + IFNULL(i.tq16, 0) +
+                   IFNULL(i.tq17, 0)) night_plan_qty,
+               max(case
+                       when i.tq8 > 0 then 1648803
+                       when i.tq9 > 0 then 1648804
+                       when i.tq10 > 0 then 1648805
+                       when i.tq11 > 0 then 1648806
+                       when i.tq12 > 0 then 1648807
+                       when i.tq13 > 0 then 1648809
+                       when i.tq14 > 0 then 1648810
+                       when i.tq15 > 0 then 1648811
+                       when i.tq16 > 0 then 1648814
+                       when i.tq17 > 0 then 1648815
+                       else null end) machine_id
+        from half_cd_import_bak i
+        where i.schedule_date = #{scheduleDate}
+          and i.tq1 is not null
+          and i.tq1 != '0'
+          and not exists (select 0
+                          from t_tq_schedule_result r
+                          where r.schedule_date = i.schedule_date and r.BEAD_CODE = i.tq1)
+        group by i.schedule_date, i.tq1
+        having sum(IFNULL(i.tq8, 0) + IFNULL(i.tq9, 0) + IFNULL(i.tq10, 0) + IFNULL(i.tq11, 0) + IFNULL(i.tq12, 0) +
+                   IFNULL(i.tq13, 0) + IFNULL(i.tq14, 0) + IFNULL(i.tq15, 0) + IFNULL(i.tq16, 0) + IFNULL(i.tq17, 0)) >
+               0
+    </insert>
+
+    <insert id="insertTqMonthPlanSurplus">
+        insert into t_tq_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                            MONTH_REMAIN_QTY)
+        select YEAR(now()), lpad(month(now()), 2, '0'), tq1, sum(cx8), 0, sum(cx8)
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and not exists (select 0
+                          from t_tq_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.tq1
+                            and t.DEL_FLAG = '0')
+        group by tq1
+    </insert>
+
+    <insert id="updateTqMonthPlanSurplus">
+        update t_tq_month_plan_surplus t
+            join (select tq1 material_code, sum(cx8) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                  group by tq1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </insert>
+
+    <update id="updateGsqScheduleResult">
+        update t_gsq_schedule_result r
+            join (select i.gsq1                                                         steel_ring_code,
+                         sum(IFNULL(i.gsq6, 0) + IFNULL(i.gsq7, 0) + IFNULL(i.gsq8, 0)) night_plan_qty,
+                         max(case
+                                 when i.gsq6 > 0 then 20121
+                                 when i.gsq7 > 0 then 20122
+                                 when i.gsq8 > 0 then 20123
+                                 else null end)                                         machine_id
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and i.gsq1 is not null
+                    and i.gsq1 != '0'
+                  group by i.gsq1) i on r.steel_ring_code = i.steel_ring_code
+        set r.night_plan_qty = i.night_plan_qty,
+            r.machine_id = ifnull(i.machine_id, r.machine_id)
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertGsqScheduleResult">
+        insert into t_gsq_schedule_result (schedule_date, steel_ring_code, DEL_FLAG, NIGHT_PLAN_QTY, machine_id)
+        select i.schedule_date,
+               i.gsq1,
+               '0',
+               sum(IFNULL(i.gsq6, 0) + IFNULL(i.gsq7, 0) + IFNULL(i.gsq8, 0)) night_plan_qty,
+               max(case
+                       when i.gsq6 > 0 then 20121
+                       when i.gsq7 > 0 then 20122
+                       when i.gsq8 > 0 then 20123
+                       else null end)                                         machine_id
+        from half_cd_import_bak i
+        where i.schedule_date = #{scheduleDate}
+          and i.gsq1 is not null
+          and i.gsq1 != '0'
+          and not exists (select 0
+                          from t_gsq_schedule_result r
+                          where r.schedule_date = i.schedule_date and r.steel_ring_code = i.gsq1)
+        group by i.schedule_date, i.gsq1
+        having sum(IFNULL(i.gsq6, 0) + IFNULL(i.gsq7, 0) + IFNULL(i.gsq8, 0)) > 0
+    </insert>
+
+    <insert id="insertGsqMonthPlanSurplus">
+        insert into t_gsq_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                             MONTH_REMAIN_QTY)
+        select YEAR(now()), lpad(month(now()), 2, '0'), gsq1, sum(cx8), 0, sum(cx8)
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and not exists (select 0
+                          from t_gsq_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.gsq1
+                            and t.DEL_FLAG = '0')
+        group by gsq1
+    </insert>
+
+    <update id="updateGsqMonthPlanSurplus">
+        update t_gsq_month_plan_surplus t
+            join (select gsq1 material_code, sum(cx8) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                  group by gsq1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </update>
+
+    <update id="updateNcScheduleResult">
+        update t_nc_schedule_result r
+            join (select i.nc1                                                 lining_code,
+                         sum(ifnull(l.curl_length, i.nc3) * IFNULL(i.nc11, 0)) night_plan_qty
+                  from half_cd_import_bak i
+                           left join t_nc_curl_roll l on l.lining_code = i.nc1 and l.del_flag = '0'
+                  where i.schedule_date = #{scheduleDate}
+                    and i.nc1 is not null
+                    and i.nc1 != '0'
+                  group by i.nc1) i on r.lining_code = i.lining_code
+        set r.night_plan_qty = i.night_plan_qty
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertNcScheduleResult">
+        insert into t_nc_schedule_result (schedule_date, lining_code, DEL_FLAG, NIGHT_PLAN_QTY)
+        select i.schedule_date,
+               i.nc1,
+               '0',
+               sum(ifnull(l.curl_length, i.nc3) * IFNULL(i.nc11, 0)) night_plan_qty
+        from half_cd_import_bak i
+                 left join t_nc_curl_roll l on l.lining_code = i.nc1 and l.del_flag = '0'
+        where i.schedule_date = #{scheduleDate}
+          and i.nc1 is not null
+          and i.nc1 != '0'
+          and i.nc1 not like 'EW%'
+          and not exists (select 0
+                          from t_nc_schedule_result r
+                          where r.schedule_date = i.schedule_date and r.lining_code = i.nc1)
+        group by i.schedule_date, i.nc1
+        having sum(ifnull(l.curl_length, i.nc3) * IFNULL(i.nc11, 0)) > 0
+    </insert>
+
+    <insert id="insertNcMonthPlanSurplus">
+        insert into t_nc_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                            MONTH_REMAIN_QTY)
+        select YEAR(now()), lpad(month(now()), 2, '0'), nc1, ceil(sum(cx8 * nc2)), 0, ceil(sum(cx8 * nc2))
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and not exists (select 0
+                          from t_nc_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.nc1
+                            and t.DEL_FLAG = '0')
+        group by nc1
+    </insert>
+
+    <update id="updateNcMonthPlanSurplus">
+        update t_nc_month_plan_surplus t
+            join (select nc1 material_code, ceil(sum(cx8 * nc2)) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                  group by nc1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </update>
+
+    <update id="updateCd90ScheduleResult">
+        update t_cd90_schedule_result r
+            join (select i.cloth_code,
+                         i.layers,
+                         sum(night_plan_qty) night_plan_qty,
+                         max(machine_Id)     machine_Id
+                  from (select i.lb1             cloth_code,
+                               (ifnull(i.lb9, 0) + ifnull(i.lb10, 0) + ifnull(i.lb11, 0) + ifnull(i.lb12, 0)) *
+                               i.lb3             night_plan_qty,
+                               1                 layers,
+                               case
+                                   when i.lb9 > 0 then 2013616
+                                   when i.lb10 > 0 then 2013617
+                                   when i.lb11 > 0 then 2013618
+                                   when i.lb12 > 0 then 2013619
+                                   else null end machine_Id
+                        from half_cd_import_bak i
+                        where i.schedule_date = #{scheduleDate}
+                          and i.lb1 is not null
+                          and i.lb1 != '0'
+                        union all
+                        select i.lbt1            cloth_code,
+                               (ifnull(i.lbt9, 0) + ifnull(i.lbt10, 0) + ifnull(i.lbt11, 0) + ifnull(i.lbt12, 0)) *
+                               i.lbt3            night_plan_qty,
+                               2                 layers,
+                               case
+                                   when i.lbt9 > 0 then 2013616
+                                   when i.lbt10 > 0 then 2013617
+                                   when i.lbt11 > 0 then 2013618
+                                   when i.lbt12 > 0 then 2013619
+                                   else null end machine_Id
+                        from half_cd_import_bak i
+                        where i.schedule_date = #{scheduleDate}
+                          and i.lbt1 is not null
+                          and i.lbt1 != '0') i
+                  group by cloth_code, layers) i on r.cloth_code = i.cloth_code and r.layers = i.layers
+        set r.night_plan_qty = i.night_plan_qty,
+            r.machine_id = ifnull(i.machine_Id, r.machine_id)
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertCd90ScheduleResult">
+        insert into t_cd90_schedule_result (schedule_date, cloth_code, DEL_FLAG, NIGHT_PLAN_QTY, layers, machine_id)
+        select i.schedule_date,
+               i.cloth_code,
+               '0',
+               sum(night_plan_qty) night_plan_qty,
+               layers,
+               machine_id
+        from (select i.schedule_date,
+                     i.lb1             cloth_code,
+                     (ifnull(i.lb9, 0) + ifnull(i.lb10, 0) + ifnull(i.lb11, 0) + ifnull(i.lb12, 0)) *
+                     i.lb3             night_plan_qty,
+                     1                 layers,
+                     case
+                         when i.lb9 > 0 then 2013616
+                         when i.lb10 > 0 then 2013617
+                         when i.lb11 > 0 then 2013618
+                         when i.lb12 > 0 then 2013619
+                         else null end machine_Id
+              from half_cd_import_bak i
+              where i.schedule_date = #{scheduleDate}
+                and i.lb1 is not null
+                and i.lb1 != '0'
+              union all
+              select i.schedule_date,
+                     i.lbt1            cloth_code,
+                     (ifnull(i.lbt9, 0) + ifnull(i.lbt10, 0) + ifnull(i.lbt11, 0) + ifnull(i.lbt12, 0)) *
+                     i.lbt3            night_plan_qty,
+                     2                 layers,
+                     case
+                         when i.lbt9 > 0 then 2013616
+                         when i.lbt10 > 0 then 2013617
+                         when i.lbt11 > 0 then 2013618
+                         when i.lbt12 > 0 then 2013619
+                         else null end machine_Id
+              from half_cd_import_bak i
+              where i.schedule_date = #{scheduleDate}
+                and i.lbt1 is not null
+                and i.lbt1 != '0') i
+        where not exists (select 0
+                          from t_cd90_schedule_result r
+                          where r.schedule_date = i.schedule_date
+                            and r.cloth_code = i.cloth_code
+                            and r.layers = i.layers)
+          and night_plan_qty > 0
+        group by schedule_date, cloth_code, layers, machine_Id
+    </insert>
+
+    <insert id="insertCd90MonthPlanSurplus">
+        insert into t_cd90_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                              MONTH_REMAIN_QTY, remark)
+        select YEAR(now()), lpad(month(now()), 2, '0'), lb1, ceil(sum(cx8 * lb2)), 0, ceil(sum(cx8 * lb2)), '1'
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and not exists (select 0
+                          from t_cd90_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.lb1
+                            and t.DEL_FLAG = '0'
+                            and t.remark = '1')
+        group by lb1
+        union all
+        select YEAR(now()), lpad(month(now()), 2, '0'), lbt1, ceil(sum(cx8 * lbt2)), 0, ceil(sum(cx8 * lbt2)), '2'
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and lbt1 is not null
+          and not exists (select 0
+                          from t_cd90_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.lbt1
+                            and t.DEL_FLAG = '0'
+                            and t.remark = '2')
+        group by lbt1
+    </insert>
+
+    <update id="updateCd90MonthPlanSurplus">
+        update t_cd90_month_plan_surplus t
+            join (select lb1 material_code, ceil(sum(cx8 * lb2)) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                  group by lb1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+          and remark = '1';
+
+        update t_cd90_month_plan_surplus t
+            join (select lbt1 material_code, ceil(sum(cx8 * lbt2)) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                    and lbt1 is not null
+                  group by lbt1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+          and remark = '2'
+    </update>
+
+    <update id="updateCd15ScheduleResult">
+        update t_cd15_schedule_result r
+            join (select i.steel_strip_code,
+                         sum(night_plan_qty) night_plan_qty
+                  from (select i.gd1 steel_strip_code,
+                               (ifnull(i.gd9, 0) + ifnull(i.gd10, 0) + ifnull(i.gd11, 0) + ifnull(i.gd12, 0)) *
+                               i.gd3 night_plan_qty
+                        from half_cd_import_bak i
+                        where i.schedule_date = #{scheduleDate}
+                          and i.gd1 is not null
+                          and i.gd1 != '0') i
+                  group by steel_strip_code) i on r.steel_strip_code1 = i.steel_strip_code
+        set r.night_plan_qty1 = i.night_plan_qty
+        where r.schedule_date = #{scheduleDate}
+          and r.steel_strip_code1 is not null;
+
+        update t_cd15_schedule_result r
+            join (select i.steel_strip_code,
+                         sum(night_plan_qty) night_plan_qty
+                  from (select i.gdt1 steel_strip_code, (ifnull(i.gdt9, 0) + ifnull(i.gdt10, 0)) * i.gdt3 night_plan_qty
+                        from half_cd_import_bak i
+                        where i.schedule_date = #{scheduleDate}
+                          and i.gdt1 is not null
+                          and i.gdt1 != '0'
+                          and (ifnull(i.gdt11, 0) + ifnull(i.gdt12, 0)) = 0) i
+                  group by steel_strip_code) i on r.steel_strip_code2 = i.steel_strip_code
+        set r.night_plan_qty1 = i.night_plan_qty
+        where r.schedule_date = #{scheduleDate}
+          and r.steel_strip_code1 is null
+    </update>
+
+    <insert id="insertCd15ScheduleResult">
+        insert into t_cd15_schedule_result (schedule_date, steel_strip_code1, DEL_FLAG, NIGHT_PLAN_QTY1)
+        select i.schedule_date,
+               i.steel_strip_code1,
+               '0',
+               sum(night_plan_qty) night_plan_qty
+        from (select i.schedule_date,
+                     i.gd1 steel_strip_code1,
+                     (ifnull(i.gd9, 0) + ifnull(i.gd10, 0) + ifnull(i.gd11, 0) + ifnull(i.gd12, 0)) *
+                     i.gd3 night_plan_qty
+              from half_cd_import_bak i
+              where i.schedule_date = #{scheduleDate}
+                and i.gd1 is not null
+                and i.gd1 != '0') i
+        where not exists (select 0
+                          from t_cd15_schedule_result r
+                          where r.schedule_date = i.schedule_date
+                            and r.steel_strip_code1 = i.steel_strip_code1)
+          and night_plan_qty > 0
+        group by schedule_date, steel_strip_code1;
+
+        insert into t_cd15_schedule_result (schedule_date, steel_strip_code2, DEL_FLAG, NIGHT_PLAN_QTY1)
+        select i.schedule_date,
+               i.steel_strip_code2,
+               '0',
+               sum(night_plan_qty) night_plan_qty
+        from (select i.schedule_date,
+                     i.gdt1                                            steel_strip_code2,
+                     (ifnull(i.gdt9, 0) + ifnull(i.gdt10, 0)) * i.gdt3 night_plan_qty
+              from half_cd_import_bak i
+              where i.schedule_date = #{scheduleDate}
+                and i.gdt1 is not null
+                and i.gdt1 != '0'
+                and (ifnull(i.gdt11, 0) + ifnull(i.gdt12, 0)) = 0) i
+        where not exists (select 0
+                          from t_cd15_schedule_result r
+                          where r.schedule_date = i.schedule_date
+                            and r.steel_strip_code2 = i.steel_strip_code2)
+          and night_plan_qty > 0
+        group by schedule_date, steel_strip_code2
+    </insert>
+
+    <insert id="insertCd15MonthPlanSurplus">
+        insert into t_cd15_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                              MONTH_REMAIN_QTY)
+        select YEAR(now()), lpad(month(now()), 2, '0'), gd1, ceil(sum(cx8 * gd2)), 0, ceil(sum(cx8 * gd2))
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and not exists (select 0
+                          from t_cd15_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.gd1
+                            and t.DEL_FLAG = '0')
+        group by gd1
+        union all
+        select YEAR(now()), lpad(month(now()), 2, '0'), gdt1, ceil(sum(cx8 * gdt2)), 0, ceil(sum(cx8 * gdt2))
+        from half_cd_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx8 > 1
+          and gdt1 is not null
+          and not exists (select 0
+                          from t_cd15_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = i.gdt1
+                            and t.DEL_FLAG = '0')
+        group by gdt1
+    </insert>
+
+    <update id="updateCd15MonthPlanSurplus">
+        update t_cd15_month_plan_surplus t
+            join (select gd1 material_code, ceil(sum(cx8 * gd2)) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                  group by gd1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0';
+
+        update t_cd15_month_plan_surplus t
+            join (select gdt1 material_code, ceil(sum(cx8 * gdt2)) MONTH_REMAIN_QTY
+                  from half_cd_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx8 > 1
+                    and gdt1 is not null
+                  group by gdt1) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </update>
+
+    <select id="selectScheduleResult" resultType="com.zlt.aps.cd15.api.domain.vo.HalfCdImportBakExportVo">
+        SET @schedule_date = #{scheduleDate};
+
+        select concat(r.bead_code, '-', ifnull(m.machine_name, 'null')) as code
+                ,
+               r.mid_plan_qty                                           as dayPlanQty,
+               r.night_plan_qty,
+               r.day_plan_qty as nextDayPlanQty,
+               0                 curlLength,
+               0                 dayPlanQtyRollNum,
+               0                 nightPlanQtyRollNum,
+               0                 nextDayPlanQtyRollNum
+        from t_tq_schedule_result r
+                 left join t_tq_machine_info m on r.machine_id = m.id
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+        union all
+        select concat(r.steel_ring_code, '-', ifnull(m.machine_name, 'null')),
+               r.mid_plan_qty,
+               r.night_plan_qty,
+               r.day_plan_qty,
+               0,
+               0,
+               0,
+               0
+        from t_gsq_schedule_result r
+                 left join t_gsq_machine_info m on r.machine_id = m.id
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+        union all
+        select r.lining_code,
+               r.day_plan_qty,
+               r.night_plan_qty,
+               r.next_day_plan_qty,
+               ifnull(cr.curl_length, p.param_value),
+               round(r.day_plan_qty / ifnull(cr.curl_length, p.param_value), 1),
+               round(r.night_plan_qty / ifnull(cr.curl_length, p.param_value), 1),
+               round(r.next_day_plan_qty / ifnull(cr.curl_length, p.param_value), 1)
+        from t_nc_schedule_result r
+                 left join t_nc_curl_roll cr on cr.lining_code = r.lining_code and cr.del_flag = '0'
+                 left join t_nc_params p on p.param_code = 'STANDARD_CRIMP_LENGTH' and p.del_flag = '0'
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+        UNION all
+        select concat(r.cloth_code, '-', ifnull(m.machine_name, 'null'), '-', r.layers),
+               r.day_plan_qty,
+               r.night_plan_qty,
+               r.next_day_plan_qty,
+               p.param_value,
+               round(r.day_plan_qty / p.param_value, 1),
+               round(r.night_plan_qty / p.param_value, 1),
+               round(r.next_day_plan_qty / p.param_value, 1)
+        from t_cd90_schedule_result r
+                 left join t_cd90_machine_info m on m.id = r.machine_id
+                 left join t_cd90_params p on p.param_code = 'CRIMP_LENGTH' and p.del_flag = '0'
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+        union all
+        select concat(r.steel_strip_code1, '-', ifnull(m.machine_name, 'null')),
+               r.day_plan_qty1,
+               r.night_plan_qty1,
+               r.next_day_plan_qty,
+               p.param_value,
+               round(r.day_plan_qty1 / p.param_value, 1),
+               round(r.night_plan_qty1 / p.param_value, 1),
+               round(r.next_day_plan_qty / p.param_value, 1)
+        from t_cd15_schedule_result r
+                 left join t_cd15_machine_info m on m.id = r.machine_id
+                 left join t_cd15_params p on p.param_code = 'CRIMP_LENGTH' and p.del_flag = '0'
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+          and r.steel_strip_code1 is not null
+        union all
+        select concat(r.steel_strip_code2, '-', ifnull(m.machine_name, 'null')),
+               r.day_plan_qty1,
+               r.night_plan_qty1,
+               r.next_day_plan_qty,
+               p.param_value,
+               round(r.day_plan_qty1 / p.param_value, 1),
+               round(r.night_plan_qty1 / p.param_value, 1),
+               round(r.next_day_plan_qty / p.param_value, 1)
+        from t_cd15_schedule_result r
+                 left join t_cd15_machine_info m on m.id = r.machine_id
+                 left join t_cd15_params p on p.param_code = 'CRIMP_LENGTH' and p.del_flag = '0'
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+          and r.steel_strip_code2 is not null
+    </select>
+
+    <select id="selectTqScheduleResult" resultType="com.zlt.aps.cd15.api.domain.vo.HalfCdImportBakExportVo">
+        SET @schedule_date = #{scheduleDate};
+
+        select concat(r.bead_code, '-', ifnull(m.machine_name, 'null')) as code
+                ,
+               r.mid_plan_qty                                           as dayPlanQty,
+               r.night_plan_qty,
+               r.day_plan_qty                                           as nextDayPlanQty,
+               0                                                           curlLength,
+               0                                                           dayPlanQtyRollNum,
+               0                                                           nightPlanQtyRollNum,
+               0                                                           nextDayPlanQtyRollNum
+        from t_tq_schedule_result r
+                 left join t_tq_machine_info m on r.machine_id = m.id
+        where r.schedule_date = @schedule_date
+          and r.del_flag = '0'
+    </select>
+
+    <select id="selectCxScheduleResult" resultType="com.zlt.aps.cd15.api.domain.vo.HalfCdImportBakExportVo">
+        select EMBRYO_CODE as                  code,
+               sum(IFNULL(CLASS3_PLANNED_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0)) cx_plan_qty
+        from t_cx_schedule_result
+        where schedule_date = #{scheduleDate}
+          and del_flag = '0'
+        group by EMBRYO_CODE
+    </select>
+
+    <update id="importCdData">
+        call importHalfCdImportBak(#{scheduleDate, mode=IN, jdbcType=DATE})
+    </update>
+</mapper>

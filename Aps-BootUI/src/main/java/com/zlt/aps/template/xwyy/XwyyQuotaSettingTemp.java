@@ -3,6 +3,7 @@ package com.zlt.aps.template.xwyy;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -11,7 +12,7 @@ import java.math.BigDecimal;
 
 @Data
 @ApiModel(value = "纤维压延定额设定对象", description = "纤维压延定额设定对象 ")
-public class XwyyQuotaSettingTemp {
+public class XwyyQuotaSettingTemp extends ApsBaseEntity {
 
     @Excel(name = "ui.data.column.xwyy.quota.bigRollCode", sort = 10)
     private String bigRollCode;

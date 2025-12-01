@@ -22,7 +22,7 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list")
+    @PostMapping("/tm/machine/list")
     TableDataInfo list(@RequestBody TmMachineInfo machineInfo);
 
     /**
@@ -30,7 +30,7 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/list2")
+    @PostMapping("/tm/machine/list2")
     List<TmMachineInfo> list2(@RequestBody TmMachineInfo machineInfo);
 	
 	/**
@@ -38,7 +38,7 @@ public interface ITmMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/machine/{ids}")
+    @DeleteMapping("/tm/machine/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 	
 	/**
@@ -46,7 +46,7 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine")
+    @PostMapping("/tm/machine")
     AjaxResult add(@Validated @RequestBody TmMachineInfo machineInfo);
 
     /**
@@ -54,7 +54,7 @@ public interface ITmMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/machine/{id}")
+    @GetMapping(value = "/tm/machine/{id}")
     TmMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
@@ -62,7 +62,7 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PutMapping("/machine")
+    @PutMapping("/tm/machine")
     AjaxResult edit(@Validated @RequestBody TmMachineInfo machineInfo);
 
     /**
@@ -70,7 +70,7 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/checkMachineCodeUnique")
+    @PostMapping("/tm/machine/checkMachineCodeUnique")
     String checkMachineCodeUnique(@Validated @RequestBody TmMachineInfo machineInfo);
 
     /**
@@ -79,10 +79,10 @@ public interface ITmMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/machine/exportList")
+    @PostMapping("/tm/machine/exportList")
     List<TmMachineInfo> exportList(@RequestBody TmMachineInfo machineInfo);
 
-    @PostMapping("/machine/importData")
+    @PostMapping("/tm/machine/importData")
     @ApiOperation("导入胎面机台信息")
     public AjaxResult importData(@RequestBody List<TmMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

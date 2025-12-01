@@ -24,20 +24,20 @@ public interface IGdyyDispatcherLogService {
      * 查询调度员排程操作日志列表
      */
     @ApiOperation("查询调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/list")
+    @PostMapping("/gdyy/dispatcherLog/list")
     TableDataInfo list(@RequestBody GdyyDispatcherLog gdyyDispatcherLog);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/dispatcherLog/{id}")
+    @GetMapping(value = "/gdyy/dispatcherLog/{id}")
     GdyyDispatcherLog getInfo(@PathVariable("id") Long id);
 
     /**
      * 导出调度员排程操作日志列表
      */
     @ApiOperation("导出调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/export")
+    @PostMapping("/gdyy/dispatcherLog/export")
     public byte[] export(@RequestBody GdyyDispatcherLog dispatcherLog);
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.FixedPointConfigurationMapper">
+
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.FixedPointConfiguration" id="FixedPointConfigurationResult">
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="productionLineType" column="PRODUCTION_LINE_TYPE"/>
+        <result property="isClosed" column="IS_CLOSED"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+    </resultMap>
+
+    <sql id="selectFixedPointConfigurationVo">
+        SELECT ID, FACTORY_CODE, PRODUCTION_LINE_TYPE, IS_CLOSED, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY FROM T_MDM_FIXED_POINT
+    </sql>
+
+    <select id="selectFixedPointConfigurationList" parameterType="com.zlt.aps.monthplan.api.domain.entity.FixedPointConfiguration" resultMap="FixedPointConfigurationResult">
+        <include refid="selectFixedPointConfigurationVo"/>
+        WHERE IS_DELETE = '0'
+        <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="productionLineType != null "> AND PRODUCTION_LINE_TYPE = #{productionLineType}</if>
+        <if test="isClosed != null "> AND IS_CLOSED = #{isClosed}</if>
+    </select>
+
+</mapper>

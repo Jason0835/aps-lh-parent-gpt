@@ -19,14 +19,14 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_XWYY_BIG_ROLL_ORIGINAL_BRAND")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class XwyyBigRollOriginalBrand extends ApsBaseEntity{
 
     private static final long serialVersionUID = 1L;
 
     /** 主键ID，对应自增序列为：SEQ_PUBLIC */
     @ApiModelProperty(value = "id")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     /** 帘布大卷编号 */

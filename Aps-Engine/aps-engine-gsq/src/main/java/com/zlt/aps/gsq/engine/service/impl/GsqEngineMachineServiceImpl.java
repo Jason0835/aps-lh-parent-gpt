@@ -1,14 +1,20 @@
 package com.zlt.aps.gsq.engine.service.impl;
 
+import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.engine.mapper.GsqEngineMachineMapper;
 import com.zlt.aps.gsq.engine.service.GsqEngineMachineService;
 import com.zlt.aps.gsq.engine.vo.GsqSpecifyMachineVo;
 import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo;
 import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscVo;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +28,14 @@ public class GsqEngineMachineServiceImpl implements GsqEngineMachineService {
 
     @Resource
     private GsqEngineMachineMapper gsqEngineMachineMapper;
+    
+    /**
+     * 加载有效钢丝圈机台
+     * @return
+     */
+    public List<GsqMachineInfo> listGsqMachine() {
+        return gsqEngineMachineMapper.listGsqMachine();
+    }
 
     /**
      * 获得钢丝圈代码和定点机台的map
@@ -70,5 +84,18 @@ public class GsqEngineMachineServiceImpl implements GsqEngineMachineService {
             twiningDiscMap.put(gsqTwiningDiscVo.getSteelRingCode(), specOrder);
         }
         return twiningDiscMap;
+    }
+    
+    /**
+     * 获取上一天规格已排产机台列表
+     * 
+     * @param scheduleDate
+     * @return
+     */
+    @Override
+    public Map<String, Long> getLastDayPlanMachine(Date scheduleDate) {
+        return gsqEngineMachineMapper.listLastDayPlanMachine(scheduleDate).stream()
+                .filter(r -> NumberUtils.isDigits(r.getMachineIds()) && StringUtils.isNotEmpty(r.getSteelRingCode()))
+                .collect(Collectors.toMap(GsqSpecifyMachineVo::getSteelRingCode, r -> new Long(r.getMachineIds())));
     }
 }

@@ -22,15 +22,15 @@ import java.util.List;
 
 @Api(tags = {"钢丝圈外协规格管理接口"})
 @RestController
-@RequestMapping("/assistSpec")
+@RequestMapping("/xwyy/assistSpec")
 public class XwyyAssistSpecController extends BaseController {
 
     @Resource
     private XwyyAssistSpecService xwyyAssistSpecService;
 
     @ApiOperation("根据条件查询外协规格管理列表")
-    @GetMapping("/listAssistSpec")
-    public TableDataInfo listAssistSpec(XwyyAssistSpec dto) {
+    @PostMapping("/listAssistSpec")
+    public TableDataInfo listAssistSpec(@RequestBody XwyyAssistSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<XwyyAssistSpec> list = xwyyAssistSpecService.listAssistSpec(dto);
@@ -77,8 +77,8 @@ public class XwyyAssistSpecController extends BaseController {
 
     @Log(title = "ui.xwyy.assistSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<XwyyAssistSpec> exportData(XwyyAssistSpec dto) {
+    @PostMapping("/exportData")
+    public List<XwyyAssistSpec> exportData(@RequestBody XwyyAssistSpec dto) {
         dto.setOrderStr(orderStr());
         List<XwyyAssistSpec> list = xwyyAssistSpecService.listAssistSpec(dto);
         return list;

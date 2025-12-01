@@ -1,5 +1,6 @@
 package com.zlt.aps.common.engine.domain;
 
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -21,7 +22,7 @@ import java.util.Date;
 @Data
 @TableName("T_CX_MONTH_STOCK")
 @ApiModel(value = "CxMonthStock对象", description = "成型月结库存表")
-@KeySequence(value = "SEQ_CX_MONTHSTOCK", clazz = Long.class)
+@KeySequence(value = "SEQ_CX_MONTHSTOCK",dbType = DbType.ORACLE)
 public class CxMonthStock extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;

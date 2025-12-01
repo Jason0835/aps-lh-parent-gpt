@@ -15,7 +15,7 @@ import java.math.BigDecimal;
  * @date 2021-05-28
  */
 @ApiModel(value = "纤维压延机台信息对象", description = "纤维压延机台信息对象 ")
-public class XwyyMachineInfoTemp {
+public class XwyyMachineInfoTemp extends ApsBaseEntity {
 
     /**
      * 机台编号

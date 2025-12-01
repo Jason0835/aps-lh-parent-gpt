@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueCollectPlanMapper">
+
+    <sql id="column">
+        tgcp.id, tgcp.demand_batch_no, tgcp.batch_no, tgcp.plan_date, tgcp.factory, tgcp.glue, tgcp.mix_area, tgcp.machine_code, tgcp.total_plan_qty,
+        tgcp.last_surplus,
+        tgcp.produce_qty,
+        tgcp.mid_plan_qty, tgcp.mid_remark, tgcp.night_plan_qty, tgcp.night_remark, tgcp.day_plan_qty, tgcp.day_remark, tgcp.data_source, tgcp.remark, tgcp.del_flag,
+        tgcp.create_by, tgcp.create_time, tgcp.update_by, tgcp.update_time, tgcp.is_finishing
+    </sql>
+
+    <select id="selectGlueCollectPlanList" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueCollectPlan"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueCollectPlan">
+        select * from (
+            select
+            <include refid="column"/>
+            from t_glue_collect_plan tgcp
+            where tgcp.del_flag = '0'
+            <if test="planDate != null ">and tgcp.plan_date = #{planDate}</if>
+            <if test="factory != null  and factory != ''">and tgcp.factory = #{factory}</if>
+            <if test="glue != null  and glue != ''">and INSTR(tgcp.glue, #{glue}) > 0</if>
+            <if test="mixArea != null  and mixArea != ''">and tgcp.mix_area = #{mixArea}</if>
+            <if test="machineCode != null  and machineCode != ''">and tgcp.machine_code = #{machineCode}</if>
+        ) t
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueCollectPlanByIds" parameterType="String">
+        update t_glue_collect_plan set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="batchInsertGlueCollectPlanInfo">
+        insert into t_glue_collect_plan
+        (id,demand_batch_no,batch_no,plan_date,factory,glue,mix_area,machine_code,total_plan_qty,mid_plan_qty,mid_remark,night_plan_qty,night_remark,day_plan_qty,day_remark,data_source,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueCollectPlan" separator=" union all ">
+            select
+            #{glueCollectPlan.demandBatchNo,jdbcType= VARCHAR} demand_batch_no,
+            #{glueCollectPlan.batchNo,jdbcType= VARCHAR} batch_no, #{glueCollectPlan.planDate,jdbcType=DATE} plan_date,
+            #{glueCollectPlan.factory,jdbcType= VARCHAR} factory, #{glueCollectPlan.glue,jdbcType= VARCHAR} glue,
+            #{glueCollectPlan.mixArea,jdbcType= VARCHAR} mix_area, #{glueCollectPlan.machineCode,jdbcType= VARCHAR}
+            machine_code, #{glueCollectPlan.totalPlanQty,jdbcType=DOUBLE} total_plan_qty,
+            #{glueCollectPlan.midPlanQty,jdbcType=DOUBLE} mid_plan_qty, #{glueCollectPlan.midRemark,jdbcType= VARCHAR}
+            mid_remark, #{glueCollectPlan.nightPlanQty,jdbcType=DOUBLE} night_plan_qty,
+            #{glueCollectPlan.nightRemark,jdbcType= VARCHAR} night_remark, #{glueCollectPlan.dayPlanQty,jdbcType=DOUBLE}
+            day_plan_qty, #{glueCollectPlan.dayRemark,jdbcType= VARCHAR} day_remark,
+            #{glueCollectPlan.dataSource,jdbcType= VARCHAR} data_source, #{glueCollectPlan.remark,jdbcType= VARCHAR}
+            remark, #{glueCollectPlan.delFlag,jdbcType= VARCHAR} del_flag, #{glueCollectPlan.createBy,jdbcType= VARCHAR}
+            create_by, #{glueCollectPlan.createTime,jdbcType=DATE} create_time,
+            #{glueCollectPlan.updateBy,jdbcType= VARCHAR} update_by, #{glueCollectPlan.updateTime,jdbcType=DATE}
+            update_time from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <insert id="syncCollectPlanToLog">
+        INSERT INTO T_GLUE_COLLECT_PLAN_LOG (ID, DEMAND_BATCH_NO, BATCH_NO, PLAN_DATE, FACTORY, GLUE, MIX_AREA, MACHINE_CODE, TOTAL_PLAN_QTY,
+                                             LAST_SURPLUS, MID_PLAN_QTY, MID_REMARK, NIGHT_PLAN_QTY, NIGHT_REMARK, DAY_PLAN_QTY, DAY_REMARK,
+                                             DATA_SOURCE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME)
+        SELECT ID, DEMAND_BATCH_NO, BATCH_NO, PLAN_DATE, FACTORY, GLUE, MIX_AREA, MACHINE_CODE, TOTAL_PLAN_QTY,
+               LAST_SURPLUS, MID_PLAN_QTY, MID_REMARK, NIGHT_PLAN_QTY, NIGHT_REMARK, DAY_PLAN_QTY, DAY_REMARK, DATA_SOURCE, REMARK,
+               DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        FROM T_GLUE_COLLECT_PLAN
+        WHERE plan_date = #{planDate}
+    </insert>
+
+    <delete id="deleteCollectPlan">
+        delete from T_GLUE_COLLECT_PLAN where plan_date = #{planDate}
+    </delete>
+
+    <insert id="summaryBasePlan">
+        INSERT INTO T_GLUE_COLLECT_PLAN(ID, DEMAND_BATCH_NO, BATCH_NO, PLAN_DATE, MIX_AREA, GLUE, FACTORY,
+                                        TOTAL_PLAN_QTY,
+                                        LAST_SURPLUS,
+                                        PRODUCE_QTY,
+                                        MID_PLAN_QTY, MID_REMARK, NIGHT_PLAN_QTY, NIGHT_REMARK, DAY_PLAN_QTY,
+                                        DAY_REMARK, DATA_SOURCE, CREATE_BY)
+        SELECT NULL id, m.*
+        FROM (
+                 SELECT
+                        GROUP_CONCAT(distinct BATCH_NO ORDER BY BATCH_NO SEPARATOR ';')                              AS DEMAND_BATCH_NO, /*对应胶料需求计划批次号*/
+                        #{batchNo}                                                                                      BATCH_NO, /*批次号*/
+                        PLAN_DATE, /*计划日期*/
+                        MIX_AREA, /*密炼区*/
+                        GLUE, /*胶料*/
+                        GROUP_CONCAT(distinct FACTORY ORDER BY FACTORY SEPARATOR ',')                                AS FACTORY, /*分厂*/
+                        SUM(ifnull(TOTAL_PLAN_QTY, 0))                                                                     TOTAL_PLAN_QTY, /*日计划*/
+                        0                                                                                               LAST_SURPLUS, /*昨日剩余*/
+                        SUM(ifnull(TOTAL_PLAN_QTY, 0))                                                                     PRODUCE_QTY, /*生产量*/
+                        SUM(ifnull(MID_PLAN_QTY, 0))                                                                       MID_PLAN_QTY, /*中班计划量*/
+                        GROUP_CONCAT(distinct MID_REMARK ORDER BY MID_REMARK SEPARATOR ';')                          AS MID_REMARK, /*中班备注*/
+                        SUM(ifnull(NIGHT_PLAN_QTY, 0))                                                                     NIGHT_PLAN_QTY, /*夜班计划量*/
+                        GROUP_CONCAT(distinct NIGHT_REMARK ORDER BY NIGHT_REMARK SEPARATOR ';')                      AS NIGHT_REMARK, /*夜班备注*/
+                        SUM(ifnull(DAY_PLAN_QTY, 0))                                                                       DAY_PLAN_QTY, /*白班计划量*/
+                        GROUP_CONCAT(distinct DAY_REMARK ORDER BY DAY_REMARK SEPARATOR ';')                          AS DAY_REMARK, /*白班备注*/
+                        '0'                                                                                             DATA_SOURCE, /*数据来源：汇总计划*/
+                        #{createBy}                                                                                     CREATE_BY
+                 FROM T_GLUE_DEMAND_PLAN
+                 where plan_date = #{planDate}
+                   and DEL_FLAG = '0'
+                 group by PLAN_DATE, MIX_AREA, GLUE
+             ) m
+    </insert>
+
+    <update id="matchMachine">
+        update T_GLUE_COLLECT_PLAN p
+            join (SELECT MIX_AREA,
+                         GLUE,
+                         (case
+                              when instr(MACHINE_CODE, ',') = 0 then MACHINE_CODE
+                              else substr(MACHINE_CODE, 1, instr(MACHINE_CODE, ',') - 1) end) as machine_code /*如果有多个机台，则只拿第一个机台*/
+                  FROM (SELECT f.MIX_AREA,
+                               f.GLUE,
+                               group_concat(distinct f.MACHINE_CODE order by f.MACHINE_ORDER SEPARATOR ',') AS MACHINE_CODE /*机台根据机台顺序升序排序*/
+                        FROM T_FORMULA_MACHINE f
+                                 INNER JOIN T_MIX_MACHINE m1 ON f.machine_code = m1.machine_code and m1.status = '0' and m1.del_flag = '0'
+                            AND (m1.mid_status = '0' OR m1.night_status = '0' OR m1.day_status = '0')
+                        WHERE f.DEL_FLAG = '0'
+                        GROUP BY f.MIX_AREA, f.GLUE) fm) m
+            on (p.glue = m.glue and p.mix_area = m.mix_area)
+        set p.MACHINE_CODE = m.MACHINE_CODE
+        where p.del_flag = '0'
+          and p.plan_date = #{planDate}
+    </update>
+
+    <update id="matchSpecialMachine">
+        update T_GLUE_COLLECT_PLAN p
+            join (SELECT d.MIX_AREA,
+                         d.GLUE,
+                         group_concat(distinct d.MACHINE_CODE order by d.MACHINE_CODE SEPARATOR ',') AS MACHINE_CODE /*密炼机台*/
+                  FROM T_MACHINE_GLUE_DECOMPOSE d
+                           INNER JOIN T_MIX_MACHINE m on d.machine_code = m.machine_code and m.DEL_FLAG = '0' and m.STATUS = '0'
+                      AND (m.mid_status = '0' OR m.night_status = '0' OR m.day_status = '0')
+                  WHERE d.DEL_FLAG = '0'
+                  GROUP BY d.MIX_AREA, d.GLUE) m
+            on (p.glue = m.glue and p.mix_area = m.mix_area)
+        set p.MACHINE_CODE = m.MACHINE_CODE
+        where p.del_flag = '0'
+          and p.plan_date = #{planDate}
+    </update>
+
+    <update id="lastSurplusPlan">
+        update T_GLUE_COLLECT_PLAN p
+        join (SELECT SCHEDULE_DATE as SCHEDULE_DATE, /*计划日期*/
+        MIX_AREA,
+        GLUE,
+        SUM(ifnull(TOTAL_SURPLUS, 0)) as TOTAL_SURPLUS /*总剩余*/
+        FROM T_GLUE_SCHEDULE_RESULT
+        WHERE DEL_FLAG = '0'
+        GROUP BY SCHEDULE_DATE, MIX_AREA, GLUE
+        ) m
+        on (p.PLAN_DATE = DATE_ADD(m.SCHEDULE_DATE, INTERVAL 1 DAY) and p.MIX_AREA = m.MIX_AREA and p.GLUE = m.GLUE)
+        set
+        <if test="isAddLastSurplus == '0'.toString()">p.PRODUCE_QTY=ifnull(m.TOTAL_SURPLUS, 0) + ifnull(p.TOTAL_PLAN_QTY, 0),</if>
+        p.LAST_SURPLUS = m.TOTAL_SURPLUS
+        where p.del_flag = '0' and p.plan_date = str_to_date(#{planDate,jdbcType=DATE},'%Y-%m-%d')
+    </update>
+
+    <!--Joran 2022-05-24 统计分厂提交计划中密炼区存在多个或者为空的记录数 start-->
+    <select id="countOfMixAreaException" parameterType="string" resultType="int">
+        select count(*) from T_GLUE_DEMAND_PLAN t
+        <where>
+            t.del_flag='0'
+            and t.plan_date=str_to_date(#{planDate},'%Y-%m-%d')
+            and (instr(t.mix_area,',')>0 or t.mix_area is null)
+        </where>
+    </select>
+    <!--Joran 2022-05-24 统计分厂提交计划中密炼区存在多个或者为空的记录数 end-->
+    
+    <!-- 重算白班待支领量 -->
+    <update id="recaculateGlueUnclaimed">
+        insert into T_GLUE_UNCLAIMED
+        (SCHEDULE_DATE,
+         MIX_AREA,
+         GLUE,
+         SHELF_NUM1,
+         SHELF_NUM2,
+         CREATE_TIME)
+        select *
+        from (SELECT P.PLAN_DATE,
+                     P.MIX_AREA,
+                     P.GLUE,
+                     CASE
+                         WHEN ifnull(P.TOTAL_PLAN_QTY, 0) > ifnull(S.SHELF_NUM, 0) THEN
+                             ifnull(P.TOTAL_PLAN_QTY, 0) - ifnull(S.SHELF_NUM, 0)
+                         ELSE
+                             0
+                         END SHELF_NUM,
+                     0,
+                     now()
+              FROM T_GLUE_COLLECT_PLAN P
+                       LEFT JOIN (SELECT S.SCHEDULE_DATE,
+                                         S.MIX_AREA,
+                                         S.MATERIAL_NAME,
+                                         SUM(S.SHELF_NUM) SHELF_NUM
+                                  FROM T_MES_PPM_RUBBER_STORE_OUT S
+                                  WHERE S.SCHEDULE_DATE = #{planDate}
+                                    AND S.DEL_FLAG = '0'
+                                  GROUP BY S.SCHEDULE_DATE, S.MIX_AREA, S.MATERIAL_NAME) S
+                                 ON P.PLAN_DATE = S.SCHEDULE_DATE
+                                     AND P.GLUE = S.MATERIAL_NAME
+                                     AND P.MIX_AREA = S.MIX_AREA
+              WHERE P.PLAN_DATE = #{planDate}
+                AND P.DEL_FLAG = '0'
+              UNION
+              SELECT U.SCHEDULE_DATE, U.MIX_AREA, U.GLUE, 0, 0, now()
+              FROM T_GLUE_UNCLAIMED U
+              WHERE NOT EXISTS (SELECT 0
+                                FROM T_GLUE_COLLECT_PLAN P
+                                WHERE P.PLAN_DATE = U.SCHEDULE_DATE
+                                  AND P.GLUE = U.GLUE
+                                  AND P.MIX_AREA = U.MIX_AREA
+                                  AND P.DEL_FLAG = '0')
+                AND U.SCHEDULE_DATE = #{planDate}
+                AND U.DEL_FLAG = '0') as tb
+        on duplicate key
+            update SHELF_NUM1  = values(SHELF_NUM1),
+                   UPDATE_TIME = now()
+    </update>
+</mapper>

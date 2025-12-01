@@ -4,7 +4,7 @@
 	<!-- 查询顶点机台的映射配置信息 -->
     <select id="selectCd15SpecifyMachineList" resultType="com.zlt.aps.cd15.engine.vo.Cd15SpecifyMachineVo">
 		SELECT steel_strip_code,
-		       listagg(M.MACHINE_ID, ',') WITHIN GROUP (ORDER BY M.MACHINE_ID) MACHINE_ID
+		       GROUP_CONCAT(M.MACHINE_ID ORDER BY M.MACHINE_ID SEPARATOR ',') MACHINE_ID
 		  FROM T_CD15_SPECIFY_MACHINE M
 		  LEFT JOIN T_CD15_MACHINE_INFO MI
 		    ON MI.ID = M.MACHINE_ID
@@ -13,6 +13,43 @@
 		   AND MI.STATUS = '0'
 		   AND M.JOB_TYPE = #{jobType}
          GROUP BY steel_strip_code
+    </select>
+
+    <select id="listCd15Machine" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo">
+        SELECT ID,
+               MACHINE_CODE,
+               MACHINE_NAME,
+               QUATA,
+               CLASS_SHIFT,
+               OPEN_MACHINE_CLASS,
+               IS_OUT_TWO,
+               STEEL_STRIP_WIDTH,
+               STATUS,
+               DEL_FLAG,
+               REMARK
+        FROM T_CD15_MACHINE_INFO
+        WHERE DEL_FLAG = '0'
+          AND STATUS = '0'
+    </select>
+
+    <select id="listLastDayPlanMachine" resultType="com.zlt.aps.cd15.engine.vo.Cd15SpecifyMachineVo">
+       SELECT cd.STEEL_STRIP_CODE1 steel_strip_code, max(MACHINE_ID) MACHINE_ID
+         FROM T_CD15_SCHEDULE_RESULT cd
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+          AND NIGHT_PLAN_QTY1 > 0
+          AND steel_strip_code1 is not null
+          AND MACHINE_ID is not null
+        GROUP BY steel_strip_code1
+        UNION
+       SELECT cd.STEEL_STRIP_CODE2 steel_strip_code, max(MACHINE_ID) MACHINE_ID
+         FROM T_CD15_SCHEDULE_RESULT cd
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+          AND NIGHT_PLAN_QTY1 > 0
+          AND steel_strip_code1 is null
+          AND MACHINE_ID is not null
+        GROUP BY steel_strip_code2
     </select>
 
 </mapper>

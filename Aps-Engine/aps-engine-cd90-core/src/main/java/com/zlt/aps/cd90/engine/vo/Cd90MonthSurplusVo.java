@@ -32,4 +32,9 @@ public class Cd90MonthSurplusVo {
 	 * 月度剩余量
 	 */
 	private Double monthRemainQty;
+	
+	/**
+	 * 备注
+	 */
+	private String remark;
 }

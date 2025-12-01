@@ -87,7 +87,7 @@ public class XwyyQuotaSettingController extends BaseController {
     @Log(title = "ui.data.column.xwyy.quota.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出纤维压延定额设定")
     @PostMapping("/export")
-    public List<XwyyQuotaSettingDto> export(XwyyQuotaSettingDto dto) {
+    public List<XwyyQuotaSettingDto> export(@RequestBody XwyyQuotaSettingDto dto) {
         dto.setOrderStr(orderStr());
         XwyyQuotaSetting setting = new XwyyQuotaSetting();
         BeanUtils.copyProperties(dto, setting);

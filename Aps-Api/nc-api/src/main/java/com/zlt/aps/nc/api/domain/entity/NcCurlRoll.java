@@ -25,13 +25,13 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_NC_CURL_ROLL")
 @ApiModel(value = "NcCurlRoll对象", description = "内衬卷曲信息维护表")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class NcCurlRoll extends ApsBaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "内衬编号")
@@ -43,4 +43,11 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
     @Excel(name = "ui.curlRoll.column.length")
     @ImportValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
     private BigDecimal curlLength;
+
+    /**
+     * 查询编号，用于精确查询
+     */
+    @ApiModelProperty(value = "查询编号，用于精确查询")
+    @TableField(exist = false)
+    private String queryCode;
 }

@@ -13,6 +13,9 @@
         <if test="originalLineName != null and originalLineName != ''">
             and INSTR(ORIGINAL_LINE_NAME, #{originalLineName, jdbcType=VARCHAR}) > 0
         </if>
+        <if test="queryCode != null and queryCode != ''">
+            and ORIGINAL_LINE_CODE = #{queryCode,jdbcType=VARCHAR}
+        </if>
         <if test="orderStr == null">
             order by CREATE_TIME desc
         </if>
@@ -22,48 +25,27 @@
 
     </select>
 
-    <update id="mergeSql" parameterType="list">
-        merge into t_xwyy_original_line_spec a USING (
-        <foreach collection="list" item="OriginalLineSpec" separator=" union ">
-            select
-            #{OriginalLineSpec.originalLineCode,jdbcType=VARCHAR} ORIGINAL_LINE_CODE,
-            #{OriginalLineSpec.originalLineName,jdbcType=VARCHAR} ORIGINAL_LINE_NAME,
-            #{OriginalLineSpec.originalLineLength,jdbcType=DOUBLE} ORIGINAL_LINE_LENGTH,
-            #{OriginalLineSpec.createBy,jdbcType=VARCHAR} create_by,
-            #{OriginalLineSpec.createTime,jdbcType=DATE} create_time,
-            #{OriginalLineSpec.updateBy,jdbcType=VARCHAR} update_by,
-            #{OriginalLineSpec.updateTime,jdbcType=DATE} update_time,
-            #{OriginalLineSpec.remark,jdbcType=VARCHAR} remark
-            from dual
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO t_xwyy_original_line_spec (
+        ORIGINAL_LINE_CODE, ORIGINAL_LINE_NAME, ORIGINAL_LINE_LENGTH, create_by, create_time, remark, del_flag
+        )
+        VALUES
+        <foreach collection="list" item="OriginalLineSpec" separator=",">
+            (
+            #{OriginalLineSpec.originalLineCode,jdbcType=VARCHAR},
+            #{OriginalLineSpec.originalLineName,jdbcType=VARCHAR},
+            #{OriginalLineSpec.originalLineLength,jdbcType=DOUBLE},
+            #{OriginalLineSpec.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{OriginalLineSpec.remark,jdbcType=VARCHAR},
+            '0'
+            )
         </foreach>
-        ) b ON (
-        a.ORIGINAL_LINE_CODE = b.ORIGINAL_LINE_CODE
-        AND a.del_flag = '0'
-        )
-        WHEN MATCHED THEN
-        UPDATE SET
-        a.ORIGINAL_LINE_LENGTH = b.ORIGINAL_LINE_LENGTH,
-        a.ORIGINAL_LINE_NAME = b.ORIGINAL_LINE_NAME,
-        a.update_by = b.create_by,
-        a.update_time = sysdate,
-        a.remark = b.remark
-        WHEN NOT MATCHED THEN
-        INSERT (
-        a.id ,
-        a.ORIGINAL_LINE_CODE ,
-        a.ORIGINAL_LINE_NAME ,
-        a.ORIGINAL_LINE_LENGTH ,
-        a.create_by ,
-        a.create_time ,
-        a.remark, a.del_flag
-        ) values
-        (SEQ_PUBLIC.NEXTVAL,
-        b.ORIGINAL_LINE_CODE ,
-        b.ORIGINAL_LINE_NAME ,
-        b.ORIGINAL_LINE_LENGTH ,
-        b.create_by,
-        sysdate,
-        b.remark, '0'
-        )
-    </update>
+        ON DUPLICATE KEY UPDATE
+        ORIGINAL_LINE_LENGTH = VALUES(ORIGINAL_LINE_LENGTH),
+        ORIGINAL_LINE_NAME = VALUES(ORIGINAL_LINE_NAME),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
 </mapper>

@@ -21,55 +21,55 @@ public interface ITcLossSettingService {
     /**
      * 查询胎侧损耗率设定列表
      */
-    @PostMapping("/loss/list")
+    @PostMapping("/tc/loss/list")
     TableDataInfo list(@RequestBody TcLossSettingDto dto);
 
     /**
      * 新增胎侧损耗率设定
      */
-    @PostMapping("/loss/add")
+    @PostMapping("/tc/loss/add")
     AjaxResult add(@RequestBody TcLossSettingDto dto);
 
     /**
      * 修改胎侧损耗率设定
      */
-    @PostMapping("/loss/edit")
+    @PostMapping("/tc/loss/edit")
     AjaxResult edit(@RequestBody TcLossSettingDto dto);
 
     /**
      * 删除胎侧损耗率设定
      */
-    @DeleteMapping("/loss/{ids}")
+    @DeleteMapping("/tc/loss/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/loss/{id}")
+    @GetMapping(value = "/tc/loss/{id}")
     TcLossSettingDto getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验胎侧损耗率设定唯一性
      */
-    @PostMapping("/loss/checkTcLossSettingUnique")
+    @PostMapping("/tc/loss/checkTcLossSettingUnique")
     String checkTcLossSettingUnique(@RequestBody TcLossSettingDto dto);
 
     /**
      * 导出胎侧损耗率设定列表
      */
-    @PostMapping("/loss/getList")
+    @PostMapping("/tc/loss/getList")
     List<TcLossSettingDto> getList(@RequestBody TcLossSettingDto dto);
 
     /**
      * 数据导入
      */
-    @PostMapping("/loss/importData")
+    @PostMapping("/tc/loss/importData")
     AjaxResult importData(@RequestBody List<TcLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/loss/deleteAll")
+    @PostMapping("/tc/loss/deleteAll")
     AjaxResult deleteAll();
 }

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueSafeStockMapper">
+
+    <select id="selectGlueSafeStockList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueSafeStock"
+            resultType="com.zlt.mix.setting.api.domain.entity.GlueSafeStock">
+        SELECT
+        t.id,
+        t.mix_area,
+        t.glue,
+        p.stock_num,
+        t.safe_stock,
+        t.reserve_stock_rate,
+        t.remark,
+        t.del_flag,
+        t.create_by,
+        t.create_time,
+        t.update_by,
+        t.update_time
+        FROM
+        t_glue_safe_stock t
+        LEFT JOIN
+        (select MIX_AREA,GLUE,STOCK_DATE,DEL_FLAG,sum(ifnull( STOCK_NUM, 0 )) stock_num from
+        (select MIX_AREA,GLUE,STOCK_DATE,DEL_FLAG,STOCK_NUM from T_ML_GLUE_STOCK
+        union all
+        select MIX_AREA,GLUE,STOCK_DATE,DEL_FLAG,STOCK_NUM from T_GLUE_STOCK) as s
+        GROUP BY
+        MIX_AREA,
+        GLUE,
+        STOCK_DATE,
+        DEL_FLAG) p ON p.STOCK_DATE =
+        #{todayDate,jdbcType=TIMESTAMP}
+        AND p.DEL_FLAG = 0
+        AND t.GLUE = p.GLUE
+        AND t.MIX_AREA = p.MIX_AREA
+        WHERE
+        t.del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and t.mix_area = #{mixArea}</if>
+        <if test="glue != null  and glue != ''">and INSTR(t.glue, #{glue}) > 0</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueSafeStockByIds" parameterType="String">
+        update t_glue_safe_stock set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueSafeStockNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.mixArea,jdbcType=VARCHAR} MIX_AREA, #{data.glue,jdbcType=VARCHAR}
+            GLUE
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from T_GLUE_SAFE_STOCK m
+        inner join temp_table t on m.MIX_AREA = t.MIX_AREA and m.GLUE = t.GLUE and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueSafeStockInfo">
+        insert into t_glue_safe_stock
+        (id,mix_area,glue,safe_stock,reserve_stock_rate,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueSafeStock" separator=" union all ">
+            select
+            #{glueSafeStock.mixArea,jdbcType=VARCHAR} mix_area,
+            #{glueSafeStock.glue,jdbcType=VARCHAR} glue,
+            #{glueSafeStock.safeStock,jdbcType=DOUBLE} safe_stock,
+            #{glueSafeStock.reserveStockRate,jdbcType=DOUBLE} reserve_stock_rate,
+            #{glueSafeStock.remark,jdbcType=VARCHAR} remark,
+            #{glueSafeStock.delFlag,jdbcType=VARCHAR} del_flag,
+            #{glueSafeStock.createBy,jdbcType=VARCHAR} create_by,
+            #{glueSafeStock.createTime,jdbcType=TIMESTAMP}
+            create_time, #{glueSafeStock.updateBy,jdbcType=VARCHAR} update_by,
+            #{glueSafeStock.updateTime,jdbcType=TIMESTAMP} update_time
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_glue_safe_stock
+        (
+        mix_area, glue, safe_stock, reserve_stock_rate, remark, del_flag, create_by, create_time )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.mixArea,jdbcType=VARCHAR} , #{item.glue,jdbcType=VARCHAR} ,
+            #{item.safeStock, jdbcType=DECIMAL} , #{item.reserveStockRate, jdbcType=DECIMAL} , #{item.remark,jdbcType=VARCHAR} ,
+            #{item.delFlag,jdbcType=VARCHAR} , #{item.createBy,jdbcType=VARCHAR} ,
+            #{item.createTime, jdbcType=TIMESTAMP} 
+            )
+        </foreach>
+        on duplicate key
+        update
+        safe_stock = values(safe_stock),reserve_stock_rate = values(reserve_stock_rate),
+        remark = values(remark), update_by = values(create_by),
+        update_time = now()
+    </update>
+
+    <update id="updateSafeStockByMixAreaAndGlue">
+        update t_glue_safe_stock set safe_stock = #{safeStock, jdbcType=DECIMAL}
+        where del_flag = 0 and mix_area = #{mixArea} and glue = #{glue}
+    </update>
+</mapper>

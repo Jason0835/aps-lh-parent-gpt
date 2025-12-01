@@ -83,8 +83,8 @@ public class XwyyMachineRollMappingController extends BaseController {
 
     @Log(title = "ui.MachineRollMapping.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<XwyyMachineRollMappingDto> exportData(XwyyMachineRollMappingDto dto) {
+    @PostMapping("/exportData")
+    public List<XwyyMachineRollMappingDto> exportData(@RequestBody XwyyMachineRollMappingDto dto) {
         dto.setOrderStr(orderStr());
         List<XwyyMachineRollMappingDto> list = xwyyMachineRollMappingService.listXwyyMachineRollMapping(dto);
         return list;

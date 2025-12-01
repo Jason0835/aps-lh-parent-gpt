@@ -2,7 +2,9 @@ package com.zlt.aps.xwyy.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
+import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.xwyy.api.domain.dto.XwyyScheduleResultDto;
+import com.zlt.aps.xwyy.api.domain.vo.HalfYyExportDataVo;
 import com.zlt.aps.xwyy.entity.XwyyScheduleResult;
 import com.zlt.aps.xwyy.vo.XwyyScheduleOriginalSumPlanVo;
 import org.apache.ibatis.annotations.Param;
@@ -111,9 +113,9 @@ public interface XwyyScheduleResultMapper extends BaseMapper<XwyyScheduleResult>
 
     int checkXwyyCodeExist(XwyyScheduleResultDto dto);
 
-    public int deleteByIds(Long[] ids);
+    public int deleteByIds(List<Long> ids);
 
-    public int batchUpdate(@Param("array") long[] ids, @Param("status") String status);
+    public int batchUpdate(@Param("list") List<Long> ids, @Param("status") String status);
 
     /**
      * 根据id查询未发布记录的条数
@@ -183,4 +185,89 @@ public interface XwyyScheduleResultMapper extends BaseMapper<XwyyScheduleResult>
      * @return 修改行数
      */
     int combinationMiddleAndNight(Map<String, Object> map);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getSummaryVo(XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取昨日早班计划量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getLastDayPlanQty(XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取成型消耗量
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getCxConsume(XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取库存
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    ScheduleSummaryVo getStock(XwyyScheduleResultDto scheduleResult);
+
+    /**
+     * 获取排程结果统计信息
+     *
+     * @param xwyyScheduleResult 日期
+     * @return 结果
+     */
+    List<HalfYyExportDataVo> selectYyResultList(@Param("scheduleResult") XwyyScheduleResult xwyyScheduleResult,
+                                                @Param("addDayList") List<Integer> addDayList);
+
+    /**
+     * 批量更新排程结果计划量
+     *
+     * @param addDate        排程日期
+     * @param xwyyResultList 要更新的物料号及计划量
+     * @return 更新行数
+     */
+    int batchUpdateToLastDayForXwyy(@Param("scheduleDate") Date addDate, @Param("list") List<HalfYyExportDataVo> xwyyResultList);
+
+    /**
+     * 批量更新排程结果计划量
+     *
+     * @param addDate        排程日期
+     * @param gdyyResultList 要更新的物料号及计划量
+     * @return 更新行数
+     */
+    int batchUpdateToLastDayForGdyy(@Param("scheduleDate") Date addDate, @Param("list") List<HalfYyExportDataVo> gdyyResultList);
+
+    /**
+     * 批量插入排程结果计划量
+     *
+     * @param addDate        排程日期
+     * @param xwyyResultList 要插入的物料号及计划量
+     * @return 插入行数
+     */
+    int batchInsertToLastDayForXwyy(@Param("scheduleDate") Date addDate, @Param("list") List<HalfYyExportDataVo> xwyyResultList);
+
+    /**
+     * 批量插入排程结果计划量
+     *
+     * @param addDate        排程日期
+     * @param gdyyResultList 要插入的物料号及计划量
+     * @return 插入行数
+     */
+    int batchInsertToLastDayForGdyy(@Param("scheduleDate") Date addDate, @Param("list") List<HalfYyExportDataVo> gdyyResultList);
+
+    /**
+     * 删除钢带压延排程结果
+     *
+     * @param scheduleDate 排程日期
+     * @return 结果
+     */
+    int deleteGdyyScheduleResultByScheduleDate(@Param("scheduleDate") Date scheduleDate);
 }

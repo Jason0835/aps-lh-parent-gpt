@@ -26,7 +26,7 @@
 
     <select id="checkParamsCodeUnique" resultMap="paramsResult">
         <include refid="selectParamsVo"/>
-        where del_flag = '0' and param_code = #{paramCode} and id = #{id} and rownum <![CDATA[ <= ]]> 1
+        where del_flag = '0' and param_code = #{paramCode} and id = #{id} limit 1
     </select>
 
     <select id="listParams" parameterType="com.zlt.aps.cd15.entity.Cd15Params"

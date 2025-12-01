@@ -205,6 +205,9 @@ public class GsqLossSettingServiceImpl extends ServiceImpl<GsqLossSettingMapper,
             } else {
                 lossSetting.setMachineId(machineId);
                 lossSetting.setBaseVale(null);
+                if (StringUtils.isBlank(lossSetting.getSteelRingCode())) {
+                    lossSetting.setSteelRingCode(null);
+                }
                 importList.add(lossSetting);
             }
         }

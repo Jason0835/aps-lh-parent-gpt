@@ -69,17 +69,22 @@ public class EngineConstants {
      * 参数code：仅投产阶段规格排产标识（值为1时，表示仅投产阶段的规格才进行自动排程；其他值的时候表示自动排程的排产全部规格）
      */
     public static String PRODUCTION_STAGE_PRODUCE = "PRODUCTION_STAGE_PRODUCE";
-    
+
     /**
      *  参数code：标准卷曲长度（部件卷曲到一个工件上的标准长度）
      */
     public static String STANDARD_CRIMP_LENGTH = "STANDARD_CRIMP_LENGTH";
-    
+
     /**
      *  参数code：卷曲数小数取整值（小数部分大于等于该值的进位，否则舍弃）
      */
     public static String CURL_DECIMAL_ROUNDING = "CURL_DECIMAL_ROUNDING";
-    
+
+    /**
+     * 夜班产量参考值
+     */
+    public static String MID_PLAN_QTY_REFERENCE = "MID_PLAN_QTY_REFERENCE";
+
     /**
      *  参数code：共用规格收尾判断天数（判断共用规格是否收尾时会按照配置的天数往回看是否有生产）
      */
@@ -94,6 +99,11 @@ public class EngineConstants {
      * 各班计划量均分阈值
      */
     public static String EQUAL_SHARE_THRESHOLD = "EQUAL_SHARE_THRESHOLD";
+
+    /**
+     * 交接班库存基准值
+     */
+    public final static String CLASS_STOCK_REFERENCE = "CLASS_STOCK_REFERENCE";
 
     /**
      * 同胶料合并生产预计库存可供应时长
@@ -131,6 +141,16 @@ public class EngineConstants {
     public static String STOCK_RATIO = "STOCK_RATIO";
 
     /**
+     * 参数Code：钢丝卷长
+     */
+    public static String WIRE_COIL_LENGTH = "WIRE_COIL_LENGTH";
+
+    /**
+     * 参数Code：纤维原丝卷长
+     */
+    public final static String ORIGINAL_LINE_LENGTH = "ORIGINAL_LINE_LENGTH";
+
+    /**
      * 参数code：纤维压延默认可破大卷数
      */
     public final static String XWYY_BREAK_ROLL_NUM = "XWYY_BREAK_ROLL_NUM";
@@ -141,6 +161,11 @@ public class EngineConstants {
     public final static String MIN_ROUND_ROLL_NUM = "MIN_ROUND_ROLL_NUM";
 
     /**
+     * 工装容量
+     */
+    public final static String TOOL_CAPACITY = "TOOL_CAPACITY";
+
+    /**
      * 参数code：卷曲长度
      */
     public final static String CRIMP_LENGTH = "CRIMP_LENGTH";
@@ -149,7 +174,74 @@ public class EngineConstants {
      * 半部件临近收尾阈值
      */
     public static String CLOSE_OUT_NUM = "CLOSE_OUT_NUM";
-    
+
+    /**
+     * 库存预生产小时数
+     */
+    public final static String PRODUCT_STOCK_HOUR = "PRODUCT_STOCK_HOUR";
+
+    /**
+     * 库存预生产小时数（一次法）
+     */
+    public final static String PRODUCT_STOCK_HOUR_ONE_METHOD = "PRODUCT_STOCK_HOUR_ONE_METHOD";
+
+    /**
+     * 大需求量规格阈值
+     */
+    public final static String LARGE_DEMAND = "LARGE_DEMAND";
+
+    /**
+     * 胶料大需求量规格阈值
+     */
+    public final static String GLUE_LARGE_DEMAND = "GLUE_LARGE_DEMAND";
+
+    /**
+     * 大需求量规格阈值扣减量
+     */
+    public final static String LARGE_DEMAND_REDUCE = "LARGE_DEMAND_REDUCE";
+
+    /**
+     * 低于参数的计划量可以推迟到下个班做
+     */
+    public final static String DELAY_PLAN_QTY = "DELAY_PLAN_QTY";
+
+    /**
+     * 工装包含大卷数
+     */
+    public final static String TOOL_ROLL_NUM = "TOOL_ROLL_NUM";
+
+    /**
+     * 供应成型规格数集中生成产阈值
+     */
+    public final static String SUPPLY_SPEC_CONCENTRATE = "SUPPLY_SPEC_CONCENTRATE";
+
+    /**
+     * 供应成型规格数分散生成产阈值
+     */
+    public final static String SUPPLY_SPEC_DISTRIBUTE = "SUPPLY_SPEC_DISTRIBUTE";
+
+    /**
+     * 单班最少排产量
+     */
+    public final static String MIN_PLAN_QTY = "MIN_PLAN_QTY";
+
+    /**
+     * 大尺寸规格阈值
+     */
+    public final static String BIG_SIZE_SPEC = "BIG_SIZE_SPEC";
+    /**
+     * 强制夜班规格
+     */
+    public final static String NIGHT_SPEC = "NIGHT_SPEC";
+    /**
+     * 强制早班规格
+     */
+    public final static String MID_SPEC = "MID_SPEC";
+    /**
+     * 机台产能时长
+     */
+    public final static String MACHINE_QUATA_HOUR = "MACHINE_QUATA_HOUR";
+
     /**
      * 硫化机空闲天数
      */
@@ -158,6 +250,10 @@ public class EngineConstants {
 	 * 钢带压延按大卷计算库存开关
 	 */
     public final static String GDYY_STOCK_ROLL_SWITCH = "GDYY_STOCK_ROLL_SWITCH";
+    /**
+     * 预估库存开关
+     */
+    public final static String ESTIMATE_STOCK_SWITCH = "ESTIMATE_STOCK_SWITCH";
 	/**
 	 * 钢带压延按大卷计算库存开关：打开
 	 */
@@ -199,9 +295,9 @@ public class EngineConstants {
     public static String JOB_TYPE_NOT = "1";
 
     /**
-     * 工序类型：硫化
+     * 工序类型：硫化（工序值0已被密炼占用）
      */
-    public static String PROCEDURE_CODE_LH = "0";
+    public static String PROCEDURE_CODE_LH = "11";
 
     /**
      * 工序类型：成型
@@ -300,4 +396,64 @@ public class EngineConstants {
      * 数据来源：增补计划
      */
     public static final String CHANGE_MACHINE_DATA_SOURCE_SUPPLE="1";
+
+    /**
+     * 机台开机班次：夜班，对应字典：CLASS_NUM
+     */
+    public static final String NIGHT_CLASS_SHIFT = "2";
+
+    /**
+     * 机台开机班次：早班，对应字典：CLASS_NUM
+     */
+    public static final String DAY_CLASS_SHIFT = "3";
+
+    /**
+     * 一次生产卷数
+     */
+    public static final String ONE_ROLL_NUM = "ONE_ROLL_NUM";
+
+    /**
+     * 限制早班生产胶料
+     */
+    public static final String DAY_PRODUCT_GLUE = "DAY_PRODUCT_GLUE";
+
+    /**
+     * 胎面：成型合并计划顺序
+     */
+    public static final String CX_MERGE_MIN_SORT = "CX_MERGE_MIN_SORT";
+
+    /**
+     * 胎面：成型合并计划顺序
+     */
+    public static final String CX_MERGE_MAX_SORT = "CX_MERGE_MAX_SORT";
+
+    /**
+     * 胎面：早合到夜最大计划量(卷)
+     */
+    public static final String MERGE_MAX_ROLL = "MERGE_MAX_ROLL";
+
+    /**
+     * 胎侧：二次法最小取整卷数
+     */
+    public static final String TC_VM_MIN_ROLL_NUM = "TC_VM_MIN_ROLL_NUM";
+
+    /**
+     * 限制早班生产规格前缀
+     */
+    public static final String DAY_PRODUCT_CODE_PREFIX = "DAY_PRODUCT_CODE_PREFIX";
+
+    /**
+     * 胎侧：成型顺序合并最大卷数(夜班早班合计卷数)
+     */
+    public static final String CX_SORT_MERGE_ROLL_NUM = "CX_SORT_MERGE_ROLL_NUM";
+
+    /**
+     * 胎面：总工装数量，如果夜班计划+库存超过总工装数量，则不提前生产早班的计划
+     */
+    public static final String TOTAL_ROLL_NUM = "TOTAL_ROLL_NUM";
+
+    /**
+     * 胎面：成型时长小于参数的排产顺序优先
+     */
+    public static String LESS_SUPPLY_TIME = "LESS_SUPPLY_TIME";
 }

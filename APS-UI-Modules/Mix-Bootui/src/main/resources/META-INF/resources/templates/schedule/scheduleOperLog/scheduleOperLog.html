@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('排程操作日志列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{schedule.scheduleOperLog.scheduleType}]]：</label>
+                            <select id="scheduleType" class="form-control" name="scheduleType"
+                                    th:with="type=${@dict.getType('SCHEDULE_TYPE')}">
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li class="select-time">
+                            <label>[[#{schedule.scheduleOperLog.scheduleDate}]]：</label>
+                            <input id="scheduleDate" type="text" class="time-input" placeholder="yyyy-MM-dd"
+                                   name="scheduleDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleOperLog.operType}]]：</label>
+                            <select id="operType" class="form-control" name="operType"
+                                    th:with="type=${@dict.getType('MIX_DISPATCHER_OPER_TYPE')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleOperLog.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@dict.getType('MIX_AREA')}">
+                                <option value="">[[#{ui.frame.btn.all}]]</option>
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.scheduleOperLog.materialCode}]]：</label>
+                            <input type="text" name="materialCode"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="schedule:scheduleOperLog:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var scheduleTypeDatas = [[${@dict.getType('SCHEDULE_TYPE')}]];
+    var operTypeDatas = [[${@dict.getType('MIX_DISPATCHER_OPER_TYPE')}]];
+    var mixMachineNameList = [[${@setting.getMachineInfo()}]];
+    var lhflMachineNameList = [[${@setting.getLhflMachineInfo()}]];
+    var recipeStageData = [[${@dict.getType('PRODUCT_STAGE')}]];
+    var releaseStatusData = [[${@dict.getType('MIX_RELEASE_STATUS')}]];
+    var prefix = ctx + "schedule/scheduleOperLog";
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            exportUrl: prefix + "/export",
+            modalName: [[#{schedule.scheduleOperLog.modelName}]],
+            columns: [
+                [
+                    {
+                        title: [[#{schedule.scheduleOperLog.baseInfo}]],
+                        align: 'center',
+                        colspan: 11
+                    },
+                    {
+                        title: [[#{schedule.scheduleOperLog.beforeOper}]],
+                        align: 'center',
+                        colspan: 11
+                    },
+                    {
+                        title: [[#{schedule.scheduleOperLog.afterOper}]],
+                        align: 'center',
+                        colspan: 11
+                    }
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'scheduleType',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.scheduleOperLog.scheduleType}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(scheduleTypeDatas, value);
+                        }
+                    },
+                    {
+                        field: 'operType',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.scheduleOperLog.operType}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(operTypeDatas, value);
+                        }
+                    },
+                    {
+                        field: 'scheduleId',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.scheduleOperLog.scheduleId}]],
+                    },
+                    {
+                        field: 'scheduleDate',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.scheduleDate}]],
+                    },
+                    {
+                        field: 'mixArea',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.mixArea}]],
+                    },
+                    {
+                        field: 'materialCode',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'left',
+                        title: [[#{schedule.scheduleOperLog.materialCode}]],
+                    },
+                    {
+                        field: 'createBy',
+                        title: [[#{ui.data.column.operlog.operName}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        sortable: true,
+                    },
+                    {
+                        field: 'createTime',
+                        title: [[#{ui.data.column.operlog.operTime}]],
+                        valign: 'middle',
+                        align: 'center',
+                        halign:'center',
+                        sortable: true,
+                    },
+                    {
+                        field: 'operIp',
+                        halign: 'center',
+                        align: 'center',
+                        sortable: true,
+                        title: [[#{schedule.scheduleOperLog.operIp}]],
+                    },
+                    {
+                        field: 'beforeMachineCode',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.beforeMachineName}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return value;
+                            }
+                            if (row.scheduleType === '0') {
+                                return selectMachineName(mixMachineNameList, value, row.mixArea);
+                            }else if (row.scheduleType === '1') {
+                                return selectMachineName(lhflMachineNameList, value, row.mixArea);
+                            }
+                        }
+                    },
+                    {
+                        field: 'beforeRecipeTypeName',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.beforeRecipeTypeName}]],
+                    },
+                    {
+                        field: 'beforeRecipeVersionId',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.beforeRecipeVersionId}]],
+                    },
+                    {
+                        field: 'beforeRecipeStage',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.beforeRecipeStage}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(recipeStageData, value);
+                        }
+                    },
+                    {
+                        field: 'beforeMidPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeMidPlan}]],
+                    },
+                    {
+                        field: 'beforeMidOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeMidOrder}]],
+                    },
+                    {
+                        field: 'beforeNightPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeNightPlan}]],
+                    },
+                    {
+                        field: 'beforeNightOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeNightOrder}]],
+                    },
+                    {
+                        field: 'beforeDayPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeDayPlan}]],
+                    },
+                    {
+                        field: 'beforeDayOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.beforeDayOrder}]],
+                    },
+                    {
+                        field: 'beforeReleaseStatus',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.beforeReleaseStatus}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(releaseStatusData, value);
+                        }
+                    },
+                    {
+                        field: 'afterMachineCode',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.afterMachineName}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                return value;
+                            }
+                            // 排程类型为终炼母炼时，回显终炼母炼机台名称
+                            if (row.scheduleType === '0') {
+                                return selectMachineName(mixMachineNameList, value, row.mixArea);
+                            }else if (row.scheduleType === '1') {
+                                return selectMachineName(lhflMachineNameList, value, row.mixArea);
+                            }
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeMachineCode != row.afterMachineCode){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterRecipeTypeName',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.afterRecipeTypeName}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeRecipeTypeName != row.afterRecipeTypeName){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterRecipeVersionId',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.afterRecipeVersionId}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeRecipeVersionId != row.afterRecipeVersionId){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterRecipeStage',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.afterRecipeStage}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(recipeStageData, value);
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeRecipeStage != row.afterRecipeStage){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterMidPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterMidPlan}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeMidPlan != row.afterMidPlan){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterMidOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterMidOrder}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeMidOrder != row.afterMidOrder){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterNightPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterNightPlan}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeNightPlan != row.afterNightPlan){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterNightOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterNightOrder}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeNightOrder != row.afterNightOrder){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterDayPlan',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterDayPlan}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeDayPlan != row.afterDayPlan){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterDayOrder',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.scheduleOperLog.afterDayOrder}]],
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeDayOrder != row.afterDayOrder){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                    {
+                        field: 'afterReleaseStatus',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.scheduleOperLog.afterReleaseStatus}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(releaseStatusData, value);
+                        },
+                        cellStyle: function(value, row, index) {
+                            if (row.beforeReleaseStatus != row.afterReleaseStatus){
+                                return { css: { "background": "#FF7B7B"} };
+                            }
+                            return {};
+                        },
+                    },
+                ]
+            ],
+            onLoadSuccess: function (data) {
+                /*固定表头start*/
+                var wh = $(window).height();//ifram容器高度
+                var fixTop = $(".fixed-table-container").offset().top;  //表格到顶部的像素
+                var bh = wh-(fixTop-50);//基础默认表格高度
+                var oneTr = $("#bootstrap-table tbody tr:eq(0)").height();
+                var toolbarH = $(".fixed-table-toolbar").height();
+                var theadH = $("#bootstrap-table thead").height();
+                var pagH = $(".fixed-table-pagination").height();
+                var contentH = bh - toolbarH - theadH - pagH;  //不出现滚动条的情况下，最大的数据高度
+                var contentRow = parseInt(contentH/oneTr);  //不出现滚动条的情况下，最大的数据量
+                var total = data.total;
+                if(total == contentRow +1) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 1.5*oneTr});
+                } else if(total == contentRow +2) {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh + 2.5*oneTr});
+                } else {
+                    $('#bootstrap-table').bootstrapTable("resetView",{height:bh});
+                }
+                /*固定表头end*/
+            },
+        };
+        $.table.init(options);
+    });
+
+    //回显机台名称
+    function selectMachineName(datas, value, mixArea) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        datas = datas.filter(item => item.mixArea === mixArea);
+        var actions = [];
+        var arr = value.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode + '' === (item) && dict.mixArea === mixArea) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+</script>
+</body>
+</html>

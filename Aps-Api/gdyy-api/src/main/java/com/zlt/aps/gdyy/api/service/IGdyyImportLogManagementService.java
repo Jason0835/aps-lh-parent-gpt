@@ -21,7 +21,7 @@ import java.util.List;
 @FeignClient(contextId = "IGdyyImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gdyy:gdyy}")
 public interface IGdyyImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +50,6 @@ public interface IGdyyImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/gdyy/importLogManagement/importData")
-    List<GdyyImportLogManagementDto> importData(@SpringQueryMap GdyyImportLogManagementDto dto);
+    @PostMapping("/gdyy/importLogManagement/importData")
+    List<GdyyImportLogManagementDto> importData(@RequestBody GdyyImportLogManagementDto dto);
 }

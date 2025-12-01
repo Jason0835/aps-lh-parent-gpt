@@ -20,4 +20,10 @@ public interface MesBaseInfoService {
      * @param dataVersion	同步版本
      */
     AjaxResult mergePlmConstructionInfo(String dataVersion);
+
+    /**
+     * MES基础物料
+     * @param dataVersion   同步版本
+     */
+    AjaxResult mergeBasMaterial(String dataVersion);
 }

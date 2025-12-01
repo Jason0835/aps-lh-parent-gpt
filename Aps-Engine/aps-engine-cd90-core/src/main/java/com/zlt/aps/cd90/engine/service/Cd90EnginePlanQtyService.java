@@ -1,12 +1,12 @@
 package com.zlt.aps.cd90.engine.service;
 
+import com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo;
+import com.zlt.aps.cd90.engine.vo.Cd90StockVo;
+
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-
-import com.zlt.aps.cd90.engine.vo.Cd90ScheduleResultVo;
-import com.zlt.aps.cd90.engine.vo.Cd90StockVo;
 
 /**
  * 90度裁断计划量计算服务接口
@@ -33,7 +33,8 @@ public interface Cd90EnginePlanQtyService {
 	 * @Return
 	 */
 	void calculateSchedulePlanQty(Date scheduleDate, List<Cd90ScheduleResultVo> scheduleList, String defaultLossRate,
-			BigDecimal stockLossRate, boolean isProductionStage, BigDecimal crimpLength, BigDecimal minRoundRollNum);
+                                  BigDecimal stockLossRate, boolean isProductionStage, BigDecimal crimpLength, BigDecimal minRoundRollNum,
+                                  Map<String, String> paramsMap);
 
 	/**
 	 * 计算成型可供时长

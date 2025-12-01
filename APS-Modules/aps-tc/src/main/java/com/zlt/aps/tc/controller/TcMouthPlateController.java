@@ -111,7 +111,7 @@ public class TcMouthPlateController extends BaseController {
     @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData")
     @ApiOperation("导出胎面口型板信息")
-    public List<TcMouthPlateDto> exportData(@SpringQueryMap TcMouthPlateDto dto) {
+    public List<TcMouthPlateDto> exportData(@RequestBody TcMouthPlateDto dto) {
         TcMouthPlate mouthPlate = new TcMouthPlate();
         BeanUtils.copyProperties(dto, mouthPlate);
         startPage();

@@ -121,6 +121,12 @@ public interface TcEngineMapper {
      */
     void batchUpdateProduceOrder(@Param("scheduleDate") String scheduleDate, @Param("list") List<TcScheduleResultVo> scheduleResultList);
 
+    int createTempTable();
+
+    int dropTempTable();
+
+    int insertTempTable(@Param("scheduleResultList") List<TcScheduleResultVo> scheduleResultList);
+
     /**
      * 批量更新各班的计划量
      * @param scheduleDate 排程日期
@@ -136,11 +142,18 @@ public interface TcEngineMapper {
 
 	/**
 	 * 查询当天的收尾规格
-	 * 
+     *
 	 * @param scheduleDate   排程日期
 	 * @param closeOutDays   收尾判断天数，
 	 * @param isProductStage 是否投产规格
 	 */
 	List<String> listCloseOutSpec(@Param("scheduleDate") Date scheduleDate, @Param("closeOutDays") int closeOutDays,
 			@Param("isProductStage") boolean isProductStage);
+
+    /**
+     * 批量更新批次号和工单号
+     *
+     * @param scheduleResultVoList 排程列表
+     */
+    int batchUpdateBatchNoAndOrderNo(@Param("list") List<TcScheduleResultVo> scheduleResultVoList);
 }

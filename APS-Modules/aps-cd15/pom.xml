@@ -6,12 +6,12 @@
     <parent>
         <groupId>com.zlt.aps</groupId>
         <artifactId>aps-modules</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.3-SNAPSHOT</version>
     </parent>
 
     <groupId>com.zlt.aps.cd15</groupId>
     <artifactId>aps-cd15</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-cd15</name>
     <description>15度裁断工序模块</description>
 
@@ -51,11 +51,37 @@
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+
+        <!-- 90度裁断 -->
+        <dependency>
+            <groupId>com.zlt.aps.cd90</groupId>
+            <artifactId>aps-cd90</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <!-- 胎圈 -->
+        <dependency>
+            <groupId>com.zlt.aps.tq</groupId>
+            <artifactId>aps-tq</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <!-- 钢丝圈 -->
+        <dependency>
+            <groupId>com.zlt.aps.gsq</groupId>
+            <artifactId>aps-gsq</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <!-- 内衬 -->
+        <dependency>
+            <groupId>com.zlt.aps.nc</groupId>
+            <artifactId>aps-nc</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
     </dependencies>
 

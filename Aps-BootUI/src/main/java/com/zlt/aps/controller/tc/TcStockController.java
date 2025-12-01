@@ -46,7 +46,7 @@ public class TcStockController extends BaseController {
     private String prefix = "tc/stock";
 
     @Autowired
-    private ITcStockService tcStockService;
+    private ITcStockService stockService;
 
     @Autowired
     private IImportLogService iImportLogService;
@@ -81,7 +81,7 @@ public class TcStockController extends BaseController {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("tcStock", tcStockService.selectTcStockById(id));
+        mmap.put("tcStock", stockService.selectTcStockById(id));
         mmap.put("editType", "1");
         return prefix + "/edit";
     }
@@ -91,7 +91,7 @@ public class TcStockController extends BaseController {
      */
     @GetMapping("/modifyStock/{id}")
     public String modifyStock(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("tcStock", tcStockService.selectTcStockById(id));
+        mmap.put("tcStock", stockService.selectTcStockById(id));
         mmap.put("editType", "2");
         return prefix + "/edit";
     }
@@ -104,7 +104,7 @@ public class TcStockController extends BaseController {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TcStock tcStock) {
-        return tcStockService.list(tcStock);
+        return stockService.list(tcStock);
     }
 
     /**
@@ -116,7 +116,7 @@ public class TcStockController extends BaseController {
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return tcStockService.remove(arr);
+        return stockService.remove(arr);
     }
 
     /**
@@ -127,7 +127,7 @@ public class TcStockController extends BaseController {
     @PostMapping("/add")
     @ResponseBody
     public AjaxResult addSave(TcStock tcStock) {
-        return tcStockService.add(tcStock);
+        return stockService.add(tcStock);
     }
 
     /**
@@ -137,8 +137,15 @@ public class TcStockController extends BaseController {
     @RequiresPermissions("tc:stock:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult editSave(TcStock tcStock) {
-        return tcStockService.edit(tcStock);
+    public AjaxResult editSave(TcStock stock) {
+        AjaxResult ajaxResult = null;
+        //id为空则是新增操作，否则是编辑
+        if (stock.getId() != null) {
+            ajaxResult = stockService.edit(stock);
+        } else {
+            ajaxResult = stockService.add(stock);
+        }
+        return ajaxResult;
     }
 
     @ApiOperation("导出胎侧库存信息")
@@ -146,7 +153,7 @@ public class TcStockController extends BaseController {
     @GetMapping("/export")
     @ResponseBody
     public void export(HttpServletResponse response, TcStock stock) throws IOException {
-        List<TcStock> list = tcStockService.exportList(stock);
+        List<TcStock> list = stockService.exportList(stock);
         ExcelUtil<TcStock> util = new ExcelUtil(TcStock.class);
         String fileName = I18nUtil.getMessage("ui.tc.stock.export.fileName");
         Workbook workbook = util.exportExcel2(response, list, fileName);
@@ -193,7 +200,7 @@ public class TcStockController extends BaseController {
         InputStream in = new ByteArrayInputStream(data);
         ExcelUtil<TcStock> util = new ExcelUtil<>(TcStock.class);
         List<TcStock> list = util.importExcel(in);
-        AjaxResult ajaxResult = tcStockService.importData(list, updateSupport, importLog.getId());
+        AjaxResult ajaxResult = stockService.importData(list, updateSupport, importLog.getId());
         // 更新日志记录成功数，失败数
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
         // 保存导入失败记录

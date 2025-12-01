@@ -87,7 +87,7 @@
         a.stock_num = b.stock_num,
         a.over_time_stock = b.over_time_stock,
         a.update_by = b.create_by,
-        a.update_time = sysdate,
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
@@ -106,7 +106,7 @@
         b.embryo_code,
         b.stock_num,
         b.create_by,
-        sysdate,
+        now(),
         b.remark, '0', b.bom_data_version
         )
     </update>

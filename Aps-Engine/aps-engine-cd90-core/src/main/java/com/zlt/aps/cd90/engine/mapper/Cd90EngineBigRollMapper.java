@@ -1,8 +1,9 @@
 package com.zlt.aps.cd90.engine.mapper;
 
-import java.util.List;
-
+import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.engine.vo.Cd90BigRollVo;
+
+import java.util.List;
 
 /**
  * 15度裁断钢带大卷信息数据Mapper
@@ -24,4 +25,11 @@ public interface Cd90EngineBigRollMapper {
 	 * @return 符合条件的月度计划列表
 	 */
 	List<Cd90BigRollVo> listCd90BigRoll();
+
+	/**
+	 * 获取帘布代码卷曲长度列表
+	 *
+	 * @return 结果
+	 */
+	List<Cd90CurlLength> listCd90CurlLength();
 }

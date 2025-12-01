@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.GlueUnclaimedMapper">
+
+    <select id="selectGlueUnclaimedList" parameterType="com.zlt.mix.setting.api.domain.entity.GlueUnclaimed"
+            resultType="com.zlt.mix.setting.api.domain.entity.GlueUnclaimed">
+        select id, mix_area, schedule_date, glue, shelf_num1, shelf_num2, remark, del_flag, create_by, create_time, update_by, update_time from t_glue_unclaimed
+        where del_flag = '0'
+        <if test="mixArea != null  and mixArea != ''">and mix_area = #{mixArea}</if>
+        <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
+        <if test="glue != null  and glue != ''">and glue = #{glue}</if>
+        <if test="orderStr == null">
+            order by create_time desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueUnclaimedByIds" parameterType="String">
+        update t_glue_unclaimed set del_flag=null where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueUnclaimedNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, #{data.scheduleDate} schedule_date, #{data.mixArea} mix_area, #{data.glue} glue,
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy, now() createTime
+        from t_glue_unclaimed m
+        inner join temp_table t on m.schedule_date = t.schedule_date and m.mix_area = t.mix_area and m.glue = t.glue and m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertGlueUnclaimedInfo">
+        insert into t_glue_unclaimed (id,mix_area,schedule_date,glue,shelf_num1,shelf_num2,remark,del_flag,create_by,create_time,update_by,update_time )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueUnclaimed" separator=" union all ">
+            select
+            #{glueUnclaimed.mixArea,jdbcType= VARCHAR} mix_area, #{glueUnclaimed.scheduleDate,jdbcType=TIMESTAMP} schedule_date,
+            #{glueUnclaimed.glue,jdbcType= VARCHAR} glue, #{glueUnclaimed.shelfNum1,jdbcType=DOUBLE} shelf_num1, #{glueUnclaimed.shelfNum2,jdbcType=DOUBLE}
+            shelf_num2, #{glueUnclaimed.remark,jdbcType= VARCHAR} remark, #{glueUnclaimed.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueUnclaimed.createBy,jdbcType= VARCHAR} create_by, #{glueUnclaimed.createTime,jdbcType=TIMESTAMP} create_time,
+            #{glueUnclaimed.updateBy,jdbcType= VARCHAR} update_by, #{glueUnclaimed.updateTime,jdbcType=TIMESTAMP} update_time 
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        insert into t_glue_unclaimed
+        (
+         mix_area, schedule_date, glue, shelf_num1, shelf_num2, remark, del_flag, create_by, create_time
+        )
+        values
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            #{item.mixArea,jdbcType=VARCHAR } , #{item.scheduleDate, jdbcType=TIMESTAMP} ,
+            #{item.glue,jdbcType=VARCHAR } , #{item.shelfNum1, jdbcType=DOUBLE} , #{item.shelfNum2, jdbcType=DOUBLE} ,
+            #{item.remark,jdbcType=VARCHAR } , '0' , #{item.createBy,jdbcType=VARCHAR } ,
+            #{item.createTime, jdbcType=TIMESTAMP}
+            )
+        </foreach>
+        on duplicate key
+        update
+        shelf_num2 = values(shelf_num2), remark =values(remark), update_by = values(create_by),
+        update_time = now()
+    </update>
+</mapper>

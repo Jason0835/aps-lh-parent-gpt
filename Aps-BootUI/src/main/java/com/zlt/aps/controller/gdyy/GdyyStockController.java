@@ -5,7 +5,6 @@ import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -24,7 +23,6 @@ import io.swagger.annotations.ApiOperation;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +32,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -141,7 +138,14 @@ public class GdyyStockController extends BaseController {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(GdyyStock stock) {
-        return stockService.edit(stock);
+        AjaxResult ajaxResult = null;
+        //id为空则是新增操作，否则是编辑
+        if (stock.getId() != null) {
+            ajaxResult = stockService.edit(stock);
+        } else {
+            ajaxResult = stockService.add(stock);
+        }
+        return ajaxResult;
     }
 
     @ApiOperation("导出钢带压延库存信息")

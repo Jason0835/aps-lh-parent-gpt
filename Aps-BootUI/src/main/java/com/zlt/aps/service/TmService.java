@@ -2,14 +2,12 @@ package com.zlt.aps.service;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common4ui.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.tm.api.domain.dto.TmGlueGroupOrderDto;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.service.ITmMachineInfoService;
 import com.zlt.aps.tm.api.service.ITmGlueGroupOrderService;
-import org.apache.commons.collections4.CollectionUtils;
+import com.zlt.aps.tm.api.service.ITmMachineInfoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

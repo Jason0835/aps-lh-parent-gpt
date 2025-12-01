@@ -73,6 +73,14 @@ public class GdyyScheduleResultDto2 extends ApsBaseDto {
     private Double dayUsed;
 
     /**
+     * 生产线
+     */
+    @ImportValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.scheduleResult.produceLine")
+    @ApiModelProperty(value = "生产线")
+    private String machineCode;
+
+    /**
      * 库存（个）
      */
     @ImportValidated(number = true, min = 0, max = 99999999)

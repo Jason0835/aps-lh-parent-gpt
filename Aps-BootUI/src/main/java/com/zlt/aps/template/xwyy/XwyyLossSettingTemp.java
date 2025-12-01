@@ -3,13 +3,14 @@ package com.zlt.aps.template.xwyy;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseDto;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
 @ApiModel(value = "纤维压延损耗率设定对象", description = "纤维压延损耗率设定对象 ")
-public class XwyyLossSettingTemp {
+public class XwyyLossSettingTemp extends ApsBaseEntity {
 
     /**
      * 帘布大卷编号

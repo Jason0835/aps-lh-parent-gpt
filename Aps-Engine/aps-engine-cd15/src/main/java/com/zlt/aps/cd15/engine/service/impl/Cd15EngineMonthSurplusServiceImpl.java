@@ -1,21 +1,5 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
-
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineBigRollMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
@@ -26,8 +10,21 @@ import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
 
 /**
  * 15度裁断根据月度计划调整计划量服务

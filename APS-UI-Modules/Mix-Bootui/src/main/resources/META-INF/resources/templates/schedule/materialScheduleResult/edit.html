@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改硫化辅料日计划排程')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-materialScheduleResult-edit" th:object="${materialScheduleResult}">
+        <input id="id" name="id" th:field="*{id}" type="hidden">
+        <input name="publishSuccessCount" th:field="*{publishSuccessCount}" type="hidden">
+        <h4 class="form-header h4">[[#{ui.baseInfo}]]</h4>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.releaseStatus}]]：</label>
+                    <div class="col-sm-8">
+                        <select id="releaseStatus" class="form-control" name="releaseStatus"
+                                th:with="type=${@dict.getType('MIX_RELEASE_STATUS')}" required disabled>
+                            <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                    th:value="${dict.dictValue}" th:field="*{releaseStatus}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.scheduleDate}]]：</label>
+                    <div class="col-sm-8">
+                        <div class="input-group date">
+                            <input name="scheduleDate"
+                                   th:value="${#dates.format(materialScheduleResult.scheduleDate, 'yyyy-MM-dd')}"
+                                   class="form-control" placeholder="yyyy-MM-dd" type="text" disabled>
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                            <input name="scheduleDate" th:value="${#dates.format(materialScheduleResult.scheduleDate, 'yyyy-MM-dd')}" type="hidden">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.mixArea}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="mixArea" th:field="*{mixArea}" class="form-control" type="text" maxlength="10" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.materialName}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="materialName" th:field="*{materialName}" class="form-control" type="text" maxlength="30" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.machineName}]]：</label>
+                    <div class="col-sm-8">
+<!--                        <select id="machineCodeSelect" name="machineCode" class="form-control" th:data-none-selected-text="#{ui.frame.btn.choose}"-->
+<!--                                th:with="type=${@setting.getEnableLhflMachineInfo(materialScheduleResult.mixArea)}" required disabled>-->
+<!--                            <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}" th:selected="${#arrays.contains(#strings.arraySplit(materialScheduleResult.machineCode==null?'':materialScheduleResult.machineCode + materialScheduleResult.mixArea,','),#strings.toString(machineInfo.machineCode + machineInfo.mixArea))}" ></option>-->
+<!--                        </select>-->
+                        <input id="machineName" name="machineName" th:field="*{machineName}" class="form-control" readonly required/>
+                        <input id="machineCode" name="machineCode" th:field="*{machineCode}" type="hidden"/>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.classShift}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="classShift" th:value="${materialScheduleResult.classShift == null ? '' : @dict.getLabel('LH_CLASS_SHIFT', materialScheduleResult.classShift)}" class="form-control" type="text"
+                               maxlength="30" required disabled>
+                        <input id="classShift" name="classShift" th:field="*{classShift}" class="form-control" type="hidden">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.recipeTypeName}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="recipeType" th:field="*{recipeTypeName}" class="form-control" type="text"
+                               maxlength="30" required readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.recipeVersionId}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="recipeVersionId" th:field="*{recipeVersionId}" class="form-control" type="text"
+                               maxlength="30" required readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">[[#{schedule.materialScheduleResult.recipeStage}]]：</label>
+                    <div class="col-sm-8">
+                        <!--                        <select id="recipeStage" class="form-control" name="recipeStage"-->
+                        <!--                                th:with="type=${@dict.getType('PRODUCT_STAGE')}" required disabled>-->
+                        <!--                            <option th:each="dict : ${type}" th:text="${dict.dictLabel}"-->
+                        <!--                                    th:value="${dict.dictValue}" th:field="*{recipeStage}"></option>-->
+                        <!--                        </select>-->
+                        <input name="recipeStage" class="form-control" th:value="${materialScheduleResult.recipeStage == null ? '' : @dict.getLabel('PRODUCT_STAGE', materialScheduleResult.recipeStage)}" disabled required/>
+                        <input name="recipeStage" th:field="*{recipeStage}" type="hidden"/>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.stockQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="stockQty" th:value="*{@nf.stripZeros(stockQty)}" class="form-control" type="text" number="true" min="0"
+                               max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.glueScheduleResult.safeStockQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="safeStockQty" th:value="*{@nf.stripZeros(safeStockQty)}" class="form-control" type="text" number="true" min="0"
+                               max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.demandQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="demandQty" th:value="*{@nf.stripZeros(demandQty)}" class="form-control" type="text" number="true" min="0"
+                               max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.demandPlanning}]]：</label>
+                    <div class="col-sm-8">
+                        <input name="demandPlanning" th:value="*{demandPlanning}" class="form-control" type="text" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.totalPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="totalPlanQty" name="totalPlanQty" th:value="*{@nf.stripZeros(totalPlanQty)}" class="form-control" type="text" number="true"
+                               min="0" max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+<!--        <div class="row">-->
+<!--            <div class="col-sm-6">-->
+<!--                <div class="form-group">-->
+<!--                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.totalSurplus}]]：</label>-->
+<!--                    <div class="col-sm-8">-->
+<!--                        <input name="totalSurplus" th:value="*{@nf.stripZeros(totalSurplus)}" class="form-control" type="text" number="true"-->
+<!--                               min="0" max="9999999" readonly>-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </div>-->
+<!--            <div class="col-sm-6">-->
+<!--            </div>-->
+<!--        </div>-->
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{ui.common.column.remark}]]：</label>
+                    <div class="col-sm-8">
+                        <textarea name="remark" class="form-control" style="width: 800px;" rows="3" th:field="*{remark}"
+                                  maxlength="300"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4 midPlan">[[#{schedule.common.midClass}]]</h4>
+        <div class="row midPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label id="midProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midProduceOrder}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="midProduceOrder" name="midProduceOrder" th:field="*{midProduceOrder}" class="form-control midPlanInput" type="text"
+                               digits="true" min="0" max="999999" th:disabled="${!editableStatus.midEditable}">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="midPlanQty" name="midPlanQty" th:value="*{@nf.stripZeros(midPlanQty)}" class="form-control midPlanInput" type="text" digits="true" min="0"
+                               max="9999999" onchange="updateMidPlanQty()"  th:disabled="${!editableStatus.midEditable}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row midPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midFinishQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="midFinishQty" name="midFinishQty" th:value="*{@nf.stripZeros(midFinishQty)}" class="form-control midPlanInput" type="text" number="true" min="0"
+                               max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midFinishRate}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="midFinishRate" name="midFinishRate" th:field="*{midFinishRate}" class="form-control" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row midPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midExpectFinishTime}]]：</label>
+                    <div class="col-sm-8">
+                        <div class="input-group date">
+                            <input name="midExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.midExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control midPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="text" disabled>
+                            <input name="midExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.midExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control midPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="hidden">
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.midRemark}]]：</label>
+                    <div class="col-sm-8">
+                        <textarea name="midRemark" th:field="*{midRemark}" class="form-control midPlanInput" type="text" maxlength="300"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4 nightPlan">[[#{schedule.common.nightClass}]]</h4>
+        <div class="row nightPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label id="nightProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightProduceOrder}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="nightProduceOrder" name="nightProduceOrder" th:field="*{nightProduceOrder}" class="form-control nightPlanInput" type="text"
+                               digits="true" min="0" max="999999" th:disabled="${!editableStatus.nightEditable}">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="nightPlanQty" name="nightPlanQty" th:value="*{@nf.stripZeros(nightPlanQty)}" class="form-control nightPlanInput" type="text" digits="true"
+                               min="0" max="9999999" onchange="updateNightPlanQty()" th:disabled="${!editableStatus.nightEditable}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row nightPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightFinishQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="nightFinishQty" name="nightFinishQty" th:value="*{@nf.stripZeros(nightFinishQty)}" class="form-control nightPlanInput" type="text" number="true"
+                               min="0" max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightFinishRate}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="nightFinishRate" name="nightFinishRate" th:field="*{nightFinishRate}" class="form-control" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row nightPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightExpectFinishTime}]]：</label>
+                    <div class="col-sm-8">
+                        <div class="input-group date">
+                            <input name="nightExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.nightExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control nightPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="text" disabled>
+                            <input name="nightExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.nightExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control nightPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="hidden">
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.nightRemark}]]：</label>
+                    <div class="col-sm-8">
+                        <textarea name="nightRemark" th:field="*{nightRemark}" class="form-control nightPlanInput" type="text" maxlength="300"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="form-header h4 dayPlan">[[#{schedule.common.dayClass}]]</h4>
+        <div class="row dayPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label id="dayProduceOrderLabel" class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayProduceOrder}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="dayProduceOrder" name="dayProduceOrder" th:field="*{dayProduceOrder}" class="form-control dayPlanInput" type="text"
+                               digits="true" min="0" max="999999" th:disabled="${!editableStatus.dayEditable}">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayPlanQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="dayPlanQty" name="dayPlanQty" th:value="*{@nf.stripZeros(dayPlanQty)}" class="form-control dayPlanInput" type="text" digits="true" min="0"
+                               max="9999999" onchange="updateDayPlanQty()" th:disabled="${!editableStatus.dayEditable}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row dayPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayFinishQty}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="dayFinishQty" name="dayFinishQty" th:value="*{@nf.stripZeros(dayFinishQty)}" class="form-control dayPlanInput" type="text" number="true" min="0"
+                               max="9999999" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayFinishRate}]]：</label>
+                    <div class="col-sm-8">
+                        <input id="dayFinishRate" name="dayFinishRate" th:field="*{dayFinishRate}" class="form-control" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row dayPlan">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayExpectFinishTime}]]：</label>
+                    <div class="col-sm-8">
+                        <div class="input-group date">
+                            <input name="dayExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.dayExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control dayPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="text" disabled>
+                            <input name="dayExpectFinishTime"
+                                   th:value="${#dates.format(materialScheduleResult.dayExpectFinishTime, 'yyyy-MM-dd HH:mm:ss')}"
+                                   class="form-control dayPlanInput" placeholder="yyyy-MM-dd HH:mm:ss" type="hidden">
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">[[#{schedule.materialScheduleResult.dayRemark}]]：</label>
+                    <div class="col-sm-8">
+                        <textarea name="dayRemark" th:field="*{dayRemark}" class="form-control dayPlanInput" type="text" maxlength="300"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "schedule/materialScheduleResult";
+    $("#form-materialScheduleResult-edit").validate({
+        focusCleanup: true
+    });
+
+    $(function () {
+        disableByMachineShift();
+        // 格式化完成率格式
+        formatterFinishRate();
+    });
+
+    function submitHandler() {
+        // 提交前校验
+        updateMidPlanQty();
+        updateNightPlanQty();
+        updateDayPlanQty();
+        if ($.validate.form()) {
+            var serializeArray = $('#form-materialScheduleResult-edit').serializeArray();
+            var parent = window.parent;
+            let tableData = parent.$("#" + parent.table.options.id).bootstrapTable('getData');
+            // 校验当前机台下，各个班次顺序是否与修改的有重复
+            let isRepeated = isProduceOrderRepeated(tableData);
+            if (isRepeated) {
+                return ;
+            }
+            $.operate.saveUpdateParentRow(prefix + "/save", serializeArray, function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var parent = window.parent;
+                    var data = result.data;
+                    for (var i = 0; i < data.length; i++) {
+                        parent.$("#" + parent.table.options.id).bootstrapTable('updateByUniqueId', {
+                            id: data[i].id,
+                            row: data[i]
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    // 根据机台班制，禁用其他班次计划量文本框
+    function disableByMachineShift() {
+        var $midPlan = $(".midPlan");
+        var $midPlanInput = $(".midPlanInput");
+        var $nightPlan = $(".nightPlan");
+        var $nightPlanInput = $(".nightPlanInput");
+        var $dayPlan = $(".dayPlan");
+        var $dayPlanInput = $(".dayPlanInput");
+        var classShift = $("#classShift").val();
+        if (classShift === "1") {
+            // 长白班
+            $midPlanInput.attr("disabled", "disable");
+            $midPlan.hide();
+            $nightPlanInput.attr("disabled", "disable");
+            $nightPlan.hide();
+        }else if (classShift === "2") {
+            // 两班制
+            $dayPlanInput.attr("disabled", "disable");
+            $dayPlan.hide();
+        }
+    }
+
+    // 更改对应班次计划量后总计划量同步更改
+    function changeQty() {
+        var midPlanQty = Number($("#midPlanQty").val());
+        var nightPlanQty = Number($("#nightPlanQty").val());
+        var dayPlanQty = Number($("#dayPlanQty").val());
+        var totalPlanQty = midPlanQty + nightPlanQty + dayPlanQty;
+        $("#totalPlanQty").val(totalPlanQty);
+        var midFinishQty = Number($("#midFinishQty").val());
+        var nightFinishQty = Number($("#nightFinishQty").val());
+        var dayFinishQty = Number($("#dayFinishQty").val());
+        if (midPlanQty !== 0) {
+            $("#midFinishRate").val(Number(midFinishQty / midPlanQty * 100).toFixed(2) + "%");
+        }
+        if (nightPlanQty !== 0) {
+            $("#nightFinishRate").val(Number(nightFinishQty / nightPlanQty * 100).toFixed(2) + "%");
+        }
+        if (dayPlanQty !== 0) {
+            $("#dayFinishRate").val(Number(dayFinishQty / dayPlanQty * 100).toFixed(2) + "%");
+        }
+    }
+
+    /**
+     * 更新中班计划量后判断是否要添加顺序必填
+     */
+    function updateMidPlanQty() {
+        var $midProduceOrder = $("#midProduceOrder");
+        var $midProduceOrderLabel = $("#midProduceOrderLabel");
+        $midProduceOrder.removeAttr("required");
+        $midProduceOrderLabel.removeClass("is-required")
+        if ($("#midPlanQty").val() > 0) {
+            $midProduceOrder.attr("required", "true");
+            $midProduceOrderLabel.addClass("is-required");
+        }
+        changeQty();
+    }
+
+    /**
+     * 更新夜班计划量后判断是否要添加顺序必填
+     */
+    function updateNightPlanQty() {
+        var $nightProduceOrder = $("#nightProduceOrder");
+        var $nightProduceOrderLabel = $("#nightProduceOrderLabel");
+        $nightProduceOrder.removeAttr("required");
+        $nightProduceOrderLabel.removeClass("is-required")
+        if ($("#nightPlanQty").val() > 0) {
+            $nightProduceOrder.attr("required", "true");
+            $nightProduceOrderLabel.addClass("is-required");
+        }
+        changeQty();
+    }
+
+    /**
+     * 更新白班计划量后判断是否要添加顺序必填
+     */
+    function updateDayPlanQty() {
+        var $dayProduceOrder = $("#dayProduceOrder");
+        var $dayProduceOrderLabel = $("#dayProduceOrderLabel");
+        $dayProduceOrder.removeAttr("required");
+        $dayProduceOrderLabel.removeClass("is-required")
+        if ($("#dayPlanQty").val() > 0) {
+            $dayProduceOrder.attr("required", "true");
+            $dayProduceOrderLabel.addClass("is-required");
+        }
+        changeQty();
+    }
+
+    // 校验当前机台下，各个班次顺序是否与修改的有重复
+    function isProduceOrderRepeated(tableData) {
+        let machineName = $("#machineName").val();
+        let id = $("#id").val();
+        let filterData = tableData.filter(item => item.machineName === machineName && item.id != id);
+        let midProduceOrderMap = filterData.map(item => item.midProduceOrder);
+        let midProduceOrder = $("#midProduceOrder").val();
+        if ($.common.isNotEmpty(midProduceOrder)) {
+            for (var i = 0; i < midProduceOrderMap.length; i++) {
+                if (midProduceOrderMap[i] == midProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameMidProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let nightProduceOrderMap = filterData.map(item => item.nightProduceOrder);
+        let nightProduceOrder = $("#nightProduceOrder").val();
+        if ($.common.isNotEmpty(nightProduceOrder)) {
+            for (var i = 0; i < nightProduceOrderMap.length; i++) {
+                if (nightProduceOrderMap[i] == nightProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameNightProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+        let dayProduceOrderMap = filterData.map(item => item.dayProduceOrder);
+        let dayProduceOrder = $("#dayProduceOrder").val();
+        if ($.common.isNotEmpty(dayProduceOrder)) {
+            for (var i = 0; i < dayProduceOrderMap.length; i++) {
+                if (dayProduceOrderMap[i] == dayProduceOrder) {
+                    $.modal.alertWarning([[#{ui.message.machine.sameDayProduceOrder}]]);
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 格式化完成率文本框为 0.00%格式
+    function formatterFinishRate() {
+        var $midFinishRate = $("#midFinishRate");
+        var midFinishRate = $midFinishRate.val();
+        var midStr = Number(midFinishRate * 100).toFixed(2) + "%";
+        $midFinishRate.val(midStr);
+        var $nightFinishRate = $("#nightFinishRate");
+        var nightFinishRate = $nightFinishRate.val();
+        var nightStr = Number(nightFinishRate * 100).toFixed(2) + "%";
+        $nightFinishRate.val(nightStr);
+        var $dayFinishRate = $("#dayFinishRate");
+        var dayFinishRate = $dayFinishRate.val();
+        var dayStr = Number(dayFinishRate * 100).toFixed(2) + "%";
+        $dayFinishRate.val(dayStr);
+    }
+</script>
+</body>
+</html>

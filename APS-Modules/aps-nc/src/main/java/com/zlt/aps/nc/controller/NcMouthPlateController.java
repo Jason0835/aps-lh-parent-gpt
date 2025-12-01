@@ -103,7 +103,7 @@ public class NcMouthPlateController extends BaseController {
     @Log(title = "ui.data.column.nc.mouthPlate.modelName", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData")
     @ApiOperation("导出胎面口型板信息")
-    public List<NcMouthPlateDto> exportData(@SpringQueryMap NcMouthPlateDto dto) {
+    public List<NcMouthPlateDto> exportData(@RequestBody NcMouthPlateDto dto) {
         NcMouthPlate mouthPlate = new NcMouthPlate();
         BeanUtils.copyProperties(dto, mouthPlate);
         startPage();

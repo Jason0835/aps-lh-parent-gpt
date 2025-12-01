@@ -5,49 +5,99 @@
     <parent>
         <artifactId>ruoyi-bootui</artifactId>
         <groupId>com.ruoyi</groupId>
-        <version>4.5.2-SNAPSHOT</version>
+        <version>4.7.6-SNAPSHOT</version>
+        <relativePath />
     </parent>
 
     <groupId>com.zlt</groupId>
     <artifactId>aps-bootui</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
     <name>aps-bootui</name>
     <description>Demo project for Spring Boot</description>
 
     <properties>
+        <ruoyi.version>4.7.6-SNAPSHOT</ruoyi.version>
+        <ruoyi-cloud.version>3.5.2-SNAPSHOT</ruoyi-cloud.version>
+        <redisson.version>3.9.1</redisson.version>
+        <quartz.version>2.3.2</quartz.version>
         <java.version>1.8</java.version>
-        <spring-boot.version>2.3.4.RELEASE</spring-boot.version>
-        <zlt-frame.version>4.5.2-SNAPSHOT</zlt-frame.version>
-        <aps-api.version>0.0.1-SNAPSHOT</aps-api.version>
+        <aps-api.version>1.0.3-SNAPSHOT</aps-api.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-frame-starter</artifactId>
-            <version>${zlt-frame.version}</version>
+            <version>${ruoyi.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-            <version>2.7.0</version>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-freeItem</artifactId>
+            <version>${ruoyi.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger-ui</artifactId>
-            <version>2.7.0</version>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-billcode</artifactId>
+            <version>${ruoyi.version}</version>
         </dependency>
         <dependency>
-        <groupId>com.github.xiaoymin</groupId>
-        <artifactId>knife4j-spring-boot-starter</artifactId>
-        <version>2.0.8</version>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-sys-def</artifactId>
+            <version>${ruoyi.version}</version>
         </dependency>
-
-
         <dependency>
             <groupId>com.ruoyi</groupId>
-            <artifactId>ruoyi-common-log</artifactId>
+            <artifactId>ruoyi-api-gateway-system</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-dataauth</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+       <!-- <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-kettle-log-api</artifactId>
+            <version>${ruoyi-cloud.version}</version>
+        </dependency>-->
+<!--        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-kettle</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>-->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ui-message</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>
+       <!-- <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-cas-client</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>-->
+<!--        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-frame-core</artifactId>
+            <version>${ruoyi.version}</version>
+        </dependency>-->
+
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>${redisson.version}</version>
+        </dependency>
+
+        <!-- Quartz -->
+      <!--  <dependency>
+            <groupId>org.quartz-scheduler</groupId>
+            <artifactId>quartz</artifactId>
+            <version>${quartz.version}</version>
+        </dependency>-->
+
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-spring-boot-starter</artifactId>
+            <version>2.0.2</version>
         </dependency>
 
         <dependency>
@@ -55,12 +105,38 @@
             <artifactId>aps-all-api</artifactId>
             <version>${aps-api.version}</version>
         </dependency>
-
-        <!-- 导入文件解密 -->
         <dependency>
+            <groupId>com.ruoyi.file</groupId>
+            <artifactId>aps-file-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-monthplan-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>Mix-Bootui</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+        <!-- 导入文件解密 -->
+      <!--  <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-ll-file-encrypt</artifactId>
             <version>3.1.4-SNAPSHOT</version>
+        </dependency>-->
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.25</version>
         </dependency>
     </dependencies>
 

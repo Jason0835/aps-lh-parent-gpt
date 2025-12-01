@@ -19,7 +19,7 @@
                     <result property="remark" column="remark"/>
                     <result property="bomDataVersion" column="bom_data_version"/>
             </resultMap>
-    
+
     <sql id="selectTCxMonthPlanAdjustVo">
         select id, month_plan_aps_version, sap_code, embryo_code, plan_modify_qty, adjust_source, create_by, create_time, update_by, update_time, del_flag, remark, BOM_DATA_VERSION from t_cx_month_plan_adjust
     </sql>
@@ -115,7 +115,7 @@
             #{id}
         </foreach>
     </delete>
-    
+
     <update id="mergeSql" parameterType="list">
         merge into t_cx_month_plan_adjust a USING (
         <foreach collection="list" item="item" separator=" union ">
@@ -147,7 +147,7 @@
         <set>
             a.plan_modify_qty = b.plan_modify_qty,
             a.update_by = b.create_by,
-            a.update_time = sysdate,
+            a.update_time = now(),
             a.remark = b.remark
         </set>
         WHEN NOT MATCHED THEN
@@ -155,7 +155,8 @@
              a.id, a.month_plan_aps_version, a.sap_code, a.embryo_code, a.plan_modify_qty, a.adjust_source, a.create_by, a.create_time, a.update_by, a.update_time, a.del_flag, a.remark, a.bom_data_version
         )
         values (
-             SEQ_PUBLIC.NEXTVAL ,b.month_plan_aps_version, b.sap_code,  b.embryo_code,  b.plan_modify_qty, b.adjust_source,  b.create_by,   sysdate,  b.update_by,  sysdate,  '0',  b.remark,  b.bom_data_version
+        SEQ_PUBLIC.NEXTVAL ,b.month_plan_aps_version, b.sap_code, b.embryo_code, b.plan_modify_qty, b.adjust_source,
+        b.create_by, now(), b.update_by, now(), '0', b.remark, b.bom_data_version
         )
     </update>
     <select id="selectAllByMonthPlanApsVersion" resultMap="TCxMonthPlanAdjustResult">

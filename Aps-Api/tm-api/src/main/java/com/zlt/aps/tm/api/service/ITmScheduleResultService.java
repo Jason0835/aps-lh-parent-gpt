@@ -3,7 +3,9 @@ package com.zlt.aps.tm.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -174,4 +176,34 @@ public interface ITmScheduleResultService{
      */
     @PostMapping("/tmScheduleResult/combinationMiddleAndNight/{ids}")
     public AjaxResult combinationMiddleAndNight(@PathVariable("ids")Long[] ids, @RequestParam("classifiedShift") String classifiedShift);
+
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/tmScheduleResult/importFinishQty")
+    @ApiOperation("导入完成量")
+    AjaxResult importFinishQty(@RequestBody List<TmDayFinishQty> list, @RequestParam("importLogId") Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param tmScheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/tmScheduleResult/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody TmScheduleResult tmScheduleResult);
+
+    /**
+     * 批量转机台
+     *
+     * @param scheduleResult 排程结果
+     * @return 结果
+     */
+    @PostMapping("/tmScheduleResult/batchChangeMachine")
+    @ApiOperation("批量转机台")
+    AjaxResult batchChangeMachine(@RequestBody TmScheduleResult scheduleResult);
 }

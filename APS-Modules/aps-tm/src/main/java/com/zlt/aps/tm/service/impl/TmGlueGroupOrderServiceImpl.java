@@ -1,20 +1,23 @@
 package com.zlt.aps.tm.service.impl;
 
 
+import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.tm.api.domain.dto.TmGlueGroupOrderDto;
 import com.zlt.aps.tm.entity.TmGlueGroupOrder;
 import com.zlt.aps.tm.mapper.TmGlueGroupOrderMapper;
 import com.zlt.aps.tm.service.TmGlueGroupOrderService;
-import com.alibaba.nacos.common.utils.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -91,13 +94,12 @@ public class TmGlueGroupOrderServiceImpl extends ServiceImpl<TmGlueGroupOrderMap
             throw new RuntimeException(groupNames + I18nUtil.getMessage("胶料组别已被使用，禁止删除！"));
         }
 
-        for (int i = 0; i < ids.length; i++) {
-            TmGlueGroupOrder entity = new TmGlueGroupOrder();
-            entity.setId(ids[i]);
-            entity.setDelFlag(ApsConstant.DEL_FLAG_DEL);
-            entity.setUpdateTime(new Date());
-            this.updateById(entity);
-        }
+        LambdaUpdateWrapper<TmGlueGroupOrder> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
+        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
+        super.getBaseMapper().update(null, wrapper);
     }
 
     /**

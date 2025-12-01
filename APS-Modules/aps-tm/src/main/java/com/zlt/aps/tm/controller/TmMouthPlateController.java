@@ -111,7 +111,7 @@ public class TmMouthPlateController extends BaseController {
     @Log(title = "ui.data.column.tm.mouthPlate.modelName", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData")
     @ApiOperation("导出胎面口型板信息")
-    public List<TmMouthPlateDto> exportData(@SpringQueryMap TmMouthPlateDto dto) {
+    public List<TmMouthPlateDto> exportData(@RequestBody TmMouthPlateDto dto) {
         startPage();
         dto.setOrderStr(orderStr());
         TmMouthPlate tmMouthPlate = new TmMouthPlate();

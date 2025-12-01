@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.common.engine.mapper.AutoScheduleLogMapper">
+
+    <insert id="insertAutoScheduleLog" parameterType="com.zlt.mix.common.engine.domain.AutoScheduleLog">
+        insert into t_auto_schedule_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="procedureCode != null">procedure_code,</if>
+            <if test="batchNo != null">batch_no,</if>
+            <if test="orderNo != null">order_no,</if>
+            <if test="title != null">title,</if>
+            <if test="logDetail != null">log_detail,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="procedureCode != null">#{procedureCode},</if>
+            <if test="batchNo != null">#{batchNo},</if>
+            <if test="orderNo != null">#{orderNo},</if>
+            <if test="title != null">#{title},</if>
+            <if test="logDetail != null">#{logDetail},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+</mapper>

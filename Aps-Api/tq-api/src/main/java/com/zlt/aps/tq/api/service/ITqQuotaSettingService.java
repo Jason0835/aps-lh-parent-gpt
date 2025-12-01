@@ -23,52 +23,52 @@ public interface ITqQuotaSettingService {
     /**
      * 查询胎圈定额设定列表
      */
-    @PostMapping("/quota/list")
+    @PostMapping("/tq/quota/list")
     TableDataInfo list(@RequestBody TqQuotaSetting tqQuotaSetting);
 
 
     /**
     * 新增胎圈定额设定
     */
-    @PostMapping("/quota/add")
+    @PostMapping("/tq/quota/add")
     AjaxResult add(@RequestBody TqQuotaSetting tqQuotaSetting);
 
 
     /**
      * 修改胎圈定额设定
      */
-    @PostMapping("/quota/edit")
+    @PostMapping("/tq/quota/edit")
     AjaxResult edit(@RequestBody TqQuotaSetting tqQuotaSetting);
 
 
     /**
      * 删除胎圈定额设定
      */
-    @DeleteMapping("/quota/{ids}")
+    @DeleteMapping("/tq/quota/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/quota/{id}")
+    @GetMapping(value = "/tq/quota/{id}")
     TqQuotaSetting getInfo(@PathVariable("id") Long id);
 
 
     /**
      * 校验胎圈定额设定唯一性
      */
-    @PostMapping("/quota/checkTqQuotaSettingUnique")
+    @PostMapping("/tq/quota/checkTqQuotaSettingUnique")
     String checkTqQuotaSettingUnique(@RequestBody TqQuotaSetting tqQuotaSetting);
 
 
     /**
      * 导出胎圈定额设定列表
      */
-    @PostMapping("/quota/getList")
+    @PostMapping("/tq/quota/getList")
     List<TqQuotaSetting> getList(@RequestBody TqQuotaSetting tqQuotaSetting);
 
-    @PostMapping("/quota/importData")
+    @PostMapping("/tq/quota/importData")
     @ApiOperation("导入胎圈定额设定信息")
     public AjaxResult importData(@RequestBody List<TqQuotaSetting> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

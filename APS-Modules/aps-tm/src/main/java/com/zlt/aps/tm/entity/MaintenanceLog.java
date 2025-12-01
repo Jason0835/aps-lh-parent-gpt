@@ -16,7 +16,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_MAINTENANCE_LOG")
-@KeySequence(value = "SEQ_MAINTENANCE_LOG", clazz = Long.class)
+//@KeySequence(value = "SEQ_MAINTENANCE_LOG",dbType = DbType.ORACLE)
 public class MaintenanceLog extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -24,7 +24,7 @@ public class MaintenanceLog extends ApsBaseEntity {
     /**
      * 主键ID，对应自增序列为：SEQ_MAINTENANCE_LOG
      */
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     /**

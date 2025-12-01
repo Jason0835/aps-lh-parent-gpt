@@ -4,28 +4,60 @@
 
     <select id="listCxPlanAndConsume" parameterType="string" resultType="com.zlt.aps.tc.engine.vo.TcStockConsumeVo">
         select cxr.SIDEWALL_CODE,   /*胎侧代码*/
-               nvl(sum(cxr.CLASS3_PLANNED_QTY*cxr.SIDEWALL_LENGTH/1000),0) CX_CLASS3_PLAN_CONSUME,  /*半制品对应成型(8点-16点)计划量的消耗量*/
-               nvl(sum(cf.FINISH_QTY*cxr.SIDEWALL_LENGTH/1000), 0) CX_FINISH_CONSUME  /*半制品对应成型(8点-12点)完成量的消耗量*/
+               IFNULL(sum(cxr.CLASS1_PLAN_QTY*cxr.SIDEWALL_LENGTH/1000),0) CX_CLASS1_PLAN_CONSUME  /*成型今日早班计划*/
         from (
                SELECT r.EMBRYO_CODE,
                       r.BOM_DATA_VERSION,
                       max(ci.SIDEWALL_CODE) SIDEWALL_CODE, /*胎侧代码*/
                       max(ci.SIDEWALL_LENGTH) SIDEWALL_LENGTH,  /*胎侧长*/
-                      sum(r.CLASS3_PLANNED_QTY) CLASS3_PLANNED_QTY /*8点-16点成型计划量*/
+                      sum(IFNULL(r.CLASS3_PLANNED_QTY, 0) + IFNULL(r.CLASS2_PLAN_QTY, 0)) CLASS1_PLAN_QTY /*成型今日早班计划计划量*/
                FROM T_CX_SCHEDULE_RESULT r
                inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
-               where schedule_date = to_date(#{scheduleDate},'yyyy-mm-dd')
+               where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
                and r.DEL_FLAG = 0
                GROUP BY r.EMBRYO_CODE,r.BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
-        left join T_CX_PART_FINISH_QTY cf on cf.stat_date = to_date(#{scheduleDate},'yyyy-mm-dd')-1 /*排程日期 要减1天，才是对应8-12点完成量日期*/ and cf.DEL_FLAG = 0 and cf.embryo_code = cxr.embryo_code and cf.BOM_DATA_VERSION = cxr.BOM_DATA_VERSION
         group by cxr.SIDEWALL_CODE
     </select>
 
     <select id="listTcStock" parameterType="string" resultType="com.zlt.aps.tc.engine.vo.TcStockVo">
-        select MATERIAL_CODE sidewallCode, (nvl(STOCK_NUM,0)+nvl(MODIFY_NUM,0)-nvl(BAD_NUM,0)) STOCK_NUM
+        select MATERIAL_CODE                                                          sidewallCode,
+               SUM(IFNULL(STOCK_NUM, 0) + IFNULL(MODIFY_NUM, 0) - IFNULL(BAD_NUM, 0)) STOCK_NUM
         from T_TC_STOCK
-        where STOCK_DATE = to_date(#{stockDate},'yyyy-mm-dd') - 1 /*排程日期 要减1天，才是对应库存日期*/
+        where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 DAY) /*排程日期 要减1天，才是对应库存日期*/
         and DEL_FLAG = '0'
+        GROUP BY MATERIAL_CODE
+    </select>
+
+    <select id="listLastDayMidPlan" resultType="com.zlt.aps.tc.engine.vo.TcStockConsumeVo">
+        SELECT SIDEWALL_CODE, IFNULL(SUM(night_plan_qty), 0) consume
+        FROM T_TC_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND DEL_FLAG = '0'
+        GROUP BY SIDEWALL_CODE
+    </select>
+
+    <select id="listLastDayMidPlan4Glue" resultType="com.zlt.aps.tc.engine.vo.TcGlueOrderVo">
+        SELECT t1.machine_id,
+               t1.glue_code
+        FROM T_TC_SCHEDULE_RESULT t1
+                 JOIN (
+            -- 子查询找出每个 machine_id 对应的最大 night_produce_order
+            SELECT schedule_date,
+                   machine_id,
+                   MAX(night_produce_order) as max_night_produce_order
+            FROM T_TC_SCHEDULE_RESULT
+
+            WHERE DEL_FLAG = '0'
+              AND schedule_date = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+            GROUP BY schedule_date,
+                     machine_id) t2
+                      ON
+                          t1.schedule_date = t2.schedule_date AND t1.machine_id = t2.machine_id AND
+                          t1.night_produce_order = t2.max_night_produce_order
+        WHERE t1.DEL_FLAG = '0'
+          AND t1.schedule_date = DATE_ADD(#{scheduleDate}, INTERVAL -1 DAY)
+          AND t1.machine_id IS NOT NULL
+          AND t1.machine_id not like '%,%'
     </select>
 </mapper>

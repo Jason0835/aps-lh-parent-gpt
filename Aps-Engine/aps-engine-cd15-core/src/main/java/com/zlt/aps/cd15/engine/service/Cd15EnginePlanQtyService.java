@@ -1,12 +1,12 @@
 package com.zlt.aps.cd15.engine.service;
 
+import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
+import com.zlt.aps.cd15.engine.vo.Cd15StockVo;
+
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-
-import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
-import com.zlt.aps.cd15.engine.vo.Cd15StockVo;
 
 /**
  * 15度裁断计划排产量计算服务接口
@@ -48,8 +48,11 @@ public interface Cd15EnginePlanQtyService {
 	 * 
 	 * @param resultVo 排产信息
 	 * @param stockQty 库存量
+     * @param midPlanQty 早班计划量
+     * @param paramsMap 排产参数
 	 */
-	void handleSecondaryProduct(Cd15ScheduleResultVo resultVo, BigDecimal stockQty);
+//	void handleSecondaryProduct(Cd15ScheduleResultVo resultVo, BigDecimal stockQty, BigDecimal midPlanQty, Map<String, String> paramsMap);
+//    void handleSecondaryProduct(Cd15ScheduleResultVo resultVo, Map<String, String> paramsMap);
 
 	/**
 	 * 获取排产日的16点半部件库存信息（包含成型机台信息相关）

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('物料信息选择物料类型')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+</head>
+<body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-material-edit" th:object="${mesBasMaterial}">
+        <input id="id" name="id" th:field="*{id}" type="hidden">
+
+        <div class="form-group">
+            <label class="col-sm-3 control-label">[[#{setting.material.glueType}]]：</label>
+            <div class="col-sm-8">
+                <select id="glueType" name="glueType" class="form-control" th:with="type=${@dict.getType('GLUE_TYPE')}"
+                        th:data-none-selected-text="#{ui.frame.choose.empty}" >
+                    <option value="">[[#{ui.frame.choose.empty}]]</option>
+                    <option th:each="dict : ${type}" th:text="${dict.dictLabel}" th:value="${dict.dictValue}" th:field="*{glueType}"></option>
+                </select>
+            </div>
+        </div>
+
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "setting/material";
+
+    $("#form-material-edit").validate({
+        focusCleanup: true
+    });
+
+    function submitHandler() {
+        if ($.validate.form()) {
+            var fromData = $('#form-material-edit').serializeArray();
+            $.operate.saveNoRefresh(prefix + "/chooseGlue", fromData, updateParentCell);
+        }
+    }
+
+    function updateParentCell(result) {
+        if (result.code == web_status.SUCCESS) {
+            var id = $("#id").val();
+            var glueType = $("#glueType option:selected").val();
+            var parent = window.parent;
+            parent.$("#" + parent.table.options.id).bootstrapTable('updateCellByUniqueId', {
+                id: id,
+                field: "glueType",
+                value: glueType
+            });
+        }
+    }
+</script>
+</body>
+</html>

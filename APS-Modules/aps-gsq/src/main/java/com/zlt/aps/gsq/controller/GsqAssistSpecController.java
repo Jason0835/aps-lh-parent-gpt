@@ -22,14 +22,14 @@ import java.util.List;
 
 @Api(tags = {"钢丝圈外协规格管理接口"})
 @RestController
-@RequestMapping("/assistSpec")
+@RequestMapping("/gsq/assistSpec")
 public class GsqAssistSpecController extends BaseController {
 
     @Resource
     private GsqAssistSpecService gsqAssistSpecService;
 
     @ApiOperation("根据条件查询外协规格管理列表")
-    @GetMapping("/listAssistSpec")
+    @PostMapping("/listAssistSpec")
     public TableDataInfo listAssistSpec(GsqAssistSpec dto) {
         startPage();
         dto.setOrderStr(orderStr());
@@ -77,8 +77,8 @@ public class GsqAssistSpecController extends BaseController {
 
     @Log(title = "ui.gsq.assistSpec.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<GsqAssistSpec> exportData(GsqAssistSpec dto) {
+    @PostMapping("/exportData")
+    public List<GsqAssistSpec> exportData(@RequestBody GsqAssistSpec dto) {
         dto.setOrderStr(orderStr());
         List<GsqAssistSpec> list = gsqAssistSpecService.listAssistSpec(dto);
         return list;

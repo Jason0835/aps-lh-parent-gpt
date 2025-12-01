@@ -85,8 +85,8 @@ public class GdyyParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.gdyy.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出钢带压延参数信息")
-    @GetMapping("/exportData")
-    public List<GdyyParamsDto> export(@SpringQueryMap GdyyParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<GdyyParamsDto> export(@RequestBody GdyyParamsDto dto) {
         dto.setOrderStr(orderStr());
         GdyyParams params = new GdyyParams();
         BeanUtils.copyProperties(dto, params);

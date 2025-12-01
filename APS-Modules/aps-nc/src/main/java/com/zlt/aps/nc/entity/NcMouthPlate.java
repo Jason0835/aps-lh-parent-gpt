@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_NC_MOUTH_PLATE")
 @ApiModel(value = "NcMouthPlate对象", description = "内衬口型板信息维护")
-@KeySequence(value = "SEQ_PUBLIC", clazz = Long.class)
+//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
 public class NcMouthPlate extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1110056585174675867L;
 
     @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC", position = 10)
-    @TableId(value = "ID", type = IdType.INPUT)
+    @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
     @ApiModelProperty(value = "口型板编号。一个口型板编号可以对应多个机台。", position = 20)

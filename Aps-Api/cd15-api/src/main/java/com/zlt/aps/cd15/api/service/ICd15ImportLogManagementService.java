@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd15.api.domain.dto.Cd15ImportErrorLogManagementDto;
 import com.zlt.aps.cd15.api.domain.dto.Cd15ImportLogManagementDto;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,7 @@ import java.util.List;
 @FeignClient(contextId = "ICd15ImportLogManagementService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.cd15:cd15}")
 public interface ICd15ImportLogManagementService
 {
-    
+
     /**
      * 查询工序导入日志信息列表
      */
@@ -50,6 +49,6 @@ public interface ICd15ImportLogManagementService
      * 导出接口
      * @param dto 查询条件
      */
-    @GetMapping("/cd15/importLogManagement/importData")
-    List<Cd15ImportLogManagementDto> importData(@SpringQueryMap Cd15ImportLogManagementDto dto);
+    @PostMapping("/cd15/importLogManagement/importData")
+    List<Cd15ImportLogManagementDto> importData(@RequestBody Cd15ImportLogManagementDto dto);
 }

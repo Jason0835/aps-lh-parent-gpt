@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.GlueDemandPlanMapper">
+
+    <select id="selectGlueDemandPlanList" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlan"
+            resultType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlan">
+        select id, batch_no, plan_date, factory, glue,glue_name,sap_code, mix_area, total_plan_qty, mid_plan_qty, mid_remark,
+        night_plan_qty, night_remark, day_plan_qty, day_remark, data_source, remark, del_flag, create_by, create_time,
+        update_by, update_time from t_glue_demand_plan
+        where del_flag = '0'
+        <if test="batchNo != null  and batchNo != ''">and batch_no = #{batchNo}</if>
+        <if test="planDate != null ">and plan_date = #{planDate}</if>
+        <if test="factory != null  and factory != ''">and factory = #{factory}</if>
+        <if test="glue != null  and glue != ''">and INSTR(glue, #{glue}) > 0</if>
+        <if test="mixArea != null  and mixArea != ''">and INSTR(mix_area, #{mixArea}) >0</if>
+        <if test="dataSource != null  and dataSource != ''">and data_source = #{dataSource}</if>
+        <if test="orderStr == null">
+            order by (case when instr(mix_area,',') > 0 then '0' when mix_area is null or mix_area = '' then '0' else mix_area end)/*多个密炼区 和 没有密炼区的排在前面*/
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteGlueDemandPlanByIds" parameterType="String">
+        update t_glue_demand_plan set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listGlueDemandPlanNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber}+2 row_numbers, concat_ws('', #{data.planDate} , #{data.factory} , #{data.glue} , #{data.mixArea})
+            uniqueKey FROM dual
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_glue_demand_plan m
+        inner join temp_table t on concat_ws('', m.plan_date , m.factory, m.glue , m.mixArea ) = t.uniqueKey and m.del_flag ='0'
+    </select>
+    <select id="listMaterialNameSet" resultType="java.lang.String">
+        SELECT distinct MATERIAL_NAME FROM T_MES_BAS_MATERIAL where MAJOR_TYPE=5 and DEL_FLAG='0'
+    </select>
+
+
+    <insert id="batchInsertGlueDemandPlanInfo">
+        insert into t_glue_demand_plan
+        (id,batch_no,plan_date,factory,glue,glue_name,sap_code,mix_area,total_plan_qty,mid_plan_qty,mid_remark,night_plan_qty,night_remark,day_plan_qty,day_remark,data_source,remark,del_flag,create_by,create_time,update_by,update_time
+        )
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="glueDemandPlan" separator=" union all ">
+            select
+            #{glueDemandPlan.batchNo,jdbcType= VARCHAR} batch_no, #{glueDemandPlan.planDate,jdbcType=DATE} plan_date,
+            #{glueDemandPlan.factory,jdbcType= VARCHAR} factory, #{glueDemandPlan.glue,jdbcType= VARCHAR} glue,
+            #{glueDemandPlan.glueName,jdbcType= VARCHAR} glue_name,#{glueDemandPlan.sapCode,jdbcType= VARCHAR} sap_code,
+            #{glueDemandPlan.mixArea,jdbcType= VARCHAR} mix_area, #{glueDemandPlan.totalPlanQty,jdbcType=DOUBLE}
+            total_plan_qty, #{glueDemandPlan.midPlanQty,jdbcType=DOUBLE} mid_plan_qty,
+            #{glueDemandPlan.midRemark,jdbcType= VARCHAR} mid_remark, #{glueDemandPlan.nightPlanQty,jdbcType=DOUBLE}
+            night_plan_qty, #{glueDemandPlan.nightRemark,jdbcType= VARCHAR} night_remark,
+            #{glueDemandPlan.dayPlanQty,jdbcType=DOUBLE} day_plan_qty, #{glueDemandPlan.dayRemark,jdbcType= VARCHAR}
+            day_remark, #{glueDemandPlan.dataSource,jdbcType= VARCHAR} data_source,
+            #{glueDemandPlan.remark,jdbcType= VARCHAR} remark, #{glueDemandPlan.delFlag,jdbcType= VARCHAR} del_flag,
+            #{glueDemandPlan.createBy,jdbcType= VARCHAR} create_by, #{glueDemandPlan.createTime,jdbcType=DATE}
+            create_time, #{glueDemandPlan.updateBy,jdbcType= VARCHAR} update_by,
+            #{glueDemandPlan.updateTime,jdbcType=DATE} update_time from dual
+        </foreach>
+        ) x
+    </insert>
+
+    <insert id="batchInsertFromInit">
+        INSERT INTO T_GLUE_DEMAND_PLAN (
+            ID,
+            BATCH_NO,
+            PLAN_DATE,
+            FACTORY,
+            GLUE,
+            glue_name,
+            sap_code,
+            MIX_AREA,
+            TOTAL_PLAN_QTY,
+            MID_PLAN_QTY,
+            MID_REMARK,
+            NIGHT_PLAN_QTY,
+            NIGHT_REMARK,
+            DAY_PLAN_QTY,
+            DAY_REMARK,
+            DATA_SOURCE,
+            REMARK,
+            DEL_FLAG,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME
+        ) SELECT
+        ID,
+        BATCH_NO,
+        PLAN_DATE,
+        FACTORY,
+        GLUE,
+        glue_name,
+        sap_code,
+        MIX_AREA,
+        TOTAL_PLAN_QTY,
+        MID_PLAN_QTY,
+        MID_REMARK,
+        NIGHT_PLAN_QTY,
+        NIGHT_REMARK,
+        DAY_PLAN_QTY,
+        DAY_REMARK,
+        DATA_SOURCE,
+        REMARK,
+        DEL_FLAG,
+        CREATE_BY,
+        CREATE_TIME,
+        UPDATE_BY,
+        UPDATE_TIME
+        FROM
+            T_GLUE_DEMAND_PLAN_INIT
+        WHERE
+            PLAN_DATE = #{planDate}
+            AND FACTORY = #{factory}
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_glue_demand_plan a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.batchNo,jdbcType=VARCHAR } batch_no, #{item.planDate, jdbcType=DATE}
+            plan_date, #{item.factory,jdbcType=VARCHAR } factory, #{item.glue,jdbcType=VARCHAR } glue,
+            #{item.glueName,jdbcType=VARCHAR } glue_name,#{item.sapCode,jdbcType=VARCHAR } sap_code,
+            #{item.mixArea,jdbcType=VARCHAR } mix_area, #{item.totalPlanQty, jdbcType=DECIMAL} total_plan_qty,
+            #{item.midPlanQty, jdbcType=DECIMAL} mid_plan_qty, #{item.midRemark,jdbcType=VARCHAR } mid_remark,
+            #{item.nightPlanQty, jdbcType=DECIMAL} night_plan_qty, #{item.nightRemark,jdbcType=VARCHAR } night_remark,
+            #{item.dayPlanQty, jdbcType=DECIMAL} day_plan_qty, #{item.dayRemark,jdbcType=VARCHAR } day_remark,
+            #{item.dataSource,jdbcType=VARCHAR } data_source, #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag, #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=DATE} create_time, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=DATE} update_time from dual
+        </foreach>
+        ) b ON ( b.plan_date = a.plan_date
+        and b.factory = a.factory
+        and b.glue = a.glue
+        and b.mixArea = a.mixArea
+        and a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.batch_no = b.batch_no , a.total_plan_qty = b.total_plan_qty, a.mid_plan_qty = b.mid_plan_qty, a.mid_remark =b.mid_remark,
+            a.night_plan_qty = b.night_plan_qty, a.night_remark = b.night_remark, a.day_plan_qty = b.day_plan_qty, a.day_remark = b.day_remark,
+            a.glue_name=b.glue_name,a.sap_code=b.sap_code,
+            a.data_source = b.data_source, a.remark = b.remark, a.update_by= b.create_by,a.update_time = now()
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.batch_no, a.plan_date, a.factory, a.glue,a.glue_name,a.sap_code, a.mix_area, a.total_plan_qty, a.mid_plan_qty, a.mid_remark,
+        a.night_plan_qty, a.night_remark, a.day_plan_qty, a.day_remark, a.data_source, a.remark, a.del_flag,
+        a.create_by, a.create_time )
+        values ( get_sequence_nextval('SEQ_T_GLUE_DEMAND_PLAN'), b.batch_no, b.plan_date, b.factory, b.glue,b.glue_name,b.sap_code, b.mix_area,
+        b.total_plan_qty, b.mid_plan_qty, b.mid_remark, b.night_plan_qty, b.night_remark, b.day_plan_qty, b.day_remark,
+        b.data_source, b.remark, 0, b.create_by, now())
+    </update>
+
+    <insert id="backupToGlueDemandPlanLog" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlan">
+        INSERT INTO T_GLUE_DEMAND_PLAN_LOG (
+            ID,
+            BATCH_NO,
+            PLAN_DATE,
+            FACTORY,
+            GLUE,
+            glue_name,
+            sap_code,
+            MIX_AREA,
+            TOTAL_PLAN_QTY,
+            MID_PLAN_QTY,
+            MID_REMARK,
+            NIGHT_PLAN_QTY,
+            NIGHT_REMARK,
+            DAY_PLAN_QTY,
+            DAY_REMARK,
+            DATA_SOURCE,
+            REMARK,
+            DEL_FLAG,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME
+        ) SELECT
+        ID,
+        BATCH_NO,
+        PLAN_DATE,
+        FACTORY,
+        GLUE,
+        glue_name,
+        sap_code,
+        MIX_AREA,
+        TOTAL_PLAN_QTY,
+        MID_PLAN_QTY,
+        MID_REMARK,
+        NIGHT_PLAN_QTY,
+        NIGHT_REMARK,
+        DAY_PLAN_QTY,
+        DAY_REMARK,
+        DATA_SOURCE,
+        REMARK,
+        DEL_FLAG,
+        CREATE_BY,
+        CREATE_TIME,
+        UPDATE_BY,
+        UPDATE_TIME
+        FROM
+            T_GLUE_DEMAND_PLAN
+        WHERE
+            DEL_FLAG = 0
+            AND PLAN_DATE = #{planDate}
+            AND FACTORY = #{factory}
+    </insert>
+
+    <delete id="deleteByPlanDateAndFactory" parameterType="com.zlt.mix.schedule.api.domain.entity.GlueDemandPlan">
+        delete from t_glue_demand_plan where plan_date = #{planDate} and factory = #{factory}
+    </delete>
+
+	<!-- 校验重新匹配是否有缺少配置关系的情况 -->
+	<select id="checkRematchNotExistsMixArea" resultType="int">
+		SELECT COUNT(1)
+		  FROM T_GLUE_DEMAND_PLAN P
+		 WHERE p.del_flag = '0'
+		   AND p.plan_date = #{planDate, jdbcType=DATE}
+		   AND NOT EXISTS (
+		      SELECT 0
+		        FROM t_factory_glue_area_relation r
+		       WHERE r.del_flag = '0'
+		         AND r.factory = p.factory
+		         AND r.glue = p.glue
+		   )
+	</select>
+	
+    <update id="rematch">
+        update T_GLUE_DEMAND_PLAN p
+        join (SELECT GLUE,
+        FACTORY,
+        MAX(MIX_AREA) as MIX_AREA
+        FROM t_factory_glue_area_relation
+        WHERE DEL_FLAG='0'
+        <if test="factory != null and factory != ''">AND factory = #{factory}</if>
+        GROUP BY GLUE, FACTORY) m
+        on (p.glue = m.glue and p.FACTORY = m.FACTORY )
+        set p.mix_area = m.mix_area
+        where p.del_flag = '0' and p.plan_date = #{planDate, jdbcType=DATE}
+    </update>
+    
+    <!-- 获取分厂胶料密炼区对应关系 -->
+    <select id="listFactoryGlueAreaRelation" resultType="com.zlt.mix.setting.api.domain.entity.FactoryGlueAreaRelation">
+        select id, factory, glue, mix_area, remark, del_flag, create_by, create_time, update_by, update_time
+          from t_factory_glue_area_relation
+         where del_flag = '0'
+        <if test="factory != null  and factory != ''"> and factory = #{factory}</if>
+    </select>
+</mapper>

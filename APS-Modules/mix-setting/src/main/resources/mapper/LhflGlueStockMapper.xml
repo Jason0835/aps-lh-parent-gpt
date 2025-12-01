@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.setting.mapper.LhflGlueStockMapper">
+
+    <select id="selectLhflGlueStockList" parameterType="com.zlt.mix.setting.api.domain.entity.LhflGlueStock"
+            resultType="com.zlt.mix.setting.api.domain.entity.LhflGlueStock">
+        select id, stock_date, mix_area, material_name, stock_num, remark, del_flag, create_by, create_time, update_by,
+        update_time,
+        bar_code,valid_time,
+        stock_weight
+        from t_lhfl_glue_stock
+        where del_flag = '0'
+        <if test="stockDate != null ">and stock_date = #{stockDate}</if>
+        <if test="mixArea != null  and mixArea != ''">and mix_area = #{mixArea}</if>
+        <if test="materialName != null  and materialName != ''">and INSTR(material_name, #{materialName}) > 0</if>
+        <if test="orderStr == null">
+            order by stock_date desc,valid_time asc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <delete id="deleteLhflGlueStockByIds" parameterType="String">
+        update t_lhfl_glue_stock set del_flag='1' where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="listLhflGlueStockNotUnique" resultType="com.ruoyi.api.gateway.system.domain.ImportErrorLog">
+        WITH temp_table AS (
+        <foreach collection="importList" item="data" index="rowNumber" separator=" union all ">
+            SELECT #{rowNumber} row_numbers,
+            #{data.stockDate,jdbcType=TIMESTAMP} stock_date, #{data.barCode,jdbcType= VARCHAR} bar_code
+            
+        </foreach>
+        )
+        select #{importLogId} importLogId, t.row_numbers errorRow, #{errorDetail} errorDetail, #{createBy} createBy,
+        now() createTime
+        from t_lhfl_glue_stock m
+        inner join temp_table t on m.stock_date = t.stock_date and m.bar_code = t.bar_code and
+        m.del_flag ='0'
+    </select>
+
+    <insert id="batchInsertLhflGlueStockInfo">
+        insert into t_lhfl_glue_stock
+        (id,stock_date,mix_area,material_name,stock_num,remark,del_flag,create_by,create_time,update_by,update_time,bar_code,valid_time,stock_weight)
+        select NULL id, x.*
+        from (
+        <foreach collection="list" item="lhflGlueStock" separator=" union all ">
+            select
+            #{lhflGlueStock.stockDate,jdbcType=TIMESTAMP} stock_date, #{lhflGlueStock.mixArea,jdbcType= VARCHAR} mix_area,
+            #{lhflGlueStock.materialName,jdbcType= VARCHAR} material_name, #{lhflGlueStock.stockNum,jdbcType=DOUBLE}
+            stock_num,
+            #{lhflGlueStock.remark,jdbcType= VARCHAR} remark, #{lhflGlueStock.delFlag,jdbcType= VARCHAR} del_flag,
+            #{lhflGlueStock.createBy,jdbcType= VARCHAR} create_by, #{lhflGlueStock.createTime,jdbcType=TIMESTAMP}
+            create_time, #{lhflGlueStock.updateBy,jdbcType= VARCHAR} update_by,
+            #{lhflGlueStock.updateTime,jdbcType=TIMESTAMP} update_time,
+            #{lhflGlueStock.barCode,jdbcType=VARCHAR} bar_code,#{lhflGlueStock.validTime, jdbcType=TIMESTAMP} valid_time,
+            #{lhflGlueStock.stockWeight,jdbcType=DOUBLE} stock_weight
+            
+        </foreach>
+        ) x
+    </insert>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_lhfl_glue_stock a USING (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.id, jdbcType=DOUBLE} id, #{item.stockDate, jdbcType=TIMESTAMP} stock_date,
+            #{item.mixArea,jdbcType=VARCHAR } mix_area, #{item.materialName,jdbcType=VARCHAR } material_name,
+            #{item.stockNum, jdbcType=DECIMAL} stock_num, #{item.remark,jdbcType=VARCHAR } remark,
+            #{item.delFlag,jdbcType=VARCHAR } del_flag, #{item.createBy,jdbcType=VARCHAR } create_by,
+            #{item.createTime, jdbcType=TIMESTAMP} create_time, #{item.updateBy,jdbcType=VARCHAR } update_by,
+            #{item.updateTime, jdbcType=TIMESTAMP} update_time,
+            #{item.barCode,jdbcType=VARCHAR } bar_code,#{item.validTime, jdbcType=TIMESTAMP} valid_time,
+            #{item.stockWeight,jdbcType=DOUBLE} stock_weight
+            
+        </foreach>
+        ) b ON ( a.stock_date = b.stock_date and a.bar_code = b.bar_code AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.stock_num = b.stock_num, a.remark =
+            b.remark, a.update_by = b.create_by,
+            a.update_time = now(),
+            a.mix_area = b.mix_area,a.material_name = b.material_name,a.valid_time=b.valid_time,
+            a.stock_weight=b.stock_weight
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+        a.id, a.stock_date, a.mix_area, a.material_name, a.stock_num, a.remark, a.del_flag, a.create_by,
+        a.create_time,a.bar_code,a.valid_time,a.stock_weight)
+        values ( get_sequence_nextval('seq_t_lhfl_glue_stock'), b.stock_date, b.mix_area, b.material_name, b.stock_num,
+        b.remark,
+        0, b.create_by,
+        now(),b.bar_code,b.valid_time,
+        b.stock_weight
+        )
+    </update>
+</mapper>

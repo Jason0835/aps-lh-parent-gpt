@@ -24,20 +24,20 @@ public interface ICd90DispatcherLogService {
      * 查询调度员排程操作日志列表
      */
     @ApiOperation("查询调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/list")
+    @PostMapping("/cd90/dispatcherLog/list")
     TableDataInfo list(@RequestBody Cd90DispatcherLog cd90DispatcherLog);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/dispatcherLog/{id}")
+    @GetMapping(value = "/cd90/dispatcherLog/{id}")
     Cd90DispatcherLog getInfo(@PathVariable("id") Long id);
 
     /**
      * 导出调度员排程操作日志列表
      */
     @ApiOperation("导出调度员排程操作日志列表")
-    @PostMapping("/dispatcherLog/export")
+    @PostMapping("/cd90/dispatcherLog/export")
     public byte[] export(@RequestBody Cd90DispatcherLog dispatcherLog);
 }

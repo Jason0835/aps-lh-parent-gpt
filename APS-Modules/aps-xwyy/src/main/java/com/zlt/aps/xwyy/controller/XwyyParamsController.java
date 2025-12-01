@@ -85,8 +85,8 @@ public class XwyyParamsController extends BaseController {
      */
     @Log(title = "ui.data.column.xwyy.params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出纤维压延参数信息")
-    @GetMapping("/exportData")
-    public List<XwyyParamsDto> export(@SpringQueryMap XwyyParamsDto dto) {
+    @PostMapping("/exportData")
+    public List<XwyyParamsDto> export(@RequestBody XwyyParamsDto dto) {
         dto.setOrderStr(orderStr());
         XwyyParams params = new XwyyParams();
         BeanUtils.copyProperties(dto, params);

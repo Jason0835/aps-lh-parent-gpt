@@ -23,7 +23,7 @@ public interface IGsqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/gsq/stock/list")
     TableDataInfo list(@RequestBody GsqStock stock);
 
     /**
@@ -32,7 +32,7 @@ public interface IGsqStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/gsq/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface IGsqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/gsq/stock")
     AjaxResult add(@Validated @RequestBody GsqStock stock);
 
 
@@ -51,7 +51,7 @@ public interface IGsqStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/gsq/stock/selectStockById/{id}")
     GsqStock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -60,7 +60,7 @@ public interface IGsqStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/gsq/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface IGsqStockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/gsq/stock")
     AjaxResult edit(@Validated @RequestBody GsqStock stock);
 
     /**
@@ -78,10 +78,10 @@ public interface IGsqStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/gsq/stock/exportList")
     List<GsqStock> exportList(@RequestBody GsqStock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/gsq/stock/importData")
     @ApiOperation("导入钢丝圈库存信息")
     public AjaxResult importData(@RequestBody List<GsqStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 

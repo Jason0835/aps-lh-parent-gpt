@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.mix.schedule.mapper.ScheduleReportMapper">
+	<!-- 查询日计划每日报表 -->
+    <select id="selectScheduleReportList" resultType="com.zlt.mix.schedule.api.domain.dto.ScheduleReportDto">
+    	SELECT TO_CHAR(ifnull(S.SCHEDULE_DATE, F.SCHEDULE_DATE), 'yyyy-mm-dd') SCHEDULE_DATE,
+		       ifnull(S.MIX_AREA, F.MIX_AREA) MIX_AREA,
+		       ifnull(S.MAJOR_TYPE, F.MAJOR_TYPE) PROCEDURE,
+		       S.GLUE PLAN_SPEC,
+		       ifnull(S.PLAN_QTY, 0) PLAN_QTY,
+		       F.GLUE FINISH_SPEC,
+		       ifnull(F.QTY, 0) FINISH_QTY,
+			   concat(CASE
+		         WHEN S.GLUE IS NOT NULL AND F.GLUE IS NOT NULL THEN
+		          1
+		         ELSE
+		          0
+		       END * 100 , '%') SPEC_RATE,
+			   concat(CASE
+		         WHEN ifnull(S.PLAN_QTY, 0) != 0 THEN
+		          ifnull(ROUND(F.QTY / S.PLAN_QTY, 4), 0)
+		         ELSE
+		          0
+		       END * 100 , '%') QTY_FINISH_RATE
+		  FROM (SELECT R.SCHEDULE_DATE,
+		               L.MIX_AREA,
+		               M.MATERIAL_NAME GLUE,
+		               SUM(L.PLAN_QTY) PLAN_QTY,
+		               M.MAJOR_TYPE
+		          FROM T_MIX_SCHEDULE_PUBLISH_RECORD R
+		         INNER JOIN T_SCHEDULE_PUBLISH_LOG L
+		            ON L.RECORD_ID = R.ID
+		         INNER JOIN T_MES_BAS_MATERIAL M
+		            ON M.MATERIAL_CODE = L.RECIPE_MATERIAL_CODE
+		           AND M.MAJOR_TYPE IN ('5', '4', '2')
+				 <if test="dto.procedure != null and dto.procedure != ''">
+				   AND M.MAJOR_TYPE = #{dto.procedure}
+				 </if>
+		         WHERE R.SCHEDULE_DATE BETWEEN #{dto.queryStartDate} AND #{dto.queryEndDate}
+                 <if test="dto.mixArea != null and dto.mixArea != ''">
+                   AND L.MIX_AREA = #{dto.mixArea}
+                 </if>
+		           AND L.PUBLISH_RESULT = '1'
+		           AND NOT EXISTS
+		         (SELECT 0
+	                      FROM T_SCHEDULE_PUBLISH_LOG LL
+	                     WHERE L.PUBLISH_RESULT = LL.PUBLISH_RESULT
+	                       AND L.ORDER_NO = LL.ORDER_NO
+		                   <![CDATA[
+		                   AND (L.CREATE_TIME < LL.CREATE_TIME OR
+		                       L.CREATE_TIME = LL.CREATE_TIME AND L.ID < LL.ID))
+		                   ]]>
+		         GROUP BY R.SCHEDULE_DATE, L.MIX_AREA, M.MATERIAL_NAME, M.MAJOR_TYPE) S
+		
+		  FULL JOIN (
+		             SELECT F.SCHEDULE_DATE,
+		                     F.MIX_AREA,
+		                     M.MAJOR_TYPE,
+		                     F.GLUE,
+		                     SUM(ifnull(F.MID_FINISH_QTY, 0) + ifnull(F.NIGHT_FINISH_QTY, 0) +
+		                         ifnull(F.DAY_FINISH_QTY, 0)) QTY
+		               FROM T_GLUE_FINISH F
+		              INNER JOIN (SELECT M.MATERIAL_NAME, MAX(M.MAJOR_TYPE) MAJOR_TYPE
+		                            FROM T_MES_BAS_MATERIAL M
+		                           WHERE M.DEL_FLAG = '0'
+		                             AND M.MAJOR_TYPE IN ('5', '4')
+								 <if test="dto.procedure != null and dto.procedure != ''">
+								     AND M.MAJOR_TYPE = #{dto.procedure}
+								 </if>
+		                           GROUP BY MATERIAL_NAME) M
+		                 ON F.GLUE = M.MATERIAL_NAME
+		             
+		              WHERE F.SCHEDULE_DATE BETWEEN #{dto.queryStartDate} AND #{dto.queryEndDate}
+	                 <if test="dto.mixArea != null and dto.mixArea != ''">
+	                    AND F.MIX_AREA = #{dto.mixArea}
+	                 </if>
+		                AND F.DEL_FLAG = '0'
+		              GROUP BY F.SCHEDULE_DATE, F.MIX_AREA, F.GLUE, M.MAJOR_TYPE
+		             
+		             UNION
+		             
+		             SELECT F.SCHEDULE_DATE,
+		                    F.MIX_AREA,
+		                    M.MAJOR_TYPE,
+		                    F.MATERIAL_NAME GLUE,
+		                    SUM(ifnull(F.MID_FINISH_QTY, 0) + ifnull(F.NIGHT_FINISH_QTY, 0) +
+		                        ifnull(F.DAY_FINISH_QTY, 0)) QTY
+		               FROM T_LHFL_FINISH F
+		              INNER JOIN (SELECT M.MATERIAL_NAME, MAX(M.MAJOR_TYPE) MAJOR_TYPE
+		                            FROM T_MES_BAS_MATERIAL M
+		                           WHERE M.DEL_FLAG = '0'
+		                             AND M.MAJOR_TYPE IN ('2')
+								 <if test="dto.procedure != null and dto.procedure != ''">
+								     AND M.MAJOR_TYPE = #{dto.procedure}
+								 </if>
+		                           GROUP BY MATERIAL_NAME) M
+		                 ON F.MATERIAL_NAME = M.MATERIAL_NAME
+		              WHERE F.SCHEDULE_DATE BETWEEN #{dto.queryStartDate} AND #{dto.queryEndDate}
+	                 <if test="dto.mixArea != null and dto.mixArea != ''">
+	                    AND F.MIX_AREA = #{dto.mixArea}
+	                 </if>
+		                AND F.DEL_FLAG = '0'
+		              GROUP BY F.SCHEDULE_DATE,
+		                       F.MIX_AREA,
+		                       F.MATERIAL_NAME,
+		                       M.MAJOR_TYPE
+		             
+		             ) F
+		    ON S.SCHEDULE_DATE = F.SCHEDULE_DATE
+		   AND S.MIX_AREA = F.MIX_AREA
+		   AND S.GLUE = F.GLUE
+		   AND S.MAJOR_TYPE = F.MAJOR_TYPE
+		 WHERE (ifnull(S.PLAN_QTY, 0) != 0
+		    OR ifnull(F.QTY, 0) != 0)
+		 ORDER BY SCHEDULE_DATE,
+		          MIX_AREA,
+		          PROCEDURE DESC,
+		          CASE
+		            WHEN PLAN_SPEC IS NOT NULL AND FINISH_SPEC IS NOT NULL THEN
+		             1
+		            WHEN PLAN_SPEC IS NOT NULL AND FINISH_SPEC IS NULL THEN
+		             2
+		            ELSE
+		             3
+		          END,
+		          PLAN_SPEC,
+		          FINISH_SPEC
+    </select>
+</mapper>

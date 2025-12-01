@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,25 +19,25 @@ public interface IGsqTwiningDiscService {
     /**
      * 根据条件查询缠绕盘列表
      */
-    @GetMapping("/twiningDisc/listTwiningDisc")
-    TableDataInfo listTwiningDisc(@SpringQueryMap GsqTwiningDiscDto dto);
+    @PostMapping("/gsq/twiningDisc/listTwiningDisc")
+    TableDataInfo listTwiningDisc(@RequestBody GsqTwiningDiscDto dto);
 
     /**
      * 根据id查询缠绕盘信息
      */
-    @GetMapping("/twiningDisc/getTwiningDisc/{id}")
+    @GetMapping("/gsq/twiningDisc/getTwiningDisc/{id}")
     GsqTwiningDiscDto getTwiningDisc(@PathVariable("id") Long id);
 
     /**
      * 保存缠绕盘信息（id为空则新增，id不为空则修改）
      */
-    @PostMapping("/twiningDisc/saveTwiningDisc")
+    @PostMapping("/gsq/twiningDisc/saveTwiningDisc")
     AjaxResult saveTwiningDisc(@RequestBody GsqTwiningDiscDto dto);
 
     /**
      * 判断缠绕code是否唯一
      */
-    @PostMapping("/twiningDisc/checkSerialNumberUnique")
+    @PostMapping("/gsq/twiningDisc/checkSerialNumberUnique")
     String checkSerialNumberUnique(@RequestBody GsqTwiningDiscDto dto);
 
 
@@ -46,23 +45,23 @@ public interface IGsqTwiningDiscService {
      * 批量删除缠绕盘信息(逻辑删)
      * @param ids 多个id逗号分割
      */
-    @PostMapping("/twiningDisc/deleteTwiningDisc/{ids}")
+    @PostMapping("/gsq/twiningDisc/deleteTwiningDisc/{ids}")
     AjaxResult deleteTwiningDisc(@PathVariable("ids") Long[] ids);
 
     /**
      * 导出接口
      * @param dto
      */
-    @GetMapping("/twiningDisc/exportData")
-    List<GsqTwiningDiscDto> exportData(@SpringQueryMap GsqTwiningDiscDto dto);
+    @PostMapping("/gsq/twiningDisc/exportData")
+    List<GsqTwiningDiscDto> exportData(@RequestBody GsqTwiningDiscDto dto);
 
-    @PostMapping("/twiningDisc/importData")
+    @PostMapping("/gsq/twiningDisc/importData")
     @ApiOperation("导入钢丝圈缠绕盘信息")
     public AjaxResult importData(@RequestBody List<GsqTwiningDiscDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     /**
      * 删除全部(逻辑删)
      */
-    @PostMapping("/twiningDisc/deleteAll")
+    @PostMapping("/gsq/twiningDisc/deleteAll")
     AjaxResult deleteAll();
 }

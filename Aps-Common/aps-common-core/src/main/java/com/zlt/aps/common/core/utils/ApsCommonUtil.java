@@ -1,7 +1,7 @@
 package com.zlt.aps.common.core.utils;
 
+import com.ruoyi.common.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.regex.Matcher;

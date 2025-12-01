@@ -1,11 +1,13 @@
 package com.zlt.aps.gsq.engine.mapper;
 
 
+import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.engine.vo.GsqSpecifyMachineVo;
 import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo;
 import com.zlt.aps.gsq.engine.vo.GsqTwiningDiscVo;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 public interface GsqEngineMachineMapper {
@@ -29,5 +31,17 @@ public interface GsqEngineMachineMapper {
      * @return
      */
     List<GsqTwiningDiscVo> listGsqTwiningDisc(String scheduleDate);
-
+    
+    /**
+     * 获取钢丝圈机台
+     * @return
+     */
+    List<GsqMachineInfo> listGsqMachine();
+    
+    /**
+     * 获取上一天规格已排产机台列表
+     * @param scheduleDate
+     * @return
+     */
+    List<GsqSpecifyMachineVo> listLastDayPlanMachine(@Param("scheduleDate")Date scheduleDate);
 }

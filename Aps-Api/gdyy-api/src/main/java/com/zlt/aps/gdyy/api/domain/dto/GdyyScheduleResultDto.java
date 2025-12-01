@@ -82,6 +82,22 @@ public class GdyyScheduleResultDto extends ApsBaseDto {
     private Double stockQty;
 
     /**
+     * 生产线
+     */
+    @ImportValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.scheduleResult.produceLine")
+    @ApiModelProperty(value = "生产线")
+    private String machineCode;
+
+    /**
+     * 生产线
+     */
+//    @ImportValidated(required = true, maxLength = 20)
+//    @Excel(name = "ui.data.column.scheduleResult.produceLine")
+    @ApiModelProperty(value = "生产线")
+    private String machineName;
+
+    /**
      * 当日日计划量合计
      */
     @ImportValidated(number = true,max = 9999999,min = 0)
@@ -106,12 +122,26 @@ public class GdyyScheduleResultDto extends ApsBaseDto {
     private Double class1Plan;
 
     /**
+     * 中班（一班16点-24点）顺序
+     */
+    @ApiModelProperty(value = "中班顺序")
+    private Double class1ProduceOrder;
+
+    /**
      * 中班计划量个数
      */
     @ImportValidated(number = true,max = 9999999,min = 0)
     @Excel(name = "ui.data.column.scheduleResult.classPlanNum")
     @ApiModelProperty(value = "中班计划量个数")
     private Double class1PlanNum;
+
+    /**
+     * 一班完成量
+     */
+    @ImportValidated(number = true, min = 0, max = 9999999)
+    @Excel(name = "ui.data.column.scheduleResult.nightFinishQty", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "一班完成量")
+    private Double class1FinishQty;
     
     /** 中班（一班16点-24点）无库存计划量*/
     @ImportValidated(number = true,max = 9999999,min = 0,isInteger = true)
@@ -150,12 +180,26 @@ public class GdyyScheduleResultDto extends ApsBaseDto {
     private Double class2Plan;
 
     /**
+     * 夜班（二班0点-8点）顺序
+     */
+    @ApiModelProperty(value = "夜班顺序")
+    private Double class2ProduceOrder;
+
+    /**
      * 夜班计划量个数
      */
     @ImportValidated(number = true,max = 9999999,min = 0)
     @Excel(name = "ui.data.column.scheduleResult.classPlanNum")
     @ApiModelProperty(value = "夜班计划量个数")
     private Double class2PlanNum;
+
+    /**
+     * 二班完成量
+     */
+    @ImportValidated(number = true, min = 0, max = 9999999)
+    @Excel(name = "ui.data.column.scheduleResult.earlyFinishQty", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "二班完成量")
+    private Double class2FinishQty;
     
     /** 夜班（二班0点-8点）无库存计划量*/
     @ImportValidated(number = true,max = 9999999,min = 0,isInteger = true)
@@ -192,6 +236,12 @@ public class GdyyScheduleResultDto extends ApsBaseDto {
     @Excel(name = "ui.data.column.gdyy.scheduleResult.class3Plan.meter")
     @ApiModelProperty(value = "白班计划量")
     private Double class3Plan;
+
+    /**
+     * 白班（三班8点-16点）顺序
+     */
+    @ApiModelProperty(value = "白班顺序")
+    private Double class3ProduceOrder;
 
     /**
      * 白班计划量个数
@@ -299,6 +349,10 @@ public class GdyyScheduleResultDto extends ApsBaseDto {
 
     @ApiModelProperty(value = "排程记录id数组")
     private Long[] ids;
+
+
+    @ApiModelProperty(value = "调度员是否修改了生产线，0：否，1：是")
+    private Integer changeMachine;
 
     @ApiModelProperty(value = "调度员是否修改了中班计划量，0：否，1：是")
     private Integer changeMidPlan;

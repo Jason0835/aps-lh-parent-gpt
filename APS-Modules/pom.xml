@@ -6,14 +6,18 @@
     <parent>
         <artifactId>ruoyi</artifactId>
         <groupId>com.ruoyi</groupId>
-        <version>2.2.2-SNAPSHOT</version>
+        <version>3.5.2-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
     <packaging>pom</packaging>
     <modules>
+        <module>aps-base</module>
+        <module>aps-maindata</module>
+        <module>aps-factory-engine</module>
+        <module>aps-monthplan</module>
         <module>aps-tm</module>
-        <module>aps-lh</module>
-        <module>aps-cx</module>
+        <module>aps-cx-lh</module>
         <module>aps-tc</module>
         <module>aps-nc</module>
         <module>aps-cd15</module>
@@ -23,11 +27,20 @@
         <module>aps-tq</module>
         <module>aps-gsq</module>
         <module>aps-mps</module>
+        <module>aps-file</module>
+        <module>aps-job</module>
+        <module>mix-schedule</module>
+        <module>mix-setting</module>
+        <module>aps-itf</module>
     </modules>
-
+    <properties>
+        <aps.version>1.0.3-SNAPSHOT</aps.version>
+        <ruoyi-cloud.version>3.5.2-SNAPSHOT</ruoyi-cloud.version>
+        <lomok.version>1.18.16</lomok.version>
+    </properties>
     <groupId>com.zlt.aps</groupId>
     <artifactId>aps-modules</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
 
     <!-- 依赖声明 -->
     <dependencyManagement>
@@ -36,132 +49,172 @@
             <dependency>
                 <groupId>com.zlt.aps</groupId>
                 <artifactId>aps-common-core</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt.aps</groupId>
+                <artifactId>aps-base</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <!-- APS双钱主数据 -->
+            <dependency>
+                <groupId>com.zlt.aps</groupId>
+                <artifactId>aps-maindata</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt.aps</groupId>
+                <artifactId>aps-factory-engine</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <!-- APS的API模块 -->
             <dependency>
+                <groupId>com.zlt.aps</groupId>
+                <artifactId>aps-monthplan-api</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
                 <groupId>com.zlt.aps.cd15</groupId>
                 <artifactId>aps-cd15-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.cd90</groupId>
                 <artifactId>aps-cd90-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.cx</groupId>
                 <artifactId>aps-cx-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.gdyy</groupId>
                 <artifactId>aps-gdyy-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.gsq</groupId>
                 <artifactId>aps-gsq-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zlt.aps.lh</groupId>
-                <artifactId>aps-lh-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.nc</groupId>
                 <artifactId>aps-nc-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tc</groupId>
                 <artifactId>aps-tc-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tm</groupId>
                 <artifactId>aps-tm-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tq</groupId>
                 <artifactId>aps-tq-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.xwyy</groupId>
                 <artifactId>aps-xwyy-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
-                <groupId>com.zlt.aps.mps</groupId>
-                <artifactId>mps-api</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <groupId>com.zlt.aps</groupId>
+                <artifactId>aps-cx-lh-api</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt.aps.itf</groupId>
+                <artifactId>aps-itf-api</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt</groupId>
+                <artifactId>zlt-busi-common</artifactId>
+                <version>3.5.2-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt</groupId>
+                <artifactId>zlt-bill-common</artifactId>
+                <version>3.5.2-SNAPSHOT</version>
             </dependency>
 
             <!-- APS的算法引擎模块 -->
             <dependency>
                 <groupId>com.zlt.aps.cd15</groupId>
                 <artifactId>aps-engine-cd15</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.cd90</groupId>
                 <artifactId>aps-engine-cd90</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.cx</groupId>
                 <artifactId>aps-engine-cx</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.gdyy</groupId>
                 <artifactId>aps-engine-gdyy</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.gsq</groupId>
                 <artifactId>aps-engine-gsq</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.lh</groupId>
                 <artifactId>aps-engine-lh</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.nc</groupId>
                 <artifactId>aps-engine-nc</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tc</groupId>
                 <artifactId>aps-engine-tc</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tm</groupId>
                 <artifactId>aps-engine-tm</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.tq</groupId>
                 <artifactId>aps-engine-tq</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps.xwyy</groupId>
                 <artifactId>aps-engine-xwyy</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
+                <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.zlt</groupId>
                 <artifactId>zlt-sync-data</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>1.0.1-SNAPSHOT</version>
             </dependency>
-
+            <dependency>
+                <groupId>com.ruoyi.file</groupId>
+                <artifactId>aps-file-api</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yomahub</groupId>
+                <artifactId>tlog-all-spring-boot-starter</artifactId>
+                <version>1.5.2</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

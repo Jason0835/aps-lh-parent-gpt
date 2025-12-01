@@ -3,7 +3,9 @@ package com.zlt.aps.cd90.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DayFinishQty;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -155,4 +157,23 @@ public interface ICd90ScheduleResultService {
     @PostMapping("/cd90ScheduleResult/combinationMiddleAndNight/{ids}")
     public AjaxResult combinationMiddleAndNight(@PathVariable("ids")Long[] ids, @RequestParam("classifiedShift") String classifiedShift);
 
+    /**
+     * 导入完成量
+     * @param list 完成量集合
+     * @param importLogId 导入记录id
+     * @return 结果
+     */
+    @PostMapping("/cd90ScheduleResult/importFinishQty")
+    @ApiOperation("导入完成量")
+    AjaxResult importFinishQty(@RequestBody List<Cd90DayFinishQty> list, @RequestParam("importLogId") Long importLogId);
+
+    /**
+     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     *
+     * @param scheduleResult 排程日期
+     * @return 结果
+     */
+    @PostMapping("/cd90ScheduleResult/getSummaryVo")
+    @ApiOperation("获取排程日期的排程结果合计")
+    public AjaxResult getSummaryVo(@RequestBody Cd90ScheduleResult scheduleResult);
 }

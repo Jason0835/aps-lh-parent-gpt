@@ -2,17 +2,20 @@ package com.zlt.aps.gsq.engine.service.impl;
 
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
+import com.zlt.aps.common.engine.utils.CollectionUtil;
+import com.zlt.aps.gsq.api.domain.dto.GsqReserveStockDto;
 import com.zlt.aps.gsq.engine.mapper.GsqEngineStockMapper;
 import com.zlt.aps.gsq.engine.service.GsqEngineStockService;
 import com.zlt.aps.gsq.engine.vo.GsqStockConsumeVo;
 import com.zlt.aps.gsq.engine.vo.GsqStockVo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.alibaba.fastjson.JSON.toJSONString;
 
@@ -40,34 +43,44 @@ public class GsqEngineStockServiceImpl implements GsqEngineStockService {
     public Map<String, Double> getPlanStockMap(String batchNo, String scheduleDate, Double stockLossRate) {
         Map<String, Double> stockMap = new HashMap<>();
         List<GsqStockVo> list = gsqEngineStockMapper.listGsqStock(scheduleDate);  //询指定日期的钢丝圈库存量
-        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "①16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗", "11点半部件库存量：" + toJSONString(list));
+        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "①预计库存 = 7点半部件库存 + 昨日半制品早班计划量 - 今天成型早班(成型一班)", "7点半部件库存量：" + toJSONString(list));
         if (list.isEmpty()) {
             log.error("钢丝圈库存查询为空");
             return stockMap;
         }
 
-        //开始计算钢丝圈16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗
-        Map<String, Double> consumMap = this.getGsqConsume(batchNo, scheduleDate); // 11点到16点半部件计划消耗量
+        //开始计算钢丝圈预计库存 = 7点半部件库存 + 昨日半制品早班计划量 - 今天成型早班(成型一班)
+        Map<String, Double> consumMap = this.getGsqConsume(batchNo, scheduleDate); // 今天成型早班(成型一班)-昨日半制品早班计划量
         for (GsqStockVo stockVo : list) {
             double consum = consumMap.getOrDefault(stockVo.getSteelRingCode(), 0D);  //消耗量
-            consum = (consum < 0 ? 0 : consum);
+//            consum = (consum < 0 ? 0 : consum);
 
-            //计算11点实际半部件库存=11点取到的库存*（100-库存损耗率值）%
+            //计算7点实际半部件库存=7点取到的库存*（100-库存损耗率值）%
             double stockNum = stockVo.getStockNum();
             double rate = BigDecimalUtil.div(BigDecimalUtil.sub(100, stockLossRate), 100);  //计算库存率rate = （100 - stockLossRate）/100
-            stockNum = BigDecimalUtil.mul(stockNum, rate);  //计算实际的11点半部件库存
+            stockNum = BigDecimalUtil.mul(stockNum, rate);  //计算实际的7点半部件库存
 
-            double planStock = BigDecimalUtil.sub(stockNum, consum); //16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗
-            planStock = (planStock <= 0 ? 0D : planStock);
+            double planStock = BigDecimalUtil.sub(stockNum, consum); //预计库存 = 7点半部件库存 - (今天成型早班(成型一班) - 昨日半制品早班计划量)
+            //预计库存需要向下取整
+            planStock = (planStock <= 0 ? 0D : BigDecimalUtil.roundDown(planStock, 0));
             stockMap.put(stockVo.getSteelRingCode(), planStock);
         }
+        // 解决物料无库存的情况，库存当成0，遍历consumMap的key和stockMap的key进行比较，如果key不存在，则添加key和value
+        for (String key : consumMap.keySet()) {
+            if (!stockMap.containsKey(key)) {
+                Double consume = consumMap.get(key);
+                if (consume < 0) {
+                    stockMap.put(key, BigDecimalUtil.roundDown(0 - consume, 0));
+                }
+            }
+        }
         autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "④16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗",
-                "16点预计库存集合：" + toJSONString(stockMap));  //添加日志
+                "预计库存集合：" + toJSONString(stockMap));  //添加日志
         return stockMap;
     }
 
     /**
-     * 计算11点到16点半部件计划消耗量 = (8点到16点成型计划 - 8点到12点成型生产量）
+     * 计算成型消耗量=今天成型早班(成型一班)-昨日半制品早班计划量
      *
      * @param batchNo 批次号
      * @param scheduleDate 排程日期
@@ -76,19 +89,59 @@ public class GsqEngineStockServiceImpl implements GsqEngineStockService {
     private Map<String, Double> getGsqConsume(String batchNo, String scheduleDate) {
         Map<String, Double> result = new HashMap<>();
         List<GsqStockConsumeVo> list = gsqEngineStockMapper.listCxPlanAndConsume(scheduleDate);  //查询钢丝圈胶对应的成型三班计划消耗量，以及8-12点实际消耗量
-        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "②16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗",
-                "半制品对应成型(8点-16点)计划量的消耗量cxClass3PlanConsume，以及制品对应成型(8点-12点)完成量的消耗量cxFinishConsume：" + toJSONString(list));  //添加日志
+        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "①预计库存 = 7点半部件库存 + 昨日半制品早班计划量 - 今天成型早班(成型一班)",
+                "成型一班计划量对应半制品计划消耗量cxClass1PlanConsume：" + toJSONString(list));  //添加日志
+        List<GsqStockConsumeVo> consumeVos = gsqEngineStockMapper.listLastDayMidPlan(scheduleDate);
+        autoScheduleLogService.insertTmScheduleLog(batchNo, "", "②预计库存 = 7点半部件库存 + 昨日半制品早班计划量 - 今天成型早班(成型一班)",
+                "昨日早班半制品生产量consume：" + toJSONString(consumeVos));  //添加日志
         if (list.isEmpty()) {
             log.error("计算12点到16点钢丝圈计划消耗量为空");
             return result;
         }
         //开始计算11点到16点半部件消耗量
         for (GsqStockConsumeVo consumeVo : list) {
-            double planConsume = BigDecimalUtil.sub(consumeVo.getCxClass3PlanConsume(), consumeVo.getCxFinishConsume());  //11点到16点半部件计划消耗量
-            result.put(consumeVo.getSteelRingCode(), planConsume);
+            Double cxClass3PlanConsume = consumeVo.getCxClass3PlanConsume();
+            if (Objects.isNull(cxClass3PlanConsume)) {
+                cxClass3PlanConsume = 0D;
+            }
+            result.put(consumeVo.getSteelRingCode(), cxClass3PlanConsume);
         }
-        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "③16点预计库存 = 11点半部件库存 - 11点到16点半部件消耗",
-                "计算11点到16点半部件消耗量 = 半制品对应成型(8点-16点)计划量的消耗量cxClass3PlanConsume - 制品对应成型(8点-12点)完成量的消耗量cxFinishConsume：" + toJSONString(result));  //添加日志
+        for (GsqStockConsumeVo consumeVo : consumeVos) {
+            String treadCode = consumeVo.getSteelRingCode();
+            Double consume = consumeVo.getConsume();
+            if (result.containsKey(treadCode)) {
+                Double cxClass3PlanConsume = result.get(treadCode);
+                if (Objects.isNull(consume)) {
+                    consume = 0D;
+                }
+                double planConsume = BigDecimalUtil.sub(cxClass3PlanConsume, consume);
+                result.put(consumeVo.getSteelRingCode(), planConsume);
+            } else {
+                double planConsume = BigDecimalUtil.sub(0, consume);
+                result.put(consumeVo.getSteelRingCode(), planConsume);
+            }
+        }
+        autoScheduleLogService.insertGsqScheduleLog(batchNo, "", "③预计库存 = 7点半部件库存 + 昨日半制品早班计划量 - 今天成型早班(成型一班)",
+                "计算成型一班计划量对应半制品计划消耗量cxClass1PlanConsume-昨日早班半制品生产量consume：" + toJSONString(result));  //添加日志
         return result;
+    }
+
+    /**
+     * 取预生产库存倍数Map
+     * @param codeList 要查询的steelRingCode列表
+     * @param reserveStockRate 预生产库存倍数
+     * @return 结果
+     */
+    @Override
+    public Map<String, BigDecimal> getReserveStockMap(List<String> codeList, Double reserveStockRate) {
+        List<GsqReserveStockDto> reserveStockList = new ArrayList<>();
+        List<List<String>> splitList = CollectionUtil.splitList(codeList, 500);
+        for (List<String> list : splitList) {
+            reserveStockList.addAll(gsqEngineStockMapper.listReserveStock(list));
+        }
+        if (CollectionUtils.isEmpty(reserveStockList)) {
+            return Collections.emptyMap();
+        }
+        return reserveStockList.stream().collect(Collectors.toMap(GsqReserveStockDto::getSteelRingCode, GsqReserveStockDto::getReserveStockRate, (v1, v2) -> v1));
     }
 }

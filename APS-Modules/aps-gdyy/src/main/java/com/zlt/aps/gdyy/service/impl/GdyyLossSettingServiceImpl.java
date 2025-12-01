@@ -1,6 +1,5 @@
 package com.zlt.aps.gdyy.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -9,14 +8,18 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyLossSettingDto;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo;
 import com.zlt.aps.gdyy.entity.GdyyLossSetting;
 import com.zlt.aps.gdyy.mapper.GdyyLossSettingMapper;
 import com.zlt.aps.gdyy.service.GdyyLossSettingService;
+import com.zlt.aps.gdyy.service.GdyyMachineInfoService;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -34,6 +37,9 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 public class GdyyLossSettingServiceImpl extends ServiceImpl<GdyyLossSettingMapper, GdyyLossSetting> implements GdyyLossSettingService {
     @Autowired
     private GdyyLossSettingMapper gdyyLossSettingMapper;
+
+    @Autowired
+    private GdyyMachineInfoService gdyyMachineInfoService;
 
     /**
      * 查询钢带压延损耗率设定
@@ -126,7 +132,7 @@ public class GdyyLossSettingServiceImpl extends ServiceImpl<GdyyLossSettingMappe
      * @param gdyyLossSetting 要检查记录
      */
     private void checkParamAndUnique(GdyyLossSetting gdyyLossSetting) {
-        if (StringUtils.isEmpty(gdyyLossSetting.getBigRollCode())) {
+        if (gdyyLossSetting.getMachineId() == null && StringUtils.isEmpty(gdyyLossSetting.getBigRollCode())) {
             throw new RuntimeException(I18nUtil.getMessage("ui.error.message.loss.isAllNull"));
         }
         String unique = checkGdyyLossSettingUnique(gdyyLossSetting);
@@ -150,30 +156,57 @@ public class GdyyLossSettingServiceImpl extends ServiceImpl<GdyyLossSettingMappe
         int failureNum = 0;
         //做校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<GdyyMachineInfo> machineInfoList = gdyyMachineInfoService.selectMachineInfoList(new GdyyMachineInfo());
+        if (com.alibaba.nacos.common.utils.CollectionUtils.isEmpty(machineInfoList)) {
+            // 未查询到机台信息
+            String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
+            addImportErrorLog(importLogId, null, message, importErrorLogs);
+            return AjaxResult.error(message, importErrorLogs);
+        }
+        Map<String, Long> machineCodeMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(machineInfoList)) {
+//            machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineCode(), a.getId()));
+            machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineName(), a.getId()));
+        }
+
         List<GdyyLossSettingDto> importList = new ArrayList<>();
 		// 按业务主键分组
 		Map<String, Long> groupMap = list.stream()
-				.collect(Collectors.groupingBy(GdyyLossSettingDto::getBigRollCode, Collectors.counting()));
+				.collect(Collectors.groupingBy(v -> (v.getBigRollCode() + v.getMachineName()), Collectors.counting()));
         for (int i = 0; i < list.size(); i++) {
             GdyyLossSettingDto entity = list.get(i);
 			// excel内业务主键唯一校验
-			Long hasValue = groupMap.get(entity.getBigRollCode());
+			Long hasValue = groupMap.get(entity.getBigRollCode() + entity.getMachineName());
 			if (hasValue > 1) {
 				entity.setId(-999L);
 				String columnName = I18nUtil.getMessage("ui.data.column.loss.gdyy.bigRollCode");
+                String columnName2 = I18nUtil.getMessage("ui.data.column.loss.line");
 				addImportErrorLog(importLogId, i + 2,
-						String.format(I18nUtil.getMessage("ui.data.column.all.conflictRecord"), columnName),
+						String.format(I18nUtil.getMessage("ui.data.column.all.conflictRecord"), columnName + columnName2),
 						importErrorLogs);
 				failureNum++;
 				continue;
 			}
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, entity);
+            // 特殊校验（代码和机台名称不能同时为空校验）
+            String machineName = entity.getMachineName();
+            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(entity.getBigRollCode())) {
+                addImportErrorLog(importLogId, i + 2, I18nUtil.getMessage("ui.error.message.loss.isAllNull"), validated);
+            }
+            if (machineCodeMap.get(machineName) == null && StringUtils.isNotEmpty(machineName)) {
+                addImportErrorLog(importLogId, i + 2, I18nUtil.getMessage("ui.error.message.column.machineCodeNotExist"), validated);
+            }
+
             if (CollectionUtils.isNotEmpty(validated)) {
 				entity.setId(-999L);
                 failureNum++;
                 importErrorLogs.addAll(validated);
             } else{
+                entity.setMachineId(machineCodeMap.get(machineName));
                 entity.setBaseVale(null);
+                if (StringUtils.isBlank(entity.getBigRollCode())) {
+                    entity.setBigRollCode(null);
+                }
                 importList.add(entity);
             }
         }

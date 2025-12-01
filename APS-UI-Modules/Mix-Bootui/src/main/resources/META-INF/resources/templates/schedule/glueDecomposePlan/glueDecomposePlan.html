@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('分解胶料需求量列表')"/>
+    <th:block th:include="include :: select2-css"/>
+    <th:block th:include="include :: bootstrap-select-css"/>
+    <th:block th:include="include :: bootstrap-editable-css"/>
+    <link th:href="@{/css/neat.css}" rel="stylesheet"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li class="select-time">
+                            <label>[[#{schedule.glueDecomposePlan.planDate}]]：</label>
+                            <input type="text" class="time-input" id="planDate"
+                                   th:placeholder="yyyy-mm-dd" name="planDate" th:value="${initDate}"/>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueDecomposePlan.mixArea}]]：</label>
+                            <select id="mixArea" class="form-control" name="mixArea"
+                                    th:with="type=${@setting.scheduleMixAreaPermission()}" onchange="changeMixArea()">
+                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"
+                                        th:value="${dict.dictValue}"></option>
+                            </select>
+                        </li>
+                        <li>
+                            <label>[[#{schedule.glueDecomposePlan.glue}]]：</label>
+                            <div class="neat">
+                                <input id="glue" type="text" name="glue" class="GlueNames" autocomplete="off"/>
+                            </div>
+                        </li>
+                        <!--                        <li>-->
+                        <!--                            <label>[[#{schedule.glueDecomposePlan.unplacedRubber}]]：</label>-->
+                        <!--                            <select class="form-control" name="unplacedRubber"-->
+                        <!--                                    th:with="type=${@dict.getType('sys_show_hide')}">-->
+                        <!--                                <option value="">[[#{ui.frame.btn.all}]]</option>-->
+                        <!--                                <option th:each="dict : ${type}" th:text="${dict.dictLabel}"-->
+                        <!--                                        th:value="${dict.dictValue}"></option>-->
+                        <!--                            </select>-->
+                        <!--                        </li>-->
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add('',800,500)" shiro:hasPermission="schedule:glueDecomposePlan:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled" onclick="$.operate.edit('',800,500)"
+               shiro:hasPermission="schedule:glueDecomposePlan:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="schedule:glueDecomposePlan:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="schedule:glueDecomposePlan:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+            <a class="btn btn-success" onclick="decompositionPlan()"
+               shiro:hasPermission="schedule:glueDecomposePlan:decompositionPlan">
+                <i class="fa fa-object-ungroup"></i> [[#{schedule.glueDecomposePlan.btn.decompositionPlan}]]
+            </a>
+            <a class="btn btn-success" onclick="sendCrossRegional()"
+               shiro:hasPermission="schedule:glueDecomposePlan:glueSpanSend">
+                <i class="fa fa-arrow-up"></i> [[#{schedule.glueDecomposePlan.btn.sendCrossRegional}]]
+            </a>
+            <a class="btn btn-success" onclick="receiveCrossRegional()"
+               shiro:hasPermission="schedule:glueDecomposePlan:glueSpanReceive">
+                <i class="fa fa-arrow-down"></i> [[#{schedule.glueDecomposePlan.btn.receiveCrossRegional}]]
+                <span id="notReceivedQuantity" class="badge">[[${notReceivedQuantity == 0 ? '' : notReceivedQuantity}]]</span>
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-bordered">
+            <table id="bootstrap-table" style="table-layout: fixed;"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<th:block th:include="include :: select2-js"/>
+<th:block th:include="include :: bootstrap-select-js"/>
+<th:block th:include="include :: bootstrap-table-editable-js"/>
+<th:block th:include="include :: bootstrap-suggest-js"/>
+<th:block th:include="include :: bootstrap-typeahead-js"/>
+<script th:inline="javascript">
+    var machineNameList = [[${@setting.getMachineInfo()}]];
+    var mixAreaData = [[${@dict.getType('MIX_AREA')}]];
+    var prefix = ctx + "schedule/glueDecomposePlan";
+    //获取胶料名称列表
+    var datas = [[${@setting.getGlueNames()}]];
+
+    //1是收尾，0是收尾，所以使用	IS_HAVE，不使用ISORNOT
+    var isHave = [[${@dict.getType('IS_HAVE')}]];
+    $('.GlueNames').typeahead({
+        source: datas,
+        autoSelect: false,
+    });
+
+    $(function () {
+        var options = {
+            uniqueId: 'id',
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            decompositionPlanUrl: prefix + "/toDecompositionPlan",
+            modifyMachineUrl: prefix + "/toModifyMachine/{id}",
+            sendCrossRegionalUrl: prefix + '/toSendCrossRegional',
+            receiveCrossRegionalUrl: prefix + '/toReceiveCrossRegional/{mixArea}',
+            modalName: [[#{schedule.glueDecomposePlan.modelName}]],
+            pageSize: 10000,
+            pageList: [10000],
+            onEditableSave: onEditableSave,
+            onEditableShown: function () {
+                setTimeout(function () {
+                    $(".form-control.input-sm").select();
+                }, 100)
+            },
+            onEditableHidden: function () {
+                $(".editable-submit").click()
+            },
+            columns: [
+                [
+                    {
+                        title: [[#{ui.baseInfo}]],
+                        align: 'center',
+                        colspan: 5
+                    },
+                    {
+                        title: [[#{schedule.glueDecomposePlan.mixArea}]] + ":" + selectMixArea(mixAreaData, $("#mixArea option:selected").val()),
+                        align: 'center',
+                        colspan: 8
+                    },
+                ],
+                [
+                    {
+                        checkbox: true
+                    },
+                    {
+                        field: 'id',
+                        title: 'id',
+                        visible: false
+                    },
+                    {
+                        field: 'planDate',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueDecomposePlan.planDate}]],
+                    },
+                    {
+                        field: 'glue',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'left',
+                        title: [[#{schedule.glueDecomposePlan.glue}]],
+                    },
+                    {
+                        field: 'isFinishing',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{schedule.glueCollectPlan.isFinishing}]],
+                        formatter: function (value, row, index) {
+                            return $.table.selectDictLabel(isHave, value);
+                        }
+
+                    },
+                    {
+                        field: 'planQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDecomposePlan.planQty}]],
+                    },
+                    {
+                        field: 'stockQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDecomposePlan.stockQty}]],
+                    },
+                    {
+                        field: 'safeStockQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDecomposePlan.safeStockQty}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDecomposePlan.safeStockQty}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'produceQty',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'right',
+                        title: [[#{schedule.glueDecomposePlan.produceQty}]],
+                        editable: {
+                            type: 'text',
+                            title: [[#{schedule.glueDecomposePlan.produceQty}]],
+                            emptytext: '-',
+                            validate: function (value) {
+                                // 输入非负整数正则校验
+                                var regu = /^\d+$/;
+                                if (!regu.test(value) && $.common.isNotEmpty(value)) {
+                                    layer.msg([[#{ui.message.editable.digits}]]);
+                                    return [[#{ui.message.editable.digits}]];
+                                }
+                                if (value.length > 7) {
+                                    layer.msg([[#{ui.message.editable.maxSeven}]]);
+                                    return [[#{ui.message.editable.maxSeven}]];
+                                }
+                            }
+                        },
+                    },
+                    {
+                        field: 'upGlue',
+                        title: 'upGlue',
+                        ignore: true,
+                        visible: false
+                    },
+                    {
+                        field: 'upMachineCode',
+                        title: 'upMachineCode',
+                        ignore: true,
+                        visible: false
+                    },
+                    {
+                        field: 'finalGlueMachine',
+                        title: 'finalGlueMachine',
+                        ignore: true,
+                        visible: false
+                    },
+                    {
+                        field: 'machineName',
+                        sortable: true,
+                        halign: 'center',
+                        align: 'center',
+                        title: [[#{setting.machine.machineName}]],
+                        formatter: function (value, row, index) {
+                            if ($.common.isEmpty(value)) {
+                                value = '-';
+                            }
+                            if (row.glue.indexOf("/") >= 0) {
+                                var actions = [];
+                                var result = [];
+                                if (value.indexOf(",") > 0) {
+                                    var valueArr = value.split(",");
+                                    for (let i = 0; i < valueArr.length; i++) {
+                                        result.push($.common.sprintf("<span class=\'badge badge-primary\'>%s</span> ", valueArr[i]));
+                                    }
+                                }else {
+                                    result.push($.common.sprintf("<span class=\'badge badge-primary\'>%s</span> ", value))
+                                }
+                                actions.push('<a href="javascript:void(0)" onclick="modifyMachine(\'' + row.id + '\')">' + result.join('') + '</a> ');
+                                return actions.join('');
+                            } else {
+                                return value;
+                            }
+                        },
+                    },
+                ]
+            ]
+        };
+        $.table.init(options, false);
+    });
+
+    layui.use('laydate', function () {
+        var laydate = layui.laydate;
+        laydate.render({
+            elem: '#planDate',
+            done: function(value, date, endDate){
+                // 更改计划日期后查询未接收跨区请求个数
+                updateNotReceivedQuantity();
+            }
+        });
+    });
+
+    // 下载模板
+    function importTemplate() {
+        window.location.href = prefix + "/importTemplate";
+    }
+
+    function decompositionPlan() {
+        table.set();
+        var url = table.options.decompositionPlanUrl;
+        $.modal.open(table.options.modalName + [[#{schedule.glueDecomposePlan.btn.decompositionPlan}]], url, 420, 500);
+    }
+
+    function changeMixArea() {
+        let columns = table.options.columns;
+        let val = $("#mixArea option:selected").val();
+        val = selectMixArea(mixAreaData, val)
+        if ($.common.isEmpty(val)) {
+            columns[0][1].title = [[#{schedule.glueDecomposePlan.mixArea}]];
+        } else {
+            columns[0][1].title = [[#{schedule.glueDecomposePlan.mixArea}]] + ":" + val;
+        }
+        $('#bootstrap-table').bootstrapTable('refreshOptions', {columns: columns});
+        updateNotReceivedQuantity();
+    }
+
+    function onEditableSave(field, row, rowIndex, oldValue, $el) {
+        // 安全库存编辑
+        if (field === 'safeStockQty') {
+            $.operate.updateRow(prefix + "/updateSafeStock", "post", row, rowIndex, function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    debugger;
+                    var updateList = result.data;
+                    for (let i = 0; i < updateList.length; i++) {
+                        let item = updateList[i];
+                        $("#" + table.options.id).bootstrapTable('updateByUniqueId', {
+                            id: item.id,
+                            row: item
+                        });
+                    }
+                    // $("#" + table.options.id).bootstrapTable('refresh');
+                }
+                if (result.code === web_status.FAIL) {
+                    $("#" + table.options.id).bootstrapTable('updateCell', {
+                        index: rowIndex,
+                        field: field,
+                        value: oldValue
+                    });
+                }
+            });
+        } else {
+            $.operate.updateRow(prefix + "/save", "post", row, rowIndex, function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    var updateList = result.data;
+                    for (let i = 0; i < updateList.length; i++) {
+                        let item = updateList[i];
+                        $("#" + table.options.id).bootstrapTable('updateByUniqueId', {
+                            id: item.id,
+                            row: item
+                        });
+                    }
+                    // $("#" + table.options.id).bootstrapTable('refresh');
+                }
+                if (result.code === web_status.FAIL) {
+                    $("#" + table.options.id).bootstrapTable('updateCell', {
+                        index: rowIndex,
+                        field: field,
+                        value: oldValue
+                    });
+                }
+            });
+        }
+    }
+
+    //回显机台名称
+    function selectMachineName(datas, row) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        var arr = row.machineCode.split(",");
+        $.each(datas, function (index, dict) {
+            $.each(arr, function (index, item) {
+                if (dict.machineCode + '' == item && row.mixArea == dict.mixArea) {
+                    var machineName = $.common.equals("default", dict.machineName) || $.common.isEmpty(dict.machineName) ? "" : dict.machineName;
+                    actions.push($.common.sprintf("<span>%s</span>", machineName, dict.machineName));
+                    return false;
+                }
+            })
+        });
+        return actions.join(',');
+    }
+
+    //回显密炼区
+    function selectMixArea(datas, value) {
+        if ($.common.isEmpty(datas)) {
+            return '';
+        }
+        var actions = [];
+        $.each(datas, function (index, dict) {
+            if (dict.dictValue == ('' + value)) {
+                actions.push(dict.dictLabel);
+                return false;
+            }
+        });
+        return actions.join('');
+    }
+
+    function modifyMachine(id) {
+        table.set();
+        var url = table.options.modifyMachineUrl.replace("{id}", id);
+        $.modal.open(table.options.modalName, url, 420, 500);
+    }
+
+    // 跳转跨区发送
+    function sendCrossRegional() {
+        table.set();
+        var ids = $.table.selectColumns('id');
+        var url = table.options.sendCrossRegionalUrl + "?mixArea=" + $("#mixArea").val();
+        url = ids.length > 0 ? url + "&ids=" + encodeURIComponent(ids.join(",")) : url + "&ids=";
+        $.modal.openTab([[#{schedule.glueDecomposePlan.sendCrossRegional.modelName}]], url);
+    }
+
+    // 跳转跨区接收
+    function receiveCrossRegional() {
+        table.set();
+        var url = table.options.receiveCrossRegionalUrl.replace("{mixArea}", $("#mixArea").val());
+        $.modal.openTab([[#{schedule.glueDecomposePlan.receiveCrossRegional.modelName}]], url);
+    }
+
+    // 更改密炼区及排程日期时，发送请求更新未接收的跨区请求数
+    function updateNotReceivedQuantity(){
+        var config = {
+            url: "/schedule/glueSpanReceive/selectUnReceiveCount",
+            type: "post",
+            dataType: "json",
+            data: {
+                "scheduleDate": new Date($("#planDate").val()),
+                "entrustedMixArea": $("#mixArea option:selected").val(),
+                "source": "0" // 数据来源:分解胶料需求量
+            },
+            success: function (result) {
+                if (result.code === web_status.SUCCESS) {
+                    if (result.data === 0) {
+                        $("#notReceivedQuantity").text('');
+                    }else {
+                        $("#notReceivedQuantity").text(result.data);
+                    }
+                }
+            }
+        };
+        $.ajax(config);
+    }
+</script>
+</body>
+<script id="importTpl" type="text/template">
+    <form enctype="multipart/form-data" class="mt20 mb10">
+        <div class="col-xs-offset-1">
+            <!--调整文件上传支持国际化-->
+            <input type="button" th:value="#{ui.file.btn.text}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input name="fileName" style="border: hidden;" readonly th:placeholder="#{ui.file.placeholder}"
+                   onclick="javascript:$('input[name=\'file\']').click();"/>
+            <input type="file" id="file" name="file" style="display: none;"
+                   onchange="javascript:$('input[name=\'fileName\']').val(this.files[0].name);"/>
+            <div class="mt10 pt5">
+                <input type="checkbox" id="updateSupport" name="updateSupport"> [[#{ui.biz.alter.isUpdateExistUser}]]
+                &nbsp; <a onclick="importTemplate()" class="btn btn-default btn-xs"><i class="fa fa-file-excel-o"></i>
+                [[#{ui.frame.btn.download.template}]]</a>
+            </div>
+            <font color="red" class="pull-left mt10">
+                [[#{ui.biz.alter.onlyExcel}]]
+            </font>
+        </div>
+    </form>
+</script>
+<style>
+    .popover-title {
+        padding: 8px 14px;
+        margin: 0 !important;
+        font-size: 14px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #ebebeb;
+        color: #808080;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .editable-input {
+        vertical-align: top;
+        display: inline-block;
+        width: auto;
+        white-space: normal;
+        zoom: 1;
+        color: #808080;
+    }
+
+    .popover-content {
+        padding: 5px;
+        background-color: #F0F0F0;
+    }
+
+    .popover ::after {
+        border-style: none;
+    }
+
+    .popover {
+        width: 340px;
+        background-color: #E7E7E7;
+        color: #808080;
+    }
+
+    .pagination-detail {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .select-table {
+        padding-bottom: 0 !important;
+    }
+
+    button.btn.btn-default.btn-sm.editable-cancel {
+        display: none
+    }
+</style>
+</html>

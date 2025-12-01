@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.LocationChannelConfigurationMapper">
+
+    <delete id="deleteByParamList">
+        delete from T_MDM_PLAN_ORDER_CONFIG
+        where FACTORY_CODE in
+        <foreach collection="factoryCodeList" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+        and BUSINESS_TYPE in
+        <foreach collection="businessTypeList" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+        and HIERARCHY in
+        <foreach collection="hierarchyList" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </delete>
+</mapper>

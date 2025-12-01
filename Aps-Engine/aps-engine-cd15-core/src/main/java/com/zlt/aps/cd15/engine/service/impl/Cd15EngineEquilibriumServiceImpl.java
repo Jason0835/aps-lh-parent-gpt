@@ -20,7 +20,10 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd15.engine.service.Cd15EngineEquilibriumService;
 import com.zlt.aps.cd15.engine.vo.Cd15EquilibriumVo;
 import com.zlt.aps.cd15.engine.vo.Cd15ScheduleResultVo;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 
@@ -34,12 +37,12 @@ import com.zlt.aps.common.engine.utils.CollectionUtil;
  */
 @Service("cd15EngineEquilibriumService")
 public class Cd15EngineEquilibriumServiceImpl implements Cd15EngineEquilibriumService {
-	// 默认中班总量和夜班总量差额百分比：15%
-	private static final Double DEFAULT_PLAN_DIFFERENCE_RATE = 15D;
-	// 默认库存供应时长小时数：12小时
-	private static final Double DEFAULT_SUPPLY_TIME_PASS = 12D;
-	// 一百，用于百分数 -> 小数的单位换算
-	private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+	private static final String DEFAULT_PLAN_DIFFERENCE_RATE = "15"; // 默认中班总量和夜班总量差额百分比：15%
+	private static final String DEFAULT_SUPPLY_TIME_PASS = "12"; // 默认库存供应时长小时数：12小时
+    private static final String DEFAULT_EQUAL_SHARE_THRESHOLD = "500"; // 需求量超过该值早夜班对半分
+    private final static String DEFAULT_ONE_ROLL_NUM = "2"; // 一次生产卷数默认值
+    private final static String DEFAULT_CRIMP_LENGTH = "190"; // 卷曲长度默认值：190
+    
 	@Resource
 	private AutoScheduleLogService autoScheduleLogService;
 
@@ -50,24 +53,29 @@ public class Cd15EngineEquilibriumServiceImpl implements Cd15EngineEquilibriumSe
 	 * @Description
 	 * @Date 2021-7-9 15:27:55
 	 * @Param scheduleList 15度裁断排产结果
-	 * @Param planDifferenceRate 系统参数：中班总量和夜班总量差额百分比
-	 * @Param supplyTimePass 系统参数：库存供应时长小时数
-	 * @Param equalShareThreshold 系统参数：各班计划量均分阈值
+     * @Param paramsMap 系统参数
 	 * @Return
 	 */
 	@Override
-	public void scheduleEquilibrium(List<Cd15ScheduleResultVo> scheduleList, String planDifferenceRate,
-			String supplyTimePass, String equalShareThreshold) {
+	public void scheduleEquilibrium(List<Cd15ScheduleResultVo> scheduleList, Map<String, String> paramsMap) {
 		// 系统参数类型转换
-		BigDecimal planDifferenceRateNum = BigDecimal
-				.valueOf(getDoubleOrDefault(planDifferenceRate, DEFAULT_PLAN_DIFFERENCE_RATE));
+		BigDecimal planDifferenceRateNum = BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.PLAN_DIFFERENCE_RATE, DEFAULT_PLAN_DIFFERENCE_RATE));
 		// 百分数转成小数
-		planDifferenceRateNum = planDifferenceRateNum.divide(ONE_HUNDRED);
-		BigDecimal supplyTimePassNum = BigDecimal.valueOf(getDoubleOrDefault(supplyTimePass, DEFAULT_SUPPLY_TIME_PASS));
+		planDifferenceRateNum = planDifferenceRateNum.divide(BigDecimalUtils.HUNDRED);
+		BigDecimal supplyTimePassNum = BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.SUPPLY_TIME_PASS, DEFAULT_SUPPLY_TIME_PASS));
+        BigDecimal shareThreshold = BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD));
+        BigDecimal oneRollNum = new BigDecimal(paramsMap.getOrDefault(EngineConstants.ONE_ROLL_NUM, DEFAULT_ONE_ROLL_NUM)); // 一次生产卷数
+        BigDecimal crimpLength = new BigDecimal(paramsMap.getOrDefault(EngineConstants.CRIMP_LENGTH, DEFAULT_CRIMP_LENGTH)); // 卷曲长度
+        BigDecimal oneProductQty = oneRollNum.multiply(crimpLength); // 最低生产数 = 一次生产卷数 * 卷长
+        
 		// 均衡运算前的排产结果，用于日志记录
 		String oldScheduleList = toJSONString(scheduleList);
 		// 批次号
 		String batchNo = CollectionUtil.firstElement(scheduleList).getBatchNo();
+
+		this.equilibriumDay1(scheduleList, shareThreshold, oneProductQty);
+        this.equilibriumDay2(scheduleList, shareThreshold, oneProductQty);
+		
 		// 均衡算法需要根据每个机台单独均衡 modify by 20220113
 		Map<String, List<Cd15ScheduleResultVo>> scheduleMachineMap = scheduleList.stream()
 				// 过滤掉无机台或者多机台的排产记录
@@ -78,11 +86,269 @@ public class Cd15EngineEquilibriumServiceImpl implements Cd15EngineEquilibriumSe
 			// 各机台单独均衡
 			this.equilibriumSingleMachine(groupingList, planDifferenceRateNum, supplyTimePassNum);
 		}
-		this.equalShare(scheduleList, equalShareThreshold);
+//		this.equalShare(scheduleList, equalShareThreshold);
 		// 新增计算日志
-		this.insertCalculateLog(batchNo, oldScheduleList, scheduleList, planDifferenceRate, supplyTimePass,
+		this.insertCalculateLog(batchNo, oldScheduleList, scheduleList, planDifferenceRateNum, supplyTimePassNum,
 				this.createEquilibrimeVo(scheduleList));
 	}
+	
+	/**
+     * 均衡第一天夜班与第二天的计划
+     *
+     * @param scheduleList   排程列表
+     * @param oneProductQty  均分阈值
+     * @param oneProductQty  最低生产量
+     */
+    private void equilibriumDay1(List<Cd15ScheduleResultVo> scheduleList, BigDecimal bisectThreshold, BigDecimal oneProductQty) {
+        double totalDayPlanQty = scheduleList.stream().mapToDouble(Cd15ScheduleResultVo::getDayPlanQty1).sum(); // 夜班总计划量
+        double totalNightPlanQty = scheduleList.stream().mapToDouble(Cd15ScheduleResultVo::getNightPlanQty1).sum(); // 早班总计划量
+        double totalNextDayPlanQty = scheduleList.stream().mapToDouble(Cd15ScheduleResultVo::getNextDayPlanQty).sum(); // 次日夜班总计划量
+        double midPlanQtyReference = BigDecimalUtils.avg(0, RoundingMode.DOWN, totalDayPlanQty, totalNightPlanQty, totalNextDayPlanQty).doubleValue(); // 计划平均值
+        double difNum = BigDecimalUtil.sub(totalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
+        if (difNum == 0) {
+            return;
+        }
+        boolean isNightClassPass = difNum > 0; // 夜班是否超量
+        // 超量，需要从库存比较大的开始调整（倒序）；不足时需要从供需比例较小的开始调整（顺序）
+        scheduleList = scheduleList.stream().sorted((r1, r2) -> {
+            BigDecimal classStock1 = BigDecimalUtils.sub(r1.getClassStock(), r1.getCxClass3Plan());
+            BigDecimal classStock2 = BigDecimalUtils.sub(r2.getClassStock(), r2.getCxClass3Plan());
+            if (isNightClassPass) {
+                // 夜班超量，将交接班库存较充足的转移到早班（倒序）
+                return classStock2.compareTo(classStock1);
+            } else {
+                // 早班超量，将交接班库存较低的转移到夜班（顺序）
+                return classStock1.compareTo(classStock2);
+            }
+        }).collect(Collectors.toList());
+        for (Cd15ScheduleResultVo scheduleVo: scheduleList) {
+            if (scheduleVo.getIsNightSpec()) { // 固定夜班规格，不处理
+                continue;
+            }
+            if (ApsConstant.STATUS_ENABLE.equals(scheduleVo.getCloseOutSpecFlag())) { // 收尾规格不处理
+                continue;
+            }
+            BigDecimal crimpLength = (BigDecimal)scheduleVo.getParams().get(EngineConstants.CRIMP_LENGTH); // 满工装长度
+            // 成型需求量
+            BigDecimal cxDay1PlanQty = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
+            BigDecimal cxDay2PlanQty = BigDecimalUtils.add(cxDay1PlanQty, scheduleVo.getCxClass3Plan()); // 前3个成型的需求量
+            // 1#钢带
+            BigDecimal stockQty1 = BigDecimalUtils.valueOf(scheduleVo.getStock1Qty1());
+            BigDecimal lastMidPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getLastMidPlanQty1());
+            BigDecimal dayPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getDayPlanQty1());
+            BigDecimal nightPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty1());
+            BigDecimal nextDayPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
+            // 2#钢带
+            BigDecimal stockQty2 = BigDecimalUtils.valueOf(scheduleVo.getStock1Qty2());
+            BigDecimal lastMidPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getLastMidPlanQty2());
+            BigDecimal dayPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getDayPlanQty2());
+            BigDecimal nightPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty2());
+            BigDecimal nextDayPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty2());
+            
+            BigDecimal dayAddPlan1 = BigDecimal.ZERO; // 1#钢带夜班增加量
+            BigDecimal dayAddPlan2 = BigDecimal.ZERO; // 2#钢带夜班增加量
+            BigDecimal nightAddPlan1 = BigDecimal.ZERO; // 1#钢带早班增加量
+            BigDecimal nightAddPlan2 = BigDecimal.ZERO; // 2#钢带早班增加量
+            BigDecimal nextDayAddPlan1 = BigDecimal.ZERO; // 1#钢带次日夜班增加量
+            BigDecimal nextDayAddPlan2 = BigDecimal.ZERO; // 2#钢带次日夜班增加量
+            if (isNightClassPass) { // 夜班超量，则从夜班推迟到隔天早班
+                BigDecimal day1LackStock1 = cxDay1PlanQty.subtract(stockQty1.add(lastMidPlanQty1));
+                BigDecimal day1LackStock2 = cxDay1PlanQty.subtract(stockQty2.add(lastMidPlanQty2));
+                // 当天库存不足的不能推迟
+                if (day1LackStock1.compareTo(BigDecimal.ZERO) > 0 || day1LackStock2.compareTo(BigDecimal.ZERO) > 0) {
+                    continue;
+                }
+
+                // 第二天交班库存不足，如果成型顺位为1也不能推迟
+                BigDecimal day2LackStock1 = cxDay2PlanQty.subtract(stockQty1.add(lastMidPlanQty1));
+                BigDecimal day2LackStock2 = cxDay2PlanQty.subtract(stockQty2.add(lastMidPlanQty2));
+                if (scheduleVo.getClass3Sort() <= 1 && (day2LackStock1.compareTo(BigDecimal.ZERO) > 0 || day2LackStock2.compareTo(BigDecimal.ZERO) > 0)) {
+                    continue;
+                }
+                nightAddPlan1 = BigDecimalUtils.floor(dayPlanQty1, crimpLength); // 1#钢带早班加量
+                nightAddPlan2 = BigDecimalUtils.floor(dayPlanQty2, crimpLength); // 2#钢带早班加量
+                dayAddPlan1 = nightAddPlan1.negate(); // 1#钢带夜班减量
+                dayAddPlan2 = nightAddPlan2.negate(); // 2#钢带夜班减量
+            } else if (nightPlanQty1.compareTo(BigDecimal.ZERO) > 0 || nightPlanQty2.compareTo(BigDecimal.ZERO) > 0) { // 隔天超量，且早班大于0，则从早班转移到夜班
+                dayAddPlan1 = BigDecimalUtils.floor(nightAddPlan1, crimpLength);// 1#钢带夜班加量
+                dayAddPlan2 = BigDecimalUtils.floor(nightAddPlan2, crimpLength);// 2#钢带夜班加量
+                nightAddPlan1 = dayAddPlan1.negate(); // 1#钢带早班减量
+                nightAddPlan2 = dayAddPlan2.negate(); // 2#钢带早班减量
+            }
+            if (dayAddPlan1.compareTo(BigDecimal.ZERO) == 0 && dayAddPlan2.compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+            // 先算一下是否调整后差异反而更大
+            double newTotalDayPlanQty = BigDecimalUtils.add(totalDayPlanQty, dayAddPlan1).doubleValue();
+            double newDifNum = BigDecimalUtil.sub(newTotalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
+            if (Math.abs(newDifNum) > Math.abs(difNum)) { // 如果更大跳过该规格
+                continue;
+            }
+            // 更新各班计划量
+            scheduleVo.setDayPlanQty1(dayPlanQty1.add(dayAddPlan1).doubleValue());
+            scheduleVo.setDayPlanQty2(dayPlanQty2.add(dayAddPlan2).doubleValue());
+            scheduleVo.setNightPlanQty1(nightPlanQty1.add(nightAddPlan1).doubleValue());
+            scheduleVo.setNightPlanQty2(nightPlanQty2.add(nightAddPlan2).doubleValue());
+            scheduleVo.setNextDayPlanQty(nextDayPlanQty1.add(nextDayAddPlan1).doubleValue());
+            scheduleVo.setNextDayPlanQty2(nextDayPlanQty2.add(nextDayAddPlan2).doubleValue());
+            if (dayAddPlan1.compareTo(BigDecimal.ZERO) != 0) {
+                scheduleVo.setClassStock(this.getClassStock(scheduleVo)); // 夜班计划有变动，需要重算交接班库存
+            }
+            totalDayPlanQty = newTotalDayPlanQty;
+            totalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, nightAddPlan1).doubleValue();
+            totalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, nextDayAddPlan1).doubleValue();
+            difNum = newDifNum;
+            if (isNightClassPass ^ difNum > 0) { // 如果计算前后差值符号相反则直接结束
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 计算交接班库存
+     * @param scheduleVo
+     * @return
+     */
+    private Double getClassStock(Cd15ScheduleResultVo scheduleVo) {
+        BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getStock1Qty1(), scheduleVo.getLastMidPlanQty1(), scheduleVo.getDayPlanQty1());
+        BigDecimal cxPlanQty = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
+        return planQty.subtract(cxPlanQty).doubleValue();
+    }
+	
+	/**
+     * 均衡第二天早夜班库存
+     *
+     * @param scheduleList    排程列表
+     * @param bisectThreshold 均分阈值
+     * @param oneProductQty   一次性最低生产量
+     */
+    private void equilibriumDay2(List<Cd15ScheduleResultVo> scheduleList, BigDecimal bisectThreshold, BigDecimal oneProductQty) {
+        this.equalShare(scheduleList, bisectThreshold, oneProductQty); // 先均分中夜班计划量
+        double totalNightPlanQty = scheduleList.stream().mapToDouble(Cd15ScheduleResultVo::getNightPlanQty1).sum(); // 早班总计划量
+        double totalNextDayPlanQty = scheduleList.stream().mapToDouble(Cd15ScheduleResultVo::getNextDayPlanQty).sum(); // 次日夜班总计划量
+        double difNum = BigDecimalUtil.sub(totalNextDayPlanQty, totalNightPlanQty); //早班和次日夜班的计划量差额
+        if (difNum == 0) {
+            return;
+        }
+
+        boolean isDayClassPass = (difNum < 0);  //true：早班超量，false：次日夜班超量
+        if (isDayClassPass) {
+            // 早班超量，说明库存不足，需要从供需比例较大的（库存比较足的）开始调整
+            scheduleList = scheduleList.stream().sorted(Comparator.comparing(Cd15ScheduleResultVo::getSupplyDemandRatio, Comparator.reverseOrder())).collect(Collectors.toList());
+        } else {
+            // 次日夜班超量，说明库存充足，都再提前做隔天的，需要从供需比例较小的（库存比较小的）开始调整
+            scheduleList = scheduleList.stream().sorted(Comparator.comparing(Cd15ScheduleResultVo::getSupplyDemandRatio)).collect(Collectors.toList());
+        }
+
+        for (Cd15ScheduleResultVo scheduleVo : scheduleList) {
+            if (scheduleVo.getIsNightSpec()) { // 固定夜班规格，不处理
+                continue;
+            }
+            if (ApsConstant.STATUS_ENABLE.equals(scheduleVo.getCloseOutSpecFlag())) { // 收尾规格不调整
+                continue;
+            }
+            double nightPlanQty1 = scheduleVo.getNightPlanQty1(); // 1#钢带早班计划
+            double nightPlanQty2 = scheduleVo.getNightPlanQty2(); // 2#钢带早班计划
+            double nextDayPlanQty1 = scheduleVo.getNextDayPlanQty(); // 1#钢带夜班计划
+            double nextDayPlanQty2 = scheduleVo.getNextDayPlanQty2(); // 2#钢带夜班计划
+            if (nightPlanQty1 == nextDayPlanQty1) { // 中夜班计划量相等的不调整
+                continue;
+            }
+            // 尝试平衡第二天早夜班的计划量
+            boolean isNightPlanQtyLarger = nightPlanQty1 > nextDayPlanQty1; // 本规格早班计划量较大
+            boolean isTotalNightPlanQtyLarger = totalNightPlanQty > totalNextDayPlanQty; // 合计值早班计划量较大
+            double diffPlanQty = BigDecimalUtil.sub(nextDayPlanQty1, nightPlanQty1); // 本计划的差异值，次日夜班 - 早班
+            if (isNightPlanQtyLarger != isTotalNightPlanQtyLarger) { // 本规格计划量较高的班次与总计划的相同才有必要调换
+                continue;
+            } else if (scheduleVo.getClassStock() < scheduleVo.getCxClass3Plan() && nextDayPlanQty1 <= 0) { // 如果交接班库存不足，且早班计划量较大，则不动
+                continue;
+            } else if (Math.abs(diffPlanQty) > Math.abs(difNum)) { // 如果差异值超过了总差异，则不处理
+                continue;
+            }
+            double tempNightPlanQty = nightPlanQty1;
+            nightPlanQty1 = nextDayPlanQty1;
+            nextDayPlanQty1 = tempNightPlanQty;
+            tempNightPlanQty = nightPlanQty2;
+            nightPlanQty2 = nextDayPlanQty2;
+            nextDayPlanQty2 = tempNightPlanQty;
+            scheduleVo.setNightPlanQty1(nightPlanQty1);
+            scheduleVo.setNightPlanQty2(nightPlanQty2);
+            scheduleVo.setNextDayPlanQty(nextDayPlanQty1);
+            scheduleVo.setNextDayPlanQty2(nextDayPlanQty2);
+            totalNightPlanQty = BigDecimalUtil.add(totalNightPlanQty, diffPlanQty); // 总早班更新为：总早班 + (次日夜班 - 早班)
+            totalNextDayPlanQty = BigDecimalUtil.sub(totalNextDayPlanQty, diffPlanQty); // 总夜班更新为：总夜班 - (次日夜班 - 早班)
+            difNum = BigDecimalUtil.sub(totalNextDayPlanQty, totalNightPlanQty); // 重算差异
+            if (isDayClassPass ^ difNum < 0) { // 如果计算前后差值符号相反则直接结束
+                break;
+            }
+        }
+    }
+    
+    /**
+     * 单规格排产数量达到设定值（equalShareThreshold）时，中夜班数量对半分
+     * @param scheduleList 排程列表
+     * @param bisectThreshold  各班计划量均分阈值
+     */
+    private void equalShare(List<Cd15ScheduleResultVo> scheduleList, BigDecimal bisectThreshold, BigDecimal oneProductQty) {
+        for (Cd15ScheduleResultVo scheduleVo : scheduleList) {
+            if (scheduleVo.getIsNightSpec()) { // 固定夜班规格，不处理
+                continue;
+            }
+            BigDecimal crimpLength = (BigDecimal)scheduleVo.getParams().get(EngineConstants.CRIMP_LENGTH); // 满工装长度
+            BigDecimal nightPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty1());
+            BigDecimal nightPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty2());
+            BigDecimal nextDayPlanQty1 = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
+            BigDecimal nextDayPlanQty2 = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty2());
+            BigDecimal nextPlanQty1 = nightPlanQty1.add(nextDayPlanQty1);
+            BigDecimal nextPlanQty2 = nightPlanQty2.add(nextDayPlanQty2);
+            if (nextPlanQty1.compareTo(BigDecimal.ZERO) <= 0 && nextPlanQty2.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            boolean isCloseOutSpec = ApsConstant.STATUS_ENABLE.equals(scheduleVo.getCloseOutSpecFlag()); // 收尾标记
+            BigDecimal nextPlanQtyNum1 = nextPlanQty1.divide(crimpLength, 1, RoundingMode.HALF_UP); // 工装数
+            BigDecimal nextPlanQtyNum2 = nextPlanQty2.divide(crimpLength, 1, RoundingMode.HALF_UP); // 工装数
+            if (nextPlanQty1.compareTo(bisectThreshold) > 0 || nextPlanQty2.compareTo(bisectThreshold) > 0) { // 超过指定计划量，则以工装的为单位平分
+                BigDecimal newNightPlanQty1 = BigDecimalUtils.half(nextPlanQtyNum1).multiply(crimpLength); // 夜班平分后的计划量，先换算成工装数，平分后再换算成米数
+                newNightPlanQty1 = BigDecimalUtils.least(newNightPlanQty1, nextPlanQty1); // 取整后的量不能超过总量
+                BigDecimal newNextDayPlanQty1 = nextPlanQty1.subtract(newNightPlanQty1); // 夜班计划 = 总计划 - 早班计划
+                scheduleVo.setNightPlanQty1(newNightPlanQty1.doubleValue());
+                scheduleVo.setNextDayPlanQty(newNextDayPlanQty1.doubleValue());
+                
+                BigDecimal newNightPlanQty2 = BigDecimalUtils.half(nextPlanQtyNum2).multiply(crimpLength); // 夜班平分后的计划量，先换算成工装数，平分后再换算成米数
+                newNightPlanQty2 = BigDecimalUtils.least(newNightPlanQty2, nextPlanQty1); // 取整后的量不能超过总量
+                BigDecimal newNextDayPlanQty2 = nextPlanQty1.subtract(newNightPlanQty2); // 夜班计划 = 总计划 - 早班计划
+                scheduleVo.setNightPlanQty2(newNightPlanQty2.doubleValue());
+                scheduleVo.setNextDayPlanQty2(newNextDayPlanQty2.doubleValue());
+            } else { // 非收尾规格，没有达到均分阈值的，要合并计划量
+                if (!isCloseOutSpec) {
+                    nextPlanQty1 = BigDecimalUtils.greatest(nextPlanQty1, oneProductQty);
+                    nextPlanQty2 = BigDecimalUtils.greatest(nextPlanQty2, oneProductQty);
+                }
+                BigDecimal newNightPlanQty1 = nightPlanQty1;
+                BigDecimal newNextDayPlanQty1 = nextDayPlanQty1;
+                BigDecimal newNightPlanQty2 = nightPlanQty2;
+                BigDecimal newNextDayPlanQty2 = nextDayPlanQty2;
+                if (nightPlanQty1.compareTo(BigDecimal.ZERO) > 0) {
+                    newNightPlanQty1 = nextPlanQty1;
+                    newNextDayPlanQty1 = BigDecimal.ZERO;
+                } else {
+                    newNightPlanQty1 = BigDecimal.ZERO;
+                    newNextDayPlanQty1 = nextPlanQty1;
+                }
+                if (nightPlanQty2.compareTo(BigDecimal.ZERO) > 0) {
+                    newNightPlanQty2 = nextPlanQty2;
+                    newNextDayPlanQty2 = BigDecimal.ZERO;
+                } else {
+                    newNightPlanQty2 = BigDecimal.ZERO;
+                    newNextDayPlanQty2 = nextPlanQty2;
+                }
+                scheduleVo.setNightPlanQty1(newNightPlanQty1.doubleValue());
+                scheduleVo.setNextDayPlanQty(newNextDayPlanQty1.doubleValue());
+                scheduleVo.setNightPlanQty2(newNightPlanQty2.doubleValue());
+                scheduleVo.setNextDayPlanQty2(newNextDayPlanQty2.doubleValue());
+            }
+        }
+    }
 
 	/**
 	 * 单规格排产数量达到设定值（equalShareThreshold）时，中夜班数量对半分
@@ -185,7 +451,7 @@ public class Cd15EngineEquilibriumServiceImpl implements Cd15EngineEquilibriumSe
 	 * @param totalPlanQtyVo
 	 */
 	private void insertCalculateLog(String batchNo, String oldScheduleList, List<Cd15ScheduleResultVo> scheduleList,
-			String planDifferenceRate, String supplyTimePass, Cd15EquilibriumVo totalPlanQtyVo) {
+			BigDecimal planDifferenceRate, BigDecimal supplyTimePass, Cd15EquilibriumVo totalPlanQtyVo) {
 		String logDetail = logSplit(
 				"对排产结果进行均衡操作。中班总量和夜班总量的差额百分比超过了参数配置的百分比，则需要做均衡处理，也就是说要把其中一班的计划量合并到另外一班，"
 						+ "一直合并到中班和夜班计划量总量的差额不超过参数配置的百分比。其中中班合并到夜班还需要遵循一个规则，就是只有库存供应时长必须要大于参数配置的值的时候，才允许从中班合并到夜班。",

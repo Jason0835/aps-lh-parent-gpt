@@ -25,7 +25,7 @@ import java.util.List;
  * @date 2021-05-31
  */
 @RestController
-@RequestMapping("/stock")
+@RequestMapping("/xwyy/stock")
 @Api(tags = "纤维压延库存信息维护接口")
 public class XwyyStockController extends BaseController {
     @Autowired
@@ -91,7 +91,7 @@ public class XwyyStockController extends BaseController {
      */
     @Log(title = "ui.frame.page.xwyy.stock.title", businessType = BusinessType.DELETE)
     @ApiOperation("根据id批量删除纤维压延库存信息")
-    @ApiImplicitParams({@ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids", paramType = "remove")})
+    @ApiImplicitParams({@ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids")})
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids) {
         return toAjax(stockService.deleteStockByIds(ids));

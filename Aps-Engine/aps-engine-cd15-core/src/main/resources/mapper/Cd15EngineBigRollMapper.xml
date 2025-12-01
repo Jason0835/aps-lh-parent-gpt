@@ -4,9 +4,13 @@
 	<!-- 查询钢压大卷配置信息 -->
     <select id="listCd15BigRoll" resultType="com.zlt.aps.cd15.engine.vo.Cd15BigRollVo">
         SELECT BIG_ROLL_CODE,
-               NVL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
+               IFNULL(MAX(ACT_CLOTH_LENGTH), 0) CLOTH_LENGTH
           FROM T_CD15_BIG_ROLL
          WHERE DEL_FLAG = '0'
          GROUP BY BIG_ROLL_CODE
+    </select>
+
+    <select id="listCd15CurlLength" resultType="com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength">
+        SELECT * FROM T_CD15_CURL_LENGTH WHERE IS_DELETE = 0
     </select>
 </mapper>

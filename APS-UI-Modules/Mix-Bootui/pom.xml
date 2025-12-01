@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.zlt</groupId>
+        <version>1.0.3-SNAPSHOT</version>
+        <artifactId>APS-UI-Modules</artifactId>
+    </parent>
+
+    <artifactId>Mix-Bootui</artifactId>
+    <name>Mix-Bootui</name>
+
+    <packaging>jar</packaging>
+    <properties>
+        <java.version>1.8</java.version>
+        <mix-api.version>1.0.3-SNAPSHOT</mix-api.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-frame-starter</artifactId>
+        </dependency>
+
+        <dependency>
+             <groupId>com.alibaba.cloud</groupId>
+             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.zlt.aps.mix.schedule</groupId>
+            <artifactId>mix-schedule-api</artifactId>
+            <version>${mix-api.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.zlt.aps.mix.setting</groupId>
+            <artifactId>mix-setting-api</artifactId>
+            <version>${mix-api.version}</version>
+        </dependency>
+
+        <!-- 导入文件解密 -->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-ll-file-encrypt</artifactId>
+        </dependency>
+
+    </dependencies>
+    
+    <distributionManagement>
+        <snapshotRepository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+
+        <repository>
+            <id>local-release</id>
+            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
+        </repository>
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>local-snapshot</id>
+            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <!-- 默认不下载快照版本，这里开启下载快照版本到本地仓库 -->
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>1.5.3.RELEASE</version>
+                <configuration>
+                    <classifier>exec</classifier>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

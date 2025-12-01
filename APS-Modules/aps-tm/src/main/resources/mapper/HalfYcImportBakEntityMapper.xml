@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.mapper.HalfYcImportBakEntityMapper">
+
+    <delete id="deleteTmStock">
+        delete
+        from t_tm_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertTmStock">
+        insert into t_tm_stock (stock_date, material_code, stock_num, del_flag)
+        select schedule_date, LEFT(cx3, 4), FLOOR(sum(tm4 * tm3) * 10) / 10, '0'
+        from half_yc_import_bak
+        where schedule_date = #{scheduleDate}
+          and cx3 is not null
+          and cx3 != '0'
+        group by schedule_date, LEFT(cx3, 4)
+        having sum(tm4 * tm3) > 0;
+    </insert>
+
+    <delete id="deleteTcStock">
+        delete
+        from t_tc_stock
+        where stock_date = #{scheduleDate}
+    </delete>
+
+    <insert id="insertTcStock">
+        insert into t_tc_stock (stock_date, material_code, stock_num, del_flag)
+        select schedule_date,
+               CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')),
+               FLOOR(sum(tc4 * tc3) * 10) / 10,
+               '0'
+        from half_yc_import_bak
+        where schedule_date = #{scheduleDate}
+          and tc1 is not null
+          and tc1 != '0'
+        group by schedule_date, CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))
+        having sum(tc4 * tc3) > 0
+    </insert>
+
+    <update id="updateTmScheduleResult">
+        update t_tm_schedule_result r
+            join (select LEFT(i.cx3, 4)                 tread_code,
+                         sum(IFNULL(i.tm9, 0) * i.tm3 + IFNULL(i.tm13, 0) * i.tm3 +
+                             IFNULL(i.tm17, 0) * i.tm3) night_plan_qty
+                  from half_yc_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and i.cx3 is not null
+                    and i.cx3 != '0'
+                  group by LEFT(i.cx3, 4)) i on r.tread_code = i.tread_code
+        set r.night_plan_qty = i.night_plan_qty
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertTmScheduleResult">
+        insert into t_tm_schedule_result (schedule_date, tread_code, DEL_FLAG, NIGHT_PLAN_QTY)
+        select i.schedule_date,
+               LEFT(i.cx3, 4),
+               '0',
+               sum(IFNULL(i.tm9, 0) * i.tm3 + IFNULL(i.tm13, 0) * i.tm3 + IFNULL(i.tm17, 0) * i.tm3) night_plan_qty
+        from half_yc_import_bak i
+        where i.schedule_date = #{scheduleDate}
+          and i.cx3 is not null
+          and i.cx3 != '0'
+          and not exists (select 0
+                          from t_tm_schedule_result r
+                          where r.schedule_date = i.schedule_date and r.tread_code = LEFT(i.cx3, 4))
+        group by i.schedule_date, LEFT(i.cx3, 4)
+        having sum(IFNULL(i.tm9, 0) * i.tm3 + IFNULL(i.tm13, 0) * i.tm3 + IFNULL(i.tm17, 0) * i.tm3) > 0
+    </insert>
+
+    <update id="updateTcScheduleResult">
+        update t_tc_schedule_result r
+            join (select CONCAT(LEFT(i.tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')) sidewall_code,
+                         sum(IFNULL(i.tc9, 0) * i.tc3 + IFNULL(i.tc13, 0) * i.tc3)     night_plan_qty
+                  from half_yc_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and i.tc1 is not null
+                    and i.tc1 != '0'
+                  group by CONCAT(LEFT(i.tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))) i on r.sidewall_code = i.sidewall_code
+        set r.night_plan_qty = i.night_plan_qty
+        where r.schedule_date = #{scheduleDate}
+    </update>
+
+    <insert id="insertTcScheduleResult">
+        insert into t_tc_schedule_result (schedule_date, sidewall_code, DEL_FLAG, NIGHT_PLAN_QTY)
+        select i.schedule_date,
+               CONCAT(LEFT(i.tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')),
+               '0',
+               sum(IFNULL(i.tc9, 0) * i.tc3 + IFNULL(i.tc13, 0) * i.tc3) night_plan_qty
+        from half_yc_import_bak i
+        where i.schedule_date = #{scheduleDate}
+          and i.tc1 is not null
+          and i.tc1 != '0'
+          and not exists (select 0
+                          from t_tc_schedule_result r
+                          where r.schedule_date = i.schedule_date
+                            and r.sidewall_code = CONCAT(LEFT(i.tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')))
+        group by i.schedule_date, CONCAT(LEFT(i.tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))
+        having sum(IFNULL(i.tc9, 0) * i.tc3 + IFNULL(i.tc13, 0) * i.tc3) > 0
+    </insert>
+
+    <insert id="insertTmMonthPlanSurplus">
+        insert into t_tm_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                            MONTH_REMAIN_QTY)
+        select YEAR(now()),
+               lpad(month(now()), 2, '0'),
+               left(cx3, 4),
+               ceil(sum(cx9 * tm2)),
+               0,
+               ceil(sum(cx9 * tm2))
+        from half_yc_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx9 > 0
+          and not exists (select 0
+                          from t_tm_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = left(cx3, 4)
+                            and t.DEL_FLAG = '0')
+        group by left(cx3, 4)
+    </insert>
+
+    <update id="updateTmMonthPlanSurplus">
+        update t_tm_month_plan_surplus t
+            join (select left(cx3, 4) material_code, ceil(sum(cx9 * tm2)) MONTH_REMAIN_QTY
+                  from half_yc_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx9 > 0
+                  group by left(cx3, 4)) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </update>
+
+    <insert id="insertTcMonthPlanSurplus">
+        insert into t_tc_month_plan_surplus(year, month, material_code, month_plan_qty, month_finish_qty,
+                                            MONTH_REMAIN_QTY)
+        select YEAR(now()),
+               lpad(month(now()), 2, '0'),
+               CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')),
+               ceil(sum(cx9 * tc2)),
+               0,
+               ceil(sum(cx9 * tc2))
+        from half_yc_import_bak i
+        where schedule_date = #{scheduleDate}
+          and cx9 > 0
+          and not exists (select 0
+                          from t_tc_month_plan_surplus t
+                          where t.year = YEAR(now())
+                            and t.month = lpad(month(now()), 2, '0')
+                            and t.material_code = CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))
+                            and t.DEL_FLAG = '0')
+        group by CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))
+    </insert>
+
+    <update id="updateTcMonthPlanSurplus">
+        update t_tc_month_plan_surplus t
+            join (select CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', '')) material_code,
+                         ceil(sum(cx9 * tc2))                                        MONTH_REMAIN_QTY
+                  from half_yc_import_bak i
+                  where i.schedule_date = #{scheduleDate}
+                    and cx9 > 0
+                  group by CONCAT(LEFT(tc1, 6), IF(INSTR(cx3, 'VM') > 0, '(VMI)', ''))) i on i.material_code = t.material_code
+        set t.MONTH_REMAIN_QTY = i.MONTH_REMAIN_QTY,
+            t.month_finish_qty = t.month_plan_qty - i.MONTH_REMAIN_QTY
+        where t.year = YEAR(now())
+          and t.month = lpad(month(now()), 2, '0')
+          and t.del_flag = '0'
+    </update>
+
+    <select id="selectScheduleResult" resultType="com.zlt.aps.tm.api.domain.vo.HalfYcImportBakExportVo">
+        select r.tread_code                                                           code,
+               mi.machine_name                                                        machineName,
+               r.day_plan_qty                                                         dayPlanQty,
+               r.night_plan_qty                                                       nightPlanQty,
+               r.next_day_plan_qty                                                    nextDayPlanQty,
+               r.day_produce_order      dayProduceOrder,
+               r.night_produce_order    nightProduceOrder,
+               r.next_day_produce_order nextDayProduceOrder,
+               ifnull(cr.curl_length, pa.param_value)                                 curlLength,
+               round(r.day_plan_qty / ifnull(cr.curl_length, pa.param_value), 1)      dayPlanQtyRollNum,
+               round(r.night_plan_qty / ifnull(cr.curl_length, pa.param_value), 1)    nightPlanQtyRollNum,
+               round(r.next_day_plan_qty / ifnull(cr.curl_length, pa.param_value), 1) nextDayPlanQtyRollNum
+        from t_tm_schedule_result r
+                 left join t_tm_curl_roll cr on cr.tread_code = r.tread_code and cr.del_flag = '0'
+                 left join t_tm_params pa on pa.param_code = 'STANDARD_CRIMP_LENGTH' and pa.del_flag = '0'
+                 left join t_tm_machine_info mi on mi.id = r.machine_id and mi.del_flag = '0'
+        where r.schedule_date = #{scheduleDate}
+          and r.del_flag = '0'
+        union
+        select r.sidewall_code                                                        code,
+               mi.machine_name                                                        machineName,
+               r.day_plan_qty                                                         dayPlanQty,
+               r.night_plan_qty                                                       nightPlanQty,
+               r.next_day_plan_qty                                                    nextDayPlanQty,
+               r.day_produce_order      dayProduceOrder,
+               r.night_produce_order    nightProduceOrder,
+               r.next_day_produce_order nextDayProduceOrder,
+               ifnull(cr.curl_length, pa.param_value)                                 curlLength,
+               round(r.day_plan_qty / ifnull(cr.curl_length, pa.param_value), 1)      dayPlanQtyRollNum,
+               round(r.night_plan_qty / ifnull(cr.curl_length, pa.param_value), 1)    nightPlanQtyRollNum,
+               round(r.next_day_plan_qty / ifnull(cr.curl_length, pa.param_value), 1) nextDayPlanQtyRollNum
+        from t_tc_schedule_result r
+                 left join t_tc_curl_roll cr on cr.sidewall_code = r.sidewall_code and cr.del_flag = '0'
+                 left join t_tc_params pa on pa.param_code = 'STANDARD_CRIMP_LENGTH' and pa.del_flag = '0'
+                 left join t_tc_machine_info mi on mi.id = r.machine_id and mi.del_flag = '0'
+        where r.schedule_date = #{scheduleDate}
+          and r.del_flag = '0'
+    </select>
+
+    <select id="selectCxScheduleResult" resultType="com.zlt.aps.tm.api.domain.vo.HalfYcImportBakExportVo">
+        select EMBRYO_CODE                     code,
+               sum(IFNULL(CLASS3_PLANNED_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0)) cx_plan_qty
+        from t_cx_schedule_result
+        where schedule_date = #{scheduleDate}
+          and del_flag = '0'
+        group by EMBRYO_CODE
+    </select>
+
+    <update id="importYcData">
+        call importHalfYcImportBak(
+                #{scheduleDate, mode=IN, jdbcType=DATE}
+             )
+    </update>
+</mapper>

@@ -1,20 +1,6 @@
 package com.zlt.aps.nc.controller;
 
 
-import java.util.List;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -24,23 +10,28 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.nc.api.domain.dto.NcCurlRollDto;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
 import com.zlt.aps.nc.service.NcCurlRollService;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import java.util.List;
 
 @Api(tags = {"内衬卷曲信息接口"})
 @RestController
-@RequestMapping("/curlRoll")
+@RequestMapping("/nc/curlRoll")
 public class NcCurlRollController extends BaseController {
 
     @Resource
     private NcCurlRollService ncCurlRollService;
 
     @ApiOperation("根据条件查询内衬卷曲信息列表")
-    @GetMapping("/listCurlRoll")
-    public TableDataInfo listCurlRoll(NcCurlRoll dto) {
+    @PostMapping("/listCurlRoll")
+    public TableDataInfo listCurlRoll(@RequestBody NcCurlRoll dto) {
         startPage();
         dto.setOrderStr(orderStr());
         List<NcCurlRoll> list = ncCurlRollService.listCurlRoll(dto);
@@ -87,8 +78,8 @@ public class NcCurlRollController extends BaseController {
 
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @GetMapping("/exportData")
-    public List<NcCurlRoll> exportData(NcCurlRoll dto) {
+    @PostMapping("/exportData")
+    public List<NcCurlRoll> exportData(@RequestBody NcCurlRoll dto) {
         dto.setOrderStr(orderStr());
         List<NcCurlRoll> list = ncCurlRollService.listCurlRoll(dto);
         return list;
@@ -102,5 +93,17 @@ public class NcCurlRollController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
         return ncCurlRollService.importData(list, updateSupport, importLogId);
+    }
+
+    /**
+     * 根据编号查询卷曲长度
+     *
+     * @param curlRoll 查询条件
+     * @return 结果
+     */
+    @ApiOperation("根据编号查询卷曲长度")
+    @PostMapping("/selectCurlLengthByCode")
+    public AjaxResult selectCurlLengthByCode(@RequestBody NcCurlRoll curlRoll) {
+        return ncCurlRollService.selectCurlLengthByCode(curlRoll);
     }
 }

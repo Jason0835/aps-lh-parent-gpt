@@ -23,7 +23,7 @@ public interface INcStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/list")
+    @PostMapping("/nc/stock/list")
     TableDataInfo list(@RequestBody NcStock stock);
 
     /**
@@ -32,7 +32,7 @@ public interface INcStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/stock/{ids}")
+    @DeleteMapping("/nc/stock/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
     /**
@@ -41,7 +41,7 @@ public interface INcStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock")
+    @PostMapping("/nc/stock")
     AjaxResult add(@Validated @RequestBody NcStock stock);
 
 
@@ -51,7 +51,7 @@ public interface INcStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/selectStockById/{id}")
+    @GetMapping(value = "/nc/stock/selectStockById/{id}")
     NcStock selectStockById(@PathVariable("id") Long id);
 
     /**
@@ -60,7 +60,7 @@ public interface INcStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/stock/{id}")
+    @GetMapping(value = "/nc/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
@@ -69,7 +69,7 @@ public interface INcStockService {
      * @param stock
      * @return
      */
-    @PutMapping("/stock")
+    @PutMapping("/nc/stock")
     AjaxResult edit(@Validated @RequestBody NcStock stock);
 
     /**
@@ -77,10 +77,10 @@ public interface INcStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/stock/exportList")
+    @PostMapping("/nc/stock/exportList")
     List<NcStock> exportList(@RequestBody NcStock stock);
 
-    @PostMapping("/stock/importData")
+    @PostMapping("/nc/stock/importData")
     @ApiOperation("导入内衬定点机台信息")
     public AjaxResult importData(@RequestBody List<NcStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

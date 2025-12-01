@@ -23,52 +23,52 @@ public interface INcQuotaSettingService {
     /**
      * 查询内衬定额设定列表
      */
-    @PostMapping("/quota/list")
+    @PostMapping("/nc/quota/list")
     TableDataInfo list(@RequestBody NcQuotaSetting ncQuotaSetting);
 
 
     /**
     * 新增内衬定额设定
     */
-    @PostMapping("/quota/add")
+    @PostMapping("/nc/quota/add")
     AjaxResult add(@RequestBody NcQuotaSetting ncQuotaSetting);
 
 
     /**
      * 修改内衬定额设定
      */
-    @PostMapping("/quota/edit")
+    @PostMapping("/nc/quota/edit")
     AjaxResult edit(@RequestBody NcQuotaSetting ncQuotaSetting);
 
 
     /**
      * 删除内衬定额设定
      */
-    @DeleteMapping("/quota/{ids}")
+    @DeleteMapping("/nc/quota/{ids}")
     AjaxResult remove(@PathVariable("ids") Long[] ids);
 
 
     /**
      * 根据ID获取详细信息
      */
-    @GetMapping(value = "/quota/{id}")
+    @GetMapping(value = "/nc/quota/{id}")
     NcQuotaSetting getInfo(@PathVariable("id") Long id);
 
 
     /**
      * 校验内衬定额设定唯一性
      */
-    @PostMapping("/quota/checkNcQuotaSettingUnique")
+    @PostMapping("/nc/quota/checkNcQuotaSettingUnique")
     String checkNcQuotaSettingUnique(@RequestBody NcQuotaSetting ncQuotaSetting);
 
 
     /**
      * 导出内衬定额设定列表
      */
-    @PostMapping("/quota/getList")
+    @PostMapping("/nc/quota/getList")
     List<NcQuotaSetting> getList(@RequestBody NcQuotaSetting ncQuotaSetting);
 
-    @PostMapping("/quota/importData")
+    @PostMapping("/nc/quota/importData")
     @ApiOperation("导入内衬定额设定信息")
     public AjaxResult importData(@RequestBody List<NcQuotaSetting> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }
