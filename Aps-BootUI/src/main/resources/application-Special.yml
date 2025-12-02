@@ -28,8 +28,8 @@ nacos:
   server-addr: 192.168.10.123:8848
   run-group: APS_TEST_GROUP
   cfg-group: APS_TEST_GROUP
-  run-namespace: dctest
-  cfg-namespace: dctest
+  run-namespace: jytest
+  cfg-namespace: jytest
 
 #系统标识
 project:
@@ -41,7 +41,7 @@ spring-app-name: aps-bootui
 redis-addr: 192.168.2.93
 redis-port: 6379
 redis-password:
-redis-database: 7
+redis-database: 5
 #redis-password:
 zipkin-addr: "http://192.168.2.93:9411/"
 
@@ -92,7 +92,7 @@ ui:
 # Spring
 spring:
   redis:
-    database: 7
+    database: 5
   datasource:
     dynamic:
       seata: false

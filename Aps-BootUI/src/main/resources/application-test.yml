@@ -20,25 +20,25 @@ spring:
     host: 192.168.2.93
     port: 6379
     password:
-    database: 2
+    database: 5
   zipkin:
     baseUrl: "http://192.168.2.93:9411/"
   cloud:
     nacos:
       discovery:
         # 服务注册地址
-        namespace: test
+        namespace: jytest
         group: APS_TEST_GROUP
       config:
         shared-configs[0]:
           data-id: application-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: TEST_GROUP
+          group: APS_TEST_GROUP
         shared-configs[1]:
           data-id: system-api-prefix-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: TEST_GROUP
+          group: APS_TEST_GROUP
         refresh-enabled: true
-        namespace: test
-        group: TEST_GROUP
+        namespace: jytest
+        group: APS_TEST_GROUP
 shiro:
   #使用单点登录时，sso = true
   sso:

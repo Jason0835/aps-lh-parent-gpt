@@ -6,8 +6,8 @@ nacos:
   server-addr: 192.168.10.123:8848
   run-group: APS_TEST_GROUP
   cfg-group: APS_TEST_GROUP
-  run-namespace: dctest
-  cfg-namespace: dctest
+  run-namespace: jytest
+  cfg-namespace: jytest
 
 ## Spring
 spring:
