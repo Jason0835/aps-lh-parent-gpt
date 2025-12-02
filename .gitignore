@@ -6,6 +6,7 @@ target/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.mvn/
 
 # Editor directories and files
 .git
