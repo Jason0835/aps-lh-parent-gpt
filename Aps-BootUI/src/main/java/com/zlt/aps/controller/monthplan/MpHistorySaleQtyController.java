@@ -80,7 +80,7 @@ public class MpHistorySaleQtyController extends BaseUIController<MpHistorySaleQt
     @ResponseBody
     public TableDataInfo queryCalcStocking(QueryCalcStockingParamVo queryCalcStockingParamVo) {
         //TODO 后续需要前端传值
-        queryCalcStockingParamVo.setFactoryCode("AH01");
+        queryCalcStockingParamVo.setFactoryCode("116");
         return iMpHistorySaleQtyService.queryCalcStocking(queryCalcStockingParamVo);
     }
 

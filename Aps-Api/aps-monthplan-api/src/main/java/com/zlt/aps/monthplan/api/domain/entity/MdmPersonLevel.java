@@ -1,17 +1,14 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.math.BigDecimal;
-
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import com.zlt.common.annotation.EntityMapping;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.math.BigDecimal;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -34,9 +31,11 @@ public class MdmPersonLevel extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-     /** 分厂编码 默认AH01 */
+    /**
+     * 分厂编码 默认116
+     */
     @Excel(name = "ui.data.column.mdmPersonLevel.factoryCode")
-    @ApiModelProperty(value = "分厂编码 默认AH01", name = "factoryCode")
+    @ApiModelProperty(value = "分厂编码 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

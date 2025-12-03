@@ -332,7 +332,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     for (MdmProductInfo mdmProductInfoEntity : mdmProductInfo) {
                         if (BigDecimalUtils.safeCompare(mdmProductInfoEntity.getProSize(), BigDecimal.valueOf(docEntity.getSpecDimension() == null ? 0 : docEntity.getSpecDimension())) == 0) {
                             docEntity.setSpecDesc(mdmProductInfoEntity.getSpecifications());
-                            docEntity.setLhSingleTireTime((double) (mdmProductInfoEntity.getCuringTime() == null ? 0 : mdmProductInfoEntity.getCuringTime()));
+//                            docEntity.setLhSingleTireTime((double) (mdmProductInfoEntity.getCuringTime() == null ? 0 : mdmProductInfoEntity.getCuringTime()));
                         }
                     }
                 }
@@ -2257,7 +2257,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             // 设置基本属性（去掉空格）
             scheduleResult.setScheduleDate(cxOnlineImport.getRq());
             scheduleResult.setCxMachineCode(StringUtils.trimToEmpty(cxOnlineImport.getJt()));
-            scheduleResult.setFactoryCode("AH01");
+            scheduleResult.setFactoryCode("116");
             scheduleResult.setBomDataVersion("1");
             scheduleResult.setEmbryoCode(StringUtils.trimToEmpty(cxOnlineImport.getSt()));
             scheduleResult.setCxMachineQty(cxOnlineImport.getCn() != null ? cxOnlineImport.getCn() : 0);
@@ -2382,7 +2382,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             scheduleResult.setOrderNo("CXGD" + DateUtils.parseDateToStr("yyyyMMdd", scheduleResult.getScheduleDate()) + idStr);
 
             scheduleResult.setCxMachineCode(cxOnlineImport.getJt());
-            scheduleResult.setFactoryCode("AH01");
+            scheduleResult.setFactoryCode("116");
             scheduleResult.setBomDataVersion("1");
             scheduleResult.setSapCode(cxOnlineImport.getSpec());
             scheduleResult.setSpecCode(cxOnlineImport.getSt());
@@ -2460,7 +2460,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 cxOnlineImport.setSy(0);
             }
             surplus.setMonthRemainQty(cxOnlineImport.getSy() - cxOnlineImport.getZbjh() - cxOnlineImport.getWbjh());
-            surplus.setFactoryCode("AH01");
+            surplus.setFactoryCode("116");
             surplus.setMaterialCode(cxOnlineImport.getSt());
             surplus.setYear(String.valueOf(localDate.getYear()));
             surplus.setMonth(String.valueOf(localDate.getMonthValue()));

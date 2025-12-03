@@ -42,10 +42,10 @@ public class MpDayHistorySaleQty extends BaseEntity {
     private Date orderDate;
 
     /**
-     * 分厂编码 默认AH01
+     * 分厂编码 默认116
      */
     @Excel(name = "ui.data.column.mpDayHistorySaleQty.factoryCode")
-    @ApiModelProperty(value = "分厂编码 默认AH01", name = "factoryCode")
+    @ApiModelProperty(value = "分厂编码 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

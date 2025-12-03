@@ -19,8 +19,6 @@ import com.zlt.aps.lh.mapper.LhMoldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
 import com.zlt.aps.lh.service.ILhMoldChangePlanService;
 import com.zlt.aps.lh.service.LhScheduleResultService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
 import com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -227,7 +225,7 @@ public class LhMoldChangePlanServiceImpl extends AbstractDocService<LhMoldChange
         //对所有list设置排程日期，让下面可以做唯一校验
         list.forEach(item ->{
             item.setScheduleDate(scheduleDate);
-            item.setFactoryCode("AH01");
+            item.setFactoryCode("116");
         });
         //1.进行非空校验,Excel中数据重复校验
         for (int i = 0; i < list.size(); i++) {
@@ -267,7 +265,7 @@ public class LhMoldChangePlanServiceImpl extends AbstractDocService<LhMoldChange
             List<String> before = Arrays.stream(beforeSpecCode.split("\\*")).collect(Collectors.toList());
             List<String> after = Arrays.stream(afterSpecCode.split("\\*")).collect(Collectors.toList());
             List<String> allSpecCode = Stream.concat(after.stream(), before.stream()).collect(Collectors.toList());
-            List<SpecCodeAndProductCodeVO> mpc = lhScheduleResultService.getConstructionList("AH01", allSpecCode);
+            List<SpecCodeAndProductCodeVO> mpc = lhScheduleResultService.getConstructionList("116", allSpecCode);
             Map<String, SpecCodeAndProductCodeVO> infoMap = mpc.stream().collect(Collectors.toMap(SpecCodeAndProductCodeVO::getSpecCode, Function.identity(), (s1, s2) -> s1));
 
             StringBuilder embryoCode = new StringBuilder();
@@ -295,7 +293,7 @@ public class LhMoldChangePlanServiceImpl extends AbstractDocService<LhMoldChange
             LhScheduleResult result = new LhScheduleResult();
             //赋值硫化时间
             result.setScheduleDate(scheduleDate);
-            result.setFactoryCode("AH01");
+            result.setFactoryCode("116");
             result.setLhMachineCode(lhMCode);
             result.setRealScheduleDate(scheduleDate);
             result.setBatchNo(batchNo);
@@ -334,7 +332,7 @@ public class LhMoldChangePlanServiceImpl extends AbstractDocService<LhMoldChange
                 // 组装换模计划
                 LhMoldChangePlan exec = new LhMoldChangePlan();
                 exec.setScheduleDate(scheduleDate);
-                exec.setFactoryCode("AH01");
+                exec.setFactoryCode("116");
                 String beSpcCode = all.split("-")[0];
                 String afSpcCode = all.split("-")[1];
                 exec.setBeforeSpecCode(beSpcCode);

@@ -316,7 +316,7 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
         MpHistorySaleQty mpHistorySaleQty = new MpHistorySaleQty();
         mpHistorySaleQty.setYear(vo.getYear());
         mpHistorySaleQty.setMonth(month);
-        mpHistorySaleQty.setFactoryCode("AH01");
+        mpHistorySaleQty.setFactoryCode("116");
         mpHistorySaleQty.setProductCode(vo.getSapCode());
         mpHistorySaleQty.setProductDesc(vo.getSpecDesc());
         mpHistorySaleQty.setLocationType(String.valueOf(locationType));
@@ -714,7 +714,7 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
             MpHistorySaleQty record = new MpHistorySaleQty();
             record.setYear(vo.getYear());
             record.setMonth(vo.getMonth());
-            record.setFactoryCode("AH01");
+            record.setFactoryCode("116");
             record.setProductCode(vo.getSapCode());
             record.setProductDesc(vo.getSpecDesc());
             record.setLocationType(String.valueOf(locationType));

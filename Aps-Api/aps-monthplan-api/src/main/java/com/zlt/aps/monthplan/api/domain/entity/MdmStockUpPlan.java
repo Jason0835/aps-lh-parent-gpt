@@ -35,10 +35,10 @@ public class MdmStockUpPlan extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 分厂编码 - 默认AH01
+     * 分厂编码 - 默认116
      */
     @Excel(name = "ui.data.column.mdmStockUpPlan.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "分厂编码 - 默认AH01", name = "factoryCode")
+    @ApiModelProperty(value = "分厂编码 - 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

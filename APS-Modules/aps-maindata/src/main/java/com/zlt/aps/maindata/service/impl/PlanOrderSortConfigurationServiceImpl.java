@@ -283,7 +283,7 @@ public class PlanOrderSortConfigurationServiceImpl extends ServiceImpl<PlanOrder
         return planOrderSortConfiguration;
     }
 
-//        lambdaQueryWrapper.eq(PlanOrderSortConfiguration::getFactoryCode, "AH01");
+//        lambdaQueryWrapper.eq(PlanOrderSortConfiguration::getFactoryCode, "116");
 
     /**
      * 创建查询包装器

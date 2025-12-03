@@ -1,14 +1,5 @@
 package com.zlt.aps.lh;
 
-import java.io.IOException;
-import java.util.Date;
-
-import javax.annotation.Resource;
-
-//import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.boot.test.context.SpringBootTest;
-
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.cx.controller.CxScheduleResultController;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
@@ -16,6 +7,11 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.controller.LhScheduleResultController;
 import com.zlt.aps.lh.handle.LhSyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.annotation.Resource;
+import java.io.IOException;
+import java.util.Date;
 
 //@SpringBootTest
 class LhScheduleResultTest {
@@ -25,7 +21,7 @@ class LhScheduleResultTest {
     private CxScheduleResultController cxScheduleResultController;
     @Resource
     private LhSyncDataHandle syncDataHandle;
-	
+
 //	@Test
 	public void test() throws IOException {
 	    Long[] ids = new Long[] {143522L};
@@ -37,18 +33,18 @@ class LhScheduleResultTest {
 //        dto.setId(142539L);
 	    lhScheduleResultController.publish(dto);
 	}
-	
+
 
 //    @Test
     public void test1() throws IOException {
         SyncParamsVO syncParamsVO = new SyncParamsVO();
         syncParamsVO.setSyncKey("MIX_GLUE_SCHE_FBK");
-        syncParamsVO.setDataVersion("APS_MES_AH01_2025082100084");
-        syncParamsVO.setFactoryCode("AH01");
-        syncParamsVO.setCompanyCode("AH01");
+        syncParamsVO.setDataVersion("APS_MES_116_2025082100084");
+        syncParamsVO.setFactoryCode("116");
+        syncParamsVO.setCompanyCode("116");
         syncDataHandle.syncNotice(syncParamsVO);
     }
-	
+
 //	@Test
     public void test2() throws IOException {
         Long[] ids = new Long[] {395929L};

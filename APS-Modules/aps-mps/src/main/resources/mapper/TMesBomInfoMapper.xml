@@ -160,23 +160,19 @@
 
     <insert id="mergeMdmProductInfo">
 		INSERT INTO t_mdm_product_info (`FACTORY_CODE`, `PRODUCT_CODE`, `PRODUCT_DESC`, `PRO_SIZE`, `PRODUCT_TYPE_CODE`, `PRODUCT_TYPE_NAME`, `SPECIFICATIONS`, `PATTERN`, `BRAND`, `TIRE_TYPE`, `COMMON_TYPE`, `HIERARCHY`, `REPLACE_GROUP`, `CANT_PRODUCE`, `NO_DELIVERY`, `SPEED`, `CREATE_BY`, `IS_DELETE`, `CREATE_TIME`, `UPDATE_TIME`)
-		SELECT 
-		  'AH01', 
-		  sap_code,  
+		SELECT '116',
+			   sap_code,
 		  SUBSTRING(Mater_Name, LOCATE(' ', Mater_Name) + 1),
 		  SUBSTRING(Mater_Name, LOCATE('R', Mater_Name) + 1, 2),
-		  'PCR', 
+			   'PCR',
 		      '半钢',
 		  SUBSTRING_INDEX(SUBSTRING(Mater_Name, LOCATE(' ', Mater_Name) + 1), ' ', 1),
 		  SUBSTRING_INDEX(Mater_Name, ' ', - (LENGTH(Mater_Name) - LENGTH(REPLACE(Mater_Name, ' ', ''))) + 2),
 		  b.DICT_VALUE,
 		  null, null, null, null,
-		  '0', 
-		  '0', 
-		  right(SUBSTRING_INDEX(Mater_Name, ' ', 3), 1),
-		  'MES', 
-		  0, 
-		  now(), 
+			   '0',
+			   '0',
+		  right(SUBSTRING_INDEX(Mater_Name, ' ', 3), 1), 'MES', 0, now(),
 		  now()
 		from t_mes_material t
 		left join sys_dict_data b on b.DICT_TYPE = 'biz_brand_type' and b.locale = 'zh_CN'

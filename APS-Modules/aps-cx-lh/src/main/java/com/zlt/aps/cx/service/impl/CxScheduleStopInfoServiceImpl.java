@@ -1,23 +1,21 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.mapper.entity.CxScheduleStopInfoEntityMapper;
+import com.zlt.aps.cx.service.ICxScheduleStopInfoService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleStopInfo;
 import com.zlt.aps.cxlh.cx.api.domain.vo.LhAlgorithmScheduleResultDto;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.aps.cx.service.ICxScheduleStopInfoService;
-
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -70,7 +68,7 @@ public class CxScheduleStopInfoServiceImpl extends AbstractDocService<CxSchedule
     @Override
     public CxScheduleStopInfo createCxScheduleStopInfo(LhAlgorithmScheduleResultDto item) {
         CxScheduleStopInfo cxScheduleStopInfo = new CxScheduleStopInfo();
-        cxScheduleStopInfo.setFactoryCode("AH01");
+        cxScheduleStopInfo.setFactoryCode("116");
         cxScheduleStopInfo.setCxBatchNo(item.getBatchNo());
         cxScheduleStopInfo.setEmbryoCode(item.getLhScheduleResult().getEmbryoCode());
         cxScheduleStopInfo.setUnScheduleNum(item.getTaskPlanQuantity());

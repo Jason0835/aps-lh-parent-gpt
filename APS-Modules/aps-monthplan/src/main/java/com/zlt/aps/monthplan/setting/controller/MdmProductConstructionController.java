@@ -327,7 +327,7 @@ public class MdmProductConstructionController extends AbstractDocBizController<M
                     "        ROW_NUMBER() OVER (ORDER BY t.create_time DESC) AS page_rn    " +
                     "    FROM (  " +
                     "        SELECT  " +
-                    "            'AH01' factory_code,  " +
+                    "            '116' factory_code,  " +
                     "            SUBSTRING(tb.sap_code, 11, LEN(tb.sap_code)) product_code,  " +
                     "            SUBSTRING(tb.tyrematerialid, 2, LEN(tb.tyrematerialid)) spec_code,  " +
                     "            SUBSTRING(m.PLM_CODE, 2, LEN(m.PLM_CODE)) construction_code,  " +

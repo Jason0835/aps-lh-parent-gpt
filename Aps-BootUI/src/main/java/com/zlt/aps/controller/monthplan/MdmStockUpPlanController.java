@@ -84,7 +84,7 @@ public class MdmStockUpPlanController extends BaseUIController<MdmStockUpPlan> {
     @ResponseBody
     public AjaxResult createStockUpPlan(QueryCalcStockingParamVo queryCalcStockingParamVo) {
         //TODO 后续需要前端传值
-        queryCalcStockingParamVo.setFactoryCode("AH01");
+        queryCalcStockingParamVo.setFactoryCode("116");
         return iMdmStockUpPlanService.createStockUpPlan(queryCalcStockingParamVo);
     }
 

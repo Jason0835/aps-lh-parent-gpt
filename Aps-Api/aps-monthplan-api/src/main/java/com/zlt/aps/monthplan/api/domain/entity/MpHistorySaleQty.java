@@ -48,9 +48,11 @@ public class MpHistorySaleQty extends BaseEntity {
     @TableField(value = "MONTH")
     private Integer month;
 
-    /** 分厂编码 默认AH01 */
+    /**
+     * 分厂编码 默认116
+     */
     @Excel(name = "ui.data.column.mpHistorySaleQty.factoryCode")
-    @ApiModelProperty(value = "分厂编码 默认AH01", name = "factoryCode")
+    @ApiModelProperty(value = "分厂编码 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

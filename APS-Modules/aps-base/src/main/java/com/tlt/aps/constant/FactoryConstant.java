@@ -216,7 +216,7 @@ public class FactoryConstant {
     /**
      * 默认工厂常量
      */
-    public static String DEFAULT_FACTORY_CODE = "AH01";
+    public static String DEFAULT_FACTORY_CODE = "116";
     /**
      * 系统参数：上调控制水位控制-近12个月销售总量
      * 参数类型：整型

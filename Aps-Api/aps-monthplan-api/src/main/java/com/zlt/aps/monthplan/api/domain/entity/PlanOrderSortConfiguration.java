@@ -31,10 +31,10 @@ public class PlanOrderSortConfiguration extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 分厂编码 默认AH01
+     * 分厂编码 默认116
      */
     @Excel(name = "ui.data.column.businessSortConfiguration.factoryCode")
-    @ApiModelProperty(value = "分厂编码 默认AH01", name = "factoryCode")
+    @ApiModelProperty(value = "分厂编码 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

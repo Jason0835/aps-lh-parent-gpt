@@ -27,7 +27,6 @@ import com.zlt.mix.schedule.service.GlueScheduleResultService;
 import com.zlt.mix.schedule.service.GlueScheduleSupplementService;
 import com.zlt.mix.schedule.service.ScheduleRedisLockService;
 import com.zlt.sync.povo.SyncParamsVO;
-
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -72,7 +71,7 @@ public class GlueScheduleResultController extends BaseController {
     private ISysDictDataCacheService iSysDictDataCacheService;
     @Value("${glueClassEditableRole:admin}")
     public String classEditableRole;
-    
+
     public String syncKey = "MIX_GLUE_SCHE_FBK";
 
     /**
@@ -200,14 +199,14 @@ public class GlueScheduleResultController extends BaseController {
     	if (idArray == null || idArray.length == 0){
     	    return AjaxResult.error(I18nUtil.getMessage("ui.frame.alter.mustChooseOneRecord"));
     	}
-    	
+
     	AjaxResult ajaxResult;
         try {
             //获取数据版本号
             String dataVersion = syncDataHandle.getDataVersion(syncKey);
             // 厂别、分公司编号
-            String factoryCode = "AH01";
-            String companyCode = "AH01";
+            String factoryCode = "116";
+            String companyCode = "116";
             glueScheduleResult.setDataVersion(dataVersion);
             glueScheduleResult.setFactoryCode(factoryCode);
             glueScheduleResult.setCompanyCode(companyCode);
@@ -400,7 +399,7 @@ public class GlueScheduleResultController extends BaseController {
     public List<GlueScheduleResult> selectSpanSendNeedFieldByIds(@PathVariable("ids") Long[] ids) {
         return glueScheduleResultService.selectSpanSendNeedFieldByIds(ids);
     }
-    
+
 
     /**
      * 计算终炼/母炼日计划补量列表
@@ -411,13 +410,13 @@ public class GlueScheduleResultController extends BaseController {
         List<GlueScheduleSupplement> list = glueScheduleSupplementService.caculateSuppliment(glueScheduleSupplement);
     	return getDataTable(list);
     }
-    
+
 	@ApiOperation("保存生产补量记录")
     @PostMapping("/saveSupplement")
 	public AjaxResult saveSupplement(@RequestBody List<GlueScheduleSupplement> glueScheduleSupplementList) {
         return glueScheduleSupplementService.saveSupplement(glueScheduleSupplementList);
 	}
-	
+
     /**
      * 检查班次是否可编辑
      * @param scheduleDate	排产日期
@@ -435,7 +434,7 @@ public class GlueScheduleResultController extends BaseController {
     	}
     	return ScheduleUtils.checkCLassEditable(scheduleDate, classShift);
     }
-	
+
     /**
      * 获取各班次可编辑状态
      * @param scheduleDate	排产日期

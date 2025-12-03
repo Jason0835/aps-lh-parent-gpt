@@ -13,7 +13,6 @@ import com.zlt.aps.cxlh.cx.api.domain.dto.CxShowDeDto;
 import com.zlt.aps.cxlh.cx.api.domain.dto.LhShowDeDto;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxParams;
 import com.zlt.aps.maindata.service.impl.MdmMoldingMachineServiceImpl;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineB;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.BeanUtils;
@@ -133,7 +132,7 @@ public class CxParamsController extends BaseController {
     @ApiOperation("测试接口")
     @PostMapping("/test")
     public void test() {
-        mdmMoldingMachineService.getMoldingMachineProNum("AH01");
+        mdmMoldingMachineService.getMoldingMachineProNum("116");
     }
 
 }

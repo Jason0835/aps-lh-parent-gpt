@@ -29,7 +29,7 @@ public class MdmProductConstructionImportVo extends BaseEntity {
 //    @Excel(name = "ui.data.column.mdmProductConstruction.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
-    private String factoryCode = "AH01";
+    private String factoryCode = "116";
 
     /**
      * 物料编号
