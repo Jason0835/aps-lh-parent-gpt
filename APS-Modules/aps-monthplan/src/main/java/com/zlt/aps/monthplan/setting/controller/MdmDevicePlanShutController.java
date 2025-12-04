@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
@@ -52,7 +51,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
     /**
      * 查询0106基础数据_设备计划停机列表
      */
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +67,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
      * 保存
      */
     @Log(title = "ui.data.column.mdmDevicePlanShut.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +78,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
      * 删除
      */
     @Log(title = "ui.data.column.mdmDevicePlanShut.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +89,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
     /**
      * 获取0106基础数据_设备计划停机详细信息
      */
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +104,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:import")
     @Log(title = "ui.data.column.mdmDevicePlanShut.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +115,6 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:mdmDevicePlanShut:export")
     @Log(title = "0106基础数据_设备计划停机", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
