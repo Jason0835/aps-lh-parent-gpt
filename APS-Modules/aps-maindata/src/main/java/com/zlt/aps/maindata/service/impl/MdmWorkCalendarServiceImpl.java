@@ -6,7 +6,6 @@ import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
@@ -116,6 +115,7 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
     public AjaxResult genAnnualPlan(MdmWorkCalendar entity) {
         Integer year = entity.getYear();
         String procCode = entity.getProcCode();
+        String factoryCode = entity.getFactoryCode();
         Calendar instance = Calendar.getInstance();
         instance.set(Calendar.YEAR, year);
         List<MdmWorkCalendar> saveList = new ArrayList<>();
@@ -133,7 +133,7 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
             for (int i = 1; i <= lastDay; i++) {
                 for (String code : procCodeList) {
                     MdmWorkCalendar mdmWorkCalendar = new MdmWorkCalendar();
-                    mdmWorkCalendar.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                    mdmWorkCalendar.setFactoryCode(factoryCode);
                     mdmWorkCalendar.setProcCode(code);
                     mdmWorkCalendar.setYear(year);
                     mdmWorkCalendar.setMonth(month + 1);
