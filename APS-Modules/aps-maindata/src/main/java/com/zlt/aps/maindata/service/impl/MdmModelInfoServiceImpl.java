@@ -12,6 +12,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -109,6 +110,9 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
      */
     @Override
     public void setProSize(List<MdmModelInfo> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return;
+        }
         List<String> mouldCodeList = list.stream().map(MdmModelInfo::getMouldCode).collect(Collectors.toList());
 
         List<MdmProductModelRelation> modelRelationList = new ArrayList<>();
