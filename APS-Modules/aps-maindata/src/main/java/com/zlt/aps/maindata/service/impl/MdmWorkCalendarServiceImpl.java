@@ -120,16 +120,17 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
      */
     @Override
     public AjaxResult genAnnualPlan(MdmWorkCalendar entity) {
+        String factoryCode = StringUtils.defaultIfBlank(entity.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
         Integer year = entity.getYear();
         String procCode = entity.getProcCode();
         LambdaQueryWrapper<MdmWorkCalendar> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MdmWorkCalendar::getYear, year);
+        wrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode);
         wrapper.eq(StringUtils.isNotBlank(procCode), MdmWorkCalendar::getProcCode, procCode);
         List<MdmWorkCalendar> mdmWorkCalendarList = entityMapper.selectList(wrapper);
         if (CollectionUtils.isNotEmpty(mdmWorkCalendarList)) {
             throw new RuntimeException("已经生成过对应年份的工作日历");
         }
-        String factoryCode = StringUtils.defaultIfBlank(entity.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
         Calendar instance = Calendar.getInstance();
         instance.set(Calendar.YEAR, year);
         List<MdmWorkCalendar> saveList = new ArrayList<>();
