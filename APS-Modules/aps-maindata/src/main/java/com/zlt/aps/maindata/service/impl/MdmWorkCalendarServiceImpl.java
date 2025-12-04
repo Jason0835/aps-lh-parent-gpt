@@ -7,6 +7,7 @@ import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
@@ -128,7 +129,7 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         if (CollectionUtils.isNotEmpty(mdmWorkCalendarList)) {
             throw new RuntimeException("已经生成过对应年份的工作日历");
         }
-        String factoryCode = entity.getFactoryCode();
+        String factoryCode = StringUtils.defaultIfBlank(entity.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
         Calendar instance = Calendar.getInstance();
         instance.set(Calendar.YEAR, year);
         List<MdmWorkCalendar> saveList = new ArrayList<>();
