@@ -154,7 +154,7 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmDevicePlanShut.modelName");
     }
 
     /**

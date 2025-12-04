@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -15,6 +16,7 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -184,5 +186,30 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
         return "MDM0104";
     }
 
+    /**
+     * 根据用户名称过滤出可查看的工序列表
+     *
+     * @param userName 用户名称
+     * @return 结果
+     */
+    @ApiOperation("根据用户名称过滤出可查看的工序列表")
+    @PostMapping("/selectProcCodeList")
+    public AjaxResult selectProcCodeList(@RequestParam("userName") String userName) {
+        if (StringUtils.isBlank(userName)) {
+            userName = SecurityUtils.getUsername();
+        }
+        return AjaxResult.success(mdmWorkCalendarService.selectProcCodeList(userName));
+    }
 
+    /**
+     * 生成全年工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @ApiOperation("生成全年工作日历")
+    @PostMapping("/genAnnualPlan")
+    public AjaxResult genAnnualPlan(@RequestBody MdmWorkCalendar entity) {
+        return mdmWorkCalendarService.genAnnualPlan(entity);
+    }
 }

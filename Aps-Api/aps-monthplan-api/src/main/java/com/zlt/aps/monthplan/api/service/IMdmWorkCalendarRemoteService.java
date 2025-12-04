@@ -78,4 +78,23 @@ public interface IMdmWorkCalendarRemoteService {
     @PostMapping("/mdmWorkCalendar/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 根据用户名称过滤出可查看的工序列表
+     *
+     * @param userName 用户名
+     * @return 结果
+     */
+    @ApiOperation("根据用户名称过滤出可查看的工序列表")
+    @PostMapping("/mdmWorkCalendar/selectProcCodeList")
+    public AjaxResult selectProcCodeList(@RequestParam("userName") String userName);
+
+    /**
+     * 生成全年工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @ApiOperation("生成全年工作日历")
+    @PostMapping("/mdmWorkCalendar/genAnnualPlan")
+    AjaxResult genAnnualPlan(@RequestBody MdmWorkCalendar entity);
 }

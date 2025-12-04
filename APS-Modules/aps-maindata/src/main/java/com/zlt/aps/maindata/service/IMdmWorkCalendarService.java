@@ -1,7 +1,11 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,4 +23,19 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMdmWorkCalendarService extends IDocService<MdmWorkCalendar> {
 
+    /**
+     * 根据用户名称过滤出可查看的工序列表
+     *
+     * @param userName 用户名称
+     * @return 结果
+     */
+    List<SysDictData> selectProcCodeList(String userName);
+
+    /**
+     * 生成全年工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    AjaxResult genAnnualPlan(MdmWorkCalendar entity);
 }

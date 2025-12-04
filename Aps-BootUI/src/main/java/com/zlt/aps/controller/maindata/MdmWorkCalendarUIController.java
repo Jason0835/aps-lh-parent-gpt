@@ -137,7 +137,6 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
         return this.getFunctionName();
     }
 
-
     /**
      * 继承时重写方法。
      *
@@ -155,7 +154,7 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.modelName");
     }
 
     /**
@@ -198,5 +197,31 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
         context.setFileBytes(data);
         AjaxResult ajaxResult = iMdmWorkCalendarService.importData(context, false);
         return ajaxResult;
+    }
+
+    /**
+     * 根据用户名称过滤出可查看的工序列表
+     *
+     * @return 结果
+     */
+    @ApiOperation("根据用户名称过滤出可查看的工序列表")
+    @PostMapping("/selectProcCodeList")
+    @ResponseBody
+    public AjaxResult selectProcCodeList() {
+        return iMdmWorkCalendarService.selectProcCodeList("");
+    }
+
+    /**
+     * 生成全年工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @RequiresPermissions("maindata:mdmWorkCalendar:genAnnualPlan")
+    @ApiOperation("生成全年工作日历")
+    @PostMapping("/genAnnualPlan")
+    @ResponseBody
+    public AjaxResult genAnnualPlan(MdmWorkCalendar entity) {
+        return iMdmWorkCalendarService.genAnnualPlan(entity);
     }
 }
