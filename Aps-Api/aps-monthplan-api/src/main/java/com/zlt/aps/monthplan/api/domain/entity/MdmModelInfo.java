@@ -94,7 +94,7 @@ public class MdmModelInfo extends BaseEntity {
     private String brand;
 
     /**
-     * 模具类型
+     * 模具类型，字典：biz_mould_Type
      */
     @Excel(name = "ui.data.column.mdmModelInfo.mouldType", dictType = "biz_mould_Type")
     @ApiModelProperty(value = "模具类型", name = "mouldType")
@@ -102,7 +102,7 @@ public class MdmModelInfo extends BaseEntity {
     private String mouldType;
 
     /**
-     * 模具状态
+     * 模具状态，字典：biz_available_status
      */
     @Excel(name = "ui.data.column.mdmModelInfo.mouldStatus", dictType = "biz_available_status")
     @ApiModelProperty(value = "模具状态", name = "mouldStatus")
