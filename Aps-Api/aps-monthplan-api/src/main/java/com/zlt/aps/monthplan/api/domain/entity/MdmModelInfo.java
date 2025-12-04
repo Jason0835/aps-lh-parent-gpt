@@ -45,7 +45,7 @@ public class MdmModelInfo extends BaseEntity {
     private String factoryCode;
 
     /**
-     * 模具号
+     * 型腔模号
      */
     @Excel(name = "ui.data.column.mdmModelInfo.mouldCode")
     @ApiModelProperty(value = "型腔模号", name = "mouldCode")
@@ -120,10 +120,10 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 模具备注
      */
-    @Excel(name = "ui.data.column.mdmModelInfo.mouldRemark")
-    @ApiModelProperty(value = "模具备注", name = "mouldRemark")
-    @TableField(value = "MOULD_REMARK")
-    private String mouldRemark;
+//    @Excel(name = "ui.data.column.mdmModelInfo.mouldRemark")
+//    @ApiModelProperty(value = "模具备注", name = "mouldRemark")
+//    @TableField(value = "MOULD_REMARK")
+//    private String mouldRemark;
 
     /**
      * 模套
