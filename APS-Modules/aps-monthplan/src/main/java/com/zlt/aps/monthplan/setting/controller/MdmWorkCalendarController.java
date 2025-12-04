@@ -69,7 +69,7 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
             Integer day = mdmWorkCalendar.getDay();
             Date date = null;
             try {
-                date = DateUtils.parseDate(year + "-" + month + "-" + day);
+                date = DateUtils.parseDate(year + "-" + String.format("%02d", month) + "-" + String.format("%02d", day), "yyyy-MM-dd");
             } catch (ParseException e) {
                 log.error("日期转换异常", e);
             }

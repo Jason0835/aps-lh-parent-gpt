@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -114,6 +115,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 日期
      */
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "日期", name = "calendarTime")
     @TableField(exist = false)
     private Date calendarTime;
