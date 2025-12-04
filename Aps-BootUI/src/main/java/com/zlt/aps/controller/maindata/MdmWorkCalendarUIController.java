@@ -169,6 +169,7 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmWorkCalendar:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -182,6 +183,7 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
         response.flushBuffer();
     }
 
+    @RequiresPermissions("monthplan:mdmWorkCalendar:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

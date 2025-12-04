@@ -169,6 +169,7 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmDevicePlanShut:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -182,6 +183,7 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
         response.flushBuffer();
     }
 
+    @RequiresPermissions("monthplan:mdmDevicePlanShut:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
