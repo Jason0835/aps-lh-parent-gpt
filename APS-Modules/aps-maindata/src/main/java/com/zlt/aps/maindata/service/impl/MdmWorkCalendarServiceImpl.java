@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
@@ -7,11 +8,13 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -59,6 +62,9 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
             Calendar.NOVEMBER,
             Calendar.DECEMBER
     ));
+
+    @Autowired
+    private MdmWorkCalendarEntityMapper entityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -115,6 +121,13 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
     public AjaxResult genAnnualPlan(MdmWorkCalendar entity) {
         Integer year = entity.getYear();
         String procCode = entity.getProcCode();
+        LambdaQueryWrapper<MdmWorkCalendar> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmWorkCalendar::getYear, year);
+        wrapper.eq(StringUtils.isNotBlank(procCode), MdmWorkCalendar::getProcCode, procCode);
+        List<MdmWorkCalendar> mdmWorkCalendarList = entityMapper.selectList(wrapper);
+        if (CollectionUtils.isNotEmpty(mdmWorkCalendarList)) {
+            throw new RuntimeException("已经生成过对应年份的工作日历");
+        }
         String factoryCode = entity.getFactoryCode();
         Calendar instance = Calendar.getInstance();
         instance.set(Calendar.YEAR, year);
