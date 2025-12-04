@@ -1,0 +1,21 @@
+package com.zlt.aps.monthplan.demand.service;
+
+
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.bill.common.service.IDocService;
+/**
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：ISalesOrderPoolService.java
+ * 描    述：ISalesOrderPoolService销售订单池后端接口
+ *@author zlt
+ *@date 2025-12-04
+ *@version 1.0
+ *
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
+ */
+public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
+
+}

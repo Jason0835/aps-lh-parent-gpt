@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('修改销售订单池')"/>
+        <th:block th:include="include :: datetimepicker-css"/>
+</head>
+
+ <body class="white-bg">
+<div class="wrapper wrapper-content animated fadeInRight ibox-content">
+    <form class="form-horizontal m" id="form-SalesOrderPool-edit" th:object="${salesOrderPool}">
+        <input name="id" th:field="*{id}" type="hidden">
+        <input name="updateTime" th:field="*{updateTime}" type="hidden">
+
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.factoryCode}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="factoryCode" name="factoryCode"
+                               th:field="*{factoryCode}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.orderPriority}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="20" id="orderPriority" name="orderPriority"
+                               th:field="*{orderPriority}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.area}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="area" name="area"
+                               th:field="*{area}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.salCode}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="salCode" name="salCode"
+                               th:field="*{salCode}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.salNCode}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="salNCode" name="salNCode"
+                               th:field="*{salNCode}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.natCode}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="natCode" name="natCode"
+                               th:field="*{natCode}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.brand}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="12" id="brand" name="brand"
+                               th:field="*{brand}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.salCodePo}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="salCodePo" name="salCodePo"
+                               th:field="*{salCodePo}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool
+                        .billDate}]]：</label>
+                    <div class="col-sm-new-form">
+                        <div class="input-group date">
+                            <input name="billDate" class="form-control time-input" placeholder="yyyy-MM-dd"
+                                   type="text">
+                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.oriMaterialCode}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="100" id="oriMaterialCode" name="oriMaterialCode"
+                               th:field="*{oriMaterialCode}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="row">
+                    <div class="col-sm-new-one">
+                        <div class="form-group">
+                            <label th:title="#{ui.data.column.SalesOrderPool.materialDesc}"
+                                   class="col-sm-new-one-label control-label">[[#{ui.data.column.${subclassName}.materialDesc}]]：</label>
+                            <div class="col-sm-new-one-form">
+                                <textarea maxLength="300" id="materialDesc" name="materialDesc"
+                                          th:placeholder="#{ui.data.column.wordLengthPlaceholder}+'300'"
+                                          th:field="*{materialDesc}" class="form-control" >
+                                </textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="row">
+                    <div class="col-sm-new-one">
+                        <div class="form-group">
+                            <label th:title="#{ui.data.column.SalesOrderPool.ordQty}"
+                                   class="col-sm-new-one-label control-label">[[#{ui.data.column.${subclassName}.ordQty}]]：</label>
+                            <div class="col-sm-new-one-form">
+                                <textarea maxLength="300" id="ordQty" name="ordQty"
+                                          th:placeholder="#{ui.data.column.wordLengthPlaceholder}+'300'"
+                                          th:field="*{ordQty}" class="form-control" >
+                                </textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.weekYear}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="weekYear" name="weekYear"
+                               th:field="*{weekYear}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.dynamicBalance}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="dynamicBalance" name="dynamicBalance"
+                               th:field="*{dynamicBalance}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.uniformity}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="uniformity" name="uniformity"
+                               th:field="*{uniformity}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.eudr}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="eudr" name="eudr"
+                               th:field="*{eudr}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.scmPriority}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="10" id="scmPriority" name="scmPriority"
+                               th:field="*{scmPriority}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.SalesOrderPool.scmDetailId}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input id="scmDetailId" name="scmDetailId" th:field="*{scmDetailId}" class="form-control"
+                               type="text" number="true" digits="true" min="0"
+                               max="999999999999999999">
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-new">
+                <div class="form-group">
+                    <label class="col-sm-new-label control-label">[[#{ui.data.column.remark}]]：</label>
+                    <div class="col-sm-new-form">
+                        <input maxLength="256" id="remark" name="remark"
+                               th:field="*{remark}" class="form-control" type="text">
+                    </div>
+                </div>
+            </div>
+    </form>
+</div>
+<th:block th:include="include :: footer"/>
+        <th:block th:include="include :: datetimepicker-js"/>
+<script th:inline="javascript">
+    var prefix = ctx + "monthplan/SalesOrderPool";
+    $("#form-SalesOrderPool-edit").validate({
+        focusCleanup: true
+    });
+
+    //提交
+    function submitHandler() {
+        if ($.validate.form()) {
+            var datas = $('#form-SalesOrderPool-edit').serializeArray();
+            $.operate.save(prefix + "/save", datas);
+        }
+    }
+
+        $("input[name='billDate']").datetimepicker({
+            format: "yyyy-mm-dd",
+            minView: "month",
+            autoclose: true
+        });
+</script>
+</body>
+</html>

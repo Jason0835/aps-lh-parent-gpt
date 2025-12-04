@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('销售订单池')"/>
+</head>
+<body class="gray-bg">
+<div class="container-div">
+    <div class="row">
+        <div class="col-sm-12 search-collapse">
+            <form id="formId">
+                <div class="select-list">
+                    <ul>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.factoryCode}]]：</label>
+                            <input maxLength="10" type="text" name="factoryCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.orderPriority}]]：</label>
+                            <input maxLength="20" type="text" name="orderPriority"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.area}]]：</label>
+                            <input maxLength="100" type="text" name="area"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.salCode}]]：</label>
+                            <input maxLength="100" type="text" name="salCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.salNCode}]]：</label>
+                            <input maxLength="100" type="text" name="salNCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.natCode}]]：</label>
+                            <input maxLength="100" type="text" name="natCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.brand}]]：</label>
+                            <input maxLength="12" type="text" name="brand"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.salCodePo}]]：</label>
+                            <input maxLength="100" type="text" name="salCodePo"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.billDate}]]：</label>
+                            <input type="text" class="time-input" th:placeholder="#{ui.frame.combox.all}" name="billDate"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.oriMaterialCode}]]：</label>
+                            <input maxLength="100" type="text" name="oriMaterialCode"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.weekYear}]]：</label>
+                            <input maxLength="10" type="text" name="weekYear"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.dynamicBalance}]]：</label>
+                            <input maxLength="10" type="text" name="dynamicBalance"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.uniformity}]]：</label>
+                            <input maxLength="10" type="text" name="uniformity"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.eudr}]]：</label>
+                            <input maxLength="10" type="text" name="eudr"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.scmPriority}]]：</label>
+                            <input maxLength="10" type="text" name="scmPriority"/>
+                        </li>
+                        <li>
+                            <label>[[#{ui.data.column.SalesOrderPool.scmDetailId}]]：</label>
+                            <input maxLength="19" type="text" name="scmDetailId"/>
+                        </li>
+                        <li>
+                            <a class="btn btn-primary btn-rounded btn-sm" onclick="$.table.search()"><i
+                                    class="fa fa-search"></i>&nbsp;[[#{ui.frame.btn.search}]]</a>
+                            <a class="btn btn-warning btn-rounded btn-sm" onclick="$.form.reset()"><i
+                                    class="fa fa-refresh"></i>&nbsp;[[#{ui.frame.btn.reset}]]</a>
+                        </li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="btn-group-sm" id="toolbar" role="group">
+            <a class="btn btn-success" onclick="$.operate.add()"
+               shiro:hasPermission="monthplan:SalesOrderPool:add">
+                <i class="fa fa-plus"></i> [[#{ui.frame.btn.add}]]
+            </a>
+            <a class="btn btn-primary single disabled"
+               onclick="$.operate.edit()"
+               shiro:hasPermission="monthplan:SalesOrderPool:edit">
+                <i class="fa fa-edit"></i> [[#{ui.frame.btn.modify}]]
+            </a>
+            <a class="btn btn-danger multiple disabled" onclick="$.operate.removeAll()"
+               shiro:hasPermission="monthplan:SalesOrderPool:remove">
+                <i class="fa fa-remove"></i> [[#{ui.frame.btn.delete}]]
+            </a>
+            <a class="btn btn-info" onclick="$.table.importExcel()" shiro:hasPermission="monthplan:SalesOrderPool:import">
+                <i class="fa fa-upload"></i> [[#{ui.frame.btn.import}]]
+            </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()"
+               shiro:hasPermission="monthplan:SalesOrderPool:export">
+                <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
+            </a>
+        </div>
+        <div class="col-sm-12 select-table table-striped">
+            <table id="bootstrap-table"></table>
+        </div>
+    </div>
+</div>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    var editFlag = [[${@permission.hasPermi('monthplan:SalesOrderPool:edit')}]];
+    var removeFlag = [[${@permission.hasPermi('monthplan:SalesOrderPool:remove')}]];
+    var prefix = ctx + "monthplan/SalesOrderPool";
+
+    $(function () {
+        var options = {
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            exportUrl: prefix + "/export",
+            importUrl: prefix + "/importData",
+            modalName: [[#{ui.data.column.SalesOrderPool.modelName}]],
+            columns: [{
+                checkbox: true
+            },
+                        {
+                            field: 'id',
+                            title: [[#{ui.data.column.SalesOrderPool.id}]],
+                            visible: false
+                        },
+                        {
+                            field: 'factoryCode',
+                            title: [[#{ui.data.column.SalesOrderPool.factoryCode}]],
+                        },
+                        {
+                            field: 'productType',
+                            title: [[#{ui.data.column.SalesOrderPool.productType}]],
+                        },
+                        {
+                            field: 'orderPriority',
+                            title: [[#{ui.data.column.SalesOrderPool.orderPriority}]],
+                        },
+                        {
+                            field: 'area',
+                            title: [[#{ui.data.column.SalesOrderPool.area}]],
+                        },
+                        {
+                            field: 'salCode',
+                            title: [[#{ui.data.column.SalesOrderPool.salCode}]],
+                        },
+                        {
+                            field: 'salNCode',
+                            title: [[#{ui.data.column.SalesOrderPool.salNCode}]],
+                        },
+                        {
+                            field: 'natCode',
+                            title: [[#{ui.data.column.SalesOrderPool.natCode}]],
+                        },
+                        {
+                            field: 'brand',
+                            title: [[#{ui.data.column.SalesOrderPool.brand}]],
+                        },
+                        {
+                            field: 'salCodePo',
+                            title: [[#{ui.data.column.SalesOrderPool.salCodePo}]],
+                        },
+                        {
+                            field: 'billDate',
+                            title: [[#{ui.data.column.SalesOrderPool.billDate}]],
+                        },
+                        {
+                            field: 'oriMaterialCode',
+                            title: [[#{ui.data.column.SalesOrderPool.oriMaterialCode}]],
+                        },
+                        {
+                            field: 'materialDesc',
+                            title: [[#{ui.data.column.SalesOrderPool.materialDesc}]],
+                        },
+                        {
+                            field: 'ordQty',
+                            title: [[#{ui.data.column.SalesOrderPool.ordQty}]],
+                        },
+                        {
+                            field: 'weekYear',
+                            title: [[#{ui.data.column.SalesOrderPool.weekYear}]],
+                        },
+                        {
+                            field: 'dynamicBalance',
+                            title: [[#{ui.data.column.SalesOrderPool.dynamicBalance}]],
+                        },
+                        {
+                            field: 'uniformity',
+                            title: [[#{ui.data.column.SalesOrderPool.uniformity}]],
+                        },
+                        {
+                            field: 'eudr',
+                            title: [[#{ui.data.column.SalesOrderPool.eudr}]],
+                        },
+                        {
+                            field: 'deliverGoodsType',
+                            title: [[#{ui.data.column.SalesOrderPool.deliverGoodsType}]],
+                        },
+                        {
+                            field: 'scmPriority',
+                            title: [[#{ui.data.column.SalesOrderPool.scmPriority}]],
+                        },
+                        {
+                            field: 'scmDetailId',
+                            title: [[#{ui.data.column.SalesOrderPool.scmDetailId}]],
+                        },
+                        {
+                            field: 'remark',
+                            title: [[#{ui.data.column.SalesOrderPool.remark}]],
+                        },
+                {
+                    title: [[#{ui.data.btn.option}]],
+                    align: 'center',
+                    formatter: function (value, row, index) {
+                        var actions = [];
+                            actions.push('<a class="btn btn-success btn-xs ' + editFlag + '" href="javascript:void(0)" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>' + [[#{ui.frame.btn.modify}]] + '</a> ');
+                        actions.push('<a class="btn btn-danger btn-xs ' + removeFlag + '" href="javascript:void(0)" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>' + [[#{ui.frame.btn.delete}]] + '</a>');
+                        return actions.join('');
+                    }
+                }]
+        };
+        $.table.init(options);
+    });
+</script>
+</body>
+<th:block th:include="component/importExcelNormal :: importExcelNormal"/>
+</html>
