@@ -57,7 +57,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @Autowired
     private ISalesOrderPoolRemoteService iSalesOrderPoolService;
 
-    private final String prefix = "aps/monthplan/SalesOrderPool";
+    private final String prefix = "monthplan/SalesOrderPool";
 
     /**
      * 跳转至主页面

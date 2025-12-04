@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -29,7 +29,7 @@ import lombok.Data;
 @Data
 @TableName(value = "T_MP_SALES_ORDER_POOL")
 @ApiModel(value = "销售订单池对象", description = "销售订单池对象 ")
-public class SalesOrderPool extends CommonBusiEntity{
+public class SalesOrderPool extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 
