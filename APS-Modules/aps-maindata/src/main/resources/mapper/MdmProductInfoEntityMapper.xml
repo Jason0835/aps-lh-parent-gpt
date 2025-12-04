@@ -10,8 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="productGroupCode" column="PRODUCT_GROUP_CODE" jdbcType="VARCHAR"/>
         <result property="productTypeName" column="PRODUCT_TYPE_NAME" jdbcType="VARCHAR"/>
         <result property="mouldCategory" column="MOULD_CATEGORY" jdbcType="VARCHAR"/>
-        <result property="curingTime" column="CURING_TIME" jdbcType="DECIMAL"/>
-        <result property="mouldCapacity" column="MOULD_CAPACITY" jdbcType="DECIMAL"/>
+        <!--        <result property="curingTime" column="CURING_TIME" jdbcType="DECIMAL"/>-->
+        <!--        <result property="mouldCapacity" column="MOULD_CAPACITY" jdbcType="DECIMAL"/>-->
         <result property="specifications" column="SPECIFICATIONS" jdbcType="VARCHAR"/>
         <result property="pattern" column="PATTERN" jdbcType="VARCHAR"/>
         <result property="brand" column="BRAND" jdbcType="VARCHAR"/>
@@ -28,6 +28,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
         <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
         <result property="forbidTag" column="FORBID_TAG" jdbcType="VARCHAR"/>
+        <result property="mesProductCode" column="MES_PRODUCT_CODE" jdbcType="VARCHAR"/>
+        <result property="mainPattern" column="MAIN_PATTERN" jdbcType="VARCHAR"/>
+        <result property="structureCode" column="STRUCTURE_CODE" jdbcType="VARCHAR"/>
+        <result property="materialType" column="MATERIAL_TYPE" jdbcType="VARCHAR"/>
     </resultMap>
 
     <select id="selectByProductCode" resultMap="BaseResultMap">
@@ -40,9 +44,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
               PRODUCT_TYPE_CODE,
               PRODUCT_TYPE_NAME,
               MOULD_CATEGORY,
-              CURING_TIME,
-              HYDRAULIC_PRESSURE_CURING_TIME,
-              MOULD_CAPACITY,
               SPECIFICATIONS,
               PATTERN,
               BRAND,
@@ -61,7 +62,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
               SINGLE_TIRE_WEIGHT,
               MOULD_CLAMPING_PRESSURE,
               GROSS_RATE_JSON,
-              REMARK
+              REMARK,
+              MES_PRODUCT_CODE,
+              MAIN_PATTERN,
+              STRUCTURE_CODE,
+              MATERIAL_TYPE
             from T_MDM_PRODUCT_INFO
             where PRODUCT_CODE = #{productCode,jdbcType=VARCHAR}
             and IS_DELETE = '0'
@@ -91,9 +96,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                tmpi.PRODUCT_TYPE_CODE,
                tmpi.PRODUCT_TYPE_NAME,
                tmpi.MOULD_CATEGORY,
-               tmpi.CURING_TIME,
-               tmpi.HYDRAULIC_PRESSURE_CURING_TIME,
-               tmpi.MOULD_CAPACITY,
                tmpi.SPECIFICATIONS,
                tmpi.PATTERN,
                tmpi.BRAND,

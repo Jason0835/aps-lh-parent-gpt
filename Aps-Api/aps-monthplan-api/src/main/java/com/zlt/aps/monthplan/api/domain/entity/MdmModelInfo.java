@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -47,7 +48,7 @@ public class MdmModelInfo extends BaseEntity {
      * 模具号
      */
     @Excel(name = "ui.data.column.mdmModelInfo.mouldCode")
-    @ApiModelProperty(value = "模具号", name = "mouldCode")
+    @ApiModelProperty(value = "型腔模号", name = "mouldCode")
     @TableField(value = "MOULD_CODE")
     private String mouldCode;
 
@@ -66,6 +67,15 @@ public class MdmModelInfo extends BaseEntity {
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
+
+    /**
+     * 主花纹
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmProductInfo.mainPattern", sort = 8)
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
 
     /**
      * 花纹
@@ -130,6 +140,20 @@ public class MdmModelInfo extends BaseEntity {
     @ApiModelProperty(value = "模具气套类型", name = "mouldAirType")
     @TableField(value = "MOULD_AIR_TYPE")
     private String mouldAirType;
+
+    /**
+     * 物流状态,字典：	logistics_status
+     */
+    @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
+    @TableField(value = "LOGISTICS_STATUS")
+    private String logisticsStatus;
+
+    /**
+     * 模壳标准
+     */
+    @ApiModelProperty(value = "模壳标准", name = "shellStandard")
+    @TableField(value = "SHELL_STANDARD")
+    private String shellStandard;
 
     @TableField(exist = false)
     private String remark;
