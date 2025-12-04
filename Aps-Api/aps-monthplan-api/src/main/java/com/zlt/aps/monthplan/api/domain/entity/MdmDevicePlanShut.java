@@ -26,7 +26,7 @@ import java.util.Date;
  * 修改内容：...
  * @date 2025-12-04
  */
-@ApiModel(value = "0106基础数据_设备计划停机对象", description = "0106基础数据_设备计划停机对象 ")
+@ApiModel(value = "0106基础数据_设备计划停机对象", description = "0106基础数据_设备计划停机对象")
 @Data
 @TableName(value = "T_MDM_DEVICE_PLAN_SHUT")
 public class MdmDevicePlanShut extends BaseEntity {
@@ -41,24 +41,6 @@ public class MdmDevicePlanShut extends BaseEntity {
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    /**
-     * 年份
-     */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmDevicePlanShut.year")
-    @ApiModelProperty(value = "年份", name = "year")
-    @TableField(value = "YEAR")
-    private Integer year;
-
-    /**
-     * 月份
-     */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmDevicePlanShut.month")
-    @ApiModelProperty(value = "月份", name = "month")
-    @TableField(value = "MONTH")
-    private Integer month;
 
     /**
      * 工序，字典：work_calendar_proc；01-月计划,02-硫化,03-成型,04-胎面,05-胎侧,06--内衬,07-垫胶,08-胎圈,09-钢丝圈,10-斜裁,11-直裁,12-压延,15-零度,16-密炼
