@@ -1,20 +1,22 @@
 package com.zlt.aps.monthplan.api.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
- * 分厂生产计划查询条件类
+ * 月计划选择需求计划记录对象
  *
  * @author ZLT
- * @date 20250213
+ * @date 20251201
  */
 @Data
-@ApiModel(value = "分厂生产计划控制台查询条件对象", description = "分厂生产计划控制台查询条件对象")
-public class FactoryProductionPlanVo implements Serializable {
+@ApiModel(value = "月份计划-计划调整参数对象", description = "月份计划-计划调整参数对象")
+public class FactoryMonthPlanVersionVo implements Serializable {
 
     /**
      * 年份
@@ -46,4 +48,10 @@ public class FactoryProductionPlanVo implements Serializable {
     @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
     private String monthPlanVersion;
 
+    /**
+     * 创建时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "创建时间", name = "createTime")
+    private Date createTime;
 }

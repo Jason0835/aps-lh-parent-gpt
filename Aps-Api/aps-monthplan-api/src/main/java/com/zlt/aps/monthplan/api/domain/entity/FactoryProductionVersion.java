@@ -23,12 +23,12 @@ import java.util.Date;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-03-19
+ * @date 20251201
  */
 
 @Data
 @TableName(value = "T_MP_PROC_VERSION")
-@ApiModel(value = "分厂月度计划排程版本对象", description = "分厂月度计划排程版本对象 ")
+@ApiModel(value = "分厂月度计划排程版本对象", description = "分厂月度计划排程版本对象")
 public class FactoryProductionVersion extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -80,6 +80,22 @@ public class FactoryProductionVersion extends BaseEntity {
     @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
+
+    /**
+     * 计划类型：bit_plan_type 01 正常 02 订单预测 03 实单模拟
+     */
+    @Excel(name = "ui.data.column.factoryProductionVersion.planType")
+    @ApiModelProperty(value = "计划类型", name = "planType")
+    @TableField(value = "PLAN_TYPE")
+    private String planType;
+
+    /**
+     * 0 不进行需求排产 1 进行需求排产
+     */
+    @Excel(name = "ui.data.column.factoryProductionVersion.isSelectedDemand")
+    @ApiModelProperty(value = "是否进行需求排产", name = "isSelectedDemand")
+    @TableField(value = "IS_SELECTED_DEMAND")
+    private Integer isSelectedDemand;
 
     /**
      * 初始化版本

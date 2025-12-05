@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
@@ -24,7 +25,13 @@ public interface IFactoryConsoleService {
      * @return
      */
     List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition);
-
+    /**
+     * 根据条件，获取对应分厂的还未选择的销售需求计划版本信息
+     *
+     * @param queryCondition
+     * @return
+     */
+    List<FactoryMonthPlanVersionVo> getNoSelectedVersionList(FactoryProductionPlanVo queryCondition);
     /**
      * 按分厂 + 年月的方式生成销售需求月度计划
      * 1、获取分厂、年、月提报的销售需求订单

@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * 分厂月份计划控制台
  *
  * @author ZLT
- * @date 20250213
+ * @date 20251201
  */
 @RestController
 @RequestMapping("/factoryConsole")
@@ -54,6 +54,7 @@ public class FactoryConsoleController extends BaseController {
             return getDataTable(Collections.emptyList());
         }
         Map<String, FactoryProductionPlanResultVo> saleDemandMap = new HashMap<>();
+        //处理排结构、排模具版本信息，按年+月份+分厂+需求计划版本+胎别分组
         dataList.stream().forEach(factoryProductionPlanVersion -> {
             if (StringUtils.isBlank(factoryProductionPlanVersion.getProductTypeCode())) {
                 factoryProductionPlanVersion.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
@@ -88,9 +89,25 @@ public class FactoryConsoleController extends BaseController {
             }
             factoryProductionPlan.setProductVersionList(productVersionList.stream().sorted(Comparator.comparing(FactoryProductionVersionVo::getCreateTime, Comparator.reverseOrder())).collect(Collectors.toList()));
         });
-
+        //排序，按需求版本排序
         List<FactoryProductionPlanResultVo> sortList = convertList.stream().sorted(Comparator.comparing(FactoryProductionPlanResultVo::getMonthPlanVersion, Comparator.reverseOrder())).collect(Collectors.toList());
         return getDataTable(sortList);
+    }
+
+    /**
+     * 查询分厂的月份排产计划
+     *
+     * @param queryCondition 查询条件
+     * @return 结果集合
+     */
+    @ApiOperation("查询分厂月份对应还没选择的需求计划版本列表")
+    @PostMapping("/getNoSelectedVersionList")
+    public TableDataInfo getNoSelectedVersionList(@RequestBody FactoryProductionPlanVo queryCondition) {
+        List<FactoryMonthPlanVersionVo> dataList = factoryConsoleService.getNoSelectedVersionList(queryCondition);
+        if (CollectionUtils.isEmpty(dataList)) {
+            return getDataTable(Collections.emptyList());
+        }
+        return getDataTable(dataList);
     }
 
     /**
