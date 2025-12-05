@@ -85,4 +85,12 @@ public interface IMdmModelInfoRemoteService {
     @PostMapping("/mdmModelInfo/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mdmModelInfo/mesCapture")
+    AjaxResult mesCapture();
 }

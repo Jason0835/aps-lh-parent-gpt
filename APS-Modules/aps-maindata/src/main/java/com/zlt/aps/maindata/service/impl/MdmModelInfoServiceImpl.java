@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
@@ -137,5 +138,16 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
                 mdmModelInfo.setProSize(mouldCodeProSizeMap.get(mouldCode).replaceAll(".00", ""));
             }
         }
+    }
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @Override
+    public AjaxResult mesCapture() {
+        // steve's TODO 待接口完善后补充
+        return AjaxResult.success();
     }
 }

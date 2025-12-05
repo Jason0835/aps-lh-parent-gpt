@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.bill.common.service.IDocService;
 
@@ -25,4 +26,11 @@ public interface IMdmModelInfoService  extends IDocService<MdmModelInfo>{
      * @param list 列表
      */
     void setProSize(List<MdmModelInfo> list);
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    AjaxResult mesCapture();
 }
