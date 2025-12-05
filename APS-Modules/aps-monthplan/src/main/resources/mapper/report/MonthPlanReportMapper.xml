@@ -496,7 +496,7 @@
         proFinish.finish_quantity as produceFinishPlanQty
         FROM (
         SELECT BRAND
-        FROM t_mdm_product_info
+        FROM t_mdm_material_info
         WHERE IS_DELETE = 0
         AND FACTORY_CODE = #{factoryCode}
         GROUP BY BRAND
@@ -530,7 +530,7 @@
         FROM
         <include refid="saleFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE
         f.YEAR = #{year}
         AND f.MONTH = #{month}
@@ -595,7 +595,7 @@
         FROM
         <include refid="produceFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE
         f.IS_DELETE = 0 AND
         ((
@@ -622,7 +622,7 @@
         FROM
         <include refid="stockTableName"/>
         proStock
-        LEFT JOIN T_MDM_PRODUCT_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
+        LEFT JOIN T_MDM_MATERIAL_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE proStock.IS_DELETE = 0 AND proStock.FACTORY_CODE = #{factoryCode}
         <if test='month == 1'>AND proStock.YEAR = #{year} - 1 AND proStock.MONTH = 12</if>
         <if test='month != 1'>AND proStock.YEAR = #{year} AND proStock.MONTH = #{month} - 1</if>
@@ -646,7 +646,7 @@
         proFinish.finish_quantity as produceFinishPlanQty
         FROM (
         SELECT BRAND
-        FROM t_mdm_product_info
+        FROM t_mdm_material_info
         WHERE IS_DELETE = 0
         AND FACTORY_CODE = #{factoryCode}
         GROUP BY BRAND
@@ -680,7 +680,7 @@
         FROM
         <include refid="saleFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE
         f.YEAR = #{year}
         AND f.MONTH = #{month}
@@ -720,7 +720,7 @@
         FROM
         <include refid="produceFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE
         f.IS_DELETE = 0 AND
         ((
@@ -747,7 +747,7 @@
         FROM
         <include refid="stockTableName"/>
         proStock
-        LEFT JOIN T_MDM_PRODUCT_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
+        LEFT JOIN T_MDM_MATERIAL_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE proStock.IS_DELETE = 0 AND proStock.FACTORY_CODE = #{factoryCode}
         <if test='month == 1'>AND proStock.YEAR = #{year} - 1 AND proStock.MONTH = 12</if>
         <if test='month != 1'>AND proStock.YEAR = #{year} AND proStock.MONTH = #{month} - 1</if>
@@ -768,7 +768,7 @@
         proFinish.finish_quantity as produceFinishPlanQty
         FROM (
         SELECT BRAND, PRO_SIZE
-        FROM t_mdm_product_info
+        FROM t_mdm_material_info
         WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode}
         GROUP BY BRAND, PRO_SIZE
         ) productInfo
@@ -797,7 +797,7 @@
         FROM
         <include refid="saleFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE f.YEAR = #{year}
         AND f.MONTH = #{month}
         AND f.FACTORY_CODE = #{factoryCode}
@@ -864,7 +864,7 @@
         FROM
         <include refid="produceFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE f.IS_DELETE = 0 AND
         ((
         -- 上个月 26 - 31 日的数据
@@ -896,7 +896,7 @@
         proFinish.finish_quantity as produceFinishPlanQty
         FROM (
         SELECT BRAND, PRO_SIZE
-        FROM t_mdm_product_info
+        FROM t_mdm_material_info
         WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode}
         GROUP BY BRAND, PRO_SIZE
         ) productInfo
@@ -925,7 +925,7 @@
         FROM
         <include refid="saleFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE f.YEAR = #{year}
         AND f.MONTH = #{month}
         AND f.FACTORY_CODE = #{factoryCode}
@@ -967,7 +967,7 @@
         FROM
         <include refid="produceFinishTableName"/>
         f
-        left JOIN t_mdm_product_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
         WHERE f.IS_DELETE = 0 AND
         ((
         -- 上个月 26 - 31 日的数据
@@ -1372,7 +1372,7 @@
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
             proInfo.PRO_SIZE
         </if>
-        FROM t_mdm_product_info proInfo
+        FROM t_mdm_material_info proInfo
         WHERE proInfo.IS_DELETE = 0
         GROUP BY
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
@@ -1403,7 +1403,7 @@
         FROM
         <include refid="stockTableName"/>
         stock
-        LEFT JOIN t_mdm_product_info proInfo
+        LEFT JOIN t_mdm_material_info proInfo
         ON proInfo.IS_DELETE = 0 AND proInfo.PRODUCT_CODE = stock.PRODUCT_CODE
 
         WHERE stock.IS_DELETE = 0
@@ -1484,7 +1484,7 @@
         FROM
         <include refid="saleFinishTableName"/>
         saleFinish
-        LEFT JOIN t_mdm_product_info proInfo
+        LEFT JOIN t_mdm_material_info proInfo
         ON proInfo.IS_DELETE = 0 AND saleFinish.PRODUCT_CODE = proInfo.PRODUCT_CODE
 
         WHERE saleFinish.IS_DELETE = 0
@@ -1634,7 +1634,7 @@
         FROM
         <include refid="produceFinishTableName"/>
         proFinish
-        LEFT JOIN t_mdm_product_info proInfo
+        LEFT JOIN t_mdm_material_info proInfo
         ON proInfo.FACTORY_CODE = proFinish.FACTORY_CODE AND proFinish.PRODUCT_CODE = proInfo.PRODUCT_CODE AND
         proInfo.IS_DELETE = 0
         WHERE proFinish.IS_DELETE = 0
@@ -1672,7 +1672,7 @@
         proInfo.PRO_SIZE,
         mlc.LOCATION_TYPE,
         mlc.CHANNEL
-        FROM t_mdm_product_info proInfo
+        FROM t_mdm_material_info proInfo
         LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0
         AND proInfo.BRAND = mlc.BRAND
         WHERE proInfo.IS_DELETE = 0
@@ -1814,7 +1814,7 @@
         FROM
         <include refid="stockTableName"/>
         stock
-        LEFT JOIN t_mdm_product_info proInfo ON proInfo.IS_DELETE = 0
+        LEFT JOIN t_mdm_material_info proInfo ON proInfo.IS_DELETE = 0
         AND stock.PRODUCT_CODE = proInfo.PRODUCT_CODE
         LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0
         AND stock.LOCATION_TYPE = mlc.LOCATION_TYPE
@@ -1846,7 +1846,7 @@
                salePlan.PLAN_QTY AS                                         salePlanQty,
                CASE WHEN IFNULL(stock.STOCK_QTY, 0) = 0 THEN 0 ELSE 1 end   stockSkuCount,
                stock.STOCK_QTY
-        FROM t_mdm_product_info proInfo
+        FROM t_mdm_material_info proInfo
                  LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
                  LEFT JOIN (
             -- 使用 CTE 提前计算每个记录的不同日期范围的总和
@@ -1948,7 +1948,7 @@
         salePlan.PLAN_QTY AS salePlanQty,
         CASE WHEN IFNULL(stock.STOCK_QTY, 0) = 0 THEN 0 ELSE 1 end stockSkuCount,
         stock.STOCK_QTY
-        FROM t_mdm_product_info proInfo
+        FROM t_mdm_material_info proInfo
         LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
         LEFT JOIN (SELECT p.PRODUCT_CODE,
         p.BRAND,
@@ -2052,7 +2052,7 @@
                                               ELSE 0
                                               END AS day_26_31_sum
                                    FROM T_MP_MONTH_PLAN_PROD_FINAL p
-                                            LEFT JOIN t_mdm_product_info proInfo
+                                            LEFT JOIN t_mdm_material_info proInfo
                                                       ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
                                                           AND proInfo.FACTORY_CODE = @factoryCode
                                    WHERE (
@@ -2100,7 +2100,7 @@
         FROM
         <include refid="salePlanTableName"/>
         p
-        LEFT JOIN t_mdm_product_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
         AND proInfo.FACTORY_CODE = @factoryCode
         WHERE
         p.YEAR = @targetYear
@@ -2130,7 +2130,7 @@
         FROM
         <include refid="stockTableName"/>
         p
-        LEFT JOIN t_mdm_product_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
         AND proInfo.FACTORY_CODE = @factoryCode
         LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
         WHERE p.IS_DELETE = 0

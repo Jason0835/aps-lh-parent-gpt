@@ -7,11 +7,11 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
 import com.zlt.aps.maindata.service.IProductMinConfigurationService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -49,7 +49,7 @@ public class ProductMinConfigurationServiceImpl extends AbstractDocService<Produ
     private FactoryParamMapper factoryParamMapper;
 
     @Autowired
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     private final ProductMinConfigurationMapper productMinConfigurationMapper;
 
@@ -110,10 +110,10 @@ public class ProductMinConfigurationServiceImpl extends AbstractDocService<Produ
                             item -> StringUtils.defaultIfBlank(item.getParamValue(), item.getDefauleValue()), (s1, s2) -> s1));
             serviceCheckParams.put(FactoryConstant.DEFAULT_UP_WATER_LEVEL, map);
 
-            LambdaQueryWrapper<MdmProductInfo> productInfoWrapper = new LambdaQueryWrapper<>();
-            productInfoWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-            List<MdmProductInfo> productInfoList = mdmProductInfoEntityMapper.selectList(productInfoWrapper);
-            Map<String, String> productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, MdmProductInfo::getProductDesc, (s1, s2) -> s1));
+            LambdaQueryWrapper<MdmMaterialInfo> productInfoWrapper = new LambdaQueryWrapper<>();
+            productInfoWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+            List<MdmMaterialInfo> productInfoList = mdmMaterialInfoEntityMapper.selectList(productInfoWrapper);
+            Map<String, String> productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMaterialDesc, (s1, s2) -> s1));
             serviceCheckParams.put("productInfoMap", productInfoMap);
         }
 

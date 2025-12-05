@@ -12,9 +12,9 @@ import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.enums.LocationTypeEnum;
 import com.tlt.aps.enums.ProductCommonTypeEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
@@ -60,7 +60,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 public class ProductStockMonthServiceImpl implements IProductStockMonthService {
 
     private final ProductStockMonthMapper productStockMonthMapper;
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final IRemoteImportLogService iRemoteImportLogService;
     private final IRemoteImportErrorLogService iRemoteImportErrorLogService;
@@ -97,12 +97,12 @@ public class ProductStockMonthServiceImpl implements IProductStockMonthService {
         if (CollectionUtils.isEmpty(productCodeList)) {
             return;
         }
-        Map<String, MdmProductInfo> infoMap = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmProductInfo.class)
-                        .in(MdmProductInfo::getProductCode, productCodeList))
-                .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        Map<String, MdmMaterialInfo> infoMap = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                        .in(MdmMaterialInfo::getMaterialCode, productCodeList))
+                .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
 
         for (ProductStockMonth itemStock : monthList) {
-            MdmProductInfo productInfo = infoMap.get(GenerageMapKeyUtils.createMapKey(itemStock.getFactoryCode(), itemStock.getProductCode()));
+            MdmMaterialInfo productInfo = infoMap.get(GenerageMapKeyUtils.createMapKey(itemStock.getFactoryCode(), itemStock.getProductCode()));
             if (productInfo == null) {
                 continue;
             }
@@ -131,13 +131,13 @@ public class ProductStockMonthServiceImpl implements IProductStockMonthService {
 
         // 查询对应物料信息
         List<String> productCodeList = list.stream().map(ProductStockMonth::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>();
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(productCodeList)) {
             List<String> factoryCodeList = list.stream().map(ProductStockMonth::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-            productInfoMap = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmProductInfo.class)
-                            .in(MdmProductInfo::getProductCode, productCodeList)
-                            .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList))
-                    .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+            productInfoMap = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                            .in(MdmMaterialInfo::getMaterialCode, productCodeList)
+                            .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList))
+                    .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
         }
 
         // 唯一键分组
@@ -156,14 +156,14 @@ public class ProductStockMonthServiceImpl implements IProductStockMonthService {
             }
 
             // 物料信息校验
-            MdmProductInfo mdmProductInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(itemStock.getFactoryCode(), itemStock.getProductCode()));
-            if (mdmProductInfo == null) {
+            MdmMaterialInfo mdmMaterialInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(itemStock.getFactoryCode(), itemStock.getProductCode()));
+            if (mdmMaterialInfo == null) {
                 failureNum++;
                 addImportErrorLog(importLogId, errorNum, String.format(productCodeError, itemStock.getProductCode()), importErrorLogs);
                 continue;
             } else {
-                itemStock.setProductDesc(mdmProductInfo.getProductDesc());
-                String commonType = mdmProductInfo.getCommonType();
+                itemStock.setProductDesc(mdmMaterialInfo.getMaterialDesc());
+                String commonType = mdmMaterialInfo.getCommonType();
                 LocationTypeEnum locationTypeEnum = ProductCommonTypeEnum.getLocationTypeByCode(commonType);
                 itemStock.setLocationType(locationTypeEnum.getValue());
             }

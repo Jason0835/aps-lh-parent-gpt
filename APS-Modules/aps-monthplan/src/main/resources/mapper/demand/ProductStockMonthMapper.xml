@@ -24,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                b.pattern,
                b.pro_size
         from T_MDM_PRODUCT_STOCK_MONTH a
-                 left join T_MDM_PRODUCT_INFO b on b.IS_DELETE = 0
+        left join T_MDM_MATERIAL_INFO b on b.IS_DELETE = 0
             and b.FACTORY_CODE = a.FACTORY_CODE
             and b.PRODUCT_CODE = a.PRODUCT_CODE
         where a.IS_DELETE = 0

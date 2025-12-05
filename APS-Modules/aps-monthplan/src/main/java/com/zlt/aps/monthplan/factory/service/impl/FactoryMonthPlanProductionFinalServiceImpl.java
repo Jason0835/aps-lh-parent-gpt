@@ -25,9 +25,9 @@ import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -109,7 +109,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
 
     private final MonthPlanProductionDayResultMapper monthPlanProductionDayResultMapper;
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final BaseDao baseDao;
 
@@ -442,7 +442,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
             List<String> productCodeList = resultVos.stream().map(MonthPlanProductionFinalResult::getProductCode).distinct().collect(Collectors.toList());
             Map<String, MdmProductConstruction> productConstructionMap = new HashMap<>(16);
             Map<String, List<MdmSkuMouldRel>> modelRelationMap = new HashMap<>(16);
-            Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
+            Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
             if (!CollectionUtils.isEmpty(productCodeList)) {
                 // 查询SAP与施工关系
                 LambdaQueryWrapper<MdmProductConstruction> consWrapper = new LambdaQueryWrapper<>();
@@ -457,11 +457,11 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                     modelRelationMap = modelRelationList.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getMaterialCode(), item.getMouldNo())));
                 }
                 // 查询物料信息，用于校验、回填信息
-                LambdaQueryWrapper<MdmProductInfo> productInfoWrapper = new LambdaQueryWrapper<>();
-                productInfoWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-                List<MdmProductInfo> productInfoList = productInfoEntityMapper.selectList(productInfoWrapper);
+                LambdaQueryWrapper<MdmMaterialInfo> productInfoWrapper = new LambdaQueryWrapper<>();
+                productInfoWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+                List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.selectList(productInfoWrapper);
                 if (!CollectionUtils.isEmpty(productInfoList)) {
-                    productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, Function.identity()));
+                    productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity()));
                 }
             }
 
@@ -492,8 +492,8 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                 if (!productInfoMap.containsKey(productCode)) {
                     addImportErrorLog(analysisHelper.getImportLogId(), errorNum, productCodeNotExistMsg, importErrorLogs);
                 } else {
-                    MdmProductInfo productInfo = productInfoMap.get(productCode);
-                    excelVo.setProductDesc(productInfo.getProductDesc());
+                    MdmMaterialInfo productInfo = productInfoMap.get(productCode);
+                    excelVo.setProductDesc(productInfo.getMaterialDesc());
                     excelVo.setBrand(productInfo.getBrand());
                     excelVo.setProSize(productInfo.getProSize());
                     excelVo.setSpecifications(productInfo.getSpecifications());
@@ -932,9 +932,9 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
     }
 
     private void setProductInfo(MonthPlanNoticeOrder noticeOrder, MonthPlanProductionFinalResult param) {
-        MdmProductInfo productInfo = productInfoEntityMapper.selectByProductCode(param.getProductCode());
+        MdmMaterialInfo productInfo = productInfoEntityMapper.selectByProductCode(param.getProductCode());
         if (productInfo != null) {
-            noticeOrder.setProductDesc(productInfo.getProductDesc());
+            noticeOrder.setProductDesc(productInfo.getMaterialDesc());
             noticeOrder.setBrand(productInfo.getBrand());
             noticeOrder.setProSize(productInfo.getProSize());
             noticeOrder.setProductTypeCode(productInfo.getProductTypeCode());
@@ -1039,10 +1039,10 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
 
 
     private void setProductInfo(MonthPlanProductionFinalResult finalData, String productCode) {
-        MdmProductInfo productInfo = productInfoEntityMapper.selectByProductCode(productCode);
+        MdmMaterialInfo productInfo = productInfoEntityMapper.selectByProductCode(productCode);
         if (productInfo != null) {
             // 手动设置产品属性，避免依赖特定 BeanUtils 实现
-            finalData.setProductDesc(productInfo.getProductDesc());
+            finalData.setProductDesc(productInfo.getMaterialDesc());
             finalData.setBrand(productInfo.getBrand());
             finalData.setProSize(productInfo.getProSize());
             finalData.setSpecifications(productInfo.getSpecifications());
@@ -2275,15 +2275,15 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
             return;
         }
         // 查询对应物料信息，根据分厂+SAP代码映射
-        Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(importList);
+        Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(importList);
         //补充物料信息
         importList.stream().forEach(item -> {
             //物料信息补充-不进行校验
-            MdmProductInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
+            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
             if (null == productInfo) {
                 return;
             }
-            item.setProductDesc(productInfo.getProductDesc());
+            item.setProductDesc(productInfo.getMaterialDesc());
             item.setProSize(productInfo.getProSize());
             item.setBrand(productInfo.getBrand());
             item.setSpecifications(productInfo.getSpecifications());
@@ -2300,7 +2300,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
      *
      * @param list 排产计划结合
      */
-    private Map<String, MdmProductInfo> getMdmProductInfoMap(List<MonthPlanProductionFinalResult> list) {
+    private Map<String, MdmMaterialInfo> getMdmMaterialInfoMap(List<MonthPlanProductionFinalResult> list) {
         if (CollectionUtils.isEmpty(list)) {
             return new HashMap<>();
         }
@@ -2309,9 +2309,9 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
         if (CollectionUtils.isEmpty(factoryCodeList) && CollectionUtils.isEmpty(productCodeList)) {
             return Collections.emptyMap();
         }
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(!CollectionUtils.isEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(!CollectionUtils.isEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(!CollectionUtils.isEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(!CollectionUtils.isEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
     }
 }

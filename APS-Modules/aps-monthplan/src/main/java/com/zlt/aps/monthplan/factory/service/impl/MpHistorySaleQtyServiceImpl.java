@@ -18,10 +18,10 @@ import com.tlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.maindata.mapper.LocationChannelConfigurationMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.entity.LocationChannelConfiguration;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpDayHistorySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleQty;
 import com.zlt.aps.monthplan.api.domain.itf.InDataListVo;
@@ -85,7 +85,7 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
 
     private final IRemoteImportErrorLogService iRemoteImportErrorLogService;
 
-    private final MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     private static final int BATCH_SIZE = 100;
 
@@ -215,48 +215,8 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
     private void processImportList(List<MpHistorySaleQtyExcelVo> importList, List<ImportErrorLog> importErrorLogs, int successNum) {
         processBatch(importList);
     }
-
-    private void processBatch(List<MpHistorySaleQtyExcelVo> batchList) {
-        List<MpHistorySaleQty> insertList = new ArrayList<>();
-
-        for (MpHistorySaleQtyExcelVo vo : batchList) {
-            addRecordsForAllMonths(vo, insertList);
-        }
-
-        // 先删除历史年月、分厂的数据
-        LambdaQueryWrapper<MpHistorySaleQty> wrapper = LambdaWrapperBuilder.buildWrapperByFunction(insertList, MpHistorySaleQty::getYear,
-                MpHistorySaleQty::getMonth, MpHistorySaleQty::getFactoryCode);
-        getBaseMapper().delete(wrapper);
-
-        // 执行批量插入
-        if (CollectionUtils.isNotEmpty(insertList)) {
-            // 分厂+物料号 关联 物料信息表
-            Map<String, List<MpHistorySaleQty>> groupMap = insertList.stream()
-                    .filter(v -> StringUtils.isNotBlank(v.getFactoryCode()) && StringUtils.isNotBlank(v.getProductCode()))
-                    .collect(Collectors.groupingBy(MpHistorySaleQty::getFactoryCode));
-            groupMap.forEach((factoryCode, itemList) -> {
-                List<String> productCodeList = itemList.stream().map(MpHistorySaleQty::getProductCode).distinct().collect(Collectors.toList());
-                if (CollectionUtils.isNotEmpty(productCodeList)) {
-                    LambdaQueryWrapper<MdmProductInfo> itemWrapper = Wrappers.lambdaQuery();
-                    itemWrapper.eq(MdmProductInfo::getFactoryCode, factoryCode);
-                    itemWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-                    List<MdmProductInfo> productInfoList = mdmProductInfoEntityMapper.selectList(itemWrapper);
-                    Map<String, String> productInfoMap = productInfoList.stream()
-                            .filter(v -> StringUtils.isNotBlank(v.getProductDesc()))
-                            .collect(Collectors.toMap(MdmProductInfo::getProductCode, MdmProductInfo::getProductDesc, (v1, v2) -> v1));
-                    for (MpHistorySaleQty item : itemList) {
-                        if (productInfoMap.containsKey(item.getProductCode())) {
-                            item.setProductDesc(productInfoMap.get(item.getProductCode()));
-                        }
-                    }
-                }
-            });
-
-            for (List<MpHistorySaleQty> itemList : ListUtils.partition(insertList, BATCH_SIZE)) {
-                getBaseMapper().batchInsertHistorySaleQty(itemList);
-            }
-        }
-    }
+    @Autowired
+    private MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     /**
      * 创建历史销售记录参数
@@ -389,15 +349,6 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
         }
     }
 
-    @Autowired
-    private MdmProductInfoEntityMapper productInfoEntityMapper;
-
-    @Autowired
-    private LocationChannelConfigurationMapper locationChannelConfigurationMapper;
-
-    @Autowired
-    private MpDayHistorySaleQtyEntityMapper mpDayHistorySaleQtyEntityMapper;
-
     /**
      * 将接口的列表数据转成内销历史订单数据
      *
@@ -406,7 +357,7 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
      * @param locationChannelConfigurationMap 库位类别渠道数据
      * @return 内销历史订单数据
      */
-    private static List<MpDayHistorySaleQty> transFormSyncListToHisOrderList(List<InDataListVo> inDataListVoList, Map<String, MdmProductInfo> productInfoMap, Map<String, LocationChannelConfiguration> locationChannelConfigurationMap) {
+    private static List<MpDayHistorySaleQty> transFormSyncListToHisOrderList(List<InDataListVo> inDataListVoList, Map<String, MdmMaterialInfo> productInfoMap, Map<String, LocationChannelConfiguration> locationChannelConfigurationMap) {
         List<MpDayHistorySaleQty> saveList = new ArrayList<>();
         for (InDataListVo inDataListVo : inDataListVoList) {
             MpDayHistorySaleQty mpDayHistorySaleQty = new MpDayHistorySaleQty();
@@ -420,9 +371,9 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
             mpDayHistorySaleQty.setProductCode(goodsNum);
 
             if (productInfoMap.containsKey(goodsNum)) {
-                MdmProductInfo productInfo = productInfoMap.get(goodsNum);
+                MdmMaterialInfo productInfo = productInfoMap.get(goodsNum);
                 mpDayHistorySaleQty.setBrand(productInfo.getBrand());
-                mpDayHistorySaleQty.setProductDesc(productInfo.getProductDesc());
+                mpDayHistorySaleQty.setProductDesc(productInfo.getMaterialDesc());
                 if (ApsConstant.APS_STRING_2.equals(productInfo.getCommonType())) {
                     mpDayHistorySaleQty.setLocationType(ApsConstant.APS_STRING_2);
                 }
@@ -444,6 +395,54 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
         return saveList;
     }
 
+    @Autowired
+    private LocationChannelConfigurationMapper locationChannelConfigurationMapper;
+
+    @Autowired
+    private MpDayHistorySaleQtyEntityMapper mpDayHistorySaleQtyEntityMapper;
+
+    private void processBatch(List<MpHistorySaleQtyExcelVo> batchList) {
+        List<MpHistorySaleQty> insertList = new ArrayList<>();
+
+        for (MpHistorySaleQtyExcelVo vo : batchList) {
+            addRecordsForAllMonths(vo, insertList);
+        }
+
+        // 先删除历史年月、分厂的数据
+        LambdaQueryWrapper<MpHistorySaleQty> wrapper = LambdaWrapperBuilder.buildWrapperByFunction(insertList, MpHistorySaleQty::getYear,
+                MpHistorySaleQty::getMonth, MpHistorySaleQty::getFactoryCode);
+        getBaseMapper().delete(wrapper);
+
+        // 执行批量插入
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            // 分厂+物料号 关联 物料信息表
+            Map<String, List<MpHistorySaleQty>> groupMap = insertList.stream()
+                    .filter(v -> StringUtils.isNotBlank(v.getFactoryCode()) && StringUtils.isNotBlank(v.getProductCode()))
+                    .collect(Collectors.groupingBy(MpHistorySaleQty::getFactoryCode));
+            groupMap.forEach((factoryCode, itemList) -> {
+                List<String> productCodeList = itemList.stream().map(MpHistorySaleQty::getProductCode).distinct().collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(productCodeList)) {
+                    LambdaQueryWrapper<MdmMaterialInfo> itemWrapper = Wrappers.lambdaQuery();
+                    itemWrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+                    itemWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+                    List<MdmMaterialInfo> productInfoList = mdmMaterialInfoEntityMapper.selectList(itemWrapper);
+                    Map<String, String> productInfoMap = productInfoList.stream()
+                            .filter(v -> StringUtils.isNotBlank(v.getMaterialDesc()))
+                            .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMaterialDesc, (v1, v2) -> v1));
+                    for (MpHistorySaleQty item : itemList) {
+                        if (productInfoMap.containsKey(item.getProductCode())) {
+                            item.setProductDesc(productInfoMap.get(item.getProductCode()));
+                        }
+                    }
+                }
+            });
+
+            for (List<MpHistorySaleQty> itemList : ListUtils.partition(insertList, BATCH_SIZE)) {
+                getBaseMapper().batchInsertHistorySaleQty(itemList);
+            }
+        }
+    }
+
     /**
      * 处理内销销售订单同步结果数据
      *
@@ -459,12 +458,12 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
         log.info("开始处理内销订单返回数据");
         // 查询物料信息
         List<String> productCodeList = inDataListVoList.stream().map(InDataListVo::getGoodsNum).distinct().collect(Collectors.toList());
-        LambdaQueryWrapper<MdmProductInfo> productQueryWrapper = new LambdaQueryWrapper<>();
-        productQueryWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-        List<MdmProductInfo> mdmProductInfoList = productInfoEntityMapper.selectList(productQueryWrapper);
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(mdmProductInfoList)) {
-            productInfoMap = mdmProductInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> productQueryWrapper = new LambdaQueryWrapper<>();
+        productQueryWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+        List<MdmMaterialInfo> mdmMaterialInfoList = productInfoEntityMapper.selectList(productQueryWrapper);
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(mdmMaterialInfoList)) {
+            productInfoMap = mdmMaterialInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (v1, v2) -> v1));
         }
 
         // 查询库位类别渠道数据，分厂编号、市场类别、品牌分组
@@ -624,13 +623,13 @@ public class MpHistorySaleQtyServiceImpl extends ServiceImpl<MpHistorySaleQtyMap
             groupMap.forEach((factoryCode, itemList) -> {
                 List<String> productCodeList = itemList.stream().map(MpHistorySaleQty::getProductCode).distinct().collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(productCodeList)) {
-                    LambdaQueryWrapper<MdmProductInfo> itemWrapper = Wrappers.lambdaQuery();
-                    itemWrapper.eq(MdmProductInfo::getFactoryCode, factoryCode);
-                    itemWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-                    List<MdmProductInfo> productInfoList = mdmProductInfoEntityMapper.selectList(itemWrapper);
+                    LambdaQueryWrapper<MdmMaterialInfo> itemWrapper = Wrappers.lambdaQuery();
+                    itemWrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+                    itemWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+                    List<MdmMaterialInfo> productInfoList = mdmMaterialInfoEntityMapper.selectList(itemWrapper);
                     Map<String, String> productInfoMap = productInfoList.stream()
-                            .filter(v -> StringUtils.isNotBlank(v.getProductDesc()))
-                            .collect(Collectors.toMap(MdmProductInfo::getProductCode, MdmProductInfo::getProductDesc, (v1, v2) -> v1));
+                            .filter(v -> StringUtils.isNotBlank(v.getMaterialDesc()))
+                            .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMaterialDesc, (v1, v2) -> v1));
                     for (MpHistorySaleQty item : itemList) {
                         if (productInfoMap.containsKey(item.getProductCode())) {
                             item.setProductDesc(productInfoMap.get(item.getProductCode()));

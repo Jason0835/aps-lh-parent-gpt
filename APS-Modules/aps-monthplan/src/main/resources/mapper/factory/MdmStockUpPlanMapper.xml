@@ -42,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         and MONTH = #{month}
         <if test="tireType != null and tireType != ''">
             and (FACTORY_CODE,PRODUCT_CODE) in(
-            select tmpi.FACTORY_CODE,tmpi.PRODUCT_CODE from T_MDM_PRODUCT_INFO tmpi
+            select tmpi.FACTORY_CODE,tmpi.PRODUCT_CODE from T_MDM_MATERIAL_INFO tmpi
             where tmpi.IS_DELETE = 0
             and tmpi.TIRE_TYPE = #{tireType}
             )

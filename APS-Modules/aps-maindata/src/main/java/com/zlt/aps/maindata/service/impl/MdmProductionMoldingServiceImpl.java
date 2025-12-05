@@ -12,11 +12,11 @@ import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineClsEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductionMoldingEntityMapper;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductionMoldingService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineCls;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductionMolding;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductionMoldingPageVo;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -49,7 +49,7 @@ public class MdmProductionMoldingServiceImpl extends BaseService<MdmProductionMo
     private MdmMoldingMachineClsEntityMapper moldingMachineClsEntityMapper;
 
     @Resource
-    private IMdmProductInfoService iMdmProductInfoService;
+    private IMdmMaterialInfoService iMdmMaterialInfoService;
 
     @Resource
     private BaseDao baseDao;
@@ -284,7 +284,7 @@ public class MdmProductionMoldingServiceImpl extends BaseService<MdmProductionMo
         }
 
         // 查询对应物料信息
-        List<MdmProductInfo> productInfoList = iMdmProductInfoService.selectListByProductCode(Collections.singletonList(vo.getProductCode()));
+        List<MdmMaterialInfo> productInfoList = iMdmMaterialInfoService.selectListByProductCode(Collections.singletonList(vo.getProductCode()));
         if (CollectionUtils.isEmpty(productInfoList)) {
             return result;
         }

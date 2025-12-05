@@ -72,7 +72,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
         SELECT a.*, IFNULL(b.PRO_SIZE, '') AS PRO_SIZE
         FROM t_mdm_product_model_relation a
-        LEFT JOIN t_mdm_product_info b ON a.PRODUCT_CODE = b.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info b ON a.PRODUCT_CODE = b.PRODUCT_CODE
         WHERE a.MOULD_CODE IN
         <foreach item="item" index="index" collection="list" open="(" separator="," close=")">
             #{item}
@@ -82,7 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectByProductCodeModuleNo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
         SELECT a.*
         FROM t_mdm_product_model_relation a
-        LEFT JOIN t_mdm_product_info b ON a.PRODUCT_CODE = b.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info b ON a.PRODUCT_CODE = b.PRODUCT_CODE
         WHERE a.MOULD_CODE IN
         <foreach item="item" index="index" collection="list" open="(" separator="," close=")">
             #{item}

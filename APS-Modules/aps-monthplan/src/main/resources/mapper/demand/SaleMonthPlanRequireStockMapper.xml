@@ -4,7 +4,7 @@
 
     <update id="updateProductInfo">
         UPDATE t_mp_month_require_stock mrs
-          JOIN t_mdm_product_info mpi
+            JOIN t_mdm_material_info mpi
             ON mrs.FACTORY_CODE = mpi.FACTORY_CODE
            AND mrs.PRODUCT_CODE = mpi.PRODUCT_CODE
            AND IFNULL(mpi.IS_DELETE, 0) = 0

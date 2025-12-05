@@ -21,7 +21,7 @@ public class ProductVersionReportVo extends BaseEntity {
     /**
      * 分厂
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.factoryCode")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.factoryCode")
     @ApiModelProperty(value = "分厂", name = "factoryCode")
     private String factoryCode;
 
@@ -59,14 +59,14 @@ public class ProductVersionReportVo extends BaseEntity {
     /**
      * 物料号
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.productCode")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productCode")
     @ApiModelProperty(value = "物料号", name = "productCode")
     private String productCode;
 
     /**
      * 规格描述
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.productDesc")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productDesc")
     @ApiModelProperty(value = "规格描述", name = "productDesc")
     private String productDesc;
 
@@ -87,21 +87,21 @@ public class ProductVersionReportVo extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.brand", dictType = "biz_brand_type")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     private String brand;
 
     /**
      * 寸口
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.proSize")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.proSize")
     @ApiModelProperty(value = "寸口", name = "proSize")
     private String proSize;
 
     /**
      * 花纹
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.pattern")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     private String pattern;
 

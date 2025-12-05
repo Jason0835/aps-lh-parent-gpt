@@ -7,9 +7,9 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.mdm.mapper.FactoryNoProductionMapper;
 import com.zlt.aps.monthplan.mdm.service.IFactoryNoProductionService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -46,7 +46,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 @RequiredArgsConstructor
 public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProductionMapper, FactoryNoProduction> implements IFactoryNoProductionService {
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final FactoryNoProductionMapper factoryNoProductionMapper;
 
@@ -71,15 +71,15 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
     public boolean save(FactoryNoProduction noProduction) {
         String productCode = noProduction.getProductCode();
         String factoryCode = noProduction.getFactoryCode();
-        QueryWrapper<MdmProductInfo> productQuery = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> productQuery = new QueryWrapper<>();
         productQuery.eq("FACTORY_CODE", factoryCode);
         productQuery.eq("PRODUCT_CODE", productCode);
         productQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        List<MdmProductInfo> productInfoList = productInfoEntityMapper.selectList(productQuery);
+        List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.selectList(productQuery);
         if (CollectionUtils.isEmpty(productInfoList)) {
             return super.save(noProduction);
         }
-        noProduction.setProductDesc(productInfoList.get(0).getProductDesc());
+        noProduction.setProductDesc(productInfoList.get(0).getMaterialDesc());
         return super.save(noProduction);
     }
 
@@ -140,7 +140,7 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
                 addImportErrorLog(importLogId, errorNum, errorMessage, validated);
             }
             //查询和赋值物料号
-            MdmProductInfo productInfo = productInfoEntityMapper.selectByProductCode(info.getProductCode());
+            MdmMaterialInfo productInfo = productInfoEntityMapper.selectByProductCode(info.getProductCode());
             if (productInfo == null) {
                 failureNum++;
                 String message = String.format(rowCountStr, i + 2) + productCodeError;
@@ -148,7 +148,7 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
                         message, importErrorLogs);
                 continue;
             } else {
-                info.setProductDesc(productInfo.getProductDesc());
+                info.setProductDesc(productInfo.getMaterialDesc());
             }
 
             if (org.apache.commons.collections4.CollectionUtils.isNotEmpty(validated)) {

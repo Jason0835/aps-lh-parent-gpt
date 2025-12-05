@@ -13,7 +13,7 @@ import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductMinConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
@@ -94,7 +94,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
 
     private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
 
-    private final IMdmProductInfoService iMdmProductInfoService;
+    private final IMdmMaterialInfoService iMdmMaterialInfoService;
 
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
 
@@ -449,7 +449,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         version.setMonth(month);
         version.setMonthPlanVersion(monthPlanVersion);
         version.setIsFinal(Constant.FALSE);
-        // 取销售订单的胎别 
+        // 取销售订单的胎别
         if (!CollectionUtils.isEmpty(saleOrderList)) {
             MonthPlanSaleOrder saleOrder = saleOrderList.get(0);
             version.setProductTypeCode(saleOrder.getProductTypeCode());
@@ -807,7 +807,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         }
 
         // 查询对应物料信息
-        Map<String, MdmProductInfo> productInfoMap = getProductInfoMapByStockUp(stockPlanList);
+        Map<String, MdmMaterialInfo> productInfoMap = getProductInfoMapByStockUp(stockPlanList);
         // 记录未提报的备货达到最小批量的部分
         List<MdmStockUpPlan> noSubmitList = new ArrayList<>();
         // 取出总备货达到上调控制水位的记录
@@ -819,7 +819,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
             ProductMinConfiguration minConfiguration = minConfigurationMap.get(groupKey);
             if (minConfiguration == null) {
                 // 取通配符最小批量配置
-                MdmProductInfo info = productInfoMap.get(GenerageMapKeyUtils.createMapKey(stockUpPlan.getFactoryCode(), stockUpPlan.getProductCode()));
+                MdmMaterialInfo info = productInfoMap.get(GenerageMapKeyUtils.createMapKey(stockUpPlan.getFactoryCode(), stockUpPlan.getProductCode()));
                 if (info != null) {
                     minConfiguration = minWildcardConfigMap.get(getProductTypeCodeKey(info.getFactoryCode(), info.getProductTypeCode()));
                 }
@@ -1342,7 +1342,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         }
 
         // 根据备货查询对应物料信息Map(分厂+SAP代码)
-        Map<String, MdmProductInfo> productMap = getProductInfoMapByStockUp(noSubmitList);
+        Map<String, MdmMaterialInfo> productMap = getProductInfoMapByStockUp(noSubmitList);
 
         for (MdmStockUpPlan itemPlan : noSubmitList) {
             String groupKey = itemPlan.getGroupKey();
@@ -1354,12 +1354,12 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
             require.setMonth(itemPlan.getMonth());
             require.setFactoryCode(itemPlan.getFactoryCode());
             require.setProductCode(itemPlan.getProductCode());
-            MdmProductInfo productInfo = productMap.get(GenerageMapKeyUtils.createMapKey(itemPlan.getFactoryCode(), itemPlan.getProductCode()));
+            MdmMaterialInfo productInfo = productMap.get(GenerageMapKeyUtils.createMapKey(itemPlan.getFactoryCode(), itemPlan.getProductCode()));
             String commonType = null;
             if (productInfo != null) {
                 // 复制对应物料信息字段
                 require.setBrand(productInfo.getBrand());
-                require.setProductDesc(productInfo.getProductDesc());
+                require.setProductDesc(productInfo.getMaterialDesc());
                 require.setProductTypeCode(productInfo.getProductTypeCode());
                 require.setProductTypeName(productInfo.getProductTypeName());
                 require.setProSize(productInfo.getProSize());
@@ -1418,14 +1418,14 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
     /**
      * 根据备货查询对应物料信息Map(分厂+SAP代码)
      */
-    private Map<String, MdmProductInfo> getProductInfoMapByStockUp(List<MdmStockUpPlan> list) {
+    private Map<String, MdmMaterialInfo> getProductInfoMapByStockUp(List<MdmStockUpPlan> list) {
         if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyMap();
         }
         List<String> factoryCodeList = list.stream().map(MdmStockUpPlan::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         List<String> productCodeList = list.stream().map(MdmStockUpPlan::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        List<MdmProductInfo> productInfoList = iMdmProductInfoService.selectListByFactoryProductCode(factoryCodeList, productCodeList);
-        return productInfoList.stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode())
+        List<MdmMaterialInfo> productInfoList = iMdmMaterialInfoService.selectListByFactoryProductCode(factoryCodeList, productCodeList);
+        return productInfoList.stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode())
                 , Function.identity(), (v1, v2) -> v1));
     }
 

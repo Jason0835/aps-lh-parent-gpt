@@ -20,9 +20,9 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
@@ -81,7 +81,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
 
     private final BaseDao baseDao;
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
 
@@ -586,7 +586,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         //补充物料信息
         if (CollectionUtils.isNotEmpty(importList)) {
             // 查询对应物料信息，根据分厂+SAP代码映射
-            Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(importList);
+            Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(importList);
             fullProductInfo(importList, productInfoMap);
         }
         //保存SAP与施工关系
@@ -639,7 +639,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      *
      * @param list 排产计划结合
      */
-    private Map<String, MdmProductInfo> getMdmProductInfoMap(List<FactoryMonthPlanProdFinal> list) {
+    private Map<String, MdmMaterialInfo> getMdmMaterialInfoMap(List<FactoryMonthPlanProdFinal> list) {
         if (CollectionUtils.isEmpty(list)) {
             return new HashMap<>();
         }
@@ -649,10 +649,10 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             return Collections.emptyMap();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(CollectionUtils.isNotEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(CollectionUtils.isNotEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
     }
 
     /**
@@ -778,14 +778,14 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      * @param importList     需要导入的计划集合
      * @param productInfoMap 物料信息
      */
-    private void fullProductInfo(List<FactoryMonthPlanProdFinal> importList, Map<String, MdmProductInfo> productInfoMap) {
+    private void fullProductInfo(List<FactoryMonthPlanProdFinal> importList, Map<String, MdmMaterialInfo> productInfoMap) {
         importList.stream().forEach(item -> {
             //物料信息补充-不进行校验
-            MdmProductInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
+            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
             if (null == productInfo) {
                 return;
             }
-            item.setProductDesc(productInfo.getProductDesc());
+            item.setProductDesc(productInfo.getMaterialDesc());
             item.setProSize(productInfo.getProSize());
             item.setSpecifications(productInfo.getSpecifications());
             item.setPattern(productInfo.getPattern());

@@ -11,9 +11,9 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductionMoldingService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductionMolding;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductionMoldingPageVo;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductionMoldingVo;
@@ -44,7 +44,7 @@ public class MdmProductionMoldingController extends BaseController {
     private IMdmProductionMoldingService ifactoryProductionProductService;
 
     @Autowired
-    private IMdmProductInfoService iProductInfoService;
+    private IMdmMaterialInfoService iProductInfoService;
 
     /**
      * 查询分厂成型正在生产的品种列表
@@ -73,9 +73,9 @@ public class MdmProductionMoldingController extends BaseController {
         }
 
         List<String> codeList = list.stream().map(MdmProductionMolding::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        List<MdmProductInfo> infoList = iProductInfoService.selectListByProductCode(codeList);
+        List<MdmMaterialInfo> infoList = iProductInfoService.selectListByProductCode(codeList);
         Map<String, String> infoMap = infoList.stream().filter(v -> StringUtils.isNotBlank(v.getProductTypeCode()))
-                .collect(Collectors.toMap(MdmProductInfo::getProductCode, MdmProductInfo::getProductTypeCode, (v1, v2) -> v1));
+                .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getProductTypeCode, (v1, v2) -> v1));
         list.forEach(l -> {
             MdmProductionMoldingVo vo = new MdmProductionMoldingVo();
             BeanUtils.copyProperties(l, vo);

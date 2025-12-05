@@ -158,8 +158,11 @@
 		     b.is_delete)
     </update>
 
-    <insert id="mergeMdmProductInfo">
-		INSERT INTO t_mdm_product_info (`FACTORY_CODE`, `PRODUCT_CODE`, `PRODUCT_DESC`, `PRO_SIZE`, `PRODUCT_TYPE_CODE`, `PRODUCT_TYPE_NAME`, `SPECIFICATIONS`, `PATTERN`, `BRAND`, `TIRE_TYPE`, `COMMON_TYPE`, `HIERARCHY`, `REPLACE_GROUP`, `CANT_PRODUCE`, `NO_DELIVERY`, `SPEED`, `CREATE_BY`, `IS_DELETE`, `CREATE_TIME`, `UPDATE_TIME`)
+    <insert id="mergeMdmMaterialInfo">
+        INSERT INTO t_mdm_material_info (`FACTORY_CODE`, `PRODUCT_CODE`, `PRODUCT_DESC`, `PRO_SIZE`,
+                                         `PRODUCT_TYPE_CODE`, `PRODUCT_TYPE_NAME`, `SPECIFICATIONS`, `PATTERN`, `BRAND`,
+                                         `TIRE_TYPE`, `COMMON_TYPE`, `HIERARCHY`, `REPLACE_GROUP`, `CANT_PRODUCE`,
+                                         `NO_DELIVERY`, `SPEED`, `CREATE_BY`, `IS_DELETE`, `CREATE_TIME`, `UPDATE_TIME`)
 		SELECT '116',
 			   sap_code,
 		  SUBSTRING(Mater_Name, LOCATE(' ', Mater_Name) + 1),
@@ -178,7 +181,8 @@
 		left join sys_dict_data b on b.DICT_TYPE = 'biz_brand_type' and b.locale = 'zh_CN'
 		 and b.DICT_LABEL = SUBSTRING_INDEX(Mater_Name,' ',1)
 		where mater_type = '安徽半钢子午线轮胎'
-		  and not exists (select 0 from t_mdm_product_info t1 where t1.is_delete = '0' and t.sap_code = t1.PRODUCT_CODE)
+          and not exists (select 0 from t_mdm_material_info t1 where t1.is_delete = '0'
+          and t.sap_code = t1.PRODUCT_CODE)
     </insert>
 
 </mapper>

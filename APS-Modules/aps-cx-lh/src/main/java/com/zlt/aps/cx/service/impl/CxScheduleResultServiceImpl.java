@@ -99,7 +99,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Autowired
     private CommonRedisService commonRedisService;
     @Autowired
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Autowired
     private CxProductConstructionInfoMapper cxProductConstructionInfoMapper;
     @Autowired
@@ -296,10 +296,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         //进行物料施工校验
-        QueryWrapper<MdmProductInfo> mdmProductInfoQueryWrapper = new QueryWrapper<>();
-        List<MdmProductInfo> mdmProductInfos = mdmProductInfoEntityMapper.selectList(mdmProductInfoQueryWrapper);
-        Map<String, List<MdmProductInfo>> mdmProductInfoMap = mdmProductInfos.stream()
-                .collect(Collectors.groupingBy(MdmProductInfo::getProductCode));
+        QueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new QueryWrapper<>();
+        List<MdmMaterialInfo> mdmMaterialInfos = mdmMaterialInfoEntityMapper.selectList(mdmMaterialInfoQueryWrapper);
+        Map<String, List<MdmMaterialInfo>> mdmMaterialInfoMap = mdmMaterialInfos.stream()
+                .collect(Collectors.groupingBy(MdmMaterialInfo::getMaterialCode));
 
         //施工信息校验
         List<CxProductConstructionInfo> cxProductConstructionInfoList = cxProductConstructionInfoMapper.selectCxProductConstructionInfoList(new CxProductConstructionInfo());
@@ -321,18 +321,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 continue;
             }
 
-            if (docEntity.getSpecCode() == null || !mdmProductInfoMap.containsKey(docEntity.getSpecCode())) {
+            if (docEntity.getSpecCode() == null || !mdmMaterialInfoMap.containsKey(docEntity.getSpecCode())) {
                 docEntity.setId(-999L);
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
                         String.format(constructionNotExist, errorNum), importErrorLogs);
             } else {
-                List<MdmProductInfo> mdmProductInfo = mdmProductInfoMap.get(docEntity.getSpecCode());
-                if (!mdmProductInfo.isEmpty()) {
-                    for (MdmProductInfo mdmProductInfoEntity : mdmProductInfo) {
-                        if (BigDecimalUtils.safeCompare(mdmProductInfoEntity.getProSize(), BigDecimal.valueOf(docEntity.getSpecDimension() == null ? 0 : docEntity.getSpecDimension())) == 0) {
-                            docEntity.setSpecDesc(mdmProductInfoEntity.getSpecifications());
-//                            docEntity.setLhSingleTireTime((double) (mdmProductInfoEntity.getCuringTime() == null ? 0 : mdmProductInfoEntity.getCuringTime()));
+                List<MdmMaterialInfo> mdmMaterialInfo = mdmMaterialInfoMap.get(docEntity.getSpecCode());
+                if (!mdmMaterialInfo.isEmpty()) {
+                    for (MdmMaterialInfo mdmMaterialInfoEntity : mdmMaterialInfo) {
+                        if (BigDecimalUtils.safeCompare(mdmMaterialInfoEntity.getProSize(), BigDecimal.valueOf(docEntity.getSpecDimension() == null ? 0 : docEntity.getSpecDimension())) == 0) {
+                            docEntity.setSpecDesc(mdmMaterialInfoEntity.getSpecifications());
+//                            docEntity.setLhSingleTireTime((double) (mdmMaterialInfoEntity.getCuringTime() == null ? 0 : mdmMaterialInfoEntity.getCuringTime()));
                         }
                     }
                 }

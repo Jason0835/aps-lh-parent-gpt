@@ -14,7 +14,7 @@
                mpi.HIERARCHY,
                mpi.COMMON_TYPE
           FROM t_mdm_factory_matching_production mfmp
-          LEFT JOIN t_mdm_product_info mpi
+                   LEFT JOIN t_mdm_material_info mpi
             ON mfmp.PRODUCT_CODE = mpi.PRODUCT_CODE
            AND mfmp.FACTORY_CODE = mpi.FACTORY_CODE
          WHERE IFNULL(mfmp.IS_DELETE, 0) = 0

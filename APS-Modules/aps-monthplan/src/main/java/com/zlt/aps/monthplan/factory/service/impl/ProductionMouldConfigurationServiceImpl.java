@@ -14,13 +14,13 @@ import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.factory.domain.dto.VulcanizingProductInfoDto;
 import com.zlt.aps.factory.mapper.FactoryProductionMouldConfigurationMapper;
 import com.zlt.aps.factory.utils.DateUtils;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMouldingProductParamDto;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMouldConfiguration;
 import com.zlt.aps.monthplan.factory.helper.MouldRelationProductHelper;
@@ -63,7 +63,7 @@ public class ProductionMouldConfigurationServiceImpl extends ServiceImpl<Factory
 
     private final FactoryProductionMouldConfigurationMapper mapper;
 
-    private final MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     private final MdmProductModelRelationEntityMapper productModelRelationMapper;
 
@@ -129,7 +129,7 @@ public class ProductionMouldConfigurationServiceImpl extends ServiceImpl<Factory
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(keyFunc, Collectors.counting()));
 
         // 获取对应物料信息、模具信息
-        Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(list);
+        Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(list);
         Map<String, MdmModelInfo> modelInfoMap = getMdmModelInfoMap(list);
 
         //公共校验（非空校验、长度校验等）
@@ -271,7 +271,7 @@ public class ProductionMouldConfigurationServiceImpl extends ServiceImpl<Factory
      * 校验物料信息和模具信息存在
      */
     private AjaxResult checkField(ProductionMouldConfiguration billVO) {
-        Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(Collections.singletonList(billVO));
+        Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(Collections.singletonList(billVO));
         if (!productInfoMap.containsKey(GenerageMapKeyUtils.createMapKey(billVO.getFactoryCode(), billVO.getProductCode()))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.productionMouldConfiguration.notExist.productInfo"));
         }
@@ -304,18 +304,18 @@ public class ProductionMouldConfigurationServiceImpl extends ServiceImpl<Factory
     /**
      * 查询对应物料信息
      */
-    private Map<String, MdmProductInfo> getMdmProductInfoMap(List<ProductionMouldConfiguration> list) {
+    private Map<String, MdmMaterialInfo> getMdmMaterialInfoMap(List<ProductionMouldConfiguration> list) {
         List<String> factoryCodeList = list.stream().map(ProductionMouldConfiguration::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         List<String> productCodeList = list.stream().map(ProductionMouldConfiguration::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productCodeList)) {
             return Collections.emptyMap();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(!CollectionUtils.isEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(!CollectionUtils.isEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return mdmProductInfoEntityMapper.selectList(wrapper).stream()
-                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(!CollectionUtils.isEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(!CollectionUtils.isEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return mdmMaterialInfoEntityMapper.selectList(wrapper).stream()
+                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
     }
 
     /**

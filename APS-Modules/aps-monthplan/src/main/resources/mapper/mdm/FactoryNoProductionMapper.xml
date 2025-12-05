@@ -38,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         fnp.UPDATE_BY
         FROM
         T_MDM_FACTORY_NO_PRODUCTION fnp
-        LEFT JOIN t_mdm_product_info pi ON fnp.PRODUCT_CODE = pi.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info pi ON fnp.PRODUCT_CODE = pi.PRODUCT_CODE
         WHERE
         fnp.IS_DELETE = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND fnp.FACTORY_CODE = #{factoryCode}</if>

@@ -1,6 +1,6 @@
 package com.zlt.aps.monthplan.factory.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import lombok.Data;
 
 import java.util.Map;
@@ -21,7 +21,7 @@ public class MonthPlanAdjustNoticeOrderHelper {
     /**
      * 存在的物料编码列表
      */
-    private Map<String, MdmProductInfo> existProductCodeMap;
+    private Map<String, MdmMaterialInfo> existProductCodeMap;
     /**
      * 提示信息
      */

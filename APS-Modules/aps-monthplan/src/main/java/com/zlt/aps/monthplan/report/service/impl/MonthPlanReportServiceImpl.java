@@ -20,7 +20,7 @@ import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.mapper.ItfInterfaceLogEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.monthplan.api.domain.dto.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.*;
@@ -2801,7 +2801,7 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
     }
 
     @Autowired
-    private MdmProductInfoEntityMapper productInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     /**
      * 查询排产版本列表数据
@@ -2834,10 +2834,10 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         log.info("理论备货查询耗时：{}", timeMillis3 - timeMillis2);
         // 查询对应物料信息
         List<String> productCodeList = stockUpPlanQtyList.stream().map(ProductVersionReportVo::getProductCode).collect(Collectors.toList());
-        List<MdmProductInfo> productInfoList = productInfoEntityMapper.queryByFactoryCodeAndProductCodes(FactoryConstant.DEFAULT_FACTORY_CODE, productCodeList);
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
+        List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.queryByFactoryCodeAndProductCodes(FactoryConstant.DEFAULT_FACTORY_CODE, productCodeList);
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(productInfoList)) {
-            productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, Function.identity(), (v1, v2) -> v1));
+            productInfoMap = productInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (v1, v2) -> v1));
         }
         long timeMillis4 = System.currentTimeMillis();
         log.info("物料信息查询耗时：{}", timeMillis4 - timeMillis3);
@@ -2901,8 +2901,8 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         for (ProductVersionReportVo reportVo : stockUpPlanQtyList) {
             String productCode = reportVo.getProductCode();
             if (productInfoMap.containsKey(productCode)) {
-                MdmProductInfo productInfo = productInfoMap.get(productCode);
-                reportVo.setProductDesc(productInfo.getProductDesc());
+                MdmMaterialInfo productInfo = productInfoMap.get(productCode);
+                reportVo.setProductDesc(productInfo.getMaterialDesc());
                 reportVo.setProSize(productInfo.getProSize().toString());
                 reportVo.setBrand(productInfo.getBrand());
                 reportVo.setPattern(productInfo.getPattern());

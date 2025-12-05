@@ -26,7 +26,7 @@ import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.service.IFactoryMonthPlanProductionDayResultService;
 import com.zlt.aps.factory.utils.MouldUtils;
 import com.zlt.aps.factory.utils.ProductUtils;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
@@ -84,7 +84,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
 
     private final MonthPlanMouldingDayResultMapper baseMapper;
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
 
@@ -176,7 +176,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(keyFunc, Collectors.counting()));
 
         // 查询对应物料信息，根据分厂+SAP代码映射
-        Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(list);
+        Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(list);
 
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
@@ -227,13 +227,13 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
 
 
             // 物料信息不存在跳过
-            MdmProductInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
+            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
             if (productInfo == null) {
                 failureNum++;
                 addImportErrorLog(importLogId, errorNum, productCodeNotExist, importErrorLogs);
                 continue;
             }
-            item.setProductDesc(productInfo.getProductDesc());
+            item.setProductDesc(productInfo.getMaterialDesc());
             item.setProSize(productInfo.getProSize());
             item.setSpecifications(productInfo.getSpecifications());
             item.setPattern(productInfo.getPattern());
@@ -570,7 +570,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
     /**
      * 查询对应物料信息，根据分厂+SAP代码映射
      */
-    private Map<String, MdmProductInfo> getMdmProductInfoMap(List<MonthPlanMouldingDayResult> list) {
+    private Map<String, MdmMaterialInfo> getMdmMaterialInfoMap(List<MonthPlanMouldingDayResult> list) {
         if (CollectionUtils.isEmpty(list)) {
             return new HashMap<>();
         }
@@ -580,10 +580,10 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             return Collections.emptyMap();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(CollectionUtils.isNotEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(CollectionUtils.isNotEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return productInfoEntityMapper.selectList(wrapper).stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
     }
 
     /**
@@ -965,10 +965,10 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             for (MonthPlanDayResultStatisticsVo statisticsVo : productInfoList) {
                 String grossRateJson = statisticsVo.getGrossRateJson();
                 if (StringUtils.isNotBlank(grossRateJson)) {
-                    List<ProductInfoGrossRateJsonVo> productInfoGrossRateJsonVoList = JSON.parseArray(grossRateJson, ProductInfoGrossRateJsonVo.class);
-                    for (ProductInfoGrossRateJsonVo productInfoGrossRateJsonVo : productInfoGrossRateJsonVoList) {
-                        Object fieldValue = ReflectUtils.getFieldValue(productInfoGrossRateJsonVo, "grossRate");
-                        String commonType = productInfoGrossRateJsonVo.getCommonType();
+                    List<MaterialInfoGrossRateJsonVo> materialInfoGrossRateJsonVoList = JSON.parseArray(grossRateJson, MaterialInfoGrossRateJsonVo.class);
+                    for (MaterialInfoGrossRateJsonVo materialInfoGrossRateJsonVo : materialInfoGrossRateJsonVoList) {
+                        Object fieldValue = ReflectUtils.getFieldValue(materialInfoGrossRateJsonVo, "grossRate");
+                        String commonType = materialInfoGrossRateJsonVo.getCommonType();
                         String fieldNameByCommonType = CommonTypeEnum.getFieldNameByCommonType(Integer.valueOf(commonType));
                         ReflectUtils.setFieldValue(statisticsVo, fieldNameByCommonType, fieldValue);
 

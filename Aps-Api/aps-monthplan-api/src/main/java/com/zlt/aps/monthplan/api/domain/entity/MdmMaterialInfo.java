@@ -13,8 +13,8 @@ import java.math.BigDecimal;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductInfo.java
- * 描    述：物料信息对象 t_mdm_product_info
+ * 文件名称：MdmMaterialInfo.java
+ * 描    述：物料信息对象 t_mdm_material_info
  *
  * @author zlt
  * @version 1.0
@@ -27,8 +27,8 @@ import java.math.BigDecimal;
  */
 @ApiModel(value = "物料信息对象", description = "物料信息对象 ")
 @Data
-@TableName(value = "T_MDM_PRODUCT_INFO")
-public class MdmProductInfo extends BaseEntity {
+@TableName(value = "T_MDM_MATERIAL_INFO")
+public class MdmMaterialInfo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -36,7 +36,7 @@ public class MdmProductInfo extends BaseEntity {
      * 分厂编号
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.factoryCode", dictType = "biz_factory_name", sort = 1)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.factoryCode", dictType = "biz_factory_name", sort = 1)
     @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -45,34 +45,34 @@ public class MdmProductInfo extends BaseEntity {
      * 物料编号
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.productCode", sort = 2)
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCode", sort = 2)
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
     /**
      * MES物料编号
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.mesProductCode", sort = 2)
-    @ApiModelProperty(value = "MES物料编号", name = "mesProductCode")
-    @TableField(value = "MES_PRODUCT_CODE")
-    private String mesProductCode;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCode", sort = 2)
+    @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     /**
      * 规格描述
      */
     @ImportExcelValidated(required = true, maxLength = 256)
-    @Excel(name = "ui.data.column.mdmProductInfo.productDesc", sort = 3)
-    @ApiModelProperty(value = "规格描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialDesc", sort = 3)
+    @ApiModelProperty(value = "规格描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /**
      * 寸口（保留2位小数）
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.proSize", sort = 9)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.proSize", sort = 9)
     @ApiModelProperty(value = "寸口", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private BigDecimal proSize;
@@ -80,7 +80,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 品名编码
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.productTypeName", dictType = "biz_product_name", sort = 13)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productTypeName", dictType = "biz_product_name", sort = 13)
     @ApiModelProperty(value = "品名编码", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -88,7 +88,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 品名
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.productTypeName", sort = 14)
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.productTypeName", sort = 14)
     @ApiModelProperty(value = "品名", name = "productTypeName")
     @TableField(value = "PRODUCT_TYPE_NAME")
     private String productTypeName;
@@ -96,7 +96,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 模具大类
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.mouldCategory")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.mouldCategory")
     @ApiModelProperty(value = "模具大类", name = "mouldCategory")
     @TableField(value = "MOULD_CATEGORY")
     private String mouldCategory;
@@ -104,7 +104,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 机械硫化时间(秒)
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.curingTime")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.curingTime")
 //    @ApiModelProperty(value = "机械硫化时间(秒)", name = "curingTime")
 //    @TableField(value = "CURING_TIME")
 //    private Integer curingTime;
@@ -112,7 +112,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 液压硫化时间(秒)
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.hydraulicPressureCuringTime")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.hydraulicPressureCuringTime")
 //    @ApiModelProperty(value = "液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
 //    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME")
 //    private Integer hydraulicPressureCuringTime;
@@ -120,7 +120,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 单模产能
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.mouldCapacity")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.mouldCapacity")
 //    @ApiModelProperty(value = "单模产能", name = "mouldCapacity")
 //    @TableField(value = "MOULD_CAPACITY")
 //    private Integer mouldCapacity;
@@ -129,7 +129,7 @@ public class MdmProductInfo extends BaseEntity {
      * 规格
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.specifications", sort = 6)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.specifications", sort = 6)
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
@@ -138,7 +138,7 @@ public class MdmProductInfo extends BaseEntity {
      * 主花纹
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.mainPattern", sort = 8)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern", sort = 8)
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
@@ -147,7 +147,7 @@ public class MdmProductInfo extends BaseEntity {
      * 花纹
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.pattern", sort = 8)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.pattern", sort = 8)
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;
@@ -156,16 +156,16 @@ public class MdmProductInfo extends BaseEntity {
      * 结构
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.structureCode", sort = 8)
-    @ApiModelProperty(value = "结构", name = "structureCode")
-    @TableField(value = "STRUCTURE_CODE")
-    private String structureCode;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.structureCode", sort = 8)
+    @ApiModelProperty(value = "结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
 
     /**
      * 品牌
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.brand", dictType = "biz_brand_type", sort = 5)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.brand", dictType = "biz_brand_type", sort = 5)
     @ApiModelProperty(value = "品牌，字典：biz_brand_type", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -173,7 +173,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 轮胎类型 取数据字典 TIRE_TYPE的编码
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.tireType", dictType = "TIRE_TYPE", sort = 4)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.tireType", dictType = "TIRE_TYPE", sort = 4)
     @ApiModelProperty(value = "轮胎类型 取数据字典 TIRE_TYPE的编码", name = "tireType")
     @TableField(value = "TIRE_TYPE")
     private String tireType;
@@ -182,7 +182,7 @@ public class MdmProductInfo extends BaseEntity {
      * 公用类型 取数据字典 biz_common_type的编码 1 公用规格 2 外销专用 3 内销专用 4 OE专用
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.commonType", dictType = "biz_common_type", sort = 12)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.commonType", dictType = "biz_common_type", sort = 12)
     @ApiModelProperty(value = "公用类型 取数据字典 biz_common_type的编码 1 公用规格 2 外销专用 3 内销专用 4 OE专用", name = "commonType")
     @TableField(value = "COMMON_TYPE")
     private String commonType;
@@ -191,16 +191,16 @@ public class MdmProductInfo extends BaseEntity {
      * 物料类型
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.materialType", dictType = "*", sort = 12)
-    @ApiModelProperty(value = "物料类型", name = "materialType")
-    @TableField(value = "MATERIAL_TYPE")
-    private String materialType;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCategory", dictType = "*", sort = 12)
+    @ApiModelProperty(value = "物料类型", name = "materialCategory")
+    @TableField(value = "MATERIAL_CATEGORY")
+    private String materialCategory;
 
     /**
      * 层级
      */
     @ImportExcelValidated(maxLength = 10)
-    @Excel(name = "ui.data.column.mdmProductInfo.hierarchy", sort = 7)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.hierarchy", sort = 7)
     @ApiModelProperty(value = "层级", name = "hierarchy")
     @TableField(value = "HIERARCHY")
     private String hierarchy;
@@ -208,7 +208,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 替换品种分组
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.replaceGroup")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.replaceGroup")
     @ApiModelProperty(value = "替换品种分组", name = "replaceGroup")
     @TableField(value = "REPLACE_GROUP")
     private String replaceGroup;
@@ -216,7 +216,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 不能生产
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.cantProduce", dictType = "biz_can_not")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.cantProduce", dictType = "biz_can_not")
     @ApiModelProperty(value = "不能生产", name = "cantProduce")
     @TableField(value = "CANT_PRODUCE")
     private Integer cantProduce;
@@ -224,7 +224,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 不能发货
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.noDelivery", dictType = "biz_can_not")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.noDelivery", dictType = "biz_can_not")
     @ApiModelProperty(value = "不能发货", name = "noDelivery")
     @TableField(value = "NO_DELIVERY")
     private Integer noDelivery;
@@ -233,7 +233,7 @@ public class MdmProductInfo extends BaseEntity {
      * 速度
      */
     @ImportExcelValidated(maxLength = 5)
-    @Excel(name = "ui.data.column.mdmProductInfo.speed", sort = 11)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.speed", sort = 11)
     @ApiModelProperty(value = "速度", name = "speed")
     @TableField(value = "SPEED")
     private String speed;
@@ -241,7 +241,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 性能
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.ability")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.ability")
     @ApiModelProperty(value = "性能", name = "ability")
     @TableField(value = "ABILITY")
     private String ability;
@@ -249,7 +249,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 环保
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.environmentProtection")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.environmentProtection")
     @ApiModelProperty(value = "环保", name = "environmentProtection")
     @TableField(value = "ENVIRONMENT_PROTECTION")
     private String environmentProtection;
@@ -257,7 +257,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 认证串
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.authentication")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.authentication")
     @ApiModelProperty(value = "认证串", name = "authentication")
     @TableField(value = "AUTHENTICATION")
     private String authentication;
@@ -265,15 +265,15 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 物料组
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.productGroupCode")
-    @ApiModelProperty(value = "物料组", name = "productGroupCode")
-    @TableField(value = "PRODUCT_GROUP_CODE")
-    private String productGroupCode;
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.productGroupCode")
+    @ApiModelProperty(value = "物料组", name = "materialGroupCode")
+    @TableField(value = "MATERIAL_GROUP_CODE")
+    private String materialGroupCode;
 
     /**
      * 废停标志
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.forbidTag")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.forbidTag")
     @ApiModelProperty(value = "废停标志", name = "forbidTag")
     @TableField(value = "FORBID_TAG")
     private String forbidTag;
@@ -281,7 +281,7 @@ public class MdmProductInfo extends BaseEntity {
     /**
      * 单胎重量
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.singleTireWeight")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.singleTireWeight")
     @ApiModelProperty(value = "单胎重量", name = "singleTireWeight")
     @TableField(value = "SINGLE_TIRE_WEIGHT")
     private BigDecimal singleTireWeight;
@@ -347,7 +347,7 @@ public class MdmProductInfo extends BaseEntity {
     private String isBrandNullData;
 
     @ImportExcelValidated(maxLength = 500)
-    @Excel(name = "ui.data.column.mdmProductInfo.remark", sort = 10)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.remark", sort = 10)
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;

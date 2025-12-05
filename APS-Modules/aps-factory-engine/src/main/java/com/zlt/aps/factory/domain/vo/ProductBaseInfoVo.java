@@ -1,7 +1,7 @@
 package com.zlt.aps.factory.domain.vo;
 
 import com.alibaba.fastjson.JSON;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateJsonVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
@@ -62,17 +62,17 @@ public class ProductBaseInfoVo implements Serializable {
     /**
      * 利率值
      */
-    List<ProductInfoGrossRateJsonVo> rateList;
+    List<MaterialInfoGrossRateJsonVo> rateList;
 
     /**
      * 获取物料的毛利率值
      *
      * @return
      */
-    public List<ProductInfoGrossRateJsonVo> getRateList() {
+    public List<MaterialInfoGrossRateJsonVo> getRateList() {
         if (StringUtils.isBlank(grossRateJson)) {
             return Collections.emptyList();
         }
-        return JSON.parseArray(grossRateJson, ProductInfoGrossRateJsonVo.class);
+        return JSON.parseArray(grossRateJson, MaterialInfoGrossRateJsonVo.class);
     }
 }

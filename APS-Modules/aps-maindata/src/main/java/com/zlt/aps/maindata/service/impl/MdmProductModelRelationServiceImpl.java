@@ -18,8 +18,8 @@ import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldConfigurationVo;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
@@ -60,7 +60,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
 
     private final MdmProductModelRelationEntityMapper entityMapper;
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final MdmMouldUseStatusEntityMapper mouldUseStatusMapper;
 
@@ -89,12 +89,12 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         // 关联物料表赋值规格、花纹、品牌
         String productCode = docEntityVO.getMaterialCode();
         if (StringUtils.isNotEmpty(productCode)) {
-            LambdaQueryWrapper<MdmProductInfo> wrapper = new LambdaQueryWrapper<MdmProductInfo>()
-                    .eq(MdmProductInfo::getProductCode, productCode);
-            List<MdmProductInfo> productInfoList = productInfoEntityMapper.selectList(wrapper);
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()
+                    .eq(MdmMaterialInfo::getMaterialCode, productCode);
+            List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.selectList(wrapper);
             if (CollectionUtils.isNotEmpty(productInfoList)) {
-                MdmProductInfo productInfo = productInfoList.get(0);
-                docEntityVO.setMaterialDesc(productInfo.getProductDesc());
+                MdmMaterialInfo productInfo = productInfoList.get(0);
+                docEntityVO.setMaterialDesc(productInfo.getMaterialDesc());
 //            docEntityVO.setSpecCode(productInfo.getSpecCode());
                 docEntityVO.setSpecifications(productInfo.getSpecifications());
                 docEntityVO.setPattern(productInfo.getPattern());
@@ -114,20 +114,20 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
     protected Map<Object, Object> getServiceCheckParams(List<MdmSkuMouldRel> list, List<MdmSkuMouldRel> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
         // 关联物料表赋值规格、花纹、品牌
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
         List<String> productCodeList = list.stream().map(MdmSkuMouldRel::getMaterialCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(productCodeList)) {
             List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(productCodeList, 100);
-            List<MdmProductInfo> productInfoList = new ArrayList<>();
+            List<MdmMaterialInfo> productInfoList = new ArrayList<>();
             for (List<String> codeList : splitList) {
-                LambdaQueryWrapper<MdmProductInfo> wrapper = new LambdaQueryWrapper<MdmProductInfo>()
-                        .in(MdmProductInfo::getProductCode, codeList)
-                        .eq(MdmProductInfo::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
+                LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, codeList)
+                        .eq(MdmMaterialInfo::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
                 productInfoList.addAll(productInfoEntityMapper.selectList(wrapper));
             }
 
             if (CollectionUtils.isNotEmpty(productInfoList)) {
-                productInfoMap = productInfoList.stream().collect(Collectors.toMap(item -> String.join("|", item.getFactoryCode(), item.getProductCode()), Function.identity(), (v1, v2) -> v1));
+                productInfoMap = productInfoList.stream().collect(Collectors.toMap(item -> String.join("|", item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
             }
             serviceCheckParams.put("productInfoMap", productInfoMap);
         }
@@ -137,11 +137,11 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
     @Override
     protected Boolean serviceCheckAndDataHandle(MdmSkuMouldRel importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         if (serviceCheckParams.containsKey("productInfoMap")) {
-            Map<String, MdmProductInfo> productInfoMap = (Map<String, MdmProductInfo>) serviceCheckParams.get("productInfoMap");
+            Map<String, MdmMaterialInfo> productInfoMap = (Map<String, MdmMaterialInfo>) serviceCheckParams.get("productInfoMap");
             String productCode = FactoryConstant.DEFAULT_FACTORY_CODE + "|" + importDocEntity.getMaterialCode();
             if (productInfoMap.containsKey(productCode)) {
-                MdmProductInfo productInfo = productInfoMap.get(productCode);
-                importDocEntity.setMaterialDesc(productInfo.getProductDesc());
+                MdmMaterialInfo productInfo = productInfoMap.get(productCode);
+                importDocEntity.setMaterialDesc(productInfo.getMaterialDesc());
                 importDocEntity.setSpecifications(productInfo.getSpecifications());
                 importDocEntity.setPattern(productInfo.getPattern());
                 importDocEntity.setBrand(productInfo.getBrand());
@@ -212,11 +212,11 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         String productCode = queryParam.getProductCode();
         String factoryCode = queryParam.getFactoryCode();
         //获取物料基础信息
-        QueryWrapper<MdmProductInfo> productInfoQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> productInfoQueryWrapper = new QueryWrapper<>();
         productInfoQueryWrapper.eq("FACTORY_CODE", factoryCode);
         productInfoQueryWrapper.eq("PRODUCT_CODE", productCode);
         productInfoQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        MdmProductInfo productInfo = productInfoEntityMapper.selectOne(productInfoQueryWrapper);
+        MdmMaterialInfo productInfo = productInfoEntityMapper.selectOne(productInfoQueryWrapper);
         if (null == productInfo) {
             return null;
         }
@@ -286,7 +286,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         }
         String productCode = configuration.getProductCode();
         String factoryCode = configuration.getFactoryCode();
-        MdmProductInfo productInfo = getProductInfo(productCode, factoryCode);
+        MdmMaterialInfo productInfo = getProductInfo(productCode, factoryCode);
         if (null == productInfo) {
             String productCodeError = I18nUtil.getMessage("ui.data.column.mdmStockUpPlan.productCode.notExist");
             return AjaxResult.error(String.format(productCodeError, productCode));
@@ -351,11 +351,11 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
      * @param factoryCode 工厂编码
      * @return
      */
-    private MdmProductInfo getProductInfo(String productCode, String factoryCode) {
+    private MdmMaterialInfo getProductInfo(String productCode, String factoryCode) {
         if (StringUtils.isBlank(productCode) || StringUtils.isBlank(factoryCode)) {
             return null;
         }
-        QueryWrapper<MdmProductInfo> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("PRODUCT_CODE", productCode);
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
@@ -386,13 +386,13 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
      * @param productInfo 物料信息
      * @return
      */
-    private MdmSkuMouldRel buildConfiguration(MdmModelInfo modelInfo, MdmProductInfo productInfo) {
+    private MdmSkuMouldRel buildConfiguration(MdmModelInfo modelInfo, MdmMaterialInfo productInfo) {
         MdmSkuMouldRel relation = new MdmSkuMouldRel();
         //模具信息
         relation.setMouldCode(modelInfo.getMouldCode());
         relation.setMouldNo(modelInfo.getMouldNo());
         //物料信息
-        relation.setMaterialDesc(productInfo.getProductDesc());
+        relation.setMaterialDesc(productInfo.getMaterialDesc());
         relation.setMouldCategory(productInfo.getMouldCategory());
         relation.setSpecifications(productInfo.getSpecifications());
         relation.setPattern(productInfo.getPattern());

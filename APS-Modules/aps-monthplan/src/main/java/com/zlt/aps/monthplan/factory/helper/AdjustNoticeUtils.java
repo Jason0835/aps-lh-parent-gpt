@@ -83,9 +83,9 @@ public class AdjustNoticeUtils {
      * @param noticeOrder 调整通知单对象
      * @param productInfo 物料基础信息对象
      */
-    public static void setProductInfo(MonthPlanNoticeOrder noticeOrder, MdmProductInfo productInfo) {
+    public static void setProductInfo(MonthPlanNoticeOrder noticeOrder, MdmMaterialInfo productInfo) {
         noticeOrder.setBrand(productInfo.getBrand());
-        noticeOrder.setProductDesc(productInfo.getProductDesc());
+        noticeOrder.setProductDesc(productInfo.getMaterialDesc());
         noticeOrder.setHierarchy(productInfo.getHierarchy());
         noticeOrder.setSpecifications(productInfo.getSpecifications());
         noticeOrder.setProSize(productInfo.getProSize());
@@ -367,8 +367,8 @@ public class AdjustNoticeUtils {
      * @param productionPlan 新增的调整计划
      * @param productInfo    物料信息
      */
-    public static void fillProductInfo(FactoryMonthPlanProdFinal productionPlan, MdmProductInfo productInfo) {
-        productionPlan.setProductDesc(productInfo.getProductDesc());
+    public static void fillProductInfo(FactoryMonthPlanProdFinal productionPlan, MdmMaterialInfo productInfo) {
+        productionPlan.setProductDesc(productInfo.getMaterialDesc());
         productionPlan.setPattern(productInfo.getPattern());
         productionPlan.setHierarchy(productInfo.getHierarchy());
         productionPlan.setSpecifications(productInfo.getSpecifications());

@@ -1,31 +1,22 @@
 package com.zlt.aps.mps.service.impl;
 
 import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.RedisLock;
-import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.mps.common.SyncKeyEnum;
-import com.zlt.aps.mps.domain.BomInfo;
-import com.zlt.aps.mps.domain.TMesBomInfo;
 import com.zlt.aps.mps.mapper.TMesBomInfoMapper;
 import com.zlt.aps.mps.mapper.TMesPlmConstructionInfoMapper;
 import com.zlt.aps.mps.service.MesBaseInfoService;
 import com.zlt.aps.mps.service.MesConstructionInfoService;
-
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 
 /**
  * @author Gim
@@ -93,11 +84,11 @@ public class MesBaseInfoServiceImpl implements MesBaseInfoService {
 			return AjaxResult.error(errorMessage);
 		}
     }
-    
+
     @Override
     public AjaxResult mergeBasMaterial(String dataVersion) {
         try {
-            bomInfoMapper.mergeMdmProductInfo(dataVersion);
+            bomInfoMapper.mergeMdmMaterialInfo(dataVersion);
             return AjaxResult.success();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
@@ -105,7 +96,7 @@ public class MesBaseInfoServiceImpl implements MesBaseInfoService {
             return AjaxResult.error(errorMessage);
         }
     }
-    
+
     /**
      * 将日期的秒数、毫秒数设置为0
      * @param time
@@ -118,7 +109,7 @@ public class MesBaseInfoServiceImpl implements MesBaseInfoService {
 		cal.set(Calendar.SECOND, 0);
 		return cal.getTime();
     }
-    
+
     /**
      * 校验同步任务是否被锁定了
      * @param syncKey

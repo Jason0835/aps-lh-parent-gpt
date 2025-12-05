@@ -129,7 +129,7 @@
                mpi.COMMON_TYPE,
                mpi.GROSS_RATE_JSON
           FROM t_mp_product_require_plan prp
-          LEFT JOIN t_mdm_product_info mpi
+                   LEFT JOIN t_mdm_material_info mpi
             ON mpi.FACTORY_CODE = prp.FACTORY_CODE
            AND mpi.PRODUCT_CODE = prp.PRODUCT_CODE
            AND IFNULL(mpi.IS_DELETE, 0) = 0

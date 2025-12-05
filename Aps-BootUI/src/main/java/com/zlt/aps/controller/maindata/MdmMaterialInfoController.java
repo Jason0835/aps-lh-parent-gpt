@@ -8,11 +8,11 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
-import com.zlt.aps.monthplan.api.service.IMdmProductInfoService;
+import com.zlt.aps.monthplan.api.service.IMdmMaterialInfoService;
 import com.zlt.aps.monthplan.api.service.IMdmProductModelRelationRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -39,9 +39,9 @@ import java.io.IOException;
 @Controller
 @RequestMapping("/lean/productinfo")
 @RequiredArgsConstructor
-public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
+public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo> {
 
-    private final IMdmProductInfoService iProductInfoService;
+    private final IMdmMaterialInfoService iMaterialInfoService;
 
     private final IMdmProductModelRelationRemoteService productModelRelationRemoteService;
 
@@ -70,7 +70,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("productInfo", new MdmProductInfo());
+        mmap.put("productInfo", new MdmMaterialInfo());
         return prefix + "/edit";
     }
 
@@ -79,7 +79,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("productInfo", iProductInfoService.getInfo(id));
+        mmap.put("productInfo", iMaterialInfoService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -90,7 +90,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(TableProductInfoVo entity) {
-        return iProductInfoService.list(entity);
+        return iMaterialInfoService.list(entity);
     }
 
     /**
@@ -100,7 +100,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/tableList")
     @ResponseBody
     public TableDataInfo tableList(TableProductInfoVo entity) {
-        return iProductInfoService.getTableList(entity);
+        return iMaterialInfoService.getTableList(entity);
     }
 
     /**
@@ -110,12 +110,12 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
 //    @RequiresPermissions("lean:productinfo:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult editSave(MdmProductInfo productInfo) {
+    public AjaxResult editSave(MdmMaterialInfo productInfo) {
         AjaxResult ajaxResult = null;
         if (productInfo.getId() != null) {
-            ajaxResult = iProductInfoService.edit(productInfo);
+            ajaxResult = iMaterialInfoService.edit(productInfo);
         } else {
-            ajaxResult = iProductInfoService.add(productInfo);
+            ajaxResult = iMaterialInfoService.add(productInfo);
         }
         return ajaxResult;
     }
@@ -141,22 +141,22 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iProductInfoService.remove(arr);
+        return iMaterialInfoService.remove(arr);
     }
 
 
     @ApiOperation("校验物料信息表唯一性")
-    @PostMapping("/checkProductInfoUnique")
+    @PostMapping("/checkMaterialInfoUnique")
     @ResponseBody
-    public String checkProductInfoUnique(MdmProductInfo productInfo) {
-        return iProductInfoService.checkProductInfoUnique(productInfo);
+    public String checkMaterialInfoUnique(MdmMaterialInfo productInfo) {
+        return iMaterialInfoService.checkMaterialInfoUnique(productInfo);
     }
 
     @ApiOperation("根据物料号获取物料信息")
-    @PostMapping({"/getProductInfo"})
+    @PostMapping({"/getMaterialInfo"})
     @ResponseBody
-    public AjaxResult getProductInfo(@RequestParam("productCode") String productCode) {
-        return iProductInfoService.getProductInfo(productCode);
+    public AjaxResult getMaterialInfo(@RequestParam("materialCode") String materialCode) {
+        return iMaterialInfoService.getMaterialInfo(materialCode);
     }
 
     /**
@@ -187,7 +187,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mdmProductInfo.modelName");
+        return I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.modelName");
     }
 
     /**
@@ -197,7 +197,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmProductInfo> util = new ExcelUtil<>(MdmProductInfo.class);
+        ExcelUtil<MdmMaterialInfo> util = new ExcelUtil<>(MdmMaterialInfo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -207,7 +207,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @ResponseBody
     public void export(HttpServletResponse response, TableProductInfoVo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iProductInfoService.exportData(entity, fileName);
+        byte[] excelBytes = iMaterialInfoService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -226,15 +226,15 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return iProductInfoService.importData(context, updateSupport);
+        return iMaterialInfoService.importData(context, updateSupport);
     }
 
     @ApiOperation("物料毛利率数据导出")
     @GetMapping({"/exportGrossRate"})
     @ResponseBody
     public void exportGrossRate(HttpServletResponse response, TableProductInfoVo entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.mdmProductInfo.grossRate.modelName");
-        byte[] excelBytes = iProductInfoService.exportGrossRate(entity, fileName);
+        String fileName = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.grossRate.modelName");
+        byte[] excelBytes = iMaterialInfoService.exportGrossRate(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -253,7 +253,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductInfoService.importGrossRate(context, false);
+        AjaxResult ajaxResult = iMaterialInfoService.importGrossRate(context, false);
         return ajaxResult;
     }
 
@@ -267,7 +267,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/configurationConstructionCheck")
     @ResponseBody
     public AjaxResult configurationConstructionCheck(MdmProductConstruction productConstruction) {
-        return iProductInfoService.configurationConstructionCheck(productConstruction);
+        return iMaterialInfoService.configurationConstructionCheck(productConstruction);
     }
 
     /**
@@ -281,7 +281,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/configurationConstruction")
     @ResponseBody
     public AjaxResult configurationConstruction(MdmProductConstruction productConstruction) {
-        return iProductInfoService.configurationConstruction(productConstruction);
+        return iMaterialInfoService.configurationConstruction(productConstruction);
     }
 
     /**
@@ -294,7 +294,7 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/selectConstructionCheckList")
     @ResponseBody
     public AjaxResult selectConstructionCheckList(MdmProductConstruction productConstruction) {
-        return iProductInfoService.selectConstructionCheckList(productConstruction);
+        return iMaterialInfoService.selectConstructionCheckList(productConstruction);
     }
 
     /**
@@ -306,6 +306,6 @@ public class MdmProductInfoController extends BaseUIController<MdmProductInfo> {
     @PostMapping("/configConstruction")
     @ResponseBody
     public AjaxResult configConstruction(ConfigConstructionVo configConstructionVo) {
-        return iProductInfoService.configConstruction(configConstructionVo);
+        return iMaterialInfoService.configConstruction(configConstructionVo);
     }
 }

@@ -11,13 +11,13 @@ import com.ruoyi.common.datasource.service.BaseService;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmCustomerInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMustFinishPlanEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMustFinishPlanService;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCustomerInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMustFinishPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -52,7 +52,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 public class MdmMustFinishPlanServiceImpl extends BaseService<MdmMustFinishPlan> implements IMdmMustFinishPlanService {
     private final MdmMustFinishPlanEntityMapper mdmMustFinishPlanEntityMapper;
     private final MdmCustomerInfoEntityMapper mdmCustomerInfoEntityMapperm;
-    private final MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     private final BaseDao baseDao;
 
@@ -122,7 +122,7 @@ public class MdmMustFinishPlanServiceImpl extends BaseService<MdmMustFinishPlan>
         }
 
         // 校验物料编号
-        Map<String, String> productInfoMap = getMdmProductInfoMap(Collections.singletonList(mdmMustFinishPlan));
+        Map<String, String> productInfoMap = getMdmMaterialInfoMap(Collections.singletonList(mdmMustFinishPlan));
         String desc = productInfoMap.get(GenerageMapKeyUtils.createMapKey(mdmMustFinishPlan.getFactoryCode(), mdmMustFinishPlan.getProductCode()));
         if (desc == null) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.column.mustFinishPlan.notExist.productInfo"));
@@ -133,18 +133,18 @@ public class MdmMustFinishPlanServiceImpl extends BaseService<MdmMustFinishPlan>
     /**
      * 查询对应的【分厂编号+物料编号=规格描述】的Map
      */
-    private Map<String, String> getMdmProductInfoMap(List<MdmMustFinishPlan> list) {
+    private Map<String, String> getMdmMaterialInfoMap(List<MdmMustFinishPlan> list) {
         List<String> factoryCodeList = list.stream().map(MdmMustFinishPlan::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         List<String> productCodeList = list.stream().map(MdmMustFinishPlan::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         if (CollectionUtils.isEmpty(factoryCodeList) && CollectionUtils.isEmpty(productCodeList)) {
             return Collections.emptyMap();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(CollectionUtils.isNotEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return mdmProductInfoEntityMapper.selectList(wrapper).stream().filter(v -> v.getProductDesc() != null)
-                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), MdmProductInfo::getProductDesc, (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(CollectionUtils.isNotEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return mdmMaterialInfoEntityMapper.selectList(wrapper).stream().filter(v -> v.getMaterialDesc() != null)
+                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), MdmMaterialInfo::getMaterialDesc, (v1, v2) -> v1));
     }
 
     /**
@@ -232,7 +232,7 @@ public class MdmMustFinishPlanServiceImpl extends BaseService<MdmMustFinishPlan>
 
         // 获取对应客户信息、物料信息
         Map<String, String> customerInfoMap = getMdmCustomerInfoMap(list);
-        Map<String, String> productInfoMap = getMdmProductInfoMap(list);
+        Map<String, String> productInfoMap = getMdmMaterialInfoMap(list);
 
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {

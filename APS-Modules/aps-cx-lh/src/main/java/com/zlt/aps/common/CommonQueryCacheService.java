@@ -10,11 +10,11 @@ import com.zlt.aps.cxlh.cx.api.domain.vo.CxProductConstructionInfoDto;
 import com.zlt.aps.cxlh.cx.api.domain.vo.LhAlgorithmScheduleResultDto;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.maindata.mapper.CxEmbryoMonthPlanSurplusEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.CxEmbryoMonthPlanSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,7 +39,7 @@ public class CommonQueryCacheService {
 
 
     @Resource
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Resource
     private CxEmbryoMonthPlanSurplusEntityMapper cxEmbryoMonthPlanSurplusEntityMapper;
     @Resource
@@ -55,7 +55,7 @@ public class CommonQueryCacheService {
      * @param lhScheduleResultList 硫化任务列表
      * @return 硫化物料信息列表
      */
-    public List<MdmProductInfo> querySulfurSpecInfo(List<LhScheduleResult> lhScheduleResultList) {
+    public List<MdmMaterialInfo> querySulfurSpecInfo(List<LhScheduleResult> lhScheduleResultList) {
         if (lhScheduleResultList.isEmpty()) {
             return new ArrayList<>();
         }
@@ -64,13 +64,13 @@ public class CommonQueryCacheService {
         List<String> specCodeList = lhScheduleResultList.stream()
                 .map(LhScheduleResult::getSpecCode)
                 .collect(Collectors.toList());
-        List<MdmProductInfo> productInfoArrayList = new ArrayList<>();
+        List<MdmMaterialInfo> productInfoArrayList = new ArrayList<>();
 
         // 2.如果列表长度大于900，分批查询
         if (!specCodeList.isEmpty()) {
             List<List<String>> splitList = ScmListUtils.getSplitList(specCodeList, BATCH_QUERY_SIZE);
             for (List<String> specCodeSplitItemList : splitList) {
-                List<MdmProductInfo> cxSpecCodeSplitItemListInfoList = mdmProductInfoEntityMapper.selectByUniqueKeyList(specCodeSplitItemList);
+                List<MdmMaterialInfo> cxSpecCodeSplitItemListInfoList = mdmMaterialInfoEntityMapper.selectByUniqueKeyList(specCodeSplitItemList);
                 productInfoArrayList.addAll(cxSpecCodeSplitItemListInfoList);
             }
         }

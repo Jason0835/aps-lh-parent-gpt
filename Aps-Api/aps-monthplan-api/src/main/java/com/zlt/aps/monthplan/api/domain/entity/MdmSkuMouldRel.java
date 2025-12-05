@@ -39,7 +39,7 @@ public class MdmSkuMouldRel extends BaseEntity {
      * 分厂编码
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -57,7 +57,7 @@ public class MdmSkuMouldRel extends BaseEntity {
      * MES物料编号
      */
 //    @ImportExcelValidated(required = true, maxLength = 20)
-//    @Excel(name = "ui.data.column.mdmProductInfo.mesProductCode")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.mesProductCode")
     @ApiModelProperty(value = "物料编号", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -107,7 +107,7 @@ public class MdmSkuMouldRel extends BaseEntity {
     /**
      * 主花纹
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.mainPattern")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;

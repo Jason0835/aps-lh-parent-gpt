@@ -19,9 +19,9 @@ import com.zlt.aps.maindata.domain.vo.DaySizeCapacityVo;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.maindata.utils.SizeCapacityUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
 import com.zlt.aps.monthplan.api.domain.vo.NoProductionDayMouldVo;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateJsonVo;
 import com.zlt.aps.monthplan.api.enums.MouldNoProductionType;
 import com.zlt.aps.monthplan.api.enums.MouldProductionLogType;
 import com.zlt.aps.monthplan.api.enums.ProductionTypeEnum;
@@ -306,7 +306,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
                 return;
             }
             String productCode = productBaseInfo.getProductCode();
-            List<ProductInfoGrossRateJsonVo> rateList = productBaseInfo.getRateList();
+            List<MaterialInfoGrossRateJsonVo> rateList = productBaseInfo.getRateList();
             ProductUtils.setProductLocationProfit(productLocationProfitGradeMap, rateList, productCode, commonType, interestRateList);
         });
         context.setProductLocationProfitGradeMap(productLocationProfitGradeMap);

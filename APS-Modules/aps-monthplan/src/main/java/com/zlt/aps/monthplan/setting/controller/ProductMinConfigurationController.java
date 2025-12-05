@@ -9,10 +9,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.text.Convert;
 import com.tlt.aps.constant.StringConstant;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
 import com.zlt.aps.maindata.service.IProductMinConfigurationService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -55,7 +55,7 @@ public class ProductMinConfigurationController extends AbstractDocBizController<
     private ProductMinConfigurationMapper productMinConfigurationMapper;
 
     @Autowired
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     /**
      * 查询最小批量列表
@@ -92,9 +92,9 @@ public class ProductMinConfigurationController extends AbstractDocBizController<
             String productCode = billVO.getProductCode();
             String[] pcs = Convert.toStrArray(productCode);
             for (String item : pcs) {
-                LambdaQueryWrapper<MdmProductInfo> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(MdmProductInfo::getProductCode, item);
-                MdmProductInfo productInfo = mdmProductInfoEntityMapper.selectOne(wrapper);
+                LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(MdmMaterialInfo::getMaterialCode, item);
+                MdmMaterialInfo productInfo = mdmMaterialInfoEntityMapper.selectOne(wrapper);
 
                 ProductMinConfiguration cinfo = new ProductMinConfiguration();
                 cinfo.setFactoryCode(billVO.getFactoryCode());

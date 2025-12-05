@@ -1,6 +1,5 @@
 package com.zlt.aps.lh.service.impl;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -44,8 +43,8 @@ import com.zlt.aps.lh.service.*;
 import com.zlt.aps.maindata.mapper.LhMonthPlanSurplusEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDeviceMaintenancePlanService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
 import com.zlt.aps.maindata.utils.CxLhEngineUtils;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -99,7 +98,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
     private MdmProductConstructionEntityMapper productConstructionEntityMapper;
 
     @Autowired
-    private IMdmProductInfoService mdmProductInfoService;
+    private IMdmMaterialInfoService mdmMaterialInfoService;
     @Autowired
     private IAutoScheduleLogService autoScheduleLogService;
     @Autowired
@@ -163,8 +162,8 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
     public List<LhMachineInfoVo> getScheduleMachineInfo(LhOrderInsertParamDTO insertParamDTO) {
 
         // 根据规格号和物料编码查询物料信息
-       /* MdmProductInfo mdmProductInfo = mdmProductInfoService.selectOneByProductCodeAndSpecCode(insertParamDTO.getProductCode(), insertParamDTO.getFactoryCode());
-        if (mdmProductInfo == null) {
+       /* MdmMaterialInfo mdmMaterialInfo = mdmMaterialInfoService.selectOneByProductCodeAndSpecCode(insertParamDTO.getProductCode(), insertParamDTO.getFactoryCode());
+        if (mdmMaterialInfo == null) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.column.productInfo.selectOneNotFound"));
         }*/
         return lhScheduleResultHandle.getScheduleMachineInfo(insertParamDTO);
@@ -195,8 +194,8 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         LhScheduleResult lhScheduleResult = new LhScheduleResult();
         BeanUtils.copyProperties(dto, lhScheduleResult);
         // 根据规格号和物料编码查询物料信息
-        MdmProductInfo mdmProductInfo = mdmProductInfoService.selectOneByProductCodeAndSpecCode(lhScheduleResult.getProductCode(), lhScheduleResult.getFactoryCode());
-        if (mdmProductInfo == null) {
+        MdmMaterialInfo mdmMaterialInfo = mdmMaterialInfoService.selectOneByProductCodeAndSpecCode(lhScheduleResult.getProductCode(), lhScheduleResult.getFactoryCode());
+        if (mdmMaterialInfo == null) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.column.productInfo.selectOneNotFound"));
         }
         MdmProductConstructionVO constructionVO = getSpecConstruction(lhScheduleResult);
@@ -248,7 +247,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         String batchNo = lhScheduleResultEntityMapper.selectBatchNoByScheduleDateAndFactoryCode(lhScheduleResult.getScheduleDate(), lhScheduleResult.getFactoryCode());
         lhScheduleResult.setBatchNo(batchNo);
         //设置规格描述信息
-        lhScheduleResult.setSpecDesc(mdmProductInfo.getProductDesc());
+        lhScheduleResult.setSpecDesc(mdmMaterialInfo.getMaterialDesc());
         lhScheduleResult.setProductionStatus(ApsConstant.APS_STRING_0);
         //插入排程操作日志
         insertLhDispatcherLog(dto);

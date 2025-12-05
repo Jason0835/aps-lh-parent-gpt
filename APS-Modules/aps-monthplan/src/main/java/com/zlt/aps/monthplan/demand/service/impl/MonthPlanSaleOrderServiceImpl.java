@@ -11,10 +11,10 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.LocationChannelConfigurationMapper;
 import com.zlt.aps.maindata.mapper.MdmCustomerInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.LocationChannelConfiguration;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCustomerInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanSaleOrder;
 import com.zlt.aps.monthplan.api.domain.itf.InDataListVo;
 import com.zlt.aps.monthplan.api.domain.itf.InSaleOrderDto;
@@ -59,7 +59,7 @@ public class MonthPlanSaleOrderServiceImpl implements IMonthPlanSaleOrderService
 
     private final BaseDao baseDao;
 
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final MdmCustomerInfoEntityMapper customerInfoEntityMapper;
 
@@ -321,18 +321,58 @@ public class MonthPlanSaleOrderServiceImpl implements IMonthPlanSaleOrderService
     }
 
     /**
-     * 是否存在
+     * 将接口的列表数据转成内销订单数据
      *
-     * @param factoryCode 分厂编码
-     * @param productCode 物料编号
-     * @return
+     * @param inSaleOrderDto                  查询参数
+     * @param inDataListVoList                接口返回的数据
+     * @param customerInfoMap                 客户信息
+     * @param productInfoMap                  物料信息
+     * @param locationChannelConfigurationMap 库位类别渠道数据
+     * @return 内销订单数据
      */
-    private boolean hasExistProductCode(String factoryCode, String productCode) {
-        QueryWrapper<MdmProductInfo> productInfoQueryWrapper = new QueryWrapper<>();
-        productInfoQueryWrapper.eq("FACTORY_CODE", factoryCode);
-        productInfoQueryWrapper.eq("PRODUCT_CODE", productCode);
-        productInfoQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        return productInfoEntityMapper.selectCount(productInfoQueryWrapper) > 0;
+    private static List<MonthPlanSaleOrder> transFormSyncListToOrderList(InSaleOrderDto inSaleOrderDto, List<InDataListVo> inDataListVoList, Map<String, MdmCustomerInfo> customerInfoMap, Map<String, MdmMaterialInfo> productInfoMap, Map<String, LocationChannelConfiguration> locationChannelConfigurationMap) {
+        List<MonthPlanSaleOrder> saveList = new ArrayList<>();
+        for (InDataListVo inDataListVo : inDataListVoList) {
+            MonthPlanSaleOrder monthPlanSaleOrder = new MonthPlanSaleOrder();
+            monthPlanSaleOrder.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            monthPlanSaleOrder.setOrderNo(inDataListVo.getNumbers());
+            monthPlanSaleOrder.setSourceType(SaleOrderSourceTypeEnum.DOMESTIC_SYSTEM.getSourceType());
+            String clientnum = removeLeadingZeros(inDataListVo.getClientnum());
+            monthPlanSaleOrder.setCustomCode(clientnum);
+            if (customerInfoMap.containsKey(clientnum)) {
+                MdmCustomerInfo customerInfo = customerInfoMap.get(clientnum);
+                monthPlanSaleOrder.setCustomName(customerInfo.getCustomName());
+            }
+            monthPlanSaleOrder.setYear(inSaleOrderDto.getYears());
+            monthPlanSaleOrder.setMonth(inSaleOrderDto.getMonths());
+
+            String goodsNum = inDataListVo.getGoodsNum();
+            monthPlanSaleOrder.setProductCode(goodsNum);
+
+            if (productInfoMap.containsKey(goodsNum)) {
+                MdmMaterialInfo productInfo = productInfoMap.get(goodsNum);
+                monthPlanSaleOrder.setBrand(productInfo.getBrand());
+            }
+
+            String mapKey = String.join("|", monthPlanSaleOrder.getFactoryCode(), inDataListVo.getClientExtendName(), monthPlanSaleOrder.getBrand());
+            if (locationChannelConfigurationMap.containsKey(mapKey)) {
+                LocationChannelConfiguration locationChannelConfiguration = locationChannelConfigurationMap.get(mapKey);
+                monthPlanSaleOrder.setLocationType(locationChannelConfiguration.getLocationType().toString());
+                monthPlanSaleOrder.setChannel(locationChannelConfiguration.getChannel());
+                monthPlanSaleOrder.setLocationType(locationChannelConfiguration.getLocationType().toString());
+            }
+
+            monthPlanSaleOrder.setPlanQty(inDataListVo.getNum());
+            monthPlanSaleOrder.setSubmissionDate(inDataListVo.getInnerDate());
+
+            monthPlanSaleOrder.setIsImportantCustom(YesOrNoEnum.NO.getValue());
+            monthPlanSaleOrder.setIsEnsurePlan(YesOrNoEnum.NO.getValue());
+            monthPlanSaleOrder.setIsEmergency(YesOrNoEnum.NO.getValue());
+
+            monthPlanSaleOrder.setBaseVale(null);
+            saveList.add(monthPlanSaleOrder);
+        }
+        return saveList;
     }
 
     /**
@@ -373,58 +413,18 @@ public class MonthPlanSaleOrderServiceImpl implements IMonthPlanSaleOrderService
     private LocationChannelConfigurationMapper locationChannelConfigurationMapper;
 
     /**
-     * 将接口的列表数据转成内销订单数据
+     * 是否存在
      *
-     * @param inSaleOrderDto                  查询参数
-     * @param inDataListVoList                接口返回的数据
-     * @param customerInfoMap                 客户信息
-     * @param productInfoMap                  物料信息
-     * @param locationChannelConfigurationMap 库位类别渠道数据
-     * @return 内销订单数据
+     * @param factoryCode 分厂编码
+     * @param productCode 物料编号
+     * @return
      */
-    private static List<MonthPlanSaleOrder> transFormSyncListToOrderList(InSaleOrderDto inSaleOrderDto, List<InDataListVo> inDataListVoList, Map<String, MdmCustomerInfo> customerInfoMap, Map<String, MdmProductInfo> productInfoMap, Map<String, LocationChannelConfiguration> locationChannelConfigurationMap) {
-        List<MonthPlanSaleOrder> saveList = new ArrayList<>();
-        for (InDataListVo inDataListVo : inDataListVoList) {
-            MonthPlanSaleOrder monthPlanSaleOrder = new MonthPlanSaleOrder();
-            monthPlanSaleOrder.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-            monthPlanSaleOrder.setOrderNo(inDataListVo.getNumbers());
-            monthPlanSaleOrder.setSourceType(SaleOrderSourceTypeEnum.DOMESTIC_SYSTEM.getSourceType());
-            String clientnum = removeLeadingZeros(inDataListVo.getClientnum());
-            monthPlanSaleOrder.setCustomCode(clientnum);
-            if (customerInfoMap.containsKey(clientnum)) {
-                MdmCustomerInfo customerInfo = customerInfoMap.get(clientnum);
-                monthPlanSaleOrder.setCustomName(customerInfo.getCustomName());
-            }
-            monthPlanSaleOrder.setYear(inSaleOrderDto.getYears());
-            monthPlanSaleOrder.setMonth(inSaleOrderDto.getMonths());
-
-            String goodsNum = inDataListVo.getGoodsNum();
-            monthPlanSaleOrder.setProductCode(goodsNum);
-
-            if (productInfoMap.containsKey(goodsNum)) {
-                MdmProductInfo productInfo = productInfoMap.get(goodsNum);
-                monthPlanSaleOrder.setBrand(productInfo.getBrand());
-            }
-
-            String mapKey = String.join("|", monthPlanSaleOrder.getFactoryCode(), inDataListVo.getClientExtendName(), monthPlanSaleOrder.getBrand());
-            if (locationChannelConfigurationMap.containsKey(mapKey)) {
-                LocationChannelConfiguration locationChannelConfiguration = locationChannelConfigurationMap.get(mapKey);
-                monthPlanSaleOrder.setLocationType(locationChannelConfiguration.getLocationType().toString());
-                monthPlanSaleOrder.setChannel(locationChannelConfiguration.getChannel());
-                monthPlanSaleOrder.setLocationType(locationChannelConfiguration.getLocationType().toString());
-            }
-
-            monthPlanSaleOrder.setPlanQty(inDataListVo.getNum());
-            monthPlanSaleOrder.setSubmissionDate(inDataListVo.getInnerDate());
-
-            monthPlanSaleOrder.setIsImportantCustom(YesOrNoEnum.NO.getValue());
-            monthPlanSaleOrder.setIsEnsurePlan(YesOrNoEnum.NO.getValue());
-            monthPlanSaleOrder.setIsEmergency(YesOrNoEnum.NO.getValue());
-
-            monthPlanSaleOrder.setBaseVale(null);
-            saveList.add(monthPlanSaleOrder);
-        }
-        return saveList;
+    private boolean hasExistProductCode(String factoryCode, String productCode) {
+        QueryWrapper<MdmMaterialInfo> productInfoQueryWrapper = new QueryWrapper<>();
+        productInfoQueryWrapper.eq("FACTORY_CODE", factoryCode);
+        productInfoQueryWrapper.eq("PRODUCT_CODE", productCode);
+        productInfoQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return productInfoEntityMapper.selectCount(productInfoQueryWrapper) > 0;
     }
 
     /**
@@ -464,12 +464,12 @@ public class MonthPlanSaleOrderServiceImpl implements IMonthPlanSaleOrderService
 
         // 查询物料信息
         List<String> productCodeList = inDataListVoList.stream().map(InDataListVo::getGoodsNum).collect(Collectors.toList());
-        LambdaQueryWrapper<MdmProductInfo> productQueryWrapper = new LambdaQueryWrapper<>();
-        productQueryWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-        List<MdmProductInfo> mdmProductInfoList = productInfoEntityMapper.selectList(productQueryWrapper);
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(mdmProductInfoList)) {
-            productInfoMap = mdmProductInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> productQueryWrapper = new LambdaQueryWrapper<>();
+        productQueryWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+        List<MdmMaterialInfo> mdmMaterialInfoList = productInfoEntityMapper.selectList(productQueryWrapper);
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(mdmMaterialInfoList)) {
+            productInfoMap = mdmMaterialInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (v1, v2) -> v1));
         }
 
         // 查询库位类别渠道数据，分厂编号、市场类别、品牌分组

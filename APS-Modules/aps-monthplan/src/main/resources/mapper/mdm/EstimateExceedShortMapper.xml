@@ -34,7 +34,8 @@
         group by YEAR,MONTH,FACTORY_CODE,PRODUCT_CODE
         having ifnull(sum(EXCEED_SHORT_QTY),0) != 0
         ) tb
-        left join t_mdm_product_info tmpi on tmpi.IS_DELETE = 0 and tb.FACTORY_CODE = tmpi.FACTORY_CODE and tb.PRODUCT_CODE = tmpi.PRODUCT_CODE
+        left join t_mdm_material_info tmpi on tmpi.IS_DELETE = 0 and tb.FACTORY_CODE = tmpi.FACTORY_CODE and
+        tb.PRODUCT_CODE = tmpi.PRODUCT_CODE
     </insert>
 
     <select id="selectMonthPlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort">

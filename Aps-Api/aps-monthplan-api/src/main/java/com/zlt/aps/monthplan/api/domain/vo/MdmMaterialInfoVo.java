@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.vo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -12,8 +13,8 @@ import java.math.BigDecimal;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductInfoVo.java
- * 描    述：物料库位毛利率Vo t_mdm_product_info
+ * 文件名称：MdmMaterialInfoVo.java
+ * 描    述：物料库位毛利率Vo t_mdm_material_info
  *@author zlt
  *@date 2025-02-19
  *@version 1.0
@@ -26,7 +27,7 @@ import java.math.BigDecimal;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ApiModel(value = "物料库位毛利率Vo", description = "物料库位毛利率Vo")
-public class MdmProductInfoVo extends BaseEntity {
+public class MdmMaterialInfoVo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -36,17 +37,32 @@ public class MdmProductInfoVo extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /** 物料编号 */
-    @Excel(name = "ui.data.column.info.productCode")
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    /**
+     * 物料编号
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCode", sort = 2)
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
-    /** 规格描述 */
-    @Excel(name = "ui.data.column.info.productDesc")
-    @ApiModelProperty(value = "规格描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    /**
+     * MES物料编号
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCode", sort = 2)
+    @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
+
+    /**
+     * 规格描述
+     */
+    @ImportExcelValidated(required = true, maxLength = 256)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialDesc", sort = 3)
+    @ApiModelProperty(value = "规格描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /** 寸口（保留2位小数） */
     @Excel(name = "ui.data.column.info.proSize", readConverterExp = "保=留2位小数")
@@ -162,11 +178,13 @@ public class MdmProductInfoVo extends BaseEntity {
     @TableField(value = "AUTHENTICATION")
     private String authentication;
 
-    /** 物料组 */
-    @Excel(name = "ui.data.column.info.productGroupCode")
-    @ApiModelProperty(value = "物料组", name = "productGroupCode")
-    @TableField(value = "PRODUCT_GROUP_CODE")
-    private String productGroupCode;
+    /**
+     * 物料组
+     */
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productGroupCode")
+    @ApiModelProperty(value = "物料组", name = "materialGroupCode")
+    @TableField(value = "MATERIAL_GROUP_CODE")
+    private String materialGroupCode;
 
     /** 废停标志 */
     @Excel(name = "ui.data.column.info.forbidTag")

@@ -9,9 +9,9 @@ import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.lh.service.LhScheduleResultService;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +33,7 @@ public class LhScheduleResultCheckHandle {
     private ILhMachineInfoService lhMachineInfoService;
 
     @Autowired
-    private IMdmProductInfoService mdmProductInfoService;
+    private IMdmMaterialInfoService mdmMaterialInfoService;
 
     /**
      * 硫化转机台验证
@@ -66,12 +66,12 @@ public class LhScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.same.error"));
         }
         //查询规格和机台是否匹配  通过物料信息表
-        MdmProductInfo mdmProductInfo = mdmProductInfoService.selectOneByProductCodeAndSpecCode(lhscheduleResult.getProductCode(),lhscheduleResult.getFactoryCode());
-        if (mdmProductInfo == null) {
+        MdmMaterialInfo mdmMaterialInfo = mdmMaterialInfoService.selectOneByProductCodeAndSpecCode(lhscheduleResult.getProductCode(), lhscheduleResult.getFactoryCode());
+        if (mdmMaterialInfo == null) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.productInfo.notExist"));
         }
         // 判断物料的寸口是否为空
-        BigDecimal proSize = mdmProductInfo.getProSize();
+        BigDecimal proSize = mdmMaterialInfo.getProSize();
         // 获取机台生产寸口范围
         BigDecimal dimensionMinimum = lhMachineInfo.getDimensionMinimum();
         BigDecimal dimensionMaximum = lhMachineInfo.getDimensionMaximum();
@@ -128,12 +128,12 @@ public class LhScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.status.error"));
         }
         //查询规格和机台是否匹配  通过物料信息表
-        MdmProductInfo mdmProductInfo = mdmProductInfoService.selectOneByProductCodeAndSpecCode(dto.getProductCode(),dto.getFactoryCode());
-        if (mdmProductInfo == null) {
+        MdmMaterialInfo mdmMaterialInfo = mdmMaterialInfoService.selectOneByProductCodeAndSpecCode(dto.getProductCode(), dto.getFactoryCode());
+        if (mdmMaterialInfo == null) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.productInfo.notExist"));
         }
         // 判断物料的寸口是否为空
-        BigDecimal proSize = mdmProductInfo.getProSize();
+        BigDecimal proSize = mdmMaterialInfo.getProSize();
         // 获取机台生产寸口范围
         BigDecimal dimensionMinimum = lhMachineInfo.getDimensionMinimum();
         BigDecimal dimensionMaximum = lhMachineInfo.getDimensionMaximum();

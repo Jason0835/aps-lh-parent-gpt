@@ -19,16 +19,16 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateJsonVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -50,8 +50,8 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductInfoServiceImpl.java
- * 描    述：MdmProductInfoServiceImpl物料信息业务层处理
+ * 文件名称：MdmMaterialInfoServiceImpl.java
+ * 描    述：MdmMaterialInfoServiceImpl物料信息业务层处理
  *
  * @author zlt
  * @version 1.0
@@ -65,10 +65,10 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo> implements IMdmProductInfoService {
+public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialInfo> implements IMdmMaterialInfoService {
 
     @Resource
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     @Autowired
     private IMdmProductConstructionService mdmProductConstructionService;
@@ -82,19 +82,19 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * 根据编号查询物料信息
      */
     @Override
-    public List<MdmProductInfo> selectListByProductCode(List<String> codeList) {
+    public List<MdmMaterialInfo> selectListByProductCode(List<String> codeList) {
         if (CollectionUtils.isEmpty(codeList)) {
             return Collections.emptyList();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery();
-        wrapper.in(MdmProductInfo::getProductCode, codeList);
-        return mdmProductInfoEntityMapper.selectList(wrapper);
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.in(MdmMaterialInfo::getMaterialCode, codeList);
+        return mdmMaterialInfoEntityMapper.selectList(wrapper);
     }
 
     @Override
     public List<TableProductInfoVo> getList(TableProductInfoVo queryCondition) {
-        List<TableProductInfoVo> resultData = mdmProductInfoEntityMapper.getProductInfoList(queryCondition);
+        List<TableProductInfoVo> resultData = mdmMaterialInfoEntityMapper.getMaterialInfoList(queryCondition);
         analysisGrossRate(resultData);
         return resultData;
     }
@@ -106,8 +106,8 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 物料信息表
      */
     @Override
-    public MdmProductInfo selectProductInfoById(Long id) {
-        return mdmProductInfoEntityMapper.selectById(id);
+    public MdmMaterialInfo selectMaterialInfoById(Long id) {
+        return mdmMaterialInfoEntityMapper.selectById(id);
     }
 
     /**
@@ -117,7 +117,7 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public int insertProductInfo(MdmProductInfo productInfo) {
+    public int insertMaterialInfo(MdmMaterialInfo productInfo) {
         return baseDao.insert(productInfo);
     }
 
@@ -128,8 +128,8 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public int updateProductInfo(MdmProductInfo productInfo) {
-        return mdmProductInfoEntityMapper.updateById(productInfo);
+    public int updateMaterialInfo(MdmMaterialInfo productInfo) {
+        return mdmMaterialInfoEntityMapper.updateById(productInfo);
     }
 
     /**
@@ -139,8 +139,8 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public int deleteProductInfoByIds(Long[] ids) {
-        return mdmProductInfoEntityMapper.deleteBatchIds(Arrays.asList(ids));
+    public int deleteMaterialInfoByIds(Long[] ids) {
+        return mdmMaterialInfoEntityMapper.deleteBatchIds(Arrays.asList(ids));
     }
 
     /**
@@ -150,26 +150,26 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public int deleteProductInfoById(Long id) {
-        return mdmProductInfoEntityMapper.deleteById(id);
+    public int deleteMaterialInfoById(Long id) {
+        return mdmMaterialInfoEntityMapper.deleteById(id);
     }
 
     /**
      * 校验唯一性
      */
     @Override
-    public String checkProductInfoUnique(MdmProductInfo productInfo) {
+    public String checkMaterialInfoUnique(MdmMaterialInfo productInfo) {
         if (productInfo == null) {
             return UserConstants.NOT_UNIQUE;
         }
-        LambdaQueryWrapper<MdmProductInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MdmProductInfo::getFactoryCode, productInfo.getFactoryCode());
-        wrapper.eq(MdmProductInfo::getProductCode, productInfo.getProductCode());
-//        wrapper.eq(MdmProductInfo::getCommonType, productInfo.getCommonType());
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmMaterialInfo::getFactoryCode, productInfo.getFactoryCode());
+        wrapper.eq(MdmMaterialInfo::getMaterialCode, productInfo.getMaterialCode());
+//        wrapper.eq(MdmMaterialInfo::getCommonType, productInfo.getCommonType());
         if (productInfo.getId() != null) {
-            wrapper.ne(MdmProductInfo::getId, productInfo.getId());
+            wrapper.ne(MdmMaterialInfo::getId, productInfo.getId());
         }
-        List<MdmProductInfo> list = mdmProductInfoEntityMapper.selectList(wrapper);
+        List<MdmMaterialInfo> list = mdmMaterialInfoEntityMapper.selectList(wrapper);
         if (CollectionUtils.isNotEmpty(list)) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -183,9 +183,9 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public List<MdmProductInfo> selectList(QueryWrapper<MdmProductInfo> wrapper) {
+    public List<MdmMaterialInfo> selectList(QueryWrapper<MdmMaterialInfo> wrapper) {
         if (wrapper != null) {
-            List<MdmProductInfo> productInfoList = mdmProductInfoEntityMapper.selectList(wrapper);
+            List<MdmMaterialInfo> productInfoList = mdmMaterialInfoEntityMapper.selectList(wrapper);
             transformJsonField(productInfoList);
             return productInfoList;
         }
@@ -198,15 +198,15 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @param productInfoList 要转换的物料信息
      */
     @Override
-    public void transformJsonField(List<MdmProductInfo> productInfoList) {
+    public void transformJsonField(List<MdmMaterialInfo> productInfoList) {
         if (CollectionUtils.isNotEmpty(productInfoList)) {
-            for (MdmProductInfo productInfo : productInfoList) {
+            for (MdmMaterialInfo productInfo : productInfoList) {
                 String grossRateJson = productInfo.getGrossRateJson();
                 if (StringUtils.isNotBlank(grossRateJson)) {
-                    List<ProductInfoGrossRateJsonVo> productInfoGrossRateJsonVoList = JSON.parseArray(grossRateJson, ProductInfoGrossRateJsonVo.class);
-                    for (ProductInfoGrossRateJsonVo productInfoGrossRateJsonVo : productInfoGrossRateJsonVoList) {
-                        Object fieldValue = ReflectUtils.getFieldValue(productInfoGrossRateJsonVo, "grossRate");
-                        String commonType = productInfoGrossRateJsonVo.getCommonType();
+                    List<MaterialInfoGrossRateJsonVo> materialInfoGrossRateJsonVoList = JSON.parseArray(grossRateJson, MaterialInfoGrossRateJsonVo.class);
+                    for (MaterialInfoGrossRateJsonVo materialInfoGrossRateJsonVo : materialInfoGrossRateJsonVoList) {
+                        Object fieldValue = ReflectUtils.getFieldValue(materialInfoGrossRateJsonVo, "grossRate");
+                        String commonType = materialInfoGrossRateJsonVo.getCommonType();
                         String fieldNameByCommonType = CommonTypeEnum.getFieldNameByCommonType(Integer.valueOf(commonType));
                         ReflectUtils.setFieldValue(productInfo, fieldNameByCommonType, fieldValue);
 
@@ -222,22 +222,22 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @param productInfoList 要转换的物料信息
      */
     @Override
-    public void transformToJsonField(List<MdmProductInfo> productInfoList) {
+    public void transformToJsonField(List<MdmMaterialInfo> productInfoList) {
         if (CollectionUtils.isNotEmpty(productInfoList)) {
-            for (MdmProductInfo productInfo : productInfoList) {
-                List<ProductInfoGrossRateJsonVo> productInfoGrossRateJsonVoList = new ArrayList<>();
-                List<Field> fieldList = Arrays.stream(MdmProductInfo.class.getDeclaredFields()).filter(item -> item.getName().contains("GrossRate")).collect(Collectors.toList());
+            for (MdmMaterialInfo productInfo : productInfoList) {
+                List<MaterialInfoGrossRateJsonVo> materialInfoGrossRateJsonVoList = new ArrayList<>();
+                List<Field> fieldList = Arrays.stream(MdmMaterialInfo.class.getDeclaredFields()).filter(item -> item.getName().contains("GrossRate")).collect(Collectors.toList());
                 for (Field field : fieldList) {
                     Integer commonTypeByFieldName = CommonTypeEnum.getCommonTypeByFieldName(field.getName());
                     Object fieldValue = ReflectUtils.getFieldValue(productInfo, field.getName());
-                    ProductInfoGrossRateJsonVo jsonVo = new ProductInfoGrossRateJsonVo();
+                    MaterialInfoGrossRateJsonVo jsonVo = new MaterialInfoGrossRateJsonVo();
                     jsonVo.setCommonType(commonTypeByFieldName.toString());
                     if (fieldValue != null) {
                         jsonVo.setGrossRate(new BigDecimal(fieldValue.toString()));
-                        productInfoGrossRateJsonVoList.add(jsonVo);
+                        materialInfoGrossRateJsonVoList.add(jsonVo);
                     }
                 }
-                String jsonString = JSON.toJSONString(productInfoGrossRateJsonVoList);
+                String jsonString = JSON.toJSONString(materialInfoGrossRateJsonVoList);
                 productInfo.setGrossRateJson(jsonString);
             }
         }
@@ -251,7 +251,7 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
     }
 
     @Override
-    public String checkUnique(MdmProductInfo docEntityVO) {
+    public String checkUnique(MdmMaterialInfo docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.productMinConfiguration.notUnique"));
@@ -265,11 +265,11 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
     }
 
     @Override
-    protected Boolean serviceCheckAndDataHandle(MdmProductInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+    protected Boolean serviceCheckAndDataHandle(MdmMaterialInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         if (StringUtils.isBlank(importDocEntity.getProductTypeCode())) {
             importDocEntity.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
         }
-        if (StringUtils.isNotBlank(importDocEntity.getProductCode())) {
+        if (StringUtils.isNotBlank(importDocEntity.getMaterialCode())) {
             ProductTypeEnum enumByValue = ProductTypeEnum.getEnumByValue(importDocEntity.getProductTypeCode());
             if (enumByValue !=  null) {
                 importDocEntity.setProductTypeName(enumByValue.getName());
@@ -287,53 +287,53 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 结果
      */
     @Override
-    public AjaxResult importGrossRate(List<ProductInfoGrossRateVo> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importGrossRate(List<MaterialInfoGrossRateVo> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
         // 校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<ProductInfoGrossRateVo> importList = new ArrayList<>();
+        List<MaterialInfoGrossRateVo> importList = new ArrayList<>();
         List<String> fieldNameList = Arrays.asList("outGrossRate", "inGrossRate", "oeGrossRate");
 
         // 提示信息
         String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-        String columnName1 = I18nUtil.getMessage("ui.data.column.mdmProductInfo.factoryCode");
-        String columnName2 = I18nUtil.getMessage("ui.data.column.mdmProductInfo.productCode");
-        String outGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmProductInfo.outGrossRate.required");
-        String inGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmProductInfo.inGrossRate.required");
-        String oeGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmProductInfo.oeGrossRate.required");
-        String dbNotExist = I18nUtil.getMessage("ui.data.column.mdmProductInfo.dbNotExist");
+        String columnName1 = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.factoryCode");
+        String columnName2 = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.productCode");
+        String outGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.outGrossRate.required");
+        String inGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.inGrossRate.required");
+        String oeGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.oeGrossRate.required");
+        String dbNotExist = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.dbNotExist");
 
         //按业务主键分组
         Map<String, Long> groupMap = list.stream().collect(Collectors
-                .groupingBy(item -> String.join("|", item.getFactoryCode(), item.getProductCode()),
+                .groupingBy(item -> String.join("|", item.getFactoryCode(), item.getMaterialCode()),
                         Collectors.counting()));
 
         // 查询数据库内对应数据，将毛利率字段更新
         // 数据库内不存在的数据暂不考虑
-        List<MdmProductInfo> productInfoList = new ArrayList<>();
+        List<MdmMaterialInfo> productInfoList = new ArrayList<>();
         List<String> uniqueKeyList = list.stream().map(productInfo ->
-                String.join("|", productInfo.getFactoryCode(), productInfo.getProductCode())).collect(Collectors.toList());
+                String.join("|", productInfo.getFactoryCode(), productInfo.getMaterialCode())).collect(Collectors.toList());
 
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(uniqueKeyList)) {
             List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(uniqueKeyList, 500);
             for (List<String> subList : splitList) {
-                List<MdmProductInfo> productInfos = mdmProductInfoEntityMapper.selectByUniqueKeyList(subList);
+                List<MdmMaterialInfo> productInfos = mdmMaterialInfoEntityMapper.selectByUniqueKeyList(subList);
                 productInfoList.addAll(productInfos);
             }
 
             productInfoMap = productInfoList.stream().collect(Collectors
-                    .toMap(item -> String.join("|", item.getFactoryCode(), item.getProductCode()),
+                    .toMap(item -> String.join("|", item.getFactoryCode(), item.getMaterialCode()),
                             Function.identity(), (v1, v2) -> v1));
         }
 
         for (int i = 0; i < list.size(); i++) {
-            ProductInfoGrossRateVo productInfo = list.get(i);
+            MaterialInfoGrossRateVo productInfo = list.get(i);
 
             //重复记录校验
             String commonType = productInfo.getCommonType();
-            String uniqueKey = String.join("|", productInfo.getFactoryCode(), productInfo.getProductCode());
+            String uniqueKey = String.join("|", productInfo.getFactoryCode(), productInfo.getMaterialCode());
             Long hasValue = groupMap.get(uniqueKey);
             if (hasValue > 1) {
                 message = String.format(message, String.join("+", columnName1, columnName2));
@@ -370,22 +370,22 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
                     }
                 }
 
-                MdmProductInfo productInfoDb = productInfoMap.get(uniqueKey);
+                MdmMaterialInfo productInfoDb = productInfoMap.get(uniqueKey);
                 Long id = productInfoDb.getId();
                 productInfo.setId(id);
-                List<ProductInfoGrossRateJsonVo> productInfoGrossRateJsonVos = new ArrayList<>();
+                List<MaterialInfoGrossRateJsonVo> materialInfoGrossRateJsonVos = new ArrayList<>();
                 for (String fieldName : fieldNameList) {
                     // 如果规格共用类型不一样，且不是公用规格，就不做json转换保存
                     String fieldNameCommonType = CommonTypeEnum.getCommonTypeByFieldName(fieldName).toString();
                     if (!fieldNameCommonType.equals(commonType) && !StringConstant.ONE.equals(commonType)) {
                         continue;
                     }
-                    ProductInfoGrossRateJsonVo productInfoGrossRateJsonVo = new ProductInfoGrossRateJsonVo();
-                    productInfoGrossRateJsonVo.setCommonType(fieldNameCommonType);
-                    productInfoGrossRateJsonVo.setGrossRate(ReflectUtils.getFieldValue(productInfo, fieldName));
-                    productInfoGrossRateJsonVos.add(productInfoGrossRateJsonVo);
+                    MaterialInfoGrossRateJsonVo materialInfoGrossRateJsonVo = new MaterialInfoGrossRateJsonVo();
+                    materialInfoGrossRateJsonVo.setCommonType(fieldNameCommonType);
+                    materialInfoGrossRateJsonVo.setGrossRate(ReflectUtils.getFieldValue(productInfo, fieldName));
+                    materialInfoGrossRateJsonVos.add(materialInfoGrossRateJsonVo);
                 }
-                productInfo.setGrossRateJson(JSON.toJSONString(productInfoGrossRateJsonVos));
+                productInfo.setGrossRateJson(JSON.toJSONString(materialInfoGrossRateJsonVos));
 
                 productInfo.setBaseVale(null);
                 importList.add(productInfo);
@@ -397,7 +397,7 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
         }
         if (CollectionUtils.isNotEmpty(importList)) {
             try {
-                List<MdmProductInfo> infoList = BeanCopyUtils.copyBeanList(importList, MdmProductInfo.class);
+                List<MdmMaterialInfo> infoList = BeanCopyUtils.copyBeanList(importList, MdmMaterialInfo.class);
                 successNum = baseDao.updateBatch(infoList);
 
                 //勾选更新记录，调用merge即可
@@ -451,15 +451,15 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 物料信息
      */
     @Override
-    public List<MdmProductInfo> selectListByFactoryProductCode(List<String> factoryCodeList, List<String> productCodeList) {
+    public List<MdmMaterialInfo> selectListByFactoryProductCode(List<String> factoryCodeList, List<String> productCodeList) {
         if (CollectionUtils.isEmpty(productCodeList)) {
             return Collections.emptyList();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery();
-        wrapper.in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList);
-        wrapper.in(MdmProductInfo::getProductCode, productCodeList);
-        return mdmProductInfoEntityMapper.selectList(wrapper);
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList);
+        wrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+        return mdmMaterialInfoEntityMapper.selectList(wrapper);
     }
 
     /**
@@ -470,32 +470,32 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      * @return 对应的施工记录列表
      */
     @Override
-    public List<MdmProductInfo> queryByFactoryCodeAndProductCodes(String factoryCode, Set<String> productCodes) {
+    public List<MdmMaterialInfo> queryByFactoryCodeAndProductCodes(String factoryCode, Set<String> productCodes) {
         // 将 Set 转换为 List，便于切分批次
         List<String> productCodeList = new ArrayList<>(productCodes);
         //定义最终返回的List
-        List<MdmProductInfo> finalList = new ArrayList<>();
+        List<MdmMaterialInfo> finalList = new ArrayList<>();
         //判断集合的长度是多少 如果超过900条则进行切分查询
         if (productCodeList.size() > SystemBaseEnums.SPLIT_LENGTH.getCode()) {
             List<List<String>> splitList = ScmListUtils.getSplitList(productCodeList, SystemBaseEnums.SPLIT_LENGTH.getCode());
             //将多次查询的结果汇总到finalList中
             for (List<String> splitItemList : splitList) {
-                List<MdmProductInfo> queryList = mdmProductInfoEntityMapper.queryByFactoryCodeAndProductCodes(factoryCode, splitItemList);
+                List<MdmMaterialInfo> queryList = mdmMaterialInfoEntityMapper.queryByFactoryCodeAndProductCodes(factoryCode, splitItemList);
                 finalList.addAll(queryList);
             }
         } else {
-            finalList = mdmProductInfoEntityMapper.queryByFactoryCodeAndProductCodes(factoryCode, productCodeList);
+            finalList = mdmMaterialInfoEntityMapper.queryByFactoryCodeAndProductCodes(factoryCode, productCodeList);
         }
         return finalList;
     }
 
     @Override
-    public MdmProductInfo selectOneByProductCodeAndSpecCode(String productCode, String factoryCode) {
-        LambdaQueryWrapper<MdmProductInfo> queryWrapper = Wrappers.lambdaQuery();
-        queryWrapper.eq(StringUtils.isNotBlank(factoryCode), MdmProductInfo::getFactoryCode, factoryCode);
-        queryWrapper.eq(StringUtils.isNotBlank(productCode), MdmProductInfo::getProductCode, productCode);
-        queryWrapper.eq(MdmProductInfo::getIsDelete, YesOrNoEnum.NO.getCode());
-        return mdmProductInfoEntityMapper.selectOne(queryWrapper);
+    public MdmMaterialInfo selectOneByProductCodeAndSpecCode(String productCode, String factoryCode) {
+        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(StringUtils.isNotBlank(factoryCode), MdmMaterialInfo::getFactoryCode, factoryCode);
+        queryWrapper.eq(StringUtils.isNotBlank(productCode), MdmMaterialInfo::getMaterialCode, productCode);
+        queryWrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getCode());
+        return mdmMaterialInfoEntityMapper.selectOne(queryWrapper);
     }
 
     /**
@@ -517,16 +517,16 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
      *
      * @param productInfo
      */
-    private void setGrossRate(MdmProductInfo productInfo) {
+    private void setGrossRate(MdmMaterialInfo productInfo) {
         String grossRateJson = productInfo.getGrossRateJson();
         if (StringUtils.isBlank(grossRateJson)) {
             return;
         }
-        List<ProductInfoGrossRateJsonVo> productInfoGrossRateJsonList = JSON.parseArray(grossRateJson, ProductInfoGrossRateJsonVo.class);
+        List<MaterialInfoGrossRateJsonVo> productInfoGrossRateJsonList = JSON.parseArray(grossRateJson, MaterialInfoGrossRateJsonVo.class);
         if (CollectionUtils.isEmpty(productInfoGrossRateJsonList)) {
             return;
         }
-        for (ProductInfoGrossRateJsonVo productInfoGrossRateJson : productInfoGrossRateJsonList) {
+        for (MaterialInfoGrossRateJsonVo productInfoGrossRateJson : productInfoGrossRateJsonList) {
             Object fieldValue = ReflectUtils.getFieldValue(productInfoGrossRateJson, "grossRate");
             String commonType = productInfoGrossRateJson.getCommonType();
             String fieldNameByCommonType = CommonTypeEnum.getFieldNameByCommonType(Integer.valueOf(commonType));
@@ -555,7 +555,7 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
             for (MdmProductConstruction construction : productConstructionList) {
                 String productCode1 = construction.getProductCode();
                 if (StringUtils.isNotBlank(productCode1) && !productCode.equals(productCode1)) {
-                    return new AjaxResult(301, I18nUtil.getMessage("ui.data.column.mdmProductInfo.configurationConstructionCheck"), 1);
+                    return new AjaxResult(301, I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.configurationConstructionCheck"), 1);
                 }
             }
         } else {
@@ -564,7 +564,7 @@ public class MdmProductInfoServiceImpl extends AbstractDocService<MdmProductInfo
             queryWrapperNew.eq(MdmProductConstruction::getEmbryoCode, productConstruction.getEmbryoCode());
             productConstructionList = productConstructionEntityMapper.selectList(queryWrapperNew);
             if (CollectionUtils.isEmpty(productConstructionList)) {
-                return new AjaxResult(301, I18nUtil.getMessage("ui.data.column.mdmProductInfo.configurationConstruction.notExist"), 2);
+                return new AjaxResult(301, I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.configurationConstruction.notExist"), 2);
             }
         }
         return AjaxResult.success();

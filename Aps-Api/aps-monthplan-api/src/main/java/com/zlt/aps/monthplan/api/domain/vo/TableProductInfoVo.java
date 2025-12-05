@@ -1,6 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.vo;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -13,7 +13,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel(value = "物料基础信息列表查询结果Vo", description = "物料基础信息列表查询结果Vo")
-public class TableProductInfoVo extends MdmProductInfo {
+public class TableProductInfoVo extends MdmMaterialInfo {
     /**
      * 模具号多个以,隔开
      */

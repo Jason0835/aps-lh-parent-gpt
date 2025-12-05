@@ -20,7 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           LEFT JOIN t_mdm_min_prod mmp
             ON mmp.FACTORY_CODE = a.FACTORY_CODE
            AND mmp.PRODUCT_CODE = a.PRODUCT_CODE
-          LEFT JOIN t_mdm_product_info mpi
+          LEFT JOIN t_mdm_material_info mpi
             ON mpi.FACTORY_CODE = a.FACTORY_CODE
            AND mpi.PRODUCT_CODE = a.PRODUCT_CODE
          WHERE mmp.PRODUCT_CODE is null
@@ -104,7 +104,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateProductInfo" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
         UPDATE t_mp_month_sale_plan msp
-          JOIN t_mdm_product_info mpi
+            JOIN t_mdm_material_info mpi
             ON msp.FACTORY_CODE = mpi.FACTORY_CODE
            AND msp.PRODUCT_CODE = mpi.PRODUCT_CODE
            AND IFNULL(mpi.IS_DELETE, 0) = 0

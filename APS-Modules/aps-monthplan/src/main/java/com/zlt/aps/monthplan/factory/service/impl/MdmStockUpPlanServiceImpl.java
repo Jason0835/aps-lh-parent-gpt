@@ -14,9 +14,9 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.AppUtils;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStockUpPlan;
 import com.zlt.aps.monthplan.api.domain.vo.CalcStockingResultVo;
 import com.zlt.aps.monthplan.api.domain.vo.MdmStockUpPlanVo;
@@ -68,7 +68,7 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
 
     private final IMpHistorySaleQtyService mpHistorySaleQtyService;
 
-    private final MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     private final IFactoryParamService factoryParamService;
 
@@ -153,7 +153,7 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
         Long id = mdmStockUpPlan.getId();
         if (null == id) {
             String productCode = mdmStockUpPlan.getProductCode();
-            MdmProductInfo productInfo = getProductInfo(productCode, mdmStockUpPlan.getFactoryCode());
+            MdmMaterialInfo productInfo = getProductInfo(productCode, mdmStockUpPlan.getFactoryCode());
             if (null == productInfo) {
                 String productCodeError = I18nUtil.getMessage("ui.data.column.mdmStockUpPlan.productCode.notExist");
                 return AjaxResult.error(String.format(productCodeError, productCode));
@@ -166,7 +166,7 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
             MdmStockUpPlan insert = new MdmStockUpPlan();
             BeanUtils.copyProperties(mdmStockUpPlan, insert);
             insert.setAverageType(averageType);
-            insert.setProductDesc(productInfo.getProductDesc());
+            insert.setProductDesc(productInfo.getMaterialDesc());
             save(insert);
             return AjaxResult.success();
         }
@@ -206,14 +206,14 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
         String repeatError = I18nUtil.getMessage("ui.data.column.mdmStockUpPlan.repeat");
 
         // 物料信息
-        Map<String, MdmProductInfo> productInfoMap = new HashMap<>();
+        Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>();
         List<String> productCodeList = list.stream().map(StockUpPlanExcelVo::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(productCodeList)) {
             List<String> factoryCodeList = list.stream().map(StockUpPlanExcelVo::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-            productInfoMap = mdmProductInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmProductInfo.class)
-                            .in(MdmProductInfo::getProductCode, productCodeList)
-                            .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList))
-                    .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+            productInfoMap = mdmMaterialInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                            .in(MdmMaterialInfo::getMaterialCode, productCodeList)
+                            .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList))
+                    .stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
         }
 
         // 重复记录，分厂 + 年 + 月 + 物料编号 + 库位
@@ -221,7 +221,7 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(keyFunc, Collectors.counting()));
 
         // 公共校验（非空校验、长度校验等）
-        Map<String, MdmProductInfo> finalProductInfoMap = productInfoMap;
+        Map<String, MdmMaterialInfo> finalProductInfoMap = productInfoMap;
         List<StockUpPlanExcelVo> importList = list.stream()
                 .map(vo -> {
                     int errorNum = list.indexOf(vo) + 2;
@@ -240,13 +240,13 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
                     }
 
                     // 查询对应物料信息
-                    MdmProductInfo mdmProductInfo = finalProductInfoMap.get(GenerageMapKeyUtils.createMapKey(vo.getFactoryCode(), vo.getProductCode()));
-                    if (mdmProductInfo == null) {
+                    MdmMaterialInfo mdmMaterialInfo = finalProductInfoMap.get(GenerageMapKeyUtils.createMapKey(vo.getFactoryCode(), vo.getProductCode()));
+                    if (mdmMaterialInfo == null) {
                         failureNum.getAndIncrement();
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum, String.format(productCodeError, vo.getProductCode()), importErrorLogs);
                         return null;
                     }
-                    vo.setProductDesc(mdmProductInfo.getProductDesc());
+                    vo.setProductDesc(mdmMaterialInfo.getMaterialDesc());
 
                     return vo;
                 })
@@ -398,15 +398,15 @@ public class MdmStockUpPlanServiceImpl extends ServiceImpl<MdmStockUpPlanMapper,
      * @param factoryCode 工厂编码
      * @return
      */
-    private MdmProductInfo getProductInfo(String productCode, String factoryCode) {
+    private MdmMaterialInfo getProductInfo(String productCode, String factoryCode) {
         if (StringUtils.isBlank(productCode) || StringUtils.isBlank(factoryCode)) {
             return null;
         }
-        QueryWrapper<MdmProductInfo> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("PRODUCT_CODE", productCode);
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        return mdmProductInfoEntityMapper.selectOne(queryWrapper);
+        return mdmMaterialInfoEntityMapper.selectOne(queryWrapper);
     }
 
 }

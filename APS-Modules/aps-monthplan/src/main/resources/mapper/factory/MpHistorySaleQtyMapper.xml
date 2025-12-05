@@ -91,7 +91,8 @@
         LPAD( MONTH, 2, '0' )) yearMonth
         FROM
         t_mp_history_sale_qty mhsq
-        LEFT JOIN t_mdm_product_info mpi ON mpi.IS_DELETE = 0 and mhsq.FACTORY_CODE = mpi.FACTORY_CODE and mhsq.PRODUCT_CODE = mpi.PRODUCT_CODE 
+        LEFT JOIN t_mdm_material_info mpi ON mpi.IS_DELETE = 0 and mhsq.FACTORY_CODE = mpi.FACTORY_CODE and
+        mhsq.PRODUCT_CODE = mpi.PRODUCT_CODE
         where mhsq.IS_DELETE = 0
         ) a
         WHERE

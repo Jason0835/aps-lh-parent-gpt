@@ -9,7 +9,7 @@ import java.math.BigDecimal;
  * @author Chen
  */
 @Data
-public class ProductInfoGrossRateJsonVo implements Serializable {
+public class MaterialInfoGrossRateJsonVo implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

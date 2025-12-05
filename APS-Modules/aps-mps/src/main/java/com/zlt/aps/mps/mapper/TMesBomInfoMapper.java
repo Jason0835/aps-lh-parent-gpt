@@ -1,10 +1,9 @@
 package com.zlt.aps.mps.mapper;
 
-import java.util.List;
-
+import com.zlt.aps.mps.domain.TMesBomInfo;
 import org.apache.ibatis.annotations.Param;
 
-import com.zlt.aps.mps.domain.TMesBomInfo;
+import java.util.List;
 
 /**
  * @Entity com.zlt.aps.mps.domain.TMesBomInfo
@@ -23,7 +22,7 @@ public interface TMesBomInfoMapper {
      * @param dataVersion
      * @return
      */
-    int mergeMdmProductInfo(@Param("dataVersion") String dataVersion);
+    int mergeMdmMaterialInfo(@Param("dataVersion") String dataVersion);
 }
 
 

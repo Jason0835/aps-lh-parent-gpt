@@ -12,10 +12,10 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
 import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
 import com.zlt.aps.monthplan.common.utils.RemoteImportExcelUtils;
@@ -59,7 +59,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 public class EstimateExceedShortServiceImpl implements IEstimateExceedShortService {
 
     private final EstimateExceedShortMapper estimateExceedShortMapper;
-    private final MdmProductInfoEntityMapper productInfoEntityMapper;
+    private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
     private final IRemoteImportLogService iRemoteImportLogService;
     private final IRemoteImportErrorLogService iRemoteImportErrorLogService;
@@ -161,7 +161,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(keyFunc, Collectors.counting()));
 
         // 获取物料信息
-        Map<String, MdmProductInfo> productInfoMap = getMdmProductInfoMap(list);
+        Map<String, MdmMaterialInfo> productInfoMap = getMdmMaterialInfoMap(list);
 
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
@@ -186,7 +186,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
             }
 
             // 物料信息不存在跳过
-            MdmProductInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(tEstimateExceedShort.getFactoryCode(), tEstimateExceedShort.getProductCode()));
+            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(tEstimateExceedShort.getFactoryCode(), tEstimateExceedShort.getProductCode()));
             if (productInfo == null) {
                 failureNum++;
                 tEstimateExceedShort.setId(-999L);
@@ -197,7 +197,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
             tEstimateExceedShort.setProSize(productInfo.getProSize());
             tEstimateExceedShort.setProductName(productInfo.getProductTypeCode());
             tEstimateExceedShort.setIsImport(Constant.TRUE);
-            
+
             importList.add(tEstimateExceedShort);
         }
 
@@ -246,7 +246,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
     /**
      * 查询对应分厂编号+物料编号的Map
      */
-    private Map<String, MdmProductInfo> getMdmProductInfoMap(List<EstimateExceedShort> list) {
+    private Map<String, MdmMaterialInfo> getMdmMaterialInfoMap(List<EstimateExceedShort> list) {
         if (CollectionUtils.isEmpty(list)) {
             return new HashMap<>();
         }
@@ -256,11 +256,11 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
             return Collections.emptyMap();
         }
 
-        LambdaQueryWrapper<MdmProductInfo> wrapper = Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList)
-                .in(CollectionUtils.isNotEmpty(productCodeList), MdmProductInfo::getProductCode, productCodeList);
-        return productInfoEntityMapper.selectList(wrapper).stream().filter(v -> v.getProductDesc() != null)
-                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList)
+                .in(CollectionUtils.isNotEmpty(productCodeList), MdmMaterialInfo::getMaterialCode, productCodeList);
+        return productInfoEntityMapper.selectList(wrapper).stream().filter(v -> v.getMaterialDesc() != null)
+                .collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
     }
 
     /**
@@ -308,18 +308,18 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
             return;
         }
 
-        List<MdmProductInfo> productInfoList = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmProductInfo.class)
-                .in(MdmProductInfo::getProductCode, productCodeList)
-                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmProductInfo::getFactoryCode, factoryCodeList));
+        List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.selectList(Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                .in(MdmMaterialInfo::getMaterialCode, productCodeList)
+                .in(CollectionUtils.isNotEmpty(factoryCodeList), MdmMaterialInfo::getFactoryCode, factoryCodeList));
         if (CollectionUtils.isEmpty(productInfoList)) {
             return;
         }
-        Map<String, MdmProductInfo> infoMap = productInfoList.stream()
-                .collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()), Function.identity(), (v1, v2) -> v1));
+        Map<String, MdmMaterialInfo> infoMap = productInfoList.stream()
+                .collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
         for (EstimateExceedShort item : shortList) {
-            MdmProductInfo mdmProductInfo = infoMap.getOrDefault(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()), new MdmProductInfo());
-            item.setProSize(mdmProductInfo.getProSize());
-            item.setProductName(mdmProductInfo.getProductTypeCode());
+            MdmMaterialInfo mdmMaterialInfo = infoMap.getOrDefault(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()), new MdmMaterialInfo());
+            item.setProSize(mdmMaterialInfo.getProSize());
+            item.setProductName(mdmMaterialInfo.getProductTypeCode());
         }
     }
 }

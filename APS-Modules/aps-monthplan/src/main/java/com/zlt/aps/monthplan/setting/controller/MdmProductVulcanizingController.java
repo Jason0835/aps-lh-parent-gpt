@@ -9,10 +9,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductVulcanizingService;
 import com.zlt.aps.maindata.service.IVulcanizingMachineService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductVulcanizing;
 import com.zlt.aps.monthplan.api.domain.entity.VulcanizingMachine;
 import io.swagger.annotations.ApiOperation;
@@ -41,7 +41,7 @@ public class MdmProductVulcanizingController extends BaseController {
     @Autowired
     private IVulcanizingMachineService iDocVulcanizingMachineService;
     @Autowired
-    private IMdmProductInfoService iMdmProductInfoService;
+    private IMdmMaterialInfoService iMdmMaterialInfoService;
 
     /**
      * 查询基础数据-硫化机正在生产品种列表
@@ -173,7 +173,7 @@ public class MdmProductVulcanizingController extends BaseController {
     @PostMapping("/getProductInfo")
     public AjaxResult getProductInfo(@RequestParam("productCode") String productCode) {
         // 查询物料信息
-        List<MdmProductInfo> productInfoList = iMdmProductInfoService.selectListByProductCode(Collections.singletonList(productCode));
+        List<MdmMaterialInfo> productInfoList = iMdmMaterialInfoService.selectListByProductCode(Collections.singletonList(productCode));
         if (CollectionUtils.isNotEmpty(productInfoList)) {
             return AjaxResult.success(productInfoList.get(0));
         }

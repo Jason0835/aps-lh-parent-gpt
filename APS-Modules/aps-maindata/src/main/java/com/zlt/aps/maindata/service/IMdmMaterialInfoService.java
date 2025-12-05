@@ -3,10 +3,10 @@ package com.zlt.aps.maindata.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.service.IDocService;
 
@@ -15,8 +15,8 @@ import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：IMdmProductInfoService.java
- * 描    述：IMdmProductInfoService物料信息后端接口
+ * 文件名称：IMdmMaterialInfoService.java
+ * 描    述：IMdmMaterialInfoService物料信息后端接口
  *
  * @author zlt
  * @version 1.0
@@ -27,12 +27,12 @@ import java.util.Set;
  * 修改内容：...
  * @date 2025-02-19
  */
-public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
+public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
 
     /**
      * 根据编号查询物料信息
      */
-    List<MdmProductInfo> selectListByProductCode(List<String> codeList);
+    List<MdmMaterialInfo> selectListByProductCode(List<String> codeList);
 
     /**
      * 根据查询条件，获取物料信息
@@ -48,7 +48,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param id 物料信息表主键
      * @return 物料信息表
      */
-    MdmProductInfo selectProductInfoById(Long id);
+    MdmMaterialInfo selectMaterialInfoById(Long id);
 
     /**
      * 新增物料信息表
@@ -56,7 +56,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param productInfo 物料信息表
      * @return 结果
      */
-    int insertProductInfo(MdmProductInfo productInfo);
+    int insertMaterialInfo(MdmMaterialInfo productInfo);
 
     /**
      * 修改物料信息表
@@ -64,7 +64,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param productInfo 物料信息表
      * @return 结果
      */
-    int updateProductInfo(MdmProductInfo productInfo);
+    int updateMaterialInfo(MdmMaterialInfo productInfo);
 
     /**
      * 批量删除物料信息表
@@ -72,7 +72,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param ids 需要删除的物料信息表主键集合
      * @return 结果
      */
-    int deleteProductInfoByIds(Long[] ids);
+    int deleteMaterialInfoByIds(Long[] ids);
 
     /**
      * 删除物料信息表信息
@@ -80,12 +80,12 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param id 物料信息表主键
      * @return 结果
      */
-    int deleteProductInfoById(Long id);
+    int deleteMaterialInfoById(Long id);
 
     /**
      * 校验物料信息表唯一性
      */
-    String checkProductInfoUnique(MdmProductInfo productInfo);
+    String checkMaterialInfoUnique(MdmMaterialInfo productInfo);
 
     /**
      * 查询列表
@@ -93,21 +93,21 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param wrapper 查询条件
      * @return 结果
      */
-    List<MdmProductInfo> selectList(QueryWrapper<MdmProductInfo> wrapper);
+    List<MdmMaterialInfo> selectList(QueryWrapper<MdmMaterialInfo> wrapper);
 
     /**
      * 将json字段转成前端展示字段
      *
      * @param productInfoList 要转换的物料信息
      */
-    void transformJsonField(List<MdmProductInfo> productInfoList);
+    void transformJsonField(List<MdmMaterialInfo> productInfoList);
 
     /**
      * 将前端的字段转换json字段存储
      *
      * @param productInfoList 要转换的物料信息
      */
-    void transformToJsonField(List<MdmProductInfo> productInfoList);
+    void transformToJsonField(List<MdmMaterialInfo> productInfoList);
 
     /**
      * 根据分厂编号和物料号集合查询物料信息
@@ -116,7 +116,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param productCodes 物料编号集合
      * @return 对应的施工记录列表
      */
-    List<MdmProductInfo> queryByFactoryCodeAndProductCodes(String factoryCode, Set<String> productCodes);
+    List<MdmMaterialInfo> queryByFactoryCodeAndProductCodes(String factoryCode, Set<String> productCodes);
 
     /**
      * 根据物料编号和规格编号查询物料信息
@@ -125,7 +125,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param factoryCode
      * @return
      */
-    MdmProductInfo selectOneByProductCodeAndSpecCode(String productInfo, String factoryCode);
+    MdmMaterialInfo selectOneByProductCodeAndSpecCode(String productInfo, String factoryCode);
 
     /**
      * 导入物料信息
@@ -135,7 +135,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param importLogId   导入记录id
      * @return 结果
      */
-    AjaxResult importGrossRate(List<ProductInfoGrossRateVo> list, boolean updateSupport, Long importLogId);
+    AjaxResult importGrossRate(List<MaterialInfoGrossRateVo> list, boolean updateSupport, Long importLogId);
 
     /**
      * 查询对应物料列表+分厂列表的物料信息
@@ -144,7 +144,7 @@ public interface IMdmProductInfoService extends IDocService<MdmProductInfo> {
      * @param productCodeList 物料编号列表（不能为空）
      * @return 物料信息
      */
-    List<MdmProductInfo> selectListByFactoryProductCode(List<String> factoryCodeList, List<String> productCodeList);
+    List<MdmMaterialInfo> selectListByFactoryProductCode(List<String> factoryCodeList, List<String> productCodeList);
 
     /**
      * 配置施工记录校验

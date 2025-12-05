@@ -3,7 +3,7 @@ package com.zlt.aps.cxlh.cx.api.domain.vo;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.monthplan.api.domain.entity.CxEmbryoMonthPlanSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -156,8 +156,8 @@ public class LhAlgorithmScheduleResultDto extends BaseEntity implements Serializ
     /**
      * 规格物料信息列表
      */
-    @ApiModelProperty(value = "规格物料信息列表", name = "mdmProductInfoList")
-    private List<MdmProductInfo> mdmProductInfoList;
+    @ApiModelProperty(value = "规格物料信息列表", name = "mdmMaterialInfoList")
+    private List<MdmMaterialInfo> mdmMaterialInfoList;
 
     /**
      * 胎胚拆单计数器
@@ -308,7 +308,7 @@ public class LhAlgorithmScheduleResultDto extends BaseEntity implements Serializ
             BeanUtils.copyProperties(lhAlgorithmScheduleResultDto.getCxProductConstructionInfoDto(), this.cxProductConstructionInfoDto);
         }
 
-        this.mdmProductInfoList = new ArrayList<>( lhAlgorithmScheduleResultDto.mdmProductInfoList);
+        this.mdmMaterialInfoList = new ArrayList<>(lhAlgorithmScheduleResultDto.mdmMaterialInfoList);
         this.tireCount = lhAlgorithmScheduleResultDto.getTireCount();
         this.taskPlanQuantity = lhAlgorithmScheduleResultDto.getTaskPlanQuantity();
         this.class1PlanQty = lhAlgorithmScheduleResultDto.getClass1PlanQty();

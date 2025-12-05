@@ -8,7 +8,7 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.MdmInterestRate;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateJsonVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -113,7 +113,7 @@ public class ProductUtils {
      * @param commonType                    物料的公用规格类型
      * @param interestRateList              毛利-利润优先值匹配规则
      */
-    public static void setProductLocationProfit(Map<String, Integer> productLocationProfitGradeMap, List<ProductInfoGrossRateJsonVo> rateList, String productCode, ProductCommonTypeEnum commonType, List<MdmInterestRate> interestRateList) {
+    public static void setProductLocationProfit(Map<String, Integer> productLocationProfitGradeMap, List<MaterialInfoGrossRateJsonVo> rateList, String productCode, ProductCommonTypeEnum commonType, List<MdmInterestRate> interestRateList) {
         String profitKeyFormat = ProductionConstant.PRODUCT_PROFIT_KEY_FORMAT;
         int defaultProfit = ProductionConstant.DEFAULT_PROFIT;
         //没有配置，默认为0，则转化利润优先等级 = 100-0
@@ -129,7 +129,7 @@ public class ProductUtils {
         }
         //有配置，且不是共用规格
         if (ProductCommonTypeEnum.COMMON_TYPE != commonType) {
-            ProductInfoGrossRateJsonVo rate = rateList.get(0);
+            MaterialInfoGrossRateJsonVo rate = rateList.get(0);
             ProductCommonTypeEnum configurationType = ProductCommonTypeEnum.getInstance(rate.getCommonType());
             Integer profit = getProfit(interestRateList, rate.getGrossRate(), defaultProfit);
             productLocationProfitGradeMap.put(String.format(profitKeyFormat, productCode, configurationType.getLocationType().getValue()), profit);

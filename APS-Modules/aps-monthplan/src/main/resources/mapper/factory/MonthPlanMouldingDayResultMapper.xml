@@ -408,7 +408,8 @@
                                        ))
                             GROUP BY f.PRODUCT_CODE) finish on a.PRODUCT_CODE = finish.PRODUCT_CODE
 
-                 LEFT JOIN t_mdm_product_info proInfo ON a.PRODUCT_CODE = proInfo.PRODUCT_CODE and a.factory_code = proInfo.factory_code
+        LEFT JOIN t_mdm_material_info proInfo ON a.PRODUCT_CODE = proInfo.PRODUCT_CODE and a.factory_code =
+        proInfo.factory_code
                  LEFT JOIN t_mdm_product_construction proCon ON a.PRODUCT_CODE = proCon.PRODUCT_CODE and a.factory_code = proCon.factory_code
                  LEFT JOIN T_PRODUCT_CONSTRUCTION_INFO ci on proCon.EMBRYO_CODE = ci.embryo_code and proCon.BOM_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
 

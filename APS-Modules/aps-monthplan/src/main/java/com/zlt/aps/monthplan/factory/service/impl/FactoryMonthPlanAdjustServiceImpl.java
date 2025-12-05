@@ -14,7 +14,7 @@ import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.factory.domain.vo.ProductionCalendarVO;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.maindata.service.IMdmProductionCalendarService;
@@ -69,7 +69,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
 
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
 
-    private final MdmProductInfoEntityMapper productInfoMapper;
+    private final MdmMaterialInfoEntityMapper productInfoMapper;
 
     private final FactoryMonthPlanAdjustMapper factoryMonthPlanAdjustMapper;
 
@@ -345,7 +345,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         Map<String, MouldingProductionResultHelper> updateMouldMap = maxAddQtyResult.getSubtractCuringTimeMouldMap();
         //新规格增量
         if (StringUtils.isBlank(productionNo)) {
-            MdmProductInfo productInfo = (MdmProductInfo) checkProductAndCuringTimeResult.get(AjaxResult.DATA_TAG);
+            MdmMaterialInfo productInfo = (MdmMaterialInfo) checkProductAndCuringTimeResult.get(AjaxResult.DATA_TAG);
             FactoryMonthPlanProdFinal addPlan = adjustAddQtyByNewProductionNo(finalVersionInfo, adjustPlan, stopDays, productInfo, updateMouldMap);
             //保存日志
             saveLogs(adjustPlan, addPlan.getProductionNo());
@@ -593,7 +593,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
      * @param productInfo                物料信息
      * @param subtractCuringTimeMouldMap 扣减过硫化时间的模具信息
      */
-    private FactoryMonthPlanProdFinal adjustAddQtyByNewProductionNo(FactoryMonthPlanFinalVersionInfoVo finalVersionInfo, FactoryMonthPlanAdjustPlanVo adjustPlan, Set<Integer> stopDays, MdmProductInfo productInfo, Map<String, MouldingProductionResultHelper> subtractCuringTimeMouldMap) {
+    private FactoryMonthPlanProdFinal adjustAddQtyByNewProductionNo(FactoryMonthPlanFinalVersionInfoVo finalVersionInfo, FactoryMonthPlanAdjustPlanVo adjustPlan, Set<Integer> stopDays, MdmMaterialInfo productInfo, Map<String, MouldingProductionResultHelper> subtractCuringTimeMouldMap) {
         String factoryCode = finalVersionInfo.getFactoryCode();
         Integer year = finalVersionInfo.getYear();
         Integer month = finalVersionInfo.getMonth();
@@ -1034,11 +1034,11 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         }
         //新插入规格
         String productCode = adjustPlan.getProductCode();
-        QueryWrapper<MdmProductInfo> productQuery = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> productQuery = new QueryWrapper<>();
         productQuery.eq("PRODUCT_CODE", productCode);
         productQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         productQuery.eq("FACTORY_CODE", factoryCode);
-        MdmProductInfo productInfo = productInfoMapper.selectOne(productQuery);
+        MdmMaterialInfo productInfo = productInfoMapper.selectOne(productQuery);
         if (null == productInfo) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.TEstimateExceedShort.notExist.productInfo"));
         }

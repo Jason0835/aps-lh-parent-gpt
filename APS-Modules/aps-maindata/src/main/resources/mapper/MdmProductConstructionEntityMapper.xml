@@ -108,7 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                pc.PRODUCT_CODE as productCode,
                pi.PRODUCT_DESC as productDesc,
                pc.SPEC_CODE as specCode from t_mdm_product_construction pc
-            left join t_mdm_product_info pi on pc.PRODUCT_CODE = pi.PRODUCT_CODE  WHERE pc.IS_DELETE = '0'
+        left join t_mdm_material_info pi on pc.PRODUCT_CODE = pi.PRODUCT_CODE WHERE pc.IS_DELETE = '0'
         <if test="factoryCode != null and factoryCode != ''">
             AND pc.FACTORY_CODE = #{factoryCode}
         </if>

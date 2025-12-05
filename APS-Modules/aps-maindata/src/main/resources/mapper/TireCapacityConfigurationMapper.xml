@@ -26,7 +26,7 @@
                                    mprp.PRO_SIZE,
                                    SUM(mprp.PLAN_QTY) AS DEMAND_QTY
                               FROM t_mp_product_require_plan mprp
-                             INNER JOIN t_mdm_product_info tmi
+        INNER JOIN t_mdm_material_info tmi
                                 ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                                AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                              WHERE IFNULL(mprp.IS_DELETE, 0) = 0
@@ -39,7 +39,7 @@
                                        mprp.PRO_SIZE,
                                        SUM(mprp.PLAN_QTY) AS NET_DEMAND_QTY
                                   FROM t_mp_product_require_plan mprp
-                                 INNER JOIN t_mdm_product_info tmi
+        INNER JOIN t_mdm_material_info tmi
                                     ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                                    AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                                  WHERE IFNULL(mprp.IS_DELETE, 0) = 0
@@ -55,7 +55,7 @@
                                        mprp.PRO_SIZE,
                                        SUM(mprp.PLAN_QTY) AS STOCK_UP_DEMAND_QTY
                                   FROM t_mp_product_require_plan mprp
-                                 INNER JOIN t_mdm_product_info tmi
+        INNER JOIN t_mdm_material_info tmi
                                     ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                                    AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                                  WHERE IFNULL(mprp.IS_DELETE, 0) = 0
@@ -92,7 +92,7 @@
                        mprp.PRO_SIZE,
                        SUM(mprp.PLAN_QTY) AS DEMAND_QTY
                   FROM t_mp_product_require_plan mprp
-                 INNER JOIN t_mdm_product_info tmi
+                           INNER JOIN t_mdm_material_info tmi
                     ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                    AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                  WHERE IFNULL(mprp.IS_DELETE, 0) = 0
@@ -107,7 +107,7 @@
                            mprp.PRO_SIZE,
                            SUM(mprp.PLAN_QTY) AS NET_DEMAND_QTY
                       FROM t_mp_product_require_plan mprp
-                     INNER JOIN t_mdm_product_info tmi
+                               INNER JOIN t_mdm_material_info tmi
                         ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                        AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                      WHERE IFNULL(mprp.IS_DELETE, 0) = 0
@@ -125,7 +125,7 @@
                            mprp.PRO_SIZE,
                            SUM(mprp.PLAN_QTY) AS STOCK_UP_DEMAND_QTY
                       FROM t_mp_product_require_plan mprp
-                     INNER JOIN t_mdm_product_info tmi
+                               INNER JOIN t_mdm_material_info tmi
                         ON tmi.FACTORY_CODE = mprp.FACTORY_CODE
                        AND tmi.PRODUCT_CODE = mprp.PRODUCT_CODE
                      WHERE IFNULL(mprp.IS_DELETE, 0) = 0

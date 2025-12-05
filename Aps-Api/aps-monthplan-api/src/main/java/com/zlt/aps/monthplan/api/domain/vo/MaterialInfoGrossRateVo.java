@@ -16,7 +16,7 @@ import java.math.BigDecimal;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class ProductInfoGrossRateVo extends BaseEntity {
+public class MaterialInfoGrossRateVo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -24,7 +24,7 @@ public class ProductInfoGrossRateVo extends BaseEntity {
      * 分厂编号
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -33,18 +33,28 @@ public class ProductInfoGrossRateVo extends BaseEntity {
      * 物料编号
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmProductInfo.productCode")
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCode", sort = 2)
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /**
+     * MES物料编号
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCode", sort = 2)
+    @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     /**
      * 规格描述
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.productDesc")
-    @ApiModelProperty(value = "规格描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    @ImportExcelValidated(required = true, maxLength = 256)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialDesc", sort = 3)
+    @ApiModelProperty(value = "规格描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /**
      * 寸口（保留2位小数）
@@ -136,7 +146,7 @@ public class ProductInfoGrossRateVo extends BaseEntity {
      * 公用类型 取数据字典 biz_common_type的编码 1 公用规格 2 外销专用 3 内销专用 4 OE专用
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmProductInfo.commonType", dictType = "biz_common_type")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.commonType", dictType = "biz_common_type")
     @ApiModelProperty(value = "公用类型 取数据字典 biz_common_type的编码 1 公用规格 2 外销专用 3 内销专用 4 OE专用", name = "commonType")
     @TableField(value = "COMMON_TYPE")
     private String commonType;
@@ -208,10 +218,10 @@ public class ProductInfoGrossRateVo extends BaseEntity {
     /**
      * 物料组
      */
-//    @Excel(name = "ui.data.column.info.productGroupCode")
-    @ApiModelProperty(value = "物料组", name = "productGroupCode")
-    @TableField(value = "PRODUCT_GROUP_CODE")
-    private String productGroupCode;
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.productGroupCode")
+    @ApiModelProperty(value = "物料组", name = "materialGroupCode")
+    @TableField(value = "MATERIAL_GROUP_CODE")
+    private String materialGroupCode;
 
     /**
      * 废停标志

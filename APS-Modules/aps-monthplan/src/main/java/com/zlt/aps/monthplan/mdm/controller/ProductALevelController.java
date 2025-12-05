@@ -177,7 +177,7 @@ public class ProductALevelController extends AbstractDocBizController<ProductALe
         }
         queryWrapper.exists(
                 StringUtils.isNotBlank(addSql),
-                " SELECT 1 FROM T_MDM_PRODUCT_INFO b WHERE b.PRODUCT_CODE = T_MDM_PRODUCT_A_LEVEL.PRODUCT_CODE and b.FACTORY_CODE = T_MDM_PRODUCT_A_LEVEL.FACTORY_CODE "
+                " SELECT 1 FROM T_MDM_MATERIAL_INFO b WHERE b.PRODUCT_CODE = T_MDM_PRODUCT_A_LEVEL.PRODUCT_CODE and b.FACTORY_CODE = T_MDM_PRODUCT_A_LEVEL.FACTORY_CODE "
                 + addSql
         );
     }
@@ -190,7 +190,7 @@ public class ProductALevelController extends AbstractDocBizController<ProductALe
     @Override
     protected String[] getQueryFormulas() {
         return new String[]{
-                "productDesc,proSize,pattern,brand->getcolsvalue(T_MDM_PRODUCT_INFO, [PRODUCT_DESC,PRO_SIZE,PATTERN,BRAND], PRODUCT_CODE, productCode)",
+                "productDesc,proSize,pattern,brand->getcolsvalue(T_MDM_MATERIAL_INFO, [PRODUCT_DESC,PRO_SIZE,PATTERN,BRAND], PRODUCT_CODE, productCode)",
         };
     }
 

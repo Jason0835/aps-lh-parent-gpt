@@ -86,7 +86,7 @@ public class ProductALevel extends BaseEntity {
     /**
      * 规格描述
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.productDesc", type = Excel.Type.EXPORT)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productDesc", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "规格描述", name = "productDesc")
     @TableField(exist = false)
     private String productDesc;
@@ -94,7 +94,7 @@ public class ProductALevel extends BaseEntity {
     /**
      * 寸口（保留2位小数）
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.proSize", type = Excel.Type.EXPORT)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.proSize", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "寸口", name = "proSize")
     @TableField(exist = false)
     private BigDecimal proSize;
@@ -102,7 +102,7 @@ public class ProductALevel extends BaseEntity {
     /**
      * 花纹
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.pattern", type = Excel.Type.EXPORT)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.pattern", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(exist = false)
     private String pattern;
@@ -110,7 +110,7 @@ public class ProductALevel extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.mdmProductInfo.brand", dictType = "biz_brand_type", type = Excel.Type.EXPORT)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.brand", dictType = "biz_brand_type", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "品牌，字典：biz_brand_type", name = "brand")
     @TableField(exist = false)
     private String brand;

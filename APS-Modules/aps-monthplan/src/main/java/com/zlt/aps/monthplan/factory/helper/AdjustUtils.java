@@ -137,8 +137,8 @@ public class AdjustUtils {
      * @param productionPlan 新增的调整计划
      * @param productInfo    物料信息
      */
-    public static void fillProductInfo(FactoryMonthPlanProdFinal productionPlan, MdmProductInfo productInfo) {
-        productionPlan.setProductDesc(productInfo.getProductDesc());
+    public static void fillProductInfo(FactoryMonthPlanProdFinal productionPlan, MdmMaterialInfo productInfo) {
+        productionPlan.setProductDesc(productInfo.getMaterialDesc());
         productionPlan.setPattern(productInfo.getPattern());
         productionPlan.setHierarchy(productInfo.getHierarchy());
         productionPlan.setSpecifications(productInfo.getSpecifications());

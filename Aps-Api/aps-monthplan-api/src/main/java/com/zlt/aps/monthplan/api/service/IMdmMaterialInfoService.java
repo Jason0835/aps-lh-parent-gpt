@@ -4,8 +4,8 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import io.swagger.annotations.ApiOperation;
@@ -21,8 +21,8 @@ import java.util.List;
  * @author leo
  * @date 2021-08-24
  */
-@FeignClient(contextId = "IProductInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
-public interface IMdmProductInfoService {
+@FeignClient(contextId = "IMaterialInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
+public interface IMdmMaterialInfoService {
     /**
      * 查询物料信息表列表
      *
@@ -30,7 +30,7 @@ public interface IMdmProductInfoService {
      * @return
      */
     @PostMapping("/productinfo/list")
-    TableDataInfo list(@RequestBody MdmProductInfo productInfo);
+    TableDataInfo list(@RequestBody MdmMaterialInfo productInfo);
 
     /**
      * 查询物料信息表列表
@@ -49,7 +49,7 @@ public interface IMdmProductInfoService {
      * @return
      */
     @PostMapping("/productinfo/add")
-    AjaxResult add(@RequestBody MdmProductInfo productInfo);
+    AjaxResult add(@RequestBody MdmMaterialInfo productInfo);
 
 
     /**
@@ -59,7 +59,7 @@ public interface IMdmProductInfoService {
      * @return
      */
     @PostMapping("/productinfo/edit")
-    AjaxResult edit(@RequestBody MdmProductInfo productInfo);
+    AjaxResult edit(@RequestBody MdmMaterialInfo productInfo);
 
 
     /**
@@ -79,7 +79,7 @@ public interface IMdmProductInfoService {
      * @return
      */
     @GetMapping(value = "/productinfo/{id}")
-    MdmProductInfo getInfo(@PathVariable("id") Long id);
+    MdmMaterialInfo getInfo(@PathVariable("id") Long id);
 
 
     /**
@@ -88,8 +88,8 @@ public interface IMdmProductInfoService {
      * @param productInfo
      * @return
      */
-    @PostMapping("/productinfo/checkProductInfoUnique")
-    String checkProductInfoUnique(@RequestBody MdmProductInfo productInfo);
+    @PostMapping("/productinfo/checkMaterialInfoUnique")
+    String checkMaterialInfoUnique(@RequestBody MdmMaterialInfo productInfo);
 
 
     /**
@@ -99,7 +99,7 @@ public interface IMdmProductInfoService {
      * @return
      */
     @PostMapping("/productinfo/getList")
-    List<MdmProductInfo> getList(@RequestBody MdmProductInfo productInfo);
+    List<MdmMaterialInfo> getList(@RequestBody MdmMaterialInfo productInfo);
 
     /**
      * 根据物料编码获取物料信息
@@ -107,8 +107,8 @@ public interface IMdmProductInfoService {
      * @param productCode
      * @return
      */
-    @PostMapping("/productinfo/getProductInfo")
-    AjaxResult getProductInfo(@RequestParam("productCode") String productCode);
+    @PostMapping("/productinfo/getMaterialInfo")
+    AjaxResult getMaterialInfo(@RequestParam("materialCode") String materialCode);
 
     /**
      * 物料数据导出

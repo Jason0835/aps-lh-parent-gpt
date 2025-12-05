@@ -23,7 +23,6 @@ import com.zlt.aps.cx.service.ICxStockService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxProductConstructionInfo;
 import com.zlt.aps.cxlh.cx.api.domain.entity.*;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxMachineInfoVo;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxProductConstructionInfo;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxProductConstructionInfoDto;
 import com.zlt.aps.cxlh.cx.api.domain.vo.LhAlgorithmScheduleResultDto;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -386,9 +385,9 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
 
         // 2. 获取物料信息并分组，用于合并后填充物料信息
-        List<MdmProductInfo> specInfos = commonQueryCacheService.querySulfurSpecInfo(lhScheduleResultList);
-        Map<String, List<MdmProductInfo>> specInfoMap = specInfos.stream()
-                .collect(Collectors.groupingBy(item->item.getFactoryCode()+item.getProductCode()));
+        List<MdmMaterialInfo> specInfos = commonQueryCacheService.querySulfurSpecInfo(lhScheduleResultList);
+        Map<String, List<MdmMaterialInfo>> specInfoMap = specInfos.stream()
+                .collect(Collectors.groupingBy(item -> item.getFactoryCode() + item.getMaterialCode()));
 
         //==================== 阶段2：分组处理 ====================//
         embryoGroupMap.forEach((embryoCode, taskGroup) -> {
@@ -452,11 +451,11 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
      * -----------------------------Step：1-合并硫化任务-----------------------------
      *
      * @param batch                    硫化计划
-     * @param mdmProductInfoInfoDtoMap 规格物料施工分组
+     * @param mdmMaterialInfoInfoDtoMap 规格物料施工分组
      * @param isTomorrowNewSpec        是否是明日新增
      * @param cxBatchNo 批次号
      */
-    private void mergeBatchLhResults(List<LhScheduleResult> batch, Map<String, List<MdmProductInfo>> mdmProductInfoInfoDtoMap, boolean isTomorrowNewSpec, String cxBatchNo) {
+    private void mergeBatchLhResults(List<LhScheduleResult> batch, Map<String, List<MdmMaterialInfo>> mdmMaterialInfoInfoDtoMap, boolean isTomorrowNewSpec, String cxBatchNo) {
         // 0.列表进行排序后合并，按照使用模数降序
         batch.sort((o1, o2) -> o2.getMoldQty().compareTo(o1.getMoldQty()));
 
@@ -469,10 +468,10 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         target.setEmbryoStock(target.getEmbryoStock() ==  null ? 0 : target.getEmbryoStock());
 
         // 4.合并
-        List<MdmProductInfo> lhScheduleResultMdmProductInfo = new ArrayList<>();
-        if(mdmProductInfoInfoDtoMap.get(target.getSpecCode()) != null) {
+        List<MdmMaterialInfo> lhScheduleResultMdmMaterialInfo = new ArrayList<>();
+        if (mdmMaterialInfoInfoDtoMap.get(target.getSpecCode()) != null) {
             // 保存外胎物料信息
-            lhScheduleResultMdmProductInfo.addAll(mdmProductInfoInfoDtoMap.get(target.getSpecCode()));
+            lhScheduleResultMdmMaterialInfo.addAll(mdmMaterialInfoInfoDtoMap.get(target.getSpecCode()));
         }
 
         for (int i = 1; i < batch.size(); i++) {
@@ -487,9 +486,9 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
             target.setLhMachineCode(joinSafe(target.getLhMachineCode(), next.getLhMachineCode()));
             //合并硫化机
             target.setLhMachineName(joinSafe(target.getLhMachineName(), next.getLhMachineName()));
-            if (mdmProductInfoInfoDtoMap.containsKey(next.getSpecCode())) {
+            if (mdmMaterialInfoInfoDtoMap.containsKey(next.getSpecCode())) {
                 // 保存外胎物料信息
-                lhScheduleResultMdmProductInfo.addAll(mdmProductInfoInfoDtoMap.get(next.getSpecCode()));
+                lhScheduleResultMdmMaterialInfo.addAll(mdmMaterialInfoInfoDtoMap.get(next.getSpecCode()));
             }
 
             //合并物料编码
@@ -546,7 +545,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto = new LhAlgorithmScheduleResultDto();
         lhAlgorithmScheduleResultDto.setLhScheduleResult(target);
         lhAlgorithmScheduleResultDto.setBatchNo(cxBatchNo);
-        lhAlgorithmScheduleResultDto.setMdmProductInfoList(lhScheduleResultMdmProductInfo);
+        lhAlgorithmScheduleResultDto.setMdmMaterialInfoList(lhScheduleResultMdmMaterialInfo);
         if (isTomorrowNewSpec) {
             lhAlgorithmScheduleResultDto.setIsNewTire(Boolean.TRUE);
         }
@@ -1762,8 +1761,8 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         newTask.setCxEmbryoMonthPlanSurplus(item.getCxEmbryoMonthPlanSurplus());
 
         // 安全设置列表（防止修改原始列表）
-        if (item.getMdmProductInfoList() != null) {
-            newTask.setMdmProductInfoList(new ArrayList<>(item.getMdmProductInfoList()));
+        if (item.getMdmMaterialInfoList() != null) {
+            newTask.setMdmMaterialInfoList(new ArrayList<>(item.getMdmMaterialInfoList()));
         }
 
         try {
@@ -2909,7 +2908,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                     if (availableSeconds.compareTo(BigDecimal.ZERO) <= 0){
                         availableSeconds = BigDecimal.valueOf(0);
                     }
-                    
+
                     // 计算理论产量 = 班次定额  / 班次时长  * 可用时长
                     BigDecimal plannedQty = BigDecimal.valueOf(shiftQuota).multiply(availableSeconds).divide(BigDecimal.valueOf(cxShiftConfig.getShiftDuration() * 3600L), 0, RoundingMode.DOWN);
                     // 计算理论产量耗时

@@ -18,12 +18,12 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductInfoGrossRateVo;
+import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -53,11 +53,11 @@ import java.util.*;
 @RestController
 @Api(tags = "基础数据-物料信息")
 @RequestMapping("/productinfo")
-public class MdmProductInfoController extends AbstractDocBizController<MdmProductInfo> {
+public class MdmMaterialInfoController extends AbstractDocBizController<MdmMaterialInfo> {
     @Autowired
-    private IMdmProductInfoService iproductInfoService;
+    private IMdmMaterialInfoService iproductInfoService;
     @Resource
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Autowired
     private IExportLogService iExportLogService;
     @Autowired
@@ -70,11 +70,11 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
      */
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody MdmProductInfo productInfo) {
+    public TableDataInfo list(@RequestBody MdmMaterialInfo productInfo) {
         startPage("create_time desc");
-        QueryWrapper<MdmProductInfo> wrapper = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
-        List<MdmProductInfo> list = iproductInfoService.selectList(wrapper);
+        List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         return getDataTable(list);
     }
 
@@ -99,11 +99,11 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
     @PostMapping("/export")
     public void export(HttpServletResponse response, TableProductInfoVo productInfo) throws IOException {
         List<TableProductInfoVo> list = iproductInfoService.getList(productInfo);
-        List<MdmProductInfo> result = new ArrayList<>();
+        List<MdmMaterialInfo> result = new ArrayList<>();
         if (!CollectionUtils.isEmpty(list)) {
-            result = BeanCopyUtils.copyBeanList(list, MdmProductInfo.class);
+            result = BeanCopyUtils.copyBeanList(list, MdmMaterialInfo.class);
         }
-        ExcelUtil<MdmProductInfo> util = new ExcelUtil<>(MdmProductInfo.class);
+        ExcelUtil<MdmMaterialInfo> util = new ExcelUtil<>(MdmMaterialInfo.class);
         util.exportExcel(response, result, "物料信息表数据");
     }
 
@@ -113,8 +113,8 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
 //    @PreAuthorize(hasPermi = "lean:productinfo:query")
     @Override
     @GetMapping(value = "/{id}")
-    public MdmProductInfo getInfo(@PathVariable("id") Long id) {
-        return baseDao.selectById(MdmProductInfo.class, id);
+    public MdmMaterialInfo getInfo(@PathVariable("id") Long id) {
+        return baseDao.selectById(MdmMaterialInfo.class, id);
     }
 
     /**
@@ -123,10 +123,10 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
 //    @PreAuthorize(hasPermi = "lean:productinfo:add")
     @PostMapping("/add")
     @Log(title = "ui.data.column.productinfo.title", businessType = BusinessType.INSERT)
-    public AjaxResult add(@RequestBody MdmProductInfo productInfo) {
-        String unique = iproductInfoService.checkProductInfoUnique(productInfo);
+    public AjaxResult add(@RequestBody MdmMaterialInfo productInfo) {
+        String unique = iproductInfoService.checkMaterialInfoUnique(productInfo);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmProductInfo.exist"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.exist"));
         }
         iproductInfoService.transformToJsonField(Collections.singletonList(productInfo));
         return toAjax(baseDao.insert(productInfo));
@@ -138,10 +138,10 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
 //    @PreAuthorize(hasPermi = "lean:productinfo:edit")
     @PostMapping("/edit")
     @Log(title = "ui.data.column.productinfo.title", businessType = BusinessType.UPDATE)
-    public AjaxResult edit(@RequestBody MdmProductInfo productInfo) {
-        String unique = iproductInfoService.checkProductInfoUnique(productInfo);
+    public AjaxResult edit(@RequestBody MdmMaterialInfo productInfo) {
+        String unique = iproductInfoService.checkMaterialInfoUnique(productInfo);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmProductInfo.exist"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.exist"));
         }
         iproductInfoService.transformToJsonField(Collections.singletonList(productInfo));
         return toAjax(baseDao.update(productInfo));
@@ -154,7 +154,7 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
     @DeleteMapping("/{ids}")
     @Log(title = "ui.data.column.productinfo.title", businessType = BusinessType.DELETE)
     public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(baseDao.deleteByIds(MdmProductInfo.class, Arrays.asList(ids)));
+        return toAjax(baseDao.deleteByIds(MdmMaterialInfo.class, Arrays.asList(ids)));
     }
 
     /**
@@ -163,11 +163,11 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
     @PostMapping("/getList")
     @Log(title = "ui.data.column.productinfo.title", businessType = BusinessType.EXPORT)
     @Override
-    public List<MdmProductInfo> getList(@RequestBody MdmProductInfo productInfo) {
+    public List<MdmMaterialInfo> getList(@RequestBody MdmMaterialInfo productInfo) {
         startPage("create_time desc");
-        QueryWrapper<MdmProductInfo> wrapper = new QueryWrapper<>();
+        QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
-        List<MdmProductInfo> list = iproductInfoService.selectList(wrapper);
+        List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         return list;
     }
 
@@ -175,18 +175,18 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
      * 校验物料信息表唯一性
      */
     @ApiOperation("校验物料信息表唯一性")
-    @PostMapping("/checkProductInfoUnique")
-    public String checkProductInfoUnique(@RequestBody MdmProductInfo productInfo) {
-        return iproductInfoService.checkProductInfoUnique(productInfo);
+    @PostMapping("/checkMaterialInfoUnique")
+    public String checkMaterialInfoUnique(@RequestBody MdmMaterialInfo productInfo) {
+        return iproductInfoService.checkMaterialInfoUnique(productInfo);
     }
 
     @ApiOperation("获取物料信息")
-    @PostMapping("/getProductInfo")
-    public AjaxResult getProductInfo(@RequestParam("productCode") String productCode) {
+    @PostMapping("/getMaterialInfo")
+    public AjaxResult getMaterialInfo(@RequestParam("materialCode") String materialCode) {
         // 查询物料信息
-        QueryWrapper<MdmProductInfo> wrapper = new QueryWrapper<>();
-        wrapper.eq("PRODUCT_CODE", productCode);
-        MdmProductInfo productInfo = mdmProductInfoEntityMapper.selectOne(wrapper);
+        QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
+        wrapper.eq("MATERIAL_CODE", materialCode);
+        MdmMaterialInfo productInfo = mdmMaterialInfoEntityMapper.selectOne(wrapper);
         if (productInfo != null) {
             return AjaxResult.success(productInfo);
         }
@@ -200,7 +200,7 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.mdmProductInfo.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.mdmMaterialInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
     @Override
@@ -215,16 +215,16 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.mdmProductInfo.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.mdmMaterialInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入物料毛利率数据")
     @PostMapping("/importGrossRate")
     public AjaxResult importGrossRate(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         Date beginTime = DateUtils.getNowDate();
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
-        ExcelUtil<ProductInfoGrossRateVo> util = new ExcelUtil<>(ProductInfoGrossRateVo.class);
+        ExcelUtil<MaterialInfoGrossRateVo> util = new ExcelUtil<>(MaterialInfoGrossRateVo.class);
         InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
-        List<ProductInfoGrossRateVo> list = util.importExcel(is);
+        List<MaterialInfoGrossRateVo> list = util.importExcel(is);
         AjaxResult ajaxResult = iproductInfoService.importGrossRate(list, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
@@ -246,11 +246,11 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<TableProductInfoVo> list = iproductInfoService.getList(queryVO);
-        List<MdmProductInfo> result = new ArrayList<>();
+        List<MdmMaterialInfo> result = new ArrayList<>();
         if (!CollectionUtils.isEmpty(list)) {
-            result = BeanCopyUtils.copyBeanList(list, MdmProductInfo.class);
+            result = BeanCopyUtils.copyBeanList(list, MdmMaterialInfo.class);
         }
-        ExcelUtil<MdmProductInfo> util = new ExcelUtil(MdmProductInfo.class);
+        ExcelUtil<MdmMaterialInfo> util = new ExcelUtil(MdmMaterialInfo.class);
         Workbook workbook = util.exportExcel2(response, result, fileName);
         byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();
@@ -279,12 +279,12 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
                                   HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<TableProductInfoVo> list = iproductInfoService.getList(queryVO);
-        List<ProductInfoGrossRateVo> rateVoList = new ArrayList<>();
+        List<MaterialInfoGrossRateVo> rateVoList = new ArrayList<>();
         if (!CollectionUtils.isEmpty(list)) {
-            rateVoList = BeanCopyUtils.copyBeanList(list, ProductInfoGrossRateVo.class);
+            rateVoList = BeanCopyUtils.copyBeanList(list, MaterialInfoGrossRateVo.class);
         }
-//        List<ProductInfoGrossRateVo> rateVoList = BeanCopyUtils.copyBeanList(list, ProductInfoGrossRateVo.class);
-        ExcelUtil<ProductInfoGrossRateVo> util = new ExcelUtil<>(ProductInfoGrossRateVo.class);
+//        List<MaterialInfoGrossRateVo> rateVoList = BeanCopyUtils.copyBeanList(list, MaterialInfoGrossRateVo.class);
+        ExcelUtil<MaterialInfoGrossRateVo> util = new ExcelUtil<>(MaterialInfoGrossRateVo.class);
         Workbook workbook = util.exportExcel2(response, rateVoList, fileName);
         byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();
@@ -304,8 +304,8 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
     }
 
     @Override
-    protected List<MdmProductInfo> listExportData(MdmProductInfo obj) {
-        QueryWrapper<MdmProductInfo> wrapper = new QueryWrapper<>();
+    protected List<MdmMaterialInfo> listExportData(MdmMaterialInfo obj) {
+        QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         return iproductInfoService.selectList(wrapper);
     }
@@ -321,11 +321,11 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
     }
 
     @Override
-    protected void builderCondition(QueryWrapper<MdmProductInfo> queryWrapper, MdmProductInfo queryVO) {
+    protected void builderCondition(QueryWrapper<MdmMaterialInfo> queryWrapper, MdmMaterialInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productCode")), "PRODUCT_CODE", queryVO.getFieldValueByFieldName("productCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesProductCode")), "MES_PRODUCT_CODE", queryVO.getFieldValueByFieldName("mesProductCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productDesc")), "PRODUCT_DESC", queryVO.getFieldValueByFieldName("productDesc"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "PRODUCT_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeName")), "PRODUCT_TYPE_NAME", queryVO.getFieldValueByFieldName("productTypeName"));
@@ -344,7 +344,7 @@ public class MdmProductInfoController extends AbstractDocBizController<MdmProduc
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ability")), "ABILITY", queryVO.getFieldValueByFieldName("ability"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("environmentProtection")), "ENVIRONMENT_PROTECTION", queryVO.getFieldValueByFieldName("environmentProtection"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("authentication")), "AUTHENTICATION", queryVO.getFieldValueByFieldName("authentication"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productGroupCode")), "PRODUCT_GROUP_CODE", queryVO.getFieldValueByFieldName("productGroupCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialGroupCode")), "MATERIAL_GROUP_CODE", queryVO.getFieldValueByFieldName("materialGroupCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("forbidTag")), "FORBID_TAG", queryVO.getFieldValueByFieldName("forbidTag"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("singleTireWeight")), "SINGLE_TIRE_WEIGHT", queryVO.getFieldValueByFieldName("singleTireWeight"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldClampingPressure")), "MOULD_CLAMPING_PRESSURE", queryVO.getFieldValueByFieldName("mouldClampingPressure"));

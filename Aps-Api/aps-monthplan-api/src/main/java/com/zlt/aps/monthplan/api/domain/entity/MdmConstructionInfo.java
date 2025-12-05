@@ -603,7 +603,7 @@ public class MdmConstructionInfo extends BaseEntity {
     /**
      * 液压硫化时间(秒)
      */
-//    @Excel(name = "ui.data.column.mdmProductInfo.hydraulicPressureCuringTime")
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.hydraulicPressureCuringTime")
     @ApiModelProperty(value = "液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
     @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;

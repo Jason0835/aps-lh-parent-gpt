@@ -24,7 +24,9 @@
             resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal">
         select
             *,
-            (SELECT t_mdm_product_info.COMMON_TYPE FROM t_mdm_product_info WHERE t_mdm_product_info.PRODUCT_CODE=t_mp_month_plan_production_final.PRODUCT_CODE AND t_mdm_product_info.IS_DELETE='0' LIMIT 1) AS LOCATION_TYPE
+        (SELECT t_mdm_material_info.COMMON_TYPE FROM t_mdm_material_info WHERE
+        t_mdm_material_info.PRODUCT_CODE=t_mp_month_plan_production_final.PRODUCT_CODE AND
+        t_mdm_material_info.IS_DELETE='0' LIMIT 1) AS LOCATION_TYPE
         from
             t_mp_month_plan_production_final
         where IS_DELETE = 0

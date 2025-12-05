@@ -8,11 +8,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductVulcanizingEntityMapper;
 import com.zlt.aps.maindata.mapper.VulcanizingMachineMapper;
 import com.zlt.aps.maindata.service.IMdmProductVulcanizingService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductVulcanizing;
 import com.zlt.aps.monthplan.api.domain.entity.VulcanizingMachine;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -42,7 +42,7 @@ public class MdmProductVulcanizingServiceImpl implements IMdmProductVulcanizingS
     @Resource
     private VulcanizingMachineMapper vulcanizingMachineMapper;
     @Resource
-    private MdmProductInfoEntityMapper mdmProductInfoEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     @Resource
     private BaseDao baseDao;
@@ -164,12 +164,12 @@ public class MdmProductVulcanizingServiceImpl implements IMdmProductVulcanizingS
         }
         // 物料信息
         List<String> productCodeList = list.stream().map(MdmProductVulcanizing::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        Map<String, MdmProductInfo> productCodeMap = new HashMap<>();
+        Map<String, MdmMaterialInfo> productCodeMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(productCodeList)) {
-            LambdaQueryWrapper<MdmProductInfo> productCodeWrapper = Wrappers.lambdaQuery();
-            productCodeWrapper.in(MdmProductInfo::getProductCode, productCodeList);
-            List<MdmProductInfo> productInfoList = mdmProductInfoEntityMapper.selectList(productCodeWrapper);
-            productCodeMap = productInfoList.stream().collect(Collectors.toMap(MdmProductInfo::getProductCode, Function.identity(), (v1, v2) -> v1));
+            LambdaQueryWrapper<MdmMaterialInfo> productCodeWrapper = Wrappers.lambdaQuery();
+            productCodeWrapper.in(MdmMaterialInfo::getMaterialCode, productCodeList);
+            List<MdmMaterialInfo> productInfoList = mdmMaterialInfoEntityMapper.selectList(productCodeWrapper);
+            productCodeMap = productInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (v1, v2) -> v1));
         }
 
         //公共校验（非空校验、长度校验等）
@@ -183,7 +183,7 @@ public class MdmProductVulcanizingServiceImpl implements IMdmProductVulcanizingS
                 importErrorLogs.addAll(validated);
             } else {
                 //判断品名和物料编号的关系
-                MdmProductInfo productInfo = productCodeMap.get(docProductVulcanization.getProductCode());
+                MdmMaterialInfo productInfo = productCodeMap.get(docProductVulcanization.getProductCode());
                 if (productInfo != null) {
                     if (!docProductVulcanization.getProductTypeCode().equals(productInfo.getProductTypeCode())) {
                         docProductVulcanization.setId(-999L);

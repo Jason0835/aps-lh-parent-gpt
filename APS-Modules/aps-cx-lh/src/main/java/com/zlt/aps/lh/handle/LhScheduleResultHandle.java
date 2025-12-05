@@ -107,7 +107,7 @@ public class LhScheduleResultHandle {
     @Autowired
     private IMdmProductModelRelationService mdmProductModelRelationService;
     @Autowired
-    private IMdmProductInfoService mdmProductInfoService;
+    private IMdmMaterialInfoService mdmMaterialInfoService;
     @Autowired
     private CommonRedisService commonCacheService;
     @Autowired
@@ -845,7 +845,7 @@ public class LhScheduleResultHandle {
         //执行公式
         try {
             QueryFormulaUtil.execFormula(scheduleResultListVo, new String[]{
-                    "brandOrder -> getcolvaluewithcondition(T_MDM_PRODUCT_INFO, BRAND, PRODUCT_CODE, productCode, IS_DELETE = 0)",
+                    "brandOrder -> getcolvaluewithcondition(T_MDM_MATERIAL_INFO, BRAND, PRODUCT_CODE, productCode, IS_DELETE = 0)",
             });
         } catch (QueryExprException e) {
             throw new ServiceException("执行查询公式时发生错误.");

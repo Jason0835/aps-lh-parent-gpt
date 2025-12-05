@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductInfoMapper.java
+ * 文件名称：MdmMaterialInfoMapper.java
  * 描    述：物料信息Mapper接口
  *@author zlt
  *@date 2025-02-19
@@ -22,11 +22,11 @@ import java.util.List;
  *     修改内容：...
  */
 @Mapper
-public interface MdmProductInfoEntityMapper extends CommBaseMapper<MdmProductInfo> {
+public interface MdmMaterialInfoEntityMapper extends CommBaseMapper<MdmMaterialInfo> {
 
-    MdmProductInfo selectByProductCode(@Param("productCode") String productCode);
+    MdmMaterialInfo selectByProductCode(@Param("productCode") String productCode);
 
-    List<MdmProductInfo> selectByPlanVersion(@Param("year") int year,@Param("month") int month,
+    List<MdmMaterialInfo> selectByPlanVersion(@Param("year") int year, @Param("month") int month,
                                           @Param("planVersion") String planVersion,
                                           @Param("productName") String productName);
 
@@ -36,18 +36,18 @@ public interface MdmProductInfoEntityMapper extends CommBaseMapper<MdmProductInf
      * @param query
      * @return
      */
-    List<TableProductInfoVo> getProductInfoList(TableProductInfoVo query);
+    List<TableProductInfoVo> getMaterialInfoList(TableProductInfoVo query);
     /**
      * 获取可以替换的物料
      */
-    List<MdmProductInfo> selectReplaceProductInfoList(MdmProductInfo productInfo);
+    List<MdmMaterialInfo> selectReplaceMaterialInfoList(MdmMaterialInfo productInfo);
 
     /**
      * 根据唯一键查询
      * @param subList 唯一键列表，根据"|"分隔
      * @return 查询结果
      */
-    List<MdmProductInfo> selectByUniqueKeyList(@Param("list") List<String> subList);
+    List<MdmMaterialInfo> selectByUniqueKeyList(@Param("list") List<String> subList);
 
     /**
      * 根据分厂编号和物料号集合查询物料信息
@@ -55,6 +55,6 @@ public interface MdmProductInfoEntityMapper extends CommBaseMapper<MdmProductInf
      * @param productCodes 物料编号集合
      * @return 对应的施工记录列表
      */
-    List<MdmProductInfo> queryByFactoryCodeAndProductCodes(@Param("factoryCode") String factoryCode,
+    List<MdmMaterialInfo> queryByFactoryCodeAndProductCodes(@Param("factoryCode") String factoryCode,
                                                            @Param("productCodes") List<String> productCodes);
 }

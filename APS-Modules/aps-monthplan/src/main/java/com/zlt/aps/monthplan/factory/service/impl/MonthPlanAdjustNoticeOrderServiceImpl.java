@@ -13,7 +13,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
-import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
@@ -67,7 +67,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 @RequiredArgsConstructor
 public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNoticeOrderService {
 
-    private final MdmProductInfoEntityMapper productInfoMapper;
+    private final MdmMaterialInfoEntityMapper productInfoMapper;
 
     private final MonthPlanAdjustDetailMapper monthPlanAdjustDetailMapper;
 
@@ -175,7 +175,7 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.noFinalized"));
         }
         String productCode = noticeOrder.getProductCode();
-        MdmProductInfo productInfo = getProductInfo(factoryCode, productCode);
+        MdmMaterialInfo productInfo = getProductInfo(factoryCode, productCode);
         if (null == productInfo) {
             return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.monthStock.productCode.notExist"), productCode));
         }
@@ -643,7 +643,7 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
         String specCode = noticeOrderOperate.getSpecCode();
         Integer month = noticeOrder.getMonth();
         //校验SAP信息
-        MdmProductInfo productInfo = getProductInfo(noticeOrder.getFactoryCode(), noticeOrder.getProductCode());
+        MdmMaterialInfo productInfo = getProductInfo(noticeOrder.getFactoryCode(), noticeOrder.getProductCode());
         if (null == productInfo) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.monthStock.productCode.notExist"));
         }
@@ -749,11 +749,11 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
         String specCode = noticeOrderOperate.getSpecCode();
         Integer month = noticeOrder.getMonth();
         //校验SAP信息
-        MdmProductInfo productInfo = getProductInfo(factoryCode, productCode);
+        MdmMaterialInfo productInfo = getProductInfo(factoryCode, productCode);
         if (null == productInfo) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.monthStock.productCode.notExist"));
         }
-        noticeOrderOperate.setProductDesc(productInfo.getProductDesc());
+        noticeOrderOperate.setProductDesc(productInfo.getMaterialDesc());
         //校验施工信息
         AjaxResult checkConstructionInfoResult = getProductConstructionInfo(factoryCode, productCode, specCode, month);
         if (AjaxResult.Type.ERROR.value() == (Integer) checkConstructionInfoResult.get(AjaxResult.CODE_TAG)) {
@@ -1055,8 +1055,8 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
      * @param productCode 物料编码
      * @return
      */
-    private MdmProductInfo getProductInfo(String factoryCode, String productCode) {
-        QueryWrapper<MdmProductInfo> productQuery = new QueryWrapper<>();
+    private MdmMaterialInfo getProductInfo(String factoryCode, String productCode) {
+        QueryWrapper<MdmMaterialInfo> productQuery = new QueryWrapper<>();
         productQuery.eq("FACTORY_CODE", factoryCode);
         productQuery.eq("PRODUCT_CODE", productCode);
         productQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
@@ -1309,14 +1309,14 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
             return false;
         }
         //存在
-        Map<String, MdmProductInfo> existProductCodeMap = helper.getExistProductCodeMap();
+        Map<String, MdmMaterialInfo> existProductCodeMap = helper.getExistProductCodeMap();
         if (existProductCodeMap.containsKey(productCode)) {
-            MdmProductInfo productInfo = existProductCodeMap.get(productCode);
+            MdmMaterialInfo productInfo = existProductCodeMap.get(productCode);
             AdjustNoticeUtils.setProductInfo(noticeOrder, productInfo);
             return true;
         }
         //查找
-        MdmProductInfo productionInfo = hasExistProductCode(factoryCode, productCode);
+        MdmMaterialInfo productionInfo = hasExistProductCode(factoryCode, productCode);
         if (null != productionInfo) {
             existProductCodeMap.put(productCode, productionInfo);
             AdjustNoticeUtils.setProductInfo(noticeOrder, productionInfo);
@@ -1350,8 +1350,8 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
      * @param productCode 物料编号
      * @return
      */
-    private MdmProductInfo hasExistProductCode(String factoryCode, String productCode) {
-        QueryWrapper<MdmProductInfo> productInfoQueryWrapper = new QueryWrapper<>();
+    private MdmMaterialInfo hasExistProductCode(String factoryCode, String productCode) {
+        QueryWrapper<MdmMaterialInfo> productInfoQueryWrapper = new QueryWrapper<>();
         productInfoQueryWrapper.eq("FACTORY_CODE", factoryCode);
         productInfoQueryWrapper.eq("PRODUCT_CODE", productCode);
         productInfoQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());

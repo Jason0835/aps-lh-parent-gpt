@@ -56,7 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                mpl.CREATE_BY,
                mpl.UPDATE_BY
           FROM T_MDM_PRODUCT_A_LEVEL mpl
-          LEFT JOIN t_mdm_product_info mpi
+        LEFT JOIN t_mdm_material_info mpi
             ON mpi.PRODUCT_CODE = mpl.PRODUCT_CODE
            AND mpi.FACTORY_CODE = mpl.FACTORY_CODE
          WHERE IFNULL(mpl.IS_DELETE,0) = 0
