@@ -85,6 +85,13 @@ public interface ISalesOrderPoolRemoteService {
     @PostMapping("/SalesOrderPool/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+    * 检查SCM数据
+    */
+    @ApiOperation("检查SCM数据")
+    @PostMapping("/SalesOrderPool/checkSCMData")
+    AjaxResult checkSCMData();
+
 
     /**
     * 抓取SCM数据

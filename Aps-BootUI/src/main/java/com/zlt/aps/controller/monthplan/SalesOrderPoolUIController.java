@@ -125,7 +125,18 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     }
 
     /**
-     * 删除销售订单池
+     * 检查SCM数据
+     */
+    @ApiOperation("检查SCM数据")
+    @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
+    @PostMapping("/checkSCMData")
+    @ResponseBody
+    public AjaxResult checkSCMData() {
+        return iSalesOrderPoolService.checkSCMData();
+    }
+    
+    /**
+     * 抓取SCM数据
      */
     @ApiOperation("抓取SCM数据")
     @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
