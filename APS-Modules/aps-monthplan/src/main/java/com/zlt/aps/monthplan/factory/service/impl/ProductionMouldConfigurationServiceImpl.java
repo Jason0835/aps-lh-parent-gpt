@@ -21,7 +21,7 @@ import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMouldingProductParamDto;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMouldConfiguration;
 import com.zlt.aps.monthplan.factory.helper.MouldRelationProductHelper;
 import com.zlt.aps.monthplan.factory.service.IProductionMouldConfigurationService;
@@ -388,16 +388,16 @@ public class ProductionMouldConfigurationServiceImpl extends ServiceImpl<Factory
         if (StringUtils.isEmpty(factoryCode)) {
             return Collections.emptyMap();
         }
-        QueryWrapper<MdmProductModelRelation> queryRelationWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmSkuMouldRel> queryRelationWrapper = new QueryWrapper<>();
         queryRelationWrapper.eq("FACTORY_CODE", factoryCode);
-        List<MdmProductModelRelation> relationList = productModelRelationMapper.selectList(queryRelationWrapper);
+        List<MdmSkuMouldRel> relationList = productModelRelationMapper.selectList(queryRelationWrapper);
         if (CollectionUtils.isEmpty(relationList)) {
             return Collections.emptyMap();
         }
         Map<String, Set<String>> mouldRelationMap = new HashMap<>();
         relationList.stream().forEach(mouldRelation -> {
             String mouldCode = mouldRelation.getMouldCode();
-            String productCode = mouldRelation.getProductCode();
+            String productCode = mouldRelation.getMaterialCode();
             if (StringUtils.isBlank(mouldCode) || StringUtils.isBlank(productCode)) {
                 return;
             }

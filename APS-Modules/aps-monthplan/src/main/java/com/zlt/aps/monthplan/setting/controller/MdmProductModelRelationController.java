@@ -17,7 +17,7 @@ import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -57,7 +57,7 @@ import java.util.stream.Collectors;
 @Api(tags = "SAP与模具关系")
 @RestController
 @RequestMapping("/relation")
-public class MdmProductModelRelationController extends AbstractDocBizController<MdmProductModelRelation> {
+public class MdmProductModelRelationController extends AbstractDocBizController<MdmSkuMouldRel> {
 
     @Autowired
     private IMdmProductModelRelationService mdmProductModelRelationService;
@@ -78,21 +78,21 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody MdmProductModelRelation queryVO) {
+    public TableDataInfo list(@RequestBody MdmSkuMouldRel queryVO) {
         this.startPage(this.getOrderBy());
-        QueryWrapper<MdmProductModelRelation> wrapper = new QueryWrapper<>();
+        QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
-        List<MdmProductModelRelation> list = entityMapper.selectList(wrapper);
+        List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
         if (CollectionUtils.isNotEmpty(list)) {
             // 根据物料号、规格代码查询施工表，取成型法
             Map<String, String> productConstructionMap = new HashMap<>(16);
             Map<String, MdmModelInfo> modelMap = new HashMap<>(16);
             List<MdmProductConstruction> productConstructionList = new ArrayList<>();
             List<MdmModelInfo> modelList = new ArrayList<>();
-            List<List<MdmProductModelRelation>> splitList = ScmListUtils.getSplitList(list, 500);
-            for (List<MdmProductModelRelation> relationList : splitList) {
-                List<String> uniqueKeyList = relationList.stream().map(item -> String.join("|", item.getProductCode(), item.getSpecCode())).collect(Collectors.toList());
-                List<String> mouldCodeList = relationList.stream().map(MdmProductModelRelation::getMouldCode).collect(Collectors.toList());
+            List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 500);
+            for (List<MdmSkuMouldRel> relationList : splitList) {
+                List<String> uniqueKeyList = relationList.stream().map(item -> String.join("|", item.getMaterialCode(), item.getSpecCode())).collect(Collectors.toList());
+                List<String> mouldCodeList = relationList.stream().map(MdmSkuMouldRel::getMouldCode).collect(Collectors.toList());
                 LambdaQueryWrapper<MdmProductConstruction> queryWrapper = new LambdaQueryWrapper<>();
                 queryWrapper.apply(" CONCAT(PRODUCT_CODE, '|', SPEC_CODE) IN('{0}')", String.join("','", uniqueKeyList));
                 productConstructionList.addAll(mdmProductConstructionEntityMapper.queryByProductCodeAndSpecCodes(queryVO.getFactoryCode(), uniqueKeyList));
@@ -111,17 +111,17 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
             if (CollectionUtils.isNotEmpty(modelList)) {
                 modelMap = modelList.stream().collect(Collectors.toMap(MdmModelInfo::getMouldCode, Function.identity(), (v1, v2) -> v1));
             }
-            for (MdmProductModelRelation mdmProductModelRelation : list) {
-                String mapKey = String.join("|", StringUtils.defaultIfBlank(mdmProductModelRelation.getProductCode(), "")
-                        , StringUtils.defaultIfBlank(mdmProductModelRelation.getSpecCode(), ""));
+            for (MdmSkuMouldRel MdmSkuMouldRel : list) {
+                String mapKey = String.join("|", StringUtils.defaultIfBlank(MdmSkuMouldRel.getMaterialCode(), "")
+                        , StringUtils.defaultIfBlank(MdmSkuMouldRel.getSpecCode(), ""));
                 if (productConstructionMap.containsKey(mapKey)) {
                     String mouldMethod = productConstructionMap.get(mapKey);
-                    mdmProductModelRelation.setMouldMethod(mouldMethod);
+                    MdmSkuMouldRel.setMouldMethod(mouldMethod);
                 }
-                String mouldCode = mdmProductModelRelation.getMouldCode();
+                String mouldCode = MdmSkuMouldRel.getMouldCode();
                 if (modelMap.containsKey(mouldCode)) {
                     MdmModelInfo mdmModelInfo = modelMap.get(mouldCode);
-                    mdmProductModelRelation.setMouldNo(mdmModelInfo.getMouldNo());
+                    MdmSkuMouldRel.setMouldNo(mdmModelInfo.getMouldNo());
                 }
             }
         }
@@ -155,7 +155,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MdmProductModelRelation billVO) {
+    public AjaxResult save(@RequestBody MdmSkuMouldRel billVO) {
         return super.save(billVO);
     }
 
@@ -188,7 +188,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
-    public MdmProductModelRelation getInfo(@PathVariable("billId") Long billId) {
+    public MdmSkuMouldRel getInfo(@PathVariable("billId") Long billId) {
         return super.getInfo(billId);
     }
 
@@ -215,14 +215,14 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody MdmProductModelRelation queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody MdmSkuMouldRel queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<MdmProductModelRelation> listExportData(MdmProductModelRelation obj) {
-        QueryWrapper<MdmProductModelRelation> wrapper = new QueryWrapper<>();
+    protected List<MdmSkuMouldRel> listExportData(MdmSkuMouldRel obj) {
+        QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         return entityMapper.selectList(wrapper);
     }
@@ -239,13 +239,16 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<MdmProductModelRelation> queryWrapper, MdmProductModelRelation queryVO) {
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productCode")), "PRODUCT_CODE", queryVO.getFieldValueByFieldName("productCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productDesc")), "PRODUCT_DESC", queryVO.getFieldValueByFieldName("productDesc"));
+    protected void builderCondition(QueryWrapper<MdmSkuMouldRel> queryWrapper, MdmSkuMouldRel queryVO) {
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specCode")), "SPEC_CODE", queryVO.getFieldValueByFieldName("specCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldCode")), "MOULD_CODE", queryVO.getFieldValueByFieldName("mouldCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("samePatternPanel")), "sAME_PATTER_PANEL", queryVO.getFieldValueByFieldName("samePatternPanel"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldCategory")), "MOULD_CATEGORY", queryVO.getFieldValueByFieldName("mouldCategory"));
         queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldNo")), " SELECT 1 FROM t_mdm_model_info WHERE" +
                 " t_mdm_model_info.MOULD_CODE = T_MDM_PRODUCT_MODEL_RELATION.MOULD_CODE AND MOULD_NO = {0}", queryVO.getFieldValueByFieldName("mouldNo"));
@@ -256,5 +259,14 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
         return "0114-1";
     }
 
-
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    public AjaxResult mesCapture() {
+        return mdmProductModelRelationService.mesCapture();
+    }
 }

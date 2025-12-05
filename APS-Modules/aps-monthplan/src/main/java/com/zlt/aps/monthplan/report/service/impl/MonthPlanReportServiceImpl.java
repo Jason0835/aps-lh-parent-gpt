@@ -1967,9 +1967,9 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
 
         // 关联模具关系表取规格代码
         Map<String, String> productMoldeRealMap = new HashMap<>(16);
-        List<MdmProductModelRelation> productMoldeRealList = monthPlanReportMapper.selectProductMoldeRealList(queryDto);
+        List<MdmSkuMouldRel> productMoldeRealList = monthPlanReportMapper.selectProductMoldeRealList(queryDto);
         if (CollectionUtils.isNotEmpty(productMoldeRealList)) {
-            productMoldeRealMap = productMoldeRealList.stream().collect(Collectors.toMap(MdmProductModelRelation::getProductCode, MdmProductModelRelation::getSpecCode, (s1, s2) -> String.join(",", s1, s2)));
+            productMoldeRealMap = productMoldeRealList.stream().collect(Collectors.toMap(MdmSkuMouldRel::getMaterialCode, MdmSkuMouldRel::getSpecCode, (s1, s2) -> String.join(",", s1, s2)));
         }
         // 关联施工赋值胶种
         List<TireTypeConstructionRealVo> tireTypeConstructionRealVoList = monthPlanReportMapper.selectConstructionReal();

@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanProductionFinalResultVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -23,7 +23,7 @@ import java.util.List;
  * @date 2025-02-18
  */
 @Mapper
-public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmProductModelRelation> {
+public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmSkuMouldRel> {
 
     /**
      * 查询规格对应的模具关系
@@ -31,7 +31,7 @@ public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmP
      * @param specCodes
      * @return
      */
-    List<MdmProductModelRelation> queryBySpecCodes(@Param("factoryCode") String factoryCode,@Param("specCodes") List<String> specCodes);
+    List<MdmSkuMouldRel> queryBySpecCodes(@Param("factoryCode") String factoryCode, @Param("specCodes") List<String> specCodes);
 
     /**
      * 根据物料、模具、年份、月份，获取其最大可用模具编号
@@ -49,19 +49,19 @@ public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmP
      * 查询共用模具的情况
      * @return 结果
      */
-    List<MdmProductModelRelation> selectSameMouldNo();
+    List<MdmSkuMouldRel> selectSameMouldNo();
 
     /**
      * 根据模具编号查询
      * @param mouldCodeList 模具编号
      * @return 结果
      */
-    List<MdmProductModelRelation> selectByMouldCode(@Param("list") List<String> mouldCodeList);
+    List<MdmSkuMouldRel> selectByMouldCode(@Param("list") List<String> mouldCodeList);
 
     /**
      * 查询SAP与模具关系，关联模具信息
      * @param resultVos 查询条件
      * @return 结果
      */
-    List<MdmProductModelRelation> select4ImportAdjustData(@Param("list") List<MonthPlanProductionFinalResultVo> resultVos);
+    List<MdmSkuMouldRel> select4ImportAdjustData(@Param("list") List<MonthPlanProductionFinalResultVo> resultVos);
 }

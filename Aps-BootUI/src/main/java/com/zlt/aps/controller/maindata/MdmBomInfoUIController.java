@@ -1,66 +1,72 @@
 package com.zlt.aps.controller.maindata;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
-import com.zlt.aps.monthplan.api.service.IMdmProductModelRelationRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
+import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
+import com.zlt.aps.monthplan.api.service.IMdmBomInfoRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.util.Arrays;
+import java.util.List;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductModelRelationUIController.java
- * 描    述：SAP与模具关系 UI控制层类：....
+ * 文件名称：MdmBomInfoUIController.java
+ * 描    述：BOM示方书 UI控制层类：....
+ *@author zlt
+ *@date 2025-12-05
+ *@version 1.0
  *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-02-24
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
  */
 @Slf4j
-@Api(tags = "SAP与模具关系")
+@Api(tags = "BOM示方书")
 @Controller
-@RequestMapping("/maindata/relation")
-public class MdmProductModelRelationUIController extends BaseUIController<MdmSkuMouldRel> {
+@RequestMapping("/maindata/mdmBomInfo")
+public class MdmBomInfoUIController extends BaseUIController<MdmBomInfo> {
 
     @Autowired
-    private IMdmProductModelRelationRemoteService iMdmProductModelRelationService;
+    private IMdmBomInfoRemoteService iMdmBomInfoService;
 
-    private final String prefix = "aps/maindata/relation";
+    private final String prefix = "aps/maindata/mdmBomInfo";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("maindata:relation:view")
+    @RequiresPermissions("monthplan:mdmBomInfo:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/relation";
+        return prefix + "/mdmBomInfo";
     }
 
     /**
@@ -68,7 +74,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("MdmSkuMouldRel", new MdmSkuMouldRel());
+        mmap.put("mdmBomInfo", new MdmBomInfo());
         return prefix + "/add";
     }
 
@@ -77,7 +83,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("MdmSkuMouldRel", iMdmProductModelRelationService.getInfo(id));
+        mmap.put("mdmBomInfo", iMdmBomInfoService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -85,74 +91,58 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("maindata:relation:list")
+    @RequiresPermissions("monthplan:mdmBomInfo:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmSkuMouldRel MdmSkuMouldRel) {
-        return iMdmProductModelRelationService.list(MdmSkuMouldRel);
-    }
-
-    /**
-     * 根据物料获取分厂年月的匹配模具
-     *
-     * @param queryParam
-     * @return
-     */
-    @ResponseBody
-    @ApiOperation("物料匹配的模具")
-    @PostMapping("/matchMouldConfiguration")
-    public ProductMouldInfoVo getProductMouldConfiguration(@RequestBody ProductMouldConfigurationParam queryParam) {
-        if (null == queryParam) {
-            return null;
-        }
-        return iMdmProductModelRelationService.getProductMouldConfiguration(queryParam);
+    public TableDataInfo list(MdmBomInfo mdmBomInfo) {
+        return iMdmBomInfoService.list(mdmBomInfo);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("maindata:relation:edit")
+    @RequiresPermissions("monthplan:mdmBomInfo:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmSkuMouldRel MdmSkuMouldRel) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmProductModelRelationService.checkUnique(MdmSkuMouldRel))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.productmodelrelation.notUnique"));
+    public AjaxResult save(MdmBomInfo mdmBomInfo) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmBomInfoService.checkUnique(mdmBomInfo))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmBomInfo.checkUnique"));
         }
-        return iMdmProductModelRelationService.save(MdmSkuMouldRel);
+
+        return iMdmBomInfoService.save(mdmBomInfo);
     }
 
     /**
-     * 删除SAP与模具关系
+     * 删除BOM示方书
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("maindata:relation:remove")
+    @RequiresPermissions("monthplan:mdmBomInfo:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmProductModelRelationService.removeByIds(Arrays.asList(arr));
+        return iMdmBomInfoService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验SAP与模具关系唯一性
+     * 校验BOM示方书唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmSkuMouldRel MdmSkuMouldRel) {
-        return iMdmProductModelRelationService.checkUnique(MdmSkuMouldRel);
+    public String checkUnique(MdmBomInfo mdmBomInfo) {
+        return iMdmBomInfoService.checkUnique(mdmBomInfo);
     }
 
     /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     *
      * @return
      */
     @Override
-    public String getExportTemplateFileName() {
-        return I18nUtil.getMessage("ui.data.column.relation.modelName");
+    public String getExportTemplateFileName(){
+        return this.getFunctionName();
     }
 
 
@@ -173,7 +163,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
      */
     @Override
     public String getFunctionName() {
-        return this.getExportTemplateFileName();
+        return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
     /**
@@ -183,24 +173,26 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmSkuMouldRel> util = new ExcelUtil<>(MdmSkuMouldRel.class);
+        ExcelUtil<MdmBomInfo> util = new ExcelUtil<>(MdmBomInfo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmBomInfo:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmSkuMouldRel entity) throws IOException {
+    public void export(HttpServletResponse response, MdmBomInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmProductModelRelationService.exportData(entity, fileName);
+        byte[] excelBytes = iMdmBomInfoService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
+    @RequiresPermissions("monthplan:mdmBomInfo:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -214,18 +206,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProductModelRelationService.importData(context, true);
+        AjaxResult ajaxResult = iMdmBomInfoService.importData(context,false);
         return ajaxResult;
-    }
-
-    /**
-     * 抓取MES数据
-     */
-    @RequiresPermissions("maindata:relation:mesCapture")
-    @ApiOperation("抓取MES数据")
-    @PostMapping("/mesCapture")
-    @ResponseBody
-    public AjaxResult mesCapture() {
-        return iMdmProductModelRelationService.mesCapture();
     }
 }

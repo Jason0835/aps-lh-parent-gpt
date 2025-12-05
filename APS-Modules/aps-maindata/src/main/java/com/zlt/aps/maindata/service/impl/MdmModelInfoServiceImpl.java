@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
@@ -8,7 +9,7 @@ import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmModelInfoService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -64,10 +65,10 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
         docEntityVO.setBaseVale(null);
         String mouldCode = docEntityVO.getMouldCode();
         /*List<String> mouldCodeList = Collections.singletonList(mouldCode);
-        LambdaQueryWrapper<MdmProductModelRelation> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(MdmProductModelRelation::getMouldCode, mouldCodeList);
-        List<MdmProductModelRelation> productModelRelations = productModelRelationMapper.selectList(wrapper);
-        Map<String, MdmProductModelRelation> modelRelationMap = productModelRelations.stream().collect(Collectors.toMap(MdmProductModelRelation::getMouldCode, Function.identity(), (s1, s2) -> s1));
+        LambdaQueryWrapper<MdmSkuMouldRel> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(MdmSkuMouldRel::getMouldCode, mouldCodeList);
+        List<MdmSkuMouldRel> productModelRelations = productModelRelationMapper.selectList(wrapper);
+        Map<String, MdmSkuMouldRel> modelRelationMap = productModelRelations.stream().collect(Collectors.toMap(MdmSkuMouldRel::getMouldCode, Function.identity(), (s1, s2) -> s1));
         if (!modelRelationMap.containsKey(mouldCode)) {
             throw new RuntimeException(I18nUtil.getMessage("biz.mouldUseStatus.mouldCodeNotExist"));
         }*/
@@ -115,13 +116,13 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
         }
         List<String> mouldCodeList = list.stream().map(MdmModelInfo::getMouldCode).collect(Collectors.toList());
 
-        List<MdmProductModelRelation> modelRelationList = new ArrayList<>();
+        List<MdmSkuMouldRel> modelRelationList = new ArrayList<>();
         List<List<String>> splitList = ScmListUtils.getSplitList(mouldCodeList, 500);
         for (List<String> mouldCodes : splitList) {
             modelRelationList.addAll(productModelRelationMapper.selectByMouldCode(mouldCodes));
         }
 
-        Map<String, String> mouldCodeProSizeMap = modelRelationList.stream().collect(Collectors.toMap(MdmProductModelRelation::getMouldCode, MdmProductModelRelation::getProSize, (s1, s2) ->  {
+        Map<String, String> mouldCodeProSizeMap = modelRelationList.stream().collect(Collectors.toMap(MdmSkuMouldRel::getMouldCode, MdmSkuMouldRel::getProSize, (s1, s2) -> {
             if (StringUtils.isBlank(s1) || s2.contains(s1)) {
                 return s2;
             }
@@ -137,5 +138,16 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
                 mdmModelInfo.setProSize(mouldCodeProSizeMap.get(mouldCode).replaceAll(".00", ""));
             }
         }
+    }
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @Override
+    public AjaxResult mesCapture() {
+        // steve's TODO 待接口完善后补充
+        return AjaxResult.success();
     }
 }

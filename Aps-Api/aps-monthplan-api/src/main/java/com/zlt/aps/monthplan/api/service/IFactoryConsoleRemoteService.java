@@ -33,6 +33,16 @@ public interface IFactoryConsoleRemoteService {
     TableDataInfo getProductionVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
 
     /**
+     * 查询分厂月份对应还没选择的需求计划版本列表
+     *
+     * @param queryCondition 查询条件
+     * @return 结果集合
+     */
+    @ApiOperation("查询分厂月份对应还没选择的需求计划版本列表")
+    @PostMapping("/factoryConsole/getNoSelectedVersionList")
+    TableDataInfo getNoSelectedVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
+
+    /**
      * 创建导入模板的版本信息，主要获取版本周期
      *
      * @param param 分厂编码、年份、月份

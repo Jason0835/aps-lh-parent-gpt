@@ -20,7 +20,10 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmProductInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
@@ -35,11 +38,7 @@ import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanMouldingDayResultMapper;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanProdDetailFinalMapper;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalService;
-import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
-import com.zlt.aps.monthplan.factory.service.IMonthPlanNoProductionPlanService;
-import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
+import com.zlt.aps.monthplan.factory.service.*;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -548,7 +547,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         Function<FactoryMonthPlanProdFinal, String> duplicateKeyFunction = FactoryMonthPlanProdFinal::getImportDuplicateKey;
         Map<String, Long> duplicateGroupMap = list.stream().collect(Collectors.groupingBy(duplicateKeyFunction, Collectors.counting()));
         Map<String, MdmProductConstruction> productConstructionMap = new HashMap<>();
-        Map<String, List<MdmProductModelRelation>> mouldBaseInfoMap = new HashMap<>();
+        Map<String, List<MdmSkuMouldRel>> mouldBaseInfoMap = new HashMap<>();
         List<FactoryMonthPlanProdFinal> informalConstructionStageList = new ArrayList<>();
         String batchNo = "T" + DateUtils.dateTimeNow();
         int productCodeIndex = 0;
@@ -807,7 +806,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      * @param mouldBaseInfoMap
      * @return
      */
-    private boolean checkDataMouldInfoAndFullMouldNo(FactoryMonthPlanProdFinal item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmProductModelRelation>> mouldBaseInfoMap) {
+    private boolean checkDataMouldInfoAndFullMouldNo(FactoryMonthPlanProdFinal item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmSkuMouldRel>> mouldBaseInfoMap) {
         String mouldErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNoErrorInfo");
         String mouldNumberErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNumberErrorInfo");
         Integer constructionStage = item.getConstructionStage();
@@ -822,7 +821,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         String specCode = item.getSpecCode();
         Integer mouldQty = item.getMouldQty();
         if (mouldBaseInfoMap.containsKey(specCode)) {
-            List<MdmProductModelRelation> modelRelationList = mouldBaseInfoMap.get(specCode);
+            List<MdmSkuMouldRel> modelRelationList = mouldBaseInfoMap.get(specCode);
             if (CollectionUtils.isEmpty(modelRelationList)) {
                 addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
                 return false;
@@ -833,10 +832,10 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             }
             return true;
         }
-        QueryWrapper<MdmProductModelRelation> modelRelationQuery = new QueryWrapper<>();
+        QueryWrapper<MdmSkuMouldRel> modelRelationQuery = new QueryWrapper<>();
         modelRelationQuery.eq("FACTORY_CODE", factoryCode);
         modelRelationQuery.eq("SPEC_CODE", specCode);
-        List<MdmProductModelRelation> modelRelationList = productModelRelationEntityMapper.selectList(modelRelationQuery);
+        List<MdmSkuMouldRel> modelRelationList = productModelRelationEntityMapper.selectList(modelRelationQuery);
         if (CollectionUtils.isEmpty(modelRelationList)) {
             mouldBaseInfoMap.put(specCode, Collections.emptyList());
             addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
@@ -847,7 +846,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
             return false;
         }
-        List<String> mouldCodeList = modelRelationList.stream().map(MdmProductModelRelation::getMouldCode).collect(Collectors.toList());
+        List<String> mouldCodeList = modelRelationList.stream().map(MdmSkuMouldRel::getMouldCode).collect(Collectors.toList());
         QueryWrapper<MdmModelInfo> mouldNoQuery = new QueryWrapper<>();
         mouldNoQuery.eq("FACTORY_CODE", item.getFactoryCode());
         mouldNoQuery.in("MOULD_CODE", mouldCodeList);
@@ -987,7 +986,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      */
     private void saveMouldRelationInfo(List<FactoryMonthPlanProdFinal> informalMouldList, Map<String, List<MdmModelInfo>> mouldBaseInfoMap) {
         Set<String> addConfigurationSet = new HashSet<>();
-        List<MdmProductModelRelation> addProductModelList = new ArrayList<>();
+        List<MdmSkuMouldRel> addProductModelList = new ArrayList<>();
         informalMouldList.stream().forEach(informalMouldPlan -> {
             String key = informalMouldPlan.getProductMouldKey();
             if (addConfigurationSet.contains(key)) {
@@ -1008,24 +1007,24 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             }
             for (int index = 0; index < mouldQty; index++) {
                 MdmModelInfo mouldInfo = modelInfoList.get(index);
-                MdmProductModelRelation addConfiguration = new MdmProductModelRelation();
+                MdmSkuMouldRel addConfiguration = new MdmSkuMouldRel();
                 addConfiguration.setFactoryCode(informalMouldPlan.getFactoryCode());
-                addConfiguration.setProductCode(informalMouldPlan.getProductCode());
+                addConfiguration.setMaterialCode(informalMouldPlan.getProductCode());
                 addConfiguration.setMouldCode(mouldInfo.getMouldCode());
                 addConfiguration.setMouldNo(mouldNo);
                 addConfiguration.setBrand(informalMouldPlan.getBrand());
-                addConfiguration.setProductDesc(informalMouldPlan.getProductDesc());
+                addConfiguration.setMaterialDesc(informalMouldPlan.getProductDesc());
                 addConfiguration.setSpecCode(informalMouldPlan.getSpecCode());
                 addConfiguration.setPattern(informalMouldPlan.getPattern());
                 addProductModelList.add(addConfiguration);
             }
             addConfigurationSet.add(key);
         });
-        LambdaQueryWrapper<MdmProductModelRelation> wrapper = LambdaWrapperBuilder.buildWrapperByFunction(addProductModelList, MdmProductModelRelation::getProductCode, MdmProductModelRelation::getSpecCode, MdmProductModelRelation::getMouldCode);
-        List<MdmProductModelRelation> oldList = productModelRelationEntityMapper.selectList(wrapper);
-        Map<String, MdmProductModelRelation> oldMap = oldList.stream().collect(Collectors.toMap(MdmProductModelRelation::getUpdateGroupKey, Function.identity(), (v1, v2) -> v1));
-        List<MdmProductModelRelation> insertList = new ArrayList<>();
-        for (MdmProductModelRelation addConfiguration : addProductModelList) {
+        LambdaQueryWrapper<MdmSkuMouldRel> wrapper = LambdaWrapperBuilder.buildWrapperByFunction(addProductModelList, MdmSkuMouldRel::getMaterialCode, MdmSkuMouldRel::getSpecCode, MdmSkuMouldRel::getMouldCode);
+        List<MdmSkuMouldRel> oldList = productModelRelationEntityMapper.selectList(wrapper);
+        Map<String, MdmSkuMouldRel> oldMap = oldList.stream().collect(Collectors.toMap(MdmSkuMouldRel::getUpdateGroupKey, Function.identity(), (v1, v2) -> v1));
+        List<MdmSkuMouldRel> insertList = new ArrayList<>();
+        for (MdmSkuMouldRel addConfiguration : addProductModelList) {
             String key = addConfiguration.getUpdateGroupKey();
             if (oldMap.containsKey(key)) {
                 continue;

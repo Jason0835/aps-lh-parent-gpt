@@ -19,10 +19,7 @@ import com.zlt.aps.maindata.service.IProductMinConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ProductStockInfo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.QueryCalcStockingParamVo;
+import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.demand.mapper.MonthPlanSaleOrderMapper;
 import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireMapper;
 import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper;
@@ -31,6 +28,7 @@ import com.zlt.aps.monthplan.enums.StockHedgingComparatorEnum;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.dto.YearSaleMinProdVo;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
+import com.zlt.aps.monthplan.factory.mapper.FactoryConsoleMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.mapper.MdmStockUpPlanMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
@@ -76,6 +74,8 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
 
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
 
+    private final FactoryConsoleMapper factoryConsoleMapper;
+
     private final BaseDao baseDao;
 
     private final IMdmStockUpPlanService stockUpPlanService;
@@ -97,6 +97,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
     private final IMdmProductInfoService iMdmProductInfoService;
 
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
+
     /**
      * 不加超欠产量
      */
@@ -111,11 +112,23 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (null == queryCondition) {
             return Collections.emptyList();
         }
-        if (null == queryCondition.getYear() || null == queryCondition.getMonth()) {
+        if (null == queryCondition.getYear() || null == queryCondition.getMonth() || StringUtils.isBlank(queryCondition.getFactoryCode())) {
             return Collections.emptyList();
         }
-        return saleMonthPlanRequireMapper.getProductionVersionList(queryCondition);
+        return factoryConsoleMapper.getProductionVersionList(queryCondition);
     }
+
+    @Override
+    public List<FactoryMonthPlanVersionVo> getNoSelectedVersionList(FactoryProductionPlanVo queryCondition) {
+        if (null == queryCondition) {
+            return Collections.emptyList();
+        }
+        if (null == queryCondition.getYear() || null == queryCondition.getMonth() || StringUtils.isBlank(queryCondition.getFactoryCode())) {
+            return Collections.emptyList();
+        }
+        return factoryConsoleMapper.getNoSelectedVersionList(queryCondition);
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)

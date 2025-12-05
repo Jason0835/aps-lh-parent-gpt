@@ -213,4 +213,15 @@ public class MdmModelInfoUIController extends BaseUIController<MdmModelInfo> {
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
+
+    /**
+     * 抓取MES数据
+     */
+    @RequiresPermissions("maindata:mdmModelInfo:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    @ResponseBody
+    public AjaxResult mesCapture() {
+        return iMdmModelInfoService.mesCapture();
+    }
 }

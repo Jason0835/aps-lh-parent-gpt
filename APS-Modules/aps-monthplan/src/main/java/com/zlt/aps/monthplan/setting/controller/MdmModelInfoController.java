@@ -225,4 +225,15 @@ public class MdmModelInfoController extends AbstractDocBizController<MdmModelInf
         this.iExportLogService.add(exportLog);
         return resultBytes;
     }
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    public AjaxResult mesCapture() {
+        return mdmModelInfoService.mesCapture();
+    }
 }
