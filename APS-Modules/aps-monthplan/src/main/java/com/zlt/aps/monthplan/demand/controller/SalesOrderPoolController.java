@@ -147,6 +147,17 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     }
     
     /**
+     * 检查SCM数据
+     */
+    @RequiresPermissions( "monthplan:SalesOrderPool:getSCMData")
+    @ApiOperation("检查SCM数据")
+    @PostMapping("/checkSCMData")
+    public AjaxResult checkSCMData(){
+    	// TODO 接口实现后调用抓取接口
+        return AjaxResult.success("北美区域未识别到优先级，是否继续", "1");
+    }
+    
+    /**
      * 抓取SCM数据
      */
     @RequiresPermissions( "monthplan:SalesOrderPool:getSCMData")
