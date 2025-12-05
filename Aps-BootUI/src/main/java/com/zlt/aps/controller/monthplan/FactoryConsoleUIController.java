@@ -4,11 +4,11 @@ import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
 import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProdFinalRemoteService;
 import io.swagger.annotations.Api;
@@ -28,7 +28,7 @@ import java.util.Date;
  * 分厂月生产计划控制台业务服务类
  *
  * @author ZLT
- * @date 20250213
+ * @date 20251201
  */
 @Controller
 @RequestMapping("/factory/console")
@@ -37,6 +37,7 @@ import java.util.Date;
 public class FactoryConsoleUIController extends BaseController {
 
     private final IFactoryConsoleRemoteService factoryConsoleService;
+
     private final IFactoryMonthPlanProdFinalRemoteService iFactoryMonthPlanProdFinalRemoteService;
 
     /**
@@ -50,22 +51,13 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
-     * 按分厂+年月的方式生成一个版本的销售需求月度计划
-     *
-     * @param createCondition
-     * @return
+     * 查询分厂月份对应还没选择的需求计划版本列表
      */
     @ResponseBody
-    @PostMapping("/createSaleRequirePlan")
-    @ApiOperation(value = "按分厂+年月的方式生成一个版本的销售需求月度计划", notes = "按分厂+年月的方式生成一个版本的销售需求月度计划")
-    public AjaxResult createSaleRequirePlan(MonthPlanSaleRequirePlanVo createCondition) {
-        if (null == createCondition) {
-            return AjaxResult.error("条件不可为空");
-        }
-        if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
-            return AjaxResult.error("分厂、年份、月份不能为空");
-        }
-        return factoryConsoleService.createSaleRequirePlan(createCondition);
+    @PostMapping("/noSelectedVersionList")
+    @ApiOperation(value = "查询分厂月份对应还没选择的需求计划版本列表", notes = "查询分厂月份对应还没选择的需求计划版本列表")
+    public TableDataInfo getNoSelectedVersionList(FactoryProductionPlanVo queryCondition) {
+        return factoryConsoleService.getNoSelectedVersionList(queryCondition);
     }
 
     /**
@@ -79,14 +71,14 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/initFactoryProduction")
     AjaxResult initFactoryProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
-            return AjaxResult.error("条件不可为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
         Integer month = factoryProductionParam.getMonth();
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error("分厂、年份、月份、需求计划版本不能为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
         }
         return factoryConsoleService.initFactoryProduction(factoryProductionParam);
     }
@@ -102,7 +94,7 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/getFinalVersionInfo")
     AjaxResult getFinalVersion(@RequestBody FactoryFinalVersionQueryDto queryCondition) {
         if (null == queryCondition) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = queryCondition.getFactoryCode();
         Date productionDate = queryCondition.getProductionDate();
@@ -123,7 +115,7 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/factoryMouldingProduction")
     public AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
-            return AjaxResult.error("条件不可为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
@@ -131,7 +123,7 @@ public class FactoryConsoleUIController extends BaseController {
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         String productionVersion = factoryProductionParam.getProductionVersion();
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
-            return AjaxResult.error("分厂、年份、月份、需求计划版本、排产版本不能为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.PRODUCTION_VERSION_NO_EMPTY));
         }
         return factoryConsoleService.factoryMouldingProduction(factoryProductionParam);
     }
@@ -147,14 +139,14 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/factoryWholeCourseProduction")
     public AjaxResult factoryWholeCourseProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
-            return AjaxResult.error("条件不可为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
         Integer month = factoryProductionParam.getMonth();
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error("分厂、年份、月份、需求计划版本不能为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
         }
         return factoryConsoleService.factoryWholeCourseProduction(factoryProductionParam);
     }
@@ -170,14 +162,14 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/deleteMonthPlanRequire")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
-            return AjaxResult.error("条件不可为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
         Integer month = factoryProductionParam.getMonth();
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error("分厂、年份、月份、需求计划版本不能为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
         }
         return factoryConsoleService.deleteMonthPlanRequire(factoryProductionParam);
     }
@@ -193,7 +185,7 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/deleteMonthPlanProductionVersion")
     public AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
-            return AjaxResult.error("条件不可为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
         }
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
@@ -201,7 +193,7 @@ public class FactoryConsoleUIController extends BaseController {
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         String productionVersion = factoryProductionParam.getProductionVersion();
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
-            return AjaxResult.error("分厂、年份、月份、需求计划版本、排产版本不能为空");
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.PRODUCTION_VERSION_NO_EMPTY));
         }
         return factoryConsoleService.deleteMonthPlanProductionVersion(factoryProductionParam);
     }
