@@ -145,6 +145,18 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         this.builderCondition(wrapper, obj);
         return entityMapper.selectList(wrapper);
     }
+    
+    /**
+     * 抓取SCM数据
+     */
+    @RequiresPermissions( "monthplan:SalesOrderPool:getSCMData")
+    @ApiOperation("抓取SCM数据")
+    @PostMapping("/getSCMData")
+    public AjaxResult getSCMData(){
+    	// TODO 接口实现后调用抓取接口
+        return AjaxResult.success();
+    }
+
 
     @Override
     protected IDocService getDocService(){
