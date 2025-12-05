@@ -7,15 +7,15 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 分厂生产计划排产上下文
+ * 工厂生产计划排产上下文
  *
  * @author ZLT
- * 20250219
+ * 20251205
  */
 @Data
 public class Context {
     /**
-     * 分厂编号
+     * 工厂编号
      */
     private String factoryCode;
 
@@ -30,7 +30,7 @@ public class Context {
     private Integer month;
 
     /**
-     * 品名
+     * 产品品类
      */
     private ProductTypeEnum productType;
 
@@ -53,7 +53,10 @@ public class Context {
      * 版本前缀
      */
     private String prefixVersion;
-
+    /**
+     * 日志存储器
+     */
+    private StringBuilder logBuilder;
     /**
      * 寸口产能需求计划集合--只用于寸口产能需求计划时使用，跟排产流程没有关系
      */

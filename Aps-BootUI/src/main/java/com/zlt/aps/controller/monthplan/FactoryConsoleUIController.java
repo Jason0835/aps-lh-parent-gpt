@@ -4,7 +4,7 @@ import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.constant.I18nConstant;
+import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;

@@ -355,7 +355,7 @@ public class ContinueProductProductionService extends AbstractProductionBusiness
         updateMouldCurrentProductionInfo(finalProductionInfoMap, continueMouldMap, continuePlan.getProductCode(), productionContext);
         if (needProductionQty <= 0) {
             //标记不可排产了
-            continuePlan.setIsProduction(YesOrNoEnum.NO.getValue());
+            continuePlan.setIsProduction(YesOrNoEnum.NO.getCode());
             continuePlan.setNoProductionQty(BigDecimal.ZERO.longValue());
             productionContext.addProductionFinishPlan(monthPlanId);
             return;
@@ -365,7 +365,7 @@ public class ContinueProductProductionService extends AbstractProductionBusiness
             String noProductionReason = JsonUtils.getLanguageJsonObject("alg.data.noProductionReason.doubleNoSingle").toString();
             continuePlan.setNoProductionReason(noProductionReason);
             //标记不可排产了
-            continuePlan.setIsProduction(YesOrNoEnum.NO.getValue());
+            continuePlan.setIsProduction(YesOrNoEnum.NO.getCode());
             continuePlan.setNoProductionQty(needProductionQty);
             productionContext.addProductionFinishPlan(monthPlanId);
             return;
@@ -470,7 +470,7 @@ public class ContinueProductProductionService extends AbstractProductionBusiness
         }
         if (needProductionQty <= BigDecimal.ZERO.longValue()) {
             //标记不可排产了
-            continuePlan.setIsProduction(YesOrNoEnum.NO.getValue());
+            continuePlan.setIsProduction(YesOrNoEnum.NO.getCode());
             continuePlan.setNoProductionQty(BigDecimal.ZERO.longValue());
             productionContext.addProductionFinishPlan(monthPlanId);
             return;
@@ -585,7 +585,7 @@ public class ContinueProductProductionService extends AbstractProductionBusiness
         updateMouldCurrentProductionInfo(finalProductionInfoMap, continueMouldMap, continuePlan.getProductCode(), productionContext);
         if (needProductionQty <= BigDecimal.ZERO.longValue()) {
             //标记不可排产了
-            continuePlan.setIsProduction(YesOrNoEnum.NO.getValue());
+            continuePlan.setIsProduction(YesOrNoEnum.NO.getCode());
             continuePlan.setNoProductionQty(BigDecimal.ZERO.longValue());
             productionContext.addProductionFinishPlan(monthPlanId);
             return;
@@ -595,7 +595,7 @@ public class ContinueProductProductionService extends AbstractProductionBusiness
             String noProductionReason = JsonUtils.getLanguageJsonObject("alg.data.noProductionReason.doubleNoSingle").toString();
             continuePlan.setNoProductionReason(noProductionReason);
             //标记不可排产了
-            continuePlan.setIsProduction(YesOrNoEnum.NO.getValue());
+            continuePlan.setIsProduction(YesOrNoEnum.NO.getCode());
             continuePlan.setNoProductionQty(needProductionQty);
             productionContext.addProductionFinishPlan(monthPlanId);
             return;

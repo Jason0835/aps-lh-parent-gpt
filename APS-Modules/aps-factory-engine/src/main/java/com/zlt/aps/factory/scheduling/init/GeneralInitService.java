@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 通用的分厂生产计划初始化及检查业务
+ * 通用的工厂生产计划初始化及检查业务
  * 主要针对半钢，全钢业务
  *
  * @author

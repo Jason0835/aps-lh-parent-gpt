@@ -722,13 +722,13 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         }
         Map<String, List<MouldProductionProductVo>> continueMap = context.getContinueProductMap();
         if (CollectionUtils.isEmpty(continueMap)) {
-            monthPlanInitList.stream().forEach(monthPlanInit -> monthPlanInit.setIsContinue(Constant.FALSE));
+            monthPlanInitList.stream().forEach(monthPlanInit -> monthPlanInit.setIsContinue(String.valueOf(Constant.FALSE)));
             return;
         }
         monthPlanInitList.stream().forEach(monthPlanInit -> {
-            monthPlanInit.setIsContinue(Constant.FALSE);
+            monthPlanInit.setIsContinue(String.valueOf(Constant.FALSE));
             if (!CollectionUtils.isEmpty(continueMap.get(monthPlanInit.getProductCode()))) {
-                monthPlanInit.setIsContinue(Constant.TRUE);
+                monthPlanInit.setIsContinue(String.valueOf(Constant.TRUE));
             }
         });
     }
@@ -765,9 +765,9 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         for (MonthPlanManufacturingRequirementVo monthPlanInitVO : monthPlanInitList) {
             FactoryNoProduction noProduction = factoryNoProductionMap.get(monthPlanInitVO.getProductCode());
             if (null == noProduction) {
-                monthPlanInitVO.setIsFactoryProduction(Constant.FALSE);
+                monthPlanInitVO.setIsFactoryProduction(String.valueOf(Constant.FALSE));
             } else {
-                monthPlanInitVO.setIsFactoryProduction(Constant.TRUE);
+                monthPlanInitVO.setIsFactoryProduction(String.valueOf(Constant.TRUE));
             }
         }
     }

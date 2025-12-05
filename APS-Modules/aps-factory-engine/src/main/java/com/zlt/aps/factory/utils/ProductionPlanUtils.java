@@ -115,12 +115,6 @@ public class ProductionPlanUtils {
         if (null != stage) {
             monthPlanInit.setConstructionStage(stage.getStage());
         }
-        //是否备胎
-        if (monthPlanInit.getProductCode().substring(0, 1).equalsIgnoreCase(RF_FLAG)) {
-            monthPlanInit.setRf(Constant.TRUE);
-        } else {
-            monthPlanInit.setRf(Constant.FALSE);
-        }
         return monthPlanInit;
     }
 
@@ -360,7 +354,7 @@ public class ProductionPlanUtils {
             return false;
         }
         //是否标记续作
-        Integer isContinue = productionPlan.getIsContinue();
+        Integer isContinue = Integer.parseInt(productionPlan.getIsContinue());
         String productCode = productionPlan.getProductCode();
         //20250906 ZLT 因续作不走，故而可直接判断第一天
         boolean isProductionFirstDay = productionContext.isProductionFirstDay(productionDate);
@@ -1341,16 +1335,16 @@ public class ProductionPlanUtils {
             return productionPlan.getHasDeliveryDate();
         }
         if (ProductionFirstSortOptionsEnum.EMERGENCY == option) {
-            return productionPlan.getIsEmergency();
+            return Integer.parseInt(productionPlan.getIsEmergency());
         }
         if (ProductionFirstSortOptionsEnum.IMPORTANT_CUSTOM == option) {
-            return productionPlan.getIsImportantCustom();
+            return Integer.parseInt(productionPlan.getIsImportantCustom());
         }
         if (ProductionFirstSortOptionsEnum.ENSURE_PLAN == option) {
-            return productionPlan.getIsEnsurePlan();
+            return Integer.parseInt(productionPlan.getIsEnsurePlan());
         }
         if (ProductionFirstSortOptionsEnum.ESTIMATE_EXCEED_SHORT == option) {
-            return productionPlan.getIsDebitPlan();
+            return Integer.parseInt(productionPlan.getIsDebitPlan());
         }
         return YesOrNoEnum.YES.getValue();
     }

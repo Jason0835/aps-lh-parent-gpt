@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -16,7 +15,7 @@ import java.util.Date;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：ProductionMonthPlanInit.java
- * 描    述：分厂月生产计划排产过程-计划初始化对象 t_mp_proc_month_plan_init
+ * 描    述：分厂月生产计划排产过程-计划初始化对象 T_MP_PROC_MONTH_PLAN_INIT
  *
  * @author zlt
  * @version 1.0
@@ -25,21 +24,21 @@ import java.util.Date;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-03-07
+ * @date 20251205
  */
 
 @Data
 @TableName(value = "T_MP_PROC_MONTH_PLAN_INIT")
-@ApiModel(value = "分厂月生产计划排产过程-计划初始化对象", description = "分厂月生产计划排产过程-计划初始化对象 ")
+@ApiModel(value = "工厂月生产计划排产过程-计划初始化表对象", description = "工厂月生产计划排产过程-计划初始化表对象")
 public class ProductionMonthPlanInit extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 生产分厂编号
+     * 工厂编号
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "生产分厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -76,36 +75,59 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String productionVersion;
 
     /**
-     * 需求计划
+     * 计划类型 01 正常 02 订单预测 03 实单模拟
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.monthPlanId")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.planType", dictType = "biz_plan_type")
+    @ApiModelProperty(value = "计划类型", name = "planType")
+    @TableField(value = "PLAN_TYPE")
+    private String planType;
+
+    /**
+     * 需求计划ID 可是需求计划或是试制量试计划
+     */
     @ApiModelProperty(value = "需求计划", name = "monthPlanId")
     @TableField(value = "MONTH_PLAN_ID")
     private Long monthPlanId;
 
     /**
-     * 序号
+     * MES物料编码
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.planSeq")
-    @ApiModelProperty(value = "序号", name = "planSeq")
-    @TableField(value = "PLAN_SEQ")
-    private Long planSeq;
+    @Excel(name = "ui.data.column.productionMonthPlanInit.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     /**
-     * 生产物料编号
+     * 物料编码
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productCode")
-    @ApiModelProperty(value = "生产物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    @Excel(name = "ui.data.column.productionMonthPlanInit.materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
     /**
-     * 生产规格描述
+     * 物料描述
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productDesc")
-    @ApiModelProperty(value = "生产规格描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    @Excel(name = "ui.data.column.productionMonthPlanInit.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /**
+     * 产品品类
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productTypeCode", dictType = "biz_product_name")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
+
+    /**
+     * 产品结构
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.structureName")
+    @ApiModelProperty(value = "产品结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
 
     /**
      * 施工阶段
@@ -127,7 +149,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 规格代号
      */
     @Excel(name = "ui.data.column.monthPlanMouldingDayResult.specCode")
-    @ImportExcelValidated(required = true, maxLength = 20)
     @ApiModelProperty(value = "规格代号", name = "specCode")
     @TableField(value = "SPEC_CODE")
     private String specCode;
@@ -136,7 +157,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 生胎代码
      */
     @Excel(name = "ui.data.column.monthPlanMouldingDayResult.embryoCode")
-    @ImportExcelValidated(required = true, maxLength = 20)
     @ApiModelProperty(value = "生胎代码", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;
@@ -173,28 +193,13 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String brand;
 
     /**
-     * 寸口
+     * 英寸 todo 字符类型
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.proSize")
-    @ApiModelProperty(value = "寸口", name = "proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private BigDecimal proSize;
 
-    /**
-     * 品名编码
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productTypeCode", dictType = "biz_product_name")
-    @ApiModelProperty(value = "品名编码", name = "productTypeCode")
-    @TableField(value = "PRODUCT_TYPE_CODE")
-    private String productTypeCode;
-
-    /**
-     * 品名
-     */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.productTypeName")
-    @ApiModelProperty(value = "品名", name = "productTypeName")
-    @TableField(value = "PRODUCT_TYPE_NAME")
-    private String productTypeName;
 
     /**
      * 规格
@@ -203,6 +208,14 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
+
+    /**
+     * 主花纹
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.mainPattern")
+    @ApiModelProperty(value = "花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
 
     /**
      * 花纹
@@ -215,31 +228,109 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 层级
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.hierarchy")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.hierarchy")
     @ApiModelProperty(value = "层级", name = "hierarchy")
     @TableField(value = "HIERARCHY")
     private String hierarchy;
 
     /**
-     * 生产需求计划
+     * 速级
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.prodReqPlan", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
-    @TableField(value = "PROD_REQ_PLAN")
-    private Long prodReqPlan;
+    @Excel(name = "ui.data.column.productionMonthPlanInit.speed")
+    @ApiModelProperty(value = "速级", name = "speed")
+    @TableField(value = "SPEED")
+    private String speed;
 
     /**
-     * 实际生产需求(含损耗)
+     * 供应链优先级 1 优先 0 不优先
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.isPrioritize", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "供应链优先级", name = "isPrioritize")
+    @TableField(value = "IS_PRIORITIZE")
+    private String isPrioritize;
+
+    /**
+     * 高优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "高优先级", name = "heightQty")
+    @TableField(value = "HEIGHT_QTY")
+    private Long heightQty;
+
+    /**
+     * 中优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.midQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "中优先级", name = "midQty")
+    @TableField(value = "MID_QTY")
+    private Long midQty;
+
+    /**
+     * 暂缓订单
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.postponeQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
+    @TableField(value = "POSTPONE_QTY")
+    private Long postponeQty;
+
+    /**
+     * 周期排产储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
+    @TableField(value = "CYCLE_RESERVE_QTY")
+    private Long cycleReserveQty;
+
+    /**
+     * 常规储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @TableField(value = "CONVENTION_RESERVE_QTY")
+    private Long conventionReserveQty;
+
+    /**
+     * 排产净需求
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.netQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "排产净需求", name = "netQty")
+    @TableField(value = "NET_QTY")
+    private Long netQty;
+
+    /**
+     * 净需求(含暂缓)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
+    @TableField(value = "POSTPONE_NET_QTY")
+    private Long postponeNetQty;
+
+    /**
+     * 净需求(不含暂缓)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
+    @TableField(value = "UN_POSTPONE_NET_QTY")
+    private Long unPostponeNetQty;
+    /**
+     * 高优先级需求(含损耗)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.heightLossQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "高优先级需求(含损耗)", name = "heightLossQty")
+    @TableField(value = "HEIGHT_LOSS_QTY")
+    private Long heightLossQty;
+
+    /**
+     * 实际生产需求(含损耗，排除高优先级损耗)
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.factProdReqQty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "实际生产需求", name = "factProdReqQty")
+    @ApiModelProperty(value = "实际生产需求(含损耗，排除高优先级损耗)", name = "factProdReqQty")
     @TableField(value = "FACT_PROD_REQ_QTY")
     private Long factProdReqQty;
 
     /**
      * 等级码
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.levelCode")
     @ApiModelProperty(value = "等级码", name = "levelCode")
     @TableField(value = "LEVEL_CODE")
     private String levelCode;
@@ -247,7 +338,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 等级名称
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.levelName")
     @ApiModelProperty(value = "等级名称", name = "levelName")
     @TableField(value = "LEVEL_NAME")
     private String levelName;
@@ -258,7 +348,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.isContinue", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否续作 0 不续作 1续作", name = "isContinue")
     @TableField(value = "IS_CONTINUE")
-    private Integer isContinue;
+    private String isContinue;
 
     /**
      * 是否重要客户 0 不重要 1 重要
@@ -266,7 +356,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.isImportantCustom", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否重要客户 0 不重要 1 重要", name = "isImportantCustom")
     @TableField(value = "IS_IMPORTANT_CUSTOM")
-    private Integer isImportantCustom;
+    private String isImportantCustom;
 
     /**
      * 是否必保计划 0 不必保 1 必保
@@ -274,7 +364,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.isEnsurePlan", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否必保计划 0 不必保 1 必保", name = "isEnsurePlan")
     @TableField(value = "IS_ENSURE_PLAN")
-    private Integer isEnsurePlan;
+    private String isEnsurePlan;
 
     /**
      * 是否紧急订单 0 不紧急 1 紧急
@@ -282,7 +372,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.isEmergency", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否紧急订单 0 不紧急 1 紧急", name = "isEmergency")
     @TableField(value = "IS_EMERGENCY")
-    private Integer isEmergency;
+    private String isEmergency;
 
     /**
      * 是否欠产（0：默认不是，1：是）
@@ -290,7 +380,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.isDebitPlan", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否欠产", name = "isDebitPlan")
     @TableField(value = "IS_DEBIT_PLAN")
-    private Integer isDebitPlan;
+    private String isDebitPlan;
 
     /**
      * 期望交期
@@ -302,20 +392,11 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private Date deliveryDateDue;
 
     /**
-     * 是否备货 0 不是 1 是
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.isStockUp", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "是否备货 0 不是 1 是", name = "isStockUp")
-    @TableField(value = "IS_STOCK_UP")
-    private Integer isStockUp;
-
-    /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    // @Excel(name = "ui.data.column.productionMonthPlanInit.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
-    private Integer isImport;
+    private String isImport;
 
     /**
      * 利润等级
@@ -326,12 +407,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private Integer profitGrade;
 
     /**
-     * 分厂不排产:0-否，1-是
+     * 工厂不排产:0-否，1-是
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.isFactoryProduction", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "分厂不排产:0-否，1-是", name = "isFactoryProduction")
+    @ApiModelProperty(value = "工厂不排产:0-否，1-是", name = "isFactoryProduction")
     @TableField(value = "IS_FACTORY_PRODUCTION")
-    private Integer isFactoryProduction;
+    private String isFactoryProduction;
 
     /**
      * 硫化时间
@@ -342,20 +423,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private BigDecimal curingTime;
 
     /**
-     * 排产顺序
+     * 日硫化量(单模)
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productionSequence", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "排产顺序", name = "productionSequence")
-    @TableField(value = "PRODUCTION_SEQUENCE")
-    private Long productionSequence;
-
-    /**
-     * 是否备胎 RF:0-否，1-是
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.rf", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "是否备胎 RF:0-否，1-是", name = "rf")
-    @TableField(value = "RF")
-    private Integer rf;
+    @Excel(name = "ui.data.column.productionMonthPlanInit.dayVulcanizationQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
+    @TableField(value = "DAY_VULCANIZATION_QTY")
+    private Long dayVulcanizationQty;
 
     /**
      * 可用模具数量
@@ -366,28 +439,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private Integer mouldQty;
 
     /**
-     * 模具满产产量
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.mouldFullQty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "模具满产产量", name = "mouldFullQty")
-    @TableField(value = "MOULD_FULL_QTY")
-    private Long mouldFullQty;
-
-    /**
-     * 可排产量
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productionQty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "可排产量", name = "productionQty")
-    @TableField(value = "PRODUCTION_QTY")
-    private Long productionQty;
-
-    /**
      * 是否排产:0-否，1-是
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.isProduction", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否排产:0-否，1-是", name = "isProduction")
     @TableField(value = "IS_PRODUCTION")
-    private Integer isProduction;
+    private String isProduction;
 
     /**
      * 不排产原因:0-否，1-是
@@ -397,4 +454,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @TableField(value = "NO_PRODUCTION_REASON")
     private String noProductionReason;
 
+    /**
+     * todo 后续要删除
+     *
+     * @return
+     */
+    public String getProductCode() {
+        return "";
+    }
 }
