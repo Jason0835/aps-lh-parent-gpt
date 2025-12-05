@@ -441,7 +441,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
         for (List<MonthPlanProductionFinalResultVo> resultVos : splitList) {
             List<String> productCodeList = resultVos.stream().map(MonthPlanProductionFinalResult::getProductCode).distinct().collect(Collectors.toList());
             Map<String, MdmProductConstruction> productConstructionMap = new HashMap<>(16);
-            Map<String, List<MdmProductModelRelation>> modelRelationMap = new HashMap<>(16);
+            Map<String, List<MdmSkuMouldRel>> modelRelationMap = new HashMap<>(16);
             Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
             if (!CollectionUtils.isEmpty(productCodeList)) {
                 // 查询SAP与施工关系
@@ -452,9 +452,9 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                     productConstructionMap = productConstructionList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getProductCode(), item.getSpecCode(), item.getEmbryoCode()), Function.identity()));
                 }
                 // 查询SAP与模具关系
-                List<MdmProductModelRelation> modelRelationList = productModelRelationEntityMapper.select4ImportAdjustData(resultVos);
+                List<MdmSkuMouldRel> modelRelationList = productModelRelationEntityMapper.select4ImportAdjustData(resultVos);
                 if (!CollectionUtils.isEmpty(modelRelationList)) {
-                    modelRelationMap = modelRelationList.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getProductCode(), item.getMouldNo())));
+                    modelRelationMap = modelRelationList.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getMaterialCode(), item.getMouldNo())));
                 }
                 // 查询物料信息，用于校验、回填信息
                 LambdaQueryWrapper<MdmProductInfo> productInfoWrapper = new LambdaQueryWrapper<>();
@@ -517,8 +517,8 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                 // 校验SAP与模具，不通过，数据添加到导入列表，仅提示
                 String modelMapKey = GenerageMapKeyUtils.createMapKey(productCode, excelVo.getMouldNo());
                 if (modelRelationMap.containsKey(modelMapKey)) {
-                    List<MdmProductModelRelation> modelRelationList = modelRelationMap.get(modelMapKey);
-                    long count = modelRelationList.stream().map(MdmProductModelRelation::getMouldCode).distinct().count();
+                    List<MdmSkuMouldRel> modelRelationList = modelRelationMap.get(modelMapKey);
+                    long count = modelRelationList.stream().map(MdmSkuMouldRel::getMouldCode).distinct().count();
                     if (count < excelVo.getMouldQty()) {
                         configureMissFlag = Boolean.TRUE;
                         addImportErrorLog(analysisHelper.getImportLogId(), errorNum,
@@ -1265,9 +1265,9 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
             ProductModelRelationResult result = new ProductModelRelationResult();
 
             // 查询产品模型关系
-            LambdaQueryWrapper<MdmProductModelRelation> relationQuery = new LambdaQueryWrapper<>();
-            relationQuery.eq(MdmProductModelRelation::getProductCode, productCode);
-            List<MdmProductModelRelation> relations = productModelRelationEntityMapper.selectList(relationQuery);
+            LambdaQueryWrapper<MdmSkuMouldRel> relationQuery = new LambdaQueryWrapper<>();
+            relationQuery.eq(MdmSkuMouldRel::getMaterialCode, productCode);
+            List<MdmSkuMouldRel> relations = productModelRelationEntityMapper.selectList(relationQuery);
 
             if (!CollectionUtils.isEmpty(relations)) {
                 result.setRelations(relations);
@@ -1275,7 +1275,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
 
                 // 批量查询模具信息
                 List<String> mouldCodes = relations.stream()
-                        .map(MdmProductModelRelation::getMouldCode)
+                        .map(MdmSkuMouldRel::getMouldCode)
                         .distinct()
                         .collect(Collectors.toList());
 
@@ -1353,7 +1353,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
             return;
         }
         // 批量查询共用模具情况（避免在循环中查询）
-        List<MdmProductModelRelation> sharedMoulds = productModelRelationEntityMapper.selectSameMouldNo();
+        List<MdmSkuMouldRel> sharedMoulds = productModelRelationEntityMapper.selectSameMouldNo();
         if (CollectionUtils.isEmpty(sharedMoulds)) {
             return;
         }
@@ -1361,7 +1361,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
         if (CollectionUtils.isEmpty(mouldNos)) {
             return;
         }
-        List<MdmProductModelRelation> currentMouldRelations = sharedMoulds.stream().filter(item -> mouldNos.contains(item.getMouldNo()))
+        List<MdmSkuMouldRel> currentMouldRelations = sharedMoulds.stream().filter(item -> mouldNos.contains(item.getMouldNo()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(currentMouldRelations)) {
             return;
@@ -1451,13 +1451,67 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
     // ============ 内部辅助类 ============
 
     /**
-     * 产品模型关系查询结果封装
+     * 校验模具信息是否存在，试制量试
+     *
+     * @param item
+     * @param importLogId
+     * @param errorNum
+     * @param importErrorLogs
+     * @param mouldBaseInfoMap
+     * @return
      */
-    @Data
-    private static class ProductModelRelationResult {
-        private List<MdmProductModelRelation> relations;
-        private List<MdmModelInfo> mouldInfos;
-        private String mouldNo;
+    private boolean checkDataMouldInfoAndFullMouldNo(MonthPlanProductionFinalResult item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmModelInfo>> mouldBaseInfoMap) {
+        String mouldErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNoErrorInfo");
+        String mouldNumberErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNumberErrorInfo");
+        //根据规格代号，校验模具信息是否正确
+        String factoryCode = item.getFactoryCode();
+        String specCode = item.getSpecCode();
+        Integer mouldQty = item.getMouldQty();
+        if (mouldBaseInfoMap.containsKey(specCode)) {
+            List<MdmModelInfo> mouldCodeList = mouldBaseInfoMap.get(specCode);
+            if (CollectionUtils.isEmpty(mouldCodeList)) {
+                addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
+                return false;
+            }
+            String mouldNo = mouldCodeList.get(0).getMouldNo();
+            item.setMouldNo(mouldNo);
+            if (mouldCodeList.size() < mouldQty) {
+                addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
+                return false;
+            }
+            return true;
+        }
+        QueryWrapper<MdmSkuMouldRel> modelRelationQuery = new QueryWrapper<>();
+        modelRelationQuery.eq("FACTORY_CODE", factoryCode);
+        modelRelationQuery.eq("SPEC_CODE", specCode);
+        List<MdmSkuMouldRel> modelRelationList = productModelRelationEntityMapper.selectList(modelRelationQuery);
+        if (CollectionUtils.isEmpty(modelRelationList)) {
+            mouldBaseInfoMap.put(specCode, Collections.emptyList());
+            addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
+            return false;
+        }
+        List<String> mouldCodeList = modelRelationList.stream().map(MdmSkuMouldRel::getMouldCode).collect(Collectors.toList());
+        QueryWrapper<MdmModelInfo> mouldNoQuery = new QueryWrapper<>();
+        mouldNoQuery.eq("FACTORY_CODE", item.getFactoryCode());
+        mouldNoQuery.in("MOULD_CODE", mouldCodeList);
+        List<MdmModelInfo> mouldInfoList = modelInfoEntityMapper.selectList(mouldNoQuery);
+        if (CollectionUtils.isEmpty(mouldInfoList)) {
+            mouldBaseInfoMap.put(specCode, Collections.emptyList());
+            addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
+            return false;
+        }
+        mouldBaseInfoMap.put(specCode, mouldInfoList);
+        if (modelRelationList.size() < mouldQty) {
+            addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
+            return false;
+        }
+        String mouldNo = mouldInfoList.get(0).getMouldNo();
+        item.setMouldNo(mouldNo);
+        if (mouldInfoList.size() < mouldQty) {
+            addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -1725,67 +1779,13 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
     }
 
     /**
-     * 校验模具信息是否存在，试制量试
-     *
-     * @param item
-     * @param importLogId
-     * @param errorNum
-     * @param importErrorLogs
-     * @param mouldBaseInfoMap
-     * @return
+     * 产品模型关系查询结果封装
      */
-    private boolean checkDataMouldInfoAndFullMouldNo(MonthPlanProductionFinalResult item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmModelInfo>> mouldBaseInfoMap) {
-        String mouldErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNoErrorInfo");
-        String mouldNumberErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNumberErrorInfo");
-        //根据规格代号，校验模具信息是否正确
-        String factoryCode = item.getFactoryCode();
-        String specCode = item.getSpecCode();
-        Integer mouldQty = item.getMouldQty();
-        if (mouldBaseInfoMap.containsKey(specCode)) {
-            List<MdmModelInfo> mouldCodeList = mouldBaseInfoMap.get(specCode);
-            if (CollectionUtils.isEmpty(mouldCodeList)) {
-                addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
-                return false;
-            }
-            String mouldNo = mouldCodeList.get(0).getMouldNo();
-            item.setMouldNo(mouldNo);
-            if (mouldCodeList.size() < mouldQty) {
-                addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
-                return false;
-            }
-            return true;
-        }
-        QueryWrapper<MdmProductModelRelation> modelRelationQuery = new QueryWrapper<>();
-        modelRelationQuery.eq("FACTORY_CODE", factoryCode);
-        modelRelationQuery.eq("SPEC_CODE", specCode);
-        List<MdmProductModelRelation> modelRelationList = productModelRelationEntityMapper.selectList(modelRelationQuery);
-        if (CollectionUtils.isEmpty(modelRelationList)) {
-            mouldBaseInfoMap.put(specCode, Collections.emptyList());
-            addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
-            return false;
-        }
-        List<String> mouldCodeList = modelRelationList.stream().map(MdmProductModelRelation::getMouldCode).collect(Collectors.toList());
-        QueryWrapper<MdmModelInfo> mouldNoQuery = new QueryWrapper<>();
-        mouldNoQuery.eq("FACTORY_CODE", item.getFactoryCode());
-        mouldNoQuery.in("MOULD_CODE", mouldCodeList);
-        List<MdmModelInfo> mouldInfoList = modelInfoEntityMapper.selectList(mouldNoQuery);
-        if (CollectionUtils.isEmpty(mouldInfoList)) {
-            mouldBaseInfoMap.put(specCode, Collections.emptyList());
-            addImportErrorLog(importLogId, errorNum, String.format(mouldErrorInfo, specCode), importErrorLogs);
-            return false;
-        }
-        mouldBaseInfoMap.put(specCode, mouldInfoList);
-        if (modelRelationList.size() < mouldQty) {
-            addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
-            return false;
-        }
-        String mouldNo = mouldInfoList.get(0).getMouldNo();
-        item.setMouldNo(mouldNo);
-        if (mouldInfoList.size() < mouldQty) {
-            addImportErrorLog(importLogId, errorNum, String.format(mouldNumberErrorInfo, specCode, mouldQty), importErrorLogs);
-            return false;
-        }
-        return true;
+    @Data
+    private static class ProductModelRelationResult {
+        private List<MdmSkuMouldRel> relations;
+        private List<MdmModelInfo> mouldInfos;
+        private String mouldNo;
     }
 
     /**

@@ -9,7 +9,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.aps.monthplan.api.service.IMdmProductModelRelationRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -47,7 +47,7 @@ import java.util.Arrays;
 @Api(tags = "SAP与模具关系")
 @Controller
 @RequestMapping("/maindata/relation")
-public class MdmProductModelRelationUIController extends BaseUIController<MdmProductModelRelation> {
+public class MdmProductModelRelationUIController extends BaseUIController<MdmSkuMouldRel> {
 
     @Autowired
     private IMdmProductModelRelationRemoteService iMdmProductModelRelationService;
@@ -68,7 +68,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmProductModelRelation", new MdmProductModelRelation());
+        mmap.put("MdmSkuMouldRel", new MdmSkuMouldRel());
         return prefix + "/add";
     }
 
@@ -77,7 +77,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmProductModelRelation", iMdmProductModelRelationService.getInfo(id));
+        mmap.put("MdmSkuMouldRel", iMdmProductModelRelationService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -88,8 +88,8 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
     @RequiresPermissions("maindata:relation:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmProductModelRelation mdmProductModelRelation) {
-        return iMdmProductModelRelationService.list(mdmProductModelRelation);
+    public TableDataInfo list(MdmSkuMouldRel MdmSkuMouldRel) {
+        return iMdmProductModelRelationService.list(MdmSkuMouldRel);
     }
 
     /**
@@ -115,11 +115,11 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
     @RequiresPermissions("maindata:relation:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmProductModelRelation mdmProductModelRelation) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmProductModelRelationService.checkUnique(mdmProductModelRelation))) {
+    public AjaxResult save(MdmSkuMouldRel MdmSkuMouldRel) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmProductModelRelationService.checkUnique(MdmSkuMouldRel))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.productmodelrelation.notUnique"));
         }
-        return iMdmProductModelRelationService.save(mdmProductModelRelation);
+        return iMdmProductModelRelationService.save(MdmSkuMouldRel);
     }
 
     /**
@@ -140,8 +140,8 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmProductModelRelation mdmProductModelRelation) {
-        return iMdmProductModelRelationService.checkUnique(mdmProductModelRelation);
+    public String checkUnique(MdmSkuMouldRel MdmSkuMouldRel) {
+        return iMdmProductModelRelationService.checkUnique(MdmSkuMouldRel);
     }
 
     /**
@@ -183,7 +183,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmProductModelRelation> util = new ExcelUtil<>(MdmProductModelRelation.class);
+        ExcelUtil<MdmSkuMouldRel> util = new ExcelUtil<>(MdmSkuMouldRel.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -192,7 +192,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmProductModelRelation entity) throws IOException {
+    public void export(HttpServletResponse response, MdmSkuMouldRel entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMdmProductModelRelationService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
@@ -216,5 +216,16 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmPro
         context.setFileBytes(data);
         AjaxResult ajaxResult = iMdmProductModelRelationService.importData(context, true);
         return ajaxResult;
+    }
+
+    /**
+     * 抓取MES数据
+     */
+    @RequiresPermissions("maindata:relation:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    @ResponseBody
+    public AjaxResult mesCapture() {
+        return iMdmProductModelRelationService.mesCapture();
     }
 }

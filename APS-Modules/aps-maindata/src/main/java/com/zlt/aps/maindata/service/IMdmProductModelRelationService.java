@@ -3,7 +3,7 @@ package com.zlt.aps.maindata.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.service.IDocService;
 
@@ -24,7 +24,7 @@ import java.util.Set;
  * 修改内容：...
  * @date 2025-02-24
  */
-public interface IMdmProductModelRelationService extends IDocService<MdmProductModelRelation> {
+public interface IMdmProductModelRelationService extends IDocService<MdmSkuMouldRel> {
 
     /**
      * 查询规格对应的模具关系
@@ -32,7 +32,7 @@ public interface IMdmProductModelRelationService extends IDocService<MdmProductM
      * @param specCodes
      * @return
      */
-    List<MdmProductModelRelation> queryBySpecCodes(Set<String> specCodes, String factoryCode);
+    List<MdmSkuMouldRel> queryBySpecCodes(Set<String> specCodes, String factoryCode);
 
     /**
      * 根据物料编码及分厂、年月信息，得到物料匹配的模具信息
@@ -52,4 +52,11 @@ public interface IMdmProductModelRelationService extends IDocService<MdmProductM
      * @return
      */
     AjaxResult configurationMouldRelation(ProductMouldRelationConfigurationParam configuration);
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    AjaxResult mesCapture();
 }

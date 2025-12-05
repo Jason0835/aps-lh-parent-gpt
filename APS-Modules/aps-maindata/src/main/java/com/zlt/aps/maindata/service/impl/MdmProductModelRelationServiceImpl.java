@@ -20,7 +20,7 @@ import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldConfigurationVo;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
-public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmProductModelRelation> implements IMdmProductModelRelationService {
+public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSkuMouldRel> implements IMdmProductModelRelationService {
 
     private final MdmProductModelRelationEntityMapper entityMapper;
 
@@ -81,20 +81,20 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
     }
 
     @Override
-    public String checkUnique(MdmProductModelRelation docEntityVO) {
+    public String checkUnique(MdmSkuMouldRel docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.productmodelrelation.notUnique"));
         }
         // 关联物料表赋值规格、花纹、品牌
-        String productCode = docEntityVO.getProductCode();
+        String productCode = docEntityVO.getMaterialCode();
         if (StringUtils.isNotEmpty(productCode)) {
             LambdaQueryWrapper<MdmProductInfo> wrapper = new LambdaQueryWrapper<MdmProductInfo>()
                     .eq(MdmProductInfo::getProductCode, productCode);
             List<MdmProductInfo> productInfoList = productInfoEntityMapper.selectList(wrapper);
             if (CollectionUtils.isNotEmpty(productInfoList)) {
                 MdmProductInfo productInfo = productInfoList.get(0);
-                docEntityVO.setProductDesc(productInfo.getProductDesc());
+                docEntityVO.setMaterialDesc(productInfo.getProductDesc());
 //            docEntityVO.setSpecCode(productInfo.getSpecCode());
                 docEntityVO.setSpecifications(productInfo.getSpecifications());
                 docEntityVO.setPattern(productInfo.getPattern());
@@ -107,15 +107,15 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "productCode", "specCode", "mouldCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "mouldCode"));
     }
 
     @Override
-    protected Map<Object, Object> getServiceCheckParams(List<MdmProductModelRelation> list, List<MdmProductModelRelation> importList) {
+    protected Map<Object, Object> getServiceCheckParams(List<MdmSkuMouldRel> list, List<MdmSkuMouldRel> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
         // 关联物料表赋值规格、花纹、品牌
         Map<String, MdmProductInfo> productInfoMap = new HashMap<>(16);
-        List<String> productCodeList = list.stream().map(MdmProductModelRelation::getProductCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<String> productCodeList = list.stream().map(MdmSkuMouldRel::getMaterialCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(productCodeList)) {
             List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(productCodeList, 100);
             List<MdmProductInfo> productInfoList = new ArrayList<>();
@@ -135,21 +135,23 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
     }
 
     @Override
-    protected Boolean serviceCheckAndDataHandle(MdmProductModelRelation importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
-        Map<String, MdmProductInfo> productInfoMap = (Map<String, MdmProductInfo>) serviceCheckParams.get("productInfoMap");
-        String productCode = FactoryConstant.DEFAULT_FACTORY_CODE + "|" + importDocEntity.getProductCode();
-        if (productInfoMap.containsKey(productCode)) {
-            MdmProductInfo productInfo = productInfoMap.get(productCode);
-            importDocEntity.setProductDesc(productInfo.getProductDesc());
-            importDocEntity.setSpecifications(productInfo.getSpecifications());
-            importDocEntity.setPattern(productInfo.getPattern());
-            importDocEntity.setBrand(productInfo.getBrand());
-            importDocEntity.setMouldCategory(productInfo.getMouldCategory());
+    protected Boolean serviceCheckAndDataHandle(MdmSkuMouldRel importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (serviceCheckParams.containsKey("productInfoMap")) {
+            Map<String, MdmProductInfo> productInfoMap = (Map<String, MdmProductInfo>) serviceCheckParams.get("productInfoMap");
+            String productCode = FactoryConstant.DEFAULT_FACTORY_CODE + "|" + importDocEntity.getMaterialCode();
+            if (productInfoMap.containsKey(productCode)) {
+                MdmProductInfo productInfo = productInfoMap.get(productCode);
+                importDocEntity.setMaterialDesc(productInfo.getProductDesc());
+                importDocEntity.setSpecifications(productInfo.getSpecifications());
+                importDocEntity.setPattern(productInfo.getPattern());
+                importDocEntity.setBrand(productInfo.getBrand());
+                importDocEntity.setMouldCategory(productInfo.getMouldCategory());
+            }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
-    private Boolean checkOneRowProductModelRef(List<MdmProductModelRelation> list, Long importLogId, AtomicInteger failureNum, List<MdmProductModelRelation> importList, List<ImportErrorLog> importErrorLogs, MdmProductModelRelation info) {
+    private Boolean checkOneRowProductModelRef(List<MdmSkuMouldRel> list, Long importLogId, AtomicInteger failureNum, List<MdmSkuMouldRel> importList, List<ImportErrorLog> importErrorLogs, MdmSkuMouldRel info) {
         int rownum;
         List<ImportErrorLog> validated;
         rownum = info.getIndex() + 2;
@@ -165,7 +167,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
 
     }
 
-    public String checkProductModelRelationUnique(MdmProductModelRelation productModelRelation, List<String> productModelKeysInDB) {
+    public String checkProductModelRelationUnique(MdmSkuMouldRel productModelRelation, List<String> productModelKeysInDB) {
         if (productModelRelation == null) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -182,17 +184,17 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
      * @return
      */
     @Override
-    public List<MdmProductModelRelation> queryBySpecCodes(Set<String> specCodes, String factoryCode) {
+    public List<MdmSkuMouldRel> queryBySpecCodes(Set<String> specCodes, String factoryCode) {
         // 将 Set 转换为 List，便于切分批次
         List<String> codeList = new ArrayList<>(specCodes);
         //定义最终返回的List
-        List<MdmProductModelRelation> finalList = new ArrayList<>();
+        List<MdmSkuMouldRel> finalList = new ArrayList<>();
         //判断集合的长度是多少 如果超过900条则进行切分查询
         if (codeList.size() > SystemBaseEnums.SPLIT_LENGTH.getCode()) {
             List<List<String>> splitList = ScmListUtils.getSplitList(codeList, SystemBaseEnums.SPLIT_LENGTH.getCode());
             //将多次查询的结果汇总到finalList中
             for (List<String> splitItemList : splitList) {
-                List<MdmProductModelRelation> queryList = entityMapper.queryBySpecCodes(factoryCode, splitItemList);
+                List<MdmSkuMouldRel> queryList = entityMapper.queryBySpecCodes(factoryCode, splitItemList);
                 finalList.addAll(queryList);
             }
         } else {
@@ -219,16 +221,16 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
             return null;
         }
         productMouldInfo.setBrand(productInfo.getBrand());
-        QueryWrapper<MdmProductModelRelation> relationQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmSkuMouldRel> relationQueryWrapper = new QueryWrapper<>();
         relationQueryWrapper.eq("PRODUCT_CODE", productCode);
-        List<MdmProductModelRelation> relationList = entityMapper.selectList(relationQueryWrapper);
+        List<MdmSkuMouldRel> relationList = entityMapper.selectList(relationQueryWrapper);
         if (CollectionUtils.isEmpty(relationList)) {
             productMouldInfo.setMouldConfigurationList(Collections.emptyList());
             return productMouldInfo;
         }
         Integer year = queryParam.getYear();
         Integer month = queryParam.getMonth();
-        List<String> mouldCodeList = relationList.stream().map(MdmProductModelRelation::getMouldCode).collect(Collectors.toList());
+        List<String> mouldCodeList = relationList.stream().map(MdmSkuMouldRel::getMouldCode).collect(Collectors.toList());
         List<MouldMonthUseDto> useStatusList = mouldUseStatusMapper.getMonthUsedMould(factoryCode, year, month, mouldCodeList);
         List<MouldMonthUseDto> maintenanceList = maintenanceMapper.getMonthMaintenanceMould(factoryCode, year, month, mouldCodeList);
         Map<String, String> mouldCodeMap = new HashMap<>();
@@ -242,7 +244,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
             productMouldInfo.setMouldConfigurationList(Collections.emptyList());
             return productMouldInfo;
         }
-        Map<String, List<MdmProductModelRelation>> groupMap = relationList.stream().collect(Collectors.groupingBy(MdmProductModelRelation::getMouldCode));
+        Map<String, List<MdmSkuMouldRel>> groupMap = relationList.stream().collect(Collectors.groupingBy(MdmSkuMouldRel::getMouldCode));
         Map<String, Set<String>> configurationMap = new HashMap<>();
         mouldCodeMap.entrySet().forEach(entry -> {
             String mouldNo = entry.getValue();
@@ -250,7 +252,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
             if (!groupMap.containsKey(mouldCode)) {
                 return;
             }
-            List<MdmProductModelRelation> relationSpecList = groupMap.get(mouldCode);
+            List<MdmSkuMouldRel> relationSpecList = groupMap.get(mouldCode);
             if (CollectionUtils.isEmpty(relationSpecList)) {
                 return;
             }
@@ -258,7 +260,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
             if (null == specCodeSet) {
                 specCodeSet = new HashSet<>();
             }
-            Set<String> relationSpecSet = relationSpecList.stream().map(MdmProductModelRelation::getSpecCode).collect(Collectors.toSet());
+            Set<String> relationSpecSet = relationSpecList.stream().map(MdmSkuMouldRel::getSpecCode).collect(Collectors.toSet());
             specCodeSet.addAll(relationSpecSet);
             configurationMap.put(mouldNo, specCodeSet);
         });
@@ -298,19 +300,19 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
         }
         String specCodeConfiguration = configuration.getSpecCode();
         List<String> specCodeList = new ArrayList<>(new HashSet<>(Arrays.asList(specCodeConfiguration.split(StringConstant.COMMA))));
-        List<MdmProductModelRelation> relationList = new ArrayList<>();
+        List<MdmSkuMouldRel> relationList = new ArrayList<>();
         for (String specCode : specCodeList) {
             for (int index = 0; index < mouldNumber; index++) {
                 MdmModelInfo modelInfo = modelInfoList.get(index);
-                MdmProductModelRelation relation = buildConfiguration(modelInfo, productInfo);
-                relation.setProductCode(productCode);
+                MdmSkuMouldRel relation = buildConfiguration(modelInfo, productInfo);
+                relation.setMaterialCode(productCode);
                 relation.setFactoryCode(factoryCode);
                 relation.setSpecCode(specCode);
                 relationList.add(relation);
             }
         }
         //先删除旧的
-        QueryWrapper<MdmProductModelRelation> deleteWrapper = new QueryWrapper<>();
+        QueryWrapper<MdmSkuMouldRel> deleteWrapper = new QueryWrapper<>();
         deleteWrapper.eq("FACTORY_CODE", factoryCode);
         deleteWrapper.eq("PRODUCT_CODE", productCode);
         entityMapper.delete(deleteWrapper);
@@ -384,18 +386,28 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmPr
      * @param productInfo 物料信息
      * @return
      */
-    private MdmProductModelRelation buildConfiguration(MdmModelInfo modelInfo, MdmProductInfo productInfo) {
-        MdmProductModelRelation relation = new MdmProductModelRelation();
+    private MdmSkuMouldRel buildConfiguration(MdmModelInfo modelInfo, MdmProductInfo productInfo) {
+        MdmSkuMouldRel relation = new MdmSkuMouldRel();
         //模具信息
         relation.setMouldCode(modelInfo.getMouldCode());
         relation.setMouldNo(modelInfo.getMouldNo());
         //物料信息
-        relation.setProductDesc(productInfo.getProductDesc());
+        relation.setMaterialDesc(productInfo.getProductDesc());
         relation.setMouldCategory(productInfo.getMouldCategory());
         relation.setSpecifications(productInfo.getSpecifications());
         relation.setPattern(productInfo.getPattern());
         relation.setBrand(productInfo.getBrand());
         return relation;
+    }
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @Override
+    public AjaxResult mesCapture() {
+        return AjaxResult.success();
     }
 }
 

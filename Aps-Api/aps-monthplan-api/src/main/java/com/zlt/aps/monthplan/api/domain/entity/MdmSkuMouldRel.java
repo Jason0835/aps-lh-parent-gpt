@@ -13,7 +13,7 @@ import lombok.Data;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductModelRelation.java
+ * 文件名称：MdmSkuMouldRel.java
  * 描    述：SAP与模具关系对象 t_mdm_product_model_relation
  *
  * @author zlt
@@ -25,11 +25,10 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-02-18
  */
-
-@ApiModel(value = "SAP与模具关系对象", description = "SAP与模具关系对象 ")
+@ApiModel(value = "SAP与模具关系对象", description = "SAP与模具关系对象")
 @Data
-@TableName(value = "T_MDM_PRODUCT_MODEL_RELATION")
-public class MdmProductModelRelation extends BaseEntity {
+@TableName(value = "T_MDM_SKU_MOULD_REL")
+public class MdmSkuMouldRel extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -40,7 +39,7 @@ public class MdmProductModelRelation extends BaseEntity {
      * 分厂编码
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmMoldingMachineCls.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmProductInfo.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -49,41 +48,50 @@ public class MdmProductModelRelation extends BaseEntity {
      * 物料编号
      */
     @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.relation.productCode")
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    @Excel(name = "ui.data.column.relation.materialCode")
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /**
+     * MES物料编号
+     */
+//    @ImportExcelValidated(required = true, maxLength = 20)
+//    @Excel(name = "ui.data.column.mdmProductInfo.mesProductCode")
+    @ApiModelProperty(value = "物料编号", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     /**
      * 规格描述
      */
-    @Excel(name = "ui.data.column.relation.productDesc")
-    @ApiModelProperty(value = "规格描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    @Excel(name = "ui.data.column.relation.materialDesc")
+    @ApiModelProperty(value = "规格描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /**
      * 规格代号
      */
-    @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.relation.specCode")
+//    @ImportExcelValidated(required = true, maxLength = 20)
+//    @Excel(name = "ui.data.column.relation.specCode")
     @ApiModelProperty(value = "规格代号", name = "specCode")
     @TableField(value = "SPEC_CODE")
     private String specCode;
 
     /**
-     * 模具号
+     * 型腔模号
      */
     @ImportExcelValidated(required = true, maxLength = 40)
     @Excel(name = "ui.data.column.relation.mouldCode")
-    @ApiModelProperty(value = "模具号", name = "mouldCode")
+    @ApiModelProperty(value = "型腔模号", name = "mouldCode")
     @TableField(value = "MOULD_CODE")
     private String mouldCode;
 
     /**
      * 规格
      */
-    @Excel(name = "ui.data.column.relation.specifications")
+//    @Excel(name = "ui.data.column.relation.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
@@ -91,15 +99,31 @@ public class MdmProductModelRelation extends BaseEntity {
     /**
      * 花纹
      */
-    @Excel(name = "ui.data.column.relation.pattern")
+//    @Excel(name = "ui.data.column.relation.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;
 
     /**
+     * 主花纹
+     */
+    @Excel(name = "ui.data.column.mdmProductInfo.mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
+
+    /**
+     * 是否共用花纹/侧板块，字典：biz_yes_no，0否1是
+     */
+    @Excel(name = "ui.data.column.relation.samePatternPanel", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否共用花纹/侧板块，字典：biz_yes_no，0否1是", name = "samePatternPanel")
+    @TableField(value = "SAME_PATTER_PANEL")
+    private String samePatternPanel;
+
+    /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.relation.brand", dictType = "biz_brand_type")
+//    @Excel(name = "ui.data.column.relation.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -127,7 +151,7 @@ public class MdmProductModelRelation extends BaseEntity {
     private Integer shareNum;
 
     public String getUnikey() {
-        return getProductCode() + getMouldCode();
+        return getMaterialCode() + getMouldCode();
     }
 
     /**
@@ -138,7 +162,7 @@ public class MdmProductModelRelation extends BaseEntity {
      */
     public String getUpdateGroupKey() {
         String duplicateKeyFormat = "%s|*|%s|*|%s";
-        return String.format(duplicateKeyFormat, getProductCode(), getSpecCode(), getMouldCode());
+        return String.format(duplicateKeyFormat, getMaterialCode(), getSpecCode(), getMouldCode());
     }
 
     /**

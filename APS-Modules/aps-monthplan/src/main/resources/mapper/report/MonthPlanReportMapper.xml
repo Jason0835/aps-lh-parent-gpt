@@ -2662,7 +2662,7 @@
     </select>
 
     <select id="selectProductMoldeRealList"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation">
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
         SELECT PRODUCT_CODE, GROUP_CONCAT(DISTINCT SPEC_CODE SEPARATOR ',') AS SPEC_CODE
         FROM T_MDM_PRODUCT_MODEL_RELATION
         WHERE FACTORY_CODE = #{factoryCode}

@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductModelRelation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -36,14 +36,14 @@ public interface IMdmProductModelRelationRemoteService {
      */
     @ApiOperation("查询列表")
     @PostMapping("/relation/list")
-    TableDataInfo list(@RequestBody MdmProductModelRelation QueryVO);
+    TableDataInfo list(@RequestBody MdmSkuMouldRel QueryVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
     @PostMapping("/relation/save")
-    AjaxResult save(@RequestBody MdmProductModelRelation mdmProductModelRelation);
+    AjaxResult save(@RequestBody MdmSkuMouldRel MdmSkuMouldRel);
 
 
     /**
@@ -58,21 +58,21 @@ public interface IMdmProductModelRelationRemoteService {
      */
     @ApiOperation("根据ID获取详细信息")
     @GetMapping(value = "/relation/{id}")
-    MdmProductModelRelation getInfo(@PathVariable("id") Long id);
+    MdmSkuMouldRel getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/relation/checkUnique")
-    String checkUnique(@RequestBody MdmProductModelRelation mdmProductModelRelationVO);
+    String checkUnique(@RequestBody MdmSkuMouldRel mdmProductModelRelationVO);
 
     /**
      * 导出SAP与模具关系列表
      */
     @ApiOperation("导出列表")
     @PostMapping("/relation/exportData/{fileName}")
-    byte[] exportData(@RequestBody MdmProductModelRelation queryVO, @PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody MdmSkuMouldRel queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入SAP与模具关系数据
@@ -100,4 +100,13 @@ public interface IMdmProductModelRelationRemoteService {
     @ApiOperation("配置物料的模具信息")
     @PostMapping("/relation/configurationMouldRelation")
     AjaxResult configurationMouldRelation(@RequestBody ProductMouldRelationConfigurationParam configuration);
+
+    /**
+     * 抓取MES数据
+     *
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/relation/mesCapture")
+    AjaxResult mesCapture();
 }

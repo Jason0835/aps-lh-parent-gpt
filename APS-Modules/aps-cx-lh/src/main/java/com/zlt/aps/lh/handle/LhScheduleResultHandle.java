@@ -1,50 +1,29 @@
 package com.zlt.aps.lh.handle;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.TypeReference;
 import com.baomidou.mybatisplus.core.toolkit.StringPool;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
-import com.ruoyi.common.exception.ServiceException;
-import com.zlt.aps.common.CxLhCommonUtils;
-import com.zlt.aps.cx.mapper.entity.AutoScheduleLogEntityMapper;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
-import com.zlt.aps.lh.api.domain.vo.LhOrderInsertMachineInfoVO;
-import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
-import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.common.exception.QueryExprException;
-import com.zlt.core.queryformulas.QueryFormulaUtil;
-import io.swagger.annotations.ApiModelProperty;
-import org.apache.commons.collections4.CollectionUtils;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.TypeReference;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.enums.MdmMachineTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.CommonRedisService;
+import com.zlt.aps.common.CxLhCommonUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constants.LhPrefixConstants;
+import com.zlt.aps.cx.mapper.entity.AutoScheduleLogEntityMapper;
 import com.zlt.aps.cx.service.ICxStockService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.AutoScheduleLog;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxStock;
 import com.zlt.aps.lh.api.domain.dto.AutoLhScheduleResultContextDTO;
 import com.zlt.aps.lh.api.domain.dto.AutoLhScheduleResultDTO;
+import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
@@ -59,20 +38,28 @@ import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.lh.service.ILhParamsService;
 import com.zlt.aps.lh.service.ILhSpecifyMachineService;
 import com.zlt.aps.lh.service.LhScheduleResultService;
-import com.zlt.aps.maindata.service.ILhMonthPlanSurplusService;
-import com.zlt.aps.maindata.service.IMdmDeviceMaintenancePlanService;
-import com.zlt.aps.maindata.service.IMdmMouldUseStatusService;
-import com.zlt.aps.maindata.service.IMdmProductConstructionService;
-import com.zlt.aps.maindata.service.IMdmProductInfoService;
-import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
+import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
+import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanProdFinalVo;
 import com.zlt.aps.monthplan.api.domain.vo.MdmDeviceMaintenancePlanVo;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
 import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProdFinalRemoteService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
-
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author xh
@@ -1083,7 +1070,7 @@ public class LhScheduleResultHandle {
      */
     private boolean reCalcOneMachineRemainTime(AutoLhScheduleResultContextDTO contextDTO, LhScheduleResultVo vo, List<LhScheduleResultVo> specList,
                                                LhMachineInfoVo machineVo, Date windowStart) {
-        
+
         // 1. 计算机台剩余时间
         Date windowEnd = getClassEndTime(contextDTO, vo);
         // 如果机台存在规格，则起始时间取该机台已排规格中最晚的结束时间
@@ -1720,12 +1707,12 @@ public class LhScheduleResultHandle {
         }
 
         // 2. 根据分厂和规格代号集合查询模具关系数据
-        List<MdmProductModelRelation> modelRelationList = mdmProductModelRelationService.queryBySpecCodes(specCodes,factoryCode);
+        List<MdmSkuMouldRel> modelRelationList = mdmProductModelRelationService.queryBySpecCodes(specCodes, factoryCode);
         // 构造“规格代号 -> 模具关系集合”的映射
-        Map<String, List<MdmProductModelRelation>> specToModelRelations = new HashMap<>();
-        Map<String, List<MdmProductModelRelation>> mouldToModelRelations = new HashMap<>();
+        Map<String, List<MdmSkuMouldRel>> specToModelRelations = new HashMap<>();
+        Map<String, List<MdmSkuMouldRel>> mouldToModelRelations = new HashMap<>();
         if (modelRelationList != null && !modelRelationList.isEmpty()) {
-            for (MdmProductModelRelation relation : modelRelationList) {
+            for (MdmSkuMouldRel relation : modelRelationList) {
                 String specCode = relation.getSpecCode();
                 specToModelRelations.computeIfAbsent(specCode, k -> new ArrayList<>()).add(relation);
                 mouldToModelRelations.computeIfAbsent(relation.getMouldCode(), k -> new ArrayList<>()).add(relation);
@@ -1734,7 +1721,7 @@ public class LhScheduleResultHandle {
 
         // 3. 从模具关系数据中提取所有涉及的模具编号，减少后续查询范围
         /*Set<String> mouldCodes = new HashSet<>();
-        for (MdmProductModelRelation relation : modelRelationList) {
+        for (MdmSkuMouldRel relation : modelRelationList) {
             mouldCodes.add(relation.getMouldCode());
         }*/
 
@@ -1764,11 +1751,11 @@ public class LhScheduleResultHandle {
         List<String> specCodeList = new ArrayList<>();
         specCodeList.addAll(specCodes);
         for (String specCode : specCodes) {
-            List<MdmProductModelRelation> relations = specToModelRelations.get(specCode);
+            List<MdmSkuMouldRel> relations = specToModelRelations.get(specCode);
             List<LhMoldInfoVo> availableList = new ArrayList<>();
             List<String> availableCodeList = new ArrayList<>();
             if (relations != null) {
-                for (MdmProductModelRelation relation : relations) {
+                for (MdmSkuMouldRel relation : relations) {
                     //if (availableMouldCodes.contains(relation.getMouldCode())) {
                     if (availableCodeList.indexOf(relation.getMouldCode())<0){
                         LhMoldInfoVo moldInfoVo = new LhMoldInfoVo();
@@ -1835,18 +1822,18 @@ public class LhScheduleResultHandle {
      * @param specCodeList
      * @return
      */
-    private int calcMouldShareNum(MdmProductModelRelation relation,
-                                  Map<String, List<MdmProductModelRelation>> mouldToModelRelations,
+    private int calcMouldShareNum(MdmSkuMouldRel relation,
+                                  Map<String, List<MdmSkuMouldRel>> mouldToModelRelations,
                                   List<String> specCodeList){
         if (PubUtil.isEmpty(specCodeList)){
             return 0;
         }
-        List<MdmProductModelRelation> modelRelations = mouldToModelRelations.get(relation.getMouldCode());
+        List<MdmSkuMouldRel> modelRelations = mouldToModelRelations.get(relation.getMouldCode());
         if (PubUtil.isEmpty(modelRelations)){
             return 0;
         }
         int iCount = 0;
-        for (MdmProductModelRelation rel:modelRelations){
+        for (MdmSkuMouldRel rel : modelRelations) {
             if (specCodeList.indexOf(rel.getSpecCode())>=0){
                 iCount++;
             }

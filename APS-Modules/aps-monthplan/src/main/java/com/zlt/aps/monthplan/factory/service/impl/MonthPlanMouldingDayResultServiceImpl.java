@@ -849,10 +849,10 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         List<List<MonthPlanDayResultStatisticsVo>> splitList = ScmListUtils.getSplitList(statisticsVos, 1000);
 
         // 查询共用模具情况
-        List<MdmProductModelRelation> modelRelationList = mdmProductModelRelationEntityMapper.selectSameMouldNo();
+        List<MdmSkuMouldRel> modelRelationList = mdmProductModelRelationEntityMapper.selectSameMouldNo();
         Map<String, String> modelRelationMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(modelRelationList)) {
-            modelRelationMap = modelRelationList.stream().collect(Collectors.toMap(MdmProductModelRelation::getMouldNo, MdmProductModelRelation::getEmbryoCode));
+            modelRelationMap = modelRelationList.stream().collect(Collectors.toMap(MdmSkuMouldRel::getMouldNo, MdmSkuMouldRel::getEmbryoCode));
         }
 
         for (List<MonthPlanDayResultStatisticsVo> vos : splitList) {
