@@ -115,6 +115,30 @@ public class MonthPlanManufacturingRequirementVo extends ProductionMonthPlanInit
      * 20251026 ZLT 配置的模具
      */
     private String mouldNoInfo;
+    /**
+     * 排产量？
+     */
+    private Long productionQty;
+    /**
+     *
+     */
+    private Long mouldFullQty;
+
+    private Long prodReqPlan;
+
+    private Long productionSequence;
+
+    public Long getProductionSequence() {
+        return null;
+    }
+
+    public Long getProdReqPlan(){
+        return null;
+    }
+
+    public String getIsStockUp(){
+        return "";
+    }
 
     /**
      * 判断是否为有交期计划
@@ -212,6 +236,10 @@ public class MonthPlanManufacturingRequirementVo extends ProductionMonthPlanInit
     public String getWorkWearTypeValue() {
         WorkWearTypeEnum type = WorkWearTypeEnum.getInstance(getProSize(), getMouldMethod(), getSpecifications());
         return type.getTypeValue();
+    }
+
+    public void setIsProduction(Integer isProduction){
+
     }
 
     /**

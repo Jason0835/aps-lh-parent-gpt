@@ -11,10 +11,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 排产参数对象
+ * 通用排产参数对象
  *
  * @author ZLT
- * @date 20250414
+ * @date 20251205
  */
 @Data
 public class ProductionParamConfiguration {

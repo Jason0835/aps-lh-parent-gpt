@@ -8,20 +8,24 @@ import java.util.List;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IProductionMonthPlanInitService.java
- * 描    述：IProductionMonthPlanInitService分厂月生产计划排产过程-计划初始化后端接口
- *@author zlt
- *@date 2025-03-17
- *@version 1.0
+ * 描    述：IProductionMonthPlanInitService工厂月计划初始化-业务接口定义
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 20251205
  */
-public interface IProductionMonthPlanInitService{
+public interface IProductionMonthPlanInitService {
 
     /**
-     * 列表查询
+     * 根据查询条件，获取工厂月计划排产版本对应的初始化信息
+     *
+     * @param condition
+     * @return
      */
-    List<ProductionMonthPlanInit> selectList(ProductionMonthPlanInit queryVO);
+    List<ProductionMonthPlanInit> getDataList(ProductionMonthPlanInit condition);
 }

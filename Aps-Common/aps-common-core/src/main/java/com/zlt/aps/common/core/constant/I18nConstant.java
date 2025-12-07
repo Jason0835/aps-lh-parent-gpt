@@ -1,4 +1,4 @@
-package com.zlt.aps.common.constant;
+package com.zlt.aps.common.core.constant;
 
 /**
  * 经常引用的国际化
@@ -8,7 +8,14 @@ package com.zlt.aps.common.constant;
  * @date 20251203
  */
 public class I18nConstant {
-
+    /**
+     * 国际化语言-中文
+     */
+    public static final String CHINESE = "zh_CN";
+    /**
+     * 国际化语言-英文
+     */
+    public static final String ENGLISH = "en_US";
     /**
      * 条件不可为空的国际化提示
      */
