@@ -44,27 +44,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectSupplyOrderPoolVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="year != null "> AND YEAR = #{year}</if>
-        <if test="month != null "> AND MONTH = #{month}</if>
-        <if test="productTypeCode != null  and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
-        <if test="productTypeName != null  and productTypeName != ''"> AND PRODUCT_TYPE_NAME LIKE CONCAT(CONCAT('%', #{productTypeName}), '%')</if>
-        <if test="locationType != null  and locationType != ''"> AND LOCATION_TYPE = #{locationType}</if>
         <if test="productCategory != null  and productCategory != ''"> AND PRODUCT_CATEGORY = #{productCategory}</if>
         <if test="orderType != null  and orderType != ''"> AND ORDER_TYPE = #{orderType}</if>
-        <if test="saleArea != null  and saleArea != ''"> AND SALE_AREA = #{saleArea}</if>
-        <if test="brand != null  and brand != ''"> AND BRAND = #{brand}</if>
+        <if test="saleArea != null  and saleArea != ''"> AND SALE_AREA LIKE CONCAT(CONCAT('%', #{saleArea}), '%')</if>
         <if test="productCode != null  and productCode != ''"> AND PRODUCT_CODE = #{productCode}</if>
         <if test="productDesc != null  and productDesc != ''"> AND PRODUCT_DESC = #{productDesc}</if>
-        <if test="stockQty != null "> AND STOCK_QTY = #{stockQty}</if>
-        <if test="averageSaleQtyInThreeMonth != null "> AND AVERAGE_SALE_QTY_IN_THREE_MONTH = #{averageSaleQtyInThreeMonth}</if>
-        <if test="averageSaleQtyInSixMonth != null "> AND AVERAGE_SALE_QTY_IN_SIX_MONTH = #{averageSaleQtyInSixMonth}</if>
-        <if test="deliveryFrequency != null "> AND DELIVERY_FREQUENCY = #{deliveryFrequency}</if>
-        <if test="structureFrequency != null "> AND STRUCTURE_FREQUENCY = #{structureFrequency}</if>
-        <if test="overThreeMonthStockQty != null "> AND OVER_THREE_MONTH_STOCK_QTY = #{overThreeMonthStockQty}</if>
-        <if test="overSixStockQty != null "> AND OVER_SIX_STOCK_QTY = #{overSixStockQty}</if>
-        <if test="overNightStockQty != null "> AND OVER_NIGHT_STOCK_QTY = #{overNightStockQty}</if>
-        <if test="overTwelveStockQty != null "> AND OVER_TWELVE_STOCK_QTY = #{overTwelveStockQty}</if>
-        <if test="stockLimit != null "> AND STOCK_LIMIT = #{stockLimit}</if>
     </select>
 
     <select id="selectSupplyOrderPoolById" parameterType="Long" resultMap="SupplyOrderPoolResult">
