@@ -165,5 +165,11 @@ public class MdmFinishStock extends BaseEntity {
     @TableField(value = "IS_EXCEED_TWELVE_MONTH")
     private String isExceedTwelveMonth;
 
-
+    /**
+     * 内外销
+     */
+    @Excel(name = "ui.data.column.mdmFinishStock.domesticExportSale")
+    @ApiModelProperty(value = "内外销", name = "domesticExportSale")
+    @TableField(exist = false)
+    private String domesticExportSale;
 }
