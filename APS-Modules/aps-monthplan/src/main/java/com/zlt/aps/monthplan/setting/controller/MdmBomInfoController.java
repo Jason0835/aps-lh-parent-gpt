@@ -127,7 +127,7 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
      */
     @RequiresPermissions( "maindata:mdmBomInfo:export")
     @Log(title = "BOM示方书", businessType = BusinessType.EXPORT)
-    @ApiOperation("导入数据")
+    @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody MdmBomInfo queryVO, @PathVariable("fileName") String fileName,
@@ -181,5 +181,16 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
         return "MDM0106";
     }
 
+
+    /**
+     * 抓取MES数据
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    public AjaxResult mesCapture() {
+        // TODO...
+        return AjaxResult.success();
+    }
 
 }

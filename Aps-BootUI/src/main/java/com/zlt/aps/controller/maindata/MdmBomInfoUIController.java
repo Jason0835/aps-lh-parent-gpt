@@ -209,4 +209,16 @@ public class MdmBomInfoUIController extends BaseUIController<MdmBomInfo> {
         AjaxResult ajaxResult = iMdmBomInfoService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 抓取MES数据
+     */
+    @RequiresPermissions("monthplan:mdmBomInfo:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    @ResponseBody
+    public AjaxResult mesCapture() {
+        return AjaxResult.success();
+    }
+
 }
