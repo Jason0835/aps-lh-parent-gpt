@@ -161,7 +161,7 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.rawMaterialOutboundRecord.modelName");
     }
 
     /**
