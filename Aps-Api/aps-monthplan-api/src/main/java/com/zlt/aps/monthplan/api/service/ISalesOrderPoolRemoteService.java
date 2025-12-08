@@ -51,6 +51,13 @@ public interface ISalesOrderPoolRemoteService {
 
 
     /**
+    * 批量修改同PO号的销售优先级
+    */
+    @ApiOperation("批量修改同PO号的销售优先级")
+    @PostMapping("/SalesOrderPool/editBySalCodePo")
+    AjaxResult editBySalCodePo(@RequestBody SalesOrderPool salesOrderPool);
+
+    /**
      * 删除
      */
     @ApiOperation("删除")
