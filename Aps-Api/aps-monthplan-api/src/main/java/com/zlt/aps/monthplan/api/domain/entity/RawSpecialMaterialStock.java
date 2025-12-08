@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -33,39 +34,43 @@ public class RawSpecialMaterialStock extends CommonBusiEntity{
 
      /** 工厂 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.factoryCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 物料代码 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "物料代码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 物料描述 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialDesc")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.standardLength")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "标准长", name = "standardLength")
     @TableField(value = "STANDARD_LENGTH")
     private Integer standardLength;
 
     /** 库存 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.stock")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "库存", name = "stock")
     @TableField(value = "STOCK")
     private Integer stock;
 
     /** 单位 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.unit")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;
-
-
 }
