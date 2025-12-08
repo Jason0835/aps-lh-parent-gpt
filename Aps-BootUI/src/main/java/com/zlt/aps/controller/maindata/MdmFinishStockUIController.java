@@ -170,6 +170,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmFinishStock:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -218,6 +219,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
      * @param entity   查询参数
      * @throws IOException 异常
      */
+    @RequiresPermissions("monthplan:mdmFinishStock:export4Mes")
     @ApiOperation("MES实时成品库存导出")
     @GetMapping({"/export4Mes"})
     @ResponseBody
