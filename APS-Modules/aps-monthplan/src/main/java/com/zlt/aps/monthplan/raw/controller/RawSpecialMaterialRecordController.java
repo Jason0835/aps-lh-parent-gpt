@@ -154,13 +154,27 @@ public class RawSpecialMaterialRecordController extends AbstractDocBizController
      */
     @Override
     protected void builderCondition(QueryWrapper<RawSpecialMaterialRecord> queryWrapper, RawSpecialMaterialRecord queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("rubberSpec")), "RUBBER_SPEC", queryVO.getFieldValueByFieldName("rubberSpec"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialType")), "MATERIAL_TYPE", queryVO.getFieldValueByFieldName("materialType"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("quota")), "QUOTA", queryVO.getFieldValueByFieldName("quota"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unit")), "UNIT", queryVO.getFieldValueByFieldName("unit"));
+        // 精确查询的字段
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMaterialType()), "MATERIAL_TYPE", queryVO.getMaterialType());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getQuota()), "QUOTA", queryVO.getQuota());
+
+        // 模糊查询的字段 - 建议添加 trim 去除空格
+        String rubberSpec = queryVO.getRubberSpec();
+        if (PubUtil.isNotEmpty(rubberSpec)) {
+            queryWrapper.like("RUBBER_SPEC", rubberSpec.trim());
+        }
+
+        String materialDesc = queryVO.getMaterialDesc();
+        if (PubUtil.isNotEmpty(materialDesc)) {
+            queryWrapper.like("MATERIAL_DESC", materialDesc.trim());
+        }
+
+        String unit = queryVO.getUnit();
+        if (PubUtil.isNotEmpty(unit)) {
+            queryWrapper.like("UNIT", unit.trim());
+        }
     }
 
 
@@ -168,6 +182,5 @@ public class RawSpecialMaterialRecordController extends AbstractDocBizController
     protected String getTypeCode(){
         return "RAW9005";
     }
-
 
 }

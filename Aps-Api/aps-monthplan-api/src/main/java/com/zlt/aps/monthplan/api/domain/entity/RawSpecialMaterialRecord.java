@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -34,42 +36,49 @@ public class RawSpecialMaterialRecord extends CommonBusiEntity{
 
      /** 工厂 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.factoryCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 胶料 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.rubberSpec")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "胶料", name = "rubberSpec")
     @TableField(value = "RUBBER_SPEC")
     private String rubberSpec;
 
     /** 物料编码 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 物料描述 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialDesc")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
     /** 物料类型            数据字典 biz_rawMaterial_type 01 常规产品 04 特殊材料            匹配特殊原材料，则 类型 = 04 */
-    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialType")
-    @ApiModelProperty(value = "物料类型            数据字典 biz_rawMaterial_type 01 常规产品 04 特殊材料            匹配特殊原材料，则 类型 = 04", name = "materialType")
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialType",dictType = "biz_rawMaterial_type")
+    @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
+    @ApiModelProperty(value = "物料类型")
     @TableField(value = "MATERIAL_TYPE")
     private String materialType;
 
     /** 定额 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.quota")
+    @ImportExcelValidated(required = true,  number = true, min = 0, max = 999999)
     @ApiModelProperty(value = "定额", name = "quota")
     @TableField(value = "QUOTA")
     private BigDecimal quota;
 
     /** 单位 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.unit")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;
