@@ -206,6 +206,7 @@ public class MdmAreaCapaAllocationUIController extends BaseUIController<MdmAreaC
      * @param entity 参数
      * @return 结果
      */
+    @RequiresPermissions("monthplan:mdmAreaCapaAllocation:copy")
     @PostMapping({"/copy"})
     @ApiOperation("复制")
     @ResponseBody

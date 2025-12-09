@@ -290,9 +290,9 @@ public class ProductionPlanExcelUtils {
             String realFieldName = String.format(fieldNameFormat, realDayNumber);
             excelData.setFieldValueByFieldName(realFieldName, copyData.getFieldValueByFieldName(excelFieldName));
         }
-        Integer excelStartDay = copyData.getBeginDate();
+        Integer excelStartDay = copyData.getBeginDay();
         if (null != excelStartDay) {
-            excelData.setBeginDate(dayNumberMap.get(excelStartDay));
+            excelData.setBeginDay(dayNumberMap.get(excelStartDay));
         }
         Integer excelEndDay = copyData.getEndDay();
         if (null != excelEndDay) {

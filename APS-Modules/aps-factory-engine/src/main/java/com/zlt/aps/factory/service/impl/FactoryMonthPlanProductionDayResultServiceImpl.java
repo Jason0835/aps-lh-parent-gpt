@@ -96,7 +96,7 @@ public class FactoryMonthPlanProductionDayResultServiceImpl extends ServiceImpl<
 
             monthPlanProductionDayResult.setIsImport(YesOrNoEnum.YES.getValue());
 
-            String productCode = monthPlanMouldingDayResultVo.getProductCode();
+            String productCode = monthPlanMouldingDayResultVo.getMaterialCode();
             if (requirePlanMap.containsKey(productCode)) {
                 SaleMonthPlanRequire monthPlanRequire = requirePlanMap.get(productCode);
                 Integer isDeliveryDateDue = monthPlanRequire.getIsDeliveryDateDue();

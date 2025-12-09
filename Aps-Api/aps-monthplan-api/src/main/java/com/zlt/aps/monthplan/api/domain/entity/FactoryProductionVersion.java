@@ -50,14 +50,6 @@ public class FactoryProductionVersion extends BaseEntity {
     private String productTypeCode;
 
     /**
-     * 品名
-     */
-    @Excel(name = "ui.data.column.factoryProductionVersion.productTypeName")
-    @ApiModelProperty(value = "品名", name = "productTypeName")
-    @TableField(value = "PRODUCT_TYPE_NAME")
-    private String productTypeName;
-
-    /**
      * 年份
      */
     @Excel(name = "ui.data.column.factoryProductionVersion.year")
@@ -104,6 +96,14 @@ public class FactoryProductionVersion extends BaseEntity {
     @ApiModelProperty(value = "初始化版本", name = "productionInitVersion")
     @TableField(value = "PRODUCTION_INIT_VERSION")
     private String productionInitVersion;
+
+    /**
+     * 产能分配版本号
+     */
+    @Excel(name = "ui.data.column.factoryProductionVersion.productionStVersion")
+    @ApiModelProperty(value = "产能分配版本号", name = "productionStVersion")
+    @TableField(value = "PRODUCTION_ST_VERSION")
+    private String productionStVersion;
 
     /**
      * 分厂版本

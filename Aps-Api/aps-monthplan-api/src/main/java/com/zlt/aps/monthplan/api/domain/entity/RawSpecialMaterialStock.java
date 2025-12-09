@@ -28,7 +28,6 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "特殊材料库存对象", description = "特殊材料库存对象 ")
 @Data
 @TableName(value = "T_RAW_SPECIAL_MATERIAL_STOCK")
-@KeySequence(value = "SEQ_SPECIAL_MATERIAL_STOCK")
 public class RawSpecialMaterialStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
