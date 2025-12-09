@@ -70,7 +70,7 @@ public class MdmMonCycleSchStruConf extends BaseEntity {
      * 周转月数
      */
     @ImportExcelValidated(required = true, digits = true, min = 0)
-    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.turnoverMonth")
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.turnoverMonth", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周转月数", name = "turnoverMonth")
     @TableField(value = "TURNOVER_MONTH")
     private Integer turnoverMonth;
@@ -79,7 +79,7 @@ public class MdmMonCycleSchStruConf extends BaseEntity {
      * 最低硫化机台数
      */
     @ImportExcelValidated(required = true, digits = true, min = 0)
-    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.minVulcanizingMachine")
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.minVulcanizingMachine", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最低硫化机台数", name = "minVulcanizingMachine")
     @TableField(value = "MIN_VULCANIZING_MACHINE")
     private Integer minVulcanizingMachine;
