@@ -9,7 +9,6 @@ import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.factory.utils.DateUtils;
-import com.zlt.aps.factory.utils.JsonUtils;
 import com.zlt.aps.factory.utils.MouldBaseUtils;
 import com.zlt.aps.factory.utils.ProductionProcessUtils;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
@@ -438,8 +437,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             preProductionCapacity.setPreProductionQty(preAllocation.getProductionQty());
             preProductionCapacity.setId(null);
             if (StringUtils.isNotBlank(preAllocation.getNoProductionReason())) {
-                String reason = JsonUtils.parseJsonRemark(preAllocation.getNoProductionReason(), language);
-                preProductionCapacity.setRemark(reason);
+//                String reason = JsonUtils.parseJsonRemark(preAllocation.getNoProductionReason(), language);
+//                preProductionCapacity.setRemark(reason);
             }
             Set<String> mouldCodeSet = preAllocation.getPreemptMouldCodeSet();
             if (!CollectionUtils.isEmpty(mouldCodeSet)) {
@@ -513,10 +512,10 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return;
         }
         dayList.stream().forEach(dayResult -> {
-            String mergeInfo = dayResult.getMergeInfo();
-            if (StringUtils.isNotBlank(mergeInfo)) {
-                dayResult.setMergeInfo(String.format("[%s]", mergeInfo));
-            }
+//            String mergeInfo = dayResult.getMergeInfo();
+//            if (StringUtils.isNotBlank(mergeInfo)) {
+//                dayResult.setMergeInfo(String.format("[%s]", mergeInfo));
+//            }
         });
         factoryProductionDayProductionResultService.saveBatch(dayList);
     }

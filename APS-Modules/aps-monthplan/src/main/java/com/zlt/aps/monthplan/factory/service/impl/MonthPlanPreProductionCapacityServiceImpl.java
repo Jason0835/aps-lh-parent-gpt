@@ -3,7 +3,7 @@ package com.zlt.aps.monthplan.factory.service.impl;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanPreProductionCapacity;
-import com.zlt.aps.monthplan.common.utils.JsonUtils;
+import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanPreProductionCapacityMapper;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanPreProductionCapacityService;
 import com.zlt.core.dao.basedao.BaseDao;

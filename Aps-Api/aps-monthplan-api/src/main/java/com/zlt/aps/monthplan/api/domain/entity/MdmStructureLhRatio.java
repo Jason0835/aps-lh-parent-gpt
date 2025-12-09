@@ -1,0 +1,65 @@
+package com.zlt.aps.monthplan.api.domain.entity;
+
+import lombok.Data;
+import com.ruoyi.common.core.annotation.Excel;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import com.zlt.common.annotation.EntityMapping;
+import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.zlt.common.domain.CommonBusiEntity;
+
+/**
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MdmStructureLhRatio.java
+ * 描    述：成型结构硫化配比对象 t_mdm_structure_lh_ratio
+ *@author zlt
+ *@date 2025-12-08
+ *@version 1.0
+ *
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
+ */
+
+@ApiModel(value = "成型结构硫化配比对象", description = "成型结构硫化配比对象 ")
+@Data
+@TableName(value = "T_MDM_STRUCTURE_LH_RATIO")
+public class MdmStructureLhRatio extends CommonBusiEntity {
+
+    private static final long serialVersionUID = 1L;
+
+     /** 工厂编号 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.factoryCode")
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /** 成型机类型编码 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.cxMachineTypeCode")
+    @ApiModelProperty(value = "成型机类型编码", name = "cxMachineTypeCode")
+    @TableField(value = "CX_MACHINE_TYPE_CODE")
+    private String cxMachineTypeCode;
+
+    /** 结构 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.structureName")
+    @ApiModelProperty(value = "结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
+
+    /** 最大硫化机台数 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.lhMachineMaxQty")
+    @ApiModelProperty(value = "最大硫化机台数", name = "lhMachineMaxQty")
+    @TableField(value = "LH_MACHINE_MAX_QTY")
+    private Integer lhMachineMaxQty;
+
+    /** 最大胎胚数 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.maxEmbryoQty")
+    @ApiModelProperty(value = "最大胎胚数", name = "maxEmbryoQty")
+    @TableField(value = "MAX_EMBRYO_QTY")
+    private Integer maxEmbryoQty;
+
+
+}
