@@ -113,7 +113,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
         Integer targetMonth = entity.getTargetMonth();
         List<MdmAreaCapaAllocation> targetList = selectByFactoryAndYearMonth(targetFactoryCode, targetYear, targetMonth);
         if (CollectionUtils.isNotEmpty(targetList)) {
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.targetExists"), targetYear, targetMonth), ApsConstant.APS_YES_NO_1);
+            return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.targetExists"), targetYear, targetMonth), ApsConstant.APS_YES_NO_1);
         }
         return AjaxResult.success(ApsConstant.APS_YES_NO_1);
     }
