@@ -1,14 +1,10 @@
 package com.zlt.aps.factory.domain.vo;
 
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.utils.ProductionLogUtils;
 import com.zlt.aps.monthplan.api.enums.ProductionTypeEnum;
 import lombok.Getter;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 /**
  * 排产信息对象
@@ -73,36 +69,6 @@ public class ProductionInfoVo implements Serializable {
         this.cleanMouldSubSecond = cleanMouldSubSecond;
         this.nextDaySubtractTime = nextDaySubtractTime;
         this.singleCuringTime = singleCuringTime;
-    }
-
-    /**
-     * 获取排产日真实产能预占量
-     *
-     * @param productionQty    实际能排产量
-     * @param singleCuringTime 单条硫化时间(包含间隔增加时间)
-     * @return
-     */
-    public Long getRealPreemptionQty(ProductionContext productionContext, MonthPlanManufacturingRequirementVo productionPlan, Long productionQty, BigDecimal singleCuringTime) {
-        //实际消耗时间：排产量消耗的时间 + 换规格消耗时间 + 洗模消耗时间
-        BigDecimal usedCuringTime = singleCuringTime.multiply(BigDecimal.valueOf(productionQty)).add(changeSubSecond).add(cleanMouldSubSecond);
-        if (BigDecimalUtils.safeCompare(nextDaySubtractTime, BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
-            //leftOverSecond小于0，则表示换规格、或是洗模消耗出现了跨天，则需要扣减跨天消耗
-            usedCuringTime = usedCuringTime.add(nextDaySubtractTime);
-        }
-        ProductionLogUtils.addUseCuringTimeInfo(productionContext, productionPlan, productionQty, usedCuringTime, changeSubSecond, cleanMouldSubSecond, nextDaySubtractTime);
-        return usedCuringTime.divide(singleCuringTime, 0, RoundingMode.DOWN).longValue();
-    }
-
-    /**
-     * 是否跨天扣减产能
-     *
-     * @return
-     */
-    public boolean hasCrossDaySubtractCapacity() {
-        if (null == nextDaySubtractTime) {
-            return false;
-        }
-        return nextDaySubtractTime.compareTo(BigDecimal.ZERO) < 0;
     }
 
 }

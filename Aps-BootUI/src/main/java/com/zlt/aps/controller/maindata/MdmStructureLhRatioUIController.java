@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.raw;
+package com.zlt.aps.controller.maindata;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -6,7 +6,10 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.monthplan.api.service.IMdmStructureLhRatioRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -18,10 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRatio;
-
-import com.zlt.aps.monthplan.api.service.IRawSpecialMaterialRatioRemoteService;
 import java.util.Arrays;
+import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
@@ -36,8 +37,8 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：RawSpecialMaterialRatioUIController.java
- * 描    述：特殊材料批次比例 UI控制层类：....
+ * 文件名称：MdmStructureLhRatioUIController.java
+ * 描    述：成型结构硫化配比 UI控制层类：....
  *@author zlt
  *@date 2025-12-08
  *@version 1.0
@@ -48,60 +49,89 @@ import javax.servlet.http.HttpServletResponse;
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "特殊材料批次比例")
+@Api(tags = "成型结构硫化配比")
 @Controller
-@RequestMapping("/maindata/rawSpecialMaterialRatio")
-public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpecialMaterialRatio> {
+@RequestMapping("/monthplan/mdmStructureLhRatio")
+public class MdmStructureLhRatioUIController extends BaseUIController<MdmStructureLhRatio> {
 
     @Autowired
-    private IRawSpecialMaterialRatioRemoteService iRawSpecialMaterialRatioService;
+    private IMdmStructureLhRatioRemoteService iMdmStructureLhRatioService;
+
+    private final String prefix = "aps/monthplan/mdmStructureLhRatio";
+
+    /**
+     * 跳转至主页面
+     */
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:view")
+    @GetMapping()
+    public String toIndex() {
+        return prefix + "/mdmStructureLhRatio";
+    }
+
+    /**
+     * 跳转至新增页面
+     */
+    @GetMapping("/add")
+    public String add(ModelMap mmap) {
+        mmap.put("mdmStructureLhRatio", new MdmStructureLhRatio());
+        return prefix + "/add";
+    }
+
+    /**
+     * 跳转至修改页面
+     */
+    @GetMapping("/edit/{id}")
+    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
+        mmap.put("mdmStructureLhRatio", iMdmStructureLhRatioService.getInfo(id));
+        return prefix + "/edit";
+    }
 
     /**
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("maindata:rawSpecialMaterialRatio:list")
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
-        return iRawSpecialMaterialRatioService.list(rawSpecialMaterialRatio);
+    public TableDataInfo list(MdmStructureLhRatio mdmStructureLhRatio) {
+        return iMdmStructureLhRatioService.list(mdmStructureLhRatio);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("maindata:rawSpecialMaterialRatio:edit")
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
-        if (UserConstants.NOT_UNIQUE.equals(iRawSpecialMaterialRatioService.checkUnique(rawSpecialMaterialRatio))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawSpecialMaterialRatio.checkUnique"));
+    public AjaxResult save(MdmStructureLhRatio mdmStructureLhRatio) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmStructureLhRatioService.checkUnique(mdmStructureLhRatio))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmStructureLhRatio.checkUnique"));
         }
 
-        return iRawSpecialMaterialRatioService.save(rawSpecialMaterialRatio);
+        return iMdmStructureLhRatioService.save(mdmStructureLhRatio);
     }
 
     /**
-     * 删除特殊材料批次比例
+     * 删除成型结构硫化配比
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("maindata:rawSpecialMaterialRatio:remove")
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iRawSpecialMaterialRatioService.removeByIds(Arrays.asList(arr));
+        return iMdmStructureLhRatioService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验特殊材料批次比例唯一性
+     * 校验成型结构硫化配比唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
-        return iRawSpecialMaterialRatioService.checkUnique(rawSpecialMaterialRatio);
+    public String checkUnique(MdmStructureLhRatio mdmStructureLhRatio) {
+        return iMdmStructureLhRatioService.checkUnique(mdmStructureLhRatio);
     }
 
     /**
@@ -142,24 +172,26 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<RawSpecialMaterialRatio> util = new ExcelUtil<>(RawSpecialMaterialRatio.class);
+        ExcelUtil<MdmStructureLhRatio> util = new ExcelUtil<>(MdmStructureLhRatio.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, RawSpecialMaterialRatio entity) throws IOException {
+    public void export(HttpServletResponse response, MdmStructureLhRatio entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iRawSpecialMaterialRatioService.exportData(entity,fileName);
+        byte[] excelBytes = iMdmStructureLhRatioService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
+    @RequiresPermissions("monthplan:mdmStructureLhRatio:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -173,7 +205,7 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,false);
+        AjaxResult ajaxResult = iMdmStructureLhRatioService.importData(context,false);
         return ajaxResult;
     }
 }

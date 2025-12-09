@@ -56,35 +56,6 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
     @Autowired
     private IRawMaterialOutboundRecordRemoteService iRawMaterialOutboundRecordService;
 
-    private final String prefix = "aps/mainda/rawMaterialOutboundRecord";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("mainda:rawMaterialOutboundRecord:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/rawMaterialOutboundRecord";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("rawMaterialOutboundRecord", new RawMaterialOutboundRecord());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("rawMaterialOutboundRecord", iRawMaterialOutboundRecordService.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询主表数据
      */

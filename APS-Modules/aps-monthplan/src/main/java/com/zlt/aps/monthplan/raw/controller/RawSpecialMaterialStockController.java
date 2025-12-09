@@ -155,10 +155,14 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
     protected void builderCondition(QueryWrapper<RawSpecialMaterialStock> queryWrapper, RawSpecialMaterialStock queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("standardLength")), "STANDARD_LENGTH", queryVO.getFieldValueByFieldName("standardLength"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stock")), "STOCK", queryVO.getFieldValueByFieldName("stock"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unit")), "UNIT", queryVO.getFieldValueByFieldName("unit"));
+
+        String materialDesc = queryVO.getMaterialDesc();
+        if (PubUtil.isNotEmpty(materialDesc)) {
+            queryWrapper.like("MATERIAL_DESC", materialDesc.trim());
+        }
     }
 
 
