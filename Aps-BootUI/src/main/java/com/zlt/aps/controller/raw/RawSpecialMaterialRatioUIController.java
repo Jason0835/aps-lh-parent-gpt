@@ -1,26 +1,5 @@
-package com.zlt.aps.controller.monthplan;
+package com.zlt.aps.controller.raw;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Arrays;
-
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
-
-import com.alibaba.cloud.commons.lang.StringUtils;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -28,20 +7,39 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.api.service.ISalesOrderPoolRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+
 import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRatio;
+
+import com.zlt.aps.monthplan.api.service.IRawSpecialMaterialRatioRemoteService;
+import java.util.Arrays;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：SalesOrderPoolUIController.java
- * 描    述：销售订单池 UI控制层类：....
+ * 文件名称：RawSpecialMaterialRatioUIController.java
+ * 描    述：特殊材料批次比例 UI控制层类：....
  *@author zlt
- *@date 2025-12-04
+ *@date 2025-12-08
  *@version 1.0
  *
  *  修改记录：
@@ -50,23 +48,23 @@ import lombok.extern.slf4j.Slf4j;
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "销售订单池")
+@Api(tags = "特殊材料批次比例")
 @Controller
-@RequestMapping("/monthplan/SalesOrderPool")
-public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool> {
+@RequestMapping("/maindata/rawSpecialMaterialRatio")
+public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpecialMaterialRatio> {
 
     @Autowired
-    private ISalesOrderPoolRemoteService iSalesOrderPoolService;
+    private IRawSpecialMaterialRatioRemoteService iRawSpecialMaterialRatioService;
 
-    private final String prefix = "monthplan/SalesOrderPool";
+    private final String prefix = "aps/maindata/rawSpecialMaterialRatio";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:SalesOrderPool:view")
+    @RequiresPermissions("maindata:rawSpecialMaterialRatio:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/SalesOrderPool";
+        return prefix + "/rawSpecialMaterialRatio";
     }
 
     /**
@@ -74,7 +72,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("salesOrderPool", new SalesOrderPool());
+        mmap.put("rawSpecialMaterialRatio", new RawSpecialMaterialRatio());
         return prefix + "/add";
     }
 
@@ -83,7 +81,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("salesOrderPool", iSalesOrderPoolService.getInfo(id));
+        mmap.put("rawSpecialMaterialRatio", iRawSpecialMaterialRatioService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -91,86 +89,48 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:SalesOrderPool:list")
+    @RequiresPermissions("maindata:rawSpecialMaterialRatio:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(SalesOrderPool salesOrderPool) {
-        return iSalesOrderPoolService.list(salesOrderPool);
+    public TableDataInfo list(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
+        return iRawSpecialMaterialRatioService.list(rawSpecialMaterialRatio);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:SalesOrderPool:edit")
+    @RequiresPermissions("maindata:rawSpecialMaterialRatio:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(SalesOrderPool salesOrderPool) {
-        if (UserConstants.NOT_UNIQUE.equals(iSalesOrderPoolService.checkUnique(salesOrderPool))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.salesOrderPool.checkUnique"));
+    public AjaxResult save(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
+        if (UserConstants.NOT_UNIQUE.equals(iRawSpecialMaterialRatioService.checkUnique(rawSpecialMaterialRatio))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawSpecialMaterialRatio.checkUnique"));
         }
 
-        return iSalesOrderPoolService.save(salesOrderPool);
-    }
-    
-
-
-    /**
-     * 批量修改同PO号的销售优先级
-     */
-    @ApiOperation("批量修改同PO号的销售优先级")
-    @RequiresPermissions("monthplan:SalesOrderPool:edit")
-    @PostMapping("/editBySalCodePo")
-    @ResponseBody
-    public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
-    	if (StringUtils.isEmpty(salesOrderPool.getSalCodePo())) {
-            return AjaxResult.error("请输入PO号！");	
-    	}
-    	return iSalesOrderPoolService.editBySalCodePo(salesOrderPool);
+        return iRawSpecialMaterialRatioService.save(rawSpecialMaterialRatio);
     }
 
     /**
-     * 删除销售订单池
+     * 删除特殊材料批次比例
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:SalesOrderPool:remove")
+    @RequiresPermissions("maindata:rawSpecialMaterialRatio:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iSalesOrderPoolService.removeByIds(Arrays.asList(arr));
+        return iRawSpecialMaterialRatioService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 检查SCM数据
-     */
-    @ApiOperation("检查SCM数据")
-    @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
-    @PostMapping("/checkSCMData")
-    @ResponseBody
-    public AjaxResult checkSCMData() {
-        return iSalesOrderPoolService.checkSCMData();
-    }
-    
-    /**
-     * 抓取SCM数据
-     */
-    @ApiOperation("抓取SCM数据")
-    @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
-    @PostMapping("/getSCMData")
-    @ResponseBody
-    public AjaxResult getSCMData() {
-        return iSalesOrderPoolService.getSCMData();
-    }
-
-    /**
-     * 校验销售订单池唯一性
+     * 校验特殊材料批次比例唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(SalesOrderPool salesOrderPool) {
-        return iSalesOrderPoolService.checkUnique(salesOrderPool);
+    public String checkUnique(RawSpecialMaterialRatio rawSpecialMaterialRatio) {
+        return iRawSpecialMaterialRatioService.checkUnique(rawSpecialMaterialRatio);
     }
 
     /**
@@ -211,7 +171,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<SalesOrderPool> util = new ExcelUtil<>(SalesOrderPool.class);
+        ExcelUtil<RawSpecialMaterialRatio> util = new ExcelUtil<>(RawSpecialMaterialRatio.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -220,9 +180,9 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, SalesOrderPool entity) throws IOException {
+    public void export(HttpServletResponse response, RawSpecialMaterialRatio entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iSalesOrderPoolService.exportData(entity,fileName);
+        byte[] excelBytes = iRawSpecialMaterialRatioService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -242,7 +202,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iSalesOrderPoolService.importData(context,false);
+        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,false);
         return ajaxResult;
     }
 }

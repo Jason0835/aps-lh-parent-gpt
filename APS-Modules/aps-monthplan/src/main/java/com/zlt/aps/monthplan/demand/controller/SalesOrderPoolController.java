@@ -87,6 +87,17 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     }
 
     /**
+     *  批量修改同PO号的销售优先级
+     */
+    @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @RequiresPermissions( "monthplan:SalesOrderPool:save")
+    @ApiOperation("批量修改同PO号的销售优先级")
+    @PostMapping("/editBySalCodePo")
+    public AjaxResult editBySalCodePo(@RequestBody SalesOrderPool billVO){
+        return salesOrderPoolService.editBySalCodePo(billVO);
+    }
+
+    /**
      * 删除
      */
     @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.DELETE)

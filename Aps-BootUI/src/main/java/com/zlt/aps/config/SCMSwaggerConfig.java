@@ -1,5 +1,6 @@
 package com.zlt.aps.config;
 
+import com.ruoyi.common.utils.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import springfox.documentation.builders.PathSelectors;
@@ -75,6 +76,25 @@ public class SCMSwaggerConfig {
                 .build().groupName("cx").pathMapping("/");
     }
 
+    /**
+     * 每个新模块就新建立一个Docket
+     * 每个模块单独分组
+     *
+     * @return PathSelectors.any()
+     */
+    @Bean
+    public Docket createRestApiForRaw() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.raw"))
+                .paths((s) -> {
+                    for (String pathPrefix : excludedPathPrefix) {
+                        if (StringUtils.endsWith(s, pathPrefix)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }).build().groupName("raw").pathMapping("/");
+    }
 
     /**
      * 每个新模块就新建立一个Docket
