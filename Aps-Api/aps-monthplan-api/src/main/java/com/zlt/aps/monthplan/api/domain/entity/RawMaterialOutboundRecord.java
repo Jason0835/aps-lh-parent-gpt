@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -31,7 +32,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_RAW_MATERIAL_OUTBOUND_RECORD")
 @KeySequence(value = "SEQ_MATERIAL_OUTBOUND_RECORD")
-public class RawMaterialOutboundRecord extends CommonBusiEntity{
+public class RawMaterialOutboundRecord extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -59,7 +60,7 @@ public class RawMaterialOutboundRecord extends CommonBusiEntity{
     /** 物料类型            数据字典 biz_rawMaterial_type 01 常规产品 02 特殊材料            匹配特殊原材料，则 类型 = 02 */
     @Excel(name = "ui.data.column.rawMaterialOutboundRecord.materialType")
     @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
-    @ApiModelProperty(value = "物料类型")
+    @ApiModelProperty(value = "物料类型  biz_rawMaterial_type")
     @TableField(value = "MATERIAL_TYPE")
     private String materialType;
 
@@ -74,7 +75,7 @@ public class RawMaterialOutboundRecord extends CommonBusiEntity{
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.rawMaterialOutboundRecord.outboundDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ImportExcelValidated(required = true, date = true)
-    @ApiModelProperty(value = "日期格式：YYYY-MM-DD hh:mm:ss", name = "outboundDate")
+    @ApiModelProperty(value = "出库日期", name = "outboundDate")
     @TableField(value = "OUTBOUND_DATE")
     private Date outboundDate;
 

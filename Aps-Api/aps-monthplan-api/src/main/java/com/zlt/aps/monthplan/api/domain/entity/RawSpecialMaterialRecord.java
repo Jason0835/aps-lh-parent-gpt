@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
 
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -30,7 +31,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_RAW_SPECIAL_MATERIAL_RECORD")
 @KeySequence(value = "SEQ_SPECIAL_MATERIAL_RECORD")
-public class RawSpecialMaterialRecord extends CommonBusiEntity{
+public class RawSpecialMaterialRecord extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -65,7 +66,7 @@ public class RawSpecialMaterialRecord extends CommonBusiEntity{
     /** 物料类型            数据字典 biz_rawMaterial_type 01 常规产品 04 特殊材料            匹配特殊原材料，则 类型 = 04 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialType",dictType = "biz_rawMaterial_type")
     @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
-    @ApiModelProperty(value = "物料类型")
+    @ApiModelProperty(value = "物料类型 biz_rawMaterial_type")
     @TableField(value = "MATERIAL_TYPE")
     private String materialType;
 

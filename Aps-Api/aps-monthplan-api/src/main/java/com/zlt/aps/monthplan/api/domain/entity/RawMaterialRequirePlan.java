@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -28,7 +30,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_RAW_MATERIAL_REQUIRE_PLAN")
 @KeySequence(value = "SEQ_MATERIAL_REQUIRE_PLAN")
-public class RawMaterialRequirePlan extends CommonBusiEntity{
+public class RawMaterialRequirePlan extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
