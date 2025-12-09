@@ -201,7 +201,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.SalesOrderPool.modelName");
     }
 
     /**
