@@ -55,5 +55,11 @@ public class MdmSkuStructureRef extends CommonBusiEntity{
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
+    /** 物料描述 */
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(exist = false)
+    private String materialDesc;
+
 
 }
