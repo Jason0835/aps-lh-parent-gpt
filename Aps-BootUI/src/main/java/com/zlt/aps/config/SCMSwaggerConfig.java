@@ -26,7 +26,6 @@ public class SCMSwaggerConfig {
      * 过滤某些不需要提供给前端的API接口
      */
     private static final List<String> excludedPathPrefix = Arrays.asList(
-            "/importTemplate",
             "/add",
             "/edit/{id}",
             "/exportAsync"
