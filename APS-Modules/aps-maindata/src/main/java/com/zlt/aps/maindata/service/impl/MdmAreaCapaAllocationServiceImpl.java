@@ -106,16 +106,16 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
         Integer sourceMonth = entity.getSourceMonth();
         List<MdmAreaCapaAllocation> sourceList = selectByFactoryAndYearMonth(sourceFactoryCode, sourceYear, sourceMonth);
         if (CollectionUtils.isEmpty(sourceList)) {
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.sourceNotExist"), sourceYear, sourceMonth));
+            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.sourceNotExist"), sourceYear, sourceMonth), ApsConstant.APS_YES_NO_0);
         }
         String targetFactoryCode = entity.getTargetFactoryCode();
         Integer targetYear = entity.getTargetYear();
         Integer targetMonth = entity.getTargetMonth();
         List<MdmAreaCapaAllocation> targetList = selectByFactoryAndYearMonth(targetFactoryCode, targetYear, targetMonth);
         if (CollectionUtils.isNotEmpty(targetList)) {
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.targetExists"), targetYear, targetMonth));
+            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.targetExists"), targetYear, targetMonth), ApsConstant.APS_YES_NO_1);
         }
-        return AjaxResult.success();
+        return AjaxResult.success(ApsConstant.APS_YES_NO_1);
     }
 
     private List<MdmAreaCapaAllocation> selectByFactoryAndYearMonth(String factoryCode, Integer year, Integer month) {
