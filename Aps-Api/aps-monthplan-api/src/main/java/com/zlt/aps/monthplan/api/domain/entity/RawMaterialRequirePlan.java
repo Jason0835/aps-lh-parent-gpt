@@ -29,7 +29,6 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "原材料需求计划对象", description = "原材料需求计划对象 ")
 @Data
 @TableName(value = "T_RAW_MATERIAL_REQUIRE_PLAN")
-@KeySequence(value = "SEQ_MATERIAL_REQUIRE_PLAN")
 public class RawMaterialRequirePlan extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

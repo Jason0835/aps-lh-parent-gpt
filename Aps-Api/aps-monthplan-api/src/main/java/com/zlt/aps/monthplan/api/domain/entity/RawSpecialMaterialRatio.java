@@ -29,7 +29,6 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "特殊材料批次比例对象", description = "特殊材料批次比例对象 ")
 @Data
 @TableName(value = "T_RAW_SPECIAL_MATERIAL_RATIO")
-@KeySequence(value = "SEQ_SPECIAL_MATERIAL_RATIO")
 public class RawSpecialMaterialRatio extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

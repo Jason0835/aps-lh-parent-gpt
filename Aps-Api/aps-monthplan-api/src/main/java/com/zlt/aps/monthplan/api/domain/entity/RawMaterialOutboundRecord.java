@@ -31,7 +31,6 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "原材料出库量对象", description = "原材料出库量对象 ")
 @Data
 @TableName(value = "T_RAW_MATERIAL_OUTBOUND_RECORD")
-@KeySequence(value = "SEQ_MATERIAL_OUTBOUND_RECORD")
 public class RawMaterialOutboundRecord extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
