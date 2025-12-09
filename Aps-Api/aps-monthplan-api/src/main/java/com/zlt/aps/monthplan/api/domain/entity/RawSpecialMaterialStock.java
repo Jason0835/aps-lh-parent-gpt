@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -28,7 +29,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_RAW_SPECIAL_MATERIAL_STOCK")
 @KeySequence(value = "SEQ_SPECIAL_MATERIAL_STOCK")
-public class RawSpecialMaterialStock extends CommonBusiEntity{
+public class RawSpecialMaterialStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

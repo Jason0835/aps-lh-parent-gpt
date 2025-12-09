@@ -20,7 +20,7 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 import com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan;
 
-import com.zlt.aps.maindata.api.IRawMaterialRequirePlanRemoteService;
+import com.zlt.aps.monthplan.api.service.IRawMaterialRequirePlanRemoteService;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;

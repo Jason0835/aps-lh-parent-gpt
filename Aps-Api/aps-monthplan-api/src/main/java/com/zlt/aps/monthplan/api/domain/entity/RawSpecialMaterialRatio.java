@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -28,7 +30,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_RAW_SPECIAL_MATERIAL_RATIO")
 @KeySequence(value = "SEQ_SPECIAL_MATERIAL_RATIO")
-public class RawSpecialMaterialRatio extends CommonBusiEntity{
+public class RawSpecialMaterialRatio extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -64,7 +66,7 @@ public class RawSpecialMaterialRatio extends CommonBusiEntity{
 
     /** 单位数据字典 biz_unit 01 米 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.unit")
-    @ApiModelProperty(value = "单位数据字典 biz_unit 01 米", name = "unit")
+    @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;
 
