@@ -12,6 +12,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,7 +57,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     /**
      * 查询原材料出库量列表
      */
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:list")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -73,7 +74,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
      * 保存
      */
     @Log(title = "ui.data.column.rawMaterialOutboundRecord.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:save")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -85,7 +86,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
      * 删除
      */
     @Log(title = "ui.data.column.rawMaterialOutboundRecord.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:remove")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -97,7 +98,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     /**
      * 获取原材料出库量详细信息
      */
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:query")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -112,7 +113,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:import")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:import")
     @Log(title = "ui.data.column.rawMaterialOutboundRecord.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -124,7 +125,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     /**
      * 导出列表
      */
-    @RequiresPermissions( "mainda:rawMaterialOutboundRecord:export")
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:export")
     @Log(title = "原材料出库量", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
@@ -171,6 +172,18 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     @Override
     protected String getTypeCode(){
         return "RAW9004";
+    }
+
+
+    /**
+     * MES抓取
+     */
+    @Log(title = "ui.data.column.rawMaterialOutboundRecord.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:catch")
+    @ApiOperation("MES抓取")
+    @PostMapping("/mesCatch")
+    public AjaxResult mesCatch(){
+        return AjaxResult.success();
     }
 
 
