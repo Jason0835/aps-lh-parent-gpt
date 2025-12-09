@@ -183,6 +183,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     @ApiOperation("MES抓取")
     @PostMapping("/mesCatch")
     public AjaxResult mesCatch(){
+        //todo 对接接口
         return AjaxResult.success();
     }
 
