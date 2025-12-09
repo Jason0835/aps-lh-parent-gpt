@@ -56,35 +56,6 @@ public class RawSpecialMaterialStockUIController extends BaseUIController<RawSpe
     @Autowired
     private IRawSpecialMaterialStockRemoteService iRawSpecialMaterialStockService;
 
-    private final String prefix = "aps/maindata/rawSpecialMaterialStock";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("maindata:rawSpecialMaterialStock:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/rawSpecialMaterialStock";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("rawSpecialMaterialStock", new RawSpecialMaterialStock());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("rawSpecialMaterialStock", iRawSpecialMaterialStockService.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询主表数据
      */

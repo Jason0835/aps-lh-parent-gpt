@@ -56,35 +56,6 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
     @Autowired
     private IRawSpecialMaterialRatioRemoteService iRawSpecialMaterialRatioService;
 
-    private final String prefix = "aps/maindata/rawSpecialMaterialRatio";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("maindata:rawSpecialMaterialRatio:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/rawSpecialMaterialRatio";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("rawSpecialMaterialRatio", new RawSpecialMaterialRatio());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("rawSpecialMaterialRatio", iRawSpecialMaterialRatioService.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询主表数据
      */

@@ -56,35 +56,6 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
     @Autowired
     private IRawMaterialRequirePlanRemoteService iRawMaterialRequirePlanService;
 
-    private final String prefix = "aps/maindata/rawMaterialRequirePlan";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("maindata:rawMaterialRequirePlan:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/rawMaterialRequirePlan";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("rawMaterialRequirePlan", new RawMaterialRequirePlan());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("rawMaterialRequirePlan", iRawMaterialRequirePlanService.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询主表数据
      */
