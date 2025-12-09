@@ -1,14 +1,12 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.zlt.common.annotation.EntityMapping;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -27,7 +25,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "SKU日硫化产能对象", description = "SKU日硫化产能对象 ")
 @Data
 @TableName(value = "T_MDM_SKU_LH_CAPACITY")
-public class MdmSkuLhCapacity extends CommonBusiEntity{
+public class MdmSkuLhCapacity extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
