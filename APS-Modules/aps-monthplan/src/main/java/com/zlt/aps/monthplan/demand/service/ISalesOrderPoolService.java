@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.service;
 
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
 /**
@@ -17,5 +18,10 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
-
+	/**
+	 * 批量修改同PO号的销售优先级
+	 * @param salesOrderPool
+	 * @return
+	 */
+	AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool);
 }

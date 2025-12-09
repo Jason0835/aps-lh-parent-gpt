@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -110,6 +111,22 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
         }
 
         return iSalesOrderPoolService.save(salesOrderPool);
+    }
+    
+
+
+    /**
+     * 批量修改同PO号的销售优先级
+     */
+    @ApiOperation("批量修改同PO号的销售优先级")
+    @RequiresPermissions("monthplan:SalesOrderPool:edit")
+    @PostMapping("/editBySalCodePo")
+    @ResponseBody
+    public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
+    	if (StringUtils.isEmpty(salesOrderPool.getSalCodePo())) {
+            return AjaxResult.error("请输入PO号！");	
+    	}
+    	return iSalesOrderPoolService.editBySalCodePo(salesOrderPool);
     }
 
     /**

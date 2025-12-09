@@ -3,13 +3,18 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import java.util.Collections;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -33,6 +38,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool>  implements ISalesOrderPoolService {
+	@Autowired
+	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
+	
     @Override
     protected String getDocTypeCode() {
         return "MP099";
@@ -59,4 +67,18 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
         // 唯一校验字段
         return Collections.emptyList();
     }
+    
+	/**
+	 * 批量修改同PO号的销售优先级
+	 * @param salesOrderPool
+	 * @return
+	 */
+    @Override
+    public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
+    	LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
+    	updateWrapper.eq(SalesOrderPool::getSalCodePo, salesOrderPool.getSalCodePo());
+    	updateWrapper.set(SalesOrderPool::getScmPriority, salesOrderPool.getScmPriority());
+    	salesOrderPoolEntityMapper.update(new SalesOrderPool(), updateWrapper);
+        return AjaxResult.success();
+	}
 }
