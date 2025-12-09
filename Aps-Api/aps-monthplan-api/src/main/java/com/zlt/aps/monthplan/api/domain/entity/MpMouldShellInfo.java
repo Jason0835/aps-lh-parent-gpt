@@ -23,7 +23,7 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-12-05
  */
-@ApiModel(value = "模壳台账对象", description = "模壳台账对象 ")
+@ApiModel(value = "模壳台账对象", description = "模壳台账对象")
 @Data
 @TableName(value = "T_MP_MOULD_SHELL_INFO")
 public class MpMouldShellInfo extends BaseEntity {
