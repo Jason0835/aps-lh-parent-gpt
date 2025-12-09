@@ -20,23 +20,16 @@ import lombok.Data;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-03-17
+ * @date 20251208
  */
 
 @Data
 @TableName(value = "T_MP_MOULD_PRODUCTION_LOG")
-@ApiModel(value = "分厂月度排产流程日志对象", description = "分厂月度排产流程日志对象 ")
+@ApiModel(value = "分厂月度排产流程日志对象", description = "分厂月度排产流程日志对象")
 public class MouldProductionLog extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 操作批次号
-     */
-    @Excel(name = "ui.data.column.mouldProductionLog.workNo")
-    @ApiModelProperty(value = "操作批次号", name = "workNo")
-    @TableField(value = "WORK_NO")
-    private String workNo;
     /**
      * 生产分厂编号
      */
@@ -78,19 +71,21 @@ public class MouldProductionLog extends BaseEntity {
     private String productionVersion;
 
     /**
-     * 需求计划
+     * 计划类型 01 正常 02 订单预测 03 实单模拟
      */
-    @Excel(name = "ui.data.column.mouldProductionLog.monthPlanId")
-    @ApiModelProperty(value = "需求计划", name = "monthPlanId")
-    @TableField(value = "MONTH_PLAN_ID")
-    private Long monthPlanId;
+    @Excel(name = "ui.data.column.cxCapacity.planType", dictType = "biz_plan_type")
+    @ApiModelProperty(value = "计划类型", name = "planType")
+    @TableField(value = "PLAN_TYPE")
+    private String planType;
 
     /**
-     * 物料编号
+     * 操作批次号
      */
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(exist = false)
-    private String productCode;
+    @Excel(name = "ui.data.column.mouldProductionLog.workNo")
+    @ApiModelProperty(value = "操作批次号", name = "workNo")
+    @TableField(value = "WORK_NO")
+    private String workNo;
+
     /**
      * 日志类型 1 初始化 2 排产顺序分组 3 单计划排产 4 单计划交期排产 5 单计划通用排产 6 同模具交期分组排产 7 同规格分组排产 8 同模具无交期分组排产
      */
@@ -106,5 +101,19 @@ public class MouldProductionLog extends BaseEntity {
     @ApiModelProperty(value = "日志内容", name = "logContent")
     @TableField(value = "LOG_CONTENT")
     private String logContent;
+
+    /**
+     * 需求计划
+     */
+    @ApiModelProperty(value = "需求计划", name = "monthPlanId")
+    @TableField(exist = false)
+    private Long monthPlanId;
+
+    /**
+     * 物料编号
+     */
+    @ApiModelProperty(value = "物料编号", name = "productCode")
+    @TableField(exist = false)
+    private String productCode;
 
 }

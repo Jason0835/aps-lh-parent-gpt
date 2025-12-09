@@ -453,7 +453,6 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (!CollectionUtils.isEmpty(saleOrderList)) {
             MonthPlanSaleOrder saleOrder = saleOrderList.get(0);
             version.setProductTypeCode(saleOrder.getProductTypeCode());
-            version.setProductTypeName(saleOrder.getProductTypeName());
         }
         factoryProductionVersionMapper.insert(version);
     }

@@ -293,7 +293,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             itemFinal.setId(null);
             itemFinal.setBaseVale(null);
             finalList.add(itemFinal);
-            locationTypeMap.put(itemResult.getProductCode(), itemResult.getLocationType());
+//            locationTypeMap.put(itemResult.getProductCode(), itemResult.getLocationType());
         }
         // 插入最终排产表
         baseDao.insertBatch(finalList);

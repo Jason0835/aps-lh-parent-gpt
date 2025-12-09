@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.common.utils;
+package com.tlt.aps.utils;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -16,6 +16,7 @@ import java.util.Locale;
 
 /**
  * 不排产原因等含有国际化信息的解析
+ * 迁移到aps-base模块
  *
  * @author ZLT
  * @version 1.0

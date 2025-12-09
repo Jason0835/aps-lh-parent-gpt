@@ -24,8 +24,6 @@ import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.service.IFactoryMonthPlanProductionDayResultService;
-import com.zlt.aps.factory.utils.MouldUtils;
-import com.zlt.aps.factory.utils.ProductUtils;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -205,14 +203,14 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             }
 
             // 生产实际排产量 > 0 ，模具数不能 <= 0
-            if (item.getTotalQty() > 0 && item.getMouldQty() <= 0) {
+            if (item.getTotalQty() > 0 && item.getTypeBlockQty() <= 0) {
                 failureNum++;
                 addImportErrorLog(importLogId, errorNum, totalQtyCheck, importErrorLogs);
                 continue;
             }
 
             // 开始不能大于结束时间，结束时间不能大于月份最大天数
-            if (item.getBeginDate() > item.getEndDay()) {
+            if (item.getBeginDay() > item.getEndDay()) {
                 failureNum++;
                 addImportErrorLog(importLogId, errorNum, endDayCheck, importErrorLogs);
                 continue;
@@ -227,21 +225,21 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
 
 
             // 物料信息不存在跳过
-            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
-            if (productInfo == null) {
-                failureNum++;
-                addImportErrorLog(importLogId, errorNum, productCodeNotExist, importErrorLogs);
-                continue;
-            }
-            item.setProductDesc(productInfo.getMaterialDesc());
-            item.setProSize(productInfo.getProSize());
-            item.setSpecifications(productInfo.getSpecifications());
-            item.setPattern(productInfo.getPattern());
-            item.setHierarchy(productInfo.getHierarchy());
-            item.setProductTypeCode(productInfo.getProductTypeCode());
-            item.setProductTypeName(productInfo.getProductTypeName());
-            item.setBrand(productInfo.getBrand());
-            item.setIsImport(Constant.TRUE);
+//            MdmMaterialInfo productInfo = productInfoMap.get(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()));
+//            if (productInfo == null) {
+//                failureNum++;
+//                addImportErrorLog(importLogId, errorNum, productCodeNotExist, importErrorLogs);
+//                continue;
+//            }
+//            item.setProductDesc(productInfo.getMaterialDesc());
+//            item.setProSize(productInfo.getProSize());
+//            item.setSpecifications(productInfo.getSpecifications());
+//            item.setPattern(productInfo.getPattern());
+//            item.setHierarchy(productInfo.getHierarchy());
+//            item.setProductTypeCode(productInfo.getProductTypeCode());
+//            item.setProductTypeName(productInfo.getProductTypeName());
+//            item.setBrand(productInfo.getBrand());
+//            item.setIsImport(Constant.TRUE);
 
             importList.add(item);
         }
@@ -317,7 +315,8 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         if (isFinal(factoryCode, year, month)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.checkFinal"));
         }
-        String productCode = productionPlan.getProductCode();
+//        String productCode = productionPlan.getProductCode();
+        String productCode = "productionPlan.getProductCode()";
         boolean isChangeSpecCode = productionPlan.getHasChangeSpecCode();
         if (!isChangeSpecCode) {
             String errorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.noChangeSpecCode");
@@ -486,13 +485,13 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         }
 
         LambdaQueryWrapper<MonthPlanMouldingDayResult> wrapper = LambdaWrapperBuilder.buildWrapperByFunction(importList,
-                MonthPlanMouldingDayResult::getProductionVersion,
-                MonthPlanMouldingDayResult::getProductCode,
-                MonthPlanMouldingDayResult::getLocationType,
-                MonthPlanMouldingDayResult::getBrand,
-                MonthPlanMouldingDayResult::getChannel,
-                MonthPlanMouldingDayResult::getIsDeliveryDate,
-                MonthPlanMouldingDayResult::getSpecCode
+                MonthPlanMouldingDayResult::getProductionVersion
+//                MonthPlanMouldingDayResult::getProductCode,
+//                MonthPlanMouldingDayResult::getLocationType,
+//                MonthPlanMouldingDayResult::getBrand,
+//                MonthPlanMouldingDayResult::getChannel,
+//                MonthPlanMouldingDayResult::getIsDeliveryDate,
+//                MonthPlanMouldingDayResult::getSpecCode
         );
         List<MonthPlanMouldingDayResult> oldList = baseMapper.selectList(wrapper);
         Map<String, Long> oldMap = oldList.stream().collect(Collectors.toMap(keyFunc, MonthPlanMouldingDayResult::getId, (v1, v2) -> v1));
@@ -543,7 +542,6 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             FactoryProductionVersion newVersion = new FactoryProductionVersion();
             newVersion.setFactoryCode(itemResult.getFactoryCode());
             newVersion.setProductTypeCode(itemResult.getProductTypeCode());
-            newVersion.setProductTypeName(itemResult.getProductTypeName());
             newVersion.setYear(itemResult.getYear());
             newVersion.setMonth(itemResult.getMonth());
             newVersion.setMonthPlanVersion(itemResult.getMonthPlanVersion());
@@ -575,7 +573,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             return new HashMap<>();
         }
         List<String> factoryCodeList = list.stream().map(MonthPlanMouldingDayResult::getFactoryCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        List<String> productCodeList = list.stream().map(MonthPlanMouldingDayResult::getProductCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
+        List<String> productCodeList = list.stream().map(MonthPlanMouldingDayResult::getMaterialCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
         if (CollectionUtils.isEmpty(factoryCodeList) && CollectionUtils.isEmpty(productCodeList)) {
             return Collections.emptyMap();
         }
@@ -667,9 +665,9 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         List<Integer> daySortList = ProductionPlanExcelUtils.getCycleDayList(version);
         Integer monthMaxDays = daySortList.size();
         resultData.stream().forEach(queryData -> {
-            Integer startDay = queryData.getBeginDate();
+            Integer startDay = queryData.getBeginDay();
             if (null != startDay && startDay <= monthMaxDays) {
-                queryData.setBeginDate(daySortList.get(startDay - BigDecimal.ONE.intValue()));
+                queryData.setBeginDay(daySortList.get(startDay - BigDecimal.ONE.intValue()));
             }
             Integer endDay = queryData.getEndDay();
             if (null != endDay && endDay <= monthMaxDays) {
@@ -680,7 +678,6 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
 
     @Autowired
     private IFactoryParamService factoryParamService;
-
 
 
     /**
@@ -875,9 +872,11 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
                 if (requirementVo.getCuringTime() == null) {
                     requirementVo.setCuringTime(BigDecimal.ZERO);
                 }
-                BigDecimal singleCuringTime = ProductUtils.getSingleCuringTime(requirementVo, productionContext);
-                // 计算硫化产能
-                Long singleMouldCapacity = MouldUtils.getSingleMouldCapacity(productionContext, singleCuringTime);
+//                BigDecimal singleCuringTime = ProductUtils.getSingleCuringTime(requirementVo, productionContext);
+//                // 计算硫化产能
+//                Long singleMouldCapacity = MouldUtils.getSingleMouldCapacity(productionContext, singleCuringTime);
+                BigDecimal singleCuringTime = BigDecimal.ZERO;
+                Long singleMouldCapacity = BigDecimal.ZERO.longValue();
                 Long remainingQty = resultVo.getRemainingQty();
                 resultVo.setNeedProductionDay(BigDecimalUtils.div(totalProductQty, singleMouldCapacity).longValue());
                 resultVo.setRemainingProductionDay(BigDecimalUtils.div(remainingQty, singleMouldCapacity).longValue());
@@ -926,7 +925,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
                 if (StringUtils.isNotBlank(reason)) {
                     if (reason.contains("|")) {
                         String[] split = reason.split("\\|");
-                         List<String> reasonList = new ArrayList<>(split.length);
+                        List<String> reasonList = new ArrayList<>(split.length);
                         for (String reasonI18n : split) {
                             String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
                             reasonList.add(convertValue);
