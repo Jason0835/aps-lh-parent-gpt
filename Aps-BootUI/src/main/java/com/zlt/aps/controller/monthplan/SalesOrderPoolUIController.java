@@ -116,11 +116,11 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
 
 
     /**
-     * 修改或新增
+     * 批量修改同PO号的销售优先级
      */
     @ApiOperation("批量修改同PO号的销售优先级")
     @RequiresPermissions("monthplan:SalesOrderPool:edit")
-    @PostMapping("/save")
+    @PostMapping("/editBySalCodePo")
     @ResponseBody
     public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
     	if (StringUtils.isEmpty(salesOrderPool.getSalCodePo())) {
