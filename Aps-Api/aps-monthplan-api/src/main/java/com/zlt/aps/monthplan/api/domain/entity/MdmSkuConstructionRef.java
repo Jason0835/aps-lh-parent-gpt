@@ -74,7 +74,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private String productionVersion;
 
     /** 成型法 */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldMethod")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldMethod", dictType = "molding_method")
     @ApiModelProperty(value = "成型法", name = "mouldMethod")
     @TableField(value = "MOULD_METHOD")
     private String mouldMethod;
