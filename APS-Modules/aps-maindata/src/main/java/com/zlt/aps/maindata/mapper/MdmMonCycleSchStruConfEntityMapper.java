@@ -1,8 +1,11 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,4 +24,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmMonCycleSchStruConfEntityMapper extends CommBaseMapper<MdmMonCycleSchStruConf> {
 
+    /**
+     * 查询月周期排产结构配置
+     *
+     * @param mdmCycleSchStruConf 查询参数
+     * @return 结果
+     */
+    List<MdmMonCycleSchStruConf> selectMonthCycleSchStruConf(MdmCycleSchStruConf mdmCycleSchStruConf);
 }
