@@ -49,7 +49,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
 
     private final String prefix = "aps/monthplan/mpMouldShellInfo";
     @Autowired
-    private IMdmMouldShellInfoRemoteService iMpMouldShellInfoService;
+    private IMdmMouldShellInfoRemoteService iMdmMouldShellInfoService;
 
     /**
      * 跳转至主页面
@@ -74,7 +74,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mpMouldShellInfo", iMpMouldShellInfoService.getInfo(id));
+        mmap.put("mpMouldShellInfo", iMdmMouldShellInfoService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -86,7 +86,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MdmMouldShellInfo mdmMouldShellInfo) {
-        return iMpMouldShellInfoService.list(mdmMouldShellInfo);
+        return iMdmMouldShellInfoService.list(mdmMouldShellInfo);
     }
 
     /**
@@ -97,11 +97,11 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MdmMouldShellInfo mdmMouldShellInfo) {
-        if (UserConstants.NOT_UNIQUE.equals(iMpMouldShellInfoService.checkUnique(mdmMouldShellInfo))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mpMouldShellInfo.notUnique"));
+        if (UserConstants.NOT_UNIQUE.equals(iMdmMouldShellInfoService.checkUnique(mdmMouldShellInfo))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmMouldShellInfo.notUnique"));
         }
 
-        return iMpMouldShellInfoService.save(mdmMouldShellInfo);
+        return iMdmMouldShellInfoService.save(mdmMouldShellInfo);
     }
 
     /**
@@ -113,7 +113,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMpMouldShellInfoService.removeByIds(Arrays.asList(arr));
+        return iMdmMouldShellInfoService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -123,7 +123,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @PostMapping("/checkUnique")
     @ResponseBody
     public String checkUnique(MdmMouldShellInfo mdmMouldShellInfo) {
-        return iMpMouldShellInfoService.checkUnique(mdmMouldShellInfo);
+        return iMdmMouldShellInfoService.checkUnique(mdmMouldShellInfo);
     }
 
     /**
@@ -155,7 +155,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mpMouldShellInfo.modelName");
+        return I18nUtil.getMessage("ui.data.column.mdmMouldShellInfo.modelName");
     }
 
     /**
@@ -176,7 +176,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @Override
     public void export(HttpServletResponse response, MdmMouldShellInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMpMouldShellInfoService.exportData(entity, fileName);
+        byte[] excelBytes = iMdmMouldShellInfoService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -196,7 +196,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpMouldShellInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmMouldShellInfoService.importData(context, false);
         return ajaxResult;
     }
 
@@ -208,6 +208,6 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
     @PostMapping("/mesCapture")
     @ResponseBody
     public AjaxResult mesCapture() {
-        return iMpMouldShellInfoService.mesCapture();
+        return iMdmMouldShellInfoService.mesCapture();
     }
 }
