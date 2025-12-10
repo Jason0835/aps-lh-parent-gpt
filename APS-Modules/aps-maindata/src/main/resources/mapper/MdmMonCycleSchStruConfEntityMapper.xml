@@ -4,4 +4,30 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper">
 
+    <select id="selectMonthCycleSchStruConf"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf">
+        SET
+        @genYear =
+        #{year};
+        SET
+        @genMonth =
+        #{month};
+
+        SELECT cssc.FACTORY_CODE,
+               @genYear  AS `YEAR`,
+               @genMonth AS `MONTH`,
+               cssc.STRUCTURE_NAME,
+               cssc.TURNOVER_MONTH,
+               cssc.MIN_VULCANIZING_MACHINE
+        FROM T_MDM_CYCLE_SCH_STRU_CONF cssc
+        WHERE cssc.IS_DELETE = 0
+          AND EXISTS(SELECT 1
+                     FROM T_MP_MONTH_PLAN_PROD_FINAL a
+                     WHERE a.IS_DELETE = 0
+                       AND a.FACTORY_CODE = cssc.FACTORY_CODE
+                       AND a.STRUCTURE_NAME = cssc.STRUCTURE_NAME
+                       AND a.`YEAR` = @genYear
+                       AND a.`MONTH` &gt;= @genMonth - cssc.TURNOVER_MONTH)
+    </select>
+
 </mapper>

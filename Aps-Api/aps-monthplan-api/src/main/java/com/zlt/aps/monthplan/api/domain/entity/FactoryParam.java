@@ -11,7 +11,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：FactoryParam.java
- * 描    述：系统参数（排产设定）对象 t_mdm_factory_param
+ * 描    述：系统参数（排产设定）对象 T_MP_FACTORY_PARAM
  *
  * @author ZLT
  * @version 1.0
@@ -22,9 +22,8 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-02-20
  */
-
 @Data
-@TableName(value = "T_MDM_FACTORY_PARAM")
+@TableName(value = "T_MP_FACTORY_PARAM")
 @ApiModel(value = "系统参数（排产设定）对象", description = "系统参数（排产设定）对象 ")
 public class FactoryParam extends BaseEntity {
 

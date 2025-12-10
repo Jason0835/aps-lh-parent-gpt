@@ -34,19 +34,19 @@ public class SalesOrderPool extends BaseEntity{
     private static final long serialVersionUID = 1L;
 
      /** 工厂编码 默认116 */
-    @Excel(name = "ui.data.column.SalesOrderPool.factoryCode")
+    @Excel(name = "ui.data.column.SalesOrderPool.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编码 默认116", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 产品品类，数据字典：biz_product_type，TBR 全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.SalesOrderPool.productType")
+    @Excel(name = "ui.data.column.SalesOrderPool.productType", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类，数据字典：biz_product_type，TBR 全钢 PCR 半钢", name = "productType")
     @TableField(value = "PRODUCT_TYPE")
     private String productType;
 
     /** 订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单 */
-    @Excel(name = "ui.data.column.SalesOrderPool.orderPriority")
+    @Excel(name = "ui.data.column.SalesOrderPool.orderPriority", dictType = "biz_order_type")
     @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单", name = "orderPriority")
     @TableField(value = "ORDER_PRIORITY")
     private String orderPriority;
@@ -137,7 +137,7 @@ public class SalesOrderPool extends BaseEntity{
     private String eudr;
 
     /** 发货模式，数据字典：biz_deliver_goods_type，01 分批交货 02 整单发货 */
-    @Excel(name = "ui.data.column.SalesOrderPool.deliverGoodsType")
+    @Excel(name = "ui.data.column.SalesOrderPool.deliverGoodsType", dictType = "biz_deliver_goods_type")
     @ApiModelProperty(value = "发货模式，数据字典：biz_deliver_goods_type，01 分批交货 02 整单发货", name = "deliverGoodsType")
     @TableField(value = "DELIVER_GOODS_TYPE")
     private String deliverGoodsType;
