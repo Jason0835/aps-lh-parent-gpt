@@ -43,7 +43,7 @@ public class MdmMouldShellInfo extends BaseEntity {
      * 模套型号
      */
     @ImportExcelValidated(required = true, maxLength = 30)
-    @Excel(name = "ui.data.column.mdmMouldShellInfo.moldModelCode", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.mdmMouldShellInfo.moldModelCode")
     @ApiModelProperty(value = "模套型号", name = "moldModelCode")
     @TableField(value = "MOLD_MODEL_CODE")
     private String moldModelCode;
