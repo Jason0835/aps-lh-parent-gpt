@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -19,6 +19,6 @@ import org.apache.ibatis.annotations.Mapper;
  * @date 2025-12-05
  */
 @Mapper
-public interface MpMouldShellInfoEntityMapper extends CommBaseMapper<MpMouldShellInfo> {
+public interface MdmMouldShellInfoEntityMapper extends CommBaseMapper<MdmMouldShellInfo> {
 
 }

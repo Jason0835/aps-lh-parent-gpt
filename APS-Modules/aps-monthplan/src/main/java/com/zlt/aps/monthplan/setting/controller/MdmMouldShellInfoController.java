@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.mapper.MpMouldShellInfoEntityMapper;
-import com.zlt.aps.maindata.service.IMpMouldShellInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
+import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
+import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -41,13 +41,13 @@ import java.util.List;
 @Api(tags = "模壳台账")
 @RestController
 @RequestMapping("/mpMouldShellInfo")
-public class MpMouldShellInfoController extends AbstractDocBizController<MpMouldShellInfo> {
+public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMouldShellInfo> {
 
     @Autowired
-    private IMpMouldShellInfoService mpMouldShellInfoService;
+    private IMdmMouldShellInfoService mpMouldShellInfoService;
 
     @Autowired
-    private MpMouldShellInfoEntityMapper entityMapper;
+    private MdmMouldShellInfoEntityMapper entityMapper;
 
     /**
      * 查询模壳台账列表
@@ -56,7 +56,7 @@ public class MpMouldShellInfoController extends AbstractDocBizController<MpMould
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody MpMouldShellInfo queryVO) {
+    public TableDataInfo list(@RequestBody MdmMouldShellInfo queryVO) {
         return super.list(queryVO);
     }
 
@@ -73,7 +73,7 @@ public class MpMouldShellInfoController extends AbstractDocBizController<MpMould
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MpMouldShellInfo billVO) {
+    public AjaxResult save(@RequestBody MdmMouldShellInfo billVO) {
         return super.save(billVO);
     }
 
@@ -97,7 +97,7 @@ public class MpMouldShellInfoController extends AbstractDocBizController<MpMould
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
-    public MpMouldShellInfo getInfo(@PathVariable("billId") Long billId) {
+    public MdmMouldShellInfo getInfo(@PathVariable("billId") Long billId) {
         return super.getInfo(billId);
     }
 
@@ -126,14 +126,14 @@ public class MpMouldShellInfoController extends AbstractDocBizController<MpMould
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody MpMouldShellInfo queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody MdmMouldShellInfo queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<MpMouldShellInfo> listExportData(MpMouldShellInfo obj) {
-        QueryWrapper<MpMouldShellInfo> wrapper = new QueryWrapper<>();
+    protected List<MdmMouldShellInfo> listExportData(MdmMouldShellInfo obj) {
+        QueryWrapper<MdmMouldShellInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         return entityMapper.selectList(wrapper);
     }
@@ -150,7 +150,7 @@ public class MpMouldShellInfoController extends AbstractDocBizController<MpMould
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<MpMouldShellInfo> queryWrapper, MpMouldShellInfo queryVO) {
+    protected void builderCondition(QueryWrapper<MdmMouldShellInfo> queryWrapper, MdmMouldShellInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldModelCode")), "MOLD_MODEL_CODE", queryVO.getFieldValueByFieldName("moldModelCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qty")), "QTY", queryVO.getFieldValueByFieldName("qty"));

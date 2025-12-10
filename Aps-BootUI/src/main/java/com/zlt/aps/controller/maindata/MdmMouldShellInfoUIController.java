@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
-import com.zlt.aps.monthplan.api.service.IMpMouldShellInfoRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
+import com.zlt.aps.monthplan.api.service.IMdmMouldShellInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -45,11 +45,11 @@ import java.util.Arrays;
 @Api(tags = "模壳台账")
 @Controller
 @RequestMapping("/monthplan/mpMouldShellInfo")
-public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellInfo> {
+public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShellInfo> {
 
     private final String prefix = "aps/monthplan/mpMouldShellInfo";
     @Autowired
-    private IMpMouldShellInfoRemoteService iMpMouldShellInfoService;
+    private IMdmMouldShellInfoRemoteService iMpMouldShellInfoService;
 
     /**
      * 跳转至主页面
@@ -65,7 +65,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mpMouldShellInfo", new MpMouldShellInfo());
+        mmap.put("mpMouldShellInfo", new MdmMouldShellInfo());
         return prefix + "/add";
     }
 
@@ -85,8 +85,8 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @RequiresPermissions("monthplan:mpMouldShellInfo:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MpMouldShellInfo mpMouldShellInfo) {
-        return iMpMouldShellInfoService.list(mpMouldShellInfo);
+    public TableDataInfo list(MdmMouldShellInfo mdmMouldShellInfo) {
+        return iMpMouldShellInfoService.list(mdmMouldShellInfo);
     }
 
     /**
@@ -96,12 +96,12 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @RequiresPermissions("monthplan:mpMouldShellInfo:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MpMouldShellInfo mpMouldShellInfo) {
-        if (UserConstants.NOT_UNIQUE.equals(iMpMouldShellInfoService.checkUnique(mpMouldShellInfo))) {
+    public AjaxResult save(MdmMouldShellInfo mdmMouldShellInfo) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpMouldShellInfoService.checkUnique(mdmMouldShellInfo))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mpMouldShellInfo.notUnique"));
         }
 
-        return iMpMouldShellInfoService.save(mpMouldShellInfo);
+        return iMpMouldShellInfoService.save(mdmMouldShellInfo);
     }
 
     /**
@@ -122,8 +122,8 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MpMouldShellInfo mpMouldShellInfo) {
-        return iMpMouldShellInfoService.checkUnique(mpMouldShellInfo);
+    public String checkUnique(MdmMouldShellInfo mdmMouldShellInfo) {
+        return iMpMouldShellInfoService.checkUnique(mdmMouldShellInfo);
     }
 
     /**
@@ -165,7 +165,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MpMouldShellInfo> util = new ExcelUtil<>(MpMouldShellInfo.class);
+        ExcelUtil<MdmMouldShellInfo> util = new ExcelUtil<>(MdmMouldShellInfo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -174,7 +174,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MpMouldShellInfo entity) throws IOException {
+    public void export(HttpServletResponse response, MdmMouldShellInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMpMouldShellInfoService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
