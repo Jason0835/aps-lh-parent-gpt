@@ -199,4 +199,17 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
         AjaxResult ajaxResult = iMpMouldDeliveryPlanService.importData(context, false);
         return ajaxResult;
     }
+
+    /**
+     * 根据计划发货日期获取计划上机日期
+     *
+     * @param entity 计划发货日期
+     * @return 结果
+     */
+    @ApiOperation("根据计划发货日期获取计划上机日期")
+    @PostMapping({"/getBoardingDate"})
+    @ResponseBody
+    public AjaxResult getBoardingDate(MpMouldDeliveryPlan entity) {
+        return iMpMouldDeliveryPlanService.getBoardingDate(entity);
+    }
 }

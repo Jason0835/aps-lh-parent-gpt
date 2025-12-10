@@ -164,11 +164,20 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
         queryWrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("boardingDateEndTime")), "BOARDING_DATE", queryVO.getFieldValueByFieldName("boardingDateEndTime"));
     }
 
-
     @Override
     protected String getTypeCode() {
         return "MP0203";
     }
 
-
+    /**
+     * 根据计划发货日期获取计划上机日期
+     *
+     * @param entity 计划发货日期
+     * @return 结果
+     */
+    @ApiOperation("根据计划发货日期获取计划上机日期")
+    @PostMapping("/getBoardingDate")
+    public AjaxResult getBoardingDate(@RequestBody MpMouldDeliveryPlan entity) {
+        return mpMouldDeliveryPlanService.getBoardingDate(entity);
+    }
 }
