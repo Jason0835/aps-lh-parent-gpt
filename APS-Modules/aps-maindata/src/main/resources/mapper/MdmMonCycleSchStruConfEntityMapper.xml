@@ -21,13 +21,15 @@
                cssc.MIN_VULCANIZING_MACHINE
         FROM T_MDM_CYCLE_SCH_STRU_CONF cssc
         WHERE cssc.IS_DELETE = 0
-          AND EXISTS(SELECT 1
-                     FROM T_MP_MONTH_PLAN_PROD_FINAL a
-                     WHERE a.IS_DELETE = 0
-                       AND a.FACTORY_CODE = cssc.FACTORY_CODE
-                       AND a.STRUCTURE_NAME = cssc.STRUCTURE_NAME
-                       AND a.`YEAR` = @genYear
-                       AND a.`MONTH` &gt;= @genMonth - cssc.TURNOVER_MONTH)
+          AND EXISTS (SELECT 1
+                      FROM T_MP_MONTH_PLAN_PROD_FINAL a
+                      WHERE a.IS_DELETE = 0
+                      GROUP BY a.FACTORY_CODE, a.STRUCTURE_NAME
+                      HAVING a.FACTORY_CODE = cssc.FACTORY_CODE
+                         AND a.STRUCTURE_NAME = cssc.STRUCTURE_NAME
+                         AND MAX(a.`YEAR_MONTH`) >= DATE_FORMAT(
+                              DATE_SUB(CONCAT(@genYear, '-', @genMonth, '-01'), INTERVAL cssc.TURNOVER_MONTH MONTH),
+                              '%Y%m'))
     </select>
 
 </mapper>
