@@ -206,6 +206,7 @@ public class MdmCycleSchStruConfUIController extends BaseUIController<MdmCycleSc
      * @param mdmCycleSchStruConf 参数
      * @return 结果
      */
+    @RequiresPermissions("monthplan:mdmCycleSchStruConf:genMonthCycleSchStruConf")
     @ApiOperation("生成月周期排产结构配置")
     @PostMapping({"/genMonthCycleSchStruConf"})
     @ResponseBody
