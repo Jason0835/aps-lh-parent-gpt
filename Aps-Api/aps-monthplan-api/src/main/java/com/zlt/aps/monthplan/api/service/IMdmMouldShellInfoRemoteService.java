@@ -4,7 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -25,22 +25,22 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-05
  */
-@FeignClient(contextId = "IMpMouldShellInfoRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
-public interface IMpMouldShellInfoRemoteService {
+@FeignClient(contextId = "IMdmMouldShellInfoRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
+public interface IMdmMouldShellInfoRemoteService {
 
     /**
      * 查询列表
      */
     @ApiOperation("查询列表")
     @PostMapping("/mpMouldShellInfo/list")
-    TableDataInfo list(@RequestBody MpMouldShellInfo QueryVO);
+    TableDataInfo list(@RequestBody MdmMouldShellInfo QueryVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
     @PostMapping("/mpMouldShellInfo/save")
-    AjaxResult save(@RequestBody MpMouldShellInfo mpMouldShellInfo);
+    AjaxResult save(@RequestBody MdmMouldShellInfo mdmMouldShellInfo);
 
 
     /**
@@ -55,21 +55,21 @@ public interface IMpMouldShellInfoRemoteService {
      */
     @ApiOperation("根据ID获取详细信息")
     @GetMapping(value = "/mpMouldShellInfo/{id}")
-    MpMouldShellInfo getInfo(@PathVariable("id") Long id);
+    MdmMouldShellInfo getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/mpMouldShellInfo/checkUnique")
-    String checkUnique(@RequestBody MpMouldShellInfo mpMouldShellInfoVO);
+    String checkUnique(@RequestBody MdmMouldShellInfo mdmMouldShellInfoVO);
 
     /**
      * 导出模壳台账列表
      */
     @ApiOperation("导出列表")
     @PostMapping("/mpMouldShellInfo/exportData/{fileName}")
-    byte[] exportData(@RequestBody MpMouldShellInfo queryVO, @PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody MdmMouldShellInfo queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入模壳台账数据

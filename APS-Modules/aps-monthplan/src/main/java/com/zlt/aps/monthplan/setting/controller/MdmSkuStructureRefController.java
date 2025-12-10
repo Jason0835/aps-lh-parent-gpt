@@ -1,12 +1,15 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -62,8 +65,22 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmSkuStructureRef queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        try {
+            QueryFormulaUtil.execFormula(tableDataInfo.getRows(), this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        return tableDataInfo;
     }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "materialDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, materialCode)"
+        };
+    }
+
 
     @Override
     protected String getOrderBy() {

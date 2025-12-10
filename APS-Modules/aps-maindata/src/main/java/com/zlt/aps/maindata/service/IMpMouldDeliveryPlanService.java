@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMouldDeliveryPlan;
 import com.zlt.bill.common.service.IDocService;
 
@@ -19,4 +20,11 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpMouldDeliveryPlanService extends IDocService<MpMouldDeliveryPlan> {
 
+    /**
+     * 根据计划发货日期获取计划上机日期
+     *
+     * @param entity 计划发货日期
+     * @return 结果
+     */
+    AjaxResult getBoardingDate(MpMouldDeliveryPlan entity);
 }

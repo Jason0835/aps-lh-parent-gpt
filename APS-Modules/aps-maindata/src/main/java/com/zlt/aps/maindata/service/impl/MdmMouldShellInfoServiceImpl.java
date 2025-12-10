@@ -4,8 +4,8 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.maindata.service.IMpMouldShellInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
+import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import java.util.List;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class MpMouldShellInfoServiceImpl extends AbstractDocService<MpMouldShellInfo> implements IMpMouldShellInfoService {
+public class MdmMouldShellInfoServiceImpl extends AbstractDocService<MdmMouldShellInfo> implements IMdmMouldShellInfoService {
     @Override
     protected String getDocTypeCode() {
         return "MP0208";
@@ -47,7 +47,7 @@ public class MpMouldShellInfoServiceImpl extends AbstractDocService<MpMouldShell
     }
 
     @Override
-    public String checkUnique(MpMouldShellInfo docEntityVO) {
+    public String checkUnique(MdmMouldShellInfo docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpMouldShellInfo.notUnique"));

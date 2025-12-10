@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldDeliveryPlan;
-import com.zlt.aps.monthplan.api.service.IMpMouldDeliveryPlanRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
+import com.zlt.aps.monthplan.api.service.IMdmMouldShellInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +29,8 @@ import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpMouldDeliveryPlanUIController.java
- * 描    述：模具到货计划 UI控制层类：....
+ * 文件名称：MpMouldShellInfoUIController.java
+ * 描    述：模壳台账 UI控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -42,22 +42,22 @@ import java.util.Arrays;
  * @date 2025-12-05
  */
 @Slf4j
-@Api(tags = "模具到货计划")
+@Api(tags = "模壳台账")
 @Controller
-@RequestMapping("/monthplan/mpMouldDeliveryPlan")
-public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDeliveryPlan> {
+@RequestMapping("/monthplan/mpMouldShellInfo")
+public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShellInfo> {
 
-    private final String prefix = "aps/monthplan/mpMouldDeliveryPlan";
+    private final String prefix = "aps/monthplan/mpMouldShellInfo";
     @Autowired
-    private IMpMouldDeliveryPlanRemoteService iMpMouldDeliveryPlanService;
+    private IMdmMouldShellInfoRemoteService iMdmMouldShellInfoService;
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:view")
+    @RequiresPermissions("monthplan:mpMouldShellInfo:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mpMouldDeliveryPlan";
+        return prefix + "/mpMouldShellInfo";
     }
 
     /**
@@ -65,7 +65,7 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mpMouldDeliveryPlan", new MpMouldDeliveryPlan());
+        mmap.put("mpMouldShellInfo", new MdmMouldShellInfo());
         return prefix + "/add";
     }
 
@@ -74,7 +74,7 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mpMouldDeliveryPlan", iMpMouldDeliveryPlanService.getInfo(id));
+        mmap.put("mpMouldShellInfo", iMdmMouldShellInfoService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -82,48 +82,48 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:list")
+    @RequiresPermissions("monthplan:mpMouldShellInfo:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MpMouldDeliveryPlan mpMouldDeliveryPlan) {
-        return iMpMouldDeliveryPlanService.list(mpMouldDeliveryPlan);
+    public TableDataInfo list(MdmMouldShellInfo mdmMouldShellInfo) {
+        return iMdmMouldShellInfoService.list(mdmMouldShellInfo);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:edit")
+    @RequiresPermissions("monthplan:mpMouldShellInfo:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MpMouldDeliveryPlan mpMouldDeliveryPlan) {
-        if (UserConstants.NOT_UNIQUE.equals(iMpMouldDeliveryPlanService.checkUnique(mpMouldDeliveryPlan))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mpMouldDeliveryPlan.notUnique"));
+    public AjaxResult save(MdmMouldShellInfo mdmMouldShellInfo) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmMouldShellInfoService.checkUnique(mdmMouldShellInfo))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmMouldShellInfo.notUnique"));
         }
 
-        return iMpMouldDeliveryPlanService.save(mpMouldDeliveryPlan);
+        return iMdmMouldShellInfoService.save(mdmMouldShellInfo);
     }
 
     /**
-     * 删除模具到货计划
+     * 删除模壳台账
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:remove")
+    @RequiresPermissions("monthplan:mpMouldShellInfo:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMpMouldDeliveryPlanService.removeByIds(Arrays.asList(arr));
+        return iMdmMouldShellInfoService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验模具到货计划唯一性
+     * 校验模壳台账唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MpMouldDeliveryPlan mpMouldDeliveryPlan) {
-        return iMpMouldDeliveryPlanService.checkUnique(mpMouldDeliveryPlan);
+    public String checkUnique(MdmMouldShellInfo mdmMouldShellInfo) {
+        return iMdmMouldShellInfoService.checkUnique(mdmMouldShellInfo);
     }
 
     /**
@@ -155,7 +155,7 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mpMouldDeliveryPlan.modelName");
+        return I18nUtil.getMessage("ui.data.column.mdmMouldShellInfo.modelName");
     }
 
     /**
@@ -165,7 +165,7 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MpMouldDeliveryPlan> util = new ExcelUtil<>(MpMouldDeliveryPlan.class);
+        ExcelUtil<MdmMouldShellInfo> util = new ExcelUtil<>(MdmMouldShellInfo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -174,9 +174,9 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MpMouldDeliveryPlan entity) throws IOException {
+    public void export(HttpServletResponse response, MdmMouldShellInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMpMouldDeliveryPlanService.exportData(entity, fileName);
+        byte[] excelBytes = iMdmMouldShellInfoService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -196,20 +196,18 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpMouldDeliveryPlanService.importData(context, false);
+        AjaxResult ajaxResult = iMdmMouldShellInfoService.importData(context, false);
         return ajaxResult;
     }
 
     /**
-     * 根据计划发货日期获取计划上机日期
-     *
-     * @param entity 计划发货日期
-     * @return 结果
+     * 抓取MES数据
      */
-    @ApiOperation("根据计划发货日期获取计划上机日期")
-    @PostMapping({"/getBoardingDate"})
+    @RequiresPermissions("maindata:mdmModelInfo:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
     @ResponseBody
-    public AjaxResult getBoardingDate(MpMouldDeliveryPlan entity) {
-        return iMpMouldDeliveryPlanService.getBoardingDate(entity);
+    public AjaxResult mesCapture() {
+        return iMdmMouldShellInfoService.mesCapture();
     }
 }

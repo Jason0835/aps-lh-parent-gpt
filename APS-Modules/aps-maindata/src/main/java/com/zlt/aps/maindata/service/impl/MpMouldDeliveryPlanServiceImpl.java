@@ -1,19 +1,25 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.service.IMpMouldDeliveryPlanService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MpMouldDeliveryPlan;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -33,6 +39,10 @@ import java.util.List;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDeliveryPlan> implements IMpMouldDeliveryPlanService {
+
+    @Autowired
+    private FactoryParamMapper factoryParamMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MP0203";
@@ -58,5 +68,30 @@ public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDe
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "mouldCode"));
+    }
+
+    /**
+     * 根据计划发货日期获取计划上机日期
+     *
+     * @param entity 计划发货日期
+     * @return 结果
+     */
+    @Override
+    public AjaxResult getBoardingDate(MpMouldDeliveryPlan entity) {
+        Date shipmentDate = entity.getShipmentDate();
+        if (Objects.isNull(shipmentDate)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mpMouldDeliveryPlan.getBoardingDate.shipmentDateNull"));
+        }
+        LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<>();
+        String code = MonthPlanEnums.MODULE_ARRIVAL_DAYS.getCode();
+        wrapper.eq(FactoryParam::getParamCode, code);
+        FactoryParam factoryParam = factoryParamMapper.selectOne(wrapper);
+        if (Objects.isNull(factoryParam)) {
+            return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.mpMouldDeliveryPlan.getBoardingDate.paramsNull"), code), DateUtils.parseDateToStr("yyyy-MM-dd", shipmentDate));
+        }
+        String defaultValue = factoryParam.getDefauleValue();
+        String paramValue = StringUtils.defaultIfBlank(factoryParam.getParamValue(), defaultValue);
+        Date date = DateUtils.addDays(shipmentDate, Integer.parseInt(paramValue));
+        return AjaxResult.success(DateUtils.parseDateToStr("yyyy-MM-dd", date));
     }
 }

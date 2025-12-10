@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
-import com.zlt.aps.monthplan.api.service.IMpMouldShellInfoRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.service.IMdmMonCycleSchStruConfRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +29,8 @@ import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpMouldShellInfoUIController.java
- * 描    述：模壳台账 UI控制层类：....
+ * 文件名称：MdmMonCycleSchStruConfUIController.java
+ * 描    述：月周期排产结构配置 UI控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -39,25 +39,25 @@ import java.util.Arrays;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-12-05
+ * @date 2025-12-09
  */
 @Slf4j
-@Api(tags = "模壳台账")
+@Api(tags = "月周期排产结构配置")
 @Controller
-@RequestMapping("/monthplan/mpMouldShellInfo")
-public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellInfo> {
+@RequestMapping("/monthplan/mdmMonCycleSchStruConf")
+public class MdmMonCycleSchStruConfUIController extends BaseUIController<MdmMonCycleSchStruConf> {
 
-    private final String prefix = "aps/monthplan/mpMouldShellInfo";
+    private final String prefix = "aps/monthplan/mdmMonCycleSchStruConf";
     @Autowired
-    private IMpMouldShellInfoRemoteService iMpMouldShellInfoService;
+    private IMdmMonCycleSchStruConfRemoteService iMdmMonCycleSchStruConfService;
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mpMouldShellInfo:view")
+    @RequiresPermissions("monthplan:mdmMonCycleSchStruConf:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mpMouldShellInfo";
+        return prefix + "/mdmMonCycleSchStruConf";
     }
 
     /**
@@ -65,7 +65,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mpMouldShellInfo", new MpMouldShellInfo());
+        mmap.put("mdmMonCycleSchStruConf", new MdmMonCycleSchStruConf());
         return prefix + "/add";
     }
 
@@ -74,7 +74,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mpMouldShellInfo", iMpMouldShellInfoService.getInfo(id));
+        mmap.put("mdmMonCycleSchStruConf", iMdmMonCycleSchStruConfService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -82,48 +82,48 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mpMouldShellInfo:list")
+    @RequiresPermissions("monthplan:mdmMonCycleSchStruConf:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MpMouldShellInfo mpMouldShellInfo) {
-        return iMpMouldShellInfoService.list(mpMouldShellInfo);
+    public TableDataInfo list(MdmMonCycleSchStruConf mdmMonCycleSchStruConf) {
+        return iMdmMonCycleSchStruConfService.list(mdmMonCycleSchStruConf);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mpMouldShellInfo:edit")
+    @RequiresPermissions("monthplan:mdmMonCycleSchStruConf:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MpMouldShellInfo mpMouldShellInfo) {
-        if (UserConstants.NOT_UNIQUE.equals(iMpMouldShellInfoService.checkUnique(mpMouldShellInfo))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mpMouldShellInfo.notUnique"));
+    public AjaxResult save(MdmMonCycleSchStruConf mdmMonCycleSchStruConf) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmMonCycleSchStruConfService.checkUnique(mdmMonCycleSchStruConf))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmMonCycleSchStruConf.notUnique"));
         }
 
-        return iMpMouldShellInfoService.save(mpMouldShellInfo);
+        return iMdmMonCycleSchStruConfService.save(mdmMonCycleSchStruConf);
     }
 
     /**
-     * 删除模壳台账
+     * 删除月周期排产结构配置
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mpMouldShellInfo:remove")
+    @RequiresPermissions("monthplan:mdmMonCycleSchStruConf:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMpMouldShellInfoService.removeByIds(Arrays.asList(arr));
+        return iMdmMonCycleSchStruConfService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验模壳台账唯一性
+     * 校验月周期排产结构配置唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MpMouldShellInfo mpMouldShellInfo) {
-        return iMpMouldShellInfoService.checkUnique(mpMouldShellInfo);
+    public String checkUnique(MdmMonCycleSchStruConf mdmMonCycleSchStruConf) {
+        return iMdmMonCycleSchStruConfService.checkUnique(mdmMonCycleSchStruConf);
     }
 
     /**
@@ -155,7 +155,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mpMouldShellInfo.modelName");
+        return I18nUtil.getMessage("ui.data.column.mdmMonCycleSchStruConf.modelName");
     }
 
     /**
@@ -165,7 +165,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MpMouldShellInfo> util = new ExcelUtil<>(MpMouldShellInfo.class);
+        ExcelUtil<MdmMonCycleSchStruConf> util = new ExcelUtil<>(MdmMonCycleSchStruConf.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -174,9 +174,9 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MpMouldShellInfo entity) throws IOException {
+    public void export(HttpServletResponse response, MdmMonCycleSchStruConf entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMpMouldShellInfoService.exportData(entity, fileName);
+        byte[] excelBytes = iMdmMonCycleSchStruConfService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -196,18 +196,7 @@ public class MpMouldShellInfoUIController extends BaseUIController<MpMouldShellI
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpMouldShellInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmMonCycleSchStruConfService.importData(context, false);
         return ajaxResult;
-    }
-
-    /**
-     * 抓取MES数据
-     */
-    @RequiresPermissions("maindata:mdmModelInfo:mesCapture")
-    @ApiOperation("抓取MES数据")
-    @PostMapping("/mesCapture")
-    @ResponseBody
-    public AjaxResult mesCapture() {
-        return iMpMouldShellInfoService.mesCapture();
     }
 }

@@ -1,15 +1,14 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.zlt.common.annotation.EntityMapping;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -28,7 +27,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "SKU与施工（示方书）关系对象", description = "SKU与施工（示方书）关系对象 ")
 @Data
 @TableName(value = "T_MDM_SKU_CONSTRUCTION_REF")
-public class MdmSkuConstructionRef extends CommonBusiEntity {
+public class MdmSkuConstructionRef extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -75,7 +74,7 @@ public class MdmSkuConstructionRef extends CommonBusiEntity {
     private String productionVersion;
 
     /** 成型法 */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldMethod")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldMethod", dictType = "molding_method")
     @ApiModelProperty(value = "成型法", name = "mouldMethod")
     @TableField(value = "MOULD_METHOD")
     private String mouldMethod;

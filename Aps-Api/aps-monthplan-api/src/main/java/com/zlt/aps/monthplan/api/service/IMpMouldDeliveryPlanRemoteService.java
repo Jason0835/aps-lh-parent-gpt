@@ -78,4 +78,13 @@ public interface IMpMouldDeliveryPlanRemoteService {
     @PostMapping("/mpMouldDeliveryPlan/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 根据计划发货日期获取计划上机日期
+     *
+     * @param entity 计划发货日期
+     * @return 结果
+     */
+    @ApiOperation("根据计划发货日期获取计划上机日期")
+    @PostMapping("/mpMouldDeliveryPlan/getBoardingDate")
+    AjaxResult getBoardingDate(@RequestBody MpMouldDeliveryPlan entity);
 }

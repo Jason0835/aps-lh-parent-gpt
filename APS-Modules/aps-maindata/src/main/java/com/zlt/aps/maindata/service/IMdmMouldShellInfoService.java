@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldShellInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.service.IDocService;
 
 /**
@@ -18,7 +18,7 @@ import com.zlt.bill.common.service.IDocService;
  * 修改内容：...
  * @date 2025-12-05
  */
-public interface IMpMouldShellInfoService extends IDocService<MpMouldShellInfo> {
+public interface IMdmMouldShellInfoService extends IDocService<MdmMouldShellInfo> {
 
     /**
      * 抓取MES数据
