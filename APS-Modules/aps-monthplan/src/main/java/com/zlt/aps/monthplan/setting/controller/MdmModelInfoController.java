@@ -166,6 +166,8 @@ public class MdmModelInfoController extends AbstractDocBizController<MdmModelInf
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldType")), "MOULD_TYPE", queryVO.getFieldValueByFieldName("mouldType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldStatus")), "MOULD_STATUS", queryVO.getFieldValueByFieldName("mouldStatus"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("logisticsStatus")), "LOGISTICS_STATUS", queryVO.getFieldValueByFieldName("logisticsStatus"));
     }
 
     @Override
