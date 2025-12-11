@@ -163,11 +163,22 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("saleArea")), "SALE_AREA", queryVO.getFieldValueByFieldName("saleArea"));
     }
 
-
     @Override
     protected String getTypeCode() {
         return "MP1209";
     }
 
+
+    /**
+     * 生成月均销量
+     *
+     * @param mpMonthlySaleQty 参数
+     * @return 结果
+     */
+    @ApiOperation("生成月均销量")
+    @PostMapping("/genMonthlySaleQty")
+    public AjaxResult genMonthlySaleQty(@RequestBody MpMonthlySaleQty mpMonthlySaleQty) {
+        return mpMonthlySaleQtyService.genMonthlySaleQty(mpMonthlySaleQty);
+    }
 
 }

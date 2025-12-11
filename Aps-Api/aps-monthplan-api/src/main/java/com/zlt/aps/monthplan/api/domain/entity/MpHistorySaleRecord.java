@@ -32,6 +32,14 @@ public class MpHistorySaleRecord extends BaseEntity{
     private static final long serialVersionUID = 1L;
 
     /**
+     * 工厂
+     */
+    @Excel(name = "ui.data.column.MpHistorySaleRecord.factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /**
      * 年份
      */
     @Excel(name = "ui.data.column.MpHistorySaleRecord.year")
@@ -46,6 +54,13 @@ public class MpHistorySaleRecord extends BaseEntity{
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
+
+    /**
+     * 年月
+     */
+    @ApiModelProperty(value = "年月", name = "yearMonth")
+    @TableField(value = "YEAR_MONTH")
+    private Integer yearMonth;
 
     /**
      * 区域
@@ -80,4 +95,10 @@ public class MpHistorySaleRecord extends BaseEntity{
     @TableField(value = "GENERATION_DATE")
     private Date generationDate;
 
+    /**
+     * 区域名称
+     */
+    @ApiModelProperty(value = "区域名称", name = "areaCodeName")
+    @TableField(exist = false)
+    private String areaCodeName;
 }

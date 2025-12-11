@@ -198,4 +198,18 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
         AjaxResult ajaxResult = iMpMonthlySaleQtyService.importData(context, false);
         return ajaxResult;
     }
+
+    /**
+     * 生成月均销量
+     *
+     * @param mpMonthlySaleQty 参数
+     * @return 结果
+     */
+    @ApiOperation("生成月均销量")
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:genMonthlySaleQty")
+    @PostMapping("/genMonthlySaleQty")
+    @ResponseBody
+    public AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty) {
+        return iMpMonthlySaleQtyService.genMonthlySaleQty(mpMonthlySaleQty);
+    }
 }

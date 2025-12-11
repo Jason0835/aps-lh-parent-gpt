@@ -1,6 +1,5 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -23,11 +22,9 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-12-11
  */
-
 @ApiModel(value = "月均销量对象", description = "月均销量对象 ")
 @Data
 @TableName(value = "T_MP_MONTHLY_SALE_QTY")
-@KeySequence(value = "SEQ_ONTHLY_SALE_QTY")
 public class MpMonthlySaleQty extends CommonBusiEntity {
 
     private static final long serialVersionUID = 1L;
@@ -43,10 +40,10 @@ public class MpMonthlySaleQty extends CommonBusiEntity {
     /**
      * 产品品类
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.productYpeCode")
-    @ApiModelProperty(value = "产品品类", name = "productYpeCode")
-    @TableField(value = "PRODUCT_YPE_CODE")
-    private String productYpeCode;
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.productTypeCode")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
 
     /**
      * 内外销
@@ -105,10 +102,10 @@ public class MpMonthlySaleQty extends CommonBusiEntity {
     private Long passThreeMonthSaleQty;
 
     /**
-     * 适销区域
+     * 适销区域，多个英文逗号分隔
      */
     @Excel(name = "ui.data.column.mpMonthlySaleQty.saleArea")
-    @ApiModelProperty(value = "适销区域", name = "saleArea")
+    @ApiModelProperty(value = "适销区域，多个英文逗号分隔", name = "saleArea")
     @TableField(value = "SALE_AREA")
     private String saleArea;
 

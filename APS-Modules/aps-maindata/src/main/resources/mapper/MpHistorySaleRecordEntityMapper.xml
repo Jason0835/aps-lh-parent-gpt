@@ -2,121 +2,16 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="ccom.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord" id="MpHistorySaleRecordResult">
-            <result property="id" column="ID"/>
-            <result property="year" column="YEAR"/>
-            <result property="month" column="MONTH"/>
-            <result property="areaCode" column="AREA_CODE"/>
-            <result property="productCode" column="PRODUCT_CODE"/>
-            <result property="saleQty" column="SALE_QTY"/>
-            <result property="generationDate" column="GENERATION_DATE"/>
-            <result property="remark" column="REMARK"/>
-            <result property="isDelete" column="IS_DELETE"/>
-            <result property="createBy" column="CREATE_BY"/>
-            <result property="createTime" column="CREATE_TIME"/>
-            <result property="updateBy" column="UPDATE_BY"/>
-            <result property="updateTime" column="UPDATE_TIME"/>
-    </resultMap>
+<mapper namespace="com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper">
 
-
-    <sql id="selectMpHistorySaleRecordVo">
-        SELECT ID, YEAR, MONTH, AREA_CODE, PRODUCT_CODE, SALE_QTY, GENERATION_DATE, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, FROM T_MP_HISTORY_SALE_RECORD
-    </sql>
-
-    <select id="selectMpHistorySaleRecordList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord" resultMap="MpHistorySaleRecordResult">
-        <include refid="selectMpHistorySaleRecordVo"/>
-        WHERE NVL(IS_DELETE,0) = 0
-        <if test="year != null "> AND YEAR = #{year}</if>
-        <if test="month != null "> AND MONTH = #{month}</if>
-        <if test="areaCode != null  and areaCode != ''"> AND AREA_CODE = #{areaCode}</if>
-        <if test="productCode != null  and productCode != ''"> AND PRODUCT_CODE = #{productCode}</if>
-        <if test="saleQty != null "> AND SALE_QTY = #{saleQty}</if>
-        <if test="generationDate != null "> AND GENERATION_DATE = #{generationDate}</if>
+    <select id="selectRollMonthSaleQty" resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
+        select MATERIAL_CODE,
+               SUM(SALE_QTY) as SALE_QTY
+        from T_MP_HISTORY_SALE_RECORD
+        where IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND YEAR_MONTH &gt;= #{minYearMonth}
+          AND YEAR_MONTH &lt;= #{maxYearMonth}
+        group by MATERIAL_CODE
     </select>
-
-    <select id="selectMpHistorySaleRecordById" parameterType="Long" resultMap="MpHistorySaleRecordResult">
-        <include refid="selectMpHistorySaleRecordVo"/>
-        WHERE ID = #{id}
-    </select>
-
-    <select id="selectMpHistorySaleRecordByIds" parameterType="list"
-            resultMap="MpHistorySaleRecordResult">
-
-        <include refid="selectMpHistorySaleRecordVo"/>
-           WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
-        <foreach collection="list" item="item" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-
-    </select>
-
-    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
-        INSERT INTO T_MP_HISTORY_SALE_RECORD
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            ID,
-            <if test="year != null">YEAR,</if>
-            <if test="month != null">MONTH,</if>
-            <if test="areaCode != null">AREA_CODE,</if>
-            <if test="productCode != null">PRODUCT_CODE,</if>
-            <if test="saleQty != null">SALE_QTY,</if>
-            <if test="generationDate != null">GENERATION_DATE,</if>
-            <if test="remark != null">REMARK,</if>
-            <if test="isDelete != null">IS_DELETE,</if>
-            <if test="createBy != null">CREATE_BY,</if>
-            <if test="createTime != null">CREATE_TIME,</if>
-            <if test="updateBy != null">UPDATE_BY,</if>
-            <if test="updateTime != null">UPDATE_TIME,</if>
-         </trim>
-        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
-            SEQ_ISTORY_SALE_RECORD.NEXTVAL,
-            <if test="year != null">#{year},</if>
-            <if test="month != null">#{month},</if>
-            <if test="areaCode != null">#{areaCode},</if>
-            <if test="productCode != null">#{productCode},</if>
-            <if test="saleQty != null">#{saleQty},</if>
-            <if test="generationDate != null">#{generationDate},</if>
-            <if test="remark != null">#{remark},</if>
-            <if test="isDelete != null">#{isDelete},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-         </trim>
-    </insert>
-
-    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
-        UPDATE T_MP_HISTORY_SALE_RECORD
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="year != null">YEAR = #{year},</if>
-            <if test="month != null">MONTH = #{month},</if>
-            <if test="areaCode != null">AREA_CODE = #{areaCode},</if>
-            <if test="productCode != null">PRODUCT_CODE = #{productCode},</if>
-            <if test="saleQty != null">SALE_QTY = #{saleQty},</if>
-            <if test="generationDate != null">GENERATION_DATE = #{generationDate},</if>
-            <if test="remark != null">REMARK = #{remark},</if>
-            <if test="isDelete != null">IS_DELETE = #{isDelete},</if>
-            <if test="createBy != null">CREATE_BY = #{createBy},</if>
-            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
-            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
-            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
-        </trim>
-        where ID = #{id}
-    </update>
-
-    <delete id="deleteMpHistorySaleRecordById" parameterType="Long">
-        UPDATE T_MP_HISTORY_SALE_RECORD SET IS_DELETE = 1 WHERE ID = #{id}
-    </delete>
-
-    <delete id="deleteMpHistorySaleRecordByIds" parameterType="String">
-        UPDATE T_MP_HISTORY_SALE_RECORD SET IS_DELETE = 1 WHERE ID IN
-        <foreach item="id" collection="array" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-    </delete>
-
-
-    <update id="mergeSql" parameterType="list">
-
-    </update>
 </mapper>

@@ -77,4 +77,13 @@ public interface IMpMonthlySaleQtyRemoteService {
     @PostMapping("/mpMonthlySaleQty/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 生成月均销量
+     *
+     * @param mpMonthlySaleQty 参数
+     * @return 结果
+     */
+    @ApiOperation("生成月均销量")
+    @PostMapping("/mpMonthlySaleQty/genMonthlySaleQty")
+    AjaxResult genMonthlySaleQty(@RequestBody MpMonthlySaleQty mpMonthlySaleQty);
 }
