@@ -102,4 +102,10 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      */
     @Transactional
     public AjaxResult importData(List<SupplyOrderPool> list, boolean updateSupport, Long importLogId);
+    /**
+     * 生成周期排产储备
+     * @param supplyOrderPool
+     */
+    @Transactional
+    void createCycleStockUp(SupplyOrderPool supplyOrderPool);
 }
