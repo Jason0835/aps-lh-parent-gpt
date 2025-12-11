@@ -17,7 +17,6 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,8 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -53,20 +50,6 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
     private IMpMonthlySaleQtyService mpMonthlySaleQtyService;
 
     /**
-     * 查询月均销量列表
-     */
-    @RequiresPermissions( "monthplan:monthlySaleQty:list")
-    @ApiOperation("查询月均销量列表")
-    @PostMapping("/list")
-    public TableDataInfo list(@RequestBody MpMonthlySaleQty mpMonthlySaleQty)
-    {
-        startPage("create_time desc");
-        List<MpMonthlySaleQty> list = mpMonthlySaleQtyService.selectMpMonthlySaleQtyList(mpMonthlySaleQty);
-        return getDataTable(list);
-    }
-
-
-    /**
      * 导出月均销量列表
      */
     @RequiresPermissions( "monthplan:monthlySaleQty:export")
@@ -77,23 +60,6 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
         return commonExport(mpMonthlySaleQty,fileName,response);
     }
 
-    @Override
-    public List<MpMonthlySaleQty> listExportData(MpMonthlySaleQty mpMonthlySaleQty) {
-        startPage("create_time desc");
-        return  mpMonthlySaleQtyService.selectMpMonthlySaleQtyList(mpMonthlySaleQty);
-    }
-
-    /**
-     * 获取月均销量详细信息
-     */
-    @RequiresPermissions( "monthplan:monthlySaleQty:query")
-    @ApiOperation("获取月均销量详细信息")
-    @GetMapping(value = "/{id}")
-    public MpMonthlySaleQty getInfo(@PathVariable("id") Long id)
-    {
-        return mpMonthlySaleQtyService.selectMpMonthlySaleQtyById(id);
-    }
-
     /**
      * 新增月均销量
      */
@@ -102,7 +68,7 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
     @ApiOperation("新增月均销量")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return toAjax(mpMonthlySaleQtyService.insertMpMonthlySaleQty(mpMonthlySaleQty));
+        return toAjax(mpMonthlySaleQtyService.save(mpMonthlySaleQty));
     }
 
     /**
@@ -113,7 +79,7 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
     @ApiOperation("修改月均销量")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return toAjax(mpMonthlySaleQtyService.updateMpMonthlySaleQty(mpMonthlySaleQty));
+        return toAjax(mpMonthlySaleQtyService.save(mpMonthlySaleQty));
     }
 
     /**
@@ -123,8 +89,8 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
     @RequiresPermissions( "monthplan:monthlySaleQty:remove")
     @ApiOperation("删除月均销量")
 	@DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids){
-        return toAjax(mpMonthlySaleQtyService.deleteMpMonthlySaleQtyByIds(ids));
+    public AjaxResult remove(@PathVariable List<Long> ids){
+        return toAjax(mpMonthlySaleQtyService.removeByIds(ids));
     }
 
     /**
@@ -133,7 +99,7 @@ public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
     @ApiOperation("校验月均销量唯一性")
     @PostMapping("/checkMpMonthlySaleQtyUnique")
     public String checkMpMonthlySaleQtyUnique(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return mpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty);
+        return mpMonthlySaleQtyService.checkUnique(mpMonthlySaleQty);
     }
 
     /**
