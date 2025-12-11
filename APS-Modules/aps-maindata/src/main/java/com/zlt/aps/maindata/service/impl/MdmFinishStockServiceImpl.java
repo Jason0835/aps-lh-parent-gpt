@@ -1,12 +1,18 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmFinishStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmFinishStockService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +38,11 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock> implements IMdmFinishStockService {
+
+    private final MdmFinishStockEntityMapper finishStockEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MDM0139";
@@ -71,5 +80,13 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
     public List<MdmFinishStock> list4Mes(MdmFinishStock queryVO) {
         // steve's TODO 查询MES实时成品库存列表
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<MdmFinishStock> findExcludeExceedTwelveMonth() {
+        LambdaQueryWrapper<MdmFinishStock> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmFinishStock::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.eq(MdmFinishStock::getIsExceedTwelveMonth,YesOrNoEnum.NO.getCode());
+        return finishStockEntityMapper.selectList(wrapper);
     }
 }

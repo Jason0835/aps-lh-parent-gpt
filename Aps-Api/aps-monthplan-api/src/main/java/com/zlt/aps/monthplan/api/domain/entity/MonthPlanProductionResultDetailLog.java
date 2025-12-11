@@ -33,10 +33,10 @@ public class MonthPlanProductionResultDetailLog extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 生产分厂编号
+     * 工厂编码
      */
     @Excel(name = "ui.data.column.productionResultDetailLog.factoryCode")
-    @ApiModelProperty(value = "生产分厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -65,10 +65,10 @@ public class MonthPlanProductionResultDetailLog extends BaseEntity {
     private String monthPlanVersion;
 
     /**
-     * 分厂版本
+     * 工厂排产版本
      */
     @Excel(name = "ui.data.column.productionResultDetailLog.productionVersion")
-    @ApiModelProperty(value = "分厂版本", name = "productionVersion")
+    @ApiModelProperty(value = "工厂排产版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 

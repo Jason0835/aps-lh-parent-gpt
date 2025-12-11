@@ -24,24 +24,24 @@ import lombok.Data;
  */
 @Data
 @TableName(value = "T_MP_FACTORY_PARAM")
-@ApiModel(value = "系统参数（排产设定）对象", description = "系统参数（排产设定）对象 ")
+@ApiModel(value = "工厂月计划-系统参数（排产设定）对象", description = "工厂月计划-系统参数（排产设定）对象")
 public class FactoryParam extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 分厂编号
+     * 工厂编码
      */
     @Excel(name = "ui.data.column.factoryParam.factoryCode")
-    @ApiModelProperty(value = "分厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /**
-     * 品名代码
+     * 产品品类
      */
-    @Excel(name = "ui.data.column.factoryParam.productTypeCode")
-    @ApiModelProperty(value = "品名代码", name = "productTypeCode")
+    @Excel(name = "ui.data.column.factoryParam.productTypeCode", dictType = "biz_product_name")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 

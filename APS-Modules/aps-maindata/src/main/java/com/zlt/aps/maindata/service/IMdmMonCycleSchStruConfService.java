@@ -3,6 +3,8 @@ package com.zlt.aps.maindata.service;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmMonCycleSchStruConfService.java
@@ -19,4 +21,5 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMdmMonCycleSchStruConfService extends IDocService<MdmMonCycleSchStruConf> {
 
+  List<MdmMonCycleSchStruConf> findCycleSchStruConf();
 }

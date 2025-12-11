@@ -3,13 +3,20 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.service.IMdmFinishStockService;
+import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.ruoyi.common.datasource.service.BaseService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.apache.commons.collections4.CollectionUtils;
 import com.ruoyi.common.constant.UserConstants;
@@ -34,10 +41,15 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  implements ISupplyOrderPoolService
 {
-    @Autowired
-    private SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
+
+    private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
+
+    private final IMdmMonCycleSchStruConfService monCycleSchStruConfService;
+
+    private final IMdmFinishStockService finishStockService;
 
 
 
@@ -247,5 +259,28 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    @Override
+    public void createCycleStockUp(SupplyOrderPool supplyOrderPool) {
+        // 1、查询当前周期性排产结构配置，如果没有周期性排产结构配置，则提示"当前没有周期性排产结构配置"；
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs = monCycleSchStruConfService.findCycleSchStruConf();
+        if(CollectionUtils.isEmpty(cycleSchStruConfs)){
+            throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleSchStruConf"));
+        }
+        Set<String> structures = cycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).collect(Collectors.toSet());
+        if(CollectionUtils.isEmpty(structures)){
+            return;
+        }
+        // (1)  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
+        List<MdmFinishStock> finishStocks =  finishStockService.findExcludeExceedTwelveMonth();
+        if(CollectionUtils.isEmpty(finishStocks)){
+            return;
+        }
+        List<MdmFinishStock> filterFinishStocks =  finishStocks.stream().filter(item -> structures.contains(item.getStructureName())).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(filterFinishStocks)){
+            return;
+        }
+
     }
 }

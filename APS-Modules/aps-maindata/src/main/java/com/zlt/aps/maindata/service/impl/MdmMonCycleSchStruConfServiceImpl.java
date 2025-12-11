@@ -1,12 +1,18 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
+import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +37,10 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMonCycleSchStruConf> implements IMdmMonCycleSchStruConfService {
+    private  final MdmMonCycleSchStruConfEntityMapper mdmMonCycleSchStruConfEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MDM0143";
@@ -58,5 +66,12 @@ public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMon
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "structureName"));
+    }
+
+    @Override
+    public List<MdmMonCycleSchStruConf> findCycleSchStruConf() {
+        LambdaQueryWrapper<MdmMonCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
+        return mdmMonCycleSchStruConfEntityMapper.selectList(wrapper);
     }
 }
