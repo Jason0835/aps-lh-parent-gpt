@@ -235,4 +235,11 @@ public class MpTrialPlan extends BaseEntity {
     @ApiModelProperty(value = "完成时间-结束时间", name = "completeDateEndTime")
     @TableField(exist = false)
     private Date completeDateEndTime;
+
+    /**
+     * 更新人名称
+     */
+    @ApiModelProperty(value = "更新人名称", name = "updateByName")
+    @TableField(exist = false)
+    private String updateByName;
 }

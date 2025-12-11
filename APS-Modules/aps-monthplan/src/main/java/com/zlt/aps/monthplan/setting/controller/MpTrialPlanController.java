@@ -164,5 +164,10 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
         return "MP0210";
     }
 
-
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
+        };
+    }
 }
