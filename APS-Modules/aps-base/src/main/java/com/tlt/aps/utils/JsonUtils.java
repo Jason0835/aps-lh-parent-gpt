@@ -8,6 +8,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import lombok.extern.slf4j.Slf4j;
+import net.sf.cglib.core.Local;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -62,6 +63,25 @@ public class JsonUtils {
         return reasonJson;
     }
 
+    /**
+     * 获取语言Json对象
+     * 采用String.format拼接动态参数值
+     *
+     * @param languageKey 语言包key
+     * @param params      参数值数组
+     * @return
+     */
+    public static JSONObject getLanguageJsonObject(String languageKey, Object... params) {
+        String formatCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
+        String formatUs = I18nUtil.getMessage(languageKey, Locale.US);
+        String cn = String.format(formatCn, params);
+        String us = String.format(formatUs, params);
+        // 构建 JSON 对象
+        JSONObject reasonJson = new JSONObject();
+        reasonJson.put(I18nConstant.CHINESE, cn);
+        reasonJson.put(I18nConstant.ENGLISH, us);
+        return reasonJson;
+    }
 
     /**
      * 获取语言Json对象

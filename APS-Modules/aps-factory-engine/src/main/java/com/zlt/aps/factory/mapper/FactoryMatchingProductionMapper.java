@@ -3,7 +3,6 @@ package com.zlt.aps.factory.mapper;
 import com.zlt.aps.factory.domain.vo.MatchingProductionConfigurationVo;
 import com.zlt.aps.factory.domain.vo.MouldInfoVO;
 import com.zlt.aps.factory.domain.vo.MouldMaintenanceConfigurationVo;
-import com.zlt.aps.factory.domain.vo.ProductMouldConfigurationVo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -44,9 +43,9 @@ public interface FactoryMatchingProductionMapper {
      * @return
      */
     List<MdmProductConstruction> getConstructionByMatchingRequire(@Param("factoryCode") String factoryCode,
-                                                          @Param("year") Integer year,
-                                                          @Param("month") Integer month,
-                                                          @Param("monthPlanVersion") String monthPlanVersion);
+                                                                  @Param("year") Integer year,
+                                                                  @Param("month") Integer month,
+                                                                  @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
      * 根据分厂、年份、月份，制造需求计划版本，获取对应搭配排产物料对应的分厂维修返厂的模具
@@ -58,9 +57,9 @@ public interface FactoryMatchingProductionMapper {
      * @return
      */
     List<MouldMaintenanceConfigurationVo> getMouldMaintenanceConfigurationByMatchingRequireDateRange(@Param("factoryCode") String factoryCode,
-                                                                                             @Param("startDate") Date startDate,
-                                                                                             @Param("endDate") Date endDate,
-                                                                                             @Param("monthPlanVersion") String monthPlanVersion);
+                                                                                                     @Param("startDate") Date startDate,
+                                                                                                     @Param("endDate") Date endDate,
+                                                                                                     @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
      * 根据制造需求计划版本，获取搭配需求对应的月度可用模具列表
@@ -72,21 +71,9 @@ public interface FactoryMatchingProductionMapper {
      * @return
      */
     List<MouldInfoVO> getMonthEnableMouldConfigurationByMatchingRequire(@Param("factoryCode") String factoryCode,
-                                                       @Param("year") Integer year,
-                                                       @Param("month") Integer month,
-                                                       @Param("monthPlanVersion") String monthPlanVersion);
+                                                                        @Param("year") Integer year,
+                                                                        @Param("month") Integer month,
+                                                                        @Param("monthPlanVersion") String monthPlanVersion);
 
-    /**
-     * 根据制造需求计划版本，获取对应的物料、模具关系
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<ProductMouldConfigurationVo> getProductionMouldRelationByMatchingRequire(@Param("factoryCode") String factoryCode,
-                                                                 @Param("year") Integer year,
-                                                                 @Param("month") Integer month,
-                                                                 @Param("monthPlanVersion") String monthPlanVersion);
+
 }

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.factory.mapper.FactoryMonthPlanProductMouldMapper">
+
+    <select id="getProductionMouldInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo">
+        SELECT DISTINCT msm.FACTORY_CODE,
+               msm.MATERIAL_CODE,
+               msm.MATERIAL_DESC,
+               msm.MOULD_CODE,
+               msm.MAIN_PATTERN,
+               mmi.MOULD_CODE AS BASE_MOULD_CODE,
+               mmi.MOULD_TYPE,
+               mmi.MOULD_STATUS,
+               mmi.SHELL_STANDARD,
+               mmi.LOGISTICS_STATUS,
+               '01' AS RELATION_TYPE
+          FROM t_mdm_sku_mould_rel msm
+          LEFT JOIN t_mdm_model_info mmi
+            ON mmi.FACTORY_CODE = msm.FACTORY_CODE
+           AND mmi.MOULD_CODE = msm.MOULD_CODE
+           AND IFNULL(mmi.IS_DELETE, 0) = 0
+         WHERE IFNULL(msm.IS_DELETE, 0) = 0
+           AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND EXISTS (SELECT 1
+                         FROM t_mp_product_require_plan prp
+                        WHERE IFNULL(prp.IS_DELETE, 0) = 0
+                          AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND prp.YEAR = #{year,jdbcType=DECIMAL}
+                          AND prp.MONTH = #{month,jdbcType=DECIMAL}
+                          AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                          AND msm.MATERIAL_DESC = prp.MATERIAL_DESC
+                          AND msm.FACTORY_CODE = prp.FACTORY_CODE)
+    </select>
+
+    <select id="getMouldDeliveryInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo">
+        SELECT DISTINCT mdp.FACTORY_CODE,
+               mdp.MATERIAL_CODE,
+               mdp.MATERIAL_DESC,
+               mdp.MOULD_CODE,
+               '' AS MAIN_PATTERN,
+               mdp.MOULD_CODE AS BASE_MOULD_CODE,
+               '' AS MOULD_TYPE,
+               1 AS MOULD_STATUS,
+               '' AS SHELL_STANDARD,
+               1 AS LOGISTICS_STATUS,
+               '02' AS RELATION_TYPE
+          FROM t_mp_mould_delivery_plan mdp
+         WHERE IFNULL(mdp.IS_DELETE, 0) = 0
+           AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
+           AND mdp.BOARDING_DATE  &lt;= #{productionEndDate,jdbcType=DATE}
+           AND EXISTS (SELECT 1
+                         FROM t_mp_product_require_plan prp
+                        WHERE IFNULL(prp.IS_DELETE, 0) = 0
+                          AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND prp.YEAR = #{year,jdbcType=DECIMAL}
+                          AND prp.MONTH = #{month,jdbcType=DECIMAL}
+                          AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                          AND mdp.MATERIAL_DESC = prp.MATERIAL_DESC
+                          AND mdp.FACTORY_CODE = prp.FACTORY_CODE)
+    </select>
+</mapper>

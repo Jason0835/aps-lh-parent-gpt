@@ -61,18 +61,28 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "CONSTRUCTION_VERSION")
     private String constructionVersion;
 
-    /** 分厂成型法 */
+    /** 成型法 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.mouldMethod")
     @ApiModelProperty(value = "分厂成型法", name = "mouldMethod")
     @TableField(value = "MOULD_METHOD")
     private String mouldMethod;
+
+    /** 鼓类型 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.buildingDrumType")
+    @ApiModelProperty(value = "鼓类型", name = "buildingDrumType")
+    @TableField(value = "BUILDING_DRUM_TYPE")
+    private String buildingDrumType;
 
     /** 寸口（保留2位小数） */
     @Excel(name = "ui.data.column.mdmConstructionInfo.proSize", readConverterExp = "保=留2位小数")
     @ApiModelProperty(value = "寸口", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private BigDecimal proSize;
-
+    /** 花纹 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.pattern")
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(value = "PATTERN")
+    private String pattern;
     /** 规格 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
@@ -234,6 +244,42 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "胎侧代号", name = "sidewallCode")
     @TableField(value = "SIDEWALL_CODE")
     private String sidewallCode;
+
+    /** 垫胶 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.paddingCode")
+    @ApiModelProperty(value = "垫胶", name = "paddingCode")
+    @TableField(value = "PADDING_CODE")
+    private String paddingCode;
+
+    /** 胶芯 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.rubberCoreCode")
+    @ApiModelProperty(value = "胶芯", name = "rubberCoreCode")
+    @TableField(value = "RUBBER_CORE_CODE")
+    private String rubberCoreCode;
+
+    /** 零度 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.zeroBeltCode")
+    @ApiModelProperty(value = "零度", name = "zeroBeltCode")
+    @TableField(value = "ZERO_BELT_CODE")
+    private String zeroBeltCode;
+
+    /** 包布 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.clothWrappingCode")
+    @ApiModelProperty(value = "包布", name = "clothWrappingCode")
+    @TableField(value = "CLOTH_WRAPPING_CODE")
+    private String clothWrappingCode;
+
+    /** 胎体 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.tireBodyCode")
+    @ApiModelProperty(value = "胎体", name = "tireBodyCode")
+    @TableField(value = "TIRE_BODY_CODE")
+    private String tireBodyCode;
+
+    /** 胎侧SAP */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.sidewallSap")
+    @ApiModelProperty(value = "胎侧SAP", name = "sidewallSap")
+    @TableField(value = "SIDEWALL_SAP")
+    private String sidewallSap;
 
     /** 胎侧—BOM版本 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.sidewallVersion")
@@ -402,6 +448,36 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "2#钢带代号", name = "beltCode2")
     @TableField(value = "BELT_CODE2")
     private String beltCode2;
+
+    /** 3#钢带代号 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCode3")
+    @ApiModelProperty(value = "3#钢带代号", name = "beltCode3")
+    @TableField(value = "BELT_CODE3")
+    private String beltCode3;
+
+    /** 4#钢带代号 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCode4")
+    @ApiModelProperty(value = "4#钢带代号", name = "beltCode4")
+    @TableField(value = "BELT_CODE4")
+    private String beltCode4;
+
+    /** 左加强层 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeLeftCode")
+    @ApiModelProperty(value = "左加强层", name = "beltCodeLeftCode")
+    @TableField(value = "BELT_CODE_LEFT_CODE")
+    private String beltCodeLeftCode;
+
+    /** 右加强层 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeRightCode")
+    @ApiModelProperty(value = "右加强层", name = "beltCodeRightCode")
+    @TableField(value = "BELT_CODE_RIGHT_CODE")
+    private String beltCodeRightCode;
+
+    /** 2#钢带SAP */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltSap2")
+    @ApiModelProperty(value = "2#钢带SAP", name = "beltSap2")
+    @TableField(value = "BELT_SAP2")
+    private String beltSap2;
 
     /** 2#钢带BOM版本 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.belt2Version")

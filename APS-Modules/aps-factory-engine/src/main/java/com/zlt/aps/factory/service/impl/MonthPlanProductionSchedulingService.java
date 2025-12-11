@@ -21,21 +21,13 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     private final IProductionBusinessService generalInitService;
 
-//    private final IProductionBusinessService generalMouldingService;
-
     private final IProductionBusinessService wholeCourseProductionService;
 
-//    private final IProductionBusinessService sizeCapacityRequireCalculateService;
-
     public MonthPlanProductionSchedulingService(@Qualifier("generalInitService") IProductionBusinessService generalInitService,
-                                                // @Qualifier("generalMouldingService") IProductionBusinessService generalMouldingService,
                                                 @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService
-                                                // @Qualifier("sizeCapacityRequireCalculateService") IProductionBusinessService sizeCapacityRequireCalculateService
                                                 ) {
         this.generalInitService = generalInitService;
-//        this.generalMouldingService = generalMouldingService;
         this.wholeCourseProductionService = wholeCourseProductionService;
-//        this.sizeCapacityRequireCalculateService = sizeCapacityRequireCalculateService;
     }
 
     @Override
@@ -52,12 +44,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void mouldingScheduling(Context context) {
-//        //根据类别进行
-//        ProductTypeEnum productType = context.getProductType();
-//        if (ProductTypeEnum.SEMI_STEEL == productType) {
-//            generalMouldingService.run(context, new Object());
-//            return;
-//        }
+
     }
 
     @Override
@@ -78,11 +65,6 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     @Override
     public void calculateSizeCapacityRequire(Context context) {
-//        //根据类别进行
-//        ProductTypeEnum productType = context.getProductType();
-//        if (ProductTypeEnum.SEMI_STEEL == productType) {
-//            sizeCapacityRequireCalculateService.run(context, new Object());
-//            return;
-//        }
+
     }
 }
