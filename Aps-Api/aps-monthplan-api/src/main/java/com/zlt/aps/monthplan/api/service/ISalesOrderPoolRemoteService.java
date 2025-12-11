@@ -97,7 +97,7 @@ public interface ISalesOrderPoolRemoteService {
     */
     @ApiOperation("检查SCM数据")
     @PostMapping("/SalesOrderPool/checkSCMData")
-    AjaxResult checkSCMData();
+    AjaxResult checkSCMData(@RequestBody SalesOrderPool salesOrderPool);
 
 
     /**
@@ -105,5 +105,5 @@ public interface ISalesOrderPoolRemoteService {
     */
     @ApiOperation("抓取SCM数据")
     @PostMapping("/SalesOrderPool/getSCMData")
-    AjaxResult getSCMData();
+    AjaxResult getSCMData(@RequestBody SalesOrderPool salesOrderPool);
 }

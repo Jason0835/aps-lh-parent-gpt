@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.common.controller.BusiController;
@@ -155,5 +156,18 @@ public class SupplyOrderPoolController extends BusiController<SupplyOrderPool>
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
         return supplyOrderPoolService.importData(list, updateSupport, importLogId);
+    }
+
+    @ApiOperation("生成周期排产储备")
+    @RedissonLockAnno(uniqueMark = "redissonLock:supplyOrderPool:createCycleStockUp:",
+        expressions = {"#supplyOrderPool.factoryCode", "#createCondition.week"},
+        msgKey = "ui.data.alert.createCycleStockUp.run",
+        waitTime = 5,
+        leaseTime = 300
+    )
+    @PostMapping("/createCycleStockUp")
+    public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
+        supplyOrderPoolService.createCycleStockUp(supplyOrderPool);
+        return AjaxResult.success();
     }
 }

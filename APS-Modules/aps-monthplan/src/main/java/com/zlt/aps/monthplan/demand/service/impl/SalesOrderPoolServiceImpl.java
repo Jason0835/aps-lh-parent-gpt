@@ -81,4 +81,15 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
     	salesOrderPoolEntityMapper.update(new SalesOrderPool(), updateWrapper);
         return AjaxResult.success();
 	}
+    
+	/**
+	 * 抓取SCM已计划未发货数据
+	 * @param salesOrderPool
+	 * @return
+	 */
+    @Override
+    public AjaxResult getSCMData(SalesOrderPool salesOrderPool) {
+    	// TODO 对接抓取接口
+    	return null;
+    }
 }
