@@ -4,7 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -13,8 +13,8 @@ import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：IMpMonthlySaleQtyRemoteService.java
- * 描    述：IMpMonthlySaleQtyRemoteService月均销量前端接口
+ * 文件名称：IMpTrialPlanRemoteService.java
+ * 描    述：IMpTrialPlanRemoteService试制量试计划前端接口
  *
  * @author zlt
  * @version 1.0
@@ -25,56 +25,56 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-11
  */
-@FeignClient(contextId = "IMpMonthlySaleQtyRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
-public interface IMpMonthlySaleQtyRemoteService {
+@FeignClient(contextId = "IMpTrialPlanRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
+public interface IMpTrialPlanRemoteService {
 
     /**
      * 查询列表
      */
     @ApiOperation("查询列表")
-    @PostMapping("/mpMonthlySaleQty/list")
-    TableDataInfo list(@RequestBody MpMonthlySaleQty QueryVO);
+    @PostMapping("/mpTrialPlan/list")
+    TableDataInfo list(@RequestBody MpTrialPlan QueryVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
-    @PostMapping("/mpMonthlySaleQty/save")
-    AjaxResult save(@RequestBody MpMonthlySaleQty mpMonthlySaleQty);
+    @PostMapping("/mpTrialPlan/save")
+    AjaxResult save(@RequestBody MpTrialPlan mpTrialPlan);
 
     /**
      * 删除
      */
     @ApiOperation("删除")
-    @DeleteMapping("/mpMonthlySaleQty/remove")
+    @DeleteMapping("/mpTrialPlan/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/mpMonthlySaleQty/{id}")
-    MpMonthlySaleQty getInfo(@PathVariable("id") Long id);
+    @GetMapping(value = "/mpTrialPlan/{id}")
+    MpTrialPlan getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
-    @PostMapping("/mpMonthlySaleQty/checkUnique")
-    String checkUnique(@RequestBody MpMonthlySaleQty mpMonthlySaleQtyVO);
+    @PostMapping("/mpTrialPlan/checkUnique")
+    String checkUnique(@RequestBody MpTrialPlan mpTrialPlanVO);
 
     /**
-     * 导出月均销量列表
+     * 导出试制量试计划列表
      */
     @ApiOperation("导出列表")
-    @PostMapping("/mpMonthlySaleQty/exportData/{fileName}")
-    byte[] exportData(@RequestBody MpMonthlySaleQty queryVO, @PathVariable("fileName") String fileName);
+    @PostMapping("/mpTrialPlan/exportData/{fileName}")
+    byte[] exportData(@RequestBody MpTrialPlan queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 导入月均销量数据
+     * 导入试制量试计划数据
      */
-    @ApiOperation("导入月均销量")
-    @PostMapping("/mpMonthlySaleQty/importData")
+    @ApiOperation("导入试制量试计划")
+    @PostMapping("/mpTrialPlan/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
 }
