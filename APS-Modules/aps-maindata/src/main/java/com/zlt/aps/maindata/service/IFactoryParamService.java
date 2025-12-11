@@ -3,6 +3,7 @@ package com.zlt.aps.maindata.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.maindata.domain.vo.SizeCapacityParamVo;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryParamVo;
@@ -106,7 +107,7 @@ public interface IFactoryParamService extends IService<FactoryParam> {
     /**
      * 获取不进行备货的品牌计划-主要为外贸贴牌品牌
      *
-     * @param factoryCode 分厂编码
+     * @param factoryCode 工厂编码
      * @return
      */
     Set<String> getNoStockUpPlanBrand(String factoryCode);
@@ -131,7 +132,7 @@ public interface IFactoryParamService extends IService<FactoryParam> {
      * 获取内销的备货方式是否采用特定方式
      * Y表示另外的备货方式，N表示与外销、OE一致
      *
-     * @param factoryCode 分厂编码
+     * @param factoryCode 工厂编码
      * @return
      */
     String getDomesticStockUpType(String factoryCode);
@@ -139,24 +140,25 @@ public interface IFactoryParamService extends IService<FactoryParam> {
     /**
      * 获取 备货计划需要提前的月份参数值
      *
-     * @param factoryCode 分厂编码
+     * @param factoryCode 工厂编码
      * @return
      */
     Integer getStockUpLastMonth(String factoryCode);
 
     /**
-     * 获取分厂的月份起始周期配置
+     * 获取工厂的月份起始周期配置
      * 在2~28值之间则表示非自然月，否则为自然月
      *
-     * @param factoryCode 分厂编码
+     * @param factoryCode 工厂编码
+     * @param productType 业务类型 TBR 全钢 PCR 半钢
      * @return
      */
-    Integer getMonthStartDay(String factoryCode);
+    Integer getMonthStartDay(String factoryCode, ProductTypeEnum productType);
 
     /**
      * 获取分厂的寸口产能分配参数
      *
-     * @param factoryCode 分厂编码
+     * @param factoryCode 工厂编码
      * @return
      */
     SizeCapacityParamVo getSizeCapacityAllocationParam(String factoryCode);

@@ -28,6 +28,25 @@ import lombok.Data;
 @TableName(value = "T_MP_MOULD_USE_STATUS_LOG")
 @ApiModel(value = "分厂月度计划模具状态日志记录对象", description = "分厂月度计划模具状态日志记录对象")
 public class FactoryMouldUsedLog extends BaseEntity {
+
+    /**
+     * 工厂编码
+     */
+    @Excel(name = "ui.data.column.mouldStatusLog.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 20)
+    @ApiModelProperty(value = "工厂编码")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /**
+     * 模具号
+     */
+    @Excel(name = "ui.data.column.mouldStatusLog.mouldCode")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 40)
+    @ApiModelProperty(value = "模具号")
+    @TableField(value = "MOULD_CODE")
+    private String mouldCode;
+
     /**
      * 年份
      */
@@ -45,24 +64,6 @@ public class FactoryMouldUsedLog extends BaseEntity {
     @ApiModelProperty(value = "月份")
     @TableField(value = "MONTH")
     private Long month;
-
-    /**
-     * 可用分厂编号
-     */
-    @Excel(name = "ui.data.column.mouldStatusLog.factoryCode", dictType = "biz_factory_name")
-    @ImportExcelValidated(required = true, isCode = true, maxLength = 20)
-    @ApiModelProperty(value = "可用分厂编号")
-    @TableField(value = "FACTORY_CODE")
-    private String factoryCode;
-
-    /**
-     * 模具号
-     */
-    @Excel(name = "ui.data.column.mouldStatusLog.mouldCode")
-    @ImportExcelValidated(required = true, isCode = true, maxLength = 40)
-    @ApiModelProperty(value = "模具号")
-    @TableField(value = "MOULD_CODE")
-    private String mouldCode;
 
     /**
      * 销售生产需求计划版本
@@ -98,10 +99,10 @@ public class FactoryMouldUsedLog extends BaseEntity {
     private Long mouldStatus;
 
     /**
-     * 归属分厂
+     * 归属分厂编码
      */
     @Excel(name = "ui.data.column.mouldStatusLog.ownerFactoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "归属分厂")
+    @ApiModelProperty(value = "归属分厂编码")
     @TableField(value = "OWNER_FACTORY_CODE")
     private String ownerFactoryCode;
 

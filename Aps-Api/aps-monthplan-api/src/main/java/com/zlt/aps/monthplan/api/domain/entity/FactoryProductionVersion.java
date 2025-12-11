@@ -34,18 +34,18 @@ public class FactoryProductionVersion extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 生产分厂编号
+     * 工厂编码
      */
-    @Excel(name = "ui.data.column.factoryProductionVersion.factoryCode")
-    @ApiModelProperty(value = "生产分厂编号", name = "factoryCode")
+    @Excel(name = "ui.data.column.factoryProductionVersion.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /**
-     * 品名编码
+     * 产品分类
      */
-    @Excel(name = "ui.data.column.factoryProductionVersion.productTypeCode")
-    @ApiModelProperty(value = "品名编码", name = "productTypeCode")
+    @Excel(name = "ui.data.column.factoryProductionVersion.productTypeCode", dictType = "biz_product_name")
+    @ApiModelProperty(value = "产品分类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
@@ -76,7 +76,7 @@ public class FactoryProductionVersion extends BaseEntity {
     /**
      * 计划类型：bit_plan_type 01 正常 02 订单预测 03 实单模拟
      */
-    @Excel(name = "ui.data.column.factoryProductionVersion.planType")
+    @Excel(name = "ui.data.column.factoryProductionVersion.planType", dictType = "biz_plan_type")
     @ApiModelProperty(value = "计划类型", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;

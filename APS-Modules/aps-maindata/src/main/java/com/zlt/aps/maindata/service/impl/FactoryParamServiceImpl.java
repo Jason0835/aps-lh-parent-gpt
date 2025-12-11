@@ -15,6 +15,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.domain.dto.ProductBrandDto;
 import com.zlt.aps.maindata.domain.vo.SizeCapacityParamVo;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamTemplateMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -125,13 +126,14 @@ public class FactoryParamServiceImpl extends ServiceImpl<FactoryParamMapper, Fac
     }
 
     /**
-     * 查询唯一的分厂系统参数
+     * 查询唯一的工厂系统参数
      */
     @Override
     public FactoryParam getFacParamSingle(FactoryParam factoryParam) {
         List<FactoryParam> paramList = factoryParamMapper.selectList(Wrappers.lambdaQuery(FactoryParam.class)
                 .eq(FactoryParam::getFactoryCode, factoryParam.getFactoryCode())
                 .eq(FactoryParam::getParamCode, factoryParam.getParamCode())
+                .eq(FactoryParam::getProductTypeCode, factoryParam.getProductTypeCode())
                 .eq(FactoryParam::getIsDelete, ApsConstant.DEL_FLAG_NORMAL));
         if (CollectionUtils.isEmpty(paramList)) {
             return null;
@@ -331,14 +333,14 @@ public class FactoryParamServiceImpl extends ServiceImpl<FactoryParamMapper, Fac
     }
 
     @Override
-    public Integer getMonthStartDay(String factoryCode) {
-        if (StringUtils.isBlank(factoryCode)) {
+    public Integer getMonthStartDay(String factoryCode, ProductTypeEnum productType) {
+        if (StringUtils.isBlank(factoryCode) || null == productType) {
             return null;
         }
         FactoryParam monthStartDayConfiguration = new FactoryParam();
         monthStartDayConfiguration.setFactoryCode(factoryCode);
-        monthStartDayConfiguration.setParamCode(FactoryConstant.SYS_PARAM_MONTH_CYCLE_START_DAY);
-        monthStartDayConfiguration.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
+        monthStartDayConfiguration.setParamCode(MonthPlanEnums.PRODUCTION_CYCLE_START.getCode());
+        monthStartDayConfiguration.setProductTypeCode(productType.getValue());
         FactoryParam monthStartDayParam = getFacParamSingle(monthStartDayConfiguration);
         if (null == monthStartDayParam || StringUtils.isBlank(monthStartDayParam.getParamValue())) {
             return null;
