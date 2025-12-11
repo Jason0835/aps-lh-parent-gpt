@@ -3,7 +3,6 @@ package com.zlt.aps.factory.mapper;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -26,20 +25,6 @@ public interface FactoryProductionSchedulingMapper {
      * @return
      */
     int updateProductionVersionInfo(FactoryProductionVersion updateVersion);
-
-    /**
-     * 根据分厂、年份、月份、制造需求计划版本，获取对应制造需求版本对应的物料与施工关系信息
-     *
-     * @param factoryCode      分厂
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<MdmProductConstruction> getConstructionByRequire(@Param("factoryCode") String factoryCode,
-                                                          @Param("year") Integer year,
-                                                          @Param("month") Integer month,
-                                                          @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
      * 获取所有施工信息，
@@ -90,21 +75,6 @@ public interface FactoryProductionSchedulingMapper {
                                                                                              @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
-     * 根据制造需求计划版本，获取对应物料的基础信息配置
-     * 包含 寸口、毛利率，硫化时间，模具大类
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<ProductBaseInfoVo> getProductBaseInfoByRequire(@Param("factoryCode") String factoryCode,
-                                                        @Param("year") Integer year,
-                                                        @Param("month") Integer month,
-                                                        @Param("monthPlanVersion") String monthPlanVersion);
-
-    /**
      * 根据制造需求计划版本，获取对应的月度可用模具列表
      *
      * @param factoryCode      分厂编码
@@ -117,20 +87,6 @@ public interface FactoryProductionSchedulingMapper {
                                                        @Param("year") Integer year,
                                                        @Param("month") Integer month,
                                                        @Param("monthPlanVersion") String monthPlanVersion);
-
-    /**
-     * 根据制造需求计划版本，获取对应的物料、模具关系
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<ProductMouldConfigurationVo> getProductionMouldRelation(@Param("factoryCode") String factoryCode,
-                                                                 @Param("year") Integer year,
-                                                                 @Param("month") Integer month,
-                                                                 @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
      * 根据制造需求版本及排产版本，删除对应的排产初始化数据

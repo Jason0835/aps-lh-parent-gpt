@@ -146,32 +146,4 @@
               )
     </select>
 
-    <select id="getProductionMouldRelationByMatchingRequire" resultType="com.zlt.aps.factory.domain.vo.ProductMouldConfigurationVo">
-        SELECT DISTINCT mfmp.FACTORY_CODE,
-               mfmp.PRODUCT_CODE,
-               pmr.MOULD_CODE,
-               pmr.SPEC_CODE
-          FROM t_mdm_product_model_relation pmr
-         INNER JOIN t_mdm_factory_matching_production mfmp
-            ON mfmp.PRODUCT_CODE = pmr.PRODUCT_CODE
-           AND mfmp.FACTORY_CODE = pmr.FACTORY_CODE
-           AND IFNULL(mfmp.IS_DELETE, 0) = 0
-           AND mfmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND mfmp.YEAR = #{year,jdbcType=DECIMAL}
-           AND mfmp.MONTH = #{month,jdbcType=DECIMAL}
-         INNER JOIN t_mdm_model_info mmi
-            ON mmi.MOULD_CODE = pmr.MOULD_CODE
-           AND mmi.FACTORY_CODE = mfmp.FACTORY_CODE
-           AND NOT EXISTS (
-               SELECT 1
-                 FROM t_mp_product_require_plan prp
-                WHERE prp.PRODUCT_CODE = mfmp.PRODUCT_CODE
-                  AND prp.FACTORY_CODE = mfmp.FACTORY_CODE
-                  AND IFNULL(prp.IS_DELETE, 0) = 0
-                  AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND prp.YEAR = #{year,jdbcType=DECIMAL}
-                  AND prp.MONTH = #{month,jdbcType=DECIMAL}
-                  AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-               )
-    </select>
 </mapper>

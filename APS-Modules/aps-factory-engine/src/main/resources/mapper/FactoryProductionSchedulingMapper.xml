@@ -14,29 +14,6 @@
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
     </update>
 
-    <select id="getConstructionByRequire" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
-        SELECT DISTINCT prp.FACTORY_CODE,
-               prp.PRODUCT_CODE,
-               mpc.CONSTRUCTION_CODE,
-               mpc.SPEC_CODE,
-               mpc.EMBRYO_CODE,
-               mpc.MOULD_METHOD,
-               mpc.CURING_TIME,
-               mpc.CURING_TIME2,
-               mpc.MOLD_CAVITY,
-               mpc.MOULD_CLAMPING_PRESSURE
-          FROM t_mp_product_require_plan prp
-          LEFT JOIN t_mdm_product_construction mpc
-            ON mpc.FACTORY_CODE = prp.FACTORY_CODE
-           AND mpc.PRODUCT_CODE = prp.PRODUCT_CODE
-           AND IFNULL(mpc.IS_DELETE, 0) = 0
-         WHERE IFNULL(prp.IS_DELETE, 0) = 0
-           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND prp.YEAR = #{year,jdbcType=DECIMAL}
-           AND prp.MONTH = #{month,jdbcType=DECIMAL}
-           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-    </select>
-
     <select id="getBaseConstructionInfo" resultType="com.zlt.aps.factory.domain.vo.BaseConstructionVersionInfoVo">
         SELECT embryo_code,
                tire_fabric_code1,
@@ -118,28 +95,6 @@
            AND mdmp.END_DAY &lt;= #{endDate,jdbcType=DATE}
     </select>
 
-    <select id="getProductBaseInfoByRequire" resultType="com.zlt.aps.factory.domain.vo.ProductBaseInfoVo">
-        SELECT DISTINCT prp.FACTORY_CODE,
-               prp.PRODUCT_CODE,
-               mpi.PRODUCT_DESC,
-               mpi.PRO_SIZE,
-               mpi.TIRE_TYPE,
-               mpi.CURING_TIME,
-               mpi.MOULD_CATEGORY,
-               mpi.COMMON_TYPE,
-               mpi.GROSS_RATE_JSON
-          FROM t_mp_product_require_plan prp
-                   LEFT JOIN t_mdm_material_info mpi
-            ON mpi.FACTORY_CODE = prp.FACTORY_CODE
-           AND mpi.PRODUCT_CODE = prp.PRODUCT_CODE
-           AND IFNULL(mpi.IS_DELETE, 0) = 0
-         WHERE IFNULL(prp.IS_DELETE, 0) = 0
-           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND prp.YEAR = #{year,jdbcType=DECIMAL}
-           AND prp.MONTH = #{month,jdbcType=DECIMAL}
-           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-    </select>
-
     <select id="getMonthEnableMouldConfiguration" resultType="com.zlt.aps.factory.domain.vo.MouldInfoVO">
         SELECT DISTINCT mus.FACTORY_CODE,
                mus.YEAR,
@@ -166,26 +121,6 @@
            AND mus.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND mus.YEAR = #{year,jdbcType=DECIMAL}
            AND mus.MONTH = #{month,jdbcType=DECIMAL}
-    </select>
-
-    <select id="getProductionMouldRelation" resultType="com.zlt.aps.factory.domain.vo.ProductMouldConfigurationVo">
-        SELECT DISTINCT prp.FACTORY_CODE,
-               prp.PRODUCT_CODE,
-               pmr.MOULD_CODE,
-               pmr.SPEC_CODE
-          FROM t_mdm_product_model_relation pmr
-         INNER JOIN t_mp_product_require_plan prp
-            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
-           AND prp.FACTORY_CODE = pmr.FACTORY_CODE
-           AND IFNULL(prp.IS_DELETE, 0) = 0
-           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND prp.YEAR = #{year,jdbcType=DECIMAL}
-           AND prp.MONTH = #{month,jdbcType=DECIMAL}
-           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND prp.PLAN_QTY > 0
-         INNER JOIN t_mdm_model_info mmi
-            ON mmi.MOULD_CODE = pmr.MOULD_CODE
-           AND mmi.FACTORY_CODE = prp.FACTORY_CODE
     </select>
 
     <delete id="deleteProductionInitVersion">
