@@ -148,8 +148,8 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
     @PostMapping("/checkSCMData")
     @ResponseBody
-    public AjaxResult checkSCMData() {
-        return iSalesOrderPoolService.checkSCMData();
+    public AjaxResult checkSCMData(SalesOrderPool salesOrderPool) {
+        return iSalesOrderPoolService.checkSCMData(salesOrderPool);
     }
     
     /**
@@ -159,8 +159,8 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @RequiresPermissions("monthplan:SalesOrderPool:getSCMData")
     @PostMapping("/getSCMData")
     @ResponseBody
-    public AjaxResult getSCMData() {
-        return iSalesOrderPoolService.getSCMData();
+    public AjaxResult getSCMData(SalesOrderPool salesOrderPool) {
+        return iSalesOrderPoolService.getSCMData(salesOrderPool);
     }
 
     /**
