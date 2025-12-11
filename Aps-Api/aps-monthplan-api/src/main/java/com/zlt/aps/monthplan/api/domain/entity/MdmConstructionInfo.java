@@ -263,6 +263,13 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "ZERO_BELT_CODE")
     private String zeroBeltCode;
 
+
+    /** 型胶 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.typeAdhesiveCode")
+    @ApiModelProperty(value = "型胶", name = "typeAdhesiveCode")
+    @TableField(value = "TYPE_ADHESIVE_CODE")
+    private String typeAdhesiveCode;
+
     /** 包布 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.clothWrappingCode")
     @ApiModelProperty(value = "包布", name = "clothWrappingCode")
