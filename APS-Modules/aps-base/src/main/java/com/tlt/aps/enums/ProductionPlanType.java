@@ -14,15 +14,15 @@ public enum ProductionPlanType {
     /**
      * 01 正常
      */
-    normal("01", "正常"),
+    NORMAL("01", "正常"),
     /**
      * 02 订单预测
      */
-    prediction("02", "订单预测"),
+    PREDICTION("02", "订单预测"),
     /**
      * 03 实单模拟
      */
-    simulate("03", "实单模拟");
+    SIMULATE("03", "实单模拟");
 
     private String planType;
 
