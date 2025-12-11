@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import java.math.BigDecimal;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -35,6 +36,7 @@ public class RawSpecialMaterialRatio extends BaseEntity {
 
      /** 工厂 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.factoryCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -42,29 +44,34 @@ public class RawSpecialMaterialRatio extends BaseEntity {
     /** 材料代码 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.materialCode")
     @ApiModelProperty(value = "材料代码", name = "materialCode")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 材料名称 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.materialName")
     @ApiModelProperty(value = "材料名称", name = "materialName")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @TableField(value = "MATERIAL_NAME")
     private String materialName;
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.standardLength")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 100)
     @ApiModelProperty(value = "标准长", name = "standardLength")
     @TableField(value = "STANDARD_LENGTH")
     private Integer standardLength;
 
     /** 比例 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.ratio")
+    @ImportExcelValidated(required = true,  number = true, min = 0, max = 999999)
     @ApiModelProperty(value = "比例", name = "ratio")
     @TableField(value = "RATIO")
     private BigDecimal ratio;
 
     /** 单位数据字典 biz_unit 01 米 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.unit")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;

@@ -132,7 +132,7 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.rawSpecialMaterialRatio.modelName");
     }
 
     /**
@@ -173,7 +173,7 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,false);
+        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,true);
         return ajaxResult;
     }
 }
