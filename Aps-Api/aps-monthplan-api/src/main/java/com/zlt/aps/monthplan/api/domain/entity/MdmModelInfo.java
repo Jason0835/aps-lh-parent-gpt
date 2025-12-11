@@ -26,7 +26,7 @@ import lombok.Data;
  * @date 2025-02-18
  */
 
-@ApiModel(value = "模具信息对象", description = "模具信息对象 ")
+@ApiModel(value = "模具信息对象", description = "模具信息对象")
 @Data
 @TableName(value = "T_MDM_MODEL_INFO")
 public class MdmModelInfo extends BaseEntity {
@@ -53,47 +53,6 @@ public class MdmModelInfo extends BaseEntity {
     private String mouldCode;
 
     /**
-     * 模具
-     */
-    @Excel(name = "ui.data.column.mdmModelInfo.mouldNo")
-    @ApiModelProperty(value = "模具", name = "mouldNo")
-    @TableField(value = "MOULD_NO")
-    private String mouldNo;
-
-    /**
-     * 规格
-     */
-    @Excel(name = "ui.data.column.mdmModelInfo.specifications")
-    @ApiModelProperty(value = "规格", name = "specifications")
-    @TableField(value = "SPECIFICATIONS")
-    private String specifications;
-
-    /**
-     * 主花纹
-     */
-    @ImportExcelValidated(required = true, maxLength = 20)
-    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern", sort = 8)
-    @ApiModelProperty(value = "主花纹", name = "mainPattern")
-    @TableField(value = "MAIN_PATTERN")
-    private String mainPattern;
-
-    /**
-     * 花纹
-     */
-    @Excel(name = "ui.data.column.mdmModelInfo.pattern")
-    @ApiModelProperty(value = "花纹", name = "pattern")
-    @TableField(value = "PATTERN")
-    private String pattern;
-
-    /**
-     * 品牌
-     */
-//    @Excel(name = "ui.data.column.mdmModelInfo.brand")
-    @ApiModelProperty(value = "品牌", name = "brand")
-    @TableField(value = "BRAND")
-    private String brand;
-
-    /**
      * 模具类型，字典：biz_mould_Type
      */
     @Excel(name = "ui.data.column.mdmModelInfo.mouldType", dictType = "biz_mould_Type")
@@ -110,9 +69,57 @@ public class MdmModelInfo extends BaseEntity {
     private Integer mouldStatus;
 
     /**
+     * 物流状态,字典：	logistics_status
+     */
+    @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
+    @TableField(value = "LOGISTICS_STATUS")
+    private String logisticsStatus;
+
+    /**
+     * 模具
+     */
+//    @Excel(name = "ui.data.column.mdmModelInfo.mouldNo")
+    @ApiModelProperty(value = "模具", name = "mouldNo")
+    @TableField(value = "MOULD_NO")
+    private String mouldNo;
+
+    /**
+     * 规格
+     */
+    @Excel(name = "ui.data.column.mdmModelInfo.specifications")
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
+
+    /**
+     * 主花纹
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
+
+    /**
+     * 品牌
+     */
+//    @Excel(name = "ui.data.column.mdmModelInfo.brand")
+    @ApiModelProperty(value = "品牌", name = "brand")
+    @TableField(value = "BRAND")
+    private String brand;
+
+    /**
+     * 花纹
+     */
+    @Excel(name = "ui.data.column.mdmModelInfo.pattern")
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(value = "PATTERN")
+    private String pattern;
+
+    /**
      * 主商标
      */
-    @Excel(name = "ui.data.column.mdmModelInfo.mainTrademark")
+//    @Excel(name = "ui.data.column.mdmModelInfo.mainTrademark")
     @ApiModelProperty(value = "主商标", name = "mainTrademark")
     @TableField(value = "MAIN_TRADEMARK")
     private String mainTrademark;
@@ -142,15 +149,9 @@ public class MdmModelInfo extends BaseEntity {
     private String mouldAirType;
 
     /**
-     * 物流状态,字典：	logistics_status
-     */
-    @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
-    @TableField(value = "LOGISTICS_STATUS")
-    private String logisticsStatus;
-
-    /**
      * 模壳标准
      */
+    @Excel(name = "ui.data.column.mdmModelInfo.shellStandard")
     @ApiModelProperty(value = "模壳标准", name = "shellStandard")
     @TableField(value = "SHELL_STANDARD")
     private String shellStandard;
