@@ -250,5 +250,15 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
         return "MDM0124";
     }
 
+    /**
+     * 抓取MES数据
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    public AjaxResult mesCapture() {
+        // TODO...对接接口
+        return AjaxResult.success();
+    }
 
 }

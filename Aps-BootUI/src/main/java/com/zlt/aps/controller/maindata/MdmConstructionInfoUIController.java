@@ -209,4 +209,16 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
         AjaxResult ajaxResult = iMdmConstructionInfoService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 抓取MES数据
+     */
+    @RequiresPermissions("monthplan:mdmConstructionInfo:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    @ResponseBody
+    public AjaxResult mesCapture() {
+        return iMdmConstructionInfoService.mesCapture();
+    }
+
 }

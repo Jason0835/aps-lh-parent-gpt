@@ -77,4 +77,12 @@ public interface IMdmConstructionInfoRemoteService {
     @PostMapping("/mdmConstructionInfo/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 抓取MES数据
+     * @return 结果
+     */
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mdmConstructionInfo/mesCapture")
+    AjaxResult mesCapture();
+
 }
