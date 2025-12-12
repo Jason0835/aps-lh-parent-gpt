@@ -125,7 +125,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		List<SyncPlanedNotShipResultVo> syncResultList = (List<SyncPlanedNotShipResultVo>) result
 				.get(AjaxResult.DATA_TAG);
 		if (CollectionUtils.isEmpty(syncResultList)) {
-			return AjaxResult.error("没有抓取到数据");
+			return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.noScmData"));
 		}
 
 		// 加载区域
@@ -144,10 +144,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		StringBuilder warnMsg = new StringBuilder();
 		String splitFlag = notPriorityAreaList.size() > 1 ? "\n" : ""; // 如果有多个区域没有维护优先级，则需要换行提示
 		for (String area : notPriorityAreaList) {
-			warnMsg.append(String.format("%s区域未识别到优先级，", area)).append(splitFlag);
+			warnMsg.append(String.format(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.notPriorityArea"), area)).append(splitFlag);
 		}
 		if (warnMsg.length() > 0) {
-			warnMsg.append("是否继续");
+			warnMsg.append(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.isContinue"));
 			return AjaxResult.success(warnMsg.toString(), ApsConstant.APS_YES_NO_1);
 		}
 
@@ -172,7 +172,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		List<SyncPlanedNotShipResultVo> syncResultList = (List<SyncPlanedNotShipResultVo>) result
 				.get(AjaxResult.DATA_TAG);
 		if (CollectionUtils.isEmpty(syncResultList)) {
-			return AjaxResult.error("没有抓取到数据");
+			return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.noScmData"));
 		}
 		return this.saveItfData(salesOrderPool, syncResultList);
 	}
@@ -346,9 +346,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 		String resultData = String.valueOf(result.get(AjaxResult.DATA_TAG));
 		if (StringUtils.isEmpty(resultData) || !JSONValidator.from(resultData).validate()) {
-			String errorMsg = "syncPlanedNotShipList 返回数据格式校验失败：" + result;
-			log.error(errorMsg);
-			return AjaxResult.error(errorMsg);
+			log.error("SMC已计划未发货接口返回数据格式校验失败：" + result);
+			String errorMsg = I18nUtil.getMessage("ui.data.alert.SalesOrderPool.itfDataError");
+			return AjaxResult.error(String.format(errorMsg, result));
 		}
 
 		List<SyncPlanedNotShipResultVo> syncResultList = JSONArray.parseArray(resultData,
