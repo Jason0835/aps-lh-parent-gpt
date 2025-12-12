@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
  * 文件名称：MdmConstructionInfoMapper.java
  * 描    述：投产胎胚施工信息Mapper接口
  *@author zlt
- *@date 2025-02-24
+ *@date 2025-12-10
  *@version 1.0
  *
  *  修改记录：

@@ -6,24 +6,21 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
-import com.zlt.aps.monthplan.api.service.IMdmConstructionInfoRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.monthplan.api.service.IMpMonthlySaleQtyRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-
+import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.ruoyi.common4ui.exception.base.BaseException;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.util.Arrays;
-import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
@@ -38,35 +35,35 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmConstructionInfoUIController.java
- * 描    述：投产胎胚施工信息 UI控制层类：....
- *@author zlt
- *@date 2025-12-10
+ * 文件名称：MpMonthlySaleQtyUIController.java
+ * 描    述：月均销量 UI控制层类：....
+ *@author yelq
+ *@date 2025-12-11
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：zlt
+ *     修 改 人：yelq
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "投产胎胚施工信息")
+@Api(tags = "月均销量")
 @Controller
-@RequestMapping("/monthplan/mdmConstructionInfo")
-public class MdmConstructionInfoUIController extends BaseUIController<MdmConstructionInfo> {
+@RequestMapping("/monthplan/monthlySaleQty")
+public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySaleQty> {
 
     @Autowired
-    private IMdmConstructionInfoRemoteService iMdmConstructionInfoService;
+    private IMpMonthlySaleQtyRemoteService iMpMonthlySaleQtyService;
 
-    private final String prefix = "aps/monthplan/mdmConstructionInfo";
+    private final String prefix = "monthplan/monthplan/monthlySaleQty";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmConstructionInfo:view")
+    @RequiresPermissions("monthplan:monthlySaleQty:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmConstructionInfo";
+        return prefix + "/monthlySaleQty";
     }
 
     /**
@@ -74,7 +71,7 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmConstructionInfo", new MdmConstructionInfo());
+        mmap.put("mpMonthlySaleQty", new MpMonthlySaleQty());
         return prefix + "/add";
     }
 
@@ -83,56 +80,61 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmConstructionInfo", iMdmConstructionInfoService.getInfo(id));
+        mmap.put("mpMonthlySaleQty", iMpMonthlySaleQtyService.getInfo(id));
         return prefix + "/edit";
     }
 
     /**
-     * 根据条件查询主表数据
+     * 根据条件查询月均销量列表
      */
-    @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmConstructionInfo:list")
+    @ApiOperation("根据条件查询月均销量列表")
+    @RequiresPermissions("monthplan:monthlySaleQty:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmConstructionInfo mdmConstructionInfo) {
-        return iMdmConstructionInfoService.list(mdmConstructionInfo);
+    public TableDataInfo list(MpMonthlySaleQty entity) {
+        return iMpMonthlySaleQtyService.list(entity);
     }
 
     /**
-     * 修改或新增
+     * 修改或新增月均销量
      */
-    @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmConstructionInfo:edit")
-    @PostMapping("/save")
+    @ApiOperation("修改或新增月均销量")
+    @RequiresPermissions("monthplan:monthlySaleQty:edit")
+    @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult save(MdmConstructionInfo mdmConstructionInfo) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmConstructionInfoService.checkUnique(mdmConstructionInfo))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmConstructionInfo.checkUnique"));
+    public AjaxResult editSave(MpMonthlySaleQty mpMonthlySaleQty) {
+        AjaxResult ajaxResult = null;
+        if (UserConstants.NOT_UNIQUE.equals(iMpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpMonthlySaleQty.checkUnique"));
         }
-
-        return iMdmConstructionInfoService.save(mdmConstructionInfo);
+        if (mpMonthlySaleQty.getId() != null){
+            ajaxResult = iMpMonthlySaleQtyService.edit(mpMonthlySaleQty);
+        } else{
+            ajaxResult = iMpMonthlySaleQtyService.add(mpMonthlySaleQty);
+        }
+        return ajaxResult;
     }
 
     /**
-     * 删除投产胎胚施工信息
+     * 删除月均销量
      */
-    @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmConstructionInfo:remove")
+    @ApiOperation("删除月均销量（id不为空）")
+    @RequiresPermissions("monthplan:monthlySaleQty:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmConstructionInfoService.removeByIds(Arrays.asList(arr));
+        return iMpMonthlySaleQtyService.remove(arr);
     }
 
     /**
-     * 校验投产胎胚施工信息唯一性
+     * 校验月均销量唯一性
      */
-    @ApiOperation("校验唯一性")
-    @PostMapping("/checkUnique")
+    @ApiOperation("校验月均销量唯一性")
+    @PostMapping("/checkMpMonthlySaleQtyUnique")
     @ResponseBody
-    public String checkUnique(MdmConstructionInfo mdmConstructionInfo) {
-        return iMdmConstructionInfoService.checkUnique(mdmConstructionInfo);
+    public String checkMpMonthlySaleQtyUnique(MpMonthlySaleQty mpMonthlySaleQty) {
+        return iMpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty);
     }
 
     /**
@@ -142,15 +144,15 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
      */
     @Override
     public String getExportTemplateFileName(){
-        return this.getFunctionName();
+        throw new BaseException("没有定义导出模板的文件名");
     }
 
 
     /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
+ * 继承时重写方法。
+ *
+ * @return
+ */
     @Override
     public String getProcedureCode() {
         return "0";
@@ -166,33 +168,19 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
         return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
-    /**
-     * 重写导入模板的生成逻辑
-     */
-    @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmConstructionInfo> util = new ExcelUtil<>(MdmConstructionInfo.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
-    }
-
-    @RequiresPermissions("monthplan:mdmConstructionInfo:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmConstructionInfo entity) throws IOException {
+    public void export(HttpServletResponse response, MpMonthlySaleQty entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmConstructionInfoService.exportData(entity,fileName);
+        byte[] excelBytes = iMpMonthlySaleQtyService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mdmConstructionInfo:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -206,19 +194,7 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmConstructionInfoService.importData(context,false);
+        AjaxResult ajaxResult = iMpMonthlySaleQtyService.importData(context,false);
         return ajaxResult;
     }
-
-    /**
-     * 抓取MES数据
-     */
-    @RequiresPermissions("monthplan:mdmConstructionInfo:mesCapture")
-    @ApiOperation("抓取MES数据")
-    @PostMapping("/mesCapture")
-    @ResponseBody
-    public AjaxResult mesCapture() {
-        return iMdmConstructionInfoService.mesCapture();
-    }
-
 }
