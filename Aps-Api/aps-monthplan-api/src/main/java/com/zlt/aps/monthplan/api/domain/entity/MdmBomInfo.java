@@ -145,5 +145,4 @@ public class MdmBomInfo extends BaseEntity {
     @TableField(value = "MES_UPDATE_DATE")
     private Date mesUpdateDate;
 
-
 }

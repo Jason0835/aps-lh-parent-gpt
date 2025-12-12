@@ -5,6 +5,7 @@ import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.RawMaterialRequirePlanEntityMapper;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import io.minio.Result;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -16,8 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
@@ -175,4 +178,24 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     }
 
 
+    @GetMapping("/default-year-month")
+    @ApiOperation("获取默认年月")
+    public AjaxResult getDefaultYearMonth() {
+        Map<String, Integer> defaultYearMonth = rawMaterialRequirePlanService.getDefaultYearMonth();
+        return AjaxResult.success(defaultYearMonth);
+    }
+
+    @PostMapping("/generate")
+    @ApiOperation("生成原材料需求计划")
+    public AjaxResult generate(@RequestParam Integer year,
+                               @RequestParam Integer month) {
+        return rawMaterialRequirePlanService.generateRawMaterialRequirePlan(year, month);
+    }
+
+    @GetMapping("/check-status")
+    @ApiOperation("检查生成状态")
+    public AjaxResult checkStatus(@RequestParam Integer year,
+                                  @RequestParam Integer month) {
+        return rawMaterialRequirePlanService.checkGeneratingStatus(year, month);
+    }
 }

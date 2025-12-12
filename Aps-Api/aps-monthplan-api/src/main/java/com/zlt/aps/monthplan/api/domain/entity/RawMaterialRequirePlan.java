@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
@@ -112,4 +113,178 @@ public class RawMaterialRequirePlan extends BaseEntity {
     private BigDecimal t2MonthEudrQty;
 
 
+
+    public RawMaterialRequirePlan() {
+        super();
+    }
+
+    public RawMaterialRequirePlan(String materialCode) {
+        this.productCode = materialCode;
+    }
+
+    /**
+     * 合并另一个需求计划的数据到当前对象
+     * @param other 另一个需求计划
+     */
+    public void merge(RawMaterialRequirePlan other) {
+        if (other == null) {
+            return;
+        }
+
+        // 合并当月需求量
+        if (other.getCurMonthQty() != null) {
+            if (this.curMonthQty == null) {
+                this.curMonthQty = other.getCurMonthQty();
+            } else {
+                this.curMonthQty = this.curMonthQty.add(other.getCurMonthQty());
+            }
+        }
+
+        // 合并当月EUDR
+        if (other.getCurMonthRudrQty() != null) {
+            if (this.curMonthRudrQty == null) {
+                this.curMonthRudrQty = other.getCurMonthRudrQty();
+            } else {
+                this.curMonthRudrQty = this.curMonthRudrQty.add(other.getCurMonthRudrQty());
+            }
+        }
+
+        // 合并次月需求量
+        if (other.getTMonthQty() != null) {
+            if (this.tMonthQty == null) {
+                this.tMonthQty = other.getTMonthQty();
+            } else {
+                this.tMonthQty = this.tMonthQty.add(other.getTMonthQty());
+            }
+        }
+
+        // 合并次月EUDR
+        if (other.getTMonthEudrQty() != null) {
+            if (this.tMonthEudrQty == null) {
+                this.tMonthEudrQty = other.getTMonthEudrQty();
+            } else {
+                this.tMonthEudrQty = this.tMonthEudrQty.add(other.getTMonthEudrQty());
+            }
+        }
+
+        // 合并次次月需求量
+        if (other.getT1MonthQty() != null) {
+            if (this.t1MonthQty == null) {
+                this.t1MonthQty = other.getT1MonthQty();
+            } else {
+                this.t1MonthQty = this.t1MonthQty.add(other.getT1MonthQty());
+            }
+        }
+
+        // 合并次次月EUDR
+        if (other.getT1MonthEudrQty() != null) {
+            if (this.t1MonthEudrQty == null) {
+                this.t1MonthEudrQty = other.getT1MonthEudrQty();
+            } else {
+                this.t1MonthEudrQty = this.t1MonthEudrQty.add(other.getT1MonthEudrQty());
+            }
+        }
+
+        // 合并次次次月需求量
+        if (other.getT2MonthQty() != null) {
+            if (this.t2MonthQty == null) {
+                this.t2MonthQty = other.getT2MonthQty();
+            } else {
+                this.t2MonthQty = this.t2MonthQty.add(other.getT2MonthQty());
+            }
+        }
+
+        // 合并次次次月EUDR
+        if (other.getT2MonthEudrQty() != null) {
+            if (this.t2MonthEudrQty == null) {
+                this.t2MonthEudrQty = other.getT2MonthEudrQty();
+            } else {
+                this.t2MonthEudrQty = this.t2MonthEudrQty.add(other.getT2MonthEudrQty());
+            }
+        }
+    }
+
+    /**
+     * 判断是否需要更新
+     * @param other 另一个需求计划
+     * @return 是否需要更新
+     */
+    public boolean needsUpdate(RawMaterialRequirePlan other) {
+        if (other == null) {
+            return false;
+        }
+
+        // 检查是否有任何字段的值不同
+        return !equalsQuantity(this.curMonthQty, other.getCurMonthQty())
+                || !equalsQuantity(this.curMonthRudrQty, other.getCurMonthRudrQty())
+                || !equalsQuantity(this.tMonthQty, other.getTMonthQty())
+                || !equalsQuantity(this.tMonthEudrQty, other.getTMonthEudrQty())
+                || !equalsQuantity(this.t1MonthQty, other.getT1MonthQty())
+                || !equalsQuantity(this.t1MonthEudrQty, other.getT1MonthEudrQty())
+                || !equalsQuantity(this.t2MonthQty, other.getT2MonthQty())
+                || !equalsQuantity(this.t2MonthEudrQty, other.getT2MonthEudrQty());
+    }
+
+    /**
+     * 比较两个BigDecimal数量是否相等
+     */
+    private boolean equalsQuantity(BigDecimal qty1, BigDecimal qty2) {
+        if (qty1 == null && qty2 == null) {
+            return true;
+        }
+        if (qty1 == null || qty2 == null) {
+            return false;
+        }
+        return qty1.compareTo(qty2) == 0;
+    }
+
+    /**
+     * 获取总需求量（所有月份之和）
+     * @return 总需求量
+     */
+    public BigDecimal getTotalRequirement() {
+        BigDecimal total = BigDecimal.ZERO;
+        if (curMonthQty != null) total = total.add(curMonthQty);
+        if (tMonthQty != null) total = total.add(tMonthQty);
+        if (t1MonthQty != null) total = total.add(t1MonthQty);
+        if (t2MonthQty != null) total = total.add(t2MonthQty);
+        return total;
+    }
+
+    /**
+     * 获取总EUDR需求量（所有月份之和）
+     * @return 总EUDR需求量
+     */
+    public BigDecimal getTotalEudrRequirement() {
+        BigDecimal total = BigDecimal.ZERO;
+        if (curMonthRudrQty != null) total = total.add(curMonthRudrQty);
+        if (tMonthEudrQty != null) total = total.add(tMonthEudrQty);
+        if (t1MonthEudrQty != null) total = total.add(t1MonthEudrQty);
+        if (t2MonthEudrQty != null) total = total.add(t2MonthEudrQty);
+        return total;
+    }
+
+    /**
+     * 检查是否为空需求（所有字段都为null或0）
+     * @return 是否为空需求
+     */
+    public boolean isEmptyRequirement() {
+        return (curMonthQty == null || curMonthQty.compareTo(BigDecimal.ZERO) == 0)
+                && (curMonthRudrQty == null || curMonthRudrQty.compareTo(BigDecimal.ZERO) == 0)
+                && (tMonthQty == null || tMonthQty.compareTo(BigDecimal.ZERO) == 0)
+                && (tMonthEudrQty == null || tMonthEudrQty.compareTo(BigDecimal.ZERO) == 0)
+                && (t1MonthQty == null || t1MonthQty.compareTo(BigDecimal.ZERO) == 0)
+                && (t1MonthEudrQty == null || t1MonthEudrQty.compareTo(BigDecimal.ZERO) == 0)
+                && (t2MonthQty == null || t2MonthQty.compareTo(BigDecimal.ZERO) == 0)
+                && (t2MonthEudrQty == null || t2MonthEudrQty.compareTo(BigDecimal.ZERO) == 0);
+    }
+
+    /**
+     * 获取需求计划的唯一标识键
+     * @return 唯一标识键
+     */
+    public String getUniqueKey() {
+        return String.format("%s_%d_%d_%s",
+                factoryCode, year, month, productCode);
+    }
 }
