@@ -153,7 +153,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 generateDifferenceData(year, month);
 
                 // 12. 生成周维度原材料用量记录
-                rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month);
+                generateWeekUsageRecords(factoryCode, year, month);
 
                 return AjaxResult.success(String.format("%d年%02d月原材料需求计划生成完成", year, month));
 
@@ -165,6 +165,33 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         } catch (Exception e) {
             log.error("生成原材料需求计划失败", e);
             return AjaxResult.error("生成原材料需求计划失败：" + e.getMessage());
+        }
+    }
+
+
+    /**
+     * 生成周维度原材料用量记录
+     */
+    private void generateWeekUsageRecords(String factoryCode, Integer year, Integer month) {
+        try {
+                try {
+                    AjaxResult result = rawWeekUsageGenerateService
+                            .generateWeekUsageForMonth(factoryCode, year, month);
+
+                    if (isSuccess(result)) {
+                        log.info("生成周维度用量记录成功，工厂：{}，年月：{}-{}",
+                                factoryCode, year, month);
+                    } else {
+                        log.warn("生成周维度用量记录失败，工厂：{}，年月：{}-{}，错误：{}",
+                                factoryCode, year, month, result.get("msg"));
+                    }
+                } catch (Exception e) {
+                    log.error("生成周维度用量记录异常，工厂：{}，年月：{}-{}",
+                            factoryCode, year, month, e);
+                }
+        } catch (Exception e) {
+            log.error("生成周维度用量记录总体失败", e);
+            // 不抛出异常，避免影响主流程
         }
     }
 
