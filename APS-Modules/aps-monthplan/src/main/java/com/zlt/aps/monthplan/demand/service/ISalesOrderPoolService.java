@@ -26,6 +26,13 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool);
 	
 	/**
+	 * 校验SCM已计划未发货数据
+	 * @param salesOrderPool
+	 * @return
+	 */
+	AjaxResult checkSCMData(SalesOrderPool salesOrderPool);
+	
+	/**
 	 * 抓取SCM已计划未发货数据
 	 * @param salesOrderPool
 	 * @return

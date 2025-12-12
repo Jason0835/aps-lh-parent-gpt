@@ -38,6 +38,15 @@ public interface IFactoryParamService extends IService<FactoryParam> {
     List<FactoryParam> getFacParamByList(FactoryParam entity);
 
     /**
+     * 批量获取参数信息
+     *
+     * @param factoryCode     工厂编码
+     * @param productTypeCode 产品品类
+     * @param paramCodeList   参数集合
+     * @return
+     */
+    List<FactoryParam> getFactoryParamByCondition(String factoryCode, String productTypeCode, List<String> paramCodeList);
+    /**
      * 复制分厂排产设定
      *
      * @param factoryParamVo
