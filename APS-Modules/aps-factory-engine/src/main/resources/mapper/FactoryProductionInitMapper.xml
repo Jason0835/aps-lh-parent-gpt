@@ -2,19 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionInitMapper">
 
-<!--    <update id="updateProductionSequence" parameterType="java.util.List">-->
-<!--        <foreach collection="sequenceList" item="productionInit" index="index" open="" close="" separator=";">-->
-<!--            UPDATE t_mp_proc_month_plan_init-->
-<!--               SET PRODUCTION_SEQUENCE = #{productionInit.productionSequence,jdbcType=DECIMAL}-->
-<!--             WHERE FACTORY_CODE = #{productionInit.factoryCode,jdbcType=VARCHAR}-->
-<!--               AND YEAR = #{productionInit.year,jdbcType=DECIMAL}-->
-<!--               AND MONTH = #{productionInit.month,jdbcType=DECIMAL}-->
-<!--               AND MONTH_PLAN_VERSION = #{productionInit.monthPlanVersion,jdbcType=VARCHAR}-->
-<!--               AND PRODUCTION_VERSION = #{productionInit.productionVersion,jdbcType=VARCHAR}-->
-<!--               AND MONTH_PLAN_ID = #{productionInit.monthPlanId,jdbcType=DECIMAL}-->
-<!--        </foreach>-->
-<!--    </update>-->
-
     <update id="updateProductionSequence" parameterType="java.util.List">
         <foreach collection="sequenceList" item="productionInit" index="index" open="" close="" separator=";">
             UPDATE t_mp_proc_month_plan_init

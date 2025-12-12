@@ -172,8 +172,8 @@ public class MonthPlanProductionFinalUtils {
         }
         String language = SecurityUtils.getUserLang().toString();
         JsonUtils.parseJsonRemarkList(list, language, "reason");
-
-        String noProductionQtyReasonJson = NoProductionReasonUtils.getNoProductionQty();
+        //NoProductionReasonUtils.getNoProductionQty();
+        String noProductionQtyReasonJson = "NoProductionReasonUtils.getNoProductionQty()";
         String noProductionQtyReason = JsonUtils.parseJsonRemark(noProductionQtyReasonJson, language);
         String firstNoProductionQtyReason = String.format("%s,", noProductionQtyReason);
         String endNoProductionQtyReason = String.format(",%s", noProductionQtyReason);

@@ -104,13 +104,13 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
     @ResponseBody
     public AjaxResult editSave(MpMonthlySaleQty mpMonthlySaleQty) {
         AjaxResult ajaxResult = null;
-        if (UserConstants.NOT_UNIQUE.equals(iMpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty))) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpMonthlySaleQtyService.checkUnique(mpMonthlySaleQty))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpMonthlySaleQty.checkUnique"));
         }
         if (mpMonthlySaleQty.getId() != null){
             ajaxResult = iMpMonthlySaleQtyService.edit(mpMonthlySaleQty);
         } else{
-            ajaxResult = iMpMonthlySaleQtyService.add(mpMonthlySaleQty);
+            ajaxResult = iMpMonthlySaleQtyService.save(mpMonthlySaleQty);
         }
         return ajaxResult;
     }
@@ -134,7 +134,7 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
     @PostMapping("/checkMpMonthlySaleQtyUnique")
     @ResponseBody
     public String checkMpMonthlySaleQtyUnique(MpMonthlySaleQty mpMonthlySaleQty) {
-        return iMpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty);
+        return iMpMonthlySaleQtyService.checkUnique(mpMonthlySaleQty);
     }
 
     /**

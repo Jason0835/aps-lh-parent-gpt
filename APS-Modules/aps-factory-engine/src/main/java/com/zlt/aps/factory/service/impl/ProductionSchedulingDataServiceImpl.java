@@ -3,17 +3,21 @@ package com.zlt.aps.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.factory.utils.MouldBaseUtils;
 import com.zlt.aps.factory.utils.ProductionProcessUtils;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
 import com.zlt.aps.maindata.service.*;
+import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.NoProductionDayMouldVo;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
@@ -37,7 +41,7 @@ import java.util.stream.Collectors;
  * 排产调用数据获取服务类
  *
  * @author ZLT
- * @date 20250220
+ * @date 20251208
  */
 @Service
 @RequiredArgsConstructor
@@ -51,13 +55,17 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final FactoryProductionInitMapper factoryProductionInitMapper;
 
-    private final FactoryNoProductionRecordMapper factoryNoProductionRecordMapper;
+    private final FactoryMonthPlanProductInfoMapper factoryMonthPlanProductInfoMapper;
 
     private final FactoryProductionSchedulingMapper factoryProductionSchedulingMapper;
 
+    private final FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
+
     private final FactoryEngineProductionVersionMapper factoryEngineProductionVersionMapper;
 
-    private final FactoryProductionMouldConfigurationMapper factoryProductionMouldConfigurationMapper;
+    private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
+
+    private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
 
     private final BaseDao baseDao;
 
@@ -79,17 +87,43 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
 
-    private final IFactoryProductionNoProductionRecordService factoryProductionNoProductionRecordService;
-
     private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
-
-    private final IFactoryMonthPlanProductionDayResultService monthPlanProductionDayResultService;
-
-    private final IFactoryMonthPlanPreProductionCapacityService factoryMonthPlanPreProductionCapacityService;
 
     private final IFactoryProductionMouldProductionResultService factoryProductionMouldProductionResultService;
 
     private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
+
+    @Override
+    public Integer getProductionCycleConfiguration(Context context) {
+        return factoryParamService.getMonthStartDay(context.getFactoryCode(), context.getProductType());
+    }
+
+    @Override
+    public String getOpenPreemptionMouldCapacity(Context context) {
+        FactoryParam openPreemptionConfiguration = new FactoryParam();
+        openPreemptionConfiguration.setFactoryCode(context.getFactoryCode());
+        openPreemptionConfiguration.setParamCode(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode());
+        openPreemptionConfiguration.setProductTypeCode(context.getProductType().getValue());
+        FactoryParam openPreemptionParam = factoryParamService.getFacParamSingle(openPreemptionConfiguration);
+        if (null == openPreemptionParam || StringUtils.isBlank(openPreemptionParam.getParamValue())) {
+            return "";
+        }
+        return (String) FactoryParamUtils.getParamValue(openPreemptionParam);
+    }
+
+    @Override
+    public DayVulcanizationModeEnum getDayVulcanizationQtyConfiguration(Context context) {
+        FactoryParam dayVulcanizationModeConfiguration = new FactoryParam();
+        dayVulcanizationModeConfiguration.setFactoryCode(context.getFactoryCode());
+        dayVulcanizationModeConfiguration.setParamCode(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        dayVulcanizationModeConfiguration.setProductTypeCode(context.getProductType().getValue());
+        FactoryParam dayVulcanizationParam = factoryParamService.getFacParamSingle(dayVulcanizationModeConfiguration);
+        if (null == dayVulcanizationParam || StringUtils.isBlank(dayVulcanizationParam.getParamValue())) {
+            return DayVulcanizationModeEnum.STANDARD_CAPACITY;
+        }
+        String dayVulcanizationMode = (String) FactoryParamUtils.getParamValue(dayVulcanizationParam);
+        return DayVulcanizationModeEnum.getInstance(dayVulcanizationMode);
+    }
 
     @Override
     public FactoryProductionVersion getFactoryMonthPlanVersion(ProductionContext context) {
@@ -155,11 +189,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<MdmProductConstruction> getProductConstruction(ProductionContext context) {
-        return factoryProductionSchedulingMapper.getConstructionByRequire(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
-    }
-
-    @Override
     public Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo() {
         List<BaseConstructionVersionInfoVo> baseConstructionInfoList = factoryProductionSchedulingMapper.getBaseConstructionInfo();
         if (CollectionUtils.isEmpty(baseConstructionInfoList)) {
@@ -169,19 +198,24 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<ProductBaseInfoVo> getProductBaseInfo(ProductionContext context) {
-        return factoryProductionSchedulingMapper.getProductBaseInfoByRequire(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
+    public List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context) {
+        QueryWrapper<SaleMonthPlanRequire> queryWrapper = new QueryWrapper();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("YEAR", context.getYear());
+        queryWrapper.eq("MONTH", context.getMonth());
+        queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return monthPlanRequireMapper.selectList(queryWrapper);
     }
 
     @Override
-    public List<SaleMonthPlanRequire> getFactoryMonthPlan(ProductionContext productionContext) {
-        QueryWrapper<SaleMonthPlanRequire> queryWrapper = new QueryWrapper();
-        queryWrapper.eq("FACTORY_CODE", productionContext.getFactoryCode());
-        queryWrapper.eq("YEAR", productionContext.getYear());
-        queryWrapper.eq("MONTH", productionContext.getMonth());
-        queryWrapper.eq("MONTH_PLAN_VERSION", productionContext.getMonthPlanVersion());
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        return monthPlanRequireMapper.selectList(queryWrapper);
+    public List<ProductBaseInfoVo> getProductionMaterialInfo(Context context) {
+        return factoryMonthPlanProductInfoMapper.getProductionMaterialInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
+    }
+
+    @Override
+    public List<MonthPlanProductConstructionInfoVo> getProductionConstructionInfo(Context context) {
+        return factoryMonthPlanProductConstructionMapper.getConstructionByRequire(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
     }
 
     @Override
@@ -281,8 +315,18 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<ProductMouldConfigurationVo> getProductionMouldInfoConfiguration(ProductionContext context) {
-        return factoryProductionSchedulingMapper.getProductionMouldRelation(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
+    public List<MonthPlanProductMouldInfoVo> getProductionMouldInfo(Context context) {
+        return factoryMonthPlanProductMouldMapper.getProductionMouldInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
+    }
+
+    @Override
+    public List<MonthPlanProductMouldInfoVo> getProductionMouldDeliveryInfo(Context context) {
+        return factoryMonthPlanProductMouldMapper.getMouldDeliveryInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionStartDate(), context.getProductionEndDate());
+    }
+
+    @Override
+    public List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context) {
+        return factoryMonthPlanProductLhCapacityMapper.getProductionLhCapacityInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
     }
 
     @Override
@@ -306,43 +350,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     @Override
     public List<ProductMouldInfoVO> getEnableUseProductMouldConfiguration(ProductionContext context) {
-        List<ProductMouldConfigurationVo> productMouldConfigurationList = factoryProductionSchedulingMapper.getProductionMouldRelation(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
-        if (CollectionUtils.isEmpty(productMouldConfigurationList)) {
-            return Collections.emptyList();
-        }
-        Map<String, ProductMouldInfoVO> productMouldInfoMap = new HashMap<>();
-        productMouldConfigurationList.stream().forEach(productMouldConfiguration -> {
-            String productCode = productMouldConfiguration.getProductCode();
-            ProductMouldInfoVO productMouldInfo = productMouldInfoMap.get(productCode);
-            if (null == productMouldInfo) {
-                productMouldInfo = new ProductMouldInfoVO();
-            }
-            productMouldInfo.setProductCode(productCode);
-            Map<String, String> mouldMap = productMouldInfo.getMouldMap();
-            if (null == mouldMap) {
-                mouldMap = new HashMap<>();
-            }
-            mouldMap.put(productMouldConfiguration.getMouldCode(), productMouldConfiguration.getSpecCode());
-            productMouldInfo.setMouldMap(mouldMap);
-            productMouldInfoMap.put(productCode, productMouldInfo);
-        });
-        Map<String, MouldInfoVO> mouldInfoMap = context.getMouldInfoMap();
-        productMouldInfoMap.forEach((productCode, productionMouldInfo) -> {
-            Set<String> mouldSet = productionMouldInfo.getMouldMap().keySet();
-            if (CollectionUtils.isEmpty(mouldSet)) {
-                productionMouldInfo.setMouldInfoList(Collections.emptyList());
-                return;
-            }
-            List<MouldInfoVO> mouldInfoList = new ArrayList<>();
-            mouldSet.forEach(mouldCode -> {
-                MouldInfoVO mouldBaseInfo = mouldInfoMap.get(mouldCode);
-                if (null != mouldBaseInfo) {
-                    mouldInfoList.add(mouldBaseInfo);
-                }
-            });
-            productionMouldInfo.setMouldInfoList(mouldInfoList);
-        });
-        return productMouldInfoMap.values().stream().collect(Collectors.toList());
+        return Collections.emptyList();
     }
 
     @Override
@@ -377,7 +385,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public void deletedInitData(ProductionContext context) {
+    public void deletedInitData(Context context) {
         String productionVersion = context.getProductionVersion();
         if (StringUtils.isBlank(productionVersion)) {
             return;
@@ -386,7 +394,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public void deletedMouldProductionData(ProductionContext context) {
+    public void deletedMouldProductionData(Context context) {
         String productionVersion = context.getProductionVersion();
         if (StringUtils.isBlank(productionVersion)) {
             return;
@@ -395,70 +403,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<MouldProductionProductVo> getContinueProductAndMould(ProductionContext context) {
-        //TODO 获取排产前一天的硫化续作规格，重新推论续作规格及续作模具
-        QueryWrapper<ProductionMouldConfiguration> queryWrapper = new QueryWrapper();
-        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
-        queryWrapper.eq("YEAR", context.getYear());
-        queryWrapper.eq("MONTH", context.getMonth());
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        List<ProductionMouldConfiguration> configurationList = factoryProductionMouldConfigurationMapper.selectList(queryWrapper);
-        if (CollectionUtils.isEmpty(configurationList)) {
-            return Collections.emptyList();
-        }
-        return BeanCopyUtils.copyBeanList(configurationList, MouldProductionProductVo.class);
-    }
-
-    @Override
-    public void saveNoProductionPlanRecord(List<MonthPlanNoProductionRecord> factoryNoProductionPlanList) {
-        if (CollectionUtils.isEmpty(factoryNoProductionPlanList)) {
-            return;
-        }
-        factoryProductionNoProductionRecordService.saveBatch(factoryNoProductionPlanList);
-    }
-
-    @Override
-    public int deletedNoProductionRecord(ProductionContext context) {
-        return factoryNoProductionRecordMapper.deletedNoProductionRecord(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
-    }
-
-    @Override
-    public void saveMouldPreCapacity(ProductionContext productionContext, List<MonthPlanManufacturingRequirementVo> preCapacityList) {
-        if (CollectionUtils.isEmpty(preCapacityList)) {
-            return;
-        }
-        String language = Locale.SIMPLIFIED_CHINESE.toString();
-        List<MonthPlanPreProductionCapacity> capacityList = new ArrayList<>();
-        preCapacityList.stream().forEach(preAllocation -> {
-            if (preAllocation.getFactProdReqQty() <= BigDecimal.ZERO.longValue()) {
-                return;
-            }
-            MonthPlanPreProductionCapacity preProductionCapacity = BeanCopyUtils.copyBean(preAllocation, MonthPlanPreProductionCapacity.class);
-            preProductionCapacity.setPreProductionQty(preAllocation.getProductionQty());
-            preProductionCapacity.setId(null);
-            if (StringUtils.isNotBlank(preAllocation.getNoProductionReason())) {
-//                String reason = JsonUtils.parseJsonRemark(preAllocation.getNoProductionReason(), language);
-//                preProductionCapacity.setRemark(reason);
-            }
-            Set<String> mouldCodeSet = preAllocation.getPreemptMouldCodeSet();
-            if (!CollectionUtils.isEmpty(mouldCodeSet)) {
-                preProductionCapacity.setMouldCodeInfo(mouldCodeSet.stream().collect(Collectors.joining(",")));
-            }
-            preProductionCapacity.setFactoryCode(productionContext.getFactoryCode());
-            preProductionCapacity.setYear(productionContext.getYear());
-            preProductionCapacity.setMonth(productionContext.getMonth());
-            preProductionCapacity.setMonthPlanVersion(productionContext.getMonthPlanVersion());
-            preProductionCapacity.setProductionVersion(productionContext.getProductionVersion());
-            capacityList.add(preProductionCapacity);
-        });
-        if (CollectionUtils.isEmpty(capacityList)) {
-            return;
-        }
-        factoryMonthPlanPreProductionCapacityService.saveBatch(capacityList);
-    }
-
-    @Override
-    public void saveMonthPlanInit(List<MonthPlanManufacturingRequirementVo> monthPlanInitList) {
+    public void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList) {
         if (CollectionUtils.isEmpty(monthPlanInitList)) {
             return;
         }
@@ -518,14 +463,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 //            }
         });
         factoryProductionDayProductionResultService.saveBatch(dayList);
-    }
-
-    @Override
-    public void saveMonthPlanProductionResult(List<MonthPlanProductionDayResult> dayProductionResultList) {
-        if (CollectionUtils.isEmpty(dayProductionResultList)) {
-            return;
-        }
-        monthPlanProductionDayResultService.saveBatch(dayProductionResultList);
     }
 
     @Override

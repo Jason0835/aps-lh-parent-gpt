@@ -302,40 +302,6 @@ public class ProductionContext extends Context {
     }
 
     /**
-     * 是否采用自然月进行排产
-     *
-     * @return
-     */
-    public boolean isNaturalMonth() {
-        ProductionParamConfiguration productionParam = getProductionParam();
-        if (null == productionParam) {
-            return true;
-        }
-        Integer startDay = productionParam.getMonthCycleStartDay();
-        if (null == startDay) {
-            return true;
-        }
-        if (startDay > ProductionConstant.NO_NATURAL_MONTH_MAX_VALUE) {
-            return true;
-        }
-        if (startDay <= ProductionConstant.MONTH_START_DAY) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 当前排产月前一个月时间
-     *
-     * @return
-     */
-    public LocalDate getPreviousMonth() {
-        LocalDate currentProductionMonth = LocalDate.of(getYear(), getMonth(), ProductionConstant.MONTH_START_DAY);
-        LocalDate previousMonth = currentProductionMonth.minusMonths(BigDecimal.ONE.intValue());
-        return previousMonth;
-    }
-
-    /**
      * 判断当前是否为夏季月份
      * <p>
      * summerMonth <= month < winterMonth

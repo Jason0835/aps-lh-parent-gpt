@@ -16,6 +16,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_HAS_PRODUCT_CODE("MP1102", "需求计划没有物料编码", ""),
     /**
+     * MP1103 需求计划不排产
+     */
+    PLAN_NO_PRODUCTION("MP1103", "需求计划不排产", ""),
+    /**
      * MP1201 物料停产状态
      */
     PRODUCT_STATUS_STOP("MP1201", "物料停产状态", ""),
@@ -32,9 +36,13 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_PRO_SIZE("MP1204", "没有寸口", ""),
     /**
-     * MP1205 没有日硫化产能
+     * MP1205 没有日硫化产能关系
      */
-    NO_DAY_LH_CAPACITY("MP1205", "没有日硫化产能", ""),
+    NO_DAY_LH_CAPACITY_RELATION("MP1205", "没有日硫化产能关系", ""),
+    /**
+     * MP1206 没有日硫化量
+     */
+    NO_DAY_LH_CAPACITY("MP1206", "没有日硫化量", ""),
     /**
      * MP1301 没有配置施工关系
      */
