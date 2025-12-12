@@ -1,4 +1,4 @@
-﻿package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.maindata.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.RawWarningRecord;
 import com.zlt.aps.monthplan.api.domain.entity.RawWeekUsage;
