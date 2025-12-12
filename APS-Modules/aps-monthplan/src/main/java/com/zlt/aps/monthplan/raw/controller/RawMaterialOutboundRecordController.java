@@ -187,5 +187,4 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
         return AjaxResult.success();
     }
 
-
 }

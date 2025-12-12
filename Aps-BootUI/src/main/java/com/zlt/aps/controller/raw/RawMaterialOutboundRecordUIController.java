@@ -176,4 +176,15 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
         AjaxResult ajaxResult = iRawMaterialOutboundRecordService.importData(context,true);
         return ajaxResult;
     }
+
+    /**
+     * MES抓取
+     */
+    @RequiresPermissions( "maindata:rawMaterialOutboundRecord:catch")
+    @ApiOperation("MES抓取")
+    @ResponseBody
+    @PostMapping("/mesCatch")
+    public AjaxResult mesCatch(){
+        return iRawMaterialOutboundRecordService.mesCatch();
+    }
 }

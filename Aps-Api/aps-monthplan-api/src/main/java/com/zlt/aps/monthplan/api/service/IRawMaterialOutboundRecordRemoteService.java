@@ -77,4 +77,9 @@ public interface IRawMaterialOutboundRecordRemoteService {
     @PostMapping("/rawMaterialOutboundRecord/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+
+
+    @ApiOperation("MES抓取")
+    @PostMapping("/rawMaterialOutboundRecord/mesCatch")
+     AjaxResult mesCatch();
 }
