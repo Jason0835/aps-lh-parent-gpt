@@ -73,6 +73,13 @@ public class MdmWorkCalendar extends BaseEntity {
     private Integer day;
 
     /**
+     * 日期
+     */
+    @ApiModelProperty(value = "日期", name = "productionDate")
+    @TableField(value = "PRODUCTION_DATE")
+    private Date productionDate;
+
+    /**
      * 一班开停产标志，0-停,1-开
      */
     @Excel(name = "ui.data.column.mdmWorkCalendar.oneShiftFlag")

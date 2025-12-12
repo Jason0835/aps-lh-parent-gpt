@@ -9,15 +9,15 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：SupplyOrderPool.java
+ * 文件名称：MpSupplyOrderPool.java
  * 描    述：供应链订单池对象 t_mp_supply_order_pool
- *@author zlt
- *@date 2025-12-06
+ *@author yelq
+ *@date 2025-12-12
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：zlt
+ *     修 改 人：yelq
  *     修改内容：...
  */
 
@@ -27,9 +27,9 @@ public class SupplyOrderPool extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 
-     /** 工厂 */
+     /** 工厂编号 */
     @Excel(name = "ui.data.column.supplyOrderPool.factoryCode")
-    @ApiModelProperty(value = "工厂", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     private String factoryCode;
 
     /** 年份 */
@@ -47,14 +47,9 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     private String productTypeCode;
 
-    /** 产品品类名称 */
-    @Excel(name = "ui.data.column.supplyOrderPool.productTypeName")
-    @ApiModelProperty(value = "产品品类名称", name = "productTypeName")
-    private String productTypeName;
-
-    /** 内外销 */
+    /** 库位 */
     @Excel(name = "ui.data.column.supplyOrderPool.locationType")
-    @ApiModelProperty(value = "内外销", name = "locationType")
+    @ApiModelProperty(value = "库位", name = "locationType")
     private String locationType;
 
     /** 产品分类 */
@@ -77,64 +72,69 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "品牌", name = "brand")
     private String brand;
 
+    /** MES物料编码 */
+    @Excel(name = "ui.data.column.supplyOrderPool.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    private String mesMaterialCode;
+
     /** 物料编码 */
-    @Excel(name = "ui.data.column.supplyOrderPool.productCode")
-    @ApiModelProperty(value = "物料编码", name = "productCode")
-    private String productCode;
+    @Excel(name = "ui.data.column.supplyOrderPool.materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    private String materialCode;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.supplyOrderPool.productDesc")
-    @ApiModelProperty(value = "物料描述", name = "productDesc")
-    private String productDesc;
+    @Excel(name = "ui.data.column.supplyOrderPool.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    private String materialDesc;
 
-    /** 储备数量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.stockQty")
-    @ApiModelProperty(value = "储备数量", name = "stockQty")
-    private Long stockQty;
+    /** 数量 */
+    @Excel(name = "ui.data.column.supplyOrderPool.qty")
+    @ApiModelProperty(value = "数量", name = "qty")
+    private Integer qty;
 
     /** 近3个月月均销量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.averageSaleQtyInThreeMonth")
-    @ApiModelProperty(value = "近3个月月均销量", name = "averageSaleQtyInThreeMonth")
-    private Long averageSaleQtyInThreeMonth;
+    @Excel(name = "ui.data.column.supplyOrderPool.threeAverageQty")
+    @ApiModelProperty(value = "近3个月月均销量", name = "threeAverageQty")
+    private Integer threeAverageQty;
 
     /** 近6个月月均销量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.averageSaleQtyInSixMonth")
-    @ApiModelProperty(value = "近6个月月均销量", name = "averageSaleQtyInSixMonth")
-    private Long averageSaleQtyInSixMonth;
+    @Excel(name = "ui.data.column.supplyOrderPool.sixAverageQty")
+    @ApiModelProperty(value = "近6个月月均销量", name = "sixAverageQty")
+    private Integer sixAverageQty;
 
     /** 滚动12个月发货频次 */
     @Excel(name = "ui.data.column.supplyOrderPool.deliveryFrequency")
     @ApiModelProperty(value = "滚动12个月发货频次", name = "deliveryFrequency")
     private Integer deliveryFrequency;
 
-    /** 滚动12个月 结构上机频次 */
+    /** 滚动12个月结构上机频次 */
     @Excel(name = "ui.data.column.supplyOrderPool.structureFrequency")
-    @ApiModelProperty(value = "滚动12个月 结构上机频次", name = "structureFrequency")
+    @ApiModelProperty(value = "滚动12个月结构上机频次", name = "structureFrequency")
     private Integer structureFrequency;
 
     /** 超3个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.overThreeMonthStockQty")
-    @ApiModelProperty(value = "超3个月库存", name = "overThreeMonthStockQty")
-    private Long overThreeMonthStockQty;
+    @Excel(name = "ui.data.column.supplyOrderPool.threeOverdueStockQty")
+    @ApiModelProperty(value = "超3个月库存", name = "threeOverdueStockQty")
+    private Integer threeOverdueStockQty;
 
     /** 超6个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.overSixStockQty")
-    @ApiModelProperty(value = "超6个月库存", name = "overSixStockQty")
-    private Long overSixStockQty;
+    @Excel(name = "ui.data.column.supplyOrderPool.sixOverdueStockQty")
+    @ApiModelProperty(value = "超6个月库存", name = "sixOverdueStockQty")
+    private Integer sixOverdueStockQty;
 
     /** 超9个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.overNightStockQty")
-    @ApiModelProperty(value = "超9个月库存", name = "overNightStockQty")
-    private Long overNightStockQty;
+    @Excel(name = "ui.data.column.supplyOrderPool.nightOverdueStockQty")
+    @ApiModelProperty(value = "超9个月库存", name = "nightOverdueStockQty")
+    private Integer nightOverdueStockQty;
 
     /** 超12个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.overTwelveStockQty")
-    @ApiModelProperty(value = "超12个月库存", name = "overTwelveStockQty")
-    private Long overTwelveStockQty;
+    @Excel(name = "ui.data.column.supplyOrderPool.twelveOverdueStockQty")
+    @ApiModelProperty(value = "超12个月库存", name = "twelveOverdueStockQty")
+    private Integer twelveOverdueStockQty;
 
     /** 备库上限 */
     @Excel(name = "ui.data.column.supplyOrderPool.stockLimit")
     @ApiModelProperty(value = "备库上限", name = "stockLimit")
-    private Long stockLimit;
+    private Integer stockLimit;
 
 }

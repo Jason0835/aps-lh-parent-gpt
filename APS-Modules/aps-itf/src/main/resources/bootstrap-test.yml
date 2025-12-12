@@ -3,7 +3,7 @@ server:
   port: 9711
 
 nacos:
-  server-addr: 192.168.2.93:8848
+  server-addr: 192.168.10.123:8848
   run-group: APS_TEST_GROUP
   cfg-group: APS_TEST_GROUP
   run-namespace: jytest
@@ -39,5 +39,8 @@ spring:
           group: ${nacos.cfg-group}
         shared-configs[4]:
           data-id: zipkin-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+          group: ${nacos.cfg-group}
+        shared-configs[5]:
+          data-id: sync-data-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         refresh-enabled: true
