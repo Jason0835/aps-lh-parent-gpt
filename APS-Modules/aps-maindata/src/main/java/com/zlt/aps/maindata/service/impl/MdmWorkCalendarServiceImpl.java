@@ -153,6 +153,8 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
                     mdmWorkCalendar.setYear(year);
                     mdmWorkCalendar.setMonth(month + 1);
                     mdmWorkCalendar.setDay(i);
+                    instance.set(Calendar.DAY_OF_MONTH, i);
+                    mdmWorkCalendar.setProductionDate(instance.getTime());
                     mdmWorkCalendar.setOneShiftFlag(ApsConstant.TRUE);
                     mdmWorkCalendar.setTwoShiftFlag(ApsConstant.TRUE);
                     mdmWorkCalendar.setThreeShiftFlag(ApsConstant.TRUE);
