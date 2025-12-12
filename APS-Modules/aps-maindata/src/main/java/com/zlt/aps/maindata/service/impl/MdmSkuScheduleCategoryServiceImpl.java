@@ -34,13 +34,13 @@ import java.util.List;
 public class MdmSkuScheduleCategoryServiceImpl extends AbstractDocService<MdmSkuScheduleCategory> implements IMdmSkuScheduleCategoryService {
     @Override
     protected String getDocTypeCode() {
-        return "MDM0145";
+        return "MDM0146";
     }
 
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
-        sysDocType.setDocTypeCode("MDM0145");
+        sysDocType.setDocTypeCode("MDM0146");
         return sysDocType;
     }
 

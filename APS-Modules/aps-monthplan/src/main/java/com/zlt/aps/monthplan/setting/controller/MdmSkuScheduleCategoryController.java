@@ -159,7 +159,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
 
     @Override
     protected String getTypeCode() {
-        return "MDM0145";
+        return "MDM0146";
     }
 
 
