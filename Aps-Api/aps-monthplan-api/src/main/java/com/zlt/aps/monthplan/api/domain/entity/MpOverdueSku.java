@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import java.util.Date;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -27,6 +28,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 @ApiModel(value = "超期SKU对象", description = "超期SKU对象 ")
 @Data
+@TableName(value = "t_mp_overdue_sku")
 public class MpOverdueSku extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
