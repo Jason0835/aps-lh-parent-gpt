@@ -25,6 +25,7 @@ public class PostMethodUtils {
         try {
             closeableHttpClient = HttpClientBuilder.create().build();
             HttpPost httpPost = new HttpPost(uri);
+    		httpPost.addHeader("Content-Type", "application/json");
             log.info("请求地址：" + uri + "，参数：" + body);
             if (header != null) {
             	for (Entry<String, String> entry: header.entrySet()) {
