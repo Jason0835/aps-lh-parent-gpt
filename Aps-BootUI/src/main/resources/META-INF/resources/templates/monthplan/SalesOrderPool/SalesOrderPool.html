@@ -106,6 +106,9 @@
                shiro:hasPermission="monthplan:SalesOrderPool:export">
                 <i class="fa fa-download"></i> [[#{ui.frame.btn.export}]]
             </a>
+            <a class="btn btn-warning" onclick="$.table.exportUiExcel()">
+                <i class="fa fa-download"></i> test
+            </a>
         </div>
         <div class="col-sm-12 select-table table-striped">
             <table id="bootstrap-table"></table>
@@ -232,6 +235,12 @@
         };
         $.table.init(options);
     });
+    
+    //提交
+    function test() {
+        var datas = {"salCodePo": "1", "scmPriority": "2"};
+        $.operate.save(prefix + "/editBySalCodePo", datas);
+    }
 </script>
 </body>
 <th:block th:include="component/importExcelNormal :: importExcelNormal"/>

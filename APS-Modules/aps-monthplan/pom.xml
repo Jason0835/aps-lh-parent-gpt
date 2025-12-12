@@ -48,6 +48,10 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-factory-engine</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
+        </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>

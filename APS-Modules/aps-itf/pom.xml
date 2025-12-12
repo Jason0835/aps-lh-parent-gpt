@@ -42,6 +42,12 @@
             <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
+        
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-sync-data</artifactId>
+            <version>1.0.1-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>

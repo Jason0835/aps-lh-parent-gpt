@@ -257,6 +257,11 @@ public class ApsConstant {
     public static String MES_ROUTING = "SYNC_PMBALANCE_MES_ROUTING_KEY";
 
     /**
+     * 供应链已计划未发货数据同步key
+     */
+    public static final String SYNC_PLANED_NOT_SHIP = "SYNC_PLANED_NOT_SHIP";
+
+    /**
      * MES监听APS发送的系统编号-MES
      */
     public static String DOCK_SYS_MES = "MES";
@@ -304,6 +309,16 @@ public class ApsConstant {
      * 是否 为是
      */
     public static final Integer APS_YES_NO_1 = 1;
+    
+    /**
+     * sync服务同步状态：异常
+     */
+    public static final Integer SYNC_STATUS_3 = 3;
+    
+    /**
+     * sync服务同步状态：成功
+     */
+    public static final Integer SYNC_STATUS_6 = 6;
 
     /**
      * 升序
@@ -376,6 +391,36 @@ public class ApsConstant {
     public static final String DC_APS_BUCKET = "upload-file";
 
     public static final Long EXPIRE_ONE = 1L;
+
+    /**
+     * 销售优先级：1-高优先级；
+     */
+    public static final String SAL_PRIORITY_HIGHT = "1";
+
+    /**
+     * 销售优先级：3-中优先级；
+     */
+    public static final String SAL_PRIORITY_MID = "3";
+    
+    /**
+     * 发货模式：02-整单发货
+     */
+    public static final String DELIVERY_MODE_ALL = "02";
+    
+    /**
+     * 发货模式：01-分批发货
+     */
+    public static final String DELIVERY_MODE_SPLIT = "01";
+    
+    /**
+     * SCM发货模式：10-整单发货
+     */
+    public static final String SCM_DELIVERY_MODE_ALL = "10";
+    
+    /**
+     * SCM发货模式：20-分批发货
+     */
+    public static final String SCM_DELIVERY_MODE_SPLIT = "20";
 
     /**
      * 硫化排程管理，自动排程
