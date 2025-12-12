@@ -24,7 +24,7 @@ public class ScmItfServiceImpl implements ScmItfService {
 	@Autowired
 	private ItfSyncDataHandle itfSyncDataHandle;
 
-	@Value("${itf:scm:syncPlanedNotShipList:url}")
+	@Value("${itf.scm.syncPlanedNotShipList.url}")
 	private String SYNC_PLANED_NOTSHIP_URL;
 
 	/**
