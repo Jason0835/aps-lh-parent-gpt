@@ -3,63 +3,79 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" id="SupplyOrderPoolResult">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" id="MpSupplyOrderPoolResult">
             <result property="id" column="ID"/>
             <result property="factoryCode" column="FACTORY_CODE"/>
             <result property="year" column="YEAR"/>
             <result property="month" column="MONTH"/>
             <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
-            <result property="productTypeName" column="PRODUCT_TYPE_NAME"/>
             <result property="locationType" column="LOCATION_TYPE"/>
             <result property="productCategory" column="PRODUCT_CATEGORY"/>
             <result property="orderType" column="ORDER_TYPE"/>
             <result property="saleArea" column="SALE_AREA"/>
             <result property="brand" column="BRAND"/>
-            <result property="productCode" column="PRODUCT_CODE"/>
-            <result property="productDesc" column="PRODUCT_DESC"/>
-            <result property="stockQty" column="STOCK_QTY"/>
-            <result property="averageSaleQtyInThreeMonth" column="AVERAGE_SALE_QTY_IN_THREE_MONTH"/>
-            <result property="averageSaleQtyInSixMonth" column="AVERAGE_SALE_QTY_IN_SIX_MONTH"/>
+            <result property="mesMaterialCode" column="MES_MATERIAL_CODE"/>
+            <result property="materialCode" column="MATERIAL_CODE"/>
+            <result property="materialDesc" column="MATERIAL_DESC"/>
+            <result property="qty" column="QTY"/>
+            <result property="threeAverageQty" column="THREE_AVERAGE_QTY"/>
+            <result property="sixAverageQty" column="SIX_AVERAGE_QTY"/>
             <result property="deliveryFrequency" column="DELIVERY_FREQUENCY"/>
             <result property="structureFrequency" column="STRUCTURE_FREQUENCY"/>
-            <result property="overThreeMonthStockQty" column="OVER_THREE_MONTH_STOCK_QTY"/>
-            <result property="overSixStockQty" column="OVER_SIX_STOCK_QTY"/>
-            <result property="overNightStockQty" column="OVER_NIGHT_STOCK_QTY"/>
-            <result property="overTwelveStockQty" column="OVER_TWELVE_STOCK_QTY"/>
+            <result property="threeOverdueStockQty" column="THREE_OVERDUE_STOCK_QTY"/>
+            <result property="sixOverdueStockQty" column="SIX_OVERDUE_STOCK_QTY"/>
+            <result property="nightOverdueStockQty" column="NIGHT_OVERDUE_STOCK_QTY"/>
+            <result property="twelveOverdueStockQty" column="TWELVE_OVERDUE_STOCK_QTY"/>
             <result property="stockLimit" column="STOCK_LIMIT"/>
             <result property="remark" column="REMARK"/>
             <result property="isDelete" column="IS_DELETE"/>
-            <result property="createBy" column="CREATE_BY"/>
             <result property="createTime" column="CREATE_TIME"/>
-            <result property="updateBy" column="UPDATE_BY"/>
             <result property="updateTime" column="UPDATE_TIME"/>
+            <result property="createBy" column="CREATE_BY"/>
+            <result property="updateBy" column="UPDATE_BY"/>
     </resultMap>
 
 
-    <sql id="selectSupplyOrderPoolVo">
-        SELECT ID, FACTORY_CODE, YEAR, MONTH, PRODUCT_TYPE_CODE, PRODUCT_TYPE_NAME, LOCATION_TYPE, PRODUCT_CATEGORY, ORDER_TYPE, SALE_AREA, BRAND, PRODUCT_CODE, PRODUCT_DESC, STOCK_QTY, AVERAGE_SALE_QTY_IN_THREE_MONTH, AVERAGE_SALE_QTY_IN_SIX_MONTH, DELIVERY_FREQUENCY, STRUCTURE_FREQUENCY, OVER_THREE_MONTH_STOCK_QTY, OVER_SIX_STOCK_QTY, OVER_NIGHT_STOCK_QTY, OVER_TWELVE_STOCK_QTY, STOCK_LIMIT, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, FROM T_MP_SUPPLY_ORDER_POOL
+    <sql id="selectMpSupplyOrderPoolVo">
+        SELECT ID, FACTORY_CODE, YEAR, MONTH, PRODUCT_TYPE_CODE, LOCATION_TYPE, PRODUCT_CATEGORY, ORDER_TYPE, SALE_AREA, BRAND, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, QTY, THREE_AVERAGE_QTY, SIX_AVERAGE_QTY, DELIVERY_FREQUENCY, STRUCTURE_FREQUENCY, THREE_OVERDUE_STOCK_QTY, SIX_OVERDUE_STOCK_QTY, NIGHT_OVERDUE_STOCK_QTY, TWELVE_OVERDUE_STOCK_QTY, STOCK_LIMIT, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_SUPPLY_ORDER_POOL
     </sql>
 
-    <select id="selectSupplyOrderPoolList" parameterType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" resultMap="SupplyOrderPoolResult">
-        <include refid="selectSupplyOrderPoolVo"/>
+    <select id="selectMpSupplyOrderPoolList" parameterType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" resultMap="MpSupplyOrderPoolResult">
+        <include refid="selectMpSupplyOrderPoolVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null "> AND YEAR = #{year}</if>
+        <if test="month != null "> AND MONTH = #{month}</if>
+        <if test="productTypeCode != null  and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
+        <if test="locationType != null  and locationType != ''"> AND LOCATION_TYPE = #{locationType}</if>
         <if test="productCategory != null  and productCategory != ''"> AND PRODUCT_CATEGORY = #{productCategory}</if>
         <if test="orderType != null  and orderType != ''"> AND ORDER_TYPE = #{orderType}</if>
-        <if test="saleArea != null  and saleArea != ''"> AND SALE_AREA LIKE CONCAT(CONCAT('%', #{saleArea}), '%')</if>
-        <if test="productCode != null  and productCode != ''"> AND PRODUCT_CODE = #{productCode}</if>
-        <if test="productDesc != null  and productDesc != ''"> AND PRODUCT_DESC = #{productDesc}</if>
+        <if test="saleArea != null  and saleArea != ''"> AND SALE_AREA = #{saleArea}</if>
+        <if test="brand != null  and brand != ''"> AND BRAND = #{brand}</if>
+        <if test="mesMaterialCode != null  and mesMaterialCode != ''"> AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
+        <if test="materialCode != null  and materialCode != ''"> AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="materialDesc != null  and materialDesc != ''"> AND MATERIAL_DESC = #{materialDesc}</if>
+        <if test="qty != null "> AND QTY = #{qty}</if>
+        <if test="threeAverageQty != null "> AND THREE_AVERAGE_QTY = #{threeAverageQty}</if>
+        <if test="sixAverageQty != null "> AND SIX_AVERAGE_QTY = #{sixAverageQty}</if>
+        <if test="deliveryFrequency != null "> AND DELIVERY_FREQUENCY = #{deliveryFrequency}</if>
+        <if test="structureFrequency != null "> AND STRUCTURE_FREQUENCY = #{structureFrequency}</if>
+        <if test="threeOverdueStockQty != null "> AND THREE_OVERDUE_STOCK_QTY = #{threeOverdueStockQty}</if>
+        <if test="sixOverdueStockQty != null "> AND SIX_OVERDUE_STOCK_QTY = #{sixOverdueStockQty}</if>
+        <if test="nightOverdueStockQty != null "> AND NIGHT_OVERDUE_STOCK_QTY = #{nightOverdueStockQty}</if>
+        <if test="twelveOverdueStockQty != null "> AND TWELVE_OVERDUE_STOCK_QTY = #{twelveOverdueStockQty}</if>
+        <if test="stockLimit != null "> AND STOCK_LIMIT = #{stockLimit}</if>
     </select>
 
-    <select id="selectSupplyOrderPoolById" parameterType="Long" resultMap="SupplyOrderPoolResult">
-        <include refid="selectSupplyOrderPoolVo"/>
+    <select id="selectMpSupplyOrderPoolById" parameterType="Long" resultMap="MpSupplyOrderPoolResult">
+        <include refid="selectMpSupplyOrderPoolVo"/>
         WHERE ID = #{id}
     </select>
 
-    <select id="selectSupplyOrderPoolByIds" parameterType="list"
-            resultMap="SupplyOrderPoolResult">
+    <select id="selectMpSupplyOrderPoolByIds" parameterType="list"
+            resultMap="MpSupplyOrderPoolResult">
 
-        <include refid="selectSupplyOrderPoolVo"/>
+        <include refid="selectMpSupplyOrderPoolVo"/>
            WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{id}
@@ -71,108 +87,108 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         INSERT INTO T_MP_SUPPLY_ORDER_POOL
         <trim prefix="(" suffix=")" suffixOverrides=",">
             ID,
-            <if test="factoryCode != null">FACTORY_CODE,</if>
+            <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE,</if>
             <if test="year != null">YEAR,</if>
             <if test="month != null">MONTH,</if>
             <if test="productTypeCode != null">PRODUCT_TYPE_CODE,</if>
-            <if test="productTypeName != null">PRODUCT_TYPE_NAME,</if>
             <if test="locationType != null">LOCATION_TYPE,</if>
             <if test="productCategory != null">PRODUCT_CATEGORY,</if>
             <if test="orderType != null">ORDER_TYPE,</if>
             <if test="saleArea != null">SALE_AREA,</if>
             <if test="brand != null">BRAND,</if>
-            <if test="productCode != null">PRODUCT_CODE,</if>
-            <if test="productDesc != null">PRODUCT_DESC,</if>
-            <if test="stockQty != null">STOCK_QTY,</if>
-            <if test="averageSaleQtyInThreeMonth != null">AVERAGE_SALE_QTY_IN_THREE_MONTH,</if>
-            <if test="averageSaleQtyInSixMonth != null">AVERAGE_SALE_QTY_IN_SIX_MONTH,</if>
+            <if test="mesMaterialCode != null">MES_MATERIAL_CODE,</if>
+            <if test="materialCode != null">MATERIAL_CODE,</if>
+            <if test="materialDesc != null">MATERIAL_DESC,</if>
+            <if test="qty != null">QTY,</if>
+            <if test="threeAverageQty != null">THREE_AVERAGE_QTY,</if>
+            <if test="sixAverageQty != null">SIX_AVERAGE_QTY,</if>
             <if test="deliveryFrequency != null">DELIVERY_FREQUENCY,</if>
             <if test="structureFrequency != null">STRUCTURE_FREQUENCY,</if>
-            <if test="overThreeMonthStockQty != null">OVER_THREE_MONTH_STOCK_QTY,</if>
-            <if test="overSixStockQty != null">OVER_SIX_STOCK_QTY,</if>
-            <if test="overNightStockQty != null">OVER_NIGHT_STOCK_QTY,</if>
-            <if test="overTwelveStockQty != null">OVER_TWELVE_STOCK_QTY,</if>
+            <if test="threeOverdueStockQty != null">THREE_OVERDUE_STOCK_QTY,</if>
+            <if test="sixOverdueStockQty != null">SIX_OVERDUE_STOCK_QTY,</if>
+            <if test="nightOverdueStockQty != null">NIGHT_OVERDUE_STOCK_QTY,</if>
+            <if test="twelveOverdueStockQty != null">TWELVE_OVERDUE_STOCK_QTY,</if>
             <if test="stockLimit != null">STOCK_LIMIT,</if>
             <if test="remark != null">REMARK,</if>
             <if test="isDelete != null">IS_DELETE,</if>
-            <if test="createBy != null">CREATE_BY,</if>
             <if test="createTime != null">CREATE_TIME,</if>
-            <if test="updateBy != null">UPDATE_BY,</if>
             <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
          </trim>
         <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
             SEQ_UPPLY_ORDER_POOL.NEXTVAL,
-            <if test="factoryCode != null">#{factoryCode},</if>
+            <if test="factoryCode != null and factoryCode != ''">#{factoryCode},</if>
             <if test="year != null">#{year},</if>
             <if test="month != null">#{month},</if>
             <if test="productTypeCode != null">#{productTypeCode},</if>
-            <if test="productTypeName != null">#{productTypeName},</if>
             <if test="locationType != null">#{locationType},</if>
             <if test="productCategory != null">#{productCategory},</if>
             <if test="orderType != null">#{orderType},</if>
             <if test="saleArea != null">#{saleArea},</if>
             <if test="brand != null">#{brand},</if>
-            <if test="productCode != null">#{productCode},</if>
-            <if test="productDesc != null">#{productDesc},</if>
-            <if test="stockQty != null">#{stockQty},</if>
-            <if test="averageSaleQtyInThreeMonth != null">#{averageSaleQtyInThreeMonth},</if>
-            <if test="averageSaleQtyInSixMonth != null">#{averageSaleQtyInSixMonth},</if>
+            <if test="mesMaterialCode != null">#{mesMaterialCode},</if>
+            <if test="materialCode != null">#{materialCode},</if>
+            <if test="materialDesc != null">#{materialDesc},</if>
+            <if test="qty != null">#{qty},</if>
+            <if test="threeAverageQty != null">#{threeAverageQty},</if>
+            <if test="sixAverageQty != null">#{sixAverageQty},</if>
             <if test="deliveryFrequency != null">#{deliveryFrequency},</if>
             <if test="structureFrequency != null">#{structureFrequency},</if>
-            <if test="overThreeMonthStockQty != null">#{overThreeMonthStockQty},</if>
-            <if test="overSixStockQty != null">#{overSixStockQty},</if>
-            <if test="overNightStockQty != null">#{overNightStockQty},</if>
-            <if test="overTwelveStockQty != null">#{overTwelveStockQty},</if>
+            <if test="threeOverdueStockQty != null">#{threeOverdueStockQty},</if>
+            <if test="sixOverdueStockQty != null">#{sixOverdueStockQty},</if>
+            <if test="nightOverdueStockQty != null">#{nightOverdueStockQty},</if>
+            <if test="twelveOverdueStockQty != null">#{twelveOverdueStockQty},</if>
             <if test="stockLimit != null">#{stockLimit},</if>
             <if test="remark != null">#{remark},</if>
             <if test="isDelete != null">#{isDelete},</if>
-            <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
             <if test="updateTime != null">#{updateTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="updateBy != null">#{updateBy},</if>
          </trim>
     </insert>
 
     <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool">
         UPDATE T_MP_SUPPLY_ORDER_POOL
         <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryCode != null">FACTORY_CODE = #{factoryCode},</if>
+            <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE = #{factoryCode},</if>
             <if test="year != null">YEAR = #{year},</if>
             <if test="month != null">MONTH = #{month},</if>
             <if test="productTypeCode != null">PRODUCT_TYPE_CODE = #{productTypeCode},</if>
-            <if test="productTypeName != null">PRODUCT_TYPE_NAME = #{productTypeName},</if>
             <if test="locationType != null">LOCATION_TYPE = #{locationType},</if>
             <if test="productCategory != null">PRODUCT_CATEGORY = #{productCategory},</if>
             <if test="orderType != null">ORDER_TYPE = #{orderType},</if>
             <if test="saleArea != null">SALE_AREA = #{saleArea},</if>
             <if test="brand != null">BRAND = #{brand},</if>
-            <if test="productCode != null">PRODUCT_CODE = #{productCode},</if>
-            <if test="productDesc != null">PRODUCT_DESC = #{productDesc},</if>
-            <if test="stockQty != null">STOCK_QTY = #{stockQty},</if>
-            <if test="averageSaleQtyInThreeMonth != null">AVERAGE_SALE_QTY_IN_THREE_MONTH = #{averageSaleQtyInThreeMonth},</if>
-            <if test="averageSaleQtyInSixMonth != null">AVERAGE_SALE_QTY_IN_SIX_MONTH = #{averageSaleQtyInSixMonth},</if>
+            <if test="mesMaterialCode != null">MES_MATERIAL_CODE = #{mesMaterialCode},</if>
+            <if test="materialCode != null">MATERIAL_CODE = #{materialCode},</if>
+            <if test="materialDesc != null">MATERIAL_DESC = #{materialDesc},</if>
+            <if test="qty != null">QTY = #{qty},</if>
+            <if test="threeAverageQty != null">THREE_AVERAGE_QTY = #{threeAverageQty},</if>
+            <if test="sixAverageQty != null">SIX_AVERAGE_QTY = #{sixAverageQty},</if>
             <if test="deliveryFrequency != null">DELIVERY_FREQUENCY = #{deliveryFrequency},</if>
             <if test="structureFrequency != null">STRUCTURE_FREQUENCY = #{structureFrequency},</if>
-            <if test="overThreeMonthStockQty != null">OVER_THREE_MONTH_STOCK_QTY = #{overThreeMonthStockQty},</if>
-            <if test="overSixStockQty != null">OVER_SIX_STOCK_QTY = #{overSixStockQty},</if>
-            <if test="overNightStockQty != null">OVER_NIGHT_STOCK_QTY = #{overNightStockQty},</if>
-            <if test="overTwelveStockQty != null">OVER_TWELVE_STOCK_QTY = #{overTwelveStockQty},</if>
+            <if test="threeOverdueStockQty != null">THREE_OVERDUE_STOCK_QTY = #{threeOverdueStockQty},</if>
+            <if test="sixOverdueStockQty != null">SIX_OVERDUE_STOCK_QTY = #{sixOverdueStockQty},</if>
+            <if test="nightOverdueStockQty != null">NIGHT_OVERDUE_STOCK_QTY = #{nightOverdueStockQty},</if>
+            <if test="twelveOverdueStockQty != null">TWELVE_OVERDUE_STOCK_QTY = #{twelveOverdueStockQty},</if>
             <if test="stockLimit != null">STOCK_LIMIT = #{stockLimit},</if>
             <if test="remark != null">REMARK = #{remark},</if>
             <if test="isDelete != null">IS_DELETE = #{isDelete},</if>
-            <if test="createBy != null">CREATE_BY = #{createBy},</if>
             <if test="createTime != null">CREATE_TIME = #{createTime},</if>
-            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
             <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
         </trim>
         where ID = #{id}
     </update>
 
-    <delete id="deleteSupplyOrderPoolById" parameterType="Long">
+    <delete id="deleteMpSupplyOrderPoolById" parameterType="Long">
         UPDATE T_MP_SUPPLY_ORDER_POOL SET IS_DELETE = 1 WHERE ID = #{id}
     </delete>
 
-    <delete id="deleteSupplyOrderPoolByIds" parameterType="String">
+    <delete id="deleteMpSupplyOrderPoolByIds" parameterType="String">
         UPDATE T_MP_SUPPLY_ORDER_POOL SET IS_DELETE = 1 WHERE ID IN
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
@@ -189,30 +205,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{item.year,} year,
             #{item.month,} month,
             #{item.productTypeCode,jdbcType=VARCHAR} product_type_code,
-            #{item.productTypeName,jdbcType=VARCHAR} product_type_name,
             #{item.locationType,jdbcType=VARCHAR} location_type,
             #{item.productCategory,jdbcType=VARCHAR} product_category,
             #{item.orderType,jdbcType=VARCHAR} order_type,
             #{item.saleArea,jdbcType=VARCHAR} sale_area,
             #{item.brand,jdbcType=VARCHAR} brand,
-            #{item.productCode,jdbcType=VARCHAR} product_code,
-            #{item.productDesc,jdbcType=VARCHAR} product_desc,
-            #{item.stockQty, jdbcType=DOUBLE} stock_qty,
-            #{item.averageSaleQtyInThreeMonth, jdbcType=DOUBLE} average_sale_qty_in_three_month,
-            #{item.averageSaleQtyInSixMonth, jdbcType=DOUBLE} average_sale_qty_in_six_month,
+            #{item.mesMaterialCode,jdbcType=VARCHAR} mes_material_code,
+            #{item.materialCode,jdbcType=VARCHAR} material_code,
+            #{item.materialDesc,jdbcType=VARCHAR} material_desc,
+            #{item.qty,} qty,
+            #{item.threeAverageQty,} three_average_qty,
+            #{item.sixAverageQty,} six_average_qty,
             #{item.deliveryFrequency,} delivery_frequency,
             #{item.structureFrequency,} structure_frequency,
-            #{item.overThreeMonthStockQty, jdbcType=DOUBLE} over_three_month_stock_qty,
-            #{item.overSixStockQty, jdbcType=DOUBLE} over_six_stock_qty,
-            #{item.overNightStockQty, jdbcType=DOUBLE} over_night_stock_qty,
-            #{item.overTwelveStockQty, jdbcType=DOUBLE} over_twelve_stock_qty,
-            #{item.stockLimit, jdbcType=DOUBLE} stock_limit,
+            #{item.threeOverdueStockQty,} three_overdue_stock_qty,
+            #{item.sixOverdueStockQty,} six_overdue_stock_qty,
+            #{item.nightOverdueStockQty,} night_overdue_stock_qty,
+            #{item.twelveOverdueStockQty,} twelve_overdue_stock_qty,
+            #{item.stockLimit,} stock_limit,
             #{item.remark,jdbcType=VARCHAR} remark,
             #{item.isDelete,} is_delete,
-            #{item.createBy,jdbcType=VARCHAR} create_by,
             #{item.createTime, jdbcType=DATE} create_time,
-            #{item.updateBy,jdbcType=VARCHAR} update_by,
             #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
             FROM dual
         </foreach>
         ) b ON (
@@ -231,8 +247,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 ,
             a.PRODUCT_TYPE_CODE = b.PRODUCT_TYPE_CODE
 ,
-            a.PRODUCT_TYPE_NAME = b.PRODUCT_TYPE_NAME
-,
             a.LOCATION_TYPE = b.LOCATION_TYPE
 ,
             a.PRODUCT_CATEGORY = b.PRODUCT_CATEGORY
@@ -243,27 +257,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 ,
             a.BRAND = b.BRAND
 ,
-            a.PRODUCT_CODE = b.PRODUCT_CODE
+            a.MES_MATERIAL_CODE = b.MES_MATERIAL_CODE
 ,
-            a.PRODUCT_DESC = b.PRODUCT_DESC
+            a.MATERIAL_CODE = b.MATERIAL_CODE
 ,
-            a.STOCK_QTY = b.STOCK_QTY
+            a.MATERIAL_DESC = b.MATERIAL_DESC
 ,
-            a.AVERAGE_SALE_QTY_IN_THREE_MONTH = b.AVERAGE_SALE_QTY_IN_THREE_MONTH
+            a.QTY = b.QTY
 ,
-            a.AVERAGE_SALE_QTY_IN_SIX_MONTH = b.AVERAGE_SALE_QTY_IN_SIX_MONTH
+            a.THREE_AVERAGE_QTY = b.THREE_AVERAGE_QTY
+,
+            a.SIX_AVERAGE_QTY = b.SIX_AVERAGE_QTY
 ,
             a.DELIVERY_FREQUENCY = b.DELIVERY_FREQUENCY
 ,
             a.STRUCTURE_FREQUENCY = b.STRUCTURE_FREQUENCY
 ,
-            a.OVER_THREE_MONTH_STOCK_QTY = b.OVER_THREE_MONTH_STOCK_QTY
+            a.THREE_OVERDUE_STOCK_QTY = b.THREE_OVERDUE_STOCK_QTY
 ,
-            a.OVER_SIX_STOCK_QTY = b.OVER_SIX_STOCK_QTY
+            a.SIX_OVERDUE_STOCK_QTY = b.SIX_OVERDUE_STOCK_QTY
 ,
-            a.OVER_NIGHT_STOCK_QTY = b.OVER_NIGHT_STOCK_QTY
+            a.NIGHT_OVERDUE_STOCK_QTY = b.NIGHT_OVERDUE_STOCK_QTY
 ,
-            a.OVER_TWELVE_STOCK_QTY = b.OVER_TWELVE_STOCK_QTY
+            a.TWELVE_OVERDUE_STOCK_QTY = b.TWELVE_OVERDUE_STOCK_QTY
 ,
             a.STOCK_LIMIT = b.STOCK_LIMIT
 ,
@@ -271,22 +287,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 ,
             a.IS_DELETE = b.IS_DELETE
 ,
-            a.CREATE_BY = b.CREATE_BY
-,
             a.CREATE_TIME = b.CREATE_TIME
 ,
-            a.UPDATE_BY = b.CREATE_BY
-,
             a.UPDATE_TIME = sysdate
+,
+            a.CREATE_BY = b.CREATE_BY
+,
+            a.UPDATE_BY = b.CREATE_BY
 ,
             需删除 a.ID = b.ID, a.CREATE_BY = b.CREATE_BY,a.CREATE_TIME = b.CREATE_TIME,
         </set>
         WHEN NOT MATCHED THEN
         INSERT (
- a.ID, a.FACTORY_CODE, a.YEAR, a.MONTH, a.PRODUCT_TYPE_CODE, a.PRODUCT_TYPE_NAME, a.LOCATION_TYPE, a.PRODUCT_CATEGORY, a.ORDER_TYPE, a.SALE_AREA, a.BRAND, a.PRODUCT_CODE, a.PRODUCT_DESC, a.STOCK_QTY, a.AVERAGE_SALE_QTY_IN_THREE_MONTH, a.AVERAGE_SALE_QTY_IN_SIX_MONTH, a.DELIVERY_FREQUENCY, a.STRUCTURE_FREQUENCY, a.OVER_THREE_MONTH_STOCK_QTY, a.OVER_SIX_STOCK_QTY, a.OVER_NIGHT_STOCK_QTY, a.OVER_TWELVE_STOCK_QTY, a.STOCK_LIMIT, a.REMARK, a.IS_DELETE, a.CREATE_BY, a.CREATE_TIME, a.UPDATE_BY, a.UPDATE_TIME,            需删除 a.UPDATE_BY,a.UPDATE_TIME
+ a.ID, a.FACTORY_CODE, a.YEAR, a.MONTH, a.PRODUCT_TYPE_CODE, a.LOCATION_TYPE, a.PRODUCT_CATEGORY, a.ORDER_TYPE, a.SALE_AREA, a.BRAND, a.MES_MATERIAL_CODE, a.MATERIAL_CODE, a.MATERIAL_DESC, a.QTY, a.THREE_AVERAGE_QTY, a.SIX_AVERAGE_QTY, a.DELIVERY_FREQUENCY, a.STRUCTURE_FREQUENCY, a.THREE_OVERDUE_STOCK_QTY, a.SIX_OVERDUE_STOCK_QTY, a.NIGHT_OVERDUE_STOCK_QTY, a.TWELVE_OVERDUE_STOCK_QTY, a.STOCK_LIMIT, a.REMARK, a.IS_DELETE, a.CREATE_TIME, a.UPDATE_TIME, a.CREATE_BY, a.UPDATE_BY,            需删除 a.UPDATE_BY,a.UPDATE_TIME
         )
         values (
- SEQ_PUBLIC.NEXTVAL,  b.FACTORY_CODE,   b.YEAR,   b.MONTH,   b.PRODUCT_TYPE_CODE,   b.PRODUCT_TYPE_NAME,   b.LOCATION_TYPE,   b.PRODUCT_CATEGORY,   b.ORDER_TYPE,   b.SALE_AREA,   b.BRAND,   b.PRODUCT_CODE,   b.PRODUCT_DESC,   b.STOCK_QTY,   b.AVERAGE_SALE_QTY_IN_THREE_MONTH,   b.AVERAGE_SALE_QTY_IN_SIX_MONTH,   b.DELIVERY_FREQUENCY,   b.STRUCTURE_FREQUENCY,   b.OVER_THREE_MONTH_STOCK_QTY,   b.OVER_SIX_STOCK_QTY,   b.OVER_NIGHT_STOCK_QTY,   b.OVER_TWELVE_STOCK_QTY,   b.STOCK_LIMIT,   b.REMARK,   0,  b.CREATE_BY,   sysdate,  b.UPDATE_BY,   b.UPDATE_TIME,              需将SEQ_PUBLIC更换为对应序列,并删除 b.UPDATE_BY,b.UPDATE_TIME
+ SEQ_PUBLIC.NEXTVAL,  b.FACTORY_CODE,   b.YEAR,   b.MONTH,   b.PRODUCT_TYPE_CODE,   b.LOCATION_TYPE,   b.PRODUCT_CATEGORY,   b.ORDER_TYPE,   b.SALE_AREA,   b.BRAND,   b.MES_MATERIAL_CODE,   b.MATERIAL_CODE,   b.MATERIAL_DESC,   b.QTY,   b.THREE_AVERAGE_QTY,   b.SIX_AVERAGE_QTY,   b.DELIVERY_FREQUENCY,   b.STRUCTURE_FREQUENCY,   b.THREE_OVERDUE_STOCK_QTY,   b.SIX_OVERDUE_STOCK_QTY,   b.NIGHT_OVERDUE_STOCK_QTY,   b.TWELVE_OVERDUE_STOCK_QTY,   b.STOCK_LIMIT,   b.REMARK,   0,  sysdate,  b.UPDATE_TIME,   b.CREATE_BY,   b.UPDATE_BY,              需将SEQ_PUBLIC更换为对应序列,并删除 b.UPDATE_BY,b.UPDATE_TIME
         )
     </update>
 </mapper>

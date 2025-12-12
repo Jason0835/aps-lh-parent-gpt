@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MpOverdueSkuEntityMapper">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku" id="MpOverdueSkuResult">
+            <result property="id" column="ID"/>
+            <result property="factoryCode" column="FACTORY_CODE"/>
+            <result property="year" column="YEAR"/>
+            <result property="month" column="MONTH"/>
+            <result property="mesMaterialCode" column="MES_MATERIAL_CODE"/>
+            <result property="materialCode" column="MATERIAL_CODE"/>
+            <result property="materialDesc" column="MATERIAL_DESC"/>
+            <result property="weekYear" column="WEEK_YEAR"/>
+            <result property="stockDate" column="STOCK_DATE"/>
+            <result property="overdueRegularDate" column="OVERDUE_REGULAR_DATE"/>
+            <result property="isOverdueRegular" column="IS_OVERDUE_REGULAR"/>
+            <result property="overdueCycleDate" column="OVERDUE_CYCLE_DATE"/>
+            <result property="isOverdueCycle" column="IS_OVERDUE_CYCLE"/>
+            <result property="remark" column="REMARK"/>
+            <result property="isDelete" column="IS_DELETE"/>
+            <result property="createTime" column="CREATE_TIME"/>
+            <result property="updateTime" column="UPDATE_TIME"/>
+            <result property="createBy" column="CREATE_BY"/>
+            <result property="updateBy" column="UPDATE_BY"/>
+    </resultMap>
+
+
+    <sql id="selectMpOverdueSkuVo">
+        SELECT ID, FACTORY_CODE, YEAR, MONTH, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, WEEK_YEAR, STOCK_DATE, OVERDUE_REGULAR_DATE, IS_OVERDUE_REGULAR, OVERDUE_CYCLE_DATE, IS_OVERDUE_CYCLE, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_OVERDUE_SKU
+    </sql>
+
+</mapper>

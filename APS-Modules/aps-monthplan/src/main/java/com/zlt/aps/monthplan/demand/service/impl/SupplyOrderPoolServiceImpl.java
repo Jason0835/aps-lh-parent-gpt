@@ -6,13 +6,18 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.zlt.aps.maindata.service.IMdmFinishStockService;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IMpOverdueSkuService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.ruoyi.common.datasource.service.BaseService;
@@ -49,11 +54,12 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
 
     private final IMdmMonCycleSchStruConfService monCycleSchStruConfService;
 
-    private final IMdmFinishStockService finishStockService;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+
+    private final  IMpOverdueSkuService overdueSkuService;
 
 
-
-    /**
+  /**
      * 查询供应链订单池
      * 
      * @param id 供应链订单池主键
@@ -272,15 +278,29 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         if(CollectionUtils.isEmpty(structures)){
             return;
         }
-        // (1)  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
-        List<MdmFinishStock> finishStocks =  finishStockService.findExcludeExceedTwelveMonth();
-        if(CollectionUtils.isEmpty(finishStocks)){
-            return;
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMaterialInfo>  materialInfos =   mdmMaterialInfoEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(materialInfos)){
+          return;
         }
-        List<MdmFinishStock> filterFinishStocks =  finishStocks.stream().filter(item -> structures.contains(item.getStructureName())).collect(Collectors.toList());
-        if(CollectionUtils.isEmpty(filterFinishStocks)){
-            return;
+        // 3、得到周期性排产结构后，获取结构下的所有SKU
+        Set<String> skus = materialInfos.stream().filter(item -> structures.contains(item.getStructureName())).map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toSet());
+        if(CollectionUtils.isEmpty(skus)){
+          return;
         }
+        //   (1)  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
+        //   其中，近12个月指当前月前一个月开始计算，往前12个月
+        Set<String> overdueSkus =  overdueSkuService.excludeOverdueCycleProduction();
+        if(CollectionUtils.isNotEmpty(overdueSkus)){
+            skus = skus.stream().filter(item -> !overdueSkus.contains(item)).collect(Collectors.toSet());
+        }
+        if(CollectionUtils.isEmpty(skus)){
+          return;
+        }
+        // 剩下的SKU则可生成到供应链订单池-周期排产储备
+        // 4、周期性排产结构下可排产的SKU,计算SKU的周期性排产量：月均销量 * 周转月数 - 无订单库存
+
 
     }
 }
