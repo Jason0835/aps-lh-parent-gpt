@@ -50,7 +50,7 @@ import javax.servlet.http.HttpServletResponse;
 @Slf4j
 @Api(tags = "原材料出库量")
 @Controller
-@RequestMapping("/mainda/rawMaterialOutboundRecord")
+@RequestMapping("/maindata/rawMaterialOutboundRecord")
 public class RawMaterialOutboundRecordUIController extends BaseUIController<RawMaterialOutboundRecord> {
 
     @Autowired
@@ -60,7 +60,7 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("mainda:rawMaterialOutboundRecord:list")
+    @RequiresPermissions("maindata:rawMaterialOutboundRecord:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(RawMaterialOutboundRecord rawMaterialOutboundRecord) {
@@ -71,7 +71,7 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("mainda:rawMaterialOutboundRecord:edit")
+    @RequiresPermissions("maindata:rawMaterialOutboundRecord:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(RawMaterialOutboundRecord rawMaterialOutboundRecord) {
@@ -86,7 +86,7 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
      * 删除原材料出库量
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("mainda:rawMaterialOutboundRecord:remove")
+    @RequiresPermissions("maindata:rawMaterialOutboundRecord:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
