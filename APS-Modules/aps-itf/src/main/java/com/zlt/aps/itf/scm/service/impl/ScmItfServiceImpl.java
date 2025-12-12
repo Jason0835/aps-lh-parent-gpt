@@ -24,7 +24,7 @@ public class ScmItfServiceImpl implements ScmItfService {
 	@Autowired
 	private ItfSyncDataHandle itfSyncDataHandle;
 
-	@Value("itf:scm:syncPlanedNotShipList:url")
+	@Value("${itf.scm.syncPlanedNotShipList.url}")
 	private String SYNC_PLANED_NOTSHIP_URL;
 
 	/**
@@ -54,17 +54,18 @@ public class ScmItfServiceImpl implements ScmItfService {
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		} finally {
-			Integer status = AppUtils.checkAjaxSuccess(ajaxResult) ? ApsConstant.SYNC_STATUS_6
-					: ApsConstant.SYNC_STATUS_3;
-			// 记录同步记录
-			SyncParamsVO paramsVO = new SyncParamsVO();
-			paramsVO.setSyncKey(ApsConstant.SYNC_PLANED_NOT_SHIP);
-			paramsVO.setParams(new JSONObject());
-			paramsVO.setFactoryCode(planedNotShipParamVo.getFactory());
-			paramsVO.setCompanyCode(planedNotShipParamVo.getFactory());
-			paramsVO.setStatus(status);
-			paramsVO.setNoMq(ApsConstant.APS_YES_NO_1); // 不发送mq，仅记录日志
-			itfSyncDataHandle.syncRequest(paramsVO); // 记录请求日志
+			// 暂时先移除接口日志记录
+//			Integer status = AppUtils.checkAjaxSuccess(ajaxResult) ? ApsConstant.SYNC_STATUS_6
+//					: ApsConstant.SYNC_STATUS_3;
+//			// 记录同步记录
+//			SyncParamsVO paramsVO = new SyncParamsVO();
+//			paramsVO.setSyncKey(ApsConstant.SYNC_PLANED_NOT_SHIP);
+//			paramsVO.setParams(new JSONObject());
+//			paramsVO.setFactoryCode(planedNotShipParamVo.getFactory());
+//			paramsVO.setCompanyCode(planedNotShipParamVo.getFactory());
+//			paramsVO.setStatus(status);
+//			paramsVO.setNoMq(ApsConstant.APS_YES_NO_1); // 不发送mq，仅记录日志
+//			itfSyncDataHandle.syncRequest(paramsVO); // 记录请求日志
 		}
 		return ajaxResult;
 	}
