@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" id="MpSupplyOrderPoolResult">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" id="SupplyOrderPoolResult">
             <result property="id" column="ID"/>
             <result property="factoryCode" column="FACTORY_CODE"/>
             <result property="year" column="YEAR"/>
@@ -36,12 +36,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
 
-    <sql id="selectMpSupplyOrderPoolVo">
+    <sql id="selectSupplyOrderPoolVo">
         SELECT ID, FACTORY_CODE, YEAR, MONTH, PRODUCT_TYPE_CODE, LOCATION_TYPE, PRODUCT_CATEGORY, ORDER_TYPE, SALE_AREA, BRAND, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, QTY, THREE_AVERAGE_QTY, SIX_AVERAGE_QTY, DELIVERY_FREQUENCY, STRUCTURE_FREQUENCY, THREE_OVERDUE_STOCK_QTY, SIX_OVERDUE_STOCK_QTY, NIGHT_OVERDUE_STOCK_QTY, TWELVE_OVERDUE_STOCK_QTY, STOCK_LIMIT, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_SUPPLY_ORDER_POOL
     </sql>
 
-    <select id="selectMpSupplyOrderPoolList" parameterType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" resultMap="MpSupplyOrderPoolResult">
-        <include refid="selectMpSupplyOrderPoolVo"/>
+    <select id="selectSupplyOrderPoolList" parameterType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool" resultMap="SupplyOrderPoolResult">
+        <include refid="selectSupplyOrderPoolVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null "> AND YEAR = #{year}</if>
@@ -67,15 +67,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="stockLimit != null "> AND STOCK_LIMIT = #{stockLimit}</if>
     </select>
 
-    <select id="selectMpSupplyOrderPoolById" parameterType="Long" resultMap="MpSupplyOrderPoolResult">
-        <include refid="selectMpSupplyOrderPoolVo"/>
+    <select id="selectSupplyOrderPoolById" parameterType="Long" resultMap="SupplyOrderPoolResult">
+        <include refid="selectSupplyOrderPoolVo"/>
         WHERE ID = #{id}
     </select>
 
-    <select id="selectMpSupplyOrderPoolByIds" parameterType="list"
-            resultMap="MpSupplyOrderPoolResult">
+    <select id="selectSupplyOrderPoolByIds" parameterType="list"
+            resultMap="SupplyOrderPoolResult">
 
-        <include refid="selectMpSupplyOrderPoolVo"/>
+        <include refid="selectSupplyOrderPoolVo"/>
            WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{id}
@@ -184,11 +184,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ID = #{id}
     </update>
 
-    <delete id="deleteMpSupplyOrderPoolById" parameterType="Long">
+    <delete id="deleteSupplyOrderPoolById" parameterType="Long">
         UPDATE T_MP_SUPPLY_ORDER_POOL SET IS_DELETE = 1 WHERE ID = #{id}
     </delete>
 
-    <delete id="deleteMpSupplyOrderPoolByIds" parameterType="String">
+    <delete id="deleteSupplyOrderPoolByIds" parameterType="String">
         UPDATE T_MP_SUPPLY_ORDER_POOL SET IS_DELETE = 1 WHERE ID IN
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
