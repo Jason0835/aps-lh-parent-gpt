@@ -8,10 +8,8 @@ import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -83,4 +81,7 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @TableField(value = "UNIT")
     private String unit;
 
+    public RawSpecialMaterialRecord(String materialCode) {
+        this.materialCode = materialCode;
+    }
 }
