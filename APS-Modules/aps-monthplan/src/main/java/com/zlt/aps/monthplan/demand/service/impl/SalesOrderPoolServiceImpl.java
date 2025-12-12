@@ -21,18 +21,21 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.utils.AppUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmAreaEntityMapper;
+import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmArea;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
@@ -58,13 +61,13 @@ import lombok.extern.slf4j.Slf4j;
 public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool> implements ISalesOrderPoolService {
 	@Autowired
 	private IScmItfService iScmItfService;
+	@Autowired
+	private IFactoryParamService iFactoryParamService;
 
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
 	private MdmAreaEntityMapper mdmAreaEntityMapper;
-	@Autowired
-	private ISysConfigService iSysConfigService;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -144,7 +147,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		StringBuilder warnMsg = new StringBuilder();
 		String splitFlag = notPriorityAreaList.size() > 1 ? "\n" : ""; // 如果有多个区域没有维护优先级，则需要换行提示
 		for (String area : notPriorityAreaList) {
-			warnMsg.append(String.format(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.notPriorityArea"), area)).append(splitFlag);
+			warnMsg.append(String.format(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.notPriorityArea"), area))
+					.append(splitFlag);
 		}
 		if (warnMsg.length() > 0) {
 			warnMsg.append(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.isContinue"));
@@ -188,18 +192,22 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		// 根据年月取出年月现有数据
 		Integer year = salesOrderPool.getYear();
 		Integer month = salesOrderPool.getMonth();
+		String factoryCode = salesOrderPool.getFactoryCode();
 		LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
 		queryWrapper.eq(SalesOrderPool::getYear, year);
 		queryWrapper.eq(SalesOrderPool::getMonth, month);
-		queryWrapper.eq(SalesOrderPool::getFactoryCode, salesOrderPool.getFactoryCode());
+		queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
 		queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
 		List<SalesOrderPool> salesOrderPoolList = salesOrderPoolEntityMapper.selectList(queryWrapper);
 		boolean isFirstCatch = CollectionUtils.isEmpty(salesOrderPoolList); // 如果抓取不到，是年月首次抓取
 
-		// 取系统参数
-		String salesOrderStockFlag = iSysConfigService.selectConfigByKey("salesOrder.stock.flag"); // 从参数取出储备标记
+		// 排产参数
+		String salesOrderStockFlag = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
+				MonthPlanEnums.SALESORDER_STOCK_FLAG); // 从参数取出储备标记
+		String hightPriorityOrderRateStr = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
+				MonthPlanEnums.HIGHT_PRIORITY_ORDER_RATE); // 高优先级订单占比
 		BigDecimal hightPriorityOrderRate = BigDecimalUtils
-				.valueOf(iSysConfigService.selectConfigByKey("hight.priority.order.rate")); // 高优先级订单占比
+				.percentages2Decimals(BigDecimalUtils.valueOf(hightPriorityOrderRateStr)); // 占比参数转换成小数
 
 		// 把接口数据转换成aps订单池对象
 		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().map(vo -> {
@@ -215,7 +223,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			}
 
 			SalesOrderPool newVO = new SalesOrderPool();
-			newVO.setFactoryCode(salesOrderPool.getFactoryCode());
+			newVO.setFactoryCode(factoryCode);
 			newVO.setYear(year);
 			newVO.setMonth(month);
 			newVO.setArea(String.valueOf(vo.getEmployeeDept()));
@@ -355,5 +363,24 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				SyncPlanedNotShipResultVo.class);
 
 		return AjaxResult.success(syncResultList);
+	}
+
+	/**
+	 * 获取配置信息
+	 * 
+	 * @param paramCode
+	 * @return
+	 */
+	private String getFactoryParam(String factoryCode, String productTypeCode, MonthPlanEnums paramCode) {
+		FactoryParam factoryParam = new FactoryParam();
+		factoryParam.setFactoryCode(factoryCode);
+		factoryParam.setParamCode(paramCode.getCode());
+		factoryParam.setProductTypeCode(productTypeCode);
+		FactoryParam param = iFactoryParamService.getFacParamSingle(factoryParam);
+		String paramValue = null;
+		if (param != null) {
+			paramValue = StringUtils.isNotEmpty(param.getParamValue())? param.getParamValue(): param.getDefauleValue();
+		}
+		return paramValue;
 	}
 }
