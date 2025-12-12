@@ -65,6 +65,18 @@ public class FactoryParamServiceImpl extends ServiceImpl<FactoryParamMapper, Fac
     }
 
     @Override
+    public List<FactoryParam> getFactoryParamByCondition(String factoryCode, String productTypeCode, List<String> paramCodeList) {
+        if (StringUtils.isBlank(factoryCode) || CollectionUtils.isEmpty(paramCodeList)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<FactoryParam> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        queryWrapper.in("PARAM_CODE", paramCodeList);
+        queryWrapper.eq(StringUtils.isNotBlank(productTypeCode), "PRODUCT_TYPE_CODE", productTypeCode);
+        return factoryParamMapper.selectList(queryWrapper);
+    }
+
+    @Override
     public AjaxResult copy(FactoryParamVo vo) {
         if (StringUtils.isBlank(vo.getFactoryCode()) || StringUtils.isBlank(vo.getProductTypeCode())
                 || StringUtils.isBlank(vo.getFactoryCode1()) || StringUtils.isBlank(vo.getProductTypeCode1())) {
