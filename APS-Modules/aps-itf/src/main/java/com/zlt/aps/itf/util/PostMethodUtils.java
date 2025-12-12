@@ -49,7 +49,7 @@ public class PostMethodUtils {
             } catch (IOException e) {
                 log.error(e.getMessage(), e);
             }
-            log.info("返回结果: " + result);
+//            log.info("返回结果: " + result);
 
         } catch (Exception e) {
             log.error(e.getMessage(), e);
