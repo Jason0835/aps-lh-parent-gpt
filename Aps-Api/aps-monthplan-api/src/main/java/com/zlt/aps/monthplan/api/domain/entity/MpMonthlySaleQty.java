@@ -3,7 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -25,7 +25,7 @@ import lombok.Data;
 @ApiModel(value = "月均销量对象", description = "月均销量对象 ")
 @Data
 @TableName(value = "T_MP_MONTHLY_SALE_QTY")
-public class MpMonthlySaleQty extends CommonBusiEntity {
+public class MpMonthlySaleQty extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
