@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.raw.service;
+package com.zlt.aps.monthplan.raw.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
@@ -65,6 +65,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     @Autowired
     private RawMaterialMonthDiffMapper rawMaterialMonthDiffMapper;
 
+    @Autowired
+    private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
+
     // 常量定义
     private static final String LOCK_PREFIX = "CREATE_RAW_MATERIAL_REQUIRE_";
     private static final int EUDR_WEEK_THRESHOLD = 3425;
@@ -101,7 +104,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateRawMaterialRequirePlan(Integer year, Integer month) {
+    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month) {
         try {
             // 1. 检查生成状态
             AjaxResult checkResult = checkGeneratingStatus(year, month);
@@ -148,6 +151,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
                 // 11. 生成差异数据
                 generateDifferenceData(year, month);
+
+                // 12. 生成周维度原材料用量记录
+                rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month);
 
                 return AjaxResult.success(String.format("%d年%02d月原材料需求计划生成完成", year, month));
 
