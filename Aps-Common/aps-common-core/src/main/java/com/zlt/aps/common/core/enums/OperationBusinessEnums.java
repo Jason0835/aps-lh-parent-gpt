@@ -17,6 +17,11 @@ public enum OperationBusinessEnums {
      */
     CREATE_MONTH_CYCLE_STRUCTURE("CREATE_MONTH_CYCLE_STRUCTRUE", "生成月周期排产结构配置"),
 
+    /**
+     * 生成月均销量
+     */
+    CREATE_MONTH_AVERAGE_SALE("CREATE_MONTH_AVERAGE_SALE", "生成月均销量"),
+
     ;
 
     /**

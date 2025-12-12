@@ -1,5 +1,7 @@
 package com.zlt.aps.monthplan.demand.mapper;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -20,5 +22,11 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
  */
 @Mapper
 public interface SalesOrderPoolEntityMapper extends CommBaseMapper<SalesOrderPool> {
-
+	
+	/**
+	 * 批量保存
+	 * @param salesOrderPoolList
+	 * @return
+	 */
+	int batchInsert(List<SalesOrderPool> salesOrderPoolList);
 }

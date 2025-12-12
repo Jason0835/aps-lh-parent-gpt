@@ -4,6 +4,7 @@ import lombok.Getter;
 
 /**
  * 月计划参数枚举
+ *
  * @author Chen
  * @since 2025/12/9
  */
@@ -11,12 +12,34 @@ import lombok.Getter;
 public enum MonthPlanEnums {
 
     /**
-     * 新模具预计到货天数
+     * SYS0209001 新模具预计到货天数
      */
     MODULE_ARRIVAL_DAYS("SYS0209001", "单位天，新模具预计到货天数"),
-
-    ;
-
+    /**
+     * SYS0201001 月份周期排产起始日
+     */
+    PRODUCTION_CYCLE_START("SYS0201001", "排产月份周期开始日"),
+    /**
+     * SYS0202001 初始化时，是否进行模具预占产能计算
+     */
+    OPEN_PREEMPTION_MOULD("SYS0202001","初始化时，是否进行模具预占产能计算"),
+    /**
+     * SYS0202002 日硫化量使用的模式值:M = 使用MES的硫化量 S = 使用标准硫化量 A = 使用APS计算的硫化量；其他则认为采用标准硫化量
+     */
+    DAY_VULCANIZATION_MODE("SYS0202002", "日硫化量使用的模式值"),
+    /**
+     * SYS0202003 是否采用损耗率计算损耗
+     */
+    OPEN_LEVEL_RATIO("SYS0202003", "是否采用损耗率计算损耗"),
+    /**
+     * SYS0102001 从供应链同步的订单PO号如果包含有配置文字说明是储备订单，如果销售也没有维护优先级，则优先级默认中优先级
+     */
+	SALESORDER_STOCK_FLAG("SYS0102001", "储备订单标记"),
+    /**
+     * SYS0102002 从供应链同步的订单高优先级订单量超过设定的比例需要自动将提报日期较晚的高优先级订单调整为中优先级
+     */
+	HIGHT_PRIORITY_ORDER_RATE("SYS0102002", "高优先级订单占比");
+	
     private final String code;
     private final String name;
 

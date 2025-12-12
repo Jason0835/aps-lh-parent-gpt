@@ -1,7 +1,9 @@
 package com.zlt.aps.factory.service;
 
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
@@ -14,9 +16,37 @@ import java.util.Set;
  * 月份排产计算，需要获取数据的接口信息
  *
  * @author ZLT
- * @date 20250220
+ * @date 20251208
  */
 public interface ProductionSchedulingDataService {
+    /**
+     * 获取排产周期配置信息
+     * 自然月与非自然月周期
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    Integer getProductionCycleConfiguration(Context context);
+
+    /**
+     * 获取工厂业务是否在初始化进行模具产能预占计算
+     * Y 开启
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    String getOpenPreemptionMouldCapacity(Context context);
+
+    /**
+     * 获取工厂业务使用日硫化量的标准值
+     * M MES硫化量 S 标准硫化量 A 根据硫化时间计算
+     * 其它 S 标准硫化量
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    DayVulcanizationModeEnum getDayVulcanizationQtyConfiguration(Context context);
+
     /**
      * 获取分厂排程版本
      *
@@ -59,14 +89,6 @@ public interface ProductionSchedulingDataService {
     List<ProductionCalendarVO> getProductCalendar(ProductionContext context);
 
     /**
-     * 根据分厂、年份、月份获取对应的物料施工关系信息
-     *
-     * @param context
-     * @return
-     */
-    List<MdmProductConstruction> getProductConstruction(ProductionContext context);
-
-    /**
      * 获取投产施工基础信息
      *
      * @return
@@ -74,21 +96,27 @@ public interface ProductionSchedulingDataService {
     Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo();
 
     /**
-     * 根据分厂、年份、月份获取对应的物料基础信息
-     * 包含 寸口、毛利率，硫化时间，模具大类
+     * 根据查询条件，获取分厂的排产制造需求计划数据
      *
      * @param context
      * @return
      */
-    List<ProductBaseInfoVo> getProductBaseInfo(ProductionContext context);
+    List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context);
 
     /**
-     * 根据查询条件，获取分厂的排产制造需求计划数据
+     * 获取需求计划对应的物料基础信息
      *
-     * @param productionContext
+     * @param context
      * @return
      */
-    List<SaleMonthPlanRequire> getFactoryMonthPlan(ProductionContext productionContext);
+    List<ProductBaseInfoVo> getProductionMaterialInfo(Context context);
+    /**
+     * 获取需求计划对应的施工配置关系信息
+     *
+     * @param context
+     * @return
+     */
+    List<MonthPlanProductConstructionInfoVo> getProductionConstructionInfo(Context context);
 
     /**
      * 根据查询条件，获取分厂的排程计划数据
@@ -142,12 +170,31 @@ public interface ProductionSchedulingDataService {
     List<MouldInfoVO> getMonthEnableMouldConfiguration(ProductionContext context);
 
     /**
-     * 获取分厂、年份、月份的物料与模具关系
+     * 根据需求计划，获取对应的需求模具配置信息
+     * 其包含的信息为物料配置的模具及对应模具的基础信息(状态、模壳标准、主花纹)
      *
      * @param context
      * @return
      */
-    List<ProductMouldConfigurationVo> getProductionMouldInfoConfiguration(ProductionContext context);
+    List<MonthPlanProductMouldInfoVo> getProductionMouldInfo(Context context);
+
+    /**
+     * 获取在排产周期范围内可到货的新物料模具关系信息
+     * 1、上机日期在排产周期范围 [productionStartDate,productionEndDate]
+     * 2、新模具到货中的物料在本次需求范围内
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getProductionMouldDeliveryInfo(Context context);
+
+    /**
+     * 获取对应SKU的日硫化量信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context);
 
     /**
      * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组
@@ -207,52 +254,21 @@ public interface ProductionSchedulingDataService {
      *
      * @param context
      */
-    void deletedInitData(ProductionContext context);
+    void deletedInitData(Context context);
 
     /**
      * 根据上下文，删除某个版本的模具排产数据
      *
      * @param context
      */
-    void deletedMouldProductionData(ProductionContext context);
-
-    /**
-     * 根据上下文，获取正在续作的规格和模具
-     *
-     * @param context 上下文配置
-     * @return
-     */
-    List<MouldProductionProductVo> getContinueProductAndMould(ProductionContext context);
-
-    /**
-     * 保存不排产记录信息
-     *
-     * @param factoryNoProductionPlanList
-     */
-    void saveNoProductionPlanRecord(List<MonthPlanNoProductionRecord> factoryNoProductionPlanList);
-
-    /**
-     * 删除不排产记录
-     *
-     * @param context
-     * @return
-     */
-    int deletedNoProductionRecord(ProductionContext context);
-
-    /**
-     * 保存排产版本的模具产能预占分配结果
-     *
-     * @param productionContext 排产上下文
-     * @param preCapacityList   模具预分配结果列表
-     */
-    void saveMouldPreCapacity(ProductionContext productionContext, List<MonthPlanManufacturingRequirementVo> preCapacityList);
+    void deletedMouldProductionData(Context context);
 
     /**
      * 保存排产初始化信息
      *
      * @param monthPlanInitList
      */
-    void saveMonthPlanInit(List<MonthPlanManufacturingRequirementVo> monthPlanInitList);
+    void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList);
 
     /**
      * 根据上下文，获取分厂排程排产顺序配置
@@ -289,13 +305,6 @@ public interface ProductionSchedulingDataService {
      * @param dayList 汇总结果列表
      */
     void saveMouldProductionSummary(List<MonthPlanMouldingDayResult> dayList);
-
-    /**
-     * 保存月计划版本排产结果--按SKU汇总
-     *
-     * @param dayProductionResultList SKU排产结果
-     */
-    void saveMonthPlanProductionResult(List<MonthPlanProductionDayResult> dayProductionResultList);
 
     /**
      * 保存模具排产结果辅助记录

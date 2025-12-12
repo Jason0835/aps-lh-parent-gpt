@@ -13,7 +13,6 @@ import com.zlt.aps.maindata.service.ISizeCapacityConfigurationService;
 import com.zlt.aps.monthplan.api.domain.entity.SizeCapacityConfiguration;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanAdjustPlanBusinessService;
-import com.zlt.aps.monthplan.mdm.service.ICreateSizeCapacityConfigurationService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -54,8 +53,6 @@ public class SizeCapacityConfigurationController extends AbstractDocBizControlle
 
     private final ISizeCapacityConfigurationService sizeCapacityConfigurationService;
 
-    private final ICreateSizeCapacityConfigurationService createSizeCapacityConfigurationService;
-
     private final IFactoryMonthPlanAdjustPlanBusinessService factoryMonthPlanAdjustPlanBusinessService;
 
     /**
@@ -69,13 +66,13 @@ public class SizeCapacityConfigurationController extends AbstractDocBizControlle
             startPage();
             List<SizeCapacityConfiguration> queryData = sizeCapacityConfigurationService.getConfigurationList(queryVO);
             //处理如果下一寸口与寸口相同，将下一寸口置为空
-            if(!CollectionUtils.isEmpty(queryData)){
-                queryData.stream().forEach(rowData ->{
-                    if(null == rowData.getNextProSize()){
-                        return ;
+            if (!CollectionUtils.isEmpty(queryData)) {
+                queryData.stream().forEach(rowData -> {
+                    if (null == rowData.getNextProSize()) {
+                        return;
                     }
-                    if(!rowData.getProSize().equals(rowData.getNextProSize())){
-                        return ;
+                    if (!rowData.getProSize().equals(rowData.getNextProSize())) {
+                        return;
                     }
                     rowData.setNextProSize(null);
                 });
@@ -126,7 +123,7 @@ public class SizeCapacityConfigurationController extends AbstractDocBizControlle
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || null == formingDate) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.sizeCapacityConfiguration.build.errorParam"));
         }
-        return createSizeCapacityConfigurationService.buildSizeCapacityConfiguration(factoryProductionParam);
+        return AjaxResult.success();
     }
 
     /**

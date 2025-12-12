@@ -11,7 +11,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：SizeCapacityConfiguration.java
- * 描    述：成型产能分配(结构) T_MP_STRUCTURE_ALLOCATION
+ * 描    述：成型产能分配(结构) t_mp_structure_allocation
  *
  * @author zlt
  * @version 1.0
@@ -31,10 +31,10 @@ public class CxCapacityConfiguration extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 分厂编号
+     * 工厂编码
      */
     @Excel(name = "ui.data.column.cxCapacity.factoryCode")
-    @ApiModelProperty(value = "分厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -63,10 +63,10 @@ public class CxCapacityConfiguration extends BaseEntity {
     private String monthPlanVersion;
 
     /**
-     * 分厂版本
+     * 工厂排产版本
      */
     @Excel(name = "ui.data.column.cxCapacity.productionVersion")
-    @ApiModelProperty(value = "分厂版本", name = "productionVersion")
+    @ApiModelProperty(value = "工厂排产版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 

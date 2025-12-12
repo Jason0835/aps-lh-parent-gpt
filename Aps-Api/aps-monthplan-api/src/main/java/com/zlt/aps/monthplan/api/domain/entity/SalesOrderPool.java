@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -110,7 +111,7 @@ public class SalesOrderPool extends BaseEntity{
     @Excel(name = "ui.data.column.SalesOrderPool.ordQty")
     @ApiModelProperty(value = "数量", name = "ordQty")
     @TableField(value = "ORD_QTY")
-    private String ordQty;
+    private BigDecimal ordQty;
 
     /** 年周号 */
     @Excel(name = "ui.data.column.SalesOrderPool.weekYear")
@@ -143,16 +144,22 @@ public class SalesOrderPool extends BaseEntity{
     private String deliverGoodsType;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority")
+    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority", dictType = "biz_product_type")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
 
     /** SCM行ID */
-    @Excel(name = "ui.data.column.SalesOrderPool.scmDetailId")
     @ApiModelProperty(value = "SCM行ID", name = "scmDetailId")
     @TableField(value = "SCM_DETAIL_ID")
     private Long scmDetailId;
 
+    /** 年份 */
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /** 月份 */
+    @TableField(value = "MONTH")
+    private Integer month;
 
 }

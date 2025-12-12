@@ -135,7 +135,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.constructionStage", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
-    private Integer constructionStage;
+    private String constructionStage;
 
     /**
      * 成型法
@@ -198,7 +198,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
-    private BigDecimal proSize;
+    private String proSize;
 
 
     /**
@@ -213,7 +213,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 主花纹
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.mainPattern")
-    @ApiModelProperty(value = "花纹", name = "mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
 

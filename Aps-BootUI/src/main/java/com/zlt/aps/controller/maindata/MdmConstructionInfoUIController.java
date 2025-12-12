@@ -1,53 +1,59 @@
 package com.zlt.aps.controller.maindata;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmConstructionInfoVo;
 import com.zlt.aps.monthplan.api.service.IMdmConstructionInfoRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.util.Arrays;
+import java.util.List;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmConstructionInfoUIController.java
  * 描    述：投产胎胚施工信息 UI控制层类：....
+ *@author zlt
+ *@date 2025-12-10
+ *@version 1.0
  *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-02-24
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
  */
 @Slf4j
 @Api(tags = "投产胎胚施工信息")
 @Controller
 @RequestMapping("/monthplan/mdmConstructionInfo")
-public class MdmConstructionInfoUIController extends BaseUIController<MdmConstructionInfoVo> {
+public class MdmConstructionInfoUIController extends BaseUIController<MdmConstructionInfo> {
 
     @Autowired
     private IMdmConstructionInfoRemoteService iMdmConstructionInfoService;
@@ -100,9 +106,8 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MdmConstructionInfo mdmConstructionInfo) {
-        AjaxResult ajaxResult = null;
         if (UserConstants.NOT_UNIQUE.equals(iMdmConstructionInfoService.checkUnique(mdmConstructionInfo))) {
-            return ajaxResult.error(I18nUtil.getMessage("ui.data.column.mdmConstructionInfo.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmConstructionInfo.checkUnique"));
         }
 
         return iMdmConstructionInfoService.save(mdmConstructionInfo);
@@ -111,7 +116,7 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
     /**
      * 删除投产胎胚施工信息
      */
-    @ApiOperation("删除,id不为空）")
+    @ApiOperation("删除,id不为空")
     @RequiresPermissions("monthplan:mdmConstructionInfo:remove")
     @PostMapping("/remove")
     @ResponseBody
@@ -133,12 +138,11 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
     /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     *
      * @return
      */
     @Override
-    public String getExportTemplateFileName() {
-        return I18nUtil.getMessage("ui.data.column.productConstruction.modelName");
+    public String getExportTemplateFileName(){
+        return this.getFunctionName();
     }
 
 
@@ -159,32 +163,36 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.productConstruction.modelName");
+        return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
-    @GetMapping({"/importTemplate"})
+    /**
+     * 重写导入模板的生成逻辑
+     */
     @ApiOperation("下载导入模板")
-    @ResponseBody
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        return super.importTemplate(response);
+        String fileName = this.getExportTemplateFileName();
+        ExcelUtil<MdmConstructionInfo> util = new ExcelUtil<>(MdmConstructionInfo.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:mdmConstructionInfo:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmConstructionInfoVo entity) throws IOException {
+    public void export(HttpServletResponse response, MdmConstructionInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        MdmConstructionInfo mdmConstructionInfo = new MdmConstructionInfo();
-        BeanUtils.copyProperties(entity, mdmConstructionInfo);
-        byte[] excelBytes = iMdmConstructionInfoService.exportData(mdmConstructionInfo, fileName);
+        byte[] excelBytes = iMdmConstructionInfoService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
+    @RequiresPermissions("monthplan:mdmConstructionInfo:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -198,7 +206,19 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmConstructionInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmConstructionInfoService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 抓取MES数据
+     */
+    @RequiresPermissions("monthplan:mdmConstructionInfo:mesCapture")
+    @ApiOperation("抓取MES数据")
+    @PostMapping("/mesCapture")
+    @ResponseBody
+    public AjaxResult mesCapture() {
+        return iMdmConstructionInfoService.mesCapture();
+    }
+
 }

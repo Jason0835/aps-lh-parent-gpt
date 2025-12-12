@@ -28,4 +28,9 @@ public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
      * @return 结果
      */
     List<MdmFinishStock> list4Mes(MdmFinishStock queryVO);
+    /**
+     *  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
+     * @return
+     */
+    List<MdmFinishStock> findExcludeExceedTwelveMonth();
 }

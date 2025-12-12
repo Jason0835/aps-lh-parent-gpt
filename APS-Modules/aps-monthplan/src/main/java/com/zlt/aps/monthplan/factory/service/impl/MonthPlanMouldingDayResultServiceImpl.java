@@ -23,7 +23,6 @@ import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.IFactoryMonthPlanProductionDayResultService;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -98,9 +97,6 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
 
     @Autowired
     private MdmProductModelRelationEntityMapper mdmProductModelRelationEntityMapper;
-
-    @Autowired
-    private IFactoryMonthPlanProductionDayResultService factoryMonthPlanProductionDayResultService;
 
     /**
      * 查询列表
@@ -252,16 +248,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
             successNum = importList.size();
             mergeByList(importList, keyFunc);
 
-            // 查询SKU合计，写入
-            if (productionVersion != null) {
-                MonthPlanMouldingDayResult mouldingDayResult = new MonthPlanMouldingDayResult();
-                mouldingDayResult.setFactoryCode(productionVersion.getFactoryCode());
-                mouldingDayResult.setYear(productionVersion.getYear());
-                mouldingDayResult.setMonth(productionVersion.getMonth());
-                mouldingDayResult.setProductionVersion(productionVersion.getProductionVersion());
-                mouldingDayResult.setMonthPlanVersion(productionVersion.getMonthPlanVersion());
-                factoryMonthPlanProductionDayResultService.insertFormImportProductionDay(mouldingDayResult);
-            }
+
         } catch (Exception e) {
             log.error("模具排产结果汇总-导入异常", e);
             successNum = 0;

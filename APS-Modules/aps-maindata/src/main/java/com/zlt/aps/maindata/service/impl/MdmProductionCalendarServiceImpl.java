@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.ProductionCalendarHelper;
 import com.tlt.aps.utils.YearMonthUtils;
@@ -72,7 +73,7 @@ public class MdmProductionCalendarServiceImpl implements IMdmProductionCalendarS
 
     @Override
     public Set<Integer> getStopDays(String factoryCode, Integer year, Integer month) {
-        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode);
+        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode, ProductTypeEnum.WHOLE_STEEL);
         boolean isNaturalMonth = YearMonthUtils.isNaturalMonth(cycleStartDay);
         LocalDate monthDate = LocalDate.of(year, month, FactoryConstant.MONTH_START_DAY);
         Integer monthDays = monthDate.with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
@@ -98,7 +99,7 @@ public class MdmProductionCalendarServiceImpl implements IMdmProductionCalendarS
 
     @Override
     public Integer getMonthMaxDays(String factoryCode, Integer year, Integer month) {
-        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode);
+        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode, ProductTypeEnum.WHOLE_STEEL);
         boolean isNaturalMonth = YearMonthUtils.isNaturalMonth(cycleStartDay);
         LocalDate monthDate = LocalDate.of(year, month, FactoryConstant.MONTH_START_DAY);
         Integer monthDays = monthDate.with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
@@ -128,7 +129,7 @@ public class MdmProductionCalendarServiceImpl implements IMdmProductionCalendarS
 
     @Override
     public Integer getMonthDays(String factoryCode, Integer year, Integer month) {
-        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode);
+        Integer cycleStartDay = factoryParamService.getMonthStartDay(factoryCode, ProductTypeEnum.WHOLE_STEEL);
         boolean isNaturalMonth = YearMonthUtils.isNaturalMonth(cycleStartDay);
         LocalDate monthDate = LocalDate.of(year, month, FactoryConstant.MONTH_START_DAY);
         Integer monthDays = monthDate.with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
