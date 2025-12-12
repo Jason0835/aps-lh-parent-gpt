@@ -7,6 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.service.IMpDemandPlanRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -102,9 +103,9 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(MpDemandPlan mpDemandPlan) {
-        AjaxResult ajaxResult = null;
+        AjaxResult ajaxResult;
         if (UserConstants.NOT_UNIQUE.equals(iMpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan))) {
-            return ajaxResult.error(I18nUtil.getMessage("ui.data.column.mpDemandPlan.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpDemandPlan.checkUnique"));
         }
         if (mpDemandPlan.getId() != null){
             ajaxResult = iMpDemandPlanService.edit(mpDemandPlan);
