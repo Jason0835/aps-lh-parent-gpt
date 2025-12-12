@@ -1,159 +1,184 @@
 package com.zlt.aps.monthplan.demand.controller;
 
-
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
-import com.zlt.common.controller.BusiController;
-import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
+import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
 /**
-* Copyright (c) 2022, All rights reserved。
-* 文件名称：MpMonthlySaleQtyController.java
-* 描    述：月均销量 控制层类：....
-*@author yelq
-*@date 2025-12-11
-*@version 1.0
-*
- *  修改记录：
-*     修改时间：...
-*     修 改 人：yelq
-*     修改内容：...
-*/
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MpMonthlySaleQtyController.java
+ * 描    述：月均销量 控制层类：....
+ *
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2025-12-11
+ */
 @Slf4j
 @Api(tags = "月均销量")
 @RestController
-@RequestMapping("/monthlySaleQty")
-public class MpMonthlySaleQtyController extends BusiController<MpMonthlySaleQty>
-{
+@RequestMapping("/mpMonthlySaleQty")
+public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonthlySaleQty> {
+
     @Autowired
     private IMpMonthlySaleQtyService mpMonthlySaleQtyService;
+
+    @Autowired
+    private MpMonthlySaleQtyEntityMapper entityMapper;
 
     /**
      * 查询月均销量列表
      */
-    @RequiresPermissions( "monthplan:monthlySaleQty:list")
-    @ApiOperation("查询月均销量列表")
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:list")
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody MpMonthlySaleQty mpMonthlySaleQty)
-    {
-        startPage("create_time desc");
-        List<MpMonthlySaleQty> list = mpMonthlySaleQtyService.selectMpMonthlySaleQtyList(mpMonthlySaleQty);
-        return getDataTable(list);
-    }
-
-
-    /**
-     * 导出月均销量列表
-     */
-    @RequiresPermissions( "monthplan:monthlySaleQty:export")
-    @Log(title = "月均销量", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportData/{fileName}")
-    public byte[] exportData(@RequestBody MpMonthlySaleQty mpMonthlySaleQty,@PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
-        return commonExport(mpMonthlySaleQty,fileName,response);
+    @Override
+    public TableDataInfo list(@RequestBody MpMonthlySaleQty queryVO) {
+        return super.list(queryVO);
     }
 
     @Override
-    public List<MpMonthlySaleQty> listExportData(MpMonthlySaleQty mpMonthlySaleQty) {
-        startPage("create_time desc");
-        return  mpMonthlySaleQtyService.selectMpMonthlySaleQtyList(mpMonthlySaleQty);
+    protected String getOrderBy() {
+        return "create_time desc";
     }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.mpMonthlySaleQty.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:save")
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody MpMonthlySaleQty billVO) {
+        return super.save(billVO);
+    }
+
+    /**
+     * 删除
+     */
+    @Log(title = "ui.data.column.mpMonthlySaleQty.modelName", businessType = BusinessType.DELETE)
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:remove")
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
 
     /**
      * 获取月均销量详细信息
      */
-    @RequiresPermissions( "monthplan:monthlySaleQty:query")
-    @ApiOperation("获取月均销量详细信息")
-    @GetMapping(value = "/{id}")
-    public MpMonthlySaleQty getInfo(@PathVariable("id") Long id)
-    {
-        return mpMonthlySaleQtyService.selectMpMonthlySaleQtyById(id);
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:query")
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{billId}")
+    @Override
+    public MpMonthlySaleQty getInfo(@PathVariable("billId") Long billId) {
+        return super.getInfo(billId);
     }
 
-    /**
-     * 新增月均销量
-     */
-    @Log(title = "ui.data.column.monthlySaleQty.modelName", businessType = BusinessType.INSERT)
-    @RequiresPermissions( "monthplan:monthlySaleQty:add")
-    @ApiOperation("新增月均销量")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return toAjax(mpMonthlySaleQtyService.insertMpMonthlySaleQty(mpMonthlySaleQty));
-    }
-
-    /**
-     * 修改月均销量
-     */
-    @Log(title = "ui.data.column.monthlySaleQty.modelName", businessType = BusinessType.UPDATE)
-    @RequiresPermissions( "monthplan:monthlySaleQty:edit")
-    @ApiOperation("修改月均销量")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return toAjax(mpMonthlySaleQtyService.updateMpMonthlySaleQty(mpMonthlySaleQty));
-    }
-
-    /**
-     * 删除月均销量
-     */
-    @Log(title = "ui.data.column.monthlySaleQty.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:monthlySaleQty:remove")
-    @ApiOperation("删除月均销量")
-	@DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids){
-        return toAjax(mpMonthlySaleQtyService.deleteMpMonthlySaleQtyByIds(ids));
-    }
-
-    /**
-     * 校验月均销量唯一性
-     */
-    @ApiOperation("校验月均销量唯一性")
-    @PostMapping("/checkMpMonthlySaleQtyUnique")
-    public String checkMpMonthlySaleQtyUnique(@RequestBody MpMonthlySaleQty mpMonthlySaleQty){
-        return mpMonthlySaleQtyService.checkMpMonthlySaleQtyUnique(mpMonthlySaleQty);
-    }
 
     /**
      * 根据集合导入月均销量数据
+     *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.monthlySaleQty.modelName", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入月均销量数据")
-    @PostMapping("/importData/{updateSupport}")
-    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
-        return commonImport(importContext,updateSupport);
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:import")
+    @Log(title = "ui.data.column.mpMonthlySaleQty.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    /**
+     * 导出列表
+     */
+    @RequiresPermissions("monthplan:mpMonthlySaleQty:export")
+    @Log(title = "月均销量", businessType = BusinessType.EXPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody MpMonthlySaleQty queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    public AjaxResult doImportData(List<MpMonthlySaleQty> list, boolean updateSupport, long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return mpMonthlySaleQtyService.importData(list, updateSupport, importLogId);
+    protected List<MpMonthlySaleQty> listExportData(MpMonthlySaleQty obj) {
+        QueryWrapper<MpMonthlySaleQty> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return entityMapper.selectList(wrapper);
     }
+
+    @Override
+    protected IDocService getDocService() {
+        return mpMonthlySaleQtyService;
+    }
+
+    /**
+     * 条件拼接
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<MpMonthlySaleQty> queryWrapper, MpMonthlySaleQty queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productYpeCode")), "PRODUCT_YPE_CODE", queryVO.getFieldValueByFieldName("productYpeCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("locationType")), "LOCATION_TYPE", queryVO.getFieldValueByFieldName("locationType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("rollMonthSaleQty")), "ROLL_MONTH_SALE_QTY", queryVO.getFieldValueByFieldName("rollMonthSaleQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("averageSaleQty")), "AVERAGE_SALE_QTY", queryVO.getFieldValueByFieldName("averageSaleQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("passThreeMonthSaleQty")), "PASS_THREE_MONTH_SALE_QTY", queryVO.getFieldValueByFieldName("passThreeMonthSaleQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("saleArea")), "SALE_AREA", queryVO.getFieldValueByFieldName("saleArea"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "MP1209";
+    }
+
+
+    /**
+     * 生成月均销量
+     *
+     * @param mpMonthlySaleQty 参数
+     * @return 结果
+     */
+    @ApiOperation("生成月均销量")
+    @PostMapping("/genMonthlySaleQty")
+    public AjaxResult genMonthlySaleQty(@RequestBody MpMonthlySaleQty mpMonthlySaleQty) {
+        return mpMonthlySaleQtyService.genMonthlySaleQty(mpMonthlySaleQty);
+    }
+
 }

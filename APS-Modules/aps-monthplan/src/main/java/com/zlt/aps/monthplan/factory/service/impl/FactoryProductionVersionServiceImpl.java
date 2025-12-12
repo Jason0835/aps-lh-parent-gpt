@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -51,7 +52,7 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         if (StringUtils.isBlank(factoryCode)) {
             return;
         }
-        Integer startDay = factoryParamService.getMonthStartDay(factoryCode);
+        Integer startDay = factoryParamService.getMonthStartDay(factoryCode, ProductTypeEnum.WHOLE_STEEL);
         if (null == startDay) {
             return;
         }

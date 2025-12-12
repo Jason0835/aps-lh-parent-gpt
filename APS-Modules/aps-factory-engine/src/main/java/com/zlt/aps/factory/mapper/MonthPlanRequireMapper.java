@@ -5,10 +5,10 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 制造需求计划SQL接口
+ * 月度需求计划业务SQL接口定义
  *
  * @author ZLT
- * @date 20250308
+ * @date 20251210
  */
 @Mapper
 public interface MonthPlanRequireMapper extends CommBaseMapper<SaleMonthPlanRequire> {

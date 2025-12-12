@@ -1,7 +1,9 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.bill.common.service.IDocService;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,4 +21,12 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> {
 
+    /**
+     * 生成月均销量
+     *
+     * @param mpMonthlySaleQty 参数
+     * @return 结果
+     */
+    @Transactional(rollbackFor = Exception.class)
+    AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty);
 }

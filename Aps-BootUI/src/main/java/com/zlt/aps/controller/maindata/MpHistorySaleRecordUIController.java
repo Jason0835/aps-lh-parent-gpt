@@ -1,69 +1,63 @@
 package com.zlt.aps.controller.maindata;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.service.IMpHistorySaleRecordRemoteService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.ruoyi.common4ui.exception.base.BaseException;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-import org.apache.commons.io.IOUtils;
-
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpHistorySaleRecordUIController.java
  * 描    述：历史销售记录 UI控制层类：....
- *@author yelq
+ *@author zlt
  *@date 2025-12-11
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：yelq
+ *     修 改 人：zlt
  *     修改内容：...
  */
 @Slf4j
 @Api(tags = "历史销售记录")
 @Controller
-@RequestMapping("/maindata/historySaleRecord")
+@RequestMapping("/monthplan/MpHistorySaleRecord")
 public class MpHistorySaleRecordUIController extends BaseUIController<MpHistorySaleRecord> {
 
     @Autowired
     private IMpHistorySaleRecordRemoteService iMpHistorySaleRecordService;
 
-    private final String prefix = "maindata/maindata/historySaleRecord";
+    private final String prefix = "aps/monthplan/MpHistorySaleRecord";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("maindata:historySaleRecord:view")
+    @RequiresPermissions("monthplan:MpHistorySaleRecord:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/historySaleRecord";
+        return prefix + "/MpHistorySaleRecord";
     }
 
     /**
@@ -85,56 +79,51 @@ public class MpHistorySaleRecordUIController extends BaseUIController<MpHistoryS
     }
 
     /**
-     * 根据条件查询历史销售记录列表
+     * 根据条件查询主表数据
      */
-    @ApiOperation("根据条件查询历史销售记录列表")
-    @RequiresPermissions("maindata:historySaleRecord:list")
+    @ApiOperation("根据条件查询主表数据")
+    @RequiresPermissions("monthplan:MpHistorySaleRecord:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MpHistorySaleRecord entity) {
-        return iMpHistorySaleRecordService.list(entity);
+    public TableDataInfo list(MpHistorySaleRecord mpHistorySaleRecord) {
+        return iMpHistorySaleRecordService.list(mpHistorySaleRecord);
     }
 
     /**
-     * 修改或新增历史销售记录
+     * 修改或新增
      */
-    @ApiOperation("修改或新增历史销售记录")
-    @RequiresPermissions("maindata:historySaleRecord:edit")
-    @PostMapping("/edit")
+    @ApiOperation("修改或新增")
+    @RequiresPermissions("monthplan:MpHistorySaleRecord:edit")
+    @PostMapping("/save")
     @ResponseBody
-    public AjaxResult editSave(MpHistorySaleRecord mpHistorySaleRecord) {
-        AjaxResult ajaxResult = null;
-        if (UserConstants.NOT_UNIQUE.equals(iMpHistorySaleRecordService.checkMpHistorySaleRecordUnique(mpHistorySaleRecord))) {
+    public AjaxResult save(MpHistorySaleRecord mpHistorySaleRecord) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpHistorySaleRecordService.checkUnique(mpHistorySaleRecord))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpHistorySaleRecord.checkUnique"));
         }
-        if (mpHistorySaleRecord.getId() != null){
-            ajaxResult = iMpHistorySaleRecordService.edit(mpHistorySaleRecord);
-        } else{
-            ajaxResult = iMpHistorySaleRecordService.add(mpHistorySaleRecord);
-        }
-        return ajaxResult;
+
+        return iMpHistorySaleRecordService.save(mpHistorySaleRecord);
     }
 
     /**
      * 删除历史销售记录
      */
-    @ApiOperation("删除历史销售记录（id不为空）")
-    @RequiresPermissions("maindata:historySaleRecord:remove")
+    @ApiOperation("删除,id不为空")
+    @RequiresPermissions("monthplan:MpHistorySaleRecord:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMpHistorySaleRecordService.remove(arr);
+        return iMpHistorySaleRecordService.removeByIds(Arrays.asList(arr));
     }
 
     /**
      * 校验历史销售记录唯一性
      */
-    @ApiOperation("校验历史销售记录唯一性")
-    @PostMapping("/checkMpHistorySaleRecordUnique")
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkMpHistorySaleRecordUnique(MpHistorySaleRecord mpHistorySaleRecord) {
-        return iMpHistorySaleRecordService.checkMpHistorySaleRecordUnique(mpHistorySaleRecord);
+    public String checkUnique(MpHistorySaleRecord mpHistorySaleRecord) {
+        return iMpHistorySaleRecordService.checkUnique(mpHistorySaleRecord);
     }
 
     /**
@@ -144,15 +133,15 @@ public class MpHistorySaleRecordUIController extends BaseUIController<MpHistoryS
      */
     @Override
     public String getExportTemplateFileName(){
-        throw new BaseException("没有定义导出模板的文件名");
+        return this.getFunctionName();
     }
 
 
     /**
- * 继承时重写方法。
- *
- * @return
- */
+     * 继承时重写方法。
+     *
+     * @return
+     */
     @Override
     public String getProcedureCode() {
         return "0";
@@ -165,7 +154,19 @@ public class MpHistorySaleRecordUIController extends BaseUIController<MpHistoryS
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.MpHistorySaleRecord.modelName");
+    }
+
+    /**
+     * 重写导入模板的生成逻辑
+     */
+    @ApiOperation("下载导入模板")
+    @Override
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        ExcelUtil<MpHistorySaleRecord> util = new ExcelUtil<>(MpHistorySaleRecord.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
     }
 
     @ApiOperation("数据导出")

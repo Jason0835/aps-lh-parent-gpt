@@ -234,8 +234,8 @@ public class MonthPlanManufacturingRequirementVo extends ProductionMonthPlanInit
      * @return
      */
     public String getWorkWearTypeValue() {
-        WorkWearTypeEnum type = WorkWearTypeEnum.getInstance(getProSize(), getMouldMethod(), getSpecifications());
-        return type.getTypeValue();
+//        WorkWearTypeEnum type = WorkWearTypeEnum.getInstance(getProSize(), getMouldMethod(), getSpecifications());
+        return "";
     }
 
     public void setIsProduction(Integer isProduction){
