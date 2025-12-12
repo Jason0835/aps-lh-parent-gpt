@@ -28,6 +28,9 @@ public enum MonthPlanEnums {
      */
     DAY_VULCANIZATION_MODE("SYS0202002", "日硫化量使用的模式值"),
     /**
+     * SYS0202003 是否采用损耗率计算损耗
+     */
+    OPEN_LEVEL_RATIO("SYS0202003", "是否采用损耗率计算损耗");    /**
      * SYS0102001 从供应链同步的订单PO号如果包含有配置文字说明是储备订单，如果销售也没有维护优先级，则优先级默认中优先级
      */
 	SALESORDER_STOCK_FLAG("SYS0102001", "储备订单标记"),
@@ -35,7 +38,6 @@ public enum MonthPlanEnums {
      * SYS0102002 从供应链同步的订单高优先级订单量超过设定的比例需要自动将提报日期较晚的高优先级订单调整为中优先级
      */
 	HIGHT_PRIORITY_ORDER_RATE("SYS0102002", "高优先级订单占比");
-
     private final String code;
     private final String name;
 
