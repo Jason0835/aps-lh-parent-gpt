@@ -51,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
@@ -507,6 +508,18 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
                 .eq(MonthPlanRequireStock::getIsDelete, ApsConstant.APS_YES_NO_0);
 
         return saleMonthPlanRequireStockMapper.selectList(query);
+    }
+
+    @Override
+    public List<FactoryMonthPlanProdFinal> findLastTwelveMonthProdFinalPlan() {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
+        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
+        LambdaQueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProdFinal.class)
+            .ge(FactoryMonthPlanProdFinal::getYearMonth, Integer.valueOf(yearMonth))
+            .eq(FactoryMonthPlanProdFinal::getIsDelete, ApsConstant.APS_YES_NO_0);
+        return this.factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
     }
 
     @Override

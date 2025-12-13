@@ -2,12 +2,14 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
@@ -15,6 +17,7 @@ import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.YearMonth;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -134,6 +138,13 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         // 生成SKU排产分类
         genSkuClassify(factoryCode, last12YearMonth, maxYearMonth);
         return AjaxResult.success();
+    }
+
+    @Override
+    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty() {
+        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
+        return entityMapper.selectList(wrapper);
     }
 
     /**

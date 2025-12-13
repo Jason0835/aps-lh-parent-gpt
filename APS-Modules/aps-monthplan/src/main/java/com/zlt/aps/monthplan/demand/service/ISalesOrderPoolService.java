@@ -4,6 +4,9 @@ package com.zlt.aps.monthplan.demand.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：ISalesOrderPoolService.java
@@ -38,4 +41,9 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	AjaxResult getSCMData(SalesOrderPool salesOrderPool);
+	/**
+	 *  查询当前销售订单
+	 * @return 当前销售订单
+	 */
+	List<SalesOrderPool> findCurrentSalesOrderPool();
 }

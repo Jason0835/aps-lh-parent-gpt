@@ -51,6 +51,15 @@ public class MdmMaterialInfo extends BaseEntity {
     private String materialCategory;
 
     /**
+     * 产品分类
+     */
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
+
+    /**
      * 结构
      */
     @ImportExcelValidated(required = true, maxLength = 20)

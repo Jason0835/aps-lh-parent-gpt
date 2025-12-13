@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -11,6 +12,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -179,6 +183,17 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.noScmData"));
 		}
 		return this.saveItfData(salesOrderPool, syncResultList);
+	}
+
+	@Override
+	public List<SalesOrderPool> findCurrentSalesOrderPool() {
+		// 获取当前年月
+		YearMonth currentYearMonth = YearMonth.now();
+		LambdaQueryWrapper<SalesOrderPool> wrapper = Wrappers.lambdaQuery();
+		wrapper.eq(SalesOrderPool::getYear, currentYearMonth.getYear());
+		wrapper.eq(SalesOrderPool::getMonth, currentYearMonth.getMonth());
+		wrapper.eq(SalesOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
+		return salesOrderPoolEntityMapper.selectList(wrapper);
 	}
 
 	/**

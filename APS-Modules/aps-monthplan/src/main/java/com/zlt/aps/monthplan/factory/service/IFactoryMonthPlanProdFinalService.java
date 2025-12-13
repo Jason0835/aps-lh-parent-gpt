@@ -127,4 +127,9 @@ public interface IFactoryMonthPlanProdFinalService {
     FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
 
     List<MonthPlanRequireStock> getSaleMonthPlanRequireStock(String monthPlanVersion);
+    /**
+     * 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
+     * @return 定稿的月度排产计划
+     */
+    List<FactoryMonthPlanProdFinal> findLastTwelveMonthProdFinalPlan();
 }

@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -83,10 +84,14 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
     }
 
     @Override
-    public List<MdmFinishStock> findExcludeExceedTwelveMonth() {
+    public List<MdmFinishStock> findCurrentFinishStock() {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
         LambdaQueryWrapper<MdmFinishStock> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmFinishStock::getYear, currentYearMonth.getYear());
+        wrapper.eq(MdmFinishStock::getMonth, currentYearMonth.getMonth());
         wrapper.eq(MdmFinishStock::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.eq(MdmFinishStock::getIsExceedTwelveMonth,YesOrNoEnum.NO.getCode());
         return finishStockEntityMapper.selectList(wrapper);
     }
+
 }

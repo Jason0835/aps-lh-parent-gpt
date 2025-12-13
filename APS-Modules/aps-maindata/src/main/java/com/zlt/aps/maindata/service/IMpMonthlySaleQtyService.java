@@ -5,6 +5,8 @@ import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpMonthlySaleQtyService.java
@@ -29,4 +31,9 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty);
+    /**
+     * 查询当前月均销量
+     * @return 查询当前月均销量
+     */
+    List<MpMonthlySaleQty> findCurrentMonthlySaleQty();
 }
