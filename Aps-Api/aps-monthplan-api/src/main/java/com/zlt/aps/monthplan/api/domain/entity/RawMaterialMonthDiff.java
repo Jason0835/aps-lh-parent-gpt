@@ -1,4 +1,4 @@
-﻿package com.zlt.aps.monthplan.api.domain.entity;
+package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.web.domain.BaseEntity;

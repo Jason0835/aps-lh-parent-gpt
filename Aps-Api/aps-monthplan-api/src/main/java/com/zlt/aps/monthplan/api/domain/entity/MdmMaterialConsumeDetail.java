@@ -1,4 +1,4 @@
-﻿package com.zlt.aps.monthplan.api.domain.entity;
+package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 /**
  * BOM物料消耗明细实体类
  * 记录解开树形结构后的关系，用胎胚代码+胎胚版本查就能找出下面用到的所有原材料
+ * @author 16799
  */
 @ApiModel(value = "BOM物料消耗明细对象", description = "BOM物料消耗明细对象")
 @Data

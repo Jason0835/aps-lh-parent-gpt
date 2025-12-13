@@ -24,11 +24,13 @@ public interface IRawMaterialRequirePlanService  extends IDocService<RawMaterial
 
     /**
      * 生成原材料需求计划
-     * @param year 年份
-     * @param month 月份
+     *
+     * @param factoryCode
+     * @param year        年份
+     * @param month       月份
      * @return 生成结果
      */
-    AjaxResult generateRawMaterialRequirePlan(Integer year, Integer month);
+    AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month);
 
     /**
      * 检查是否正在生成

@@ -1,4 +1,4 @@
-﻿package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;

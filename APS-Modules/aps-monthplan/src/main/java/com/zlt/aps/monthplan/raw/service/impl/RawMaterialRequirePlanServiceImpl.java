@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.raw.service;
+package com.zlt.aps.monthplan.raw.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
@@ -65,6 +65,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     @Autowired
     private RawMaterialMonthDiffMapper rawMaterialMonthDiffMapper;
 
+    @Autowired
+    private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
+
     // 常量定义
     private static final String LOCK_PREFIX = "CREATE_RAW_MATERIAL_REQUIRE_";
     private static final int EUDR_WEEK_THRESHOLD = 3425;
@@ -101,7 +104,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateRawMaterialRequirePlan(Integer year, Integer month) {
+    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month) {
         try {
             // 1. 检查生成状态
             AjaxResult checkResult = checkGeneratingStatus(year, month);
@@ -149,6 +152,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 // 11. 生成差异数据
                 generateDifferenceData(year, month);
 
+                // 12. 生成周维度原材料用量记录
+                generateWeekUsageRecords(factoryCode, year, month);
+
                 return AjaxResult.success(String.format("%d年%02d月原材料需求计划生成完成", year, month));
 
             } finally {
@@ -159,6 +165,33 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         } catch (Exception e) {
             log.error("生成原材料需求计划失败", e);
             return AjaxResult.error("生成原材料需求计划失败：" + e.getMessage());
+        }
+    }
+
+
+    /**
+     * 生成周维度原材料用量记录
+     */
+    private void generateWeekUsageRecords(String factoryCode, Integer year, Integer month) {
+        try {
+                try {
+                    AjaxResult result = rawWeekUsageGenerateService
+                            .generateWeekUsageForMonth(factoryCode, year, month);
+
+                    if (isSuccess(result)) {
+                        log.info("生成周维度用量记录成功，工厂：{}，年月：{}-{}",
+                                factoryCode, year, month);
+                    } else {
+                        log.warn("生成周维度用量记录失败，工厂：{}，年月：{}-{}，错误：{}",
+                                factoryCode, year, month, result.get("msg"));
+                    }
+                } catch (Exception e) {
+                    log.error("生成周维度用量记录异常，工厂：{}，年月：{}-{}",
+                            factoryCode, year, month, e);
+                }
+        } catch (Exception e) {
+            log.error("生成周维度用量记录总体失败", e);
+            // 不抛出异常，避免影响主流程
         }
     }
 
