@@ -82,5 +82,10 @@ public interface ISupplyOrderPoolRemoteService {
     @ApiOperation("导入供应链订单池")
     @PostMapping("/supplyOrderPool/importData")
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
-
+    /**
+     * 生成周期排产储备
+     */
+    @ApiOperation("生成周期排产储备")
+    @PostMapping("/supplyOrderPool/createCycleStockUp")
+    AjaxResult createCycleStockUp(@RequestBody  SupplyOrderPool supplyOrderPool);
 }

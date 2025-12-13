@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -165,4 +166,15 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
         AjaxResult ajaxResult = iSupplyOrderPoolService.importData(context,false);
         return ajaxResult;
     }
+
+  /**
+   * 生成周期排产储备
+   */
+  @ApiOperation("生成周期排产储备")
+  @PostMapping("/createCycleStockUp")
+  @ResponseBody
+  public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool) {
+    return iSupplyOrderPoolService.createCycleStockUp(supplyOrderPool);
+  }
+
 }
