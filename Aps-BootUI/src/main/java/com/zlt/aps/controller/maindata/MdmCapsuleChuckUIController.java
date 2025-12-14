@@ -8,7 +8,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
-
 import java.util.Arrays;
 import java.util.List;
 import java.io.IOException;
@@ -37,10 +36,10 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmMoldingMachineUIController.java
- * 描    述：基础数据-成型机档案 UI控制层类：....
+ * 文件名称：MdmCapsuleChuckUIController.java
+ * 描    述：胶囊卡盘台账 UI控制层类：....
  *@author zlt
- *@date 2025-12-14
+ *@date 2025-12-12
  *@version 1.0
  *
  *  修改记录：
@@ -49,23 +48,23 @@ import javax.servlet.http.HttpServletResponse;
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "基础数据-成型机档案")
+@Api(tags = "胶囊卡盘台账")
 @Controller
-@RequestMapping("/monthplan/mdmMoldingMachine")
-public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMachine> {
+@RequestMapping("/monthplan/mdmCapsuleChuck")
+public class MdmCapsuleChuckUIController extends BaseUIController<MdmCapsuleChuck> {
 
     @Autowired
-    private IMdmMoldingMachineRemoteService iMdmMoldingMachineService;
+    private IMdmCapsuleChuckRemoteService iMdmCapsuleChuckService;
 
-    private final String prefix = "aps/monthplan/mdmMoldingMachine";
+    private final String prefix = "aps/monthplan/mdmCapsuleChuck";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmMoldingMachine:view")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmMoldingMachine";
+        return prefix + "/mdmCapsuleChuck";
     }
 
     /**
@@ -73,7 +72,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmMoldingMachine", new MdmMoldingMachine());
+        mmap.put("mdmCapsuleChuck", new MdmCapsuleChuck());
         return prefix + "/add";
     }
 
@@ -82,7 +81,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmMoldingMachine", iMdmMoldingMachineService.getInfo(id));
+        mmap.put("mdmCapsuleChuck", iMdmCapsuleChuckService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -90,48 +89,48 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:list")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmMoldingMachine mdmMoldingMachine) {
-        return iMdmMoldingMachineService.list(mdmMoldingMachine);
+    public TableDataInfo list(MdmCapsuleChuck mdmCapsuleChuck) {
+        return iMdmCapsuleChuckService.list(mdmCapsuleChuck);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:edit")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmMoldingMachine mdmMoldingMachine) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmMoldingMachineService.checkUnique(mdmMoldingMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmMoldingMachine.checkUnique"));
+    public AjaxResult save(MdmCapsuleChuck mdmCapsuleChuck) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmCapsuleChuckService.checkUnique(mdmCapsuleChuck))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmCapsuleChuck.checkUnique"));
         }
 
-        return iMdmMoldingMachineService.save(mdmMoldingMachine);
+        return iMdmCapsuleChuckService.save(mdmCapsuleChuck);
     }
 
     /**
-     * 删除基础数据-成型机档案
+     * 删除胶囊卡盘台账
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:remove")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmMoldingMachineService.removeByIds(Arrays.asList(arr));
+        return iMdmCapsuleChuckService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验基础数据-成型机档案唯一性
+     * 校验胶囊卡盘台账唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmMoldingMachine mdmMoldingMachine) {
-        return iMdmMoldingMachineService.checkUnique(mdmMoldingMachine);
+    public String checkUnique(MdmCapsuleChuck mdmCapsuleChuck) {
+        return iMdmCapsuleChuckService.checkUnique(mdmCapsuleChuck);
     }
 
     /**
@@ -172,26 +171,26 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmMoldingMachine> util = new ExcelUtil<>(MdmMoldingMachine.class);
+        ExcelUtil<MdmCapsuleChuck> util = new ExcelUtil<>(MdmCapsuleChuck.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmMoldingMachine:export")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmMoldingMachine entity) throws IOException {
+    public void export(HttpServletResponse response, MdmCapsuleChuck entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmMoldingMachineService.exportData(entity,fileName);
+        byte[] excelBytes = iMdmCapsuleChuckService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mdmMoldingMachine:import")
+    @RequiresPermissions("monthplan:mdmCapsuleChuck:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -205,7 +204,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMoldingMachineService.importData(context,false);
+        AjaxResult ajaxResult = iMdmCapsuleChuckService.importData(context,false);
         return ajaxResult;
     }
 }

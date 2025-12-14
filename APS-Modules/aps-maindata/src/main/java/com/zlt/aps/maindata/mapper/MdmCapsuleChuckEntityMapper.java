@@ -1,15 +1,15 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmMoldingMachineMapper.java
- * 描    述：基础数据-成型机档案Mapper接口
+ * 文件名称：MdmCapsuleChuckMapper.java
+ * 描    述：胶囊卡盘台账Mapper接口
  *@author zlt
- *@date 2025-12-14
+ *@date 2025-12-12
  *@version 1.0
  *
  *  修改记录：
@@ -18,6 +18,6 @@ import org.apache.ibatis.annotations.Mapper;
  *     修改内容：...
  */
 @Mapper
-public interface MdmMoldingMachineEntityMapper extends CommBaseMapper<MdmMoldingMachine> {
+public interface MdmCapsuleChuckEntityMapper extends CommBaseMapper<MdmCapsuleChuck> {
 
 }

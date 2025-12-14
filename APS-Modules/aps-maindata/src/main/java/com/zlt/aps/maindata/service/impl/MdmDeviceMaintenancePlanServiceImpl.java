@@ -452,8 +452,8 @@ public class MdmDeviceMaintenancePlanServiceImpl implements IMdmDeviceMaintenanc
             List<String> machineCodeList = moldingList.stream().map(MdmDeviceMaintenancePlanVo::getMachineCode).distinct().collect(Collectors.toList());
             List<MdmMoldingMachine> moldingMachineList = moldingMachineEntityMapper.selectList(Wrappers.lambdaQuery(MdmMoldingMachine.class)
                     .in(MdmMoldingMachine::getFactoryCode, factoryCodeList)
-                    .in(MdmMoldingMachine::getMoldingMachineCode, machineCodeList));
-            moldingMap = moldingMachineList.stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getMoldingMachineCode()), MdmMoldingMachine::getId, (v1, v2) -> v1));
+                    .in(MdmMoldingMachine::getCxMachineCode, machineCodeList));
+            moldingMap = moldingMachineList.stream().collect(Collectors.toMap(v -> GenerageMapKeyUtils.createMapKey(v.getFactoryCode(), v.getCxMachineCode()), MdmMoldingMachine::getId, (v1, v2) -> v1));
         }
         // 硫化机信息
         Map<String, Long> vulcanizingMap = new HashMap<>();

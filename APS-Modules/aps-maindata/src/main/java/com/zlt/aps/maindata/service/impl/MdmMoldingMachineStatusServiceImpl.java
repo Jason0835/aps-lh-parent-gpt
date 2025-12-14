@@ -134,11 +134,11 @@ public class MdmMoldingMachineStatusServiceImpl implements IMdmMoldingMachineSta
         LambdaQueryWrapper<MdmMoldingMachine> machineWrapper = Wrappers.lambdaQuery();
         Map<String, Long> moldingMachineMap = new HashMap<>();
         List<String> machineCodeList = list.stream().map(MdmMoldingMachineStatusVo::getMoldingMachineCode).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
-        if (CollectionUtils.isNotEmpty(machineCodeList)) {
-            machineWrapper.in(MdmMoldingMachine::getMoldingMachineCode, machineCodeList);
-            List<MdmMoldingMachine> moldingMachineList = moldingMachineEntityMapper.selectList(machineWrapper);
-            moldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductTypeCode(), item.getMoldingMachineCode()), MdmMoldingMachine::getId, (v1, v2) -> v1));
-        }
+//        if (CollectionUtils.isNotEmpty(machineCodeList)) {
+//            machineWrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
+//            List<MdmMoldingMachine> moldingMachineList = moldingMachineEntityMapper.selectList(machineWrapper);
+//            moldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductTypeCode(), item.getCxMachineCode()), MdmMoldingMachine::getId, (v1, v2) -> v1));
+//        }
 
         if (!list.isEmpty()) {
             for (int i = 0; i < list.size(); i++) {

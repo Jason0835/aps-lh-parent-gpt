@@ -8,7 +8,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -37,8 +37,8 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmMoldingMachineUIController.java
- * 描    述：基础数据-成型机档案 UI控制层类：....
+ * 文件名称：MdmMouldAllocationUIController.java
+ * 描    述：模具分配比例(同结构/不同结构) UI控制层类：....
  *@author zlt
  *@date 2025-12-14
  *@version 1.0
@@ -49,23 +49,23 @@ import javax.servlet.http.HttpServletResponse;
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "基础数据-成型机档案")
+@Api(tags = "模具分配比例(同结构/不同结构)")
 @Controller
-@RequestMapping("/monthplan/mdmMoldingMachine")
-public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMachine> {
+@RequestMapping("/monthplan/mdmMouldAllocation")
+public class MdmMouldAllocationUIController extends BaseUIController<MdmMouldAllocation> {
 
     @Autowired
-    private IMdmMoldingMachineRemoteService iMdmMoldingMachineService;
+    private IMdmMouldAllocationRemoteService iMdmMouldAllocationService;
 
-    private final String prefix = "aps/monthplan/mdmMoldingMachine";
+    private final String prefix = "aps/monthplan/mdmMouldAllocation";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmMoldingMachine:view")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmMoldingMachine";
+        return prefix + "/mdmMouldAllocation";
     }
 
     /**
@@ -73,7 +73,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmMoldingMachine", new MdmMoldingMachine());
+        mmap.put("mdmMouldAllocation", new MdmMouldAllocation());
         return prefix + "/add";
     }
 
@@ -82,7 +82,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmMoldingMachine", iMdmMoldingMachineService.getInfo(id));
+        mmap.put("mdmMouldAllocation", iMdmMouldAllocationService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -90,48 +90,48 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:list")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmMoldingMachine mdmMoldingMachine) {
-        return iMdmMoldingMachineService.list(mdmMoldingMachine);
+    public TableDataInfo list(MdmMouldAllocation mdmMouldAllocation) {
+        return iMdmMouldAllocationService.list(mdmMouldAllocation);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:edit")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmMoldingMachine mdmMoldingMachine) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmMoldingMachineService.checkUnique(mdmMoldingMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmMoldingMachine.checkUnique"));
+    public AjaxResult save(MdmMouldAllocation mdmMouldAllocation) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmMouldAllocationService.checkUnique(mdmMouldAllocation))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmMouldAllocation.checkUnique"));
         }
 
-        return iMdmMoldingMachineService.save(mdmMoldingMachine);
+        return iMdmMouldAllocationService.save(mdmMouldAllocation);
     }
 
     /**
-     * 删除基础数据-成型机档案
+     * 删除模具分配比例(同结构/不同结构)
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmMoldingMachine:remove")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmMoldingMachineService.removeByIds(Arrays.asList(arr));
+        return iMdmMouldAllocationService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验基础数据-成型机档案唯一性
+     * 校验模具分配比例(同结构/不同结构)唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmMoldingMachine mdmMoldingMachine) {
-        return iMdmMoldingMachineService.checkUnique(mdmMoldingMachine);
+    public String checkUnique(MdmMouldAllocation mdmMouldAllocation) {
+        return iMdmMouldAllocationService.checkUnique(mdmMouldAllocation);
     }
 
     /**
@@ -172,26 +172,26 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmMoldingMachine> util = new ExcelUtil<>(MdmMoldingMachine.class);
+        ExcelUtil<MdmMouldAllocation> util = new ExcelUtil<>(MdmMouldAllocation.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmMoldingMachine:export")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmMoldingMachine entity) throws IOException {
+    public void export(HttpServletResponse response, MdmMouldAllocation entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmMoldingMachineService.exportData(entity,fileName);
+        byte[] excelBytes = iMdmMouldAllocationService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mdmMoldingMachine:import")
+    @RequiresPermissions("monthplan:mdmMouldAllocation:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -205,7 +205,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMoldingMachineService.importData(context,false);
+        AjaxResult ajaxResult = iMdmMouldAllocationService.importData(context,false);
         return ajaxResult;
     }
 }

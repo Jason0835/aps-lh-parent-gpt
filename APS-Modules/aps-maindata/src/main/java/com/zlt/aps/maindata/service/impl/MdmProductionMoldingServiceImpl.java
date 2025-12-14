@@ -292,25 +292,25 @@ public class MdmProductionMoldingServiceImpl extends BaseService<MdmProductionMo
         // 查询机台信息
         String productTypeCode = productInfoList.get(0).getProductTypeCode();
         LambdaQueryWrapper<MdmMoldingMachine> machineWrapper = Wrappers.lambdaQuery();
-        machineWrapper.eq(MdmMoldingMachine::getProductTypeCode, productTypeCode);
+//        machineWrapper.eq(MdmMoldingMachine::getProductTypeCode, productTypeCode);
         machineWrapper.eq(MdmMoldingMachine::getFactoryCode, vo.getFactoryCode());
-        machineWrapper.eq(MdmMoldingMachine::getMoldingMachineCode, vo.getMachineCode());
+        machineWrapper.eq(MdmMoldingMachine::getCxMachineCode, vo.getMachineCode());
         List<MdmMoldingMachine> machineList = moldingMachineEntityMapper.selectList(machineWrapper);
         if (CollectionUtils.isEmpty(machineList)) {
             return result;
         }
 
         // 查询成型法则
-        Long moldingMachineClassId = machineList.get(0).getMoldingMachineClassId();
-        if (moldingMachineClassId == null) {
-            return result;
-        }
-        MdmMoldingMachineCls mdmMoldingMachineCls = moldingMachineClsEntityMapper.selectById(moldingMachineClassId);
-        if (mdmMoldingMachineCls == null) {
-            return result;
-        }
+//        Long moldingMachineClassId = machineList.get(0).getMoldingMachineClassId();
+//        if (moldingMachineClassId == null) {
+//            return result;
+//        }
+//        MdmMoldingMachineCls mdmMoldingMachineCls = moldingMachineClsEntityMapper.selectById(moldingMachineClassId);
+//        if (mdmMoldingMachineCls == null) {
+//            return result;
+//        }
 
-        result.setMoldingMethod(mdmMoldingMachineCls.getMouldMethod());
+//        result.setMoldingMethod(mdmMoldingMachineCls.getMouldMethod());
         return result;
     }
 }
