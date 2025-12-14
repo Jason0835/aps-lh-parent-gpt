@@ -79,11 +79,11 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
         // 查询成型机台
         List<String> machineCodeList = list.stream().map(MdmCxMachineFixed::getCxMachineCode).collect(Collectors.toList());
         LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(MdmMoldingMachine::getMoldingMachineCode, machineCodeList);
+        wrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
         List<MdmMoldingMachine> moldingMachineList = mdmMoldingMachineEntityMapper.selectList(wrapper);
         Map<String, MdmMoldingMachine> mdmMoldingMachineMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(moldingMachineList)) {
-            mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMoldingMachineCode()), Function.identity(), (v1, v2) -> v1));
+            mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getCxMachineCode()), Function.identity(), (v1, v2) -> v1));
         }
         serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
         return serviceCheckParams;
