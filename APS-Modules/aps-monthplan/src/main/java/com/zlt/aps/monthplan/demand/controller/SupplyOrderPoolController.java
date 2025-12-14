@@ -160,7 +160,6 @@ public class SupplyOrderPoolController extends BusiController<SupplyOrderPool>
 
     @ApiOperation("生成周期排产储备")
     @RedissonLockAnno(uniqueMark = "redissonLock:supplyOrderPool:createCycleStockUp:",
-        expressions = {"#supplyOrderPool.factoryCode", "#createCondition.week"},
         msgKey = "ui.data.alert.createCycleStockUp.run",
         waitTime = 5,
         leaseTime = 300
@@ -168,6 +167,18 @@ public class SupplyOrderPoolController extends BusiController<SupplyOrderPool>
     @PostMapping("/createCycleStockUp")
     public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
         supplyOrderPoolService.createCycleStockUp(supplyOrderPool);
+        return AjaxResult.success();
+    }
+
+    @ApiOperation("生成常规储备")
+    @RedissonLockAnno(uniqueMark = "redissonLock:supplyOrderPool:createPrecedentStockUp:",
+        msgKey = "ui.data.alert.createPrecedentStockUp.run",
+        waitTime = 5,
+        leaseTime = 300
+    )
+    @PostMapping("/createPrecedentStockUp")
+    public AjaxResult createPrecedentStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
+        supplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
         return AjaxResult.success();
     }
 }

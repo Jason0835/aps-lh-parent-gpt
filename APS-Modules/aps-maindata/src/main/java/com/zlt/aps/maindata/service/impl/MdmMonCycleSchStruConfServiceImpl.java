@@ -71,11 +71,7 @@ public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMon
 
     @Override
     public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf() {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
         LambdaQueryWrapper<MdmMonCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(MdmMonCycleSchStruConf::getYear, currentYearMonth.getYear());
-        wrapper.eq(MdmMonCycleSchStruConf::getMonth, currentYearMonth.getMonth());
         wrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmMonCycleSchStruConfEntityMapper.selectList(wrapper);
     }

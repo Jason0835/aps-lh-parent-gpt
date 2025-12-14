@@ -108,4 +108,9 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      */
     @Transactional
     void createCycleStockUp(SupplyOrderPool supplyOrderPool);
+    /**
+     *  生产常规储备
+     * @param supplyOrderPool
+     */
+    void createPrecedentStockUp(SupplyOrderPool supplyOrderPool);
 }

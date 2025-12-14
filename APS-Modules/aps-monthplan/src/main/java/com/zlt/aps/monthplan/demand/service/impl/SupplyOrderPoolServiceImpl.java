@@ -14,12 +14,14 @@ import java.util.stream.Collectors;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmFinishStockService;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
+import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
@@ -81,6 +83,8 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
     private final ISalesOrderPoolService salesOrderPoolService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
+    // 历史销售记录
+    private final IMpHistorySaleRecordService historySaleRecordService;
 
 
   /**
@@ -300,18 +304,18 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         }
         Set<String> structures = cycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).collect(Collectors.toSet());
         if(CollectionUtils.isEmpty(structures)){
-            return;
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleProductionStructureConfig"));
         }
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo>  materialInfos =   mdmMaterialInfoEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(materialInfos)){
-          return;
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
         }
         // 3、得到周期性排产结构后，获取结构下的所有SKU
         Set<String> skus = materialInfos.stream().filter(item -> structures.contains(item.getStructureName())).map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toSet());
         if(CollectionUtils.isEmpty(skus)){
-          return;
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
         }
         //   (1)  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
         //   其中，近12个月指当前月前一个月开始计算，往前12个月
@@ -320,8 +324,9 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
             skus = skus.stream().filter(item -> !overdueSkus.contains(item)).collect(Collectors.toSet());
         }
         if(CollectionUtils.isEmpty(skus)){
-          return;
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
         }
+        this.deleteSupplyOrderPool(SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         List<MpMonthlySaleQty> monthlySaleQtyList =   monthlySaleQtyService.findCurrentMonthlySaleQty();
         Map<String,MpMonthlySaleQty> sku2AverageSaleQty = sku2AverageSaleQty(monthlySaleQtyList);
         // 剩下的SKU则可生成到供应链订单池-周期排产储备
@@ -339,6 +344,89 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         skus.forEach(sku -> supplyOrderPools.add(buildSupplyOrderPool(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishStockMap,countSkuMap)));
         this.insertBatchData(supplyOrderPools);
     }
+
+  @Override
+  public void createPrecedentStockUp(SupplyOrderPool supplyOrderPool) {
+        // 1、检查储备排产是否在生成
+        // 2、获取可常规储备的“SKU列表”
+        //  (1) 获取所有不在周期排产结构配置表中的结构下的“SKU列表1”
+        //  (2)查询近12个月的月均销量大于零的月份数 > 8 的“SKU列表2”(其中，近12个月指当前月前一个月开始计算，往前12个月)
+        //  (3)SKU列表 = “SKU列表1”与“SKU列表2”取交集
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMaterialInfo>  materialInfos =   mdmMaterialInfoEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(materialInfos)){
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+        }
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs = monCycleSchStruConfService.findCurrentCycleSchStruConf();
+        Set<String> structures = Sets.newHashSet();
+        if(CollectionUtils.isNotEmpty(cycleSchStruConfs)){
+          structures = cycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).collect(Collectors.toSet());
+        }
+        final Set<String> finalStructures = structures;
+        // (1) 获取所有不在周期排产结构配置表中的结构下的“SKU列表1”
+        Set<String> skus = materialInfos.stream().filter(item -> !finalStructures.contains(item.getStructureName())).map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toSet());
+        if(CollectionUtils.isEmpty(skus)){
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+        }
+        Set<String> skusByAverageSaleQty = historySaleRecordService.findSkuInLastTwelveMonth();
+        if(CollectionUtils.isEmpty(skusByAverageSaleQty)){
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+        }
+        // (3)SKU列表 = “SKU列表1”与“SKU列表2”取交集
+        Set<String> intersections  =  skus.stream()
+              .filter(skusByAverageSaleQty::contains)
+              .collect(Collectors.toSet());
+        // (4) 如果没有获取到SKU列表，则提示“当前没有常规储备物料"，系统不作处理
+        if(CollectionUtils.isEmpty(intersections)){
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+        }
+        // 3、从步骤2中的SKU列表中排除近12个月有常规储备超期胎的SKU(超期SKU表.超期储备排产 = 1)，剩下的SKU则可生成到供应链订单池-常规储备排产
+        Set<String> overdueSkus =  overdueSkuService.excludeOverduePrecedentProduction();
+        if(CollectionUtils.isNotEmpty(overdueSkus)){
+          intersections = intersections.stream().filter(item -> !overdueSkus.contains(item)).collect(Collectors.toSet());
+        }
+        if(CollectionUtils.isEmpty(intersections)){
+          throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+        }
+        this.deleteSupplyOrderPool(SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
+        // 4、计算常规储备SKU的排产量： (周转天数/30) * 月均销量 - 无订单库存 无订单库存 = 成品库存 - 销售订单池提报量(需结合年周号、动平衡、均匀性)；
+        List<MpMonthlySaleQty> monthlySaleQtyList =   monthlySaleQtyService.findCurrentMonthlySaleQty();
+        Map<String,MpMonthlySaleQty> sku2AverageSaleQty = sku2AverageSaleQty(monthlySaleQtyList);
+        // 剩下的SKU则可生成到供应链订单池-周期排产储备
+        // 4、周期性排产结构下可排产的SKU,计算SKU的周期性排产量：月均销量 * 周转月数 - 无订单库存
+        List<SupplyOrderPool> supplyOrderPools = Lists.newArrayList();
+        Map<String,MdmMaterialInfo> sku2StructureMap  = sku2Structure(materialInfos);
+        Map<String, Integer> structure2TurnoverMonthMap = structure2TurnoverMonth(cycleSchStruConfs);
+        List<MdmFinishStock> finishStocks = this.finishStockService.findCurrentFinishStock();
+        Map<String,List<MdmFinishStock>> finishStockMap = this.getFinishStockMap(finishStocks);
+        Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishStocks);
+        List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
+        Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
+        List<FactoryMonthPlanProdFinal>  factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
+        Map<String,Integer> countSkuMap = this.countSkuMap(factoryMonthPlanProdFinals);
+        intersections.forEach(sku -> supplyOrderPools.add(buildPrecedentOrder(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishStockMap,countSkuMap)));
+        this.insertBatchData(supplyOrderPools);
+  }
+
+  /**
+   *  删除
+   */
+  private void deleteSupplyOrderPool(String orderType) {
+    SupplyOrderPool param = new SupplyOrderPool();
+    param.setOrderType(orderType);
+    // 获取当前年月
+    YearMonth nextYearMonth = YearMonth.now().plusMonths(1);
+    param.setYear(nextYearMonth.getYear());
+    param.setMonth(nextYearMonth.getMonthValue());
+    List<SupplyOrderPool>  deleteList =  this.selectSupplyOrderPoolList(param);
+    if(CollectionUtils.isEmpty(deleteList)){
+      return;
+    }
+    List<Long> list = deleteList.stream().map(SupplyOrderPool::getId).collect(Collectors.toList());
+    this.deleteSupplyOrderPoolByIds(list);
+  }
+
 
   private Map<String, Integer> countSkuMap(List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals) {
     if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
@@ -503,6 +591,76 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         // 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
         entity.setStructureFrequency(countSkuMap.getOrDefault(materialCode,0));
         return entity;
+  }
+
+  private SupplyOrderPool buildPrecedentOrder(String materialCode, Map<String, MdmMaterialInfo> sku2StructureMap, Map<String, MpMonthlySaleQty> sku2AverageSaleQty, Map<String, Integer> structure2TurnoverMonthMap, Map<String, Long> stockMap, Map<String, Long> saleOrderMap, Map<String, List<MdmFinishStock>> finishStockMap, Map<String, Integer> countSkuMap) {
+    SupplyOrderPool entity = new SupplyOrderPool();
+    MdmMaterialInfo materialInfo = sku2StructureMap.get(materialCode);
+    String structureName = materialInfo.getStructureName();
+    int turnoverMonth = structure2TurnoverMonthMap.getOrDefault(structureName,0);
+    // SKU的周期性排产量：月均销量 * 周转月数 - 无订单库存
+    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+    entity.setOrderType(SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
+    entity.setMaterialCode(materialCode);
+    entity.setBrand(materialInfo.getBrand());
+    // 获取当前年月
+    YearMonth nextYearMonth = YearMonth.now().plusMonths(1);
+    entity.setYear(nextYearMonth.getYear());
+    entity.setMonth(nextYearMonth.getMonthValue());
+    String yearMonth = String.format("%s%02d", entity.getYear(), entity.getMonth());
+    entity.setYearMonth(Integer.valueOf(yearMonth));
+    entity.setLocationType(materialInfo.getCommonType());
+    entity.setMaterialDesc(materialInfo.getMaterialDesc());
+    entity.setMesMaterialCode(materialInfo.getMesMaterialCode());
+    entity.setProductCategory(materialInfo.getProductCategory());
+    entity.setProductTypeCode(materialInfo.getProductTypeCode());
+    long averageSaleQty = 0;
+    Long passThreeMonthSaleQty = null;
+    Long passSixMonthSaleQty = null;
+    Integer deliveryFrequency = null;
+    String saleArea = null;
+    // 7、从月均销量表中取得近3个月月均销量、近6个月月均销量、近12个月的发货频次、适销区域
+    if(sku2AverageSaleQty.containsKey(materialCode)) {
+      MpMonthlySaleQty monthlySaleQty = sku2AverageSaleQty.get(materialCode);
+      averageSaleQty = monthlySaleQty.getAverageSaleQty();
+      passThreeMonthSaleQty = monthlySaleQty.getPassThreeMonthSaleQty();
+      passSixMonthSaleQty = monthlySaleQty.getPassSixMonthSaleQty();
+      deliveryFrequency = monthlySaleQty.getDeliveryFrequency();
+      saleArea = monthlySaleQty.getSaleArea();
+    }
+    long notOrderStockQty = getNotOrderStockQty(materialCode,stockMap,saleOrderMap);
+    // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
+    // 无订单库存 = 成品库存 - 销售订单池提报量(需结合年周号、动平衡、均匀性)
+    entity.setQty(averageSaleQty * turnoverMonth - notOrderStockQty);
+    entity.setBaseVale(null);
+    entity.setIsDelete(YesOrNoEnum.NO.getValue());
+    // 计算备库上限：备库上限/月均销量 * 30 = 30（天）注：第1个30，月度天数（固定）；第2个30，周转天数（可配置）；月均销量（6个月）。
+    // 备库上限值 = 周转天数(全局参数) * 月均销量 / 30
+    entity.setStockLimit(averageSaleQty * turnoverMonth);
+    long threeOverdueStockQty = 0;
+    long sixOverdueStockQty = 0;
+    long nightOverdueStockQty = 0;
+    long twelveOverdueStockQty = 0;
+    // 6、查询成品库存表，汇总计算超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
+    if(finishStockMap.containsKey(materialCode)) {
+      List<MdmFinishStock> finishStockList = finishStockMap.get(materialCode);
+      threeOverdueStockQty = finishStockList.stream().filter(item -> YesOrNoEnum.YES.getCode().equals(item.getIsExceedThreeMonth())).mapToLong(MdmFinishStock::getStockQty).sum();
+      sixOverdueStockQty = finishStockList.stream().filter(item -> YesOrNoEnum.YES.getCode().equals(item.getIsExceedSixMonth())).mapToLong(MdmFinishStock::getStockQty).sum();
+      nightOverdueStockQty = finishStockList.stream().filter(item -> YesOrNoEnum.YES.getCode().equals(item.getIsExceedNineMonth())).mapToLong(MdmFinishStock::getStockQty).sum();
+      twelveOverdueStockQty  = finishStockList.stream().filter(item -> YesOrNoEnum.YES.getCode().equals(item.getIsExceedTwelveMonth())).mapToLong(MdmFinishStock::getStockQty).sum();
+    }
+    entity.setThreeOverdueStockQty(threeOverdueStockQty);
+    entity.setSixOverdueStockQty(sixOverdueStockQty);
+    entity.setNightOverdueStockQty(nightOverdueStockQty);
+    entity.setTwelveOverdueStockQty(twelveOverdueStockQty);
+    // 7、从月均销量表中取得近3个月月均销量、近6个月月均销量、近12个月的发货频次、适销区域
+    entity.setThreeAverageQty(passThreeMonthSaleQty);
+    entity.setSixAverageQty(passSixMonthSaleQty);
+    entity.setDeliveryFrequency(deliveryFrequency);
+    entity.setSaleArea(saleArea);
+    // 8、12个月结构上机频次 = 从月度排产计划，获取近12个月的已排产的月份个数
+    entity.setStructureFrequency(countSkuMap.getOrDefault(materialCode,0));
+    return entity;
   }
 
   private long getNotOrderStockQty(String materialCode, Map<String, Long> stockMap, Map<String, Long> saleOrderMap) {

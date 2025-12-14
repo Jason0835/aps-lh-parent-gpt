@@ -173,8 +173,18 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
   @ApiOperation("生成周期排产储备")
   @PostMapping("/createCycleStockUp")
   @ResponseBody
-  public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool) {
+  public AjaxResult createCycleStockUp(SupplyOrderPool supplyOrderPool) {
     return iSupplyOrderPoolService.createCycleStockUp(supplyOrderPool);
+  }
+
+  /**
+   * 生成常规储备
+   */
+  @ApiOperation("生成常规储备")
+  @PostMapping("/createCycleStockUp")
+  @ResponseBody
+  public AjaxResult createPrecedentStockUp(SupplyOrderPool supplyOrderPool) {
+    return iSupplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
   }
 
 }

@@ -88,4 +88,10 @@ public interface ISupplyOrderPoolRemoteService {
     @ApiOperation("生成周期排产储备")
     @PostMapping("/supplyOrderPool/createCycleStockUp")
     AjaxResult createCycleStockUp(@RequestBody  SupplyOrderPool supplyOrderPool);
+    /**
+     * 生成常规储备
+     */
+    @ApiOperation("生成常规储备")
+    @PostMapping("/supplyOrderPool/createPrecedentStockUp")
+    AjaxResult createPrecedentStockUp(@RequestBody  SupplyOrderPool supplyOrderPool);
 }
