@@ -7,29 +7,24 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.ruoyi.common4ui.exception.base.BaseException;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.api.service.ISupplyOrderPoolRemoteService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.ruoyi.common4ui.exception.base.BaseException;
-import lombok.extern.slf4j.Slf4j;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-import org.apache.commons.io.IOUtils;
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -181,7 +176,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
    * 生成常规储备
    */
   @ApiOperation("生成常规储备")
-  @PostMapping("/createCycleStockUp")
+  @PostMapping("/createPrecedentStockUp")
   @ResponseBody
   public AjaxResult createPrecedentStockUp(SupplyOrderPool supplyOrderPool) {
     return iSupplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
