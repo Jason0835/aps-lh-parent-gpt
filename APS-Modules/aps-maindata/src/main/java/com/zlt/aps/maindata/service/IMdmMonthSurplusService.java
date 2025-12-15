@@ -1,7 +1,12 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -18,5 +23,11 @@ import com.zlt.bill.common.service.IDocService;
  * @date 2025-12-08
  */
 public interface IMdmMonthSurplusService extends IDocService<MdmMonthSurplus> {
-
+  /**
+   *
+   * @param createCondition 参数
+   * @param requireVersionNumber 需求版本号
+   * @param finishedProductStockMap 成品库存
+   */
+  void calculateMonthSurplus(MpDemandPlan createCondition, String requireVersionNumber,Map<String, List<MpFinishedProductStock>> finishedProductStockMap);
 }

@@ -131,4 +131,13 @@ public class MpFinishedProductStock extends BaseEntity{
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
 
+    /**
+     * 以分厂+物料为维度，转换库存
+     *
+     * @return
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialCode);
+    }
 }

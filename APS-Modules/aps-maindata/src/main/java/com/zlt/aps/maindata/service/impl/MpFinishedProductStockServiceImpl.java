@@ -259,11 +259,10 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
     }
 
     @Override
-    public MpFinishedProductStock getMpFinishedProductStockByMaterialCode(String materialCode) {
+    public List<MpFinishedProductStock> getMpFinishedProductStockByMaterialCode(String materialCode) {
         MpFinishedProductStock param = new MpFinishedProductStock();
         param.setMaterialCode(materialCode);
         param.setIsDelete(YesOrNoEnum.NO.getValue());
-        List<MpFinishedProductStock> finishedProductStocks =  this.mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(param);
-        return CollectionUtils.isNotEmpty(finishedProductStocks) ? finishedProductStocks.get(0) : null;
+        return this.mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(param);
     }
 }
