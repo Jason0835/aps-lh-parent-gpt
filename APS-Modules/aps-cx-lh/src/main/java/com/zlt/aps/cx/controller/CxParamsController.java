@@ -132,7 +132,7 @@ public class CxParamsController extends BaseController {
     @ApiOperation("测试接口")
     @PostMapping("/test")
     public void test() {
-        mdmMoldingMachineService.getMoldingMachineProNum("116");
+//        mdmMoldingMachineService.getMoldingMachineProNum("116");
     }
 
 }
