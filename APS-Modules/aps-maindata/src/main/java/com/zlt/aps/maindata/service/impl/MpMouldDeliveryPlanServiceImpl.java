@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -93,5 +94,35 @@ public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDe
         String paramValue = StringUtils.defaultIfBlank(factoryParam.getParamValue(), defaultValue);
         Date date = DateUtils.addDays(shipmentDate, Integer.parseInt(paramValue));
         return AjaxResult.success(DateUtils.parseDateToStr("yyyy-MM-dd", date));
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MpMouldDeliveryPlan importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        Date shipmentDate = importDocEntity.getShipmentDate();
+        Date boardingDate = getBoardingDate(shipmentDate);
+        importDocEntity.setBoardingDate(boardingDate);
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
+
+    /**
+     * 获取计划上机日期
+     *
+     * @param shipmentDate 计划发货日期
+     * @return 结果
+     */
+    private Date getBoardingDate(Date shipmentDate) {
+        if (Objects.isNull(shipmentDate)) {
+            return shipmentDate;
+        }
+        LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<>();
+        String code = MonthPlanEnums.MODULE_ARRIVAL_DAYS.getCode();
+        wrapper.eq(FactoryParam::getParamCode, code);
+        FactoryParam factoryParam = factoryParamMapper.selectOne(wrapper);
+        if (Objects.isNull(factoryParam)) {
+            return shipmentDate;
+        }
+        String defaultValue = factoryParam.getDefauleValue();
+        String paramValue = StringUtils.defaultIfBlank(factoryParam.getParamValue(), defaultValue);
+        return DateUtils.addDays(shipmentDate, Integer.parseInt(paramValue));
     }
 }
