@@ -38,7 +38,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0102002 从供应链同步的订单高优先级订单量超过设定的比例需要自动将提报日期较晚的高优先级订单调整为中优先级
      */
-	HIGHT_PRIORITY_ORDER_RATE("SYS0102002", "高优先级订单占比");
+	  HIGHT_PRIORITY_ORDER_RATE("SYS0102002", "高优先级订单占比"),
+    /**
+     *  SYS1215 周转天数(全局参数) ,用于供应链订单池备库上限的计算
+     */
+    TURN_OVER_DAYS("SYS1215","周转天数(全局参数) ,用于供应链订单池备库上限的计算");
 	
     private final String code;
     private final String name;

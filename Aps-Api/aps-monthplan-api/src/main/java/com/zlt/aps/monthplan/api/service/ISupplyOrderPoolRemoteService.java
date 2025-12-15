@@ -94,4 +94,10 @@ public interface ISupplyOrderPoolRemoteService {
     @ApiOperation("生成常规储备")
     @PostMapping("/supplyOrderPool/createPrecedentStockUp")
     AjaxResult createPrecedentStockUp(@RequestBody  SupplyOrderPool supplyOrderPool);
+    /**
+     * 输入物料编码，带出对应信息
+     */
+    @ApiOperation("输入物料编码，带出对应信息")
+    @PostMapping("/supplyOrderPool/queryRelationByMaterialCode")
+    AjaxResult queryRelationByMaterialCode(@RequestBody  SupplyOrderPool supplyOrderPool);
 }

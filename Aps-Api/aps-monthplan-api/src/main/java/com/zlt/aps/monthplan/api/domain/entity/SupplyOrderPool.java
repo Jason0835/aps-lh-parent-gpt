@@ -167,5 +167,11 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "备库上限", name = "stockLimit")
     @TableField(value = "STOCK_LIMIT")
     private Long stockLimit;
+    /**
+     * 月均销量
+     */
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(exist = false)
+    private Long averageSaleQty;
 
 }

@@ -181,4 +181,14 @@ public class SupplyOrderPoolController extends BusiController<SupplyOrderPool>
         supplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
         return AjaxResult.success();
     }
+
+    /**
+     * 输入NC物料编码，带出对应信息
+     */
+    @ApiOperation("输入NC物料编码，带出对应信息")
+    @PostMapping("/queryRelationByMaterialCode")
+    public AjaxResult queryRelationByMaterialCode(@RequestBody SupplyOrderPool supplyOrderPool)
+    {
+        return AjaxResult.success(supplyOrderPoolService.queryRelationByMaterialCode(supplyOrderPool));
+    }
 }
