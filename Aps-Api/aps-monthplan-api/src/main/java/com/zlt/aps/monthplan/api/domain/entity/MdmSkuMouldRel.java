@@ -140,7 +140,7 @@ public class MdmSkuMouldRel extends BaseEntity {
 
     //    @Excel(name = "ui.data.column.docProductALevel.remark")
     @ApiModelProperty("备注")
-    @TableField(exist = false)
+    @TableField(value = "REMARK")
     private String remark;
 
     @TableField(exist = false)
