@@ -1022,9 +1022,9 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 machine.setRemainTime(BigDecimal.valueOf(totalMinutes));
 
                 // 加入全局上下文缓存
-                CX_MACHINE_ACCTIVE_TIME_CONTEXT_MAP.put(machine.getMoldingMachineCode(), machine);
+                CX_MACHINE_ACCTIVE_TIME_CONTEXT_MAP.put(machine.getCxMachineCode(), machine);
                 logDebug("机台[{}]初始化完成 | 开始时间: {} | 结束时间: {} | 总剩余可用时长: {}小时",
-                        machine.getMoldingMachineCode(),
+                        machine.getCxMachineCode(),
                         machine.getAvailableBeginTime(),
                         machine.getAvailableEndTime(),
                         totalMinutes);
@@ -1172,17 +1172,17 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 for (CxMachineInfoVo machine : CX_MACHINE_ACCTIVE_TIME_CONTEXT_MAP.values()) {
                     // 1. 过滤成型法不匹配的机台
                     if (!isMoldingMethodMatch(machine, moldingMethod)) {
-                        logDebug("机台[{}]成型法不匹配，跳过", machine.getMoldingMachineCode());
+                        logDebug("机台[{}]成型法不匹配，跳过", machine.getCxMachineCode());
                         continue;
                     }
 
-                    if (skipMachineNo != null && skipMachineNo.contains(machine.getMoldingMachineCode())) {
-                        logDebug("机台[{}]在跳过名单中，跳过", machine.getMoldingMachineCode());
+                    if (skipMachineNo != null && skipMachineNo.contains(machine.getCxMachineCode())) {
+                        logDebug("机台[{}]在跳过名单中，跳过", machine.getCxMachineCode());
                         continue;
                     }
 
                     //获取昨日成型寸口
-                    BigDecimal yesterdayMachineSize = CX_MACHINE_QUOTA_CONTEXT_MAP.get(machine.getMoldingMachineCode());
+                    BigDecimal yesterdayMachineSize = CX_MACHINE_QUOTA_CONTEXT_MAP.get(machine.getCxMachineCode());
 
                     // 2. 获取当前机台可用子类列表（未分配配额且生产定额最小）
                     // 过滤未分配配额的子类
@@ -1196,13 +1196,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                                 .filter(sub -> sub.getProSize().compareTo(yesterdayMachineSize) == 0)
                                 .findFirst();
                     }catch (Exception e){
-                        throw new RuntimeException("机台[{"+machine.getMoldingMachineCode()+"}]获取昨日寸口失败");
+                        throw new RuntimeException("机台[{"+machine.getCxMachineCode()+"}]获取昨日寸口失败");
                     }
 
 
                     // 3. 无可用子类时跳过
                     if (!optionalSubclass.isPresent()) {
-                        logDebug("机台[{}]无可用子类（所有子类已分配配额）", machine.getMoldingMachineCode());
+                        logDebug("机台[{}]无可用子类（所有子类已分配配额）", machine.getCxMachineCode());
                         continue;
                     }
 
@@ -1213,7 +1213,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                     // 5. 计算差异值
                     int difference = Math.abs(currentQuota - targetQuota);
                     logDebug("差异计算 | 机台={} 子类寸口={} 当前配额={} 目标={} 差异={}",
-                            machine.getMoldingMachineCode(),
+                            machine.getCxMachineCode(),
                             targetSubclass.getProSize(),
                             currentQuota,
                             targetQuota,
@@ -1225,7 +1225,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                         bestSubclass = targetSubclass;
                         bestMachine = machine;
                         logDebug("发现更优匹配 | 机台={} 子类寸口={} 差异={}",
-                                machine.getMoldingMachineCode(),
+                                machine.getCxMachineCode(),
                                 targetSubclass.getProSize(),
                                 difference);
                     }
@@ -1233,7 +1233,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
                 if (bestMachine != null) {
                     logInfo("分配配额 | 机台={} 子类寸口={} 班次={} 配额={} 差异={}",
-                            bestMachine.getMoldingMachineCode(), bestSubclass.getProSize(),
+                            bestMachine.getCxMachineCode(), bestSubclass.getProSize(),
                             shift, targetQuota, minDifference);
 
                     // 更新该机台所有子类（根据业务需求确认是否需要更新全部子类）
@@ -1241,7 +1241,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                     for (MdmMoldingMachineClsB subclass : bestMachine.getMoldingMachineClassList()) {
                         subclass.setFieldValueByFieldName(fieldName, (int) targetQuota * trainingCoefficient);
                         logDebug("更新子类配额 | 机台={} 子类寸口={} 字段={} 值={}",
-                                bestMachine.getMoldingMachineCode(), subclass.getProSize(),
+                                bestMachine.getCxMachineCode(), subclass.getProSize(),
                                 fieldName, (int) targetQuota * trainingCoefficient);
                     }
 
@@ -1286,13 +1286,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         CxProductConstructionInfoDto taskSpec = task.getCxProductConstructionInfoDto();
         CxProductConstructionInfoDto machineSpec = machine.getCxProductConstructionInfo();
         if (machineSpec == null) {
-            logWarn("机台[{}]无前序任务，直接分配新任务", machine.getMoldingMachineCode());
+            logWarn("机台[{}]无前序任务，直接分配新任务", machine.getCxMachineCode());
             tryAllocateToMachine(task, machine);
             return;
         }
 
         // 换装时间计算
-        final BigDecimal changeoverHours = BigDecimal.valueOf(changeSpecTime(taskSpec, machineSpec,machine.getMouldMethod()))
+        final BigDecimal changeoverHours = BigDecimal.valueOf(changeSpecTime(taskSpec, machineSpec,Integer.valueOf(machine.getRollOverType())))
                 .setScale(2, RoundingMode.HALF_UP);
         logDebug("换装时间计算 | 规格变更: {} → {} | 耗时: {}小时",
                 taskSpec.getEmbryoCode(), machineSpec.getEmbryoCode(), changeoverHours);
@@ -1443,7 +1443,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         task.setStartTime(startTime);
         logInfo("初始化排产参数 | 任务ID[{}] | 机台[{}] | 任务开始在机台上可以开始生产的时间[{}]",
                 task.getLhScheduleResult().getMergeIds(),
-                machine.getMoldingMachineCode(),
+                machine.getCxMachineCode(),
                 startTime);
         double changeTime = 0;
 
@@ -1513,7 +1513,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
              changeTime = changeSpecTime(
                     task.getCxProductConstructionInfoDto(),
                     machine.getCxProductConstructionInfo(),
-                    machine.getMouldMethod()
+                    Integer.valueOf(machine.getRollOverType())
             );
 
             if (changeTime > 0) {
@@ -1612,11 +1612,11 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         // --- 最终状态更新 ---
         // 更新机台施工信息
         machine.setCxProductConstructionInfo(task.getCxProductConstructionInfoDto());
-        logDebug("机台[{}]绑定最后一个规格的施工信息: {}", machine.getMoldingMachineCode(), task.getCxProductConstructionInfoDto());
+        logDebug("机台[{}]绑定最后一个规格的施工信息: {}", machine.getCxMachineCode(), task.getCxProductConstructionInfoDto());
 
         // 更新机台任务计数
         machine.setTaskNum(machine.getTaskNum() + 1);
-        logInfo("机台[{}]累计任务数 → {}", machine.getMoldingMachineCode(), machine.getTaskNum());
+        logInfo("机台[{}]累计任务数 → {}", machine.getCxMachineCode(), machine.getTaskNum());
 
         // 更新机台最后占用任务是否有交期
         machine.setLhAlgorithmScheduleResultDto(task);
@@ -1626,9 +1626,9 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
         // 标记任务排产完成
         task.setIsScheduleEnd(true);
-        task.getLastOccupiedMachines().add(machine.getMoldingMachineCode());
-        task.setFinalMachine(machine.getMoldingMachineCode());
-        logInfo("任务[{}]排产完成，占用机台: {}", task.getLhScheduleResult().getMergeIds(), machine.getMoldingMachineCode());
+        task.getLastOccupiedMachines().add(machine.getCxMachineCode());
+        task.setFinalMachine(machine.getCxMachineCode());
+        logInfo("任务[{}]排产完成，占用机台: {}", task.getLhScheduleResult().getMergeIds(), machine.getCxMachineCode());
     }
 
     private int updateProductionData(LhAlgorithmScheduleResultDto task, CxMachineInfoVo machine, LocalDateTime startTime, int shift, int actualQty, int remainingQty, BigDecimal actualQtyTime, Integer shiftQuota, double changeTime) {
@@ -1638,13 +1638,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
         // 更新机台班次及顺序号
         if (machine.getCurrentShift() != shift) {
-            logDebug("机台[{}]当前班次：[{}],切换至新班次：[{}]，重置顺序号", machine.getMoldingMachineCode(), machine.getCurrentShift(), shift);
+            logDebug("机台[{}]当前班次：[{}],切换至新班次：[{}]，重置顺序号", machine.getCxMachineCode(), machine.getCurrentShift(), shift);
             machine.setCurrentShift(shift);
             machine.setCurrentShiftSort(1);
         } else {
             machine.setCurrentShiftSort(machine.getCurrentShiftSort() + 1);
             logDebug("机台[{}]班次[{}]顺序号+1 → {}",
-                    machine.getMoldingMachineCode(), shift, machine.getCurrentShiftSort());
+                    machine.getCxMachineCode(), shift, machine.getCurrentShiftSort());
         }
 
         // 更新机台可用开始时间（累加已排产时间）
@@ -1942,13 +1942,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
         // 2.遍历候选机台
         for (CxMachineInfoVo machine : cxMachineInfoVoList) {
-            logDebug("计算机台[{}]的剩余产能", machine.getMoldingMachineCode());
+            logDebug("计算机台[{}]的剩余产能", machine.getCxMachineCode());
 
             // 获取机台寸口配置子表
             List<MdmMoldingMachineClsB> configList = machine.getMoldingMachineClassList();
             if (configList == null || configList.isEmpty()) {
                 throw new IllegalStateException(
-                        String.format("机台[%s]无配置定额信息，无法计算！", machine.getMoldingMachineCode())
+                        String.format("机台[%s]无配置定额信息，无法计算！", machine.getCxMachineCode())
                 );
             }
 
@@ -1957,19 +1957,19 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
             for (MdmMoldingMachineClsB config : configList) {
                 // 跳过空配置项
                 if (config == null || config.getProSize() == null) {
-                    log.trace("机台[{}]存在空成型机类型子表，跳过", machine.getMoldingMachineCode());
+                    log.trace("机台[{}]存在空成型机类型子表，跳过", machine.getCxMachineCode());
                     continue;
                 }
 
                 // 规格匹配检查
                 if (BigDecimalUtils.safeCompare(config.getProSize(), taskDimension) != 0) {
                     log.trace("机台[{}]配置寸口不匹配（当前：{}mm/需要：{}mm）",
-                            machine.getMoldingMachineCode(), config.getProSize(), taskDimension);
+                            machine.getCxMachineCode(), config.getProSize(), taskDimension);
                     continue;
                 }
 
                 foundMatch = true;
-                logDebug("找到机台[{}]的匹配寸口，开始计算剩余产能", machine.getMoldingMachineCode());
+                logDebug("找到机台[{}]的匹配寸口，开始计算剩余产能", machine.getCxMachineCode());
 
                 // 单班定额
                 int quotaPerShift = config.getProductionQuotaQty();
@@ -1984,13 +1984,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 // 机台剩余时间(小时)
                 BigDecimal remainingTime = machine.getRemainTime();
                 // 换装时间(小时)
-                double changeoverTime = changeSpecTime(taskSpec, machine.getCxProductConstructionInfo(), machine.getMouldMethod());
+                double changeoverTime = changeSpecTime(taskSpec, machine.getCxProductConstructionInfo(), Integer.valueOf(machine.getRollOverType()));
                 // 计算有效生产时间（剩余时间 - 换装时间）* 60
                 BigDecimal effectiveTime = (remainingTime.subtract(BigDecimal.valueOf(changeoverTime)).multiply(BigDecimal.valueOf(60)));
-                logDebug("机台[{}]剩余有效生产时间计算：机台剩余时间={}小时，换装时间={}小时，最终有效生产时间={}分钟", machine.getMoldingMachineCode(), remainingTime, changeoverTime,effectiveTime);
+                logDebug("机台[{}]剩余有效生产时间计算：机台剩余时间={}小时，换装时间={}小时，最终有效生产时间={}分钟", machine.getCxMachineCode(), remainingTime, changeoverTime,effectiveTime);
                 if (effectiveTime.compareTo(BigDecimal.ZERO) < 0) {
                     logWarn("机台[{}]有效生产时间为负数（剩余：{}分钟，换装需：{}分钟）",
-                            machine.getMoldingMachineCode(), remainingTime, changeoverTime);
+                            machine.getCxMachineCode(), remainingTime, changeoverTime);
                     effectiveTime = BigDecimal.ZERO;
                 }
 
@@ -2002,14 +2002,14 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 // 预计完剩余产能并记录日志
                 machine.setRemainCapacity(remainCapacity.intValue());
                 logDebug("机台[{}]预计产能计算完成：机台定额={}，班制={}，基准产能={}, 有效时间={}分钟, 最终产能={}",
-                        machine.getMoldingMachineCode(), quotaPerShift, totalShifts, totalCapacityBase, effectiveTime, remainCapacity);
+                        machine.getCxMachineCode(), quotaPerShift, totalShifts, totalCapacityBase, effectiveTime, remainCapacity);
                 break;
             }
 
             if (!foundMatch) {
                 throw new IllegalStateException(
                         String.format("机台[%s]没有匹配%smm规格的成型机类型子表，无法继续排程！",
-                                machine.getMoldingMachineCode(), taskDimension)
+                                machine.getCxMachineCode(), taskDimension)
                 );
             }
         }
@@ -2116,7 +2116,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
         //=============== 机台筛选流程 ===============//
         for (CxMachineInfoVo machine : CX_MACHINE_ACCTIVE_TIME_CONTEXT_MAP.values()) {
-            String machineCode = machine.getMoldingMachineCode();
+            String machineCode = machine.getCxMachineCode();
             logDebug("正在检查机台: {}", machineCode);
 
             // 1. 机台限制检查
@@ -2130,22 +2130,22 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
             }
 
             // 2. 历史机台检查
-            boolean isHistory = historyMachines.contains(machine.getMoldingMachineCode());
+            boolean isHistory = historyMachines.contains(machine.getCxMachineCode());
             machine.setIsHistoryMachine(isHistory);
             if (isHistory) {
                 // 历史机台就是中心机构满足,不用再判断【寸口】/【扁平比】
                 logDebug("规格的历史机台[{}]", JSON.toJSONString(historyMachines));
-                logDebug("标记机台[{}]为历史使用机台", machine.getMoldingMachineCode());
+                logDebug("标记机台[{}]为历史使用机台", machine.getCxMachineCode());
             } else {
                 // 成型法检查
                 MdmMoldingMachineCls machineCls = machine.getMoldingMachineCls();
                 if (machineCls == null) {
                     String errorMsg = StringUtils.format(I18nUtil.getMessage("机台[{}]成型机类型没有维护！"),
-                            machine.getMoldingMachineCode());
+                            machine.getCxMachineCode());
                     throw new IllegalArgumentException(errorMsg);
                 } else if (machineCls.getMouldMethod() == null || requiredMouldMethod == null) {
                     String errorMsg = StringUtils.format(I18nUtil.getMessage("机台[{}]成型法[{}]、胎胚[{}]对应施工维护成型法[{}]，缺失请补充！"),
-                            machine.getMoldingMachineCode(),
+                            machine.getCxMachineCode(),
                             machineCls.getMouldMethod(),
                             embryoCode,
                             requiredMouldMethod
@@ -2158,43 +2158,43 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                             requiredMouldMethod);
                     continue;
                 }
-
-                // 寸口检查
-                if (machine.getMinSize().compareTo(BigDecimal.valueOf(requiredDimension)) > 0) {
-                    logDebug("机台[{}]最小尺寸限制(机台:{}寸/任务:{}寸)",
-                            machineCode, machine.getMinSize(), requiredDimension);
-                    continue;
-                }
-                if (machine.getMaxSize().compareTo(BigDecimal.valueOf(requiredDimension)) < 0) {
-                    logDebug("机台[{}]最大尺寸限制(机台:{}寸/任务:{}寸)",
-                            machineCode, machine.getMaxSize(), requiredDimension);
-                    continue;
-                }
-
-                // 扁平比检查
-                if (flatRatio != null && StringUtils.isNotEmpty(machine.getMoldingDrumMax()) && Integer.parseInt(machine.getMoldingDrumMax()) > flatRatio) {
-                    logDebug("机台[{}]最大扁平比限制(机台:{}/任务:{})",
-                            machineCode, machine.getMoldingDrumMax(), flatRatio);
-                    continue;
-                }
-                if (flatRatio != null && StringUtils.isNotEmpty(machine.getMoldingDrumMin()) && Integer.parseInt(machine.getMoldingDrumMin()) > flatRatio) {
-                    logDebug("机台[{}]最小扁平比限制(机台:{}/任务:{})",
-                            machineCode, machine.getMoldingDrumMin(), flatRatio);
-                    continue;
-                }
-
-
-                // 断面宽检查
-                if (sectionWidth != null && machine.getSectionWidthMax() != null && machine.getSectionWidthMax() > sectionWidth) {
-                    logDebug("机台[{}]最大断面宽限制(机台:{}/任务:{})",
-                            machineCode, machine.getSectionWidthMax(), sectionWidth);
-                    continue;
-                }
-                if (sectionWidth != null && machine.getSectionWidthMin() != null && machine.getSectionWidthMin() > sectionWidth) {
-                    logDebug("机台[{}]最小断面宽限制(机台:{}/任务:{})",
-                            machineCode, machine.getSectionWidthMin(), sectionWidth);
-                    continue;
-                }
+//
+//                // 寸口检查
+//                if (machine.getMinSize().compareTo(BigDecimal.valueOf(requiredDimension)) > 0) {
+//                    logDebug("机台[{}]最小尺寸限制(机台:{}寸/任务:{}寸)",
+//                            machineCode, machine.getMinSize(), requiredDimension);
+//                    continue;
+//                }
+//                if (machine.getMaxSize().compareTo(BigDecimal.valueOf(requiredDimension)) < 0) {
+//                    logDebug("机台[{}]最大尺寸限制(机台:{}寸/任务:{}寸)",
+//                            machineCode, machine.getMaxSize(), requiredDimension);
+//                    continue;
+//                }
+//
+//                // 扁平比检查
+//                if (flatRatio != null && StringUtils.isNotEmpty(machine.getMoldingDrumMax()) && Integer.parseInt(machine.getMoldingDrumMax()) > flatRatio) {
+//                    logDebug("机台[{}]最大扁平比限制(机台:{}/任务:{})",
+//                            machineCode, machine.getMoldingDrumMax(), flatRatio);
+//                    continue;
+//                }
+//                if (flatRatio != null && StringUtils.isNotEmpty(machine.getMoldingDrumMin()) && Integer.parseInt(machine.getMoldingDrumMin()) > flatRatio) {
+//                    logDebug("机台[{}]最小扁平比限制(机台:{}/任务:{})",
+//                            machineCode, machine.getMoldingDrumMin(), flatRatio);
+//                    continue;
+//                }
+//
+//
+//                // 断面宽检查
+//                if (sectionWidth != null && machine.getSectionWidthMax() != null && machine.getSectionWidthMax() > sectionWidth) {
+//                    logDebug("机台[{}]最大断面宽限制(机台:{}/任务:{})",
+//                            machineCode, machine.getSectionWidthMax(), sectionWidth);
+//                    continue;
+//                }
+//                if (sectionWidth != null && machine.getSectionWidthMin() != null && machine.getSectionWidthMin() > sectionWidth) {
+//                    logDebug("机台[{}]最小断面宽限制(机台:{}/任务:{})",
+//                            machineCode, machine.getSectionWidthMin(), sectionWidth);
+//                    continue;
+//                }
 
 
                 // 单机班产检查
@@ -2225,7 +2225,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 // 如果没有找到任何匹配规格的配置项
                 if (!foundMatch) {
                     logDebug("机台[{}]没有匹配{}寸规格的成型机类型子表，跳过",
-                            machine.getMoldingMachineCode(), requiredDimension);
+                            machine.getCxMachineCode(), requiredDimension);
                     continue;  // 跳过当前机台，继续处理下一个机台
                 }
 
@@ -2246,15 +2246,15 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                         taskClothTypeNum += 1;
                     }
 
-                    if (taskClothTypeNum == 3 && !"L505".equals(machine.getMoldingMachineCode())){
-                        logDebug("机台[{}]的胎体布层数为{}，不能安排在{}层胎体布的机台, 3层只能安排在505机台", machine.getMoldingMachineCode(), taskClothTypeNum, machine.getCarcassClothType());
+                    if (taskClothTypeNum == 3 && !"L505".equals(machine.getCxMachineCode())){
+//                        logDebug("机台[{}]的胎体布层数为{}，不能安排在{}层胎体布的机台, 3层只能安排在505机台", machine.getCxMachineCode(), taskClothTypeNum, machine.getCarcassClothType());
                         continue;
                     }
 
-                    if (taskClothTypeNum != machine.getCarcassClothType()) {
-                        logDebug("机台[{}]的胎体布层数为{}，不能安排在{}层胎体布的机台", machine.getMoldingMachineCode(), taskClothTypeNum, machine.getCarcassClothType());
-                        continue;
-                    }
+//                    if (taskClothTypeNum != machine.getCarcassClothType()) {
+//                        logDebug("机台[{}]的胎体布层数为{}，不能安排在{}层胎体布的机台", machine.getCxMachineCode(), taskClothTypeNum, machine.getCarcassClothType());
+//                        continue;
+//                    }
                 }
             }
             availableMachines.add(machine);
@@ -2264,7 +2264,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         if (availableMachines.isEmpty()) {
             return Collections.emptyList();
         }
-        logInfo("任务[{}]一次筛选机台，中心机构满足机台保[{}]", task.getLhScheduleResult().getMergeIds(), JSON.toJSONString(availableMachines.stream().map(CxMachineInfoVo::getMoldingMachineCode).collect(Collectors.toList())));
+        logInfo("任务[{}]一次筛选机台，中心机构满足机台保[{}]", task.getLhScheduleResult().getMergeIds(), JSON.toJSONString(availableMachines.stream().map(CxMachineInfoVo::getCxMachineCode).collect(Collectors.toList())));
 
         //=============== 二次筛选逻辑 ===============//
         List<CxMachineInfoVo> finalCandidates = new ArrayList<>();
@@ -2287,7 +2287,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 //寸口确定
                 if (!machineSpec.getDimension().equals(requiredDimension)) {
                     logDebug("机台[{}]当前规格尺寸不匹配(实际:{}/要求:{})",
-                            machine.getMoldingMachineCode(),
+                            machine.getCxMachineCode(),
                             machineSpec.getDimension(),
                             requiredDimension);
                     continue;
@@ -2297,12 +2297,12 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 MdmMoldingMachineCls cls = machine.getMoldingMachineCls();
                 if (cls != null && cls.getMouldMethod().equals(Integer.valueOf(CxEngineConstants.MACHINE_TYPE_TWICE))) {
                     Objects.requireNonNull(machineSpec.getFlipDiscDiameter(),
-                            "二次成型机[" + machine.getMoldingMachineCode() + "]的扣圈盘直径未配置");
+                            "二次成型机[" + machine.getCxMachineCode() + "]的扣圈盘直径未配置");
                     Objects.requireNonNull(requiredFlipDisc, "任务胎胚[" + embryoCode + "]要求的扣圈盘直径未配置！");
 
                     if (!machineSpec.getFlipDiscDiameter().equals(requiredFlipDisc)) {
                         logDebug("二次成型机[{}]扣圈盘不匹配(实际:{}/任务要求:{})",
-                                machine.getMoldingMachineCode(),
+                                machine.getCxMachineCode(),
                                 machineSpec.getFlipDiscDiameter(),
                                 requiredFlipDisc);
                         continue;
@@ -2316,7 +2316,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                     double requiredFlatRatio = flatRatio;
                     if (Math.abs(machineFlatRatio-requiredFlatRatio) > ratioDiff) {
                         logDebug("机台[{}]的扁平比不匹配(实际:{}/要求:{})",
-                                machine.getMoldingMachineCode(),
+                                machine.getCxMachineCode(),
                                 machineFlatRatio,
                                 requiredFlatRatio);
                         continue;
@@ -2329,7 +2329,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 double taskSpecSectionWidth = productInfo.getSectionWidth();
                 if (Math.abs(machineSpecSectionWidth-taskSpecSectionWidth) > sectionWidthDiff) {
                     logDebug("机台[{}]的断面宽不匹配(实际:{}/要求:{})",
-                            machine.getMoldingMachineCode(),
+                            machine.getCxMachineCode(),
                             machineSpecSectionWidth,
                             taskSpecSectionWidth);
                     continue;
@@ -2437,11 +2437,11 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
             // 处理无机台施工信息的情况
             if (machineSpec == null) {
-                logDebug("机台[{}]无施工信息，相似度保持0", machine.getMoldingMachineCode());
+                logDebug("机台[{}]无施工信息，相似度保持0", machine.getCxMachineCode());
                 continue;
             }
 
-            logDebug("开始比较机台[{}]施工相似度", machine.getMoldingMachineCode());
+            logDebug("开始比较机台[{}]施工相似度", machine.getCxMachineCode());
 
             // 遍历每个比较字段
             for (String field : compareFields) {
@@ -2471,7 +2471,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
                 }
             }
 
-            logInfo("机台[{}]最终相似度：{}", machine.getMoldingMachineCode(), machine.getSimilarity());
+            logInfo("机台[{}]最终相似度：{}", machine.getCxMachineCode(), machine.getSimilarity());
         }
     }
 
@@ -2567,7 +2567,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
             List<LhAlgorithmScheduleResultDto> tasks = entry.getValue();
             logInfo("开始处理机台[{}]的任务补偿，共{}个任务", machineCode, tasks.size());
 
-            if (machine.getMoldingMachineCode().equals("L102")){
+            if (machine.getCxMachineCode().equals("L102")){
                 //todo debug 快速定位
                 int a = 1;
             }
@@ -2853,7 +2853,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 //                }
 
                 //考虑换工装时间
-                double changeTime =  changeSpecTime(currencyTask.getCxProductConstructionInfoDto(),machine.getCxProductConstructionInfo(),machine.getMouldMethod());
+                double changeTime =  changeSpecTime(currencyTask.getCxProductConstructionInfoDto(),machine.getCxProductConstructionInfo(),Integer.valueOf(machine.getRollOverType()));
 
                 remainingQty = (int) (remainingQty - maxAddNum);
 
@@ -2945,13 +2945,13 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
 
                     // 更新机台班次及顺序号
                     if (machine.getCurrentShift() != shift) {
-                        logDebug("机台[{}]当前班次：[{}],切换至新班次：[{}]，重置顺序号", machine.getMoldingMachineCode(), machine.getCurrentShift(), shift);
+                        logDebug("机台[{}]当前班次：[{}],切换至新班次：[{}]，重置顺序号", machine.getCxMachineCode(), machine.getCurrentShift(), shift);
                         machine.setCurrentShift(shift);
                         machine.setCurrentShiftSort(1);
                     } else {
                         machine.setCurrentShiftSort(machine.getCurrentShiftSort() + 1);
                         logDebug("机台[{}]班次[{}]顺序号+1 → {}",
-                                machine.getMoldingMachineCode(), shift, machine.getCurrentShiftSort());
+                                machine.getCxMachineCode(), shift, machine.getCurrentShiftSort());
                     }
 
                     // 更新机台可用开始时间（累加已排产时间）
