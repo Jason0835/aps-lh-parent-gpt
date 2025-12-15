@@ -42,9 +42,15 @@ public class MdmMoldingMachine extends BaseEntity {
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
 
-    /** 成型机类型编码 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineTypeCode")
-    @ApiModelProperty(value = "成型机类型编码", name = "cxMachineTypeCode")
+    /** 成型机类型 */
+    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineBrandCode",dictType = "biz_machine_brand")
+    @ApiModelProperty(value = "成型机类型", name = "cxMachineBrandCode")
+    @TableField(value = "CX_MACHINE_BRAND_CODE")
+    private String cxMachineBrandCode;
+
+    /** 类型 */
+    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineTypeCode", dictType = "biz_class_type")
+    @ApiModelProperty(value = "类型", name = "cxMachineTypeCode")
     @TableField(value = "CX_MACHINE_TYPE_CODE")
     private String cxMachineTypeCode;
 
