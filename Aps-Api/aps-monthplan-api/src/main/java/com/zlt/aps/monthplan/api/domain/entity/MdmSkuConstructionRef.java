@@ -97,6 +97,12 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @TableField(value = "MOULD_CAVITY")
     private String mouldCavity;
 
+    /** 是否零度材料 */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.isZeroRack", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
+    @TableField(value = "IS_ZERO_RACK")
+    private String isZeroRack;
+
     /** 夏季机械硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime")
     @ApiModelProperty(value = "夏季机械硫化时间(秒)", name = "curingTime")
