@@ -36,4 +36,10 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * @return 查询当前月均销量
      */
     List<MpMonthlySaleQty> findCurrentMonthlySaleQty();
+    /**
+     * 根据物料编码获取月均销量
+     * @param materialCode
+     * @return
+     */
+    MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode);
 }

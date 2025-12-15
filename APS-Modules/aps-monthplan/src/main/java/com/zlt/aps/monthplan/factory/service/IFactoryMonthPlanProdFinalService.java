@@ -132,4 +132,10 @@ public interface IFactoryMonthPlanProdFinalService {
      * @return 定稿的月度排产计划
      */
     List<FactoryMonthPlanProdFinal> findLastTwelveMonthProdFinalPlan();
+    /**
+     *  根据物料编号,通过月度生产计划表，获取近12个月有排产的月份个数
+     * @param materialCode 物料编号
+     * @return 近12个月有排产的月份个数
+     */
+    int getProductionMonthInLastTwelveMonth(String materialCode);
 }

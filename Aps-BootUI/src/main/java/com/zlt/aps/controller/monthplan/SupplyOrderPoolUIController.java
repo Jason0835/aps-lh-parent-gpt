@@ -182,4 +182,15 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
     return iSupplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
   }
 
+  /**
+   * 输入NC物料编码，带出对应信息
+   */
+  @ApiOperation("输入物料编码，带出对应信息")
+  @PostMapping("/queryRelationByMaterialCode")
+  @ResponseBody
+  public AjaxResult queryRelationByMaterialCode(SupplyOrderPool supplyOrderPool)
+  {
+    return AjaxResult.success(iSupplyOrderPoolService.queryRelationByMaterialCode(supplyOrderPool));
+  }
+
 }
