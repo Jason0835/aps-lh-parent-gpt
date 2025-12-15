@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.service.ScmItfService;
+import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 
 import io.swagger.annotations.Api;
@@ -29,9 +30,29 @@ public class ScmItfController {
 	/**
 	 * 同步已计划未发货数据
 	 */
-	@ApiOperation("同步已计划未发货数据")
+	@ApiOperation("已计划未发货订单接口（含排发货）")
 	@PostMapping("/syncPlanedNotShipList")
 	public AjaxResult syncPlanedNotShipList(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo) {
 		return scmItfService.syncPlanedNotShipList(planedNotShipParamVo);
+	}
+
+
+	/**
+	 * 发货明细表同步接口
+	 */
+	@ApiOperation("发货明细表同步接口")
+	@PostMapping("/syncOutShipDmdOrdList")
+	public AjaxResult syncOutShipDmdOrdList(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo) {
+		return scmItfService.syncOutShipDmdOrdList(planedNotShipParamVo);
+	}
+
+
+	/**
+	 * 月计划排程结果推送
+	 */
+	@ApiOperation("月计划排程结果推送")
+	@PostMapping("/publicFacScheduleVersion")
+	public AjaxResult publicFacScheduleVersion(@RequestBody SyncOutFacScheduleVersionVo planedNotShipParamVo) {
+		return scmItfService.publicFacScheduleVersion(planedNotShipParamVo);
 	}
 }
