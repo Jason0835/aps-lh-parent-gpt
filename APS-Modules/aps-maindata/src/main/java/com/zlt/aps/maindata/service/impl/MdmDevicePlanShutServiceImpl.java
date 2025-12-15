@@ -1,14 +1,18 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -16,9 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -74,7 +77,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
         queryWrapper.eq(MdmDevicePlanShut::getProcCode, procCode);
         queryWrapper.eq(MdmDevicePlanShut::getMachineType, machineType);
         queryWrapper.eq(MdmDevicePlanShut::getMachineCode, machineCode);
-        queryWrapper.ne(BaseEntity::getId, docEntityVO.getId());
+        queryWrapper.ne(Objects.nonNull(docEntityVO.getId()), BaseEntity::getId, docEntityVO.getId());
         List<MdmDevicePlanShut> mdmDevicePlanShutList = entityMapper.selectList(queryWrapper);
         if (CollectionUtils.isNotEmpty(mdmDevicePlanShutList)) {
             for (MdmDevicePlanShut mdmDevicePlanShut : mdmDevicePlanShutList) {
@@ -94,5 +97,56 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    protected Map<Object, Object> getServiceCheckParams(List<MdmDevicePlanShut> list, List<MdmDevicePlanShut> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        Map<String, List<MdmDevicePlanShut>> groupMap = list.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProcCode(), item.getMachineCode())));
+        serviceCheckParams.put("groupMap", groupMap);
+        for (int i = 0; i < list.size(); i++) {
+            MdmDevicePlanShut mdmDevicePlanShut = list.get(i);
+            mdmDevicePlanShut.setSearchValue(i + "");
+        }
+        return serviceCheckParams;
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmDevicePlanShut importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (serviceCheckParams.containsKey("groupMap")) {
+            Map<String, List<MdmDevicePlanShut>> groupMap = (Map<String, List<MdmDevicePlanShut>>) serviceCheckParams.get("groupMap");
+            String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getProcCode(), importDocEntity.getMachineCode());
+            // excel内校验
+            if (groupMap.containsKey(mapKey)) {
+                List<MdmDevicePlanShut> mdmDevicePlanShutList = groupMap.get(mapKey);
+                for (MdmDevicePlanShut mdmDevicePlanShut : mdmDevicePlanShutList) {
+                    String searchValue = mdmDevicePlanShut.getSearchValue();
+                    // 不一样的比较开始结束时间，看有没冲突区间
+                    if (!searchValue.equals(importDocEntity.getSearchValue())) {
+                        long dbBeginTime = mdmDevicePlanShut.getBeginDate().getTime();
+                        long dbEndTime = mdmDevicePlanShut.getEndDate().getTime();
+                        long beginTime = importDocEntity.getBeginDate().getTime();
+                        long endTime = importDocEntity.getEndDate().getTime();
+                        if (beginTime <= dbEndTime || endTime >= dbBeginTime) {
+                            String message = I18nUtil.getMessage("import.validated.repeat");
+                            String errorMsg = String.format(message, errorRowNum, Integer.parseInt(searchValue) + 2);
+                            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, errorMsg, importErrorLogs);
+                            return Boolean.FALSE;
+                        }
+                    }
+                }
+            }
+            // 数据库内校验
+            String unique = null;
+            try {
+                unique = checkUnique(importDocEntity);
+            } catch (Exception e) {
+                logger.error("设备计划停机数据唯一性校验异常", e);
+                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, String.format(uniqueMsg, errorRowNum), importErrorLogs);
+                return Boolean.FALSE;
+            }
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }
