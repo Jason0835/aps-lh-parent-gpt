@@ -72,6 +72,15 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
         if (beginDate.after(endDate)) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.DocDeviceMaintenancePlan.timeCheck"));
         }
+        // 开始结束时间不能跨月
+        Calendar beginCal = Calendar.getInstance();
+        beginCal.setTime(beginDate);
+        Calendar endCal = Calendar.getInstance();
+        endCal.setTime(endDate);
+        if (beginCal.get(Calendar.YEAR) != endCal.get(Calendar.YEAR) ||
+                beginCal.get(Calendar.MONTH) != endCal.get(Calendar.MONTH)) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.DocDeviceMaintenancePlan.yearAndMonthMustBeTheSame"));
+        }
         LambdaQueryWrapper<MdmDevicePlanShut> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmDevicePlanShut::getFactoryCode, factoryCode);
         queryWrapper.eq(MdmDevicePlanShut::getProcCode, procCode);
