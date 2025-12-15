@@ -170,7 +170,7 @@ public class CommonEngineService extends CommonLogService {
         availableMachines.sort(machineComparator);
         logDebug("排序后机台列表: {}",
                 availableMachines.stream()
-                        .map(CxMachineInfoVo::getMoldingMachineCode)
+                        .map(CxMachineInfoVo::getCxMachineCode)
                         .collect(Collectors.toList()));
 
         // 4. 尝试分配机台
@@ -266,13 +266,13 @@ public class CommonEngineService extends CommonLogService {
         logDebug("尝试为任务[ID:{}]分配机台，候选机台数: {}", task.getLhScheduleResult().getMergeIds(), candidates.size());
 
         for (CxMachineInfoVo machine : candidates) {
-            logDebug("尝试分配至机台[{}]", machine.getMoldingMachineCode());
-            if ("L102".equals(machine.getMoldingMachineCode())){
+            logDebug("尝试分配至机台[{}]", machine.getCxMachineCode());
+            if ("L102".equals(machine.getCxMachineCode())){
                 int a = 1; //todo debug 快速定位
             }
             if (tryAllocateToMachine(task, machine)) {
                 logInfo("任务[ID:{}] 成功分配至机台[{}]",
-                        task.getLhScheduleResult().getMergeIds(), machine.getMoldingMachineCode());
+                        task.getLhScheduleResult().getMergeIds(), machine.getCxMachineCode());
                 return true;
             }
         }
@@ -296,7 +296,7 @@ public class CommonEngineService extends CommonLogService {
         // 2. 检查机台
         if (availableTime.isAfter(cxShiftConfig.parseToDayLastShiftEndTime())) {
             task.setStopScheduleReason( task.getStopScheduleReason() == null ? "": task.getStopScheduleReason() + String.format("机台[%s]机台已经安排满了,没有剩余产能！",
-                    machine.getMoldingMachineCode()));
+                    machine.getCxMachineCode()));
             return false;
         }
 
@@ -305,7 +305,7 @@ public class CommonEngineService extends CommonLogService {
             logWarn("欠胎时间是否落点无效 可用时间[{}] 欠胎时间[{}]",
                     availableTime, task.getPreviousTireTime());
             task.setStopScheduleReason( task.getStopScheduleReason() == null ? "": task.getStopScheduleReason() + String.format("机台[%s]可用时间无法满足欠胎！",
-                    machine.getMoldingMachineCode()));
+                    machine.getCxMachineCode()));
             return false;
         }
 
@@ -318,7 +318,7 @@ public class CommonEngineService extends CommonLogService {
 
         if (machine.getRemainCapacity() < task.getTaskPlanQuantity() && !task.getIsSatisfySpecification()) {
             task.setStopScheduleReason( task.getStopScheduleReason() == null ? "": task.getStopScheduleReason() + String.format("机台[%s]产能不足！",
-                    machine.getMoldingMachineCode()));
+                    machine.getCxMachineCode()));
             return false;
         }
 
@@ -346,7 +346,7 @@ public class CommonEngineService extends CommonLogService {
         // 2. 检查机台
         if (availableTime.isAfter(cxShiftConfig.parseToDayLastShiftEndTime())) {
             task.setStopScheduleReason( task.getStopScheduleReason() == null ? "": task.getStopScheduleReason() + String.format("机台[%s]机台已经安排满了,没有剩余产能！",
-                    machine.getMoldingMachineCode()));
+                    machine.getCxMachineCode()));
             return false;
         }
 
@@ -390,7 +390,7 @@ public class CommonEngineService extends CommonLogService {
         double changeTime = changeSpecTime(
                 task.getCxProductConstructionInfoDto(),
                 machine.getCxProductConstructionInfo(),
-                machine.getMouldMethod()
+                Integer.valueOf(machine.getRollOverType())
         );
         logDebug("换工装耗时计算: {}小时", changeTime);
 
@@ -503,11 +503,11 @@ public class CommonEngineService extends CommonLogService {
         CxMachineInfoVo targetMachine = null;
         for (CxMachineInfoVo machine : machines) {
             boolean hasDelivery = ApsConstant.APS_STRING_1.equals(machine.getIsDelivery());
-            logDebug("机台[{}]当前生产的规格是否有交期: {}", machine.getMoldingMachineCode(), hasDelivery ? "有" : "无");
+            logDebug("机台[{}]当前生产的规格是否有交期: {}", machine.getCxMachineCode(), hasDelivery ? "有" : "无");
 
             if (!hasDelivery) {
                 targetMachine = machine;
-                logInfo("选中无交期机台：{}", machine.getMoldingMachineCode());
+                logInfo("选中无交期机台：{}", machine.getCxMachineCode());
                 break;
             }
         }
@@ -516,13 +516,13 @@ public class CommonEngineService extends CommonLogService {
         if (targetMachine == null) {
             targetMachine = machines.get(0);
             log.warn("所有{}台机台均有交期，默认选择首台：{}",
-                    machines.size(), targetMachine.getMoldingMachineCode());
+                    machines.size(), targetMachine.getCxMachineCode());
         }
 
-        logInfo("▷ 开始抢占机台[{}]给任务[{}]", targetMachine.getMoldingMachineCode(), task);
+        logInfo("▷ 开始抢占机台[{}]给任务[{}]", targetMachine.getCxMachineCode(), task);
         performMachineOccupation(task, targetMachine);
         logInfo("◉ 机台强占完成，任务[{}] → 机台[{}]",
-                task, targetMachine.getMoldingMachineCode());
+                task, targetMachine.getCxMachineCode());
     }
 
     /**
@@ -565,7 +565,7 @@ public class CommonEngineService extends CommonLogService {
                                 Optional.ofNullable(vo.getRemainCapacity()).orElse(0),
                         Comparator.reverseOrder())
                 .thenComparing(CxMachineInfoVo::getSimilarity, Comparator.reverseOrder())
-                .thenComparing(CxMachineInfoVo::getMoldingMachineCode);
+                .thenComparing(CxMachineInfoVo::getCxMachineCode);
     }
 
     /**
@@ -577,7 +577,7 @@ public class CommonEngineService extends CommonLogService {
                 .thenComparing(CxMachineInfoVo::getSimilarity, Comparator.reverseOrder())
                 .thenComparing(vo -> Optional.ofNullable(vo.getRemainCapacity()).orElse(0),
                         Comparator.reverseOrder())
-                .thenComparing(CxMachineInfoVo::getMoldingMachineCode);
+                .thenComparing(CxMachineInfoVo::getCxMachineCode);
     }
 
 

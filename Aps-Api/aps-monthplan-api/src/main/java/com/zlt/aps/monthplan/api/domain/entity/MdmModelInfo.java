@@ -39,6 +39,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 分厂编号
      */
+    @ImportExcelValidated(required = true, dictType = "biz_factory_name")
     @Excel(name = "ui.data.column.mdmModelInfo.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -47,6 +48,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 型腔模号
      */
+    @ImportExcelValidated(required = true, maxLength = 40)
     @Excel(name = "ui.data.column.mdmModelInfo.mouldCode")
     @ApiModelProperty(value = "型腔模号", name = "mouldCode")
     @TableField(value = "MOULD_CODE")
@@ -71,6 +73,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 物流状态,字典：	logistics_status
      */
+    @Excel(name = "ui.data.column.mdmModelInfo.logisticsStatus", dictType = "biz_available_status")
     @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
     @TableField(value = "LOGISTICS_STATUS")
     private String logisticsStatus;
@@ -86,6 +89,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 规格
      */
+    @ImportExcelValidated(maxLength = 256)
     @Excel(name = "ui.data.column.mdmModelInfo.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
@@ -94,7 +98,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 主花纹
      */
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
@@ -111,6 +115,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 花纹
      */
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mdmModelInfo.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
@@ -151,12 +156,15 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 模壳标准
      */
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mdmModelInfo.shellStandard")
     @ApiModelProperty(value = "模壳标准", name = "shellStandard")
     @TableField(value = "SHELL_STANDARD")
     private String shellStandard;
 
-    @TableField(exist = false)
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.remark")
+    @TableField(value = "REMARK")
     private String remark;
 
     @TableField(exist = false)

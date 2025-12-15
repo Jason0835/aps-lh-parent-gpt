@@ -198,7 +198,7 @@ public class MdmModelInfoUIController extends BaseUIController<MdmModelInfo> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmModelInfoService.importData(context, true);
+        AjaxResult ajaxResult = iMdmModelInfoService.importData(context, false);
         return ajaxResult;
     }
 

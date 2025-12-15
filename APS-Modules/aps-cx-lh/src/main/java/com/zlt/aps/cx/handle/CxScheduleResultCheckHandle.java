@@ -43,10 +43,10 @@ public class CxScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.changeMachine.notExist"));
         }
         //查询机台是否存在
-        MdmMoldingMachine cxMachineInfo = mdmMoldingMachineService.getMoldingMachineByMachineCode(cxscheduleResult.getFactoryCode(),dto.getCxMachineCode());
-        if (cxMachineInfo == null) {
-            return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machineInfo.notExist"));
-        }
+//        MdmMoldingMachine cxMachineInfo = mdmMoldingMachineService.getMoldingMachineByMachineCode(cxscheduleResult.getFactoryCode(),dto.getCxMachineCode());
+//        if (cxMachineInfo == null) {
+//            return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machineInfo.notExist"));
+//        }
         //判断是否空机台
 //        CxScheduleResult cxScheduleResultMachine = cxScheduleResultService.getScheduleResultByMachineCodeAndScheduleDate(cxscheduleResult.getFactoryCode(),dto.getCxMachineCode(),cxscheduleResult.getScheduleDate());
 //        if(cxScheduleResultMachine != null){
