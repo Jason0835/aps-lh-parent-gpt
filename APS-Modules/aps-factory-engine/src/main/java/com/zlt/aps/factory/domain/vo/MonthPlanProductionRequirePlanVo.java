@@ -56,6 +56,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 计划类型
      */
     private String planType;
+    /**
+     * 成型产能需求量
+     * 首轮 = 净需求
+     * 第二轮 = 模拟模具已排产量 + 换模损耗量
+     */
+    private Long cxCapacityRequireQty;
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)

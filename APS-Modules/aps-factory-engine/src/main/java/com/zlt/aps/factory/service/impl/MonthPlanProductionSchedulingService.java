@@ -23,7 +23,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     private final IProductionBusinessService wholeCourseProductionService;
 
-    public MonthPlanProductionSchedulingService(@Qualifier("generalInitService") IProductionBusinessService generalInitService,
+    public MonthPlanProductionSchedulingService(@Qualifier("tbrProductionInitService") IProductionBusinessService generalInitService,
                                                 @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService
                                                 ) {
         this.generalInitService = generalInitService;
