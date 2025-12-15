@@ -73,7 +73,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 物流状态,字典：	logistics_status
      */
-    @Excel(name = "ui.data.column.mdmModelInfo.logisticsStatus", dictType = "biz_available_status")
+    @Excel(name = "ui.data.column.mdmModelInfo.logisticsStatus", dictType = "logistics_status")
     @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
     @TableField(value = "LOGISTICS_STATUS")
     private String logisticsStatus;

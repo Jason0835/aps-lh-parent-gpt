@@ -17,7 +17,6 @@ import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
@@ -32,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.YearMonth;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -145,6 +143,15 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
         return entityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode) {
+        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MpMonthlySaleQty::getMaterialCode, materialCode);
+        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MpMonthlySaleQty> monthlySaleQties = entityMapper.selectList(wrapper);
+        return CollectionUtils.isEmpty(monthlySaleQties) ? null : monthlySaleQties.get(0);
     }
 
     /**

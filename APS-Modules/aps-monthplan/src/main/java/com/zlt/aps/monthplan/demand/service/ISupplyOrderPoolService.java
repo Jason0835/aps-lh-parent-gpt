@@ -26,7 +26,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @param id 供应链订单池主键
      * @return 供应链订单池
      */
-    public SupplyOrderPool selectSupplyOrderPoolById(Long id);
+    SupplyOrderPool selectSupplyOrderPoolById(Long id);
 
     /**
      * 查询供应链订单池列表
@@ -34,7 +34,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @param supplyOrderPool 供应链订单池
      * @return 供应链订单池集合
      */
-    public List<SupplyOrderPool> selectSupplyOrderPoolList(SupplyOrderPool supplyOrderPool);
+    List<SupplyOrderPool> selectSupplyOrderPoolList(SupplyOrderPool supplyOrderPool);
 
     /**
      * 批量查询供应链订单池列表
@@ -42,7 +42,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @param ids 需要查询的数据主键集合
      * @return 供应链订单池集合
      */
-    public List<SupplyOrderPool> selectSupplyOrderPoolByIds(List<Long> ids);
+    List<SupplyOrderPool> selectSupplyOrderPoolByIds(List<Long> ids);
 
 
     /**
@@ -52,7 +52,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @return 结果
      */
     @Transactional
-    public int insertSupplyOrderPool(SupplyOrderPool supplyOrderPool);
+    int insertSupplyOrderPool(SupplyOrderPool supplyOrderPool);
 
     /**
      * 修改供应链订单池
@@ -61,7 +61,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @return 结果
      */
     @Transactional
-    public int updateSupplyOrderPool(SupplyOrderPool supplyOrderPool);
+    int updateSupplyOrderPool(SupplyOrderPool supplyOrderPool);
 
     /**
      * 批量删除供应链订单池
@@ -71,7 +71,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      */
    
     @Transactional
-    public int deleteSupplyOrderPoolByIds(Long[] ids);
+    int deleteSupplyOrderPoolByIds(Long[] ids);
 
     /**
      * 批量删除供应链订单池
@@ -81,7 +81,7 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      */
 
     @Transactional
-    public int deleteSupplyOrderPoolByIds(List<Long> ids);
+    int deleteSupplyOrderPoolByIds(List<Long> ids);
 
     /**
      * 删除供应链订单池信息
@@ -90,18 +90,18 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @return 结果
      */
     @Transactional
-    public int deleteSupplyOrderPoolById(Long id);
+    int deleteSupplyOrderPoolById(Long id);
 
     /**
      * 校验供应链订单池唯一性
      */
-    public String checkSupplyOrderPoolUnique(SupplyOrderPool supplyOrderPool);
+    String checkSupplyOrderPoolUnique(SupplyOrderPool supplyOrderPool);
 
     /**
      * 导入供应链订单池数据
      */
     @Transactional
-    public AjaxResult importData(List<SupplyOrderPool> list, boolean updateSupport, Long importLogId);
+    AjaxResult importData(List<SupplyOrderPool> list, boolean updateSupport, Long importLogId);
     /**
      * 生成周期排产储备
      * @param supplyOrderPool
@@ -113,4 +113,10 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @param supplyOrderPool
      */
     void createPrecedentStockUp(SupplyOrderPool supplyOrderPool);
+    /**
+     *  输入物料编码，带出对应信息
+     * @param supplyOrderPool  物料编码
+     * @return 对应信息
+     */
+    SupplyOrderPool queryRelationByMaterialCode(SupplyOrderPool supplyOrderPool);
 }
