@@ -111,5 +111,13 @@ public class MdmMouldShellInfo extends BaseEntity {
     @TableField(value = "FORCE_OUT_BOUND_QTY")
     private Integer forceOutBoundQty;
 
+    /**
+     * 备注
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
 
 }
