@@ -163,7 +163,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmSkuStructureRef.modelName");
     }
 
     /**
