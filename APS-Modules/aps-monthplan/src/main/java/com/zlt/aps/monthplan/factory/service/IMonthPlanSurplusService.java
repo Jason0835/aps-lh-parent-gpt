@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanProductionFinalResult;
 
 import java.util.List;
@@ -20,4 +21,9 @@ public interface IMonthPlanSurplusService {
    * @param importList
    */
   void finalUpdatePlanSurplusList(List<MonthPlanProductionFinalResult> importList);
+  /**
+   *  批量保存月度剩余量
+   * @param mdmMonthSurpluses
+   */
+  void batchInsertPlanSurplusList(List<MdmMonthSurplus> mdmMonthSurpluses);
 }

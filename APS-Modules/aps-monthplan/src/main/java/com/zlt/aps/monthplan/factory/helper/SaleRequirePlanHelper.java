@@ -565,7 +565,7 @@ public class SaleRequirePlanHelper {
     if (CollectionUtils.isEmpty(salesOrders)) {
       return Collections.emptyMap();
     }
-    Map<String, List<SalesOrderPool>> groupedMap = salesOrders
+    return salesOrders
         .parallelStream()
         .filter(Objects::nonNull)
         .filter(order -> order.getGroupKey() != null)
@@ -573,106 +573,7 @@ public class SaleRequirePlanHelper {
             SalesOrderPool::getGroupKey,
             Collectors.toCollection(ArrayList::new)
         ));
-    // 并行排序每个分组
-    groupedMap.entrySet().parallelStream().forEach(entry -> {
-      List<SalesOrderPool> orders = entry.getValue();
-      orders.sort(getHighPerformanceComparator());
-    });
-    return groupedMap;
   }
 
-  /**
-   * 高性能自定义比较器（适用于大数据量）
-   */
-  public static Comparator<SalesOrderPool> getHighPerformanceComparator() {
-    return new SalesOrderComparator();
-  }
 
-  /**
-   * 自定义高性能比较器实现
-   * 避免重复解析和lambda开销
-   */
-  private static class SalesOrderComparator implements Comparator<SalesOrderPool> {
-
-    @Override
-    public int compare(SalesOrderPool o1, SalesOrderPool o2) {
-      // 1. 比较供应链优先级
-      int scmPriorityCompare = compareScmPriority(o1, o2);
-      if (scmPriorityCompare != 0) {
-        return scmPriorityCompare;
-      }
-
-      // 2. 比较提报日期
-      int dateCompare = compareBillDate(o1, o2);
-      if (dateCompare != 0) {
-        return dateCompare;
-      }
-
-      // 3. 比较提报量
-      return compareOrdQty(o1, o2);
-    }
-
-    private int compareScmPriority(SalesOrderPool o1, SalesOrderPool o2) {
-      Integer p1 = parseScmPriority(o1.getScmPriority());
-      Integer p2 = parseScmPriority(o2.getScmPriority());
-
-      if (p1 == null && p2 == null) {
-        return 0;
-      }
-      if (p1 == null) {
-        return 1; // null排最后
-      }
-      if (p2 == null) {
-        return -1;
-      }
-
-      return Integer.compare(p1, p2);
-    }
-
-    private int compareBillDate(SalesOrderPool o1, SalesOrderPool o2) {
-      Date d1 = o1.getBillDate();
-      Date d2 = o2.getBillDate();
-
-      if (d1 == null && d2 == null) {
-        return 0;
-      }
-      // null排最后
-      if (d1 == null) {
-        return 1;
-      }
-      if (d2 == null) {
-        return -1;
-      }
-
-      return d1.compareTo(d2);
-    }
-
-    private int compareOrdQty(SalesOrderPool o1, SalesOrderPool o2) {
-      BigDecimal q1 = o1.getOrdQty();
-      BigDecimal q2 = o2.getOrdQty();
-
-      if (q1 == null && q2 == null) {
-        return 0;
-      }
-      // null排最后
-      if (q1 == null) {
-        return 1;
-      }
-      if (q2 == null) {
-        return -1;
-      }
-      return q1.compareTo(q2);
-    }
-
-    private Integer parseScmPriority(String scmPriority) {
-      if (scmPriority == null || scmPriority.trim().isEmpty()) {
-        return null;
-      }
-      try {
-        return Integer.parseInt(scmPriority.trim());
-      } catch (NumberFormatException e) {
-        return null;
-      }
-    }
-  }
 }

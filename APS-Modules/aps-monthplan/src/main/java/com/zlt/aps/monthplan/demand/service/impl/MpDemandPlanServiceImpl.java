@@ -17,13 +17,16 @@ import com.zlt.aps.maindata.service.IMpFinishedProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.MpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
+import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.factory.service.IMpMonthPlanProdFinalService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.ruoyi.common.datasource.service.BaseService;
 import lombok.RequiredArgsConstructor;
@@ -62,8 +65,8 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
     private final IMpFinishedProductStockService finishedProductStockService;
-    // 月底计划余量
-    private final IMdmMonthSurplusService mdmMonthSurplusService;
+    // 定稿的月度排产计划
+    private final IMpMonthPlanProdFinalService mpMonthPlanProdFinalService;
 
     /**
      * 查询需求计划
@@ -285,14 +288,14 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
         }
 
         // 1、创建新的需求版本号(REQ+yyyymmdd+3位流水号)，
-        String requireVersionNumber = requirementVersionService.generateVersion();
+        String monthPlanVersion = requirementVersionService.generateVersion();
         // 2、查询获取销售订单池中的所有订单
         List<SalesOrderPool> salesOrders = this.salesOrderPoolService.findCurrentSalesOrderPool();
         // 3、查询获取所有成品库存
         List<MpFinishedProductStock> finishedProductStocks = this.finishedProductStockService.findCurrentFinishStock();
         Map<String,List<MpFinishedProductStock>> finishedProductStockMap = this.getFinishedProductStockMap(finishedProductStocks);
         // 计算月底计划余量 查询获取所有成品库存；同时计算月底计划余量：库存抓取日~（同月）月底的月度计划量汇总
-        mdmMonthSurplusService.calculateMonthSurplus(createCondition,requireVersionNumber,finishedProductStockMap);
+        Map<String,Long> mdmMonthSurplusMap =  mpMonthPlanProdFinalService.calculateMonthSurplus(monthPlanVersion);
         // 4、从获取的销售订单池数据中筛选高、中优先级列表(供应链优先级 !=暂缓订单(5))
         if(CollectionUtils.isNotEmpty(salesOrders)){
             salesOrders = salesOrders
@@ -301,11 +304,10 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
                     || ApsConstant.SAL_PRIORITY_MID.equals(item.getOrderPriority()))
                 .collect(Collectors.toList());
         }
-        //  (1) 按SKU分组，进行库存冲减得到订单还需生产的需求量(即净需求)；
-        //   对SKU分组的订单列表，按供应链优先级升序(值越小优先级越高) ->提报日期升序(提报日期越早，越优先) -> 提报量升序(提报量小的越优先)排序
         Map<String, List<SalesOrderPool>> saleOrderGroupMap = SaleRequirePlanHelper.getGroupSalesOrder(salesOrders);
-        // (2)订单中有年周号要求的，则库存冲减需取得满足年周号要求的库存，在此基础上年周号越早的优先对冲
         //按照库存冲销顺序进行对冲
+        List<MpOrderOffsetAllocation> orderOffsetAllocations = StockAllocationHelper.calculateStockAllocation(monthPlanVersion,saleOrderGroupMap,finishedProductStockMap,mdmMonthSurplusMap);
+        // 7、将分配冲减后的结果记录到订单分配表中(以需求版本号的维度)；
 
 
     }
