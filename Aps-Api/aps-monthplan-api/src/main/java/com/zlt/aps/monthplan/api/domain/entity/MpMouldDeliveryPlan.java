@@ -72,7 +72,7 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     /**
      * 物料描述
      */
-    @ImportExcelValidated(required = true, maxLength = 64)
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mpMouldDeliveryPlan.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
