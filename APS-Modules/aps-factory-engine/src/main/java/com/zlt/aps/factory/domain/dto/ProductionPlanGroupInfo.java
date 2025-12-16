@@ -2,6 +2,7 @@ package com.zlt.aps.factory.domain.dto;
 
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -11,10 +12,8 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -31,9 +30,13 @@ public class ProductionPlanGroupInfo {
      */
     private ProductTypeEnum productType;
     /**
-     * 分组值
+     * 分组值 TBR为结构
      */
     private String groupName;
+    /**
+     * 是否零度结构 1 是 0 否
+     */
+    private String isZero;
     /**
      * 分配产能的总需求量
      */
@@ -54,6 +57,22 @@ public class ProductionPlanGroupInfo {
      * 估算需要的机台数
      */
     private BigDecimal needCxCapacityMachineCount;
+    /**
+     * 成型-硫化配比信息
+     */
+    private Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap;
+    /**
+     * 针对成型机的固定优先级
+     */
+    private Integer fixedPriority;
+    /**
+     * 近1个月的上机日期
+     */
+    private Date lastBoardingDate;
+    /**
+     * 近3个月的排产次数
+     */
+    private Integer productionCount;
 
     /**
      * 粗步计算 结构需求量需要的成型产能分配
@@ -61,15 +80,18 @@ public class ProductionPlanGroupInfo {
      * 保留1位小数
      * 如果 小数部分 > 0.9，则向上取整
      *
-     * @param context         排产上下文
-     * @param requirePlanList 需排产的计划
-     * @param minLhRatioMap   结构下最小的硫化配比信息
+     * @param context              排产上下文
+     * @param requirePlanList      需排产的计划
+     * @param structureLhRatioList 结构硫化配比信息
      * @return
      */
-    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList, Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap) {
+    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
+        //提取结构下最小的硫化配比信息
+        Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
+        Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
         //1、对计划按结构分组
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
@@ -78,6 +100,12 @@ public class ProductionPlanGroupInfo {
             groupInfo.setGroupName(structureName);
             groupInfo.setProductType(context.getProductType());
             groupInfo.setGroupPlanData(planList);
+            List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
+            if (CollectionUtils.isEmpty(cxLhRatioList)) {
+                groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
+            } else {
+                groupInfo.setCxMachineLhRationMap(cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity())));
+            }
             groupInfoMap.put(structureName, groupInfo);
         });
         //2、提取有效净需求--剔除不可排产的-汇总需求量，并获得分组下最小日硫化产能
@@ -141,5 +169,222 @@ public class ProductionPlanGroupInfo {
             return;
         }
         needCxCapacityMachineCount = machineCount.setScale(1, RoundingMode.UP);
+    }
+
+    /**
+     * 根据成型对应硫化配比，得到剩余需求量需要分配的天数
+     *
+     * @param lhRatio
+     * @return
+     */
+    public Integer calculateNeedDays(Integer lhRatio) {
+        if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue() || null == lhRatio || lhRatio <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //剩余需求量
+        Long remainingProductionQty = getRemainingProductionQty();
+        if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        BigDecimal monthCapacity = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(lhRatio));
+        return BigDecimal.valueOf(remainingProductionQty).divide(monthCapacity, 0, RoundingMode.UP).intValue();
+    }
+
+    /**
+     * 获取结构分组下剩余还需排产量
+     *
+     * @return
+     */
+    public Long getRemainingProductionQty() {
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.longValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return BigDecimal.ZERO.longValue();
+        }
+        return hasProductionList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
+     * 获取剩余排产中高优先级的SKU个数
+     *
+     * @return
+     */
+    public Integer getHeightPriorityCount() {
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> hasHeightProductionList = hasProductionList.stream().filter(heightProductionPlan -> heightProductionPlan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasHeightProductionList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Set<String> materialSet = hasHeightProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(materialSet)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return materialSet.size();
+    }
+
+    /**
+     * 含有特殊材料的SKU个数
+     *
+     * @return
+     */
+    public Integer getSpecialMaterialsCount() {
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> hasSpecialMaterialList = hasProductionList.stream().filter(specialMaterialPlan -> YesOrNoEnum.YES.getCode().equals(specialMaterialPlan.getIsSpecialMaterials())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasSpecialMaterialList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Set<String> materialSet = hasSpecialMaterialList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(materialSet)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return materialSet.size();
+    }
+
+    /**
+     * 两个结构分组是否含有同规格
+     * true 含有同规格
+     * false 不含有同规格
+     *
+     * @param beforeProductionPlanList 前排产结构
+     * @return
+     */
+    public boolean hasSameSpecifications(List<MonthPlanProductionRequirePlanVo> beforeProductionPlanList) {
+        if (CollectionUtils.isEmpty(beforeProductionPlanList)) {
+            return false;
+        }
+        Set<String> specificationSet = beforeProductionPlanList.stream().map(MonthPlanProductionRequirePlanVo::getSpecifications).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(specificationSet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> currentProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(currentProductionList)) {
+            return false;
+        }
+        Set<String> currentSpecificationSet = currentProductionList.stream().map(MonthPlanProductionRequirePlanVo::getSpecifications).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(currentSpecificationSet)) {
+            return false;
+        }
+        for (String currentSpecification : currentSpecificationSet) {
+            if (specificationSet.contains(currentSpecification)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 两个结构分组断面宽是否在±10范围内
+     * true 在±10范围内
+     * false 不在±10范围内
+     *
+     * @param beforeProductionPlanList 前排产结构
+     * @param diffValue                断面宽差值范围
+     * @return
+     */
+    public boolean hasSectionWidthCondition(List<MonthPlanProductionRequirePlanVo> beforeProductionPlanList, Integer diffValue) {
+        if (CollectionUtils.isEmpty(beforeProductionPlanList)) {
+            return false;
+        }
+        Set<String> specificationSet = beforeProductionPlanList.stream().map(MonthPlanProductionRequirePlanVo::getSpecifications).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(specificationSet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> currentProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(currentProductionList)) {
+            return false;
+        }
+        Set<String> currentSpecificationSet = currentProductionList.stream().map(MonthPlanProductionRequirePlanVo::getSpecifications).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(currentSpecificationSet)) {
+            return false;
+        }
+        String specification = new ArrayList<>(specificationSet).get(BigDecimal.ZERO.intValue());
+        Integer sectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(specification).get(BigDecimal.ZERO.intValue());
+        String currentSpecification = new ArrayList<>(currentSpecificationSet).get(BigDecimal.ZERO.intValue());
+        Integer currentSectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(currentSpecification).get(BigDecimal.ZERO.intValue());
+        int diff = Math.abs(sectionWidth - currentSectionWidth);
+        return diff <= diffValue;
+    }
+
+    /**
+     * 两个结构分组是否含有同英寸
+     * true 含有同英寸
+     * false 不含有同英寸
+     *
+     * @param beforeProductionPlanList 前排产结构
+     * @return
+     */
+    public boolean hasSameProSize(List<MonthPlanProductionRequirePlanVo> beforeProductionPlanList) {
+        if (CollectionUtils.isEmpty(beforeProductionPlanList)) {
+            return false;
+        }
+        Set<String> proSizeSet = beforeProductionPlanList.stream().map(MonthPlanProductionRequirePlanVo::getProSize).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(proSizeSet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> currentProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(currentProductionList)) {
+            return false;
+        }
+        Set<String> currentProSizeSet = currentProductionList.stream().map(MonthPlanProductionRequirePlanVo::getProSize).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(currentProSizeSet)) {
+            return false;
+        }
+        for (String currentSpecification : currentProSizeSet) {
+            if (proSizeSet.contains(currentSpecification)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 按结构分组硫化配比
+     *
+     * @param structureLhRatioList 成型硫化配比集合
+     * @return
+     */
+    private static Map<String, List<MonthPlanStructureLhRatioVo>> getStructureGroupInfo(List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        if (CollectionUtils.isEmpty(structureLhRatioList)) {
+            return Collections.emptyMap();
+        }
+        return structureLhRatioList.stream().collect(Collectors.groupingBy(MonthPlanStructureLhRatioVo::getStructureName));
+    }
+
+    /**
+     * 按结构提取最小硫化配比信息
+     *
+     * @param structureGroupMap 结构配比分组
+     * @return
+     */
+    private static Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioMap(Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap) {
+        if (CollectionUtils.isEmpty(structureGroupMap)) {
+            return Collections.emptyMap();
+        }
+        Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = new HashMap<>();
+        structureGroupMap.forEach((structureName, ratioList) -> {
+            if (CollectionUtils.isEmpty(ratioList)) {
+                return;
+            }
+            ratioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
+            minLhRatioMap.put(structureName, ratioList.get(BigDecimal.ZERO.intValue()));
+        });
+        return minLhRatioMap;
     }
 }

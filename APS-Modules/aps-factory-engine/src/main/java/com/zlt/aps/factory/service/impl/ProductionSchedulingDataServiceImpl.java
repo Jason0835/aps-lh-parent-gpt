@@ -186,16 +186,16 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioInfo(Context context, List<String> structureNameList) {
+    public List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList) {
         String factoryCode = context.getFactoryCode();
         if (StringUtils.isBlank(factoryCode) || CollectionUtils.isEmpty(structureNameList)) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
         List<MonthPlanStructureLhRatioVo> configurationList = factoryMonthPlanProductLhCapacityMapper.getStructureLhRatioInfo(factoryCode, structureNameList);
         if (CollectionUtils.isEmpty(configurationList)) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
-        return configurationList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getStructureName, Function.identity()));
+        return configurationList;
     }
 
     @Override
@@ -221,9 +221,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
         Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = getCxMachineStopInfo(context);
-        if (CollectionUtils.isEmpty(cxStopInfo)) {
-            return cxMachineInfoMap;
-        }
         cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> {
             CxDevicePlanShutInfoHelper stopInfoHelper = cxStopInfo.get(cxMachineCode);
             if (null == stopInfoHelper) {
@@ -239,7 +236,12 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             if (!CollectionUtils.isEmpty(wholeStop)) {
                 stopDaySet.addAll(wholeStop);
             }
+            Integer monthDays = context.getMonthDays();
+            Integer maxProductionDays = monthDays - stopDaySet.size();
+            //排产日信息
             cxMachineInfo.setStopDayInfo(stopDaySet);
+            cxMachineInfo.setMaxProductionDays(maxProductionDays);
+            cxMachineInfo.setRemainingDays(maxProductionDays);
         });
         return cxMachineInfoMap;
     }

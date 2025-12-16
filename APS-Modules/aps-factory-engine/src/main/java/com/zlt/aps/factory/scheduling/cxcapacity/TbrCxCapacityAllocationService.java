@@ -6,6 +6,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -63,30 +64,70 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
         //获取周期内的生产日历信息
         setMonthProductionDays(context);
-        //获取结构的最小日硫化量
-        Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioConfiguration(productionContext, requirePlanList);
+        //获取结构的硫化配比
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         //todo 记录日志-粗算成型机台数
         //按结构分组，汇总结构净需求量，粗算需要的机台数
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(context, requirePlanList, minLhRatioMap);
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(context, requirePlanList, structureLhRatioList);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         //获取上个月度的月度定稿排产计划，得到在产结构及对应的成型机及在产SKU
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context);
         //获取成型机台信息--日产信息
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
-
         productionContext.setCxMachineBaseInfo(cxMachineBaseInfo);
         //todo 记录日志 续作结构排产分配
         //先对续作结构进行成型机台分配
+        productionContext.setReverseFindSet(new HashSet<>());
         CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
 
         //对收尾成型机台，反向匹配待排结构
-
-        //对还需排产结构，获取优先级最高的结构
-
-        //对挑选出的机构，匹配还有排产量的成型机台
-
+        CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
+        //对还需排产结构，获取优先级最高的结构--结构新增
+        addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
+        //todo 记录日志
         //得到结构成型排程结果
+    }
+
+    /**
+     * 对还需排产的结构，获取优先级最高的结构进行机台匹配排产
+     *
+     * @param context                      排产上下文
+     * @param estimateGroupCxAllocationMap 分组计划需求量
+     */
+    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+        ProductionPlanGroupInfo addNewGroupPlan = CxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap);
+        if (null == addNewGroupPlan) {
+            //todo 记录日志
+            return;
+        }
+        //对挑选出的机构，匹配还有排产量的成型机台
+        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachine(context, addNewGroupPlan);
+        if (null == selectedCxMachine) {
+            //todo 记录日志
+            //todo 结构标记不可排产
+            return;
+        }
+        //分配产能
+        Integer lhRatio = selectedCxMachine.getRatio();
+        Integer remainingDays = selectedCxMachine.getRemainingDays();
+        //判断成型鼓是否符合条件
+        Integer needAllocationDays = addNewGroupPlan.calculateNeedDays(lhRatio);
+        Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
+        //更新剩余天数
+        Integer leftOver = remainingDays - realAllocationDays;
+        selectedCxMachine.setRemainingDays(leftOver);
+        List<CxMachineAllocationPlanHelper> allocationList = selectedCxMachine.getAllocationList();
+        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        Integer startDay = lastHelper.getEndDay() + BigDecimal.ONE.intValue();
+        CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatio, addNewGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
+        selectedCxMachine.addAllocationPlanInfo(addHelper);
+        //反向机台匹配结构计划
+        if (leftOver > BigDecimal.ZERO.intValue()) {
+            CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
+        }
+        //下一新增结构
+        addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
     }
 
     /**
@@ -146,19 +187,19 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
-     * 获取计划对应结构的最小日硫化量信息
+     * 获取计划对应结构的硫化配比信息
      *
      * @param context         排产上下文
      * @param requirePlanList 需求计划信息
      * @return
      */
-    private Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioConfiguration(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    private List<MonthPlanStructureLhRatioVo> getLhRatioConfiguration(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
         Set<String> structureNameMap = requirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getStructureName).collect(Collectors.toSet());
         List<String> structureNameList = new ArrayList<>(structureNameMap);
-        return getDataService().getMinLhRatioInfo(context, structureNameList);
+        return getDataService().getLhRatioInfo(context, structureNameList);
     }
 
     /**
@@ -189,32 +230,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList);
-    }
-
-    /**
-     * 设置成型机台基础信息
-     * 包含 成型可排产日信息
-     * 固定结构、固定SKU
-     * 不可排产结构、不可排产SKU
-     *
-     * @param productionContext
-     */
-    private void setCxMachineInitInfo(TbrProductionContext productionContext) {
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
-        if (CollectionUtils.isEmpty(cxMachineBaseInfo)) {
-            productionContext.setCxMachineBaseInfo(cxMachineBaseInfo);
-            return;
-        }
-        cxMachineBaseInfo.forEach((cxMachineCode, singleBaseInfo) -> {
-            Set<Integer> stopDayInfo = singleBaseInfo.getStopDayInfo();
-            if (null == stopDayInfo) {
-                stopDayInfo = new HashSet<>();
-            }
-            Integer monthDays = productionContext.getMonthDays();
-            Integer maxProductionDays = monthDays - stopDayInfo.size();
-            singleBaseInfo.setMaxProductionDays(maxProductionDays);
-            singleBaseInfo.setRemainingDays(maxProductionDays);
-        });
     }
 
     /**

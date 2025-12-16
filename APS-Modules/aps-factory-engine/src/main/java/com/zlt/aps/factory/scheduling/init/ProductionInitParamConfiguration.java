@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.scheduling;
+package com.zlt.aps.factory.scheduling.init;
 
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import lombok.Data;

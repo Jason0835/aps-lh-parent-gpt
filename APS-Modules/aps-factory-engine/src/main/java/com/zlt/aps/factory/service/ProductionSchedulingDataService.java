@@ -95,7 +95,7 @@ public interface ProductionSchedulingDataService {
      * @param structureNameList 结构集合
      * @return
      */
-    Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioInfo(Context context, List<String> structureNameList);
+    List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList);
 
     /**
      * 获取续作SKU信息，包含续作机台及使用的模具数
@@ -113,6 +113,7 @@ public interface ProductionSchedulingDataService {
      * 包含成型维修停机信息(合并全局停产日)
      * 固定机构先后顺序，固定SKU
      * 不可作业结构，不可作业SKU
+     * 最大排产天数及剩余可排产天数
      *
      * @param context 排产上下文
      * @return
