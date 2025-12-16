@@ -17,6 +17,7 @@ import com.tlt.aps.enums.CommonTypeEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -275,6 +276,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
                 importDocEntity.setProductTypeName(enumByValue.getName());
             }
         }
+        importDocEntity.setCantProduce(ApsConstant.APS_YES_NO_0);
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
