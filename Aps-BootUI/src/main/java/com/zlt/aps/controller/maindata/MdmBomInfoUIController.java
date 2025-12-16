@@ -163,7 +163,7 @@ public class MdmBomInfoUIController extends BaseUIController<MdmBomInfo> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmBomInfo.modelName");
     }
 
     /**
