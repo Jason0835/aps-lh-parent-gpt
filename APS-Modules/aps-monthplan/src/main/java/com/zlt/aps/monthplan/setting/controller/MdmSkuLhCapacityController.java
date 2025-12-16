@@ -57,7 +57,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     /**
      * 查询SKU日硫化产能列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
      * 保存
      */
     @Log(title = "ui.data.column.mdmSkuLhCapacity.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -86,7 +84,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
      * 删除
      */
     @Log(title = "ui.data.column.mdmSkuLhCapacity.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -98,7 +95,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     /**
      * 获取SKU日硫化产能详细信息
      */
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +109,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:import")
     @Log(title = "ui.data.column.mdmSkuLhCapacity.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +120,6 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuLhCapacity:export")
     @Log(title = "SKU日硫化产能", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

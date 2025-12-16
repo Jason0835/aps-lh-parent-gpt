@@ -1,9 +1,9 @@
 package com.zlt.aps.factory.service;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
@@ -29,31 +29,31 @@ public interface ProductionSchedulingDataService {
     Integer getProductionCycleConfiguration(Context context);
 
     /**
-     * 获取工厂业务是否在初始化进行模具产能预占计算
-     * Y 开启
+     * 批量获取业务参数设定
      *
-     * @param context 排产上下文
+     * @param context       排产上下文
+     * @param paramCodeList 参数编码集合
      * @return
      */
-    String getOpenPreemptionMouldCapacity(Context context);
+    Map<String, Object> getFactoryParamByCondition(Context context, List<String> paramCodeList);
 
     /**
-     * 获取工厂业务使用日硫化量的标准值
-     * M MES硫化量 S 标准硫化量 A 根据硫化时间计算
-     * 其它 S 标准硫化量
+     * 获取工厂排程版本
      *
      * @param context 排产上下文
      * @return
      */
-    DayVulcanizationModeEnum getDayVulcanizationQtyConfiguration(Context context);
+    FactoryProductionVersion getFactoryMonthPlanVersion(Context context);
 
     /**
-     * 获取分厂排程版本
+     * 根据工厂编码、年份、月份获取对应的定稿版本信息
      *
-     * @param context 排产上下文
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
      * @return
      */
-    FactoryProductionVersion getFactoryMonthPlanVersion(ProductionContext context);
+    FactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month);
 
     /**
      * 更新分厂排程版本
@@ -81,12 +81,44 @@ public interface ProductionSchedulingDataService {
     int addFactoryProductionVersion(FactoryProductionVersion updateVersion);
 
     /**
-     * 根据分厂、年份、月份获取分厂对应的停车日历日期范围
+     * 根据工厂、排产信息获取工厂对应的月计划开停产工作日历
      *
      * @param context
      * @return
      */
-    List<ProductionCalendarVO> getProductCalendar(ProductionContext context);
+    List<ProductionDayInfoVo> getProductCalendar(Context context);
+
+    /**
+     * 获取结构最小硫化机台配比信息
+     *
+     * @param context           排产上下文
+     * @param structureNameList 结构集合
+     * @return
+     */
+    List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList);
+
+    /**
+     * 获取续作SKU信息，包含续作机台及使用的模具数
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+
+    /**
+     * 获取工厂的成型基础配置信息
+     * 包含成型维修停机信息(合并全局停产日)
+     * 固定机构先后顺序，固定SKU
+     * 不可作业结构，不可作业SKU
+     * 最大排产天数及剩余可排产天数
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    Map<String, CxMachineBaseInfoVo> getCxMachineBaseInfo(Context context);
 
     /**
      * 获取投产施工基础信息
@@ -110,6 +142,7 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<ProductBaseInfoVo> getProductionMaterialInfo(Context context);
+
     /**
      * 获取需求计划对应的施工配置关系信息
      *
@@ -119,21 +152,13 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanProductConstructionInfoVo> getProductionConstructionInfo(Context context);
 
     /**
-     * 根据查询条件，获取分厂的排程计划数据
+     * 根据查询条件，获取工厂的排产计划信息
+     * 从初始化中获取
      *
-     * @param productionContext
+     * @param context
      * @return
      */
-    List<MonthPlanManufacturingRequirementVo> getFactoryMonthPlanManufacturing(ProductionContext productionContext);
-
-    /**
-     * 获取分厂的品名排产参数设置
-     *
-     * @param factoryCode
-     * @param productTypeCode
-     * @return
-     */
-    Map<String, FactoryParam> getFactoryParamConfiguration(String factoryCode, String productTypeCode);
+    List<MonthPlanProductionRequirePlanVo> getFactoryMonthPlanManufacturing(Context context);
 
     /**
      * 获取分厂品名物料的折损率配置

@@ -7,7 +7,7 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.FormingMethodTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.factory.domain.vo.ProductionCalendarVO;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.domain.vo.DaySizeCapacityVo;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
@@ -669,7 +669,7 @@ public class FactoryMonthPlanAdjustPlanBusinessServiceImpl implements IFactoryMo
             if (CollectionUtils.isEmpty(calendarList)) {
                 return Collections.emptySet();
             }
-            Set<Integer> stopList = DateUtils.calculateStopDays(BeanCopyUtils.copyBeanList(calendarList, ProductionCalendarVO.class));
+            Set<Integer> stopList = DateUtils.calculateStopDays(BeanCopyUtils.copyBeanList(calendarList, ProductionDayInfoVo.class));
             return stopList;
         }
         //非自然月
@@ -677,7 +677,7 @@ public class FactoryMonthPlanAdjustPlanBusinessServiceImpl implements IFactoryMo
         if (CollectionUtils.isEmpty(calendarList)) {
             return Collections.emptySet();
         }
-        Set<Integer> stopList = DateUtils.calculateStopDays(BeanCopyUtils.copyBeanList(calendarList, ProductionCalendarVO.class), finalVersion);
+        Set<Integer> stopList = DateUtils.calculateStopDays(BeanCopyUtils.copyBeanList(calendarList, ProductionDayInfoVo.class), finalVersion);
         return stopList;
     }
 

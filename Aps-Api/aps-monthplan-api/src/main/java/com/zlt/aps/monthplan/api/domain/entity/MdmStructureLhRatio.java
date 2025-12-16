@@ -30,16 +30,16 @@ public class MdmStructureLhRatio extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmStructureLhRatio.factoryCode")
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /** 成型机类型编码 */
-    @Excel(name = "ui.data.column.mdmStructureLhRatio.cxMachineTypeCode")
-    @ApiModelProperty(value = "成型机类型编码", name = "cxMachineTypeCode")
-    @TableField(value = "CX_MACHINE_TYPE_CODE")
-    private String cxMachineTypeCode;
+    /** 成型机类型 */
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.cxMachineBrandCode", dictType = "biz_machine_brand")
+    @ApiModelProperty(value = "成型机类型", name = "cxMachineBrandCode")
+    @TableField(value = "CX_MACHINE_BRAND_CODE")
+    private String cxMachineBrandCode;
 
     /** 结构 */
     @Excel(name = "ui.data.column.mdmStructureLhRatio.structureName")

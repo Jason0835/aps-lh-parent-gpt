@@ -1,11 +1,10 @@
 package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductLhCapacityVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -27,7 +26,16 @@ public interface FactoryMonthPlanProductLhCapacityMapper {
      * @return
      */
     List<MonthPlanProductLhCapacityVo> getProductionLhCapacityInfo(@Param("factoryCode") String factoryCode,
-                                                              @Param("year") Integer year,
-                                                              @Param("month") Integer month,
-                                                              @Param("monthPlanVersion") String monthPlanVersion);
+                                                                   @Param("year") Integer year,
+                                                                   @Param("month") Integer month,
+                                                                   @Param("monthPlanVersion") String monthPlanVersion);
+
+    /**
+     * 获取工厂对应的结构硫化配比信息
+     *
+     * @param factoryCode       工厂编码
+     * @param structureNameList 结构信息
+     * @return
+     */
+    List<MonthPlanStructureLhRatioVo> getStructureLhRatioInfo(@Param("factoryCode") String factoryCode, @Param("structureNameList") List<String> structureNameList);
 }

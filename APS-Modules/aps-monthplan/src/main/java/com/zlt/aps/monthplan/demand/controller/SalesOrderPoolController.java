@@ -78,7 +78,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
      * 保存
      */
     @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:SalesOrderPool:save")
+    @RequiresPermissions( "monthplan:SalesOrderPool:edit")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -90,7 +90,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
      *  批量修改同PO号的销售优先级
      */
     @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:SalesOrderPool:save")
+    @RequiresPermissions( "monthplan:SalesOrderPool:edit")
     @ApiOperation("批量修改同PO号的销售优先级")
     @PostMapping("/editBySalCodePo")
     public AjaxResult editBySalCodePo(@RequestBody SalesOrderPool billVO){

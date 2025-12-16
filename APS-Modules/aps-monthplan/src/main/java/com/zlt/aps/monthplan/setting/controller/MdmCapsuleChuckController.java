@@ -57,7 +57,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
     /**
      * 查询胶囊卡盘台账列表
      */
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
      * 保存
      */
     @Log(title = "ui.data.column.mdmCapsuleChuck.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -86,7 +84,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
      * 删除
      */
     @Log(title = "ui.data.column.mdmCapsuleChuck.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -98,7 +95,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
     /**
      * 获取胶囊卡盘台账详细信息
      */
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +109,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:import")
     @Log(title = "ui.data.column.mdmCapsuleChuck.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +120,6 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmCapsuleChuck:export")
     @Log(title = "胶囊卡盘台账", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

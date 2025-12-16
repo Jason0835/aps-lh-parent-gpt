@@ -163,7 +163,7 @@ public class MdmSkuLhCapacityUIController extends BaseUIController<MdmSkuLhCapac
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmSkuLhCapacity.modelName");
     }
 
     /**

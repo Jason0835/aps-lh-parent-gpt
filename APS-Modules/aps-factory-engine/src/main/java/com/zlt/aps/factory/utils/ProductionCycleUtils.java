@@ -1,8 +1,13 @@
 package com.zlt.aps.factory.utils;
 
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.domain.vo.CxDevicePlanShutInfoVo;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -12,38 +17,43 @@ import java.util.*;
  * 纯计算类
  *
  * @author ZLT
- * @date 20250927
+ * @date 20251215
  */
 @Slf4j
 public class ProductionCycleUtils {
 
     /**
-     * 解析排产周期内，特殊天限定
-     * 天,产能数;天,产能数
+     * 根据排产版本信息及排产日历信息，得到最后排产天
      *
-     * @param specialDayLimitValue
+     * @param productionVersion 排产版本信息
+     * @param productionDayInfo 对应的月份排产日历
      * @return
      */
-    public static Map<Integer, Long> analysisSpecialDayLimit(String specialDayLimitValue) {
-        if (StringUtils.isBlank(specialDayLimitValue)) {
-            return Collections.emptyMap();
+    public static Integer getLastProductionDay(FactoryProductionVersion productionVersion, List<ProductionDayInfoVo> productionDayInfo) {
+        Date productionStartDate = productionVersion.getProductionStartDate();
+        //理论结束天数 = 月份周期最大天数
+        Integer maxDay = DateUtils.getIntervalDays(productionStartDate, productionVersion.getProductionEndDate());
+        if (CollectionUtils.isEmpty(productionDayInfo)) {
+            return maxDay;
         }
-        Map<Integer, Long> limitMap = new HashMap<>();
-        String[] specialDayLimitList = specialDayLimitValue.split(StringConstant.SPLIT_SEMICOLON);
-        for (int index = 0; index < specialDayLimitList.length; index++) {
-            String limitConfiguration = specialDayLimitList[index];
-            if (StringUtils.isBlank(limitConfiguration)) {
-                continue;
+        //提取可排产的天信息
+        Set<Integer> productionDaySet = new HashSet<>();
+        productionDayInfo.forEach(singleProductionDayInfo -> {
+            Date productionDate = singleProductionDayInfo.getProductionDate();
+            String dayFlag = singleProductionDayInfo.getDayFlag();
+            Integer productionDay = DateUtils.getIntervalDays(productionStartDate, productionDate);
+            Integer ratio = singleProductionDayInfo.getRate();
+            if (YesOrNoEnum.YES.getCode().equals(dayFlag) && ratio > BigDecimal.ONE.intValue()) {
+                productionDaySet.add(productionDay);
             }
-            String[] dayLimitConfiguration = limitConfiguration.split(StringConstant.COMMA);
-            if (dayLimitConfiguration.length != 2) {
-                continue;
-            }
-            Integer day = Integer.valueOf(dayLimitConfiguration[BigDecimal.ZERO.intValue()]);
-            Long capacity = Long.valueOf(dayLimitConfiguration[BigDecimal.ONE.intValue()]);
-            limitMap.put(day, capacity);
+        });
+        List<Integer> productionDayList = new ArrayList<>(productionDaySet);
+        if (CollectionUtils.isEmpty(productionDayList)) {
+            return BigDecimal.ZERO.intValue();
         }
-        return limitMap;
+        //升序排序，取最后一天
+        productionDayList.sort(Comparator.comparing(Integer::intValue));
+        return productionDayList.get(productionDayList.size() - 1);
     }
 
     /**

@@ -162,7 +162,7 @@ public class MdmStructureLhRatioUIController extends BaseUIController<MdmStructu
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmStructureLhRatio.modelName");
     }
 
     /**

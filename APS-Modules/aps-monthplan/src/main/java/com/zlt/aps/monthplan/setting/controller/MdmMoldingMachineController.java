@@ -56,7 +56,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     /**
      * 查询基础数据-成型机档案列表
      */
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -73,7 +72,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
      * 保存
      */
     @Log(title = "ui.data.column.mdmMoldingMachine.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -85,7 +83,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
      * 删除
      */
     @Log(title = "ui.data.column.mdmMoldingMachine.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -97,7 +94,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     /**
      * 获取基础数据-成型机档案详细信息
      */
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -112,7 +108,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:import")
     @Log(title = "ui.data.column.mdmMoldingMachine.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -124,7 +119,6 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmMoldingMachine:export")
     @Log(title = "基础数据-成型机档案", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
