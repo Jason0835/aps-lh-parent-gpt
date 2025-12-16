@@ -58,7 +58,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
     /**
      * 查询模具分配比例(同结构/不同结构)列表
      */
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -75,7 +74,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
      * 保存
      */
     @Log(title = "ui.data.column.mdmMouldAllocation.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -87,7 +85,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
      * 删除
      */
     @Log(title = "ui.data.column.mdmMouldAllocation.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -99,7 +96,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
     /**
      * 获取模具分配比例(同结构/不同结构)详细信息
      */
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -114,7 +110,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:import")
     @Log(title = "ui.data.column.mdmMouldAllocation.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -126,7 +121,6 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmMouldAllocation:export")
     @Log(title = "模具分配比例(同结构/不同结构)", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

@@ -57,7 +57,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
     /**
      * 查询投产胎胚施工信息列表
      */
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
      * 保存
      */
     @Log(title = "ui.data.column.mdmConstructionInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -86,7 +84,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
      * 删除
      */
     @Log(title = "ui.data.column.mdmConstructionInfo.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -98,7 +95,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
     /**
      * 获取投产胎胚施工信息详细信息
      */
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +109,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:import")
     @Log(title = "ui.data.column.mdmConstructionInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +120,6 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmConstructionInfo:export")
     @Log(title = "投产胎胚施工信息", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

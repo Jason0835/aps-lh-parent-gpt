@@ -57,7 +57,6 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
     /**
      * 查询SKU与施工（示方书）关系列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
      * 保存
      */
     @Log(title = "ui.data.column.mdmSkuConstructionRef.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -98,7 +96,6 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
     /**
      * 获取SKU与施工（示方书）关系详细信息
      */
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +110,6 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:import")
     @Log(title = "ui.data.column.mdmSkuConstructionRef.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +121,6 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:export")
     @Log(title = "SKU与施工（示方书）关系", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
