@@ -1,19 +1,18 @@
 package com.zlt.aps.factory.utils;
 
-import com.zlt.aps.factory.domain.vo.ProductionCalendarVO;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalVersionInfoVo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 日期工具类
@@ -91,6 +90,24 @@ public class DateUtils {
     }
 
     /**
+     * 获取两个日期之间相差的天数
+     * 如2025-12-01与2025-12-31之间天数为31
+     *
+     * @param startDate 起始日期
+     * @param endDate   结束日期
+     * @return
+     */
+    public static Integer getIntervalDays(Date startDate, Date endDate) {
+        if (null == startDate || null == endDate) {
+            return BigDecimal.ZERO.intValue();
+        }
+        ZoneId zoneId = ZoneId.systemDefault();
+        LocalDate startLocal = startDate.toInstant().atZone(zoneId).toLocalDate();
+        LocalDate endLocal = endDate.toInstant().atZone(zoneId).toLocalDate();
+        return Long.valueOf(Math.abs(ChronoUnit.DAYS.between(startLocal, endLocal))).intValue() + BigDecimal.ONE.intValue();
+    }
+
+    /**
      * 得到年、月、日的日期值
      *
      * @param date
@@ -143,35 +160,6 @@ public class DateUtils {
     }
 
     /**
-     * 20250519 ZLT 非自然月方式
-     * 根据工厂月份停开工日历及月份最大天数
-     * 计算获取停车列表
-     *
-     * @param productionContext      排产上下文
-     * @param productionCalendarList 停开工日历
-     * @return
-     */
-    public static Set<Integer> calculateStopDaysByNoNaturalMonth(ProductionContext productionContext, List<ProductionCalendarVO> productionCalendarList) {
-        if (CollectionUtils.isEmpty(productionCalendarList)) {
-            return Collections.emptySet();
-        }
-        ZoneId zoneId = ZoneId.systemDefault();
-        Set<Integer> stopDays = productionCalendarList.stream().flatMap(productionCalendar -> {
-            LocalDate beginDate = productionCalendar.getBeginDate().toInstant().atZone(zoneId).toLocalDate();
-            LocalDate endDate = productionCalendar.getEndDate().toInstant().atZone(zoneId).toLocalDate();
-            Map<String, Integer> daysMap = calculateDaysByMonth(productionContext, beginDate, endDate);
-            Integer beginDay = daysMap.get(START_DAY);
-            Integer endDay = daysMap.get(END_DAY);
-            Set<Integer> holidays = new HashSet<>();
-            for (int day = beginDay; day <= endDay; day++) {
-                holidays.add(day);
-            }
-            return holidays.stream();
-        }).collect(Collectors.toSet());
-        return stopDays;
-    }
-
-    /**
      * 自然月方式
      * 根据工厂月份停开工日历及月份最大天数
      * 计算获取停车列表
@@ -179,23 +167,8 @@ public class DateUtils {
      * @param productionCalendarList 停开工日历
      * @return
      */
-    public static Set<Integer> calculateStopDays(List<ProductionCalendarVO> productionCalendarList) {
-        if (CollectionUtils.isEmpty(productionCalendarList)) {
-            return Collections.emptySet();
-        }
-        ZoneId zoneId = ZoneId.systemDefault();
-        Set<Integer> stopDays = productionCalendarList.stream().flatMap(productionCalendar -> {
-            LocalDate beginDate = productionCalendar.getBeginDate().toInstant().atZone(zoneId).toLocalDate();
-            LocalDate endDate = productionCalendar.getEndDate().toInstant().atZone(zoneId).toLocalDate();
-            Integer beginDay = beginDate.getDayOfMonth();
-            Integer endDay = endDate.getDayOfMonth();
-            Set<Integer> holidays = new HashSet<>();
-            for (int day = beginDay; day <= endDay; day++) {
-                holidays.add(day);
-            }
-            return holidays.stream();
-        }).collect(Collectors.toSet());
-        return stopDays;
+    public static Set<Integer> calculateStopDays(List<ProductionDayInfoVo> productionCalendarList) {
+        return Collections.emptySet();
     }
 
     /**
@@ -206,42 +179,8 @@ public class DateUtils {
      * @param productionCalendarList 停开工日历
      * @return
      */
-    public static Set<Integer> calculateStopDays(List<ProductionCalendarVO> productionCalendarList, FactoryMonthPlanFinalVersionInfoVo finalVersion) {
-        if (CollectionUtils.isEmpty(productionCalendarList)) {
-            return Collections.emptySet();
-        }
-        Integer productionYear = finalVersion.getYear();
-        Integer productionMonth = finalVersion.getMonth();
-        ZoneId zoneId = ZoneId.systemDefault();
-        LocalDate localStartDate = finalVersion.getProductionStartDate().toInstant().atZone(zoneId).toLocalDate();
-        LocalDate localEndDate = finalVersion.getProductionEndDate().toInstant().atZone(zoneId).toLocalDate();
-        Integer startDay = localEndDate.getDayOfMonth() + BigDecimal.ONE.intValue();
-        //前一个月的最大天数
-        Integer previousMonthDays = localStartDate.with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
-        //下个月起始天数值
-        Integer nextMonthStartDays = previousMonthDays - startDay + BigDecimal.ONE.intValue();
-        Set<Integer> stopDays = productionCalendarList.stream().flatMap(productionCalendar -> {
-            LocalDate beginDate = productionCalendar.getBeginDate().toInstant().atZone(zoneId).toLocalDate();
-            Integer beginDay = beginDate.getDayOfMonth();
-            if (DateUtils.isProductionMonth(productionYear, productionMonth, beginDate)) {
-                beginDay = nextMonthStartDays + beginDay;
-            } else {
-                beginDay = beginDay - startDay + BigDecimal.ONE.intValue();
-            }
-            LocalDate endDate = productionCalendar.getEndDate().toInstant().atZone(zoneId).toLocalDate();
-            Integer endDay = endDate.getDayOfMonth();
-            if (DateUtils.isProductionMonth(productionYear, productionMonth, endDate)) {
-                endDay = nextMonthStartDays + endDay;
-            } else {
-                endDay = endDay - startDay + BigDecimal.ONE.intValue();
-            }
-            Set<Integer> holidays = new HashSet<>();
-            for (int day = beginDay; day <= endDay; day++) {
-                holidays.add(day);
-            }
-            return holidays.stream();
-        }).collect(Collectors.toSet());
-        return stopDays;
+    public static Set<Integer> calculateStopDays(List<ProductionDayInfoVo> productionCalendarList, FactoryMonthPlanFinalVersionInfoVo finalVersion) {
+        return Collections.emptySet();
     }
 
     /**
@@ -315,4 +254,5 @@ public class DateUtils {
         Integer dateMonth = date.getMonthValue();
         return productionYear.equals(dateYear) && productionMonth.equals(dateMonth);
     }
+
 }

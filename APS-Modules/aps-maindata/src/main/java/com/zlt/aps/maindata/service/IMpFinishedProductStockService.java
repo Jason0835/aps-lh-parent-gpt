@@ -112,5 +112,5 @@ public interface IMpFinishedProductStockService  extends IBaseService<MpFinished
      * @param materialCode 自定义工具栏…
      * @return 成品库存
      */
-    MpFinishedProductStock getMpFinishedProductStockByMaterialCode(String materialCode);
+    List<MpFinishedProductStock> getMpFinishedProductStockByMaterialCode(String materialCode);
 }

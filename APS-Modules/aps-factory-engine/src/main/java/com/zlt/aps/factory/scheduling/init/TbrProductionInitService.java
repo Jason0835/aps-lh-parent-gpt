@@ -3,23 +3,24 @@ package com.zlt.aps.factory.scheduling.init;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
  * @author
  */
 @Slf4j
-@Service(value = "generalInitService")
+@Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
     public TbrProductionInitService(ProductionSchedulingDataService dataService) {
@@ -65,19 +66,18 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         log.info(startInitLog);
         //获取需求计划
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
+        //获取初始化业务参数设定
+        ProductionInitParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        //SKU-损耗处理
+        handlerLoss(requirePlanList, paramConfiguration.getOpenLevelRatio());
         //物料基础信息
         Map<String, ProductBaseInfoVo> productBaseInfoMap = getMaterialInfo(productionContext);
         //施工关系
         Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
         //模具关系
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
-        //模具预占参数
-        String openPreemptionMouldCapacity = getDataService().getOpenPreemptionMouldCapacity(productionContext);
-        if (FactoryConstant.YES_VALUE.equalsIgnoreCase(openPreemptionMouldCapacity)) {
-            //TODO 模具产能预占计算
-        }
         //SKU-日硫化产能
-        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext);
+        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
         //赋值施工信息，模具，日硫化产能
         requirePlanList.forEach(requirePlan -> {
             String materialCode = requirePlan.getMaterialCode();
@@ -97,6 +97,10 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             //不排产检测
             requirePlan.checkProductionConditionByBase();
         });
+        //模具预占参数
+        if (FactoryConstant.YES_VALUE.equalsIgnoreCase(paramConfiguration.getOpenPreemptionMouldCapacity())) {
+            //TODO 模具产能预占计算
+        }
         String checkEndLog = TbrProductionLogUtils.addInitEndLog(productionContext);
         log.info(checkEndLog);
         //保存初始化结果
@@ -124,6 +128,34 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             productionPlanList.add(productionPlan);
         });
         return productionPlanList;
+    }
+
+    /**
+     * 获取初始化业务的参数设定
+     *
+     * @param productionContext
+     * @return
+     */
+    private ProductionInitParamConfiguration createParamConfiguration(TbrProductionContext productionContext) {
+        ProductionInitParamConfiguration configuration = new ProductionInitParamConfiguration();
+        List<String> paramCodeList = new ArrayList<>(16);
+        paramCodeList.add(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode());
+        paramCodeList.add(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
+        if (CollectionUtils.isEmpty(paramConfigurationMap)) {
+            return configuration;
+        }
+        configuration.setOpenPreemptionMouldCapacity((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode()));
+        configuration.setOpenLevelRatio((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode()));
+        //日硫化量获取
+        String dayVulcanizationParam = (String) paramConfigurationMap.get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        if (StringUtils.isBlank(dayVulcanizationParam)) {
+            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.STANDARD_CAPACITY);
+        } else {
+            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.getInstance(dayVulcanizationParam));
+        }
+        return configuration;
     }
 
     /**
@@ -185,18 +217,97 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * 获取SKU的日硫化产能信息
      * key = materialDesc: value = MonthPlanProductLhCapacityVo
      *
-     * @param productionContext
+     * @param productionContext 排产上下文
+     * @param mode              日硫化量模式
      * @return
      */
-    private Map<String, MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(TbrProductionContext productionContext) {
+    private Map<String, MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(TbrProductionContext productionContext, DayVulcanizationModeEnum mode) {
         List<MonthPlanProductLhCapacityVo> lhCapacityList = getDataService().getProductLhCapacityInfo(productionContext);
         if (CollectionUtils.isEmpty(lhCapacityList)) {
             return Collections.emptyMap();
         }
         //计算日硫化产能
-        DayVulcanizationModeEnum mode = getDataService().getDayVulcanizationQtyConfiguration(productionContext);
         lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
         return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity()));
+    }
+
+    /**
+     * 损耗处理，看是否开启采用损耗率
+     *
+     * @param requirePlanList 需求计划
+     */
+    private void handlerLoss(List<MonthPlanProductionRequirePlanVo> requirePlanList, String openLevelRatio) {
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        //采用损耗率方式计算损耗
+        if (FactoryConstant.YES_VALUE.equalsIgnoreCase(openLevelRatio)) {
+            //TODO 损耗率方式计算
+            return;
+        }
+        //按SKU汇总需求，双数 +2 单数 +3。放置在第一条记录
+        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        productGroupMap.forEach((materialDesc, planList) -> {
+            //统计需求量
+            if (CollectionUtils.isEmpty(planList)) {
+                return;
+            }
+            Long addLossQty = getAddLossQtyUnRatio(planList);
+            //排序，高优先级值高的在前，排产净需求值高的在前
+            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.reverseOrder()).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.reverseOrder()));
+            addLossQtyUnRatio(planList.get(0), addLossQty);
+        });
+    }
+
+    /**
+     * 计算非损耗率需要增加的损耗量
+     * 偶数+2，奇数+3
+     *
+     * @param requireList
+     * @return
+     */
+    private Long getAddLossQtyUnRatio(List<MonthPlanProductionRequirePlanVo> requireList) {
+        //汇总排产净需求量
+        Long sumQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        if (sumQty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.longValue();
+        }
+        //偶数+2
+        if (sumQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
+            return ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+        }
+        //奇数+3
+        return ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+    }
+
+    /**
+     * 对计划增加损耗值
+     *
+     * @param plan       计划
+     * @param addLossQty 增加的损耗量
+     */
+    private void addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Long addLossQty) {
+        if (null == addLossQty || addLossQty <= BigDecimal.ZERO.longValue()) {
+            plan.setHeightLossQty(plan.getHeightQty());
+            plan.setFactProdReqQty(plan.getNetQty());
+            return;
+        }
+        Long heightQty = plan.getHeightQty();
+        Long netQty = plan.getNetQty();
+        Long addHeightLossQty = BigDecimal.ZERO.longValue();
+        //有高优先级需求，则加在高优先级上
+        if (heightQty > BigDecimal.ZERO.longValue()) {
+            if (heightQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
+                addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+            } else {
+                addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+            }
+        }
+        //高优先级损耗值
+        plan.setHeightLossQty(heightQty + addHeightLossQty);
+        //除高优先级的损耗值
+        Long otherLossQty = addLossQty - addHeightLossQty;
+        plan.setFactProdReqQty(netQty + otherLossQty);
     }
 
     /**

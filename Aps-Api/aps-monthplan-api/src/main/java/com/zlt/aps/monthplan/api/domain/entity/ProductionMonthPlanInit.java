@@ -242,6 +242,30 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String speed;
 
     /**
+     * 年周号
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.yearWeek")
+    @ApiModelProperty(value = "年周号", name = "yearWeek")
+    @TableField(value = "YEAR_WEEK")
+    private String yearWeek;
+
+    /**
+     * 动平衡
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.isDynamicBalance")
+    @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
+
+    /**
+     * 均匀性
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.isUniformity")
+    @ApiModelProperty(value = "均匀性", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
+
+    /**
      * 供应链优先级 1 优先 0 不优先
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.isPrioritize", dictType = "biz_yes_no")

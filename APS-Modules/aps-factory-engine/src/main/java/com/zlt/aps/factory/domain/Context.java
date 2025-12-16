@@ -5,10 +5,13 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 工厂月度生产计划排产
@@ -84,6 +87,15 @@ public class Context {
     private Date productionEndDate;
 
     /**
+     * 停产日信息
+     */
+    private Set<Integer> stopDays;
+    /**
+     * 排产产能比例 1~100的值，需除以100
+     */
+    private Map<Integer, Integer> capacityRatioMap;
+
+    /**
      * 是否采用自然月进行排产
      *
      * @return
@@ -137,5 +149,28 @@ public class Context {
         LocalDate currentProductionMonth = LocalDate.of(getYear(), getMonth(), ProductionConstant.MONTH_START_DAY);
         LocalDate previousMonth = currentProductionMonth.minusMonths(BigDecimal.ONE.intValue());
         return previousMonth;
+    }
+
+    /**
+     * 获取排产周期的天数
+     *
+     * @return
+     */
+    public Integer getMonthDays() {
+        return com.zlt.aps.factory.utils.DateUtils.getIntervalDays(productionStartDate, productionEndDate);
+    }
+
+    /**
+     * 获取最大可排产的天数信息
+     * 需要剔除停产日
+     *
+     * @return
+     */
+    public Integer getMaxProductionDays() {
+        Integer monthDays = com.zlt.aps.factory.utils.DateUtils.getIntervalDays(productionStartDate, productionEndDate);
+        if (CollectionUtils.isEmpty(stopDays)) {
+            return monthDays;
+        }
+        return monthDays - stopDays.size();
     }
 }

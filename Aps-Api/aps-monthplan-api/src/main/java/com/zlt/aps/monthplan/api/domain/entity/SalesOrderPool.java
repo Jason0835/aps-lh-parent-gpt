@@ -162,4 +162,11 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "MONTH")
     private Integer month;
 
+    /**
+     * 以分厂+物料为维度，转换销售订单
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, oriMaterialCode);
+    }
 }

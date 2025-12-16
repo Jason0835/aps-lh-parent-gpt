@@ -46,6 +46,14 @@ public class ProductionConstant {
      */
     public final static Integer SINGLE_MOULD_QTY = 1;
     /**
+     * 分配后，补整台的值
+     */
+    public final static double REPAIR_WHOLE = 0.9d;
+    /**
+     * 百分比 100
+     */
+    public final static Integer PERCENTAGE = 100;
+    /**
      * 2 双模台
      */
     public final static Integer DOUBLE_MOULD_QTY = 2;
@@ -73,4 +81,17 @@ public class ProductionConstant {
      * 达不到排产条件
      */
     public final static Long SKIP_PRODUCTION = Long.MIN_VALUE;
+    /**
+     * 偶数 2
+     */
+    public final static int EVEN_NUMBER = 2;
+    /**
+     * 偶数增加的损耗量 2
+     */
+    public final static Long ADD_LOSS_QTY_EVEN_NUMBER = 2L;
+
+    /**
+     * 偶数增加的损耗量 3
+     */
+    public final static Long ADD_LOSS_QTY_ODD_NUMBER = 3L;
 }
