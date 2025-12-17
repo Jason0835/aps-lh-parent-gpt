@@ -7,10 +7,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -120,6 +122,17 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
         }
         return AjaxResult.success(ApsConstant.APS_YES_NO_1);
     }
+
+    @Override
+    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(MpDemandPlan createCondition) {
+        LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();
+        sourceWrapper
+            .eq(MdmAreaCapaAllocation::getYear, createCondition.getYear())
+            .eq(MdmAreaCapaAllocation::getMonth, createCondition.getMonth())
+            .eq(MdmAreaCapaAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
+        return mdmAreaCapaAllocationEntityMapper.selectList(sourceWrapper);
+    }
+
 
     private List<MdmAreaCapaAllocation> selectByFactoryAndYearMonth(String factoryCode, Integer year, Integer month) {
         LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();

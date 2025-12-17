@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.I18nChangeMapper">
+
+    <select id="selectRelList" resultType="com.zlt.aps.monthplan.api.domain.entity.I18nChange">
+        select
+        TIC.id,
+        TIC.REL_ID,
+        TIC.CHANGE_KEY,
+        TIC.CHANGE_VALUE,
+        TIC.IS_CHANGE,
+        TIC.IS_DELETE,
+        TIC.REMARK,
+        TIC.CREATE_BY,
+        TIC.UPDATE_BY,
+        TIC.CREATE_TIME,
+        TIC.UPDATE_TIME,
+        TIR.MODE_NAME,
+        TIR.FILE_NAME,
+        TIR.IS_PAGE
+        from T_I18N_CHANGE TIC
+        left join T_I18N_RELATION TIR on TIC.REL_ID = TIR.ID
+        where TIC.IS_DELETE = 0
+        <if test="isPage != null">
+            and TIR.IS_PAGE = #{isPage}
+        </if>
+        <if test="isChange != null">
+            and TIC.IS_CHANGE = #{isChange}
+        </if>
+        <if test="id != null">
+            and TIC.id = #{id}
+        </if>
+        <if test="changeKey != null and changeKey != ''">
+            and TIC.CHANGE_KEY like concat(concat('%', #{changeKey}),'%')
+        </if>
+        <if test="changeValue != null and changeValue != ''">
+            and TIC.CHANGE_VALUE like concat(concat('%', #{changeValue}),'%')
+        </if>
+        <if test="modeName != null and modeName != ''">
+            and TIR.MODE_NAME like concat(concat('%', #{modeName}),'%')
+        </if>
+
+        <if test="params != null">
+            <if test="params.fileNameList != null and params.fileNameList.size() > 0">
+                and (1,TIR.FILE_NAME) in
+                <foreach collection="params.fileNameList" item="item" separator="," open="(" close=")">
+                    (1,#{item})
+                </foreach>
+            </if>
+        </if>
+
+        <if test="params != null and params.orderBy != null and params.orderBy != ''">
+            order by ${params.orderBy}
+        </if>
+
+    </select>
+
+    <update id="mergeNoChange">
+        merge into T_I18N_CHANGE a using (
+        <foreach collection="list" item="item" separator=" union all ">
+            select
+            #{item.relId,jdbcType=BIGINT} REL_ID,
+            #{item.changeKey,jdbcType=VARCHAR} CHANGE_KEY,
+            #{item.changeValue,jdbcType=VARCHAR} CHANGE_VALUE,
+            #{item.isChange,jdbcType=INTEGER} IS_CHANGE,
+            #{item.remark, jdbcType=VARCHAR} REMARK,
+            #{item.isDelete, jdbcType=INTEGER} IS_DELETE,
+            #{item.createBy, jdbcType=VARCHAR} CREATE_BY,
+            #{item.updateBy, jdbcType=VARCHAR} UPDATE_BY,
+            #{item.createTime, jdbcType=DATE} CREATE_TIME,
+            #{item.updateTime, jdbcType=DATE} UPDATE_TIME
+            from dual
+        </foreach>
+        ) b on (a.CHANGE_KEY = b.CHANGE_KEY and a.REL_ID = b.REL_ID)
+        WHEN MATCHED THEN
+        update
+        <set>
+            a.CHANGE_VALUE = b.CHANGE_VALUE,
+            a.UPDATE_TIME = b.UPDATE_TIME
+        </set>
+        WHEN NOT MATCHED THEN
+        insert (
+        a.ID,
+        a.REL_ID,
+        a.CHANGE_KEY,
+        a.CHANGE_VALUE,
+        a.IS_CHANGE,
+        a.IS_DELETE,
+        a.REMARK,
+        a.CREATE_BY,
+        a.UPDATE_BY,
+        a.CREATE_TIME,
+        a.UPDATE_TIME
+        )
+        values (
+        SEQ_I18N_CHANGE.NEXTVAL,
+        b.REL_ID,
+        b.CHANGE_KEY,
+        b.CHANGE_VALUE,
+        0,
+        0,
+        b.REMARK,
+        b.CREATE_BY,
+        b.UPDATE_BY,
+        b.CREATE_TIME,
+        b.UPDATE_TIME
+        )
+    </update>
+
+    <update id="update">
+        update T_I18N_CHANGE
+        set CHANGE_VALUE = #{changeValue},
+            IS_CHANGE    = #{isChange},
+            UPDATE_BY    = #{updateBy},
+            UPDATE_TIME  = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <select id="selectByUniqueKey" resultType="com.zlt.aps.monthplan.api.domain.entity.I18nChange">
+        SELECT * FROM T_I18N_CHANGE
+        WHERE IS_DELETE = 0
+        <if test="list != null and list.size() > 0">
+            AND (REL_ID, CHANGE_KEY) IN (
+            <foreach collection="list" item="item" separator="," open="(" close=")">
+                (#{item.relId}, #{item.changeKey})
+            </foreach>
+            )
+        </if>
+    </select>
+
+    <update id="batchUpdateByRelIdAndKey">
+        UPDATE T_I18N_CHANGE as a
+            JOIN temp_i18n_change tempTable
+        ON a.REL_ID = tempTable.REL_ID AND a.CHANGE_KEY = tempTable.CHANGE_KEY
+            SET
+                a.CHANGE_VALUE = tempTable.CHANGE_VALUE, a.UPDATE_TIME = NOW()
+        where a.IS_DELETE = 0
+    </update>
+
+    <update id="createTempTable">
+        -- 创建临时表用于批量更新
+        CREATE
+        TEMPORARY TABLE temp_i18n_change (
+            ID bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
+			REL_ID bigint NOT NULL,
+			CHANGE_KEY text,
+			CHANGE_VALUE text,
+			IS_CHANGE decimal(1,0),
+			IS_DELETE decimal(1,0),
+			REMARK text,
+			CREATE_BY varchar(20),
+			CREATE_TIME DATETIME,
+			update_by VARCHAR(20),
+			update_time DATETIME
+		);
+    </update>
+
+    <insert id="insertTempTable">
+        INSERT INTO temp_i18n_change
+        (REL_ID,
+        CHANGE_KEY,
+        CHANGE_VALUE,
+        IS_CHANGE,
+        IS_DELETE,
+        REMARK,
+        CREATE_BY,
+        UPDATE_BY,
+        CREATE_TIME,
+        UPDATE_TIME)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.relId,jdbcType=BIGINT},
+            #{item.changeKey,jdbcType=VARCHAR},
+            #{item.changeValue,jdbcType=VARCHAR},
+            #{item.isChange,jdbcType=INTEGER},
+            #{item.remark, jdbcType=VARCHAR},
+            #{item.isDelete, jdbcType=INTEGER},
+            #{item.createBy, jdbcType=VARCHAR},
+            #{item.updateBy, jdbcType=VARCHAR},
+            #{item.createTime, jdbcType=DATE},
+            #{item.updateTime, jdbcType=DATE}
+            )
+        </foreach>
+    </insert>
+
+    <delete id="dropTempTable">
+        -- 删除临时表
+        DROP
+        TEMPORARY TABLE temp_i18n_change
+    </delete>
+</mapper>

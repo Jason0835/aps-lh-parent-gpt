@@ -1,19 +1,15 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
-import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonthSurplusService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +42,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurplus> implements IMdmMonthSurplusService {
 
-    private final MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+  private final MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
   @Override
     protected String getDocTypeCode() {
@@ -113,31 +109,5 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
             }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
-    }
-
-    @Override
-    public void calculateMonthSurplus(MpDemandPlan createCondition, String requireVersionNumber, Map<String,List<MpFinishedProductStock>> finishedProductStockMap) {
-        if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
-            return;
-        }
-        List<MdmMonthSurplus> list = Lists.newArrayList();
-        finishedProductStockMap.forEach((key, value) -> {
-            MdmMonthSurplus entity = new MdmMonthSurplus();
-            entity.setBaseVale(null);
-            entity.setYear(createCondition.getYear());
-            entity.setMonth(createCondition.getMonth());
-            entity.setBrand(value.get(0).getBrand());
-            entity.setProductTypeCode(value.get(0).getProductTypeCode());
-            entity.setStructureName(value.get(0).getStructureName());
-            entity.setMaterialCode(value.get(0).getMaterialCode());
-            entity.setMaterialDesc(value.get(0).getMaterialDesc());
-            entity.setFactoryCode(value.get(0).getFactoryCode());
-            long planSurplusQty = value.stream().mapToLong(MpFinishedProductStock::getStockQty).sum();
-            entity.setPlanSurplusQty(planSurplusQty);
-            entity.setRequireVersion(requireVersionNumber);
-            entity.setIsDelete(YesOrNoEnum.NO.getValue());
-            list.add(entity);
-        });
-        this.baseDao.insertBatch(list);
     }
 }

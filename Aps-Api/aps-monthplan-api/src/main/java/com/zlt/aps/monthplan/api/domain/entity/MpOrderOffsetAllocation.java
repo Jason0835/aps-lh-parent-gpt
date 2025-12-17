@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 
+import java.util.Date;
+
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -130,25 +132,30 @@ public class MpOrderOffsetAllocation extends BaseEntity{
     @Excel(name = "ui.data.column.orderOffsetAllocation.orderQty")
     @ApiModelProperty(value = "订单数量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
-    private Integer orderQty;
+    private Long orderQty;
 
     /** 库存总数 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.stockQty")
     @ApiModelProperty(value = "库存总数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Integer stockQty;
+    private Long stockQty;
 
     /** 库存分配量 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.allocationQty")
     @ApiModelProperty(value = "库存分配量", name = "allocationQty")
     @TableField(value = "ALLOCATION_QTY")
-    private Integer allocationQty;
+    private Long allocationQty;
 
     /** 月底计划余量分配量 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.plannedSurplus")
     @ApiModelProperty(value = "月底计划余量分配量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
-    private Integer plannedSurplus;
+    private Long plannedSurplus;
+
+    /** 预计需要生产量 */
+    @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
+    @TableField(value = "PRODUCE_QTY_DUE")
+    private Long produceQtyDue;
 
     /** 供应链优先级 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.scmPriority")
@@ -185,5 +192,15 @@ public class MpOrderOffsetAllocation extends BaseEntity{
     @ApiModelProperty(value = "SCMID", name = "scmId")
     @TableField(value = "SCM_ID")
     private Long scmId;
+
+    /** 订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单 */
+    @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单", name = "orderPriority")
+    @TableField(exist = false)
+    private String orderPriority;
+
+    /** 提报日期 */
+    @ApiModelProperty(value = "提报日期", name = "billDate")
+    @TableField(exist = false)
+    private Date billDate;
 
 }
