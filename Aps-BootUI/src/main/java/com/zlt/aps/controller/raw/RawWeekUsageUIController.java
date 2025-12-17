@@ -67,57 +67,16 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
     }
 
     /**
-     * 修改或新增
-     */
-    @ApiOperation("修改或新增")
-    @RequiresPermissions("maindata:rawWeekUsage:edit")
-    @PostMapping("/save")
-    @ResponseBody
-    public AjaxResult save(RawWeekUsage rawWeekUsage) {
-        if (UserConstants.NOT_UNIQUE.equals(iRawWeekUsageService.checkUnique(rawWeekUsage))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWeekUsage.checkUnique"));
-        }
-
-        return iRawWeekUsageService.save(rawWeekUsage);
-    }
-
-    /**
-     * 删除周维度原材料用量记录
-     */
-    @ApiOperation("删除,id不为空")
-    @RequiresPermissions("maindata:rawWeekUsage:remove")
-    @PostMapping("/remove")
-    @ResponseBody
-    public AjaxResult remove(String ids) {
-        Long[] arr = Convert.toLongArray(ids);
-        return iRawWeekUsageService.removeByIds(Arrays.asList(arr));
-    }
-
-    /**
-     * 校验周维度原材料用量记录唯一性
-     */
-    @ApiOperation("校验唯一性")
-    @PostMapping("/checkUnique")
-    @ResponseBody
-    public String checkUnique(RawWeekUsage rawWeekUsage) {
-        return iRawWeekUsageService.checkUnique(rawWeekUsage);
-    }
-
-    /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     * @return
      */
     @Override
     public String getExportTemplateFileName(){
         return this.getFunctionName();
     }
 
-
     /**
      * 继承时重写方法。
-     *
-     * @return
      */
     @Override
     public String getProcedureCode() {
@@ -126,8 +85,6 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
 
     /**
      * 继承时重写方法。
-     *
-     * @return
      */
     @Override
     public String getFunctionName() {
