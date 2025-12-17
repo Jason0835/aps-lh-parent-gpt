@@ -232,16 +232,6 @@ public interface ProductionSchedulingDataService {
     Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
 
     /**
-     * 获取分厂在指定年份、月份的寸口产能分配配置
-     *
-     * @param factoryCode 分厂
-     * @param year        年份
-     * @param month       月份
-     * @return
-     */
-    List<SizeCapacityConfiguration> getSizeCapacityConfiguration(String factoryCode, Integer year, Integer month);
-
-    /**
      * 获取分厂在指定年份、月份的轮胎类型产能分配配置
      *
      * @param factoryCode 分厂
