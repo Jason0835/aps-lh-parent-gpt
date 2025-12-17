@@ -62,6 +62,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 第二轮 = 模拟模具已排产量 + 换模损耗量
      */
     private Long cxCapacityRequireQty;
+    /**
+     * 高优先级还需排产量
+     */
+    private Long heightProductionQty;
+    /**
+     * 总的还需排产量
+     */
+    private Long productionQty;
+    /**
+     * 是否含有特殊材料 1 含有 0 不含有
+     */
+    private String isSpecialMaterials;
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)
@@ -184,6 +196,28 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             setMouldQty(enableMouldList.size());
         }
+    }
+
+    /**
+     * 是否还需排产
+     * 排产标记 = 1 且还有可排产量
+     * true表示还需排产 false表示无需排产
+     *
+     * @return
+     */
+    public boolean hasProduction() {
+        //标记不排产
+        if (YesOrNoEnum.NO.getCode().equals(getIsProduction())) {
+            return false;
+        }
+        //总的还需排产量为零
+        if (null == productionQty) {
+            return false;
+        }
+        if (productionQty <= BigDecimal.ZERO.longValue()) {
+            return false;
+        }
+        return true;
     }
 
     /**

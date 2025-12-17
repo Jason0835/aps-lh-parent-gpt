@@ -18,7 +18,10 @@ import com.zlt.aps.factory.utils.ProductionProcessUtils;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
-import com.zlt.aps.maindata.service.*;
+import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
+import com.zlt.aps.maindata.service.IProductALevelService;
+import com.zlt.aps.maindata.service.ITireCapacityConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.NoProductionDayMouldVo;
@@ -81,8 +84,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IProductALevelService productALevelService;
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
-
-    private final ISizeCapacityConfigurationService sizeCapacityConfigurationService;
 
     private final ITireCapacityConfigurationService tireCapacityConfigurationService;
 
@@ -186,16 +187,16 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioInfo(Context context, List<String> structureNameList) {
+    public List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList) {
         String factoryCode = context.getFactoryCode();
         if (StringUtils.isBlank(factoryCode) || CollectionUtils.isEmpty(structureNameList)) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
         List<MonthPlanStructureLhRatioVo> configurationList = factoryMonthPlanProductLhCapacityMapper.getStructureLhRatioInfo(factoryCode, structureNameList);
         if (CollectionUtils.isEmpty(configurationList)) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
-        return configurationList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getStructureName, Function.identity()));
+        return configurationList;
     }
 
     @Override
@@ -221,9 +222,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
         Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = getCxMachineStopInfo(context);
-        if (CollectionUtils.isEmpty(cxStopInfo)) {
-            return cxMachineInfoMap;
-        }
         cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> {
             CxDevicePlanShutInfoHelper stopInfoHelper = cxStopInfo.get(cxMachineCode);
             if (null == stopInfoHelper) {
@@ -239,7 +237,12 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             if (!CollectionUtils.isEmpty(wholeStop)) {
                 stopDaySet.addAll(wholeStop);
             }
+            Integer monthDays = context.getMonthDays();
+            Integer maxProductionDays = monthDays - stopDaySet.size();
+            //排产日信息
             cxMachineInfo.setStopDayInfo(stopDaySet);
+            cxMachineInfo.setMaxProductionDays(maxProductionDays);
+            cxMachineInfo.setRemainingDays(maxProductionDays);
         });
         return cxMachineInfoMap;
     }
@@ -380,11 +383,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyMap();
         }
         return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getProductCode, Function.identity()));
-    }
-
-    @Override
-    public List<SizeCapacityConfiguration> getSizeCapacityConfiguration(String factoryCode, Integer year, Integer month) {
-        return sizeCapacityConfigurationService.getConfigurationByFactoryYearAndMonth(factoryCode, year, month);
     }
 
     @Override

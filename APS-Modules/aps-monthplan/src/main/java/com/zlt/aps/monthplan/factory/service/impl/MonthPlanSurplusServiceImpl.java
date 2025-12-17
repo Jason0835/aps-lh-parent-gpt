@@ -12,6 +12,7 @@ import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus;
 import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalMapper;
@@ -87,6 +88,11 @@ public class MonthPlanSurplusServiceImpl implements IMonthPlanSurplusService {
     List<FactoryMonthPlanProdFinal> allList = factoryMonthPlanProductionFinalMapper.selectParamList(importList);
     // 查询历史分厂、年、月、SAP代码、规格的定稿列表
     this.savePlanSurplusList(allList);
+  }
+
+  @Override
+  public void batchInsertPlanSurplusList(List<MdmMonthSurplus> mdmMonthSurpluses) {
+    this.baseDao.insertBatch(mdmMonthSurpluses);
   }
 
   /**

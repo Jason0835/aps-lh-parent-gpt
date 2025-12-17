@@ -60,7 +60,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     /**
      * 查询SKU与结构关系列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -91,7 +90,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
      * 保存
      */
     @Log(title = "ui.data.column.mdmSkuStructureRef.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -103,7 +101,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
      * 删除
      */
     @Log(title = "ui.data.column.mdmSkuStructureRef.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -115,7 +112,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     /**
      * 获取SKU与结构关系详细信息
      */
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -130,7 +126,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:import")
     @Log(title = "ui.data.column.mdmSkuStructureRef.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -142,7 +137,6 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmSkuStructureRef:export")
     @Log(title = "SKU与结构关系", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

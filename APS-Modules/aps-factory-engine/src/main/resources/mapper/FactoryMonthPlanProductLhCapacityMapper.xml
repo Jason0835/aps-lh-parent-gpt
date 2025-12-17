@@ -24,7 +24,9 @@
 
     <select id="getStructureLhRatioInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo">
         SELECT STRUCTURE_NAME,
-               MIN(LH_MACHINE_MAX_QTY)
+               CX_MACHINE_BRAND_CODE,
+               LH_MACHINE_MAX_QTY,
+               MAX_EMBRYO_QTY,
           FROM t_mdm_structure_lh_ratio
          WHERE IFNULL(IS_DELETE, 0) = 0
            AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -32,7 +34,6 @@
         <foreach item="structureName" collection="structureNameList" open="(" separator="," close=")">
             #{structureName,jdbcType=VARCHAR}
         </foreach>
-          GROUP BY STRUCTURE_NAME
     </select>
 
 </mapper>

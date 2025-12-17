@@ -31,7 +31,7 @@ public class MdmMoldingMachine extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;

@@ -130,25 +130,30 @@ public class MpOrderOffsetAllocation extends BaseEntity{
     @Excel(name = "ui.data.column.orderOffsetAllocation.orderQty")
     @ApiModelProperty(value = "订单数量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
-    private Integer orderQty;
+    private Long orderQty;
 
     /** 库存总数 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.stockQty")
     @ApiModelProperty(value = "库存总数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Integer stockQty;
+    private Long stockQty;
 
     /** 库存分配量 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.allocationQty")
     @ApiModelProperty(value = "库存分配量", name = "allocationQty")
     @TableField(value = "ALLOCATION_QTY")
-    private Integer allocationQty;
+    private Long allocationQty;
 
     /** 月底计划余量分配量 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.plannedSurplus")
     @ApiModelProperty(value = "月底计划余量分配量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
-    private Integer plannedSurplus;
+    private Long plannedSurplus;
+
+    /** 预计需要生产量 */
+    @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
+    @TableField(value = "PRODUCE_QTY_DUE")
+    private Long produceQtyDue;
 
     /** 供应链优先级 */
     @Excel(name = "ui.data.column.orderOffsetAllocation.scmPriority")

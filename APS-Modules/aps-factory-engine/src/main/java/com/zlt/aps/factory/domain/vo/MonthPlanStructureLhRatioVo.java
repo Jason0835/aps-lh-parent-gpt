@@ -17,7 +17,15 @@ public class MonthPlanStructureLhRatioVo implements Serializable {
      */
     private String structureName;
     /**
+     * 成型类型-品牌
+     */
+    private String cxMachineBrandCode;
+    /**
      * 硫化机台配比值
      */
     private Integer lhMachineMaxQty;
+    /**
+     * 最大胎胚数
+     */
+    private Integer maxEmbryoQty;
 }
