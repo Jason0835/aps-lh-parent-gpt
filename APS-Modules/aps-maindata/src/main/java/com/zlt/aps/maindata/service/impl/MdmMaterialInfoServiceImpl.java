@@ -17,6 +17,7 @@ import com.tlt.aps.enums.CommonTypeEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -261,7 +262,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "productCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode"));
     }
 
     @Override
@@ -275,6 +276,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
                 importDocEntity.setProductTypeName(enumByValue.getName());
             }
         }
+        importDocEntity.setCantProduce(ApsConstant.APS_YES_NO_0);
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
@@ -298,7 +300,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
         // 提示信息
         String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
         String columnName1 = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.factoryCode");
-        String columnName2 = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.productCode");
+        String columnName2 = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.materialCode");
         String outGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.outGrossRate.required");
         String inGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.inGrossRate.required");
         String oeGrossRateRequired = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.oeGrossRate.required");

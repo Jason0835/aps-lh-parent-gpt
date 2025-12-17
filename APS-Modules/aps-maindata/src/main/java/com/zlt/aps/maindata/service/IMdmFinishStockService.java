@@ -1,9 +1,12 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -29,8 +32,10 @@ public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
      */
     List<MdmFinishStock> list4Mes(MdmFinishStock queryVO);
     /**
-     *  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
-     * @return
+     * 将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
+     * @param createCondition 需求参数
+     * @param monthPlanVersion 需求版本号
+     * @param finishedProductStockMap 成品库存记录
      */
-    List<MdmFinishStock> findExcludeExceedTwelveMonth();
+    void insertBatchData(MpDemandPlan createCondition,String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap);
 }

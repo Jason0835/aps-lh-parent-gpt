@@ -71,30 +71,30 @@ public class CxMatchingSpecifyMachineServiceImpl implements CxMatchingSpecifyMac
             CxMachineInfoVo item = new CxMachineInfoVo();
             BeanUtils.copyProperties(moldingMachine, item);
 
-            //拷贝成型机类型
-            List<MdmMoldingMachineCls> machineClsList = moldingMachineClassCodeMap.get(item.getMoldingMachineClassId());
-            if (machineClsList != null && !machineClsList.isEmpty()) {
-                MdmMoldingMachineCls copiedCls = new MdmMoldingMachineCls();
-                BeanUtils.copyProperties(machineClsList.get(0), copiedCls);
-                item.setMoldingMachineCls(copiedCls);
-                item.setMouldMethod(copiedCls.getMouldMethod());
-            }
-
-            //拷贝成型机类型子表
-            List<MdmMoldingMachineClsB> classBList = moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId());
-            if (classBList != null) {
-                List<MdmMoldingMachineClsB> copiedClassBList = new ArrayList<>();
-                classBList.forEach(subclass -> {
-                    MdmMoldingMachineClsB copiedSubclass = new MdmMoldingMachineClsB();
-                    BeanUtils.copyProperties(subclass, copiedSubclass);
-                    copiedClassBList.add(copiedSubclass);
-                });
-                item.setMoldingMachineClassList(copiedClassBList);
-            }
-
-            if (CxEngineConstants.MACHINE_STATUS_ENABLE.equals(item.getMachineStatus())) {
-                result.put(item.getMoldingMachineCode(), item);
-            }
+//            //拷贝成型机类型
+//            List<MdmMoldingMachineCls> machineClsList = moldingMachineClassCodeMap.get(item.getMoldingMachineClassId());
+//            if (machineClsList != null && !machineClsList.isEmpty()) {
+//                MdmMoldingMachineCls copiedCls = new MdmMoldingMachineCls();
+//                BeanUtils.copyProperties(machineClsList.get(0), copiedCls);
+//                item.setMoldingMachineCls(copiedCls);
+//                item.setMouldMethod(copiedCls.getMouldMethod());
+//            }
+//
+//            //拷贝成型机类型子表
+//            List<MdmMoldingMachineClsB> classBList = moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId());
+//            if (classBList != null) {
+//                List<MdmMoldingMachineClsB> copiedClassBList = new ArrayList<>();
+//                classBList.forEach(subclass -> {
+//                    MdmMoldingMachineClsB copiedSubclass = new MdmMoldingMachineClsB();
+//                    BeanUtils.copyProperties(subclass, copiedSubclass);
+//                    copiedClassBList.add(copiedSubclass);
+//                });
+//                item.setMoldingMachineClassList(copiedClassBList);
+//            }
+//
+//            if (CxEngineConstants.MACHINE_STATUS_ENABLE.equals(item.getMachineStatus())) {
+//                result.put(item.getMoldingMachineCode(), item);
+//            }
         });
         return result;
     }

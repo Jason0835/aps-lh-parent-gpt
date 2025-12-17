@@ -26,7 +26,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @param id 需求计划主键
      * @return 需求计划
      */
-    public MpDemandPlan selectMpDemandPlanById(Long id);
+    MpDemandPlan selectMpDemandPlanById(Long id);
 
     /**
      * 查询需求计划列表
@@ -34,7 +34,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @param mpDemandPlan 需求计划
      * @return 需求计划集合
      */
-    public List<MpDemandPlan> selectMpDemandPlanList(MpDemandPlan mpDemandPlan);
+    List<MpDemandPlan> selectMpDemandPlanList(MpDemandPlan mpDemandPlan);
 
     /**
      * 批量查询需求计划列表
@@ -42,7 +42,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @param ids 需要查询的数据主键集合
      * @return 需求计划集合
      */
-    public List<MpDemandPlan> selectMpDemandPlanByIds(List<Long> ids);
+    List<MpDemandPlan> selectMpDemandPlanByIds(List<Long> ids);
 
 
     /**
@@ -52,7 +52,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @return 结果
      */
     @Transactional
-    public int insertMpDemandPlan(MpDemandPlan mpDemandPlan);
+    int insertMpDemandPlan(MpDemandPlan mpDemandPlan);
 
     /**
      * 修改需求计划
@@ -61,7 +61,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @return 结果
      */
     @Transactional
-    public int updateMpDemandPlan(MpDemandPlan mpDemandPlan);
+    int updateMpDemandPlan(MpDemandPlan mpDemandPlan);
 
     /**
      * 批量删除需求计划
@@ -71,7 +71,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      */
    
     @Transactional
-    public int deleteMpDemandPlanByIds(Long[] ids);
+    int deleteMpDemandPlanByIds(Long[] ids);
 
     /**
      * 批量删除需求计划
@@ -81,7 +81,7 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      */
 
     @Transactional
-    public int deleteMpDemandPlanByIds(List<Long> ids);
+    int deleteMpDemandPlanByIds(List<Long> ids);
 
     /**
      * 删除需求计划信息
@@ -90,16 +90,21 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @return 结果
      */
     @Transactional
-    public int deleteMpDemandPlanById(Long id);
+    int deleteMpDemandPlanById(Long id);
 
     /**
      * 校验需求计划唯一性
      */
-    public String checkMpDemandPlanUnique(MpDemandPlan mpDemandPlan);
+    String checkMpDemandPlanUnique(MpDemandPlan mpDemandPlan);
 
     /**
      * 导入需求计划数据
      */
     @Transactional
-    public AjaxResult importData(List<MpDemandPlan> list, boolean updateSupport, Long importLogId);
+    AjaxResult importData(List<MpDemandPlan> list, boolean updateSupport, Long importLogId);
+    /**
+     *  生成需求计划
+     * @param createCondition 参数
+     */
+    void createMonthRequire(MpDemandPlan createCondition);
 }

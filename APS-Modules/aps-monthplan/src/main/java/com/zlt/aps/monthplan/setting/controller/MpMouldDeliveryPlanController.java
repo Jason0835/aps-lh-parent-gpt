@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpMouldDeliveryPlanService;
 import com.zlt.aps.monthplan.api.domain.entity.MpMouldDeliveryPlan;
@@ -52,7 +51,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
     /**
      * 查询模具到货计划列表
      */
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +67,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
      * 保存
      */
     @Log(title = "ui.data.column.mpMouldDeliveryPlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +78,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
      * 删除
      */
     @Log(title = "ui.data.column.mpMouldDeliveryPlan.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +89,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
     /**
      * 获取模具到货计划详细信息
      */
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +104,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:import")
     @Log(title = "ui.data.column.mpMouldDeliveryPlan.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +115,6 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:export")
     @Log(title = "模具到货计划", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

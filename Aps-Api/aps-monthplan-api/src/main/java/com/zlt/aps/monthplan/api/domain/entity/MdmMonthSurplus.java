@@ -116,5 +116,13 @@ public class MdmMonthSurplus extends BaseEntity {
     @TableField(value = "PLAN_SURPLUS_QTY")
     private Long planSurplusQty;
 
+    /**
+     * 以分厂+物料为维度，转换月底计划余量
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialCode);
+    }
+
 
 }

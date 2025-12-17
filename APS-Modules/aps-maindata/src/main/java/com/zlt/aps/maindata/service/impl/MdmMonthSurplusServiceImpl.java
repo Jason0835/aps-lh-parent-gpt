@@ -12,9 +12,9 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,12 +39,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
+@RequiredArgsConstructor
 public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurplus> implements IMdmMonthSurplusService {
 
-    @Autowired
-    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+  private final MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
-    @Override
+  @Override
     protected String getDocTypeCode() {
         return "MDM0140";
     }

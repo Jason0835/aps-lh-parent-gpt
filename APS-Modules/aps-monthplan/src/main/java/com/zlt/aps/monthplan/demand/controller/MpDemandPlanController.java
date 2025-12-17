@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
 import com.zlt.aps.monthplan.demand.service.IMpDemandPlanService;
 import com.zlt.common.controller.BusiController;
@@ -14,6 +15,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -155,5 +157,24 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
         return mpDemandPlanService.importData(list, updateSupport, importLogId);
+    }
+
+    @ApiOperation("生成需求计划")
+    @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:createMonthRequire:",
+        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
+        msgKey = "ui.data.alert.createMonthRequire.run",
+        waitTime = 5,
+        leaseTime = 300
+    )
+    @PostMapping("/createMonthRequire")
+    public AjaxResult createMonthRequire(@RequestBody MpDemandPlan createCondition){
+        if (null == createCondition) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
+        }
+        if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+        mpDemandPlanService.createMonthRequire(createCondition);
+        return AjaxResult.success();
     }
 }

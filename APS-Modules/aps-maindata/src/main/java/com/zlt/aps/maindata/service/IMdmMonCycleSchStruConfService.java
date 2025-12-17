@@ -20,6 +20,9 @@ import java.util.List;
  * @date 2025-12-09
  */
 public interface IMdmMonCycleSchStruConfService extends IDocService<MdmMonCycleSchStruConf> {
-
-  List<MdmMonCycleSchStruConf> findCycleSchStruConf();
+  /**
+   *  查询当前周期性排产结构配置
+   * @return 当前周期性排产结构配置
+   */
+  List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf();
 }

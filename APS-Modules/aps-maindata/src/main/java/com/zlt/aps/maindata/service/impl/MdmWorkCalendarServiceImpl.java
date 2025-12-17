@@ -144,7 +144,8 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         }
         for (Integer month : MONTH_CALENDAR) {
             instance.set(Calendar.MONTH, month);
-            int lastDay = instance.getActualMaximum(Calendar.DATE);
+            instance.set(Calendar.DAY_OF_MONTH, 1);
+            int lastDay = instance.getActualMaximum(Calendar.DAY_OF_MONTH);
             for (int i = 1; i <= lastDay; i++) {
                 for (String code : procCodeList) {
                     MdmWorkCalendar mdmWorkCalendar = new MdmWorkCalendar();

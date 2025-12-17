@@ -203,9 +203,9 @@ public class CxPersionTrainSettingServiceImpl extends AbstractDocService<CxPersi
         // 校验机台是否存在
         if (!machineSet.isEmpty()) {
             LambdaQueryWrapper<MdmMoldingMachine> machineWrapper = Wrappers.lambdaQuery(MdmMoldingMachine.class);
-            machineWrapper.in(MdmMoldingMachine::getMoldingMachineCode, machineSet);
+            machineWrapper.in(MdmMoldingMachine::getCxMachineCode, machineSet);
             List<MdmMoldingMachine> moldingMachineList = moldingMachineEntityMapper.selectList(machineWrapper);
-            Set<String> existMachine = moldingMachineList.stream().map(MdmMoldingMachine::getMoldingMachineCode).collect(Collectors.toSet());
+            Set<String> existMachine = moldingMachineList.stream().map(MdmMoldingMachine::getCxMachineCode).collect(Collectors.toSet());
             for (String item : machineSet) {
                 if (!existMachine.contains(item)) {
                     throw new RuntimeException(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxPersionTrainSetting.checkMachine"), item));
