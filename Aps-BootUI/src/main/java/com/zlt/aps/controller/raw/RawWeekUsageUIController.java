@@ -23,13 +23,9 @@ import org.apache.commons.io.IOUtils;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
+import java.util.Map;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 
@@ -102,5 +98,36 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
+    }
+
+    @RequiresPermissions( "maindata:rawWeekUsage:generateByMonth")
+    @PostMapping("/generate-by-month")
+    @ApiOperation("按照月份生成周维度原材料用量记录")
+    public AjaxResult generateByMonth(@RequestParam String factoryCode,
+                                      @RequestParam Integer year,
+                                      @RequestParam Integer month) {
+        return iRawWeekUsageService.generateByMonth(factoryCode, year, month);
+    }
+
+    @RequiresPermissions( "maindata:rawWeekUsage:generateByWeek")
+    @PostMapping("/generate-by-week")
+    @ApiOperation("按照周维度份生成周维度原材料用量记录")
+    public AjaxResult generateByWeek(@RequestParam String factoryCode,
+                                     @RequestParam Integer year,
+                                     @RequestParam Integer month,
+                                     @RequestParam Integer week) {
+        return iRawWeekUsageService.generateByWeek(factoryCode, year, month, week);
+    }
+
+    @RequiresPermissions( "maindata:rawWeekUsage:statistics")
+    @GetMapping("/statistics")
+    @ApiOperation("获取周用量统计数据")
+    public AjaxResult getStatistics(@RequestParam String factoryCode,
+                                    @RequestParam Integer year,
+                                    @RequestParam(required = false) Integer month,
+                                    @RequestParam(required = false) Integer week) {
+        Map<String, Object> statistics = iRawWeekUsageService
+                .getStatistics(factoryCode, year, month, week);
+        return AjaxResult.success(statistics);
     }
 }
