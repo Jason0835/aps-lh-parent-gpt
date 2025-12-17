@@ -3,6 +3,7 @@ package com.zlt.aps.maindata.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.I18nChange;
 import com.zlt.aps.monthplan.api.domain.vo.I18nJsonVo;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public interface I18nChangeService {
     /**
      * 查询页面JSON
      */
+    @Transactional(rollbackFor = Exception.class)
     AjaxResult pageJson(I18nJsonVo jsonVo);
 
     /**

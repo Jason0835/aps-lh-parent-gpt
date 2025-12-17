@@ -558,6 +558,8 @@ public class I18nChangeServiceImpl implements I18nChangeService {
                 i18nChangeMapper.insertTempTable(list);
                 i18nChangeMapper.batchUpdateByRelIdAndKey(list);
             }
+            i18nChangeMapper.batchInsertByRelIdAndKey();
+//            i18nChangeMapper.dropTempTable();
         }
 
         // 如果需要进行国际化

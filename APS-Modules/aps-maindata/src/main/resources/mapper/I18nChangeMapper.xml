@@ -57,58 +57,6 @@
 
     </select>
 
-    <update id="mergeNoChange">
-        merge into T_I18N_CHANGE a using (
-        <foreach collection="list" item="item" separator=" union all ">
-            select
-            #{item.relId,jdbcType=BIGINT} REL_ID,
-            #{item.changeKey,jdbcType=VARCHAR} CHANGE_KEY,
-            #{item.changeValue,jdbcType=VARCHAR} CHANGE_VALUE,
-            #{item.isChange,jdbcType=INTEGER} IS_CHANGE,
-            #{item.remark, jdbcType=VARCHAR} REMARK,
-            #{item.isDelete, jdbcType=INTEGER} IS_DELETE,
-            #{item.createBy, jdbcType=VARCHAR} CREATE_BY,
-            #{item.updateBy, jdbcType=VARCHAR} UPDATE_BY,
-            #{item.createTime, jdbcType=DATE} CREATE_TIME,
-            #{item.updateTime, jdbcType=DATE} UPDATE_TIME
-            from dual
-        </foreach>
-        ) b on (a.CHANGE_KEY = b.CHANGE_KEY and a.REL_ID = b.REL_ID)
-        WHEN MATCHED THEN
-        update
-        <set>
-            a.CHANGE_VALUE = b.CHANGE_VALUE,
-            a.UPDATE_TIME = b.UPDATE_TIME
-        </set>
-        WHEN NOT MATCHED THEN
-        insert (
-        a.ID,
-        a.REL_ID,
-        a.CHANGE_KEY,
-        a.CHANGE_VALUE,
-        a.IS_CHANGE,
-        a.IS_DELETE,
-        a.REMARK,
-        a.CREATE_BY,
-        a.UPDATE_BY,
-        a.CREATE_TIME,
-        a.UPDATE_TIME
-        )
-        values (
-        SEQ_I18N_CHANGE.NEXTVAL,
-        b.REL_ID,
-        b.CHANGE_KEY,
-        b.CHANGE_VALUE,
-        0,
-        0,
-        b.REMARK,
-        b.CREATE_BY,
-        b.UPDATE_BY,
-        b.CREATE_TIME,
-        b.UPDATE_TIME
-        )
-    </update>
-
     <update id="update">
         update T_I18N_CHANGE
         set CHANGE_VALUE = #{changeValue},
@@ -176,8 +124,8 @@
             #{item.changeKey,jdbcType=VARCHAR},
             #{item.changeValue,jdbcType=VARCHAR},
             #{item.isChange,jdbcType=INTEGER},
+            0,
             #{item.remark, jdbcType=VARCHAR},
-            #{item.isDelete, jdbcType=INTEGER},
             #{item.createBy, jdbcType=VARCHAR},
             #{item.updateBy, jdbcType=VARCHAR},
             #{item.createTime, jdbcType=DATE},
@@ -188,7 +136,36 @@
 
     <delete id="dropTempTable">
         -- 删除临时表
-        DROP
-        TEMPORARY TABLE temp_i18n_change
+        DROP TABLE IF EXISTS temp_i18n_change;
     </delete>
+
+    <insert id="batchInsertByRelIdAndKey">
+        INSERT INTO T_I18N_CHANGE
+        (REL_ID,
+         CHANGE_KEY,
+         CHANGE_VALUE,
+         IS_CHANGE,
+         IS_DELETE,
+         REMARK,
+         CREATE_BY,
+         UPDATE_BY,
+         CREATE_TIME,
+         UPDATE_TIME)
+        SELECT REL_ID,
+               CHANGE_KEY,
+               CHANGE_VALUE,
+               IS_CHANGE,
+               IS_DELETE,
+               REMARK,
+               CREATE_BY,
+               UPDATE_BY,
+               CREATE_TIME,
+               UPDATE_TIME
+        FROM temp_i18n_change t
+        WHERE NOT EXISTS (SELECT 1
+                          FROM T_I18N_CHANGE b
+                          WHERE b.REL_ID = t.REL_ID
+                            AND b.CHANGE_KEY = t.CHANGE_KEY
+                            AND b.IS_DELETE = 0)
+    </insert>
 </mapper>
