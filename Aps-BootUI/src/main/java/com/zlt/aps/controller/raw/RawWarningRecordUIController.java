@@ -98,48 +98,48 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
         response.flushBuffer();
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:executeUsageWarning")
+    @RequiresPermissions("maindata:rawWarningRecord:executeUsageWarning")
     @PostMapping("/execute-usage-warning")
     @ApiOperation("执行用量偏差预警")
-    public AjaxResult executeUsageWarning(@RequestParam String factoryCode,
-                                          @RequestParam Integer year,
-                                          @RequestParam Integer week) {
+    public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
+                                          @RequestParam("year") Integer year,
+                                          @RequestParam("week") Integer week) {
         return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:executeNewMaterialWarning")
+    @RequiresPermissions("maindata:rawWarningRecord:executeNewMaterialWarning")
     @PostMapping("/execute-new-material-warning")
     @ApiOperation("执行新材料预警")
-    public AjaxResult executeNewMaterialWarning(@RequestParam String factoryCode,
-                                                @RequestParam Integer year,
-                                                @RequestParam Integer month) {
+    public AjaxResult executeNewMaterialWarning(@RequestParam("factoryCode") String factoryCode,
+                                                @RequestParam("year") Integer year,
+                                                @RequestParam("month") Integer month) {
         return iRawWarningRecordService.executeNewMaterialWarning(factoryCode, year, month);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:syncActualUsage")
+    @RequiresPermissions("maindata:rawWarningRecord:syncActualUsage")
     @PostMapping("/sync-actual-usage")
     @ApiOperation("同步实际用量数据")
-    public AjaxResult syncActualUsage(@RequestParam String factoryCode,
-                                      @RequestParam Integer year,
-                                      @RequestParam Integer week) {
+    public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
+                                      @RequestParam("year") Integer year,
+                                      @RequestParam("week") Integer week) {
         return iRawWarningRecordService.syncActualUsage(factoryCode, year, week);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:handleWarning")
+    @RequiresPermissions("maindata:rawWarningRecord:handleWarning")
     @PostMapping("/handle-warning")
     @ApiOperation("处理预警记录")
-    public AjaxResult handleWarning(@RequestParam Long id,
-                                    @RequestParam String handler,
-                                    @RequestParam String opinion) {
+    public AjaxResult handleWarning(@RequestParam("id") Long id,
+                                    @RequestParam("handler") String handler,
+                                    @RequestParam("opinion") String opinion) {
         return iRawWarningRecordService.handleWarning(id, handler, opinion);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:handleWarning")
+    @RequiresPermissions("maindata:rawWarningRecord:statistics")
     @GetMapping("/statistics")
     @ApiOperation("获取预警统计")
-    public AjaxResult getStatistics(@RequestParam String factoryCode,
-                                    @RequestParam(required = false) String warningType,
-                                    @RequestParam(required = false) Integer days) {
+    public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,
+                                    @RequestParam(value = "warningType", required = false) String warningType,
+                                    @RequestParam(value = "days", required = false) Integer days) {
         Map<String, Object> statistics = iRawWarningRecordService.getStatistics(
                 factoryCode, warningType, days);
         return AjaxResult.success(statistics);
