@@ -18,7 +18,10 @@ import com.zlt.aps.factory.utils.ProductionProcessUtils;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
-import com.zlt.aps.maindata.service.*;
+import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
+import com.zlt.aps.maindata.service.IProductALevelService;
+import com.zlt.aps.maindata.service.ITireCapacityConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.NoProductionDayMouldVo;
@@ -81,8 +84,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IProductALevelService productALevelService;
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
-
-    private final ISizeCapacityConfigurationService sizeCapacityConfigurationService;
 
     private final ITireCapacityConfigurationService tireCapacityConfigurationService;
 
@@ -382,11 +383,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyMap();
         }
         return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getProductCode, Function.identity()));
-    }
-
-    @Override
-    public List<SizeCapacityConfiguration> getSizeCapacityConfiguration(String factoryCode, Integer year, Integer month) {
-        return sizeCapacityConfigurationService.getConfigurationByFactoryYearAndMonth(factoryCode, year, month);
     }
 
     @Override
