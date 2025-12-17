@@ -468,7 +468,7 @@ public class I18nChangeServiceImpl implements I18nChangeService {
      * @return 完整的json结构，如果存在key丢失，返回为空
      */
     private JSONObject buildPageJson(String keyPrefix) {
-        initPageJsonFirstElement();
+//        initPageJsonFirstElement();
         JSONObject json = new JSONObject();
 
         for (String jsonKey : this.firstElementSet) {
