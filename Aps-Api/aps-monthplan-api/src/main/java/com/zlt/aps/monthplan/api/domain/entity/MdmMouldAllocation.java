@@ -67,10 +67,10 @@ public class MdmMouldAllocation extends BaseEntity {
     private String productTypeCode;
 
     /** 结构 */
-    @Excel(name = "ui.data.column.mdmMouldAllocation.structrueName")
-    @ApiModelProperty(value = "结构", name = "structrueName")
-    @TableField(value = "STRUCTRUE_NAME")
-    private String structrueName;
+    @Excel(name = "ui.data.column.mdmMouldAllocation.structureName")
+    @ApiModelProperty(value = "结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
 
     /** 规格 */
     @Excel(name = "ui.data.column.mdmMouldAllocation.specifications")

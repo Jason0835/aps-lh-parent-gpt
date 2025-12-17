@@ -15,11 +15,6 @@ public interface I18nChangeMapper {
     List<I18nChange> selectRelList(I18nChange i18nChange);
 
     /**
-     * 用户修改过的记录不进行更新，其他记录有则更新，无则插入
-     */
-    void mergeNoChange(List<I18nChange> list);
-
-    /**
      * 更新
      */
     void update(I18nChange change);
@@ -61,4 +56,11 @@ public interface I18nChangeMapper {
      * @return 影响行数
      */
     int insertTempTable(@Param("list") List<I18nChange> i18nChangeList);
+
+    /**
+     * 批量插入
+     *
+     * @return 影响行数
+     */
+    int batchInsertByRelIdAndKey();
 }

@@ -154,12 +154,4 @@ public class RawWarningRecord extends BaseEntity {
     @ApiModelProperty(value = "通知时间", name = "notifyTime")
     @TableField(value = "NOTIFY_TIME")
     private Date notifyTime;
-
-    /**
-     * 备注
-     */
-    @Excel(name = "备注")
-    @ApiModelProperty(value = "备注", name = "remark")
-    @TableField(value = "REMARK")
-    private String remark;
 }

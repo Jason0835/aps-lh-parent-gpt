@@ -468,7 +468,7 @@ public class I18nChangeServiceImpl implements I18nChangeService {
      * @return 完整的json结构，如果存在key丢失，返回为空
      */
     private JSONObject buildPageJson(String keyPrefix) {
-        initPageJsonFirstElement();
+//        initPageJsonFirstElement();
         JSONObject json = new JSONObject();
 
         for (String jsonKey : this.firstElementSet) {
@@ -558,6 +558,8 @@ public class I18nChangeServiceImpl implements I18nChangeService {
                 i18nChangeMapper.insertTempTable(list);
                 i18nChangeMapper.batchUpdateByRelIdAndKey(list);
             }
+            i18nChangeMapper.batchInsertByRelIdAndKey();
+//            i18nChangeMapper.dropTempTable();
         }
 
         // 如果需要进行国际化
