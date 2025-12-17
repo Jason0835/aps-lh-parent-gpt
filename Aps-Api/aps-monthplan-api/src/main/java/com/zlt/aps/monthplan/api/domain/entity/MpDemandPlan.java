@@ -175,13 +175,13 @@ public class MpDemandPlan extends BaseEntity{
     @Excel(name = "ui.data.column.demandPlan.postponeNetQty")
     @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
     @TableField(value = "POSTPONE_NET_QTY")
-    private Integer postponeNetQty;
+    private Long postponeNetQty;
 
     /** 净需求(不含暂缓) */
     @Excel(name = "ui.data.column.demandPlan.unPostponeNetQty")
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
-    private Integer unPostponeNetQty;
+    private Long unPostponeNetQty;
 
     /** 高优先级 */
     @Excel(name = "ui.data.column.demandPlan.heightQty")
@@ -199,19 +199,19 @@ public class MpDemandPlan extends BaseEntity{
     @Excel(name = "ui.data.column.demandPlan.postponeQty")
     @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
     @TableField(value = "POSTPONE_QTY")
-    private Integer postponeQty;
+    private Long postponeQty;
 
     /** 周期排产储备 */
     @Excel(name = "ui.data.column.demandPlan.cycleReserveQty")
     @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
     @TableField(value = "CYCLE_RESERVE_QTY")
-    private Integer cycleReserveQty;
+    private Long cycleReserveQty;
 
     /** 常规储备 */
     @Excel(name = "ui.data.column.demandPlan.conventionReserveQty")
     @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
-    private Integer conventionReserveQty;
+    private Long conventionReserveQty;
 
     /** 是否满足最小投产量 */
     @Excel(name = "ui.data.column.demandPlan.isReachMinProductionQty")
@@ -310,4 +310,11 @@ public class MpDemandPlan extends BaseEntity{
     @TableField(value = "IS_IMPORT")
     private String isImport;
 
+    /**
+     * 按SKU、动平衡、均匀性、年周号为维度分组合并
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s|*|%s";
+        return String.format(keyFormat, materialCode, isDynamicBalance,isUniformity,yearWeek);
+    }
 }
