@@ -3,6 +3,9 @@ package com.zlt.aps.maindata.service;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.List;
+import java.util.Set;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpHistorySaleRecordService.java
@@ -17,5 +20,9 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IMpHistorySaleRecordService extends IDocService<MpHistorySaleRecord> {
-
+  /**
+   *  查询近12个月的月均销量大于零的月份数 > 8 的“SKU列表2”
+   * @return
+   */
+  Set<String> findSkuInLastTwelveMonth();
 }

@@ -2,12 +2,14 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
@@ -134,6 +136,22 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         // 生成SKU排产分类
         genSkuClassify(factoryCode, last12YearMonth, maxYearMonth);
         return AjaxResult.success();
+    }
+
+    @Override
+    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty() {
+        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
+        return entityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode) {
+        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MpMonthlySaleQty::getMaterialCode, materialCode);
+        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MpMonthlySaleQty> monthlySaleQties = entityMapper.selectList(wrapper);
+        return CollectionUtils.isEmpty(monthlySaleQties) ? null : monthlySaleQties.get(0);
     }
 
     /**

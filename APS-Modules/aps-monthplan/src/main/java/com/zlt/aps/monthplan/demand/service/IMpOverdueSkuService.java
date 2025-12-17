@@ -24,4 +24,9 @@ public interface IMpOverdueSkuService  extends IBaseService<MpOverdueSku>
      *  排除近12个月有周期性排产超期胎的SKU(超期SKU表.超期周期排产 = 1)，剩下的SKU则可生成到供应链订单池-周期排产储备
      */
     Set<String> excludeOverdueCycleProduction();
+
+  /**
+   *  排除近12个月有常规储备超期胎的SKU(超期SKU表.超期储备排产 = 1)，剩下的SKU则可生成到供应链订单池-常规储备排产
+   */
+  Set<String> excludeOverduePrecedentProduction();
 }

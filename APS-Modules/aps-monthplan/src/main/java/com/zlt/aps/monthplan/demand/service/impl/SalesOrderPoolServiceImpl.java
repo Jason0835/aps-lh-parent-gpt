@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.tlt.aps.enums.YesOrNoEnum;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.constant.UserConstants;
@@ -179,6 +180,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.noScmData"));
 		}
 		return this.saveItfData(salesOrderPool, syncResultList);
+	}
+
+	@Override
+	public List<SalesOrderPool> findCurrentSalesOrderPool() {
+		LambdaQueryWrapper<SalesOrderPool> wrapper = Wrappers.lambdaQuery();
+		wrapper.eq(SalesOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
+		return salesOrderPoolEntityMapper.selectList(wrapper);
 	}
 
 	/**
@@ -352,15 +360,11 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			log.error(String.valueOf(result.get(AjaxResult.MSG_TAG)));
 			return result;
 		}
-		String resultData = String.valueOf(result.get(AjaxResult.DATA_TAG));
-		if (StringUtils.isEmpty(resultData) || !JSONValidator.from(resultData).validate()) {
-			log.error("SMC已计划未发货接口返回数据格式校验失败：" + result);
-			String errorMsg = I18nUtil.getMessage("ui.data.alert.SalesOrderPool.itfDataError");
-			return AjaxResult.error(String.format(errorMsg, result));
+		List<SyncPlanedNotShipResultVo> syncResultList = null;
+		Object resultData = result.get(AjaxResult.DATA_TAG);
+		if (resultData instanceof List) {
+			syncResultList = JSONArray.parseArray(JSONArray.toJSONString(resultData), SyncPlanedNotShipResultVo.class);
 		}
-
-		List<SyncPlanedNotShipResultVo> syncResultList = JSONArray.parseArray(resultData,
-				SyncPlanedNotShipResultVo.class);
 
 		return AjaxResult.success(syncResultList);
 	}
@@ -379,7 +383,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		FactoryParam param = iFactoryParamService.getFacParamSingle(factoryParam);
 		String paramValue = null;
 		if (param != null) {
-			paramValue = StringUtils.isNotEmpty(param.getParamValue())? param.getParamValue(): param.getDefauleValue();
+			paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? param.getParamValue()
+					: param.getDefauleValue();
 		}
 		return paramValue;
 	}

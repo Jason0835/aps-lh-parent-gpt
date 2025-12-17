@@ -40,6 +40,24 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String factoryCode;
 
     /**
+     * 成型机类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆
+     */
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.cxMachineBrandCode", dictType = "biz_machine_brand")
+    @ApiModelProperty(value = "成型机类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆", name = "cxMachineBrandCode")
+    @TableField(value = "CX_MACHINE_BRAND_CODE")
+    private String cxMachineBrandCode;
+
+    /**
+     * 类型 数据字典 biz_class_type 01 机械 02 宽基
+     */
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.cxMachineTypeCode", dictType = "biz_class_type")
+    @ApiModelProperty(value = "类型 数据字典 biz_class_type 01 机械 02 宽基", name = "cxMachineTypeCode")
+    @TableField(value = "CX_MACHINE_TYPE_CODE")
+    private String cxMachineTypeCode;
+
+    /**
      * 工装名称，必填长度64
      */
     @ImportExcelValidated(required = true, maxLength = 64)
@@ -73,6 +91,24 @@ public class MdmWorkWearInfo extends BaseEntity {
     @ApiModelProperty(value = "工装状态 biz_available_status 1 可用 0 禁用", name = "workWearStatus")
     @TableField(value = "WORK_WEAR_STATUS")
     private String workWearStatus;
+
+    /**
+     * 成型鼓周长下限
+     */
+    @ImportExcelValidated(digits = true, min = 1, max = 999999)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMin")
+    @ApiModelProperty(value = "成型鼓周长下限", name = "perimeterMin")
+    @TableField(value = "PERIMETER_MIN")
+    private Integer perimeterMin;
+
+    /**
+     * 成型鼓周长上限
+     */
+    @ImportExcelValidated(digits = true, min = 1, max = 999999)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMax")
+    @ApiModelProperty(value = "成型鼓周长上限", name = "perimeterMax")
+    @TableField(value = "PERIMETER_MAX")
+    private Integer perimeterMax;
 
     /**
      * 数量，必填，整数，最大9999

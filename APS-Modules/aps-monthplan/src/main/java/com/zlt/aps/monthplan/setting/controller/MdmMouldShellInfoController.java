@@ -52,7 +52,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 查询模壳台账列表
      */
-    @RequiresPermissions("monthplan:mpMouldShellInfo:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -81,7 +80,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * 删除
      */
     @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:mpMouldShellInfo:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +91,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 获取模壳台账详细信息
      */
-    @RequiresPermissions("monthplan:mpMouldShellInfo:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +106,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:mpMouldShellInfo:import")
     @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +117,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:mpMouldShellInfo:export")
     @Log(title = "模壳台账", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

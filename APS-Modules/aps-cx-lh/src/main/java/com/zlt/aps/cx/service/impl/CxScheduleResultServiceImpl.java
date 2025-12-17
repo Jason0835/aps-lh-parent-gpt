@@ -370,10 +370,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             // 机台信息
             BeanUtils.copyProperties(moldingMachine, item);
             // 机台类型
-            item.setMoldingMachineCls(moldingMachineClassCodeMap.get(item.getMoldingMachineClassId()) == null ? null : moldingMachineClassCodeMap.get(item.getMoldingMachineClassId()).get(0));
+//            item.setMoldingMachineCls(moldingMachineClassCodeMap.get(item.getMoldingMachineClassId()) == null ? null : moldingMachineClassCodeMap.get(item.getMoldingMachineClassId()).get(0));
             // 机台类型子表
-            item.setMoldingMachineClassList(moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId()) == null ? null : moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId()));
-            cxMachineInfoVoArrayList.put(item.getMoldingMachineCode(), item);
+//            item.setMoldingMachineClassList(moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId()) == null ? null : moldingMachineClassItemCodeMap.get(item.getMoldingMachineClassId()));
+            cxMachineInfoVoArrayList.put(item.getCxMachineCode(), item);
         });
 
         for (int i = 0; i < list.size(); i++) {
@@ -1527,20 +1527,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 //        }
 
         // 尺寸范围校验
-        BigDecimal machineMinSize = machineInfo.getMinSize();
-        BigDecimal machineMaxSize = machineInfo.getMaxSize();
-        if (machineMinSize.compareTo(BigDecimal.valueOf(requiredDimension)) > 0) {
-            String msg = StringUtils.format(I18nUtil.getMessage("cx.engine.change.proSizeMin.no.tip"),
-                    machineCode, machineMinSize, requiredDimension);
-            tipMsg.append(msg);
-            log.warn("[插单预检] 尺寸小于机台最小值，机台最小值:{} 需求尺寸:{}", machineMinSize, requiredDimension);
-        }
-        if (machineMaxSize.compareTo(BigDecimal.valueOf(requiredDimension)) < 0) {
-            String msg = StringUtils.format(I18nUtil.getMessage("cx.engine.change.proSizeMax.no.tip"),
-                    machineCode, machineMaxSize, requiredDimension);
-            tipMsg.append(msg);
-            log.warn("[插单预检] 尺寸超过机台最大值，机台最大值:{} 需求尺寸:{}", machineMaxSize, requiredDimension);
-        }
+//        BigDecimal machineMinSize = machineInfo.getMinSize();
+//        BigDecimal machineMaxSize = machineInfo.getMaxSize();
+//        if (machineMinSize.compareTo(BigDecimal.valueOf(requiredDimension)) > 0) {
+//            String msg = StringUtils.format(I18nUtil.getMessage("cx.engine.change.proSizeMin.no.tip"),
+//                    machineCode, machineMinSize, requiredDimension);
+//            tipMsg.append(msg);
+//            log.warn("[插单预检] 尺寸小于机台最小值，机台最小值:{} 需求尺寸:{}", machineMinSize, requiredDimension);
+//        }
+//        if (machineMaxSize.compareTo(BigDecimal.valueOf(requiredDimension)) < 0) {
+//            String msg = StringUtils.format(I18nUtil.getMessage("cx.engine.change.proSizeMax.no.tip"),
+//                    machineCode, machineMaxSize, requiredDimension);
+//            tipMsg.append(msg);
+//            log.warn("[插单预检] 尺寸超过机台最大值，机台最大值:{} 需求尺寸:{}", machineMaxSize, requiredDimension);
+//        }
 
         //提示各个有计划的班次可安排最大的计划量
         validateClassShiftPlanQty(machineInfo, cxScheduleResult, tipMsg, constructionInfo);
@@ -1556,7 +1556,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     private void validateClassShiftPlanQty(CxMachineInfoVo machineInfo, CxScheduleResult cxScheduleResult, StringBuilder tipMsg, CxProductConstructionInfoDto constructionInfo) {
-        logger.debug("开始验证班次计划量，机台编码：{}，排程日期：{}", machineInfo.getMoldingMachineCode(), cxScheduleResult.getScheduleDate());
+        logger.debug("开始验证班次计划量，机台编码：{}，排程日期：{}", machineInfo.getCxMachineCode(), cxScheduleResult.getScheduleDate());
 
         // 1. 查询当前机台当天的所有成型排程任务
         QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();

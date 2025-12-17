@@ -61,11 +61,4 @@ public interface SupplyOrderPoolEntityMapper extends IBaseMapper<SupplyOrderPool
      * @return 结果
      */
     public int deleteSupplyOrderPoolByIds(Long[] ids);
-
-
-    /**
- * 合并操作，如果记录存在则更新，否则新增
- */
-    @Override
-    public int mergeSql(Collection<? extends SupplyOrderPool> collection);
 }

@@ -57,7 +57,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
     /**
      * 查询BOM示方书列表
      */
-    @RequiresPermissions( "maindata:mdmBomInfo:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
      * 保存
      */
     @Log(title = "ui.data.column.mdmBomInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "maindata:mdmBomInfo:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -86,7 +84,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
      * 删除
      */
     @Log(title = "ui.data.column.mdmBomInfo.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "maindata:mdmBomInfo:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -98,7 +95,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
     /**
      * 获取BOM示方书详细信息
      */
-    @RequiresPermissions( "maindata:mdmBomInfo:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +109,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "maindata:mdmBomInfo:import")
     @Log(title = "ui.data.column.mdmBomInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +120,6 @@ public class MdmBomInfoController extends AbstractDocBizController<MdmBomInfo> {
     /**
      * 导出列表
      */
-    @RequiresPermissions( "maindata:mdmBomInfo:export")
     @Log(title = "BOM示方书", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

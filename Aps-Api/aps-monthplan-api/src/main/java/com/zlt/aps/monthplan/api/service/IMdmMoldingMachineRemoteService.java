@@ -2,21 +2,21 @@ package com.zlt.aps.monthplan.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
-import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmMoldingMachineRemoteService.java
  * 描    述：IMdmMoldingMachineRemoteService基础数据-成型机档案前端接口
  *@author zlt
- *@date 2025-02-18
+ *@date 2025-12-14
  *@version 1.0
  *
  *  修改记录：

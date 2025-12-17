@@ -77,6 +77,44 @@ public class MpOverdueSkuServiceImpl extends BaseService<MpOverdueSku>  implemen
     }
 
     @Override
+    public Set<String> excludeOverduePrecedentProduction() {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
+        // 构建查询条件
+        QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("IS_OVERDUE_REGULAR", YesOrNoEnum.YES.getValue());
+        // 方法1：使用复杂条件构造
+        // 方法1：使用复杂条件构造
+        queryWrapper.and(wrapper -> {
+            // 起始年月之后的数据
+            wrapper.or(w -> w
+                .eq("year", startYearMonth.getYear())
+                .ge("month", startYearMonth.getMonthValue())
+            );
+
+            // 中间完整年份
+            for (int year = startYearMonth.getYear() + 1;
+                 year < currentYearMonth.getYear();
+                 year++) {
+                int finalYear = year;
+                wrapper.or(w -> w.eq("year", finalYear));
+            }
+
+            // 结束年月之前的数据
+            wrapper.or(w -> w
+                .eq("year", currentYearMonth.getYear())
+                .le("month", currentYearMonth.getMonthValue())
+            );
+        });
+        List<MpOverdueSku> list = this.mpOverdueSkuEntityMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Sets.newHashSet();
+        }
+        return list.stream().map(MpOverdueSku::getMaterialCode).collect(Collectors.toSet());
+    }
+
+    @Override
     public void insertBatchData(Collection<MpOverdueSku> collection) {
 
     }

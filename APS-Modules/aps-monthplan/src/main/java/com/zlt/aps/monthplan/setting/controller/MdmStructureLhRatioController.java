@@ -57,7 +57,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
     /**
      * 查询成型结构硫化配比列表
      */
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +73,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
      * 保存
      */
     @Log(title = "ui.data.column.mdmStructureLhRatio.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -86,7 +84,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
      * 删除
      */
     @Log(title = "ui.data.column.mdmStructureLhRatio.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -98,7 +95,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
     /**
      * 获取成型结构硫化配比详细信息
      */
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +109,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:import")
     @Log(title = "ui.data.column.mdmStructureLhRatio.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +120,6 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:mdmStructureLhRatio:export")
     @Log(title = "成型结构硫化配比", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")

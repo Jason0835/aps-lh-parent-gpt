@@ -1,0 +1,152 @@
+package com.zlt.aps.monthplan.api.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import com.ruoyi.common.core.annotation.Excel;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+
+
+/**
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MpFinishedProductStock.java
+ * 描    述：成品库存对象 t_mp_finished_product_stock
+ *@author yelq
+ *@date 2025-12-15
+ *@version 1.0
+ *
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：yelq
+ *     修改内容：...
+ */
+@TableName(value = "T_MP_FINISHED_PRODUCT_STOCK")
+@ApiModel(value = "成品库存对象", description = "成品库存对象 ")
+@Data
+public class MpFinishedProductStock extends BaseEntity{
+
+    private static final long serialVersionUID = 1L;
+
+     /** 工厂编号 */
+    @Excel(name = "ui.data.column.finishedProductStock.factoryCode")
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /** 产品品类 TBR 全钢 PCR 半钢 */
+    @Excel(name = "ui.data.column.finishedProductStock.productTypeCode")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
+    @TableField(value = "FACTORY_CODE")
+    private String productTypeCode;
+
+    /** 品牌 */
+    @Excel(name = "ui.data.column.finishedProductStock.brand")
+    @ApiModelProperty(value = "品牌", name = "brand")
+    @TableField(value = "BRAND")
+    private String brand;
+
+    /** 产品结构 */
+    @Excel(name = "ui.data.column.finishedProductStock.structureName")
+    @ApiModelProperty(value = "产品结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
+
+    /** 库位类别 */
+    @Excel(name = "ui.data.column.finishedProductStock.locationType")
+    @ApiModelProperty(value = "库位类别", name = "locationType")
+    @TableField(value = "LOCATION_TYPE")
+    private String locationType;
+
+    /** MES物料编码 */
+    @Excel(name = "ui.data.column.finishedProductStock.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
+
+    /** 物料编码 */
+    @Excel(name = "ui.data.column.finishedProductStock.materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /** 物料描述 */
+    @Excel(name = "ui.data.column.finishedProductStock.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /** 库存数量 */
+    @Excel(name = "ui.data.column.finishedProductStock.stockQty")
+    @ApiModelProperty(value = "库存数量", name = "stockQty")
+    @TableField(value = "STOCK_QTY")
+    private Long stockQty;
+
+    /** 年周号 */
+    @Excel(name = "ui.data.column.finishedProductStock.weekYear")
+    @ApiModelProperty(value = "年周号", name = "weekYear")
+    @TableField(value = "WEEK_YEAR")
+    private String weekYear;
+
+    /** 均匀性 */
+    @Excel(name = "ui.data.column.finishedProductStock.dynamicBalance")
+    @ApiModelProperty(value = "均匀性", name = "dynamicBalance")
+    @TableField(value = "DYNAMIC_BALANCE")
+    private String dynamicBalance;
+
+    /** 动平衡 */
+    @Excel(name = "ui.data.column.finishedProductStock.uniformity")
+    @ApiModelProperty(value = "动平衡", name = "uniformity")
+    @TableField(value = "UNIFORMITY")
+    private String uniformity;
+
+    /** 是否超3个月胎 */
+    @Excel(name = "ui.data.column.finishedProductStock.isExceedThreeMonth")
+    @ApiModelProperty(value = "是否超3个月胎", name = "isExceedThreeMonth")
+    @TableField(value = "IS_EXCEED_THREE_MONTH")
+    private String isExceedThreeMonth;
+
+    /** 是否超6个月胎 */
+    @Excel(name = "ui.data.column.finishedProductStock.isExceedSixMonth")
+    @ApiModelProperty(value = "是否超6个月胎", name = "isExceedSixMonth")
+    @TableField(value = "IS_EXCEED_SIX_MONTH")
+    private String isExceedSixMonth;
+
+    /** 是否超9个月胎 */
+    @Excel(name = "ui.data.column.finishedProductStock.isExceedNineMonth")
+    @ApiModelProperty(value = "是否超9个月胎", name = "isExceedNineMonth")
+    @TableField(value = "IS_EXCEED_NINE_MONTH")
+    private String isExceedNineMonth;
+
+    /** 是否超12个月胎 */
+    @Excel(name = "ui.data.column.finishedProductStock.isExceedTwelveMonth")
+    @ApiModelProperty(value = "是否超12个月胎", name = "isExceedTwelveMonth")
+    @TableField(value = "IS_EXCEED_TWELVE_MONTH")
+    private String isExceedTwelveMonth;
+
+    /** 是否超龄胎 */
+    @Excel(name = "ui.data.column.finishedProductStock.isExceedTire")
+    @ApiModelProperty(value = "是否超龄胎", name = "isExceedTire")
+    @TableField(value = "IS_EXCEED_TIRE")
+    private String isExceedTire;
+
+    /** 年周号整数值  */
+    @TableField(exist = false)
+    private Integer stockWeekYear;
+    /**
+     * 对冲后，剩余库存总量
+     */
+    @TableField(exist = false)
+    private Long leftOverQty;
+
+    /**
+     * 以分厂+物料为维度，转换库存
+     *
+     * @return
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialCode);
+    }
+}

@@ -52,10 +52,10 @@ public class MdmDevicePlanShut extends BaseEntity {
     private String procCode;
 
     /**
-     * 机台类型，字典：machine_type；硫化、成型、压出、裁断、压延、密炼；
+     * 机台类型，字典：device_shut_machine_type；硫化、成型、压出、裁断、压延、密炼；
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmDevicePlanShut.machineType", dictType = "machine_type")
+    @Excel(name = "ui.data.column.mdmDevicePlanShut.machineType", dictType = "device_shut_machine_type")
     @ApiModelProperty(value = "机台类型，字典：machine_type；硫化、成型、压出、裁断、压延、密炼；", name = "machineType")
     @TableField(value = "MACHINE_TYPE")
     private String machineType;

@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -69,7 +70,7 @@ public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMon
     }
 
     @Override
-    public List<MdmMonCycleSchStruConf> findCycleSchStruConf() {
+    public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf() {
         LambdaQueryWrapper<MdmMonCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmMonCycleSchStruConfEntityMapper.selectList(wrapper);

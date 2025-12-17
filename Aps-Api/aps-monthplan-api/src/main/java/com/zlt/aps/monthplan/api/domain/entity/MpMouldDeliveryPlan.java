@@ -63,8 +63,8 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     /**
      * MES物料编码
      */
-    @ImportExcelValidated(required = true, maxLength = 32)
-    @Excel(name = "ui.data.column.mpMouldDeliveryPlan.mesMaterialCode")
+//    @ImportExcelValidated(required = true, maxLength = 32)
+//    @Excel(name = "ui.data.column.mpMouldDeliveryPlan.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -72,7 +72,7 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     /**
      * 物料描述
      */
-    @ImportExcelValidated(required = true, maxLength = 64)
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mpMouldDeliveryPlan.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
@@ -91,9 +91,9 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     /**
      * 计划上机日期
      */
-    @ImportExcelValidated(required = true, date = true)
+//    @ImportExcelValidated(required = true, date = true)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpMouldDeliveryPlan.boardingDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.mpMouldDeliveryPlan.boardingDate", width = 30, dateFormat = "yyyy-MM-dd", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "计划上机日期", name = "boardingDate")
     @TableField(value = "BOARDING_DATE")
     private Date boardingDate;
@@ -130,5 +130,12 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     @TableField(exist = false)
     private Date boardingDateEndTime;
 
-
+    /**
+     * 备注
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
 }

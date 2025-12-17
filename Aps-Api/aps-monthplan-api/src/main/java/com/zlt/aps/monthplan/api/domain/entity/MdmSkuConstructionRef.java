@@ -32,7 +32,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.factoryCode")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -96,6 +96,12 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @ApiModelProperty(value = "模具型腔", name = "mouldCavity")
     @TableField(value = "MOULD_CAVITY")
     private String mouldCavity;
+
+    /** 是否零度材料 */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.isZeroRack", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
+    @TableField(value = "IS_ZERO_RACK")
+    private String isZeroRack;
 
     /** 夏季机械硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime")
