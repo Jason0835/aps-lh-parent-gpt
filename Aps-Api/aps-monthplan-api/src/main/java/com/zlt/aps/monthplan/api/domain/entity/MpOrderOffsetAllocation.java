@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 
+import java.util.Date;
+
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -190,5 +192,15 @@ public class MpOrderOffsetAllocation extends BaseEntity{
     @ApiModelProperty(value = "SCMID", name = "scmId")
     @TableField(value = "SCM_ID")
     private Long scmId;
+
+    /** 订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单 */
+    @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单", name = "orderPriority")
+    @TableField(exist = false)
+    private String orderPriority;
+
+    /** 提报日期 */
+    @ApiModelProperty(value = "提报日期", name = "billDate")
+    @TableField(exist = false)
+    private Date billDate;
 
 }

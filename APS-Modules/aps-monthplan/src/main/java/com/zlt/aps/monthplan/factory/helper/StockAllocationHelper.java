@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -243,7 +244,7 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static MpOrderOffsetAllocation allocateStockForSingleOrder(String monthPlanVersion,SalesOrderPool order, StockAllocationContext context) {
-    long stockQty = context.getStockInfos().stream().mapToLong(MpFinishedProductStock::getStockQty).sum();
+    long stockQty = context.getStockInfos().stream().mapToLong(MpFinishedProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
     // 库存分配量
@@ -361,8 +362,8 @@ public class StockAllocationHelper {
    * 判断库存是否有效
    */
   private static boolean isValidStock(MpFinishedProductStock stock) {
-    return stock.getStockQty() != null
-        && stock.getStockQty() > 0;
+    return stock.getLeftOverQty() != null
+        && stock.getLeftOverQty() > 0;
   }
 
   /**
@@ -385,7 +386,7 @@ public class StockAllocationHelper {
     }
     // 优先级3：库存数量大的优先（提高冲减效率）
     comparators.add(Comparator.comparing(
-        MpFinishedProductStock::getStockQty,
+        MpFinishedProductStock::getLeftOverQty,
         Comparator.reverseOrder()
     ));
     // 优先级4：库存ID小的优先（先进先出，假设ID递增）
@@ -432,20 +433,20 @@ public class StockAllocationHelper {
         break;
       }
       // 获取当前库存数量
-      BigDecimal stockQty = BigDecimal.valueOf(stock.getStockQty());
+      BigDecimal stockQty = BigDecimal.valueOf(stock.getLeftOverQty());
       ReductionItem item = new ReductionItem();
       item.setStockId(stock.getId());
       item.setStockWeekYear(stock.getWeekYear());
       item.setOriginalStockQty(stockQty);
       if (stockQty.compareTo(remainingQty) >= 0) {
         // 当前库存足够冲减
-        stock.setStockQty(stockQty.subtract(remainingQty).longValue());
+        stock.setLeftOverQty(stockQty.subtract(remainingQty).longValue());
         item.setReducedQty(remainingQty);
-        item.setRemainingStockQty(BigDecimal.valueOf(stock.getStockQty()));
+        item.setRemainingStockQty(BigDecimal.valueOf(stock.getLeftOverQty()));
         remainingQty = BigDecimal.ZERO;
       } else {
         // 当前库存不足，全部冲减
-        stock.setStockQty(0L);
+        stock.setLeftOverQty(0L);
         item.setReducedQty(stockQty);
         item.setRemainingStockQty(BigDecimal.ZERO);
         remainingQty = remainingQty.subtract(stockQty);
@@ -462,7 +463,7 @@ public class StockAllocationHelper {
     List<MpFinishedProductStock> result =  stockInfos.stream()
         // 过滤：库存年周号晚于订单年周号
         .filter(stock -> {
-          if (StringUtils.isBlank(stock.getWeekYear()) || stock.getStockQty() == null || stock.getStockQty() <= 0) {
+          if (StringUtils.isBlank(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
             return false;
           }
           int stockWeekYear = Integer.parseInt(stock.getWeekYear());
@@ -484,31 +485,22 @@ public class StockAllocationHelper {
    */
   private static MpOrderOffsetAllocation buildAllocation(SalesOrderPool order, String version,long stockQty,long plannedSurplus,long allocationQty,long produceQtyDue) {
     MpOrderOffsetAllocation allocation = new MpOrderOffsetAllocation();
+    BeanUtils.copyProperties(order, allocation);
+    allocation.setId(null);
     allocation.setBaseVale(null);
-    allocation.setFactoryCode(order.getFactoryCode());
-    allocation.setYear(order.getYear());
-    allocation.setMonth(order.getMonth());
     allocation.setMonthPlanVersion(version);
     allocation.setProductTypeCode(order.getProductType());
-    allocation.setBrand(order.getBrand());
     allocation.setAreaCode(order.getArea());
     allocation.setCustomCode(order.getSalCode());
     // allocation.setCustomName();
     allocation.setCustomNationCode(order.getSalNCode());
-    allocation.setDeliverGoodsType(order.getDeliverGoodsType());
     allocation.setDestinationNationCode(order.getNatCode());
-    allocation.setDynamicBalance(order.getDynamicBalance());
-    allocation.setUniformity(order.getUniformity());
     allocation.setMaterialCode(order.getOriMaterialCode());
-    allocation.setMaterialDesc(order.getMaterialDesc());
     allocation.setPoNumber(order.getSalCodePo());
-    allocation.setWeekYear(order.getWeekYear());
     allocation.setScmId(order.getScmDetailId());
-    allocation.setScmPriority(order.getScmPriority());
     allocation.setPlannedSurplus(plannedSurplus);
     // allocation.setMesMaterialCode();
     // allocation.setLocationType(order);
-    allocation.setId(null);
     allocation.setOrderQty(order.getOrdQty().longValue());
     allocation.setStockQty(stockQty);
     allocation.setAllocationQty(allocationQty);

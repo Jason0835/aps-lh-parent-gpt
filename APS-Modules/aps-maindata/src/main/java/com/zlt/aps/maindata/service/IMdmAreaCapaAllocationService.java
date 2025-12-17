@@ -2,7 +2,10 @@ package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -35,4 +38,10 @@ public interface IMdmAreaCapaAllocationService extends IDocService<MdmAreaCapaAl
      * @return 结果
      */
     AjaxResult checkBeforeCopy(MdmAreaCapaAllocation entity);
+    /**
+     * 查询区域产能分配是否有配置
+     * @param createCondition 需求计划参数
+     * @return 区域产能分配
+     */
+    List<MdmAreaCapaAllocation> findAreaCapaAllocation(MpDemandPlan createCondition);
 }

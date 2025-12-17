@@ -134,6 +134,11 @@ public class MpFinishedProductStock extends BaseEntity{
     /** 年周号整数值  */
     @TableField(exist = false)
     private Integer stockWeekYear;
+    /**
+     * 对冲后，剩余库存总量
+     */
+    @TableField(exist = false)
+    private Long leftOverQty;
 
     /**
      * 以分厂+物料为维度，转换库存
