@@ -143,8 +143,8 @@
         -- 创建临时表用于批量更新
         CREATE
         TEMPORARY TABLE temp_i18n_change (
-            ID decimal(20,0) NOT NULL PRIMARY KEY AUTO_INCREMENT,
-			REL_ID decimal(20,0) NOT NULL,
+            ID bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
+			REL_ID bigint NOT NULL,
 			CHANGE_KEY text,
 			CHANGE_VALUE text,
 			IS_CHANGE decimal(1,0),
