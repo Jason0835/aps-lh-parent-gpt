@@ -3,7 +3,7 @@ package com.zlt.aps.monthplan.raw.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
-import com.zlt.aps.maindata.mapper.RawWeekUsageMapper;
+import com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.monthplan.api.domain.entity.RawWeekUsage;
@@ -19,7 +19,6 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -32,7 +31,7 @@ public class RawWeekUsageGenerateServiceImpl {
     private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
     @Autowired
-    private RawWeekUsageMapper rawWeekUsageMapper;
+    private RawWeekUsageEntityMapper rawWeekUsageEntityMapper;
 
 
     /**
@@ -184,7 +183,8 @@ public class RawWeekUsageGenerateServiceImpl {
         copy.setFactoryCode(plan.getFactoryCode());
         copy.setEmbryoCode(plan.getEmbryoCode());
         copy.setProductCode(plan.getProductCode());
-        copy.setTotalQty(dailyQty); // 使用当天的产量
+        // 使用当天的产量
+        copy.setTotalQty(dailyQty);
         return copy;
     }
 
@@ -259,7 +259,7 @@ public class RawWeekUsageGenerateServiceImpl {
             wrapper.in("WEEK", weeksInMonth);
         }
 
-        rawWeekUsageMapper.delete(wrapper);
+        rawWeekUsageEntityMapper.delete(wrapper);
         log.info("删除旧的周用量记录，工厂：{}，年份：{}，月份：{}，涉及周次：{}",
                 factoryCode, year, month, weeksInMonth);
     }
@@ -292,7 +292,8 @@ public class RawWeekUsageGenerateServiceImpl {
             weekUsage.setMaterialCode(materialCode);
             weekUsage.setMaterialName(materialName);
             weekUsage.setPlanQty(planQty);
-            weekUsage.setActualQty(BigDecimal.ZERO); // 初始化为0，后续从MES同步
+            // 初始化为0，后续从MES同步
+            weekUsage.setActualQty(BigDecimal.ZERO);
             weekUsage.setHasWarning(0);
             weekUsage.setStartDate(java.sql.Date.valueOf(weekStartDate));
             weekUsage.setEndDate(java.sql.Date.valueOf(weekEndDate));
@@ -304,7 +305,7 @@ public class RawWeekUsageGenerateServiceImpl {
             weekUsage.setCreateTime(new Date());
             weekUsage.setCreateBy("system");
 
-            rawWeekUsageMapper.insert(weekUsage);
+            rawWeekUsageEntityMapper.insert(weekUsage);
             records++;
         }
 
@@ -403,7 +404,7 @@ public class RawWeekUsageGenerateServiceImpl {
             deleteWrapper.eq("FACTORY_CODE", factoryCode);
             deleteWrapper.eq("YEAR", year);
             deleteWrapper.eq("WEEK", week);
-            rawWeekUsageMapper.delete(deleteWrapper);
+            rawWeekUsageEntityMapper.delete(deleteWrapper);
 
             // 5. 保存新的用量记录
             int records = saveWeekUsage(factoryCode, year, month, week, weekMaterialUsage);
@@ -463,7 +464,7 @@ public class RawWeekUsageGenerateServiceImpl {
         wrapper.eq("FACTORY_CODE", factoryCode);
         wrapper.eq("YEAR", year);
         wrapper.eq("WEEK", week);
-        List<RawWeekUsage> weekUsages = rawWeekUsageMapper.selectList(wrapper);
+        List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(wrapper);
 
         Map<String, Object> statistics = new HashMap<>();
 

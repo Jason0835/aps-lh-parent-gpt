@@ -7,7 +7,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
-import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,13 +22,13 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordMapper, RawWarningRecord> implements IRawWarningService {
+public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMapper, RawWarningRecord> implements IRawWarningService {
 
     @Autowired
-    private RawWarningConfigMapper warningConfigMapper;
+    private RawWarningConfigEntityMapper warningConfigMapper;
 
     @Autowired
-    private RawWeekUsageMapper rawWeekUsageMapper;
+    private RawWeekUsageEntityMapper rawWeekUsageEntityMapper;
 
     @Autowired
     private RawMaterialMonthDiffMapper rawMaterialMonthDiffMapper;
@@ -58,7 +57,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordMapper, R
             usageWrapper.eq("FACTORY_CODE", factoryCode);
             usageWrapper.eq("YEAR", year);
             usageWrapper.eq("WEEK", week);
-            List<RawWeekUsage> weekUsages = rawWeekUsageMapper.selectList(usageWrapper);
+            List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
 
             if (weekUsages.isEmpty()) {
                 log.warn("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
@@ -95,12 +94,12 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordMapper, R
                     // 更新用量记录的预警状态
                     usage.setHasWarning(1);
                     usage.setWarningLevel(config.getWarningLevel());
-                    rawWeekUsageMapper.updateById(usage);
+                    rawWeekUsageEntityMapper.updateById(usage);
                 } else {
                     // 清除预警状态
                     usage.setHasWarning(0);
                     usage.setWarningLevel(null);
-                    rawWeekUsageMapper.updateById(usage);
+                    rawWeekUsageEntityMapper.updateById(usage);
                 }
             }
 
@@ -392,7 +391,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordMapper, R
             usageWrapper.eq("FACTORY_CODE", factoryCode);
             usageWrapper.eq("YEAR", year);
             usageWrapper.eq("WEEK", week);
-            List<RawWeekUsage> weekUsages = rawWeekUsageMapper.selectList(usageWrapper);
+            List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
 
             // 4. 更新实际用量
             for (RawWeekUsage usage : weekUsages) {
@@ -401,7 +400,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordMapper, R
                     usage.setActualQty(actualQty);
                     // 重新计算偏差
                     usage.calculateDeviation();
-                    rawWeekUsageMapper.updateById(usage);
+                    rawWeekUsageEntityMapper.updateById(usage);
                 }
             }
 

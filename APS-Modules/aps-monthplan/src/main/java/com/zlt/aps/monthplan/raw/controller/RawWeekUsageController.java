@@ -1,13 +1,23 @@
 package com.zlt.aps.monthplan.raw.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper;
+import com.zlt.aps.maindata.service.IRawWeekUsageService;
+import com.zlt.aps.monthplan.api.domain.entity.RawWeekUsage;
 import com.zlt.aps.monthplan.raw.service.impl.RawWeekUsageGenerateServiceImpl;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,28 +26,90 @@ import java.util.Map;
 @RestController
 @RequestMapping("/raw-week-usage")
 @Api(tags = "周维度原材料用量管理")
-public class RawWeekUsageController {
+public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsage> {
+
+    @Autowired
+    private RawWeekUsageEntityMapper entityMapper;
+
+    @Autowired
+    private IRawWeekUsageService rawWeekUsageService;
 
     @Autowired
     private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
 
-    @PostMapping("/generate")
-    @ApiOperation("生成周维度原材料用量记录")
-    public AjaxResult generate(@RequestParam String factoryCode,
+    /**
+     * 查询周维度原材料用量记录列表
+     */
+    @RequiresPermissions( "maindata:rawWeekUsage:list")
+    @ApiOperation("查询列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody RawWeekUsage queryVO) {
+        return super.list(queryVO);
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
+    }
+
+
+
+    @Override
+    protected List<RawWeekUsage> listExportData(RawWeekUsage obj) {
+        QueryWrapper<RawWeekUsage> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return entityMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService(){
+        return rawWeekUsageService;
+    }
+
+    /**
+     * 条件拼接
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<RawWeekUsage> queryWrapper, RawWeekUsage queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("week")), "WEEK", queryVO.getFieldValueByFieldName("week"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialName")), "MATERIAL_NAME", queryVO.getFieldValueByFieldName("materialName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planQty")), "PLAN_QTY", queryVO.getFieldValueByFieldName("planQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("actualQty")), "ACTUAL_QTY", queryVO.getFieldValueByFieldName("actualQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deviationQty")), "DEVIATION_QTY", queryVO.getFieldValueByFieldName("deviationQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deviationRate")), "DEVIATION_RATE", queryVO.getFieldValueByFieldName("deviationRate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hasWarning")), "HAS_WARNING", queryVO.getFieldValueByFieldName("hasWarning"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningLevel")), "WARNING_LEVEL", queryVO.getFieldValueByFieldName("warningLevel"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("startDate")), "START_DATE", queryVO.getFieldValueByFieldName("startDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("endDate")), "END_DATE", queryVO.getFieldValueByFieldName("endDate"));
+    }
+
+    @RequiresPermissions( "maindata:rawWeekUsage:generateByMonth")
+    @PostMapping("/generate-by-month")
+    @ApiOperation("按照月份生成周维度原材料用量记录")
+    public AjaxResult generateByMonth(@RequestParam String factoryCode,
                                @RequestParam Integer year,
                                @RequestParam Integer month) {
         return rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month);
     }
 
-    @PostMapping("/recalculate")
-    @ApiOperation("重新计算周用量记录")
-    public AjaxResult recalculate(@RequestParam String factoryCode,
+    @RequiresPermissions( "maindata:rawWeekUsage:generateByWeek")
+    @PostMapping("/generate-by-week")
+    @ApiOperation("按照周维度份生成周维度原材料用量记录")
+    public AjaxResult generateByWeek(@RequestParam String factoryCode,
                                   @RequestParam Integer year,
                                   @RequestParam Integer month,
                                   @RequestParam Integer week) {
         return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week);
     }
 
+    @RequiresPermissions( "maindata:rawWeekUsage:statistics")
     @GetMapping("/statistics")
     @ApiOperation("获取周用量统计数据")
     public AjaxResult getStatistics(@RequestParam String factoryCode,
@@ -49,11 +121,8 @@ public class RawWeekUsageController {
         return AjaxResult.success(statistics);
     }
 
-    @PostMapping("/generate-for-month")
-    @ApiOperation("为月度计划生成周用量记录")
-    public AjaxResult generateForMonth(@RequestParam String factoryCode,
-                                       @RequestParam Integer year,
-                                       @RequestParam Integer month) {
-        return rawWeekUsageGenerateService.generateWeekUsageForMonth(factoryCode, year, month);
+    @Override
+    protected String getTypeCode(){
+        return "S3522";
     }
 }

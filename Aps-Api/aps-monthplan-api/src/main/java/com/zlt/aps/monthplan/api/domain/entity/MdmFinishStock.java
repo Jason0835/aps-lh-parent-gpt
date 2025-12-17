@@ -22,7 +22,7 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-12-08
  */
-@ApiModel(value = "成品库存对象", description = "成品库存对象")
+@ApiModel(value = "版本库存对象", description = "版本库存对象")
 @Data
 @TableName(value = "T_MDM_FINISH_STOCK")
 public class MdmFinishStock extends BaseEntity {
@@ -108,7 +108,13 @@ public class MdmFinishStock extends BaseEntity {
     @ApiModelProperty(value = "库存数量", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Long stockQty;
-
+    /**
+     * 需求对冲后-余量库存
+     */
+    @Excel(name = "ui.data.column.mdmFinishStock.remainingQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
+    @TableField(value = "REMAINING_QTY")
+    private Long remainingQty;
     /**
      * 年周号
      */

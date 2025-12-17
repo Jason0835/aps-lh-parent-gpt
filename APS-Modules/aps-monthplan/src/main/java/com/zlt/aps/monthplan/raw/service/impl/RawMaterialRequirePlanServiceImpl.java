@@ -141,7 +141,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 Map<String, RawMaterialRequirePlan> t2Requirements = calculateT2MonthRequirements(year, month);
 
                 // 8. 计算EUDR和非EUDR
-                // calculateEudrRequirements(currentMonthRequirements, t1Requirements, t2Requirements);
+                //calculateEudrRequirements(currentMonthRequirements, t1Requirements, t2Requirements);
 
                 // 9. 特殊材料批次计算
                 calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
@@ -262,11 +262,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         // 如果是春节，检查T+2月
         if (isSpringFestivalMonth(year, month)) {
-            MpOrderPrediction mpOrderPrediction = mpOrderPredictionMapper.selectOne(queryWrapper);
+            List<MpOrderPrediction> mpOrderPredictionList = mpOrderPredictionMapper.selectList(queryWrapper);
 
-            if (mpOrderPrediction == null || mpOrderPrediction.getMonth3() == null || mpOrderPrediction.getMonth3() == 0) {
-                return AjaxResult.error(String.format("%d年%02d月的预测月生产计划还没有生成，请先生成",
-                        date.getYear(), date.getMonthValue()));
+            for (MpOrderPrediction mpOrderPrediction : mpOrderPredictionList){
+                if (mpOrderPrediction == null || mpOrderPrediction.getMonth3() == null || mpOrderPrediction.getMonth3() == 0) {
+                    return AjaxResult.error(String.format("%d年%02d月的预测月生产计划还没有生成，请先生成",
+                            date.getYear(), date.getMonthValue()));
+                }
             }
         }
         return AjaxResult.success();

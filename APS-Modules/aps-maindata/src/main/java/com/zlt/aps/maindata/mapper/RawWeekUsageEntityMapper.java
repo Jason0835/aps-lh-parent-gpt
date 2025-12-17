@@ -1,18 +1,14 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialMonthDiff;
 import com.zlt.aps.monthplan.api.domain.entity.RawWeekUsage;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-
-
-import java.util.List;
 
 /**
  * @author nick
  */
 @Mapper
-public interface RawWeekUsageMapper extends CommBaseMapper<RawWeekUsage> {
+public interface RawWeekUsageEntityMapper extends CommBaseMapper<RawWeekUsage> {
 
 
 }

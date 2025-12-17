@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -25,6 +26,7 @@ public class RawWarningConfig extends BaseEntity {
      * 工厂编码
      */
     @Excel(name = "工厂编码")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -33,6 +35,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料编码
      */
     @Excel(name = "原材料编码")
+    @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "原材料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
@@ -41,6 +44,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料名称
      */
     @Excel(name = "原材料名称")
+    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "原材料名称", name = "materialName")
     @TableField(value = "MATERIAL_NAME")
     private String materialName;
@@ -92,5 +96,4 @@ public class RawWarningConfig extends BaseEntity {
     @ApiModelProperty(value = "通知方式", name = "notifyTypes")
     @TableField(value = "NOTIFY_TYPES")
     private String notifyTypes;
-
 }
