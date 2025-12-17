@@ -119,4 +119,9 @@ public interface ISupplyOrderPoolService  extends IBaseService<SupplyOrderPool>
      * @return 对应信息
      */
     SupplyOrderPool queryRelationByMaterialCode(SupplyOrderPool supplyOrderPool);
+    /**
+     *  查询当前年月供应链订单
+     * @return 当前年月供应链订单
+     */
+    List<SupplyOrderPool> findCurrentSupplyOrderPool();
 }
