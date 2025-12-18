@@ -77,4 +77,10 @@ public interface IRawMaterialRequirePlanRemoteService {
     @PostMapping("/rawMaterialRequirePlan/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+
+    @PostMapping("/rawMaterialRequirePlan/generate")
+    @ApiOperation("生成原材料需求计划")
+    public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
+                               @RequestParam("year") Integer year,
+                               @RequestParam("month") Integer month);
 }

@@ -290,6 +290,7 @@ public class RawWeekUsageGenerateServiceImpl {
             RawWeekUsage weekUsage = new RawWeekUsage();
             weekUsage.setFactoryCode(factoryCode);
             weekUsage.setYear(year);
+            weekUsage.setMonth(month);
             weekUsage.setWeek(week);
             weekUsage.setMaterialCode(materialCode);
             weekUsage.setMaterialName(materialName);
