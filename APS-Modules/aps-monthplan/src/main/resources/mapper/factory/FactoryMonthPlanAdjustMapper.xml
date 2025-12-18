@@ -8,7 +8,7 @@
                pmr.SPEC_CODE,
                mmi.MOULD_NO
           FROM t_mdm_mould_use_status mus
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mus.MOULD_CODE
            AND mmi.FACTORY_CODE = mus.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -27,7 +27,7 @@
                mus.MOULD_CODE,
                mmi.MOULD_NO
           FROM t_mdm_mould_use_status mus
-         INNER JOIN t_mdm_model_info mmi
+        INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mus.MOULD_CODE
            AND mmi.FACTORY_CODE = mus.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -54,7 +54,7 @@
                             tmmi.MOULD_NO,
                             mpmr.PRODUCT_CODE
                        FROM t_mdm_product_model_relation mpmr
-                      INNER JOIN t_mdm_model_info tmmi
+                                INNER JOIN T_MDM_MOULD_INFO tmmi
                          ON tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
                         AND tmmi.MOULD_CODE = mpmr.MOULD_CODE
                       WHERE mpmr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -73,7 +73,7 @@
                mmi.MOULD_NO,
                pmr.SPEC_CODE
           FROM t_mdm_device_maintenance_plan mdmp
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -94,7 +94,7 @@
                mus.MOULD_CODE,
                mmi.MOULD_NO
           FROM t_mdm_mould_use_status mus
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mus.MOULD_CODE
            AND mmi.FACTORY_CODE = mus.FACTORY_CODE
          INNER JOIN (SELECT DISTINCT pmr.FACTORY_CODE,
@@ -103,7 +103,7 @@
                             pmr.MOULD_CODE,
                             sammi.MOULD_NO
                        FROM t_mdm_product_model_relation pmr
-                      INNER JOIN t_mdm_model_info sammi
+                                INNER JOIN T_MDM_MOULD_INFO sammi
                          ON sammi.FACTORY_CODE = pmr.FACTORY_CODE
                         AND sammi.MOULD_CODE = pmr.MOULD_CODE
                       INNER JOIN (SELECT DISTINCT samr.PRODUCT_CODE,
@@ -115,7 +115,7 @@
                                                       tmmi.MOULD_NO,
                                                       mpmr.PRODUCT_CODE
                                                  FROM t_mdm_product_model_relation mpmr
-                                                INNER JOIN t_mdm_model_info tmmi
+                                                          INNER JOIN T_MDM_MOULD_INFO tmmi
                                                    ON tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
                                                   AND tmmi.MOULD_CODE = mpmr.MOULD_CODE
                                                 WHERE mpmr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -144,7 +144,7 @@
                mmi.MOULD_NO,
                pmr.SPEC_CODE
           FROM t_mdm_device_maintenance_plan mdmp
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -167,7 +167,7 @@
                mdmp.END_DAY,
                mmi.MOULD_NO
           FROM t_mdm_device_maintenance_plan mdmp
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN (SELECT samr.PRODUCT_CODE,
@@ -180,7 +180,7 @@
                                          tmmi.MOULD_NO,
                                          mpmr.PRODUCT_CODE
                                     FROM t_mdm_product_model_relation mpmr
-                                   INNER JOIN t_mdm_model_info tmmi
+                                             INNER JOIN T_MDM_MOULD_INFO tmmi
                                       ON tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
                                      AND tmmi.MOULD_CODE = mpmr.MOULD_CODE
                                    WHERE mpmr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -204,7 +204,7 @@
                mus.MOULD_CODE,
                mmi.MOULD_NO
           FROM t_mdm_mould_use_status mus
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mus.MOULD_CODE
            AND mmi.FACTORY_CODE = mus.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -224,7 +224,7 @@
                mdmp.END_DAY,
                mmi.MOULD_NO
           FROM t_mdm_device_maintenance_plan mdmp
-         INNER JOIN t_mdm_model_info mmi
+                   INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -246,7 +246,7 @@
                mdmp.END_DAY,
                mmi.MOULD_NO
           FROM t_mdm_device_maintenance_plan mdmp
-         INNER JOIN t_mdm_model_info mmi
+        INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr

@@ -40,7 +40,6 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     private static final long serialVersionUID = 1L;
 
 
-    
 
     /**
      * 生产物料编号
@@ -189,9 +188,6 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     private Integer isDeliveryDate;
 
 
-
-
-
     
     /**
      * 开始日期
@@ -202,17 +198,8 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
      @TableField(exist = false)
     private Integer beginDate;
     
-    /**
-     * 备注说明
-     */
-    @Excel(name = "ui.common.column.remark")
-    @ApiModelProperty("备注")
-     @TableField(exist = false)
-    private String remark;
-  
-    
 
-    
+
 
     /**
      * 获取原始的合并计划集合

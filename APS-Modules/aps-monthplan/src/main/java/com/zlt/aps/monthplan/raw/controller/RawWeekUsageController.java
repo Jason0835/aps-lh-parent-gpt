@@ -24,7 +24,7 @@ import java.util.Map;
  * @author Nick
  */
 @RestController
-@RequestMapping("/raw-week-usage")
+@RequestMapping("/rawWeekUsage")
 @Api(tags = "周维度原材料用量管理")
 public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsage> {
 
@@ -90,7 +90,7 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("endDate")), "END_DATE", queryVO.getFieldValueByFieldName("endDate"));
     }
 
-    @RequiresPermissions( "maindata:rawWeekUsage:generateByMonth")
+    //@RequiresPermissions( "maindata:rawWeekUsage:generateByMonth")
     @PostMapping("/generate-by-month")
     @ApiOperation("按照月份生成周维度原材料用量记录")
     public AjaxResult generateByMonth(@RequestParam("factoryCode") String factoryCode,
@@ -99,7 +99,7 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
         return rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month);
     }
 
-    @RequiresPermissions( "maindata:rawWeekUsage:generateByWeek")
+    //@RequiresPermissions( "maindata:rawWeekUsage:generateByWeek")
     @PostMapping("/generate-by-week")
     @ApiOperation("按照周维度份生成周维度原材料用量记录")
     public AjaxResult generateByWeek(@RequestParam("factoryCode") String factoryCode,
@@ -109,7 +109,7 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
         return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week);
     }
 
-    @RequiresPermissions( "maindata:rawWeekUsage:statistics")
+    //@RequiresPermissions( "maindata:rawWeekUsage:statistics")
     @GetMapping("/statistics")
     @ApiOperation("获取周用量统计数据")
     public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,

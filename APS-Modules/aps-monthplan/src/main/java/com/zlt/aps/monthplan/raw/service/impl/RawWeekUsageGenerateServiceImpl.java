@@ -55,7 +55,7 @@ public class RawWeekUsageGenerateServiceImpl {
 
             if (monthPlans.isEmpty()) {
                 log.warn("未找到月生产计划，工厂：{}，年份：{}，月份：{}", factoryCode, year, month);
-                return AjaxResult.error("未找到月生产计划数据");
+                return AjaxResult.error(String.format("未找到月生产计划，工厂：%s，年份：%d，月份：%d", factoryCode, year, month));
             }
 
             // 2. 按周分组生产计划
@@ -106,8 +106,8 @@ public class RawWeekUsageGenerateServiceImpl {
         for (FactoryMonthPlanProdFinal plan : monthPlans) {
             // 遍历该计划的每一天
             for (int day = 1; day <= daysInMonth; day++) {
-                Long dailyQty = getDailyProductionQty(plan, day);
-                if (dailyQty != null && dailyQty > 0) {
+                int dailyQty = getDailyProductionQty(plan, day);
+                if (dailyQty > 0) {
                     // 计算这一天属于第几周
                     LocalDate date = LocalDate.of(year, month, day);
                     int week = getWeekOfMonth(date);
@@ -123,42 +123,44 @@ public class RawWeekUsageGenerateServiceImpl {
     }
 
     /**
-     * 获取指定日期的生产数量
+     * 获取指定日期的生产数量（null视为0）
      */
-    private Long getDailyProductionQty(FactoryMonthPlanProdFinal plan, int day) {
+    private Integer getDailyProductionQty(FactoryMonthPlanProdFinal plan, int day) {
+        if (plan == null) return 0;
+
         switch (day) {
-            case 1: return plan.getDay1();
-            case 2: return plan.getDay2();
-            case 3: return plan.getDay3();
-            case 4: return plan.getDay4();
-            case 5: return plan.getDay5();
-            case 6: return plan.getDay6();
-            case 7: return plan.getDay7();
-            case 8: return plan.getDay8();
-            case 9: return plan.getDay9();
-            case 10: return plan.getDay10();
-            case 11: return plan.getDay11();
-            case 12: return plan.getDay12();
-            case 13: return plan.getDay13();
-            case 14: return plan.getDay14();
-            case 15: return plan.getDay15();
-            case 16: return plan.getDay16();
-            case 17: return plan.getDay17();
-            case 18: return plan.getDay18();
-            case 19: return plan.getDay19();
-            case 20: return plan.getDay20();
-            case 21: return plan.getDay21();
-            case 22: return plan.getDay22();
-            case 23: return plan.getDay23();
-            case 24: return plan.getDay24();
-            case 25: return plan.getDay25();
-            case 26: return plan.getDay26();
-            case 27: return plan.getDay27();
-            case 28: return plan.getDay28();
-            case 29: return plan.getDay29();
-            case 30: return plan.getDay30();
-            case 31: return plan.getDay31();
-            default: return 0L;
+            case 1: return plan.getDay1() != null ? plan.getDay1() : 0;
+            case 2: return plan.getDay2() != null ? plan.getDay2() : 0;
+            case 3: return plan.getDay3() != null ? plan.getDay3() : 0;
+            case 4: return plan.getDay4() != null ? plan.getDay4() : 0;
+            case 5: return plan.getDay5() != null ? plan.getDay5() : 0;
+            case 6: return plan.getDay6() != null ? plan.getDay6() : 0;
+            case 7: return plan.getDay7() != null ? plan.getDay7() : 0;
+            case 8: return plan.getDay8() != null ? plan.getDay8() : 0;
+            case 9: return plan.getDay9() != null ? plan.getDay9() : 0;
+            case 10: return plan.getDay10() != null ? plan.getDay10() : 0;
+            case 11: return plan.getDay11() != null ? plan.getDay11() : 0;
+            case 12: return plan.getDay12() != null ? plan.getDay12() : 0;
+            case 13: return plan.getDay13() != null ? plan.getDay13() : 0;
+            case 14: return plan.getDay14() != null ? plan.getDay14() : 0;
+            case 15: return plan.getDay15() != null ? plan.getDay15() : 0;
+            case 16: return plan.getDay16() != null ? plan.getDay16() : 0;
+            case 17: return plan.getDay17() != null ? plan.getDay17() : 0;
+            case 18: return plan.getDay18() != null ? plan.getDay18() : 0;
+            case 19: return plan.getDay19() != null ? plan.getDay19() : 0;
+            case 20: return plan.getDay20() != null ? plan.getDay20() : 0;
+            case 21: return plan.getDay21() != null ? plan.getDay21() : 0;
+            case 22: return plan.getDay22() != null ? plan.getDay22() : 0;
+            case 23: return plan.getDay23() != null ? plan.getDay23() : 0;
+            case 24: return plan.getDay24() != null ? plan.getDay24() : 0;
+            case 25: return plan.getDay25() != null ? plan.getDay25() : 0;
+            case 26: return plan.getDay26() != null ? plan.getDay26() : 0;
+            case 27: return plan.getDay27() != null ? plan.getDay27() : 0;
+            case 28: return plan.getDay28() != null ? plan.getDay28() : 0;
+            case 29: return plan.getDay29() != null ? plan.getDay29() : 0;
+            case 30: return plan.getDay30() != null ? plan.getDay30() : 0;
+            case 31: return plan.getDay31() != null ? plan.getDay31() : 0;
+            default: return 0;
         }
     }
 
@@ -177,12 +179,12 @@ public class RawWeekUsageGenerateServiceImpl {
     /**
      * 创建计划的副本，用于指定日期的生产
      */
-    private FactoryMonthPlanProdFinal createPlanCopyForDay(FactoryMonthPlanProdFinal plan, Long dailyQty) {
+    private FactoryMonthPlanProdFinal createPlanCopyForDay(FactoryMonthPlanProdFinal plan, Integer dailyQty) {
         // 创建一个新的计划对象，只包含必要信息
         FactoryMonthPlanProdFinal copy = new FactoryMonthPlanProdFinal();
         copy.setFactoryCode(plan.getFactoryCode());
-        copy.setEmbryoCode(plan.getEmbryoCode());
-        copy.setProductCode(plan.getProductCode());
+        copy.setMainMaterialDesc(plan.getMainMaterialDesc());
+        copy.setMaterialCode(plan.getMaterialCode());
         // 使用当天的产量
         copy.setTotalQty(dailyQty);
         return copy;
@@ -193,23 +195,23 @@ public class RawWeekUsageGenerateServiceImpl {
      */
     private Map<String, BigDecimal> calculateWeekMaterialUsage(List<FactoryMonthPlanProdFinal> weekPlans) {
         // 按胎胚代码分组生产数量
-        Map<String, Long> embryoProductionMap = new HashMap<>();
+        Map<String, Integer> embryoProductionMap = new HashMap<>();
 
         for (FactoryMonthPlanProdFinal plan : weekPlans) {
-            String embryoCode = plan.getEmbryoCode();
-            Long productionQty = plan.getTotalQty();
+            String embryoCode = plan.getMainMaterialDesc();
+            int productionQty = plan.getTotalQty();
 
-            if (productionQty != null && productionQty > 0) {
-                embryoProductionMap.merge(embryoCode, productionQty, Long::sum);
+            if (productionQty > 0) {
+                embryoProductionMap.merge(embryoCode, productionQty, Integer::sum);
             }
         }
 
         // 计算所有原材料的用量
         Map<String, BigDecimal> totalMaterialUsage = new HashMap<>();
 
-        for (Map.Entry<String, Long> entry : embryoProductionMap.entrySet()) {
+        for (Map.Entry<String, Integer> entry : embryoProductionMap.entrySet()) {
             String embryoCode = entry.getKey();
-            Long productionQty = entry.getValue();
+            int productionQty = entry.getValue();
 
             // 获取该胎胚的BOM详情
             List<MdmMaterialConsumeDetail> bomDetails = getBomDetails(embryoCode);
@@ -288,6 +290,7 @@ public class RawWeekUsageGenerateServiceImpl {
             RawWeekUsage weekUsage = new RawWeekUsage();
             weekUsage.setFactoryCode(factoryCode);
             weekUsage.setYear(year);
+            weekUsage.setMonth(month);
             weekUsage.setWeek(week);
             weekUsage.setMaterialCode(materialCode);
             weekUsage.setMaterialName(materialName);
@@ -431,7 +434,7 @@ public class RawWeekUsageGenerateServiceImpl {
         for (FactoryMonthPlanProdFinal plan : monthPlans) {
             // 遍历该计划的每一天
             for (int day = 1; day <= 31; day++) {
-                Long dailyQty = getDailyProductionQty(plan, day);
+                Integer dailyQty = getDailyProductionQty(plan, day);
                 if (dailyQty != null && dailyQty > 0) {
                     try {
                         LocalDate date = LocalDate.of(year, month, day);

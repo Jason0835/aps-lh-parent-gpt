@@ -23,7 +23,8 @@
 
 
     <sql id="selectMpHistorySaleQtyVo">
-        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, PRODUCT_DESC, LOCATION_TYPE, SALE_QTY, ORDER_QTY, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME FROM T_MP_HISTORY_SALE_QTY
+        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, PRODUCT_DESC, LOCATION_TYPE, SALE_QTY, ORDER_QTY, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        FROM T_MDM_HISTORY_SALE_RECORD
     </sql>
 
     <select id="selectMpHistorySaleQtyList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleQty" resultMap="MpHistorySaleQtyResult">
@@ -90,7 +91,7 @@
         YEAR,
         LPAD( MONTH, 2, '0' )) yearMonth
         FROM
-        t_mp_history_sale_qty mhsq
+        T_MDM_HISTORY_SALE_RECORD mhsq
         LEFT JOIN t_mdm_material_info mpi ON mpi.IS_DELETE = 0 and mhsq.FACTORY_CODE = mpi.FACTORY_CODE and
         mhsq.PRODUCT_CODE = mpi.PRODUCT_CODE
         where mhsq.IS_DELETE = 0
@@ -113,7 +114,7 @@
     </select>
 
     <insert id="batchInsertHistorySaleQty">
-        insert into T_MP_HISTORY_SALE_QTY
+        insert into T_MDM_HISTORY_SALE_RECORD
         (ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, PRODUCT_DESC, LOCATION_TYPE, SALE_QTY, ORDER_QTY, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
         )
         select NULL id, x.*
@@ -134,7 +135,7 @@
     </insert>
 
     <update id="updateByDayHisSale">
-        UPDATE T_MP_HISTORY_SALE_QTY mpDaySale
+        UPDATE T_MDM_HISTORY_SALE_RECORD mpDaySale
             JOIN (SELECT YEAR(mpDayHisSale.ORDER_DATE)  AS `YEAR`,
                          MONTH(mpDayHisSale.ORDER_DATE) AS `MONTH`,
                          mpDayHisSale.FACTORY_CODE,
@@ -166,7 +167,7 @@
     </update>
 
     <insert id="insertByDayHisSaleNotExist">
-        INSERT INTO T_MP_HISTORY_SALE_QTY (`YEAR`, `MONTH`, FACTORY_CODE, PRODUCT_CODE, PRODUCT_DESC, LOCATION_TYPE,
+        INSERT INTO T_MDM_HISTORY_SALE_RECORD (`YEAR`, `MONTH`, FACTORY_CODE, PRODUCT_CODE, PRODUCT_DESC, LOCATION_TYPE,
                                            SALE_QTY, ORDER_QTY, CREATE_BY, CREATE_TIME, IS_DELETE)
         SELECT YEAR(mpDayHisSale.ORDER_DATE)  AS `YEAR`,
                MONTH(mpDayHisSale.ORDER_DATE) AS `MONTH`,
@@ -182,7 +183,7 @@
         FROM T_MP_DAY_HISTORY_SALE_QTY mpDayHisSale
         WHERE mpDayHisSale.LOCATION_TYPE != '下架'
           AND NOT EXISTS (SELECT 1
-                          FROM T_MP_HISTORY_SALE_QTY mpDaySale
+            FROM T_MDM_HISTORY_SALE_RECORD mpDaySale
                           WHERE mpDaySale.IS_DELETE = 0
                             AND YEAR(mpDayHisSale.ORDER_DATE) = mpDaySale.`YEAR`
                             AND MONTH(mpDayHisSale.ORDER_DATE) = mpDaySale.`MONTH`

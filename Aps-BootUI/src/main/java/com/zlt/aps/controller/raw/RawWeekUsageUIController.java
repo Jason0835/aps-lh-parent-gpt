@@ -102,6 +102,7 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
 
     @RequiresPermissions("maindata:rawWeekUsage:generateByMonth")
     @PostMapping("/generate-by-month")
+    @ResponseBody
     @ApiOperation("按照月份生成周维度原材料用量记录")
     public AjaxResult generateByMonth(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
@@ -111,6 +112,7 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
 
     @RequiresPermissions("maindata:rawWeekUsage:generateByWeek")
     @PostMapping("/generate-by-week")
+    @ResponseBody
     @ApiOperation("按照周维度份生成周维度原材料用量记录")
     public AjaxResult generateByWeek(@RequestParam("factoryCode") String factoryCode,
                                      @RequestParam("year") Integer year,
@@ -121,6 +123,7 @@ public class RawWeekUsageUIController extends BaseUIController<RawWeekUsage> {
 
     @RequiresPermissions("maindata:rawWeekUsage:statistics")
     @GetMapping("/statistics")
+    @ResponseBody
     @ApiOperation("获取周用量统计数据")
     public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,
                                     @RequestParam("year") Integer year,

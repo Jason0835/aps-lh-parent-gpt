@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.api;
+package com.zlt.aps.monthplan.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
@@ -95,7 +95,8 @@ public interface IRawWarningRecordRemoteService {
     @ApiOperation("同步实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
-                                      @RequestParam("week") Integer week);
+                                      @RequestParam("week") Integer week,
+                                      @RequestParam("month") Integer month);
 
     @PostMapping("/rawWarningRecord/execute-new-material-warning")
     @ApiOperation("执行新材料预警")
@@ -107,5 +108,6 @@ public interface IRawWarningRecordRemoteService {
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("year") Integer year,
-                                          @RequestParam("week") Integer week);
+                                          @RequestParam("week") Integer week,
+                                          @RequestParam("month") Integer month);
 }

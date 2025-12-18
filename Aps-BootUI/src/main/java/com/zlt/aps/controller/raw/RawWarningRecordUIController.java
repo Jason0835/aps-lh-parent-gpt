@@ -21,7 +21,7 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
 
-import com.zlt.aps.maindata.api.IRawWarningRecordRemoteService;
+import com.zlt.aps.monthplan.api.service.IRawWarningRecordRemoteService;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -100,15 +100,18 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
 
     @RequiresPermissions("maindata:rawWarningRecord:executeUsageWarning")
     @PostMapping("/execute-usage-warning")
+    @ResponseBody
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("year") Integer year,
-                                          @RequestParam("week") Integer week) {
-        return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week);
+                                          @RequestParam("week") Integer week,
+                                          @RequestParam("month") Integer month) {
+        return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week, month);
     }
 
     @RequiresPermissions("maindata:rawWarningRecord:executeNewMaterialWarning")
     @PostMapping("/execute-new-material-warning")
+    @ResponseBody
     @ApiOperation("执行新材料预警")
     public AjaxResult executeNewMaterialWarning(@RequestParam("factoryCode") String factoryCode,
                                                 @RequestParam("year") Integer year,
@@ -118,15 +121,18 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
 
     @RequiresPermissions("maindata:rawWarningRecord:syncActualUsage")
     @PostMapping("/sync-actual-usage")
+    @ResponseBody
     @ApiOperation("同步实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
-                                      @RequestParam("week") Integer week) {
-        return iRawWarningRecordService.syncActualUsage(factoryCode, year, week);
+                                      @RequestParam("week") Integer week,
+                                      @RequestParam("month") Integer month) {
+        return iRawWarningRecordService.syncActualUsage(factoryCode, year, week, month);
     }
 
     @RequiresPermissions("maindata:rawWarningRecord:handleWarning")
     @PostMapping("/handle-warning")
+    @ResponseBody
     @ApiOperation("处理预警记录")
     public AjaxResult handleWarning(@RequestParam("id") Long id,
                                     @RequestParam("handler") String handler,
@@ -136,6 +142,7 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
 
     @RequiresPermissions("maindata:rawWarningRecord:statistics")
     @GetMapping("/statistics")
+    @ResponseBody
     @ApiOperation("获取预警统计")
     public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,
                                     @RequestParam(value = "warningType", required = false) String warningType,

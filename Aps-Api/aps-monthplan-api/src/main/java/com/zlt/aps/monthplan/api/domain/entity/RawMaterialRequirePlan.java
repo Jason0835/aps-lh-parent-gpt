@@ -60,7 +60,7 @@ public class RawMaterialRequirePlan extends BaseEntity {
 
     /** 分类 */
     @Excel(name = "ui.data.column.rawMaterialRequirePlan.category")
-    @ApiModelProperty(value = "分类", name = "category")
+    @ApiModelProperty(value = "分类  biz_rawMaterial_type", name = "category")
     @TableField(value = "CATEGORY")
     private String category;
 

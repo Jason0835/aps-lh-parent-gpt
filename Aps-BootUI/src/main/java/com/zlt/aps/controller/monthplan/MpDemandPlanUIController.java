@@ -1,37 +1,31 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.ruoyi.common4ui.exception.base.BaseException;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.service.IMpDemandPlanRemoteService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.ruoyi.common4ui.exception.base.BaseException;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-import org.apache.commons.io.IOUtils;
-
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -50,7 +44,7 @@ import javax.servlet.http.HttpServletResponse;
 @Api(tags = "需求计划")
 @Controller
 @RequestMapping("/monthplan/demandPlan")
-public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
+public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
 
     @Autowired
     private IMpDemandPlanRemoteService iMpDemandPlanService;
@@ -71,7 +65,7 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mpDemandPlan", new MpDemandPlan());
+        mmap.put("mpDemandPlan", new DpDemandPlan());
         return prefix + "/add";
     }
 
@@ -91,7 +85,7 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
     @RequiresPermissions("monthplan:demandPlan:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MpDemandPlan entity) {
+    public TableDataInfo list(DpDemandPlan entity) {
         return iMpDemandPlanService.list(entity);
     }
 
@@ -102,7 +96,7 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
     @RequiresPermissions("monthplan:demandPlan:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult editSave(MpDemandPlan mpDemandPlan) {
+    public AjaxResult editSave(DpDemandPlan mpDemandPlan) {
         AjaxResult ajaxResult;
         if (UserConstants.NOT_UNIQUE.equals(iMpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpDemandPlan.checkUnique"));
@@ -133,7 +127,7 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
     @ApiOperation("校验需求计划唯一性")
     @PostMapping("/checkMpDemandPlanUnique")
     @ResponseBody
-    public String checkMpDemandPlanUnique(MpDemandPlan mpDemandPlan) {
+    public String checkMpDemandPlanUnique(DpDemandPlan mpDemandPlan) {
         return iMpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan);
     }
 
@@ -172,7 +166,7 @@ public class MpDemandPlanUIController extends BaseUIController<MpDemandPlan> {
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MpDemandPlan entity) throws IOException {
+    public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMpDemandPlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

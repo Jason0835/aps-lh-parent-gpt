@@ -89,7 +89,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                             mpmr.PRODUCT_CODE,
                             GROUP_CONCAT( DISTINCT(tmmi.MOULD_NO) )  AS MOULD_NO
                        FROM t_mdm_product_model_relation mpmr
-                       LEFT JOIN t_mdm_model_info tmmi
+        LEFT JOIN T_MDM_MOULD_INFO tmmi
                          ON tmmi.MOULD_CODE = mpmr.MOULD_CODE
                         AND tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
                       WHERE 1=1
