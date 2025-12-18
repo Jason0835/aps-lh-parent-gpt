@@ -15,7 +15,7 @@ import java.util.Date;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpMouldDeliveryPlan.java
- * 描    述：模具到货计划对象 t_mp_mould_delivery_plan
+ * 描    述：模具到货计划对象 T_MDM_MOULD_DELIVERY_PLAN
  *
  * @author zlt
  * @version 1.0
@@ -26,9 +26,9 @@ import java.util.Date;
  * 修改内容：...
  * @date 2025-12-05
  */
-@ApiModel(value = "模具到货计划对象", description = "模具到货计划对象 ")
+@ApiModel(value = "模具到货计划对象", description = "模具到货计划对象")
 @Data
-@TableName(value = "T_MP_MOULD_DELIVERY_PLAN")
+@TableName(value = "T_MDM_MOULD_DELIVERY_PLAN")
 public class MpMouldDeliveryPlan extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

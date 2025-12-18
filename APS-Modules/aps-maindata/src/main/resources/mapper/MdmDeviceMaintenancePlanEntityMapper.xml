@@ -6,7 +6,7 @@
         SELECT mdmp.MACHINE_CODE AS MOULD_CODE,
                mmi.MOULD_NO
           FROM t_mdm_device_maintenance_plan mdmp
-          LEFT JOIN T_MDM_MODEL_INFO mmi
+        LEFT JOIN T_MDM_MOULD_INFO mmi
             ON mdmp.FACTORY_CODE = mmi.FACTORY_CODE
            AND mdmp.MACHINE_CODE = mmi.MOULD_CODE
            AND mdmp.MACHINE_TYPE = 2

@@ -48,7 +48,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * 2、根据需求计划信息，获取必要的配置关系信息
      * 2.1、SKU与施工关系：t_mdm_sku_construction_ref ：specCode + embryoCode + constructionCode
      * 2.2、SKU与模具关系：t_mdm_sku_mould_rel：materialDesc + mouldCode + factoryCode
-     * 2.3、模具基础信息：t_mdm_model_info：mouldCode + factoryCode
+     * 2.3、模具基础信息：T_MDM_MOULD_INFO：mouldCode + factoryCode
      * 2.4、模具到货计划：t_mdm_mould_delivery_plan：materialCode + factoryCode + mouldCode
      * 2.5、SKU与结构关系：t_mdm_sku_structure_ref：materialCode + factoryCode + structureName
      * 2.6、SKU日硫化产能：t_mdm_sku_lh_capacity：materialCode + factoryCode + mesCapacity/standardCapacity/apsCapacity

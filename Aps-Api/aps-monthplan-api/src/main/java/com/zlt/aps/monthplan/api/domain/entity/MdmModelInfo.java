@@ -14,7 +14,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmModelInfo.java
- * 描    述：模具信息对象 t_mdm_model_info
+ * 描    述：模具信息对象 T_MDM_MOULD_INFO
  *
  * @author zlt
  * @version 1.0
@@ -28,7 +28,7 @@ import lombok.Data;
 
 @ApiModel(value = "模具信息对象", description = "模具信息对象")
 @Data
-@TableName(value = "T_MDM_MODEL_INFO")
+@TableName(value = "T_MDM_MOULD_INFO")
 public class MdmModelInfo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
