@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
-import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -142,7 +141,7 @@ public class AdjustUtils {
         productionPlan.setPattern(productInfo.getPattern());
         productionPlan.setHierarchy(productInfo.getHierarchy());
         productionPlan.setSpecifications(productInfo.getSpecifications());
-        productionPlan.setProSize(String.valueOf(productInfo.getProSize()));
+        // productionPlan.setProSize(String.valueOf(productInfo.getProSize()));
         productionPlan.setBrand(productInfo.getBrand());
         productionPlan.setProductTypeCode(productInfo.getProductTypeCode());
         productionPlan.setProductTypeName(productInfo.getProductTypeName());

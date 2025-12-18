@@ -156,7 +156,7 @@ public class MdmMaterialInfo extends BaseEntity {
     @Excel(name = "ui.data.column.mdmMaterialInfo.proSize")
     @ApiModelProperty(value = "轮辋尺寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
-    private BigDecimal proSize;
+    private String proSize;
 
     /**
      * 性能

@@ -2001,7 +2001,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         }
         int total = 0;
         for (FactoryMonthPlanProdFinalVo record : records) {
-            total += record.sumDays(); // 累加每个对象的总和
+            // total += record.sumDays(); // 累加每个对象的总和
         }
         return total;
     }

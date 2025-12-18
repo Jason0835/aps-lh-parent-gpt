@@ -48,7 +48,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private FactoryMonthPlanProdFinalMapper factoryMonthPlanProdFinalMapper;
 
     @Autowired
-    private MpOrderPredictionEntityMapper mpOrderPredictionMapper;
+    private MpProductionPredictionEntityMapper mpOrderPredictionMapper;
 
     @Autowired
     private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
@@ -250,7 +250,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         // 计算T+1月
         LocalDate date = LocalDate.of(year, month, 1);
 
-        QueryWrapper<MpOrderPrediction> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpProductionPrediction> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("YEAR", date.getYear())
                 .eq("MONTH", date.getMonthValue());
         Long currencyCount = mpOrderPredictionMapper.selectCount(queryWrapper);
@@ -262,10 +262,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         // 如果是春节，检查T+2月
         if (isSpringFestivalMonth(year, month)) {
-            List<MpOrderPrediction> mpOrderPredictionList = mpOrderPredictionMapper.selectList(queryWrapper);
+            List<MpProductionPrediction> mpProductionPredictionList = mpOrderPredictionMapper.selectList(queryWrapper);
 
-            for (MpOrderPrediction mpOrderPrediction : mpOrderPredictionList){
-                if (mpOrderPrediction == null || mpOrderPrediction.getMonth3() == null || mpOrderPrediction.getMonth3() == 0) {
+            for (MpProductionPrediction mpProductionPrediction : mpProductionPredictionList){
+                if (mpProductionPrediction == null || mpProductionPrediction.getMonth3() == null || mpProductionPrediction.getMonth3() == 0) {
                     return AjaxResult.error(String.format("%d年%02d月的预测月生产计划还没有生成，请先生成",
                             date.getYear(), date.getMonthValue()));
                 }
@@ -389,12 +389,12 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
 
         // 获取预测计划
-        QueryWrapper<MpOrderPrediction> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpProductionPrediction> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("YEAR", year)
                 .eq("MONTH", month);
-        List<MpOrderPrediction> predictions = mpOrderPredictionMapper.selectList(queryWrapper);
+        List<MpProductionPrediction> predictions = mpOrderPredictionMapper.selectList(queryWrapper);
 
-        for (MpOrderPrediction prediction : predictions) {
+        for (MpProductionPrediction prediction : predictions) {
             Integer productionQty = prediction.getProductionQty();
             if (productionQty == null || productionQty == 0) {
                 continue;

@@ -1361,7 +1361,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
                 require.setProductDesc(productInfo.getMaterialDesc());
                 require.setProductTypeCode(productInfo.getProductTypeCode());
                 require.setProductTypeName(productInfo.getProductTypeName());
-                require.setProSize(productInfo.getProSize());
+                //require.setProSize(productInfo.getProSize());
                 require.setSpecifications(productInfo.getSpecifications());
                 require.setPattern(productInfo.getPattern());
                 require.setHierarchy(productInfo.getHierarchy());

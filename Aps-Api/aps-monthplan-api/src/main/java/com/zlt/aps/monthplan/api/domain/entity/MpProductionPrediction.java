@@ -1,15 +1,12 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-
-import java.util.Date;
 
 
 /**
@@ -23,8 +20,8 @@ import java.util.Date;
 @ApiModel(value = "订单预测对象", description = "订单预测表")
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName(value = "T_MP_ORDER_PREDICTION")
-public class MpOrderPrediction extends BaseEntity {
+@TableName(value = "T_MP_PRODUCTION_PREDICTION")
+public class MpProductionPrediction extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

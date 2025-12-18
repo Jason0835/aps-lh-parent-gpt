@@ -91,7 +91,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
     // 历史销售记录
     private final IMpHistorySaleRecordService historySaleRecordService;
-
+    // 排产设定
     private final IFactoryParamService iFactoryParamService;
 
 
@@ -450,7 +450,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
       supplyOrderPool.setSaleArea(monthlySaleQty.getSaleArea());
       supplyOrderPool.setAverageSaleQty(monthlySaleQty.getAverageSaleQty());
       // 周转天数
-      String turnOverDaysStr = this.getFactoryParam(supplyOrderPool.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
+      String turnOverDaysStr = this.getTurnOverDays(supplyOrderPool.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
       // 备库上限值 = 周转天数(全局参数) * 月均销量 / 30
       BigDecimal turnOverDays = BigDecimalUtils.valueOf(turnOverDaysStr);
       long stockLimit = BigDecimalUtils.multiply(turnOverDays,BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
@@ -491,7 +491,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
    *
    * @return
    */
-  private String getFactoryParam(String factoryCode, String productTypeCode) {
+  private String getTurnOverDays(String factoryCode, String productTypeCode) {
     FactoryParam factoryParam = new FactoryParam();
     factoryParam.setFactoryCode(factoryCode);
     factoryParam.setParamCode(MonthPlanEnums.TURN_OVER_DAYS.getCode());
@@ -558,8 +558,8 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
             salesOrder -> createCompositeKey(
                 salesOrder.getOriMaterialCode(),
                 salesOrder.getWeekYear(),
-                salesOrder.getDynamicBalance(),
-                salesOrder.getUniformity()
+                salesOrder.getIsDynamicBalance(),
+                salesOrder.getIsUniformity()
             ),
             Collectors.summingLong(item -> item.getOrdQty().longValue())
         ));
@@ -654,7 +654,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
            deliveryFrequency = monthlySaleQty.getDeliveryFrequency();
            saleArea = monthlySaleQty.getSaleArea();
            // 周转天数
-           String turnOverDaysStr = this.getFactoryParam(entity.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
+           String turnOverDaysStr = this.getTurnOverDays(entity.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
            // 备库上限值 = 周转天数(全局参数) * 月均销量 / 30
            BigDecimal turnOverDays = BigDecimalUtils.valueOf(turnOverDaysStr);
            long stockLimit = BigDecimalUtils.multiply(turnOverDays,BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
@@ -728,7 +728,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
       deliveryFrequency = monthlySaleQty.getDeliveryFrequency();
       saleArea = monthlySaleQty.getSaleArea();
       // 周转天数
-      String turnOverDaysStr = this.getFactoryParam(entity.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
+      String turnOverDaysStr = this.getTurnOverDays(entity.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
       // 备库上限值 = 周转天数(全局参数) * 月均销量 / 30
       BigDecimal turnOverDays = BigDecimalUtils.valueOf(turnOverDaysStr);
       long stockLimit = BigDecimalUtils.multiply(turnOverDays,BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))

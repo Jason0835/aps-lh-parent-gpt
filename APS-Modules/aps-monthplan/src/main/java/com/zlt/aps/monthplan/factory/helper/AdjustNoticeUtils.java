@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
-import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.SortHierarchyEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -88,7 +87,7 @@ public class AdjustNoticeUtils {
         noticeOrder.setProductDesc(productInfo.getMaterialDesc());
         noticeOrder.setHierarchy(productInfo.getHierarchy());
         noticeOrder.setSpecifications(productInfo.getSpecifications());
-        noticeOrder.setProSize(productInfo.getProSize());
+        //noticeOrder.setProSize(productInfo.getProSize());
         noticeOrder.setProductTypeCode(productInfo.getProductTypeCode());
         noticeOrder.setProductTypeName(productInfo.getProductTypeName());
         noticeOrder.setPattern(productInfo.getPattern());

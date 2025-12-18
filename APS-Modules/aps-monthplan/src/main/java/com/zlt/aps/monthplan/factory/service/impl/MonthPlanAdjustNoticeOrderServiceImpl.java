@@ -654,7 +654,7 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
         }
         AdjustProductConstructionInfoHelper helper = (AdjustProductConstructionInfoHelper) checkConstructionInfoResult.get(AjaxResult.DATA_TAG);
         AddQtyAdjustPlanHelper addQtyInfo = AdjustNoticeUtils.buildAddQtyInfo(noticeOrderOperate, checkHelper);
-        addQtyInfo.setProSize(productInfo.getProSize());
+        // addQtyInfo.setProSize(productInfo.getProSize());
         //20250616 修改为只考虑模具产能
         AjaxResult checkQtyResult = factoryMonthPlanAdjustPlanBusinessService.checkMaxMouldQtyByStartDate(helper, addQtyInfo);
         if (AjaxResult.Type.ERROR.value() == (Integer) checkQtyResult.get(AjaxResult.CODE_TAG)) {
@@ -775,7 +775,7 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
         //校验调减后的模具产能、寸口产能、每日产能
         AdjustProductConstructionInfoHelper helper = (AdjustProductConstructionInfoHelper) checkConstructionInfoResult.get(AjaxResult.DATA_TAG);
         AddQtyAdjustPlanHelper addQtyInfo = AdjustNoticeUtils.buildAddQtyInfo(noticeOrderOperate, checkHelper);
-        addQtyInfo.setProSize(productInfo.getProSize());
+        //addQtyInfo.setProSize(productInfo.getProSize());
         AjaxResult checkAfterSubtractResult = factoryMonthPlanAdjustPlanBusinessService.checkAfterSubtractOtherPlanByMould(helper, addQtyInfo, updateList);
         if (AjaxResult.Type.ERROR.value() == (Integer) checkAfterSubtractResult.get(AjaxResult.CODE_TAG)) {
             return checkAfterSubtractResult;

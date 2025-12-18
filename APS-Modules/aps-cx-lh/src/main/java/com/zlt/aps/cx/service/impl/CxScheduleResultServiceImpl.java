@@ -330,10 +330,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 List<MdmMaterialInfo> mdmMaterialInfo = mdmMaterialInfoMap.get(docEntity.getSpecCode());
                 if (!mdmMaterialInfo.isEmpty()) {
                     for (MdmMaterialInfo mdmMaterialInfoEntity : mdmMaterialInfo) {
-                        if (BigDecimalUtils.safeCompare(mdmMaterialInfoEntity.getProSize(), BigDecimal.valueOf(docEntity.getSpecDimension() == null ? 0 : docEntity.getSpecDimension())) == 0) {
+                        /*if (BigDecimalUtils.safeCompare(mdmMaterialInfoEntity.getProSize(), BigDecimal.valueOf(docEntity.getSpecDimension() == null ? 0 : docEntity.getSpecDimension())) == 0) {
                             docEntity.setSpecDesc(mdmMaterialInfoEntity.getSpecifications());
 //                            docEntity.setLhSingleTireTime((double) (mdmMaterialInfoEntity.getCuringTime() == null ? 0 : mdmMaterialInfoEntity.getCuringTime()));
-                        }
+                        }*/
                     }
                 }
             }

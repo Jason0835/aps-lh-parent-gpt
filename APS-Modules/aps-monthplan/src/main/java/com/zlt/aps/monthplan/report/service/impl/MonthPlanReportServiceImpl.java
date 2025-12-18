@@ -2903,7 +2903,7 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
             if (productInfoMap.containsKey(productCode)) {
                 MdmMaterialInfo productInfo = productInfoMap.get(productCode);
                 reportVo.setProductDesc(productInfo.getMaterialDesc());
-                reportVo.setProSize(productInfo.getProSize().toString());
+                // reportVo.setProSize(productInfo.getProSize().toString());
                 reportVo.setBrand(productInfo.getBrand());
                 reportVo.setPattern(productInfo.getPattern());
             }
