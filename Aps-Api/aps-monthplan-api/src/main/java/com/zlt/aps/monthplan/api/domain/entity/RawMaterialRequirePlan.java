@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -52,17 +53,25 @@ public class RawMaterialRequirePlan extends BaseEntity {
     @TableField(value = "MONTH")
     private Integer month;
 
-    /** 生产物料编号 */
-    @Excel(name = "ui.data.column.rawMaterialRequirePlan.productCode")
-    @ApiModelProperty(value = "生产物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    /** 材料代码 */
+    @Excel(name = "ui.data.column.rawMaterialRequirePlan.materialCode")
+    @ApiModelProperty(value = "材料代码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
-    /** 分类 */
-    @Excel(name = "ui.data.column.rawMaterialRequirePlan.category")
-    @ApiModelProperty(value = "分类  biz_rawMaterial_type", name = "category")
-    @TableField(value = "CATEGORY")
-    private String category;
+    /** 材料描述 */
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialDesc")
+    @ImportExcelValidated(required = true, maxLength = 100)
+    @ApiModelProperty(value = "材料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /** 物料类型            数据字典 biz_rawMaterial_type 01 常规产品 04 特殊材料            匹配特殊原材料，则 类型 = 04 */
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialType",dictType = "biz_rawMaterial_type")
+    @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
+    @ApiModelProperty(value = "物料类型 biz_rawMaterial_type")
+    @TableField(value = "MATERIAL_TYPE")
+    private String materialType;
 
     /** 当月需求量 */
     @Excel(name = "ui.data.column.rawMaterialRequirePlan.curMonthQty")
@@ -119,7 +128,7 @@ public class RawMaterialRequirePlan extends BaseEntity {
     }
 
     public RawMaterialRequirePlan(String materialCode) {
-        this.productCode = materialCode;
+        this.materialCode = materialCode;
     }
 
     /**
@@ -285,6 +294,6 @@ public class RawMaterialRequirePlan extends BaseEntity {
      */
     public String getUniqueKey() {
         return String.format("%s_%d_%d_%s",
-                factoryCode, year, month, productCode);
+                factoryCode, year, month, materialCode);
     }
 }

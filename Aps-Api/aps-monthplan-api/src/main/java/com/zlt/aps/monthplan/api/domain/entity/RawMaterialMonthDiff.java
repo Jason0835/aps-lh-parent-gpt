@@ -18,7 +18,7 @@ public class RawMaterialMonthDiff extends BaseEntity {
     private Integer year;
     private Integer month;
     private String materialCode;
-    private String materialName;
+    private String materialDesc;
 
     // 差异类型：新增/减少
     private String diffType;

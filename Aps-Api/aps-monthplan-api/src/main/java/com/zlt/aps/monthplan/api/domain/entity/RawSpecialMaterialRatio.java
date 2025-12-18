@@ -50,10 +50,10 @@ public class RawSpecialMaterialRatio extends BaseEntity {
 
     /** 材料名称 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.materialName")
-    @ApiModelProperty(value = "材料名称", name = "materialName")
+    @ApiModelProperty(value = "材料名称", name = "materialDesc")
     @ImportExcelValidated(required = true, maxLength = 100)
-    @TableField(value = "MATERIAL_NAME")
-    private String materialName;
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.standardLength")

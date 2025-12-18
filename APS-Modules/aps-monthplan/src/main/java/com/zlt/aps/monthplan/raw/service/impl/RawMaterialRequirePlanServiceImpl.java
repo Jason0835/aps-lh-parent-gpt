@@ -147,10 +147,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
 
                 // 10. 汇总并保存需求计划
-                saveRawMaterialRequirePlan(year, month, currentMonthRequirements, t1Requirements, t2Requirements);
+                saveRawMaterialRequirePlan(year, month, currentMonthRequirements, t1Requirements, t2Requirements, factoryCode);
 
                 // 11. 生成差异数据
-                generateDifferenceData(year, month);
+                generateDifferenceData(year, month,factoryCode);
 
                 // 12. 生成周维度原材料用量记录
                 generateWeekUsageRecords(factoryCode, year, month);
@@ -310,12 +310,17 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
             // 根据胎胚代码获取BOM结构
             //todo 需要用SKU与施工关系拿胎胚版本
-            List<MdmMaterialConsumeDetail> bomDetails = getBomDetails(plan.getEmbryoCode());
+            List<MdmMaterialConsumeDetail> bomDetails = getBomDetails(plan.getMainMaterialDesc());
 
             // 计算原材料需求
             for (MdmMaterialConsumeDetail detail : bomDetails) {
                 String materialCode = detail.getChildMaterialCode();
                 BigDecimal dosage = detail.getDosage();
+
+                if (dosage == null) {
+                    log.warn("物料 {} 的用量为空，设为0", materialCode);
+                    dosage = BigDecimal.ZERO;
+                }
 
                 // 计算需求数量 = 产量 * 单胎消耗量
                 BigDecimal requiredQty = BigDecimal.valueOf(totalQty).multiply(dosage);
@@ -462,7 +467,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private void saveRawMaterialRequirePlan(Integer year, Integer month,
                                             Map<String, RawMaterialRequirePlan> currentMonthRequirements,
                                             Map<String, RawMaterialRequirePlan> t1Requirements,
-                                            Map<String, RawMaterialRequirePlan> t2Requirements) {
+                                            Map<String, RawMaterialRequirePlan> t2Requirements, String factoryCode) {
 
         // 删除旧的计划
         QueryWrapper<RawMaterialRequirePlan> deleteWrapper = new QueryWrapper<>();
@@ -478,7 +483,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         // 保存新的计划
         for (RawMaterialRequirePlan requirement : allRequirements.values()) {
-            RawMaterialRequirePlan plan = convertToEntity(year, month, requirement);
+            RawMaterialRequirePlan plan = convertToEntity(year, month, requirement, factoryCode);
             rawMaterialRequirePlanMapper.insert(plan);
         }
     }
@@ -504,22 +509,22 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 转换为实体
      */
     private RawMaterialRequirePlan convertToEntity(Integer year, Integer month,
-                                                   RawMaterialRequirePlan requirement) {
+                                                   RawMaterialRequirePlan requirement, String factoryCode) {
         RawMaterialRequirePlan plan = new RawMaterialRequirePlan();
         plan.setYear(year);
         plan.setMonth(month);
-        plan.setProductCode(requirement.getProductCode());
-        plan.setCurMonthQty(requirement.getCurMonthQty());
-        plan.setCurMonthRudrQty(requirement.getCurMonthRudrQty());
-        plan.setTMonthQty(requirement.getTMonthQty());
-        plan.setTMonthEudrQty(requirement.getTMonthEudrQty());
-        plan.setT1MonthQty(requirement.getT1MonthQty());
-        plan.setT1MonthEudrQty(requirement.getT1MonthEudrQty());
-        plan.setT2MonthQty(requirement.getT2MonthQty());
-        plan.setT2MonthEudrQty(requirement.getT2MonthEudrQty());
+        plan.setMaterialCode(requirement.getMaterialCode());
+        plan.setFactoryCode(factoryCode);
 
-        // 设置工厂编码（这里需要根据实际情况获取）
-        plan.setFactoryCode("FACTORY001");
+        // 处理所有BigDecimal字段，确保2位小数，不超过10位整数
+        plan.setCurMonthQty(formatAndValidateBigDecimal(requirement.getCurMonthQty(), "CUR_MONTH_QTY"));
+        plan.setCurMonthRudrQty(formatAndValidateBigDecimal(requirement.getCurMonthRudrQty(), "CUR_MONTH_RUDR_QTY"));
+        plan.setTMonthQty(formatAndValidateBigDecimal(requirement.getTMonthQty(), "T_MONTH_QTY"));
+        plan.setTMonthEudrQty(formatAndValidateBigDecimal(requirement.getTMonthEudrQty(), "T_MONTH_EUDR_QTY"));
+        plan.setT1MonthQty(formatAndValidateBigDecimal(requirement.getT1MonthQty(), "T1_MONTH_QTY"));
+        plan.setT1MonthEudrQty(formatAndValidateBigDecimal(requirement.getT1MonthEudrQty(), "T1_MONTH_EUDR_QTY"));
+        plan.setT2MonthQty(formatAndValidateBigDecimal(requirement.getT2MonthQty(), "T2_MONTH_QTY"));
+        plan.setT2MonthEudrQty(formatAndValidateBigDecimal(requirement.getT2MonthEudrQty(), "T2_MONTH_EUDR_QTY"));
 
         // 设置创建信息
         String username = SecurityUtils.getUsername();
@@ -531,6 +536,65 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         return plan;
     }
+
+    /**
+     * 格式化并验证BigDecimal值
+     * 要求：2位小数，整数部分不超过10位
+     */
+    private BigDecimal formatAndValidateBigDecimal(BigDecimal value, String fieldName) {
+        if (value == null) {
+            return null;
+        }
+
+        try {
+            // 1. 四舍五入到2位小数
+            BigDecimal roundedValue = value.setScale(2, RoundingMode.HALF_UP);
+
+            // 2. 检查整数部分长度（8位整数 + 2位小数）
+            // DECIMAL(10,2) 的最大值是 99999999.99，最小值是 -99999999.99
+            BigDecimal maxValue = new BigDecimal("99999999.99");
+            BigDecimal minValue = new BigDecimal("-99999999.99");
+
+            // 3. 检查是否超出范围
+            if (roundedValue.compareTo(maxValue) > 0) {
+                log.warn("字段 {} 的值 {} 超出最大范围，将被限制为 {}",
+                        fieldName, roundedValue, maxValue);
+                return maxValue;
+            }
+
+            if (roundedValue.compareTo(minValue) < 0) {
+                log.warn("字段 {} 的值 {} 超出最小范围，将被限制为 {}",
+                        fieldName, roundedValue, minValue);
+                return minValue;
+            }
+
+            // 4. 检查整数部分位数
+            String strValue = roundedValue.toPlainString();
+            int dotIndex = strValue.indexOf('.');
+            if (dotIndex == -1) {
+                // 没有小数点，整个都是整数部分
+                if (strValue.length() > 8) {
+                    // 取前8位
+                    String limitedInt = strValue.substring(0, 8);
+                    return new BigDecimal(limitedInt + ".00");
+                }
+            } else {
+                String integerPart = strValue.substring(0, dotIndex);
+                if (integerPart.length() > 8) {
+                    // 取前8位
+                    String limitedInt = integerPart.substring(0, 8);
+                    return new BigDecimal(limitedInt + strValue.substring(dotIndex));
+                }
+            }
+
+            return roundedValue;
+        } catch (Exception e) {
+            log.error("格式化字段 {} 的值 {} 时发生错误: {}",
+                    fieldName, value, e.getMessage(), e);
+            return BigDecimal.ZERO;
+        }
+    }
+
 
     /**
      * 计算特殊材料批次
@@ -545,7 +609,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         List<RawMaterialRequirePlan> specialMaterials = rawMaterialRequirePlanMapper.selectList(specialMaterialQuery);
 
         for (RawMaterialRequirePlan specialMaterial : specialMaterials) {
-            String materialCode = specialMaterial.getProductCode();
+            String materialCode = specialMaterial.getMaterialCode();
             RawMaterialRequirePlan requirement = requirements.get(materialCode);
 
             if (requirement != null && requirement.getCurMonthQty() != null) {
@@ -589,13 +653,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 生成差异数据
      */
-    private void generateDifferenceData(Integer year, Integer month) {
+    private void generateDifferenceData(Integer year, Integer month, String factoryCode) {
         // 计算当前月与上个月的差异
         Map<String, RawMaterialRequirePlan> currentRequirements = getRequirementsByMonth(year, month);
         Map<String, RawMaterialRequirePlan> previousRequirements = getPreviousMonthRequirements(year, month);
 
         // 计算差异并保存
-        calculateAndSaveDifferences(year, month, currentRequirements, previousRequirements);
+        calculateAndSaveDifferences(year, month, currentRequirements, previousRequirements, factoryCode);
     }
 
     /**
@@ -609,7 +673,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
         for (RawMaterialRequirePlan plan : plans) {
-            RawMaterialRequirePlan requirement = new RawMaterialRequirePlan(plan.getProductCode());
+            RawMaterialRequirePlan requirement = new RawMaterialRequirePlan(plan.getMaterialCode());
             requirement.setCurMonthQty(plan.getCurMonthQty());
             requirement.setCurMonthRudrQty(plan.getCurMonthRudrQty());
             requirement.setTMonthQty(plan.getTMonthQty());
@@ -619,7 +683,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             requirement.setT2MonthQty(plan.getT2MonthQty());
             requirement.setT2MonthEudrQty(plan.getT2MonthEudrQty());
 
-            requirements.put(plan.getProductCode(), requirement);
+            requirements.put(plan.getMaterialCode(), requirement);
         }
         return requirements;
     }
@@ -638,7 +702,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private void calculateAndSaveDifferences(Integer year, Integer month,
                                              Map<String, RawMaterialRequirePlan> current,
-                                             Map<String, RawMaterialRequirePlan> previous) {
+                                             Map<String, RawMaterialRequirePlan> previous, String factoryCode) {
 
         // 计算新增的原材料
         for (String materialCode : current.keySet()) {
@@ -648,14 +712,14 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             if (prevReq == null) {
                 // 新增的原材料
                 saveDifferenceRecord(year, month, materialCode, "新增",
-                        BigDecimal.ZERO, currentReq.getCurMonthQty());
+                        BigDecimal.ZERO, currentReq.getCurMonthQty(), factoryCode);
             } else {
                 // 计算差异
                 BigDecimal diff = currentReq.getCurMonthQty().subtract(prevReq.getCurMonthQty());
                 if (diff.compareTo(BigDecimal.ZERO) != 0) {
                     String diffType = diff.compareTo(BigDecimal.ZERO) > 0 ? "增加" : "减少";
                     saveDifferenceRecord(year, month, materialCode, diffType,
-                            prevReq.getCurMonthQty(), currentReq.getCurMonthQty());
+                            prevReq.getCurMonthQty(), currentReq.getCurMonthQty(), factoryCode);
                 }
             }
         }
@@ -666,7 +730,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 RawMaterialRequirePlan prevReq = previous.get(materialCode);
                 // 减少的原材料
                 saveDifferenceRecord(year, month, materialCode, "减少",
-                        prevReq.getCurMonthQty(), BigDecimal.ZERO);
+                        prevReq.getCurMonthQty(), BigDecimal.ZERO, factoryCode);
             }
         }
     }
@@ -675,12 +739,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 保存差异记录
      */
     private void saveDifferenceRecord(Integer year, Integer month, String materialCode,
-                                      String diffType, BigDecimal prevQty, BigDecimal curQty) {
+                                      String diffType, BigDecimal prevQty, BigDecimal curQty, String factoryCode) {
         RawMaterialMonthDiff diffRecord = new RawMaterialMonthDiff();
-        diffRecord.setFactoryCode("FACTORY001");
+        diffRecord.setFactoryCode(factoryCode);
         diffRecord.setYear(year);
         diffRecord.setMonth(month);
         diffRecord.setMaterialCode(materialCode);
+
         diffRecord.setDiffType(diffType);
         diffRecord.setPrevMonthQty(prevQty);
         diffRecord.setCurMonthQty(curQty);

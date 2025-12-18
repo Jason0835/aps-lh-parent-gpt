@@ -293,7 +293,7 @@ public class RawWeekUsageGenerateServiceImpl {
             weekUsage.setMonth(month);
             weekUsage.setWeek(week);
             weekUsage.setMaterialCode(materialCode);
-            weekUsage.setMaterialName(materialName);
+            weekUsage.setMaterialDesc(materialName);
             weekUsage.setPlanQty(planQty);
             // 初始化为0，后续从MES同步
             weekUsage.setActualQty(BigDecimal.ZERO);
