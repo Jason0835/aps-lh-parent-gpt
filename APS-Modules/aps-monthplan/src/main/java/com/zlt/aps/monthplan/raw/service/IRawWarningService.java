@@ -23,7 +23,7 @@ public interface IRawWarningService extends IService<RawWarningRecord> {
     /**
      * 同步周维度实际用量数据
      */
-    AjaxResult syncWeekActualUsage(String factoryCode, Integer year, Integer week);
+    AjaxResult syncWeekActualUsage(String factoryCode, Integer year, Integer week, Integer month);
 
     /**
      * 查询预警记录

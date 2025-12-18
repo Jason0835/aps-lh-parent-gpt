@@ -4,7 +4,6 @@ package com.zlt.aps.monthplan.raw.controller;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -30,6 +29,7 @@ public class RawWarningSchedule {
             // 获取上周的周次（假设处理上周的数据）
             LocalDate lastWeek = LocalDate.now().minusWeeks(1);
             int year = lastWeek.getYear();
+            int month = lastWeek.getMonthValue();
             int week = getWeekOfYear(lastWeek);
 
             // 假设工厂编码列表
@@ -38,7 +38,7 @@ public class RawWarningSchedule {
             for (String factoryCode : factoryCodes) {
                 try {
                     // 同步实际用量数据
-                    rawWarningService.syncWeekActualUsage(factoryCode, year, week);
+                    rawWarningService.syncWeekActualUsage(factoryCode, year, week, month);
 
                     // 执行用量偏差预警
                     rawWarningService.executeUsageDeviationWarning(factoryCode, year, week);

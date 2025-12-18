@@ -124,8 +124,9 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
     @ApiOperation("同步实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
-                                      @RequestParam("week") Integer week) {
-        return iRawWarningRecordService.syncActualUsage(factoryCode, year, week);
+                                      @RequestParam("week") Integer week,
+                                      @RequestParam("month") Integer month) {
+        return iRawWarningRecordService.syncActualUsage(factoryCode, year, week, month);
     }
 
     @RequiresPermissions("maindata:rawWarningRecord:handleWarning")

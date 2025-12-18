@@ -354,20 +354,22 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
     /**
      * 同步周维度实际用量数据（从MES系统）
+     *
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param week 周次
+     * @param year        年份
+     * @param week        周次
+     * @param month
      * @return 同步结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult syncWeekActualUsage(String factoryCode, Integer year, Integer week) {
+    public AjaxResult syncWeekActualUsage(String factoryCode, Integer year, Integer week, Integer month) {
         try {
             log.info("开始同步周维度实际用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
 
             // 1. 获取周的开始和结束日期
-            LocalDate weekStartDate = getWeekStartDate(year, week);
-            LocalDate weekEndDate = getWeekEndDate(year, week);
+            LocalDate weekStartDate = getWeekStartDate(year, month, week);
+            LocalDate weekEndDate = getWeekEndDate(year, month, week);
 
             // 2. 从MES系统查询该周的实际出库量
             QueryWrapper<RawMaterialOutboundRecord> outboundWrapper = new QueryWrapper<>();
@@ -390,6 +392,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             QueryWrapper<RawWeekUsage> usageWrapper = new QueryWrapper<>();
             usageWrapper.eq("FACTORY_CODE", factoryCode);
             usageWrapper.eq("YEAR", year);
+            usageWrapper.eq("MONTH", month);
             usageWrapper.eq("WEEK", week);
             List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
 
@@ -418,9 +421,9 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     /**
      * 根据年份和周次获取周开始日期
      */
-    private LocalDate getWeekStartDate(int year, int week) {
+    private LocalDate getWeekStartDate(int year, int month, int week) {
         // 假设第一周从1月1日开始
-        LocalDate date = LocalDate.of(year, 1, 1);
+        LocalDate date = LocalDate.of(year, month, 1);
         // 调整到该周的第一天（周一）
         date = date.plusWeeks(week - 1);
         date = date.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
@@ -430,8 +433,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     /**
      * 根据年份和周次获取周结束日期
      */
-    private LocalDate getWeekEndDate(int year, int week) {
-        LocalDate startDate = getWeekStartDate(year, week);
+    private LocalDate getWeekEndDate(int year, int month, int week) {
+        LocalDate startDate = getWeekStartDate(year, month, week);
         return startDate.plusDays(6);
     }
 

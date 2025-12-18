@@ -95,7 +95,8 @@ public interface IRawWarningRecordRemoteService {
     @ApiOperation("同步实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
-                                      @RequestParam("week") Integer week);
+                                      @RequestParam("week") Integer week,
+                                      @RequestParam("month") Integer month);
 
     @PostMapping("/rawWarningRecord/execute-new-material-warning")
     @ApiOperation("执行新材料预警")

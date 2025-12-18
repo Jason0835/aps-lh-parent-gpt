@@ -25,12 +25,7 @@ import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 
@@ -175,5 +170,13 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
         context.setFileBytes(data);
         AjaxResult ajaxResult = iRawMaterialRequirePlanService.importData(context,false);
         return ajaxResult;
+    }
+
+
+    @PostMapping("/generate")
+    @ApiOperation("生成原材料需求计划")
+    public AjaxResult generate(@RequestParam String factoryCode, @RequestParam Integer year,
+                               @RequestParam Integer month) {
+        return iRawMaterialRequirePlanService.generate(factoryCode, year, month);
     }
 }
