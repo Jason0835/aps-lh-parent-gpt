@@ -540,8 +540,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         plan.setMaterialDesc(requirement.getMaterialDesc());
         plan.setMaterialType(requirement.getMaterialType());
         plan.setFactoryCode(factoryCode);
-        plan.setRemark("采购批次量："+requirement.getRemark());
-
+        if (requirement.getRemark() != null) {
+            plan.setRemark("采购批次量：" + requirement.getRemark());
+        }
         // 处理所有BigDecimal字段，确保2位小数，不超过10位整数
         plan.setCurMonthQty(formatAndValidateBigDecimal(requirement.getCurMonthQty(), "CUR_MONTH_QTY"));
         plan.setCurMonthRudrQty(formatAndValidateBigDecimal(requirement.getCurMonthRudrQty(), "CUR_MONTH_RUDR_QTY"));
