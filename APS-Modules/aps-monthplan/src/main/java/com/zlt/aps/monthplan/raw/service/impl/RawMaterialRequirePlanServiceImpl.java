@@ -514,6 +514,8 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         plan.setYear(year);
         plan.setMonth(month);
         plan.setMaterialCode(requirement.getMaterialCode());
+        plan.setMaterialDesc(requirement.getMaterialDesc());
+        plan.setMaterialType(requirement.getMaterialType());
         plan.setFactoryCode(factoryCode);
 
         // 处理所有BigDecimal字段，确保2位小数，不超过10位整数
@@ -712,14 +714,14 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             if (prevReq == null) {
                 // 新增的原材料
                 saveDifferenceRecord(year, month, materialCode, "新增",
-                        BigDecimal.ZERO, currentReq.getCurMonthQty(), factoryCode);
+                        BigDecimal.ZERO, currentReq.getCurMonthQty(), factoryCode, currentReq.getMaterialDesc());
             } else {
                 // 计算差异
                 BigDecimal diff = currentReq.getCurMonthQty().subtract(prevReq.getCurMonthQty());
                 if (diff.compareTo(BigDecimal.ZERO) != 0) {
                     String diffType = diff.compareTo(BigDecimal.ZERO) > 0 ? "增加" : "减少";
                     saveDifferenceRecord(year, month, materialCode, diffType,
-                            prevReq.getCurMonthQty(), currentReq.getCurMonthQty(), factoryCode);
+                            prevReq.getCurMonthQty(), currentReq.getCurMonthQty(), factoryCode, currentReq.getMaterialDesc());
                 }
             }
         }
@@ -730,7 +732,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 RawMaterialRequirePlan prevReq = previous.get(materialCode);
                 // 减少的原材料
                 saveDifferenceRecord(year, month, materialCode, "减少",
-                        prevReq.getCurMonthQty(), BigDecimal.ZERO, factoryCode);
+                        prevReq.getCurMonthQty(), BigDecimal.ZERO, factoryCode, prevReq.getMaterialDesc());
             }
         }
     }
@@ -739,12 +741,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 保存差异记录
      */
     private void saveDifferenceRecord(Integer year, Integer month, String materialCode,
-                                      String diffType, BigDecimal prevQty, BigDecimal curQty, String factoryCode) {
+                                      String diffType, BigDecimal prevQty, BigDecimal curQty, String factoryCode, String materialDesc) {
         RawMaterialMonthDiff diffRecord = new RawMaterialMonthDiff();
         diffRecord.setFactoryCode(factoryCode);
         diffRecord.setYear(year);
         diffRecord.setMonth(month);
         diffRecord.setMaterialCode(materialCode);
+        diffRecord.setMaterialDesc(materialDesc);
 
         diffRecord.setDiffType(diffType);
         diffRecord.setPrevMonthQty(prevQty);
