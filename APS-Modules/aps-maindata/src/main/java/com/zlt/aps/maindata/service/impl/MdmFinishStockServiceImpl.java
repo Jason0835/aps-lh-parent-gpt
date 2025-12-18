@@ -8,7 +8,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmFinishStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmFinishStockService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -88,7 +88,7 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
     }
 
     @Override
-    public void insertBatchData(MpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap) {
+    public void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap) {
         if (CollectionUtils.isEmpty(finishedProductStockMap)) {
             return;
         }
@@ -101,7 +101,7 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
         this.baseDao.insertBatch(list);
     }
 
-    private MdmFinishStock buildRequireStock(MpDemandPlan createCondition, String monthPlanVersion, MpFinishedProductStock finishedProductStock) {
+    private MdmFinishStock buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MpFinishedProductStock finishedProductStock) {
         MdmFinishStock requireStock = new MdmFinishStock();
         BeanUtils.copyProperties(finishedProductStock, requireStock);
         requireStock.setId(null);

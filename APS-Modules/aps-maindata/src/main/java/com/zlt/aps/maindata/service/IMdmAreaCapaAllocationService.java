@@ -2,7 +2,7 @@ package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -43,5 +43,5 @@ public interface IMdmAreaCapaAllocationService extends IDocService<MdmAreaCapaAl
      * @param createCondition 需求计划参数
      * @return 区域产能分配
      */
-    List<MdmAreaCapaAllocation> findAreaCapaAllocation(MpDemandPlan createCondition);
+    List<MdmAreaCapaAllocation> findAreaCapaAllocation(DpDemandPlan createCondition);
 }

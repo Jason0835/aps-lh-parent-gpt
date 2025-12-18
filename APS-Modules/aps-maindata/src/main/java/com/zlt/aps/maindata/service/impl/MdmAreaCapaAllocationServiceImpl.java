@@ -12,7 +12,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -124,7 +124,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     }
 
     @Override
-    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(MpDemandPlan createCondition) {
+    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(DpDemandPlan createCondition) {
         LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();
         sourceWrapper
             .eq(MdmAreaCapaAllocation::getYear, createCondition.getYear())

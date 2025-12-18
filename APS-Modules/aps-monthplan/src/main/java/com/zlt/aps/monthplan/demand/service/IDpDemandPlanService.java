@@ -2,7 +2,7 @@ package com.zlt.aps.monthplan.demand.service;
 
 import java.util.List;
 import com.ruoyi.common.datasource.service.IBaseService;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 /**
@@ -18,23 +18,24 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
  *     修 改 人：yelq
  *     修改内容：...
  */
-public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
+public interface IDpDemandPlanService  extends IBaseService<DpDemandPlan>
 {
+
     /**
      * 查询需求计划
-     * 
+     *
      * @param id 需求计划主键
      * @return 需求计划
      */
-    MpDemandPlan selectMpDemandPlanById(Long id);
+    DpDemandPlan selectDpDemandPlanById(Long id);
 
     /**
      * 查询需求计划列表
-     * 
-     * @param mpDemandPlan 需求计划
+     *
+     * @param dpDemandPlan 需求计划
      * @return 需求计划集合
      */
-    List<MpDemandPlan> selectMpDemandPlanList(MpDemandPlan mpDemandPlan);
+    List<DpDemandPlan> selectDpDemandPlanList(DpDemandPlan dpDemandPlan);
 
     /**
      * 批量查询需求计划列表
@@ -42,36 +43,26 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      * @param ids 需要查询的数据主键集合
      * @return 需求计划集合
      */
-    List<MpDemandPlan> selectMpDemandPlanByIds(List<Long> ids);
+    List<DpDemandPlan> selectDpDemandPlanByIds(List<Long> ids);
 
 
     /**
      * 新增需求计划
-     * 
-     * @param mpDemandPlan 需求计划
+     *
+     * @param dpDemandPlan 需求计划
      * @return 结果
      */
     @Transactional
-    int insertMpDemandPlan(MpDemandPlan mpDemandPlan);
+    int insertDpDemandPlan(DpDemandPlan dpDemandPlan);
 
     /**
      * 修改需求计划
-     * 
-     * @param mpDemandPlan 需求计划
+     *
+     * @param dpDemandPlan 需求计划
      * @return 结果
      */
     @Transactional
-    int updateMpDemandPlan(MpDemandPlan mpDemandPlan);
-
-    /**
-     * 批量删除需求计划
-     * 
-     * @param ids 需要删除的需求计划主键集合
-     * @return 结果
-     */
-   
-    @Transactional
-    int deleteMpDemandPlanByIds(Long[] ids);
+    int updateDpDemandPlan(DpDemandPlan dpDemandPlan);
 
     /**
      * 批量删除需求计划
@@ -81,30 +72,40 @@ public interface IMpDemandPlanService  extends IBaseService<MpDemandPlan>
      */
 
     @Transactional
-    int deleteMpDemandPlanByIds(List<Long> ids);
+    int deleteDpDemandPlanByIds(Long[] ids);
+
+    /**
+     * 批量删除需求计划
+     *
+     * @param ids 需要删除的需求计划主键集合
+     * @return 结果
+     */
+
+    @Transactional
+    int deleteDpDemandPlanByIds(List<Long> ids);
 
     /**
      * 删除需求计划信息
-     * 
+     *
      * @param id 需求计划主键
      * @return 结果
      */
     @Transactional
-    int deleteMpDemandPlanById(Long id);
+    int deleteDpDemandPlanById(Long id);
 
     /**
      * 校验需求计划唯一性
      */
-    String checkMpDemandPlanUnique(MpDemandPlan mpDemandPlan);
+    String checkDpDemandPlanUnique(DpDemandPlan dpDemandPlan);
 
     /**
      * 导入需求计划数据
      */
     @Transactional
-    AjaxResult importData(List<MpDemandPlan> list, boolean updateSupport, Long importLogId);
+    AjaxResult importData(List<DpDemandPlan> list, boolean updateSupport, Long importLogId);
     /**
      *  生成需求计划
      * @param createCondition 参数
      */
-    void createMonthRequire(MpDemandPlan createCondition);
+    void createMonthRequire(DpDemandPlan createCondition);
 }

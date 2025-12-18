@@ -21,17 +21,17 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmFinishStockService;
 import com.zlt.aps.maindata.service.IMpFinishedProductStockService;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
-import com.zlt.aps.monthplan.demand.mapper.MpDemandPlanEntityMapper;
+import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
-import com.zlt.aps.monthplan.demand.service.IMpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpOrderOffsetAllocationService;
 import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -57,8 +57,8 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpDemandPlanServiceImpl.java
- * 描    述：MpDemandPlanServiceImpl需求计划业务层处理
+ * 文件名称：DpDemandPlanServiceImpl.java
+ * 描    述：DpDemandPlanServiceImpl需求计划业务层处理
  *@author yelq
  *@date 2025-12-12
  *@version 1.0
@@ -71,10 +71,10 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implements IMpDemandPlanService
+public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implements IDpDemandPlanService
 {
 
-    private final MpDemandPlanEntityMapper mpDemandPlanEntityMapper;
+    private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
@@ -102,21 +102,21 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @return 需求计划
      */
     @Override
-    public MpDemandPlan selectMpDemandPlanById(Long id)
+    public DpDemandPlan selectDpDemandPlanById(Long id)
     {
-        return mpDemandPlanEntityMapper.selectMpDemandPlanById(id);
+        return dpDemandPlanEntityMapper.selectDpDemandPlanById(id);
     }
 
     /**
      * 查询需求计划列表
      * 
-     * @param mpDemandPlan 需求计划
+     * @param dpDemandPlan 需求计划
      * @return 需求计划
      */
     @Override
-    public List<MpDemandPlan> selectMpDemandPlanList(MpDemandPlan mpDemandPlan)
+    public List<DpDemandPlan> selectDpDemandPlanList(DpDemandPlan dpDemandPlan)
     {
-        return mpDemandPlanEntityMapper.selectMpDemandPlanList(mpDemandPlan);
+        return dpDemandPlanEntityMapper.selectDpDemandPlanList(dpDemandPlan);
     }
 
     /**
@@ -126,10 +126,10 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @return 需求计划集合
      */
     @Override
-    public List<MpDemandPlan> selectMpDemandPlanByIds(List<Long> ids)
+    public List<DpDemandPlan> selectDpDemandPlanByIds(List<Long> ids)
     {
         return super.executeSelectIn(
-                    mpDemandPlanEntityMapper::selectMpDemandPlanByIds
+            dpDemandPlanEntityMapper::selectDpDemandPlanByIds
                     ,ids
         );
     }
@@ -138,27 +138,27 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
     /**
      * 新增需求计划
      * 
-     * @param mpDemandPlan 需求计划
+     * @param dpDemandPlan 需求计划
      * @return 结果
      */
     @Override
-    public int insertMpDemandPlan(MpDemandPlan mpDemandPlan)
+    public int insertDpDemandPlan(DpDemandPlan dpDemandPlan)
     {
-        mpDemandPlan.setBaseVale(null);
-        return mpDemandPlanEntityMapper.insert(mpDemandPlan);
+        dpDemandPlan.setBaseVale(null);
+        return dpDemandPlanEntityMapper.insert(dpDemandPlan);
     }
 
     /**
      * 修改需求计划
      * 
-     * @param mpDemandPlan 需求计划
+     * @param dpDemandPlan 需求计划
      * @return 结果
      */
     @Override
-    public int updateMpDemandPlan(MpDemandPlan mpDemandPlan)
+    public int updateDpDemandPlan(DpDemandPlan dpDemandPlan)
     {
-        mpDemandPlan.setBaseVale(mpDemandPlan.getId());
-        return mpDemandPlanEntityMapper.update(mpDemandPlan);
+        dpDemandPlan.setBaseVale(dpDemandPlan.getId());
+        return dpDemandPlanEntityMapper.update(dpDemandPlan);
     }
 
     /**
@@ -168,9 +168,9 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @return 结果
      */
     @Override
-    public int deleteMpDemandPlanByIds(Long[] ids)
+    public int deleteDpDemandPlanByIds(Long[] ids)
     {
-        return mpDemandPlanEntityMapper.deleteMpDemandPlanByIds(ids);
+        return dpDemandPlanEntityMapper.deleteDpDemandPlanByIds(ids);
     }
 
     /**
@@ -180,11 +180,11 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @return 结果
      */
     @Override
-    public int deleteMpDemandPlanByIds(List<Long> ids)
+    public int deleteDpDemandPlanByIds(List<Long> ids)
     {
         Long[] arrayids = ids.toArray(new Long[0]);
 
-        return this.deleteMpDemandPlanByIds(arrayids);
+        return this.deleteDpDemandPlanByIds(arrayids);
     }
 
     /**
@@ -194,39 +194,39 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @return 结果
      */
     @Override
-    public int deleteMpDemandPlanById(Long id)
+    public int deleteDpDemandPlanById(Long id)
     {
-        return mpDemandPlanEntityMapper.deleteMpDemandPlanById(id);
+        return dpDemandPlanEntityMapper.deleteDpDemandPlanById(id);
     }
 
     @Override
-    public void insertBatchData(Collection<MpDemandPlan> dataList) {
+    public void insertBatchData(Collection<DpDemandPlan> dataList) {
 
-        this.insertBatchData(dataList, MpDemandPlanEntityMapper.class);
+        this.insertBatchData(dataList, DpDemandPlanEntityMapper.class);
     }
 
     @Override
-    public void updateBatchData(Collection<MpDemandPlan> dataList) {
+    public void updateBatchData(Collection<DpDemandPlan> dataList) {
 
-        this.updateBatchData(dataList, MpDemandPlanEntityMapper.class);
+        this.updateBatchData(dataList, DpDemandPlanEntityMapper.class);
     }
 
     @Override
-    public void mergerIntoBatchData(List<MpDemandPlan> list) {
-        this.mergerIntoBatchData(list, MpDemandPlanEntityMapper.class);
+    public void mergerIntoBatchData(List<DpDemandPlan> list) {
+        this.mergerIntoBatchData(list, DpDemandPlanEntityMapper.class);
     }
 
     /**
      * 校验需求计划唯一性
      */
     @Override
-    public String checkMpDemandPlanUnique(MpDemandPlan mpDemandPlan) {
-        if (mpDemandPlan == null) {
+    public String checkDpDemandPlanUnique(DpDemandPlan dpDemandPlan) {
+        if (dpDemandPlan == null) {
             return UserConstants.NOT_UNIQUE;
         }
-        List<MpDemandPlan> list = mpDemandPlanEntityMapper.selectMpDemandPlanList(mpDemandPlan);
+        List<DpDemandPlan> list = dpDemandPlanEntityMapper.selectDpDemandPlanList(dpDemandPlan);
         if (CollectionUtils.isNotEmpty(list)) {
-            long iCount = list.stream().filter(x->!x.getId().equals(mpDemandPlan.getId())).count();
+            long iCount = list.stream().filter(x->!x.getId().equals(dpDemandPlan.getId())).count();
             return iCount == 0 ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
@@ -239,26 +239,26 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
      * @param importLogId   导入日志id
      */
     @Override
-    public AjaxResult importData(List<MpDemandPlan> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<DpDemandPlan> list, boolean updateSupport, Long importLogId) {
         //初始化
         int successNum = 0;
         int failureNum = 0;
-        List<MpDemandPlan> importList = new ArrayList<>();
+        List<DpDemandPlan> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
 
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            MpDemandPlan mpDemandPlan = list.get(i);
-            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, mpDemandPlan);
-            ImportExcelValidatedUtils.validatedRepeat(list,mpDemandPlan,i,2,importLogId,validated);
+            DpDemandPlan dpDemandPlan = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, dpDemandPlan);
+            ImportExcelValidatedUtils.validatedRepeat(list,dpDemandPlan,i,2,importLogId,validated);
             if (CollectionUtils.isNotEmpty(validated)) {
-                mpDemandPlan.setId(-999L);
+                dpDemandPlan.setId(-999L);
                 failureNum++;
                 importErrorLogs.addAll(validated);
             } else{
-                mpDemandPlan.setBaseVale(null);
-                importList.add(mpDemandPlan);
+                dpDemandPlan.setBaseVale(null);
+                importList.add(dpDemandPlan);
             }
         }
 
@@ -266,19 +266,19 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
             //勾选更新记录，调用mergeOrInsert
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
-                    mpDemandPlanEntityMapper.mergeSql(importList);
+                dpDemandPlanEntityMapper.mergeSql(importList);
             } else {
                 //唯一则新增
                 for (int i = 0; i < list.size(); i++) {
-                    MpDemandPlan mpDemandPlan = list.get(i);
+                    DpDemandPlan dpDemandPlan = list.get(i);
                     // 错误记录跳过
-                    if (mpDemandPlan.getId() != null && mpDemandPlan.getId().equals(-999L)) {
+                    if (dpDemandPlan.getId() != null && dpDemandPlan.getId().equals(-999L)) {
                         continue;
                     }
-                    String unique = this.checkMpDemandPlanUnique(mpDemandPlan);
+                    String unique = this.checkDpDemandPlanUnique(dpDemandPlan);
                     if (UserConstants.UNIQUE.equals(unique)) {
                         successNum++;
-                        this.insertMpDemandPlan(mpDemandPlan);
+                        this.insertDpDemandPlan(dpDemandPlan);
                     } else {
                         failureNum++;
                         //TODO:此处需手动填写唯一校验失败国际化信息
@@ -304,7 +304,7 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
     }
 
     @Override
-    public void createMonthRequire(MpDemandPlan createCondition) {
+    public void createMonthRequire(DpDemandPlan createCondition) {
         // 如果已经定稿，不能重新生成需求计划
         if (factoryProductionVersionMapper.selectCount(Wrappers.lambdaQuery(FactoryProductionVersion.class)
             .eq(FactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
@@ -346,7 +346,7 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
         mpOrderOffsetAllocationService.insertBatchData(orderOffsetAllocations);
         // 8、将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
         mdmFinishStockService.insertBatchData(createCondition,monthPlanVersion,finishedProductStockMap);
-        List<MpDemandPlan> demandPlans = Lists.newArrayList();
+        List<DpDemandPlan> demandPlans = Lists.newArrayList();
         if(CollectionUtils.isNotEmpty(netDemands)){
             // 9、将销售订单池中高优先级、中优先级订单冲减后还有需求量的订单，纳入需求计划；并根据SKU排产分类表中的SKU分类，填充排产分类类型值
             List<MdmAreaCapaAllocation>  areaCapaAllocations =  mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition);
@@ -385,18 +385,14 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
 
         // 10、同时将销售订单池中的暂缓订单、供应链订单池中的SKU，也纳入需求计划；并根据SKU排产分类表中的SKU分类，填充排产分类类型值
         if(CollectionUtils.isNotEmpty(postponeOrders)) {
-            postponeOrders.forEach(postponeOrder -> {
-                demandPlans.add(buildDemandPlan(postponeOrder,createCondition,productionTypeMap,stockQtyMap,mdmMonthSurplusMap));
-            });
+            postponeOrders.forEach(postponeOrder -> demandPlans.add(buildDemandPlan(postponeOrder,createCondition,productionTypeMap,stockQtyMap,mdmMonthSurplusMap)));
         }
         List<SupplyOrderPool> supplyOrderPools = supplyOrderPoolService.findCurrentSupplyOrderPool();
         if(CollectionUtils.isNotEmpty(supplyOrderPools)) {
-            supplyOrderPools.forEach(supplyOrder -> {
-                demandPlans.add(buildDemandPlan(supplyOrder,createCondition,productionTypeMap,stockQtyMap,mdmMonthSurplusMap));
-            });
+            supplyOrderPools.forEach(supplyOrder -> demandPlans.add(buildDemandPlan(supplyOrder,createCondition,productionTypeMap,stockQtyMap,mdmMonthSurplusMap)));
         }
         // 11、对需求计划，按SKU、动平衡、均匀性、年周号为维度分组合并(形成需求版本号)，并写入需求计划表
-        List<MpDemandPlan> mergedDemandPlans = mergedDemandPlan(demandPlans);
+        List<DpDemandPlan> mergedDemandPlans = mergedDemandPlan(demandPlans);
         if(CollectionUtils.isNotEmpty(mergedDemandPlans)){
             this.insertBatchData(mergedDemandPlans);
         }
@@ -404,37 +400,37 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
         dpOrderPoolSnapshotService.saveOrderPoolSnapshot(createCondition,salesOrders,supplyOrderPools);
     }
 
-    private List<MpDemandPlan> mergedDemandPlan(List<MpDemandPlan> demandPlans) {
+    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans) {
         if(CollectionUtils.isEmpty(demandPlans)){
             return Lists.newArrayList();
         }
-        List<MpDemandPlan> mergedDemandPlans = Lists.newArrayList();
-        Map<String,List<MpDemandPlan>>  mapByGroupKey = demandPlans.stream().collect(Collectors.groupingBy(MpDemandPlan::getGroupKey));
+        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
+        Map<String,List<DpDemandPlan>>  mapByGroupKey = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
         mapByGroupKey.forEach((key,value) -> {
-            MpDemandPlan entity = BeanCopyUtils.copyBean(value.get(0),MpDemandPlan.class);
+            DpDemandPlan entity = BeanCopyUtils.copyBean(value.get(0),DpDemandPlan.class);
 
             // entity.setMesMaterialCode();
             long  heightQty = value.stream()
                 .filter(item ->
                     ApsConstant.SAL_PRIORITY_HIGHT.equals(item.getOrderPriority()))
-                .mapToLong(MpDemandPlan::getNetQty).sum();
+                .mapToLong(DpDemandPlan::getNetQty).sum();
             long  midQty = value.stream()
                 .filter(item ->
                     ApsConstant.SAL_PRIORITY_MID.equals(item.getOrderPriority()))
-                .mapToLong(MpDemandPlan::getNetQty).sum();
+                .mapToLong(DpDemandPlan::getNetQty).sum();
             long  postponeQty = value.stream()
                 .filter(item ->
                     ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getOrderPriority()))
-                .mapToLong(MpDemandPlan::getNetQty).sum();
+                .mapToLong(DpDemandPlan::getNetQty).sum();
             long  cycleReserveQty = value.stream()
                 .filter(item ->
                     ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(item.getOrderPriority()))
-                .mapToLong(MpDemandPlan::getNetQty).sum();
+                .mapToLong(DpDemandPlan::getNetQty).sum();
             long  conventionReserveQty = value.stream()
                 .filter(item ->
                     ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(item.getOrderPriority()))
-                .mapToLong(MpDemandPlan::getNetQty).sum();
-            long  netQty = value.stream().mapToLong(MpDemandPlan::getNetQty).sum();
+                .mapToLong(DpDemandPlan::getNetQty).sum();
+            long  netQty = value.stream().mapToLong(DpDemandPlan::getNetQty).sum();
             entity.setNetQty(netQty);
             //    (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
             entity.setPostponeNetQty(heightQty + midQty + postponeQty);
@@ -470,8 +466,8 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
         return mergedDemandPlans;
     }
 
-    private MpDemandPlan buildDemandPlan(SupplyOrderPool supplyOrder, MpDemandPlan createCondition, Map<String, String> productionTypeMap, Map<String, Long> stockQtyMap, Map<String, Long> mdmMonthSurplusMap) {
-        MpDemandPlan demandPlan = new MpDemandPlan();
+    private DpDemandPlan buildDemandPlan(SupplyOrderPool supplyOrder, DpDemandPlan createCondition, Map<String, String> productionTypeMap, Map<String, Long> stockQtyMap, Map<String, Long> mdmMonthSurplusMap) {
+        DpDemandPlan demandPlan = new DpDemandPlan();
         demandPlan.setFactoryCode(supplyOrder.getFactoryCode());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
@@ -532,8 +528,8 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
             ));
     }
 
-    private MpDemandPlan buildDemandPlan(SalesOrderPool postponeOrder,MpDemandPlan createCondition,Map<String, String> productionTypeMap,Map<String,Long> stockQtyMap,Map<String,Long> mdmMonthSurplusMap) {
-        MpDemandPlan demandPlan = new MpDemandPlan();
+    private DpDemandPlan buildDemandPlan(SalesOrderPool postponeOrder,DpDemandPlan createCondition,Map<String, String> productionTypeMap,Map<String,Long> stockQtyMap,Map<String,Long> mdmMonthSurplusMap) {
+        DpDemandPlan demandPlan = new DpDemandPlan();
         demandPlan.setFactoryCode(postponeOrder.getFactoryCode());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
@@ -719,12 +715,12 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
     }
 
 
-    private void transformSaleOrderToDemandPlan(List<MpOrderOffsetAllocation> netDemands, List<MpDemandPlan> demandPlans,Map<String, String> productionTypeMap) {
+    private void transformSaleOrderToDemandPlan(List<MpOrderOffsetAllocation> netDemands, List<DpDemandPlan> demandPlans,Map<String, String> productionTypeMap) {
         netDemands.forEach(netDemand -> demandPlans.add(buildDemandPlan(netDemand,productionTypeMap)));
     }
 
-    private MpDemandPlan buildDemandPlan(MpOrderOffsetAllocation netDemand,Map<String, String> productionTypeMap) {
-        MpDemandPlan demandPlan = new MpDemandPlan();
+    private DpDemandPlan buildDemandPlan(MpOrderOffsetAllocation netDemand,Map<String, String> productionTypeMap) {
+        DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
         demandPlan.setId(null);
         demandPlan.setBaseVale(null);
