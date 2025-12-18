@@ -2,12 +2,12 @@ package com.zlt.aps.monthplan.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
-import org.springframework.cloud.openfeign.FeignClient;
-import io.swagger.annotations.ApiOperation;
-import org.springframework.web.bind.annotation.*;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
 
 
 
@@ -32,21 +32,21 @@ public interface IMpDemandPlanRemoteService {
      */
     @ApiOperation("查询需求计划列表")
     @PostMapping("/demandPlan/list")
-    TableDataInfo list(@RequestBody MpDemandPlan mpDemandPlan);
+    TableDataInfo list(@RequestBody DpDemandPlan mpDemandPlan);
 
     /**
     * 新增需求计划
     */
     @ApiOperation("新增需求计划")
     @PostMapping("/demandPlan/add")
-    AjaxResult add(@RequestBody MpDemandPlan mpDemandPlan);
+    AjaxResult add(@RequestBody DpDemandPlan mpDemandPlan);
 
     /**
      * 修改需求计划
      */
     @ApiOperation("修改需求计划")
     @PostMapping("/demandPlan/edit")
-    AjaxResult edit(@RequestBody MpDemandPlan mpDemandPlan);
+    AjaxResult edit(@RequestBody DpDemandPlan mpDemandPlan);
 
     /**
      * 删除需求计划
@@ -60,21 +60,21 @@ public interface IMpDemandPlanRemoteService {
      */
     @ApiOperation("根据ID获取详细信息")
     @GetMapping(value = "/demandPlan/{id}")
-    MpDemandPlan getInfo(@PathVariable("id") Long id);
+    DpDemandPlan getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验需求计划唯一性
      */
     @ApiOperation("校验需求计划唯一性")
     @PostMapping("/demandPlan/checkMpDemandPlanUnique")
-    String checkMpDemandPlanUnique(@RequestBody MpDemandPlan mpDemandPlan);
+    String checkMpDemandPlanUnique(@RequestBody DpDemandPlan mpDemandPlan);
 
     /**
      * 导出需求计划列表
     */
     @ApiOperation("导出需求计划列表")
     @PostMapping("/demandPlan/exportData/{fileName}")
-    byte[] exportData(@RequestBody MpDemandPlan mpDemandPlan,@PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody DpDemandPlan mpDemandPlan, @PathVariable("fileName") String fileName);
 
     /**
      * 导入需求计划数据
