@@ -315,6 +315,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             // 计算原材料需求
             for (MdmMaterialConsumeDetail detail : bomDetails) {
                 String materialCode = detail.getChildMaterialCode();
+                String materialDesc = detail.getChildMaterialName();
                 BigDecimal dosage = detail.getDosage();
 
                 if (dosage == null) {
@@ -326,7 +327,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 BigDecimal requiredQty = BigDecimal.valueOf(totalQty).multiply(dosage);
 
                 RawMaterialRequirePlan requirement = requirements.getOrDefault(materialCode,
-                        new RawMaterialRequirePlan(materialCode));
+                        new RawMaterialRequirePlan(materialCode, materialDesc, null));
 
                 // 判断EUDR
                 boolean isEudr = isEudrPlan(plan);
@@ -411,12 +412,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
             for (MdmMaterialConsumeDetail detail : bomDetails) {
                 String materialCode = detail.getChildMaterialCode();
+                String materialDesc = detail.getChildMaterialName();
                 BigDecimal dosage = detail.getDosage();
 
                 BigDecimal requiredQty = BigDecimal.valueOf(productionQty).multiply(dosage);
 
                 RawMaterialRequirePlan requirement = requirements.getOrDefault(materialCode,
-                        new RawMaterialRequirePlan(materialCode));
+                        new RawMaterialRequirePlan(materialCode, materialDesc, null));
 
                 // 根据预测月份设置不同的字段
                 //todo 预测表增加年周号区分
@@ -675,7 +677,12 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
         for (RawMaterialRequirePlan plan : plans) {
-            RawMaterialRequirePlan requirement = new RawMaterialRequirePlan(plan.getMaterialCode());
+            RawMaterialRequirePlan requirement = new RawMaterialRequirePlan();
+            requirement.setMaterialCode(plan.getMaterialCode());
+            requirement.setMaterialDesc(plan.getMaterialDesc());
+            requirement.setFactoryCode(plan.getFactoryCode());
+            requirement.setMaterialType(plan.getMaterialType());
+
             requirement.setCurMonthQty(plan.getCurMonthQty());
             requirement.setCurMonthRudrQty(plan.getCurMonthRudrQty());
             requirement.setTMonthQty(plan.getTMonthQty());

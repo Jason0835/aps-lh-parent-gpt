@@ -127,8 +127,10 @@ public class RawMaterialRequirePlan extends BaseEntity {
         super();
     }
 
-    public RawMaterialRequirePlan(String materialCode) {
+    public RawMaterialRequirePlan(String materialCode, String materialDesc, String materialType) {
         this.materialCode = materialCode;
+        this.materialDesc = materialDesc;
+        this.materialType = materialType;
     }
 
     /**
