@@ -332,29 +332,29 @@ public class AdjustNoticeUtils {
         productionPlan.setProductionVersion(productionVersion.getProductionVersion());
         //物料信息
         productionPlan.setProductCode(addPlan.getProductCode());
-        productionPlan.setCuringTime(helper.getCuringTime());
-        productionPlan.setLocationType(addPlan.getLocationType());
-        productionPlan.setChannel(addPlan.getChannel());
-        //排产量
-        Long adjustNumber = Long.valueOf(addPlan.getAdjustNumber());
-        productionPlan.setProdReqPlan(adjustNumber);
-        productionPlan.setFactProdReqQty(adjustNumber);
-        productionPlan.setTotalQty(adjustNumber);
-        productionPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
-        //模具、规格代号、生胎代码
-        String specCodeInfo = helper.getSpecCodeInfo();
-        String specCode = addPlan.getSpecCode();
-        productionPlan.setMouldNo(addPlan.getMouldNo());
-        productionPlan.setSpecCodeInfo(specCodeInfo);
-        productionPlan.setSpecCode(specCode);
-        setEmbryoCodeInfo(specCodeInfo, productionPlan, specCode);
-        //施工信息
-        ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(helper.getConstructionCode());
-        productionPlan.setConstructionStage(stage.getStage());
-        productionPlan.setMergeInfo("");
-        productionPlan.setIsImport(YesOrNoEnum.NO.getValue());
+//        productionPlan.setCuringTime(helper.getCuringTime());
+//        productionPlan.setLocationType(addPlan.getLocationType());
+//        productionPlan.setChannel(addPlan.getChannel());
+//        //排产量
+//        Long adjustNumber = Long.valueOf(addPlan.getAdjustNumber());
+//        productionPlan.setProdReqPlan(adjustNumber);
+//        productionPlan.setFactProdReqQty(adjustNumber);
+//        productionPlan.setTotalQty(adjustNumber);
+//        productionPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
+//        //模具、规格代号、生胎代码
+//        String specCodeInfo = helper.getSpecCodeInfo();
+//        String specCode = addPlan.getSpecCode();
+//        productionPlan.setMouldNo(addPlan.getMouldNo());
+//        productionPlan.setSpecCodeInfo(specCodeInfo);
+//        productionPlan.setSpecCode(specCode);
+//        setEmbryoCodeInfo(specCodeInfo, productionPlan, specCode);
+//        //施工信息
+//        ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(helper.getConstructionCode());
+//        productionPlan.setConstructionStage(stage.getStage());
+//        productionPlan.setMergeInfo("");
+//        productionPlan.setIsImport(YesOrNoEnum.NO.getValue());
         productionPlan.setIsDeliveryDate(YesOrNoEnum.NO.getValue());
-        BigDecimal totalCuringTime = helper.getCuringTime().multiply(BigDecimal.valueOf(adjustNumber));
+        BigDecimal totalCuringTime = BigDecimal.ONE;
         productionPlan.setTotalVulcanizationMinutes(totalCuringTime.divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP));
         return productionPlan;
     }
@@ -372,7 +372,7 @@ public class AdjustNoticeUtils {
         productionPlan.setPattern(productInfo.getPattern());
         productionPlan.setHierarchy(productInfo.getHierarchy());
         productionPlan.setSpecifications(productInfo.getSpecifications());
-        productionPlan.setProSize(productInfo.getProSize());
+//        productionPlan.setProSize(productInfo.getProSize());
         productionPlan.setBrand(productInfo.getBrand());
         productionPlan.setProductTypeCode(productInfo.getProductTypeCode());
         productionPlan.setProductTypeName(productInfo.getProductTypeName());

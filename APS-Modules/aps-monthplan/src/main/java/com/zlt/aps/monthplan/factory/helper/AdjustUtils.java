@@ -102,29 +102,29 @@ public class AdjustUtils {
         productionPlan.setProductionVersion(finalVersionInfo.getProductionVersion());
         //物料信息
         productionPlan.setProductCode(adjustPlan.getProductCode());
-        productionPlan.setCuringTime(adjustPlan.getCuringTime());
-        productionPlan.setLocationType(adjustPlan.getLocationType());
-        productionPlan.setChannel(adjustPlan.getChannel());
-        //排产量
-        Long adjustNumber = Long.valueOf(adjustPlan.getAdjustNumber());
-        productionPlan.setProdReqPlan(adjustNumber);
-        productionPlan.setFactProdReqQty(adjustNumber);
-        productionPlan.setTotalQty(adjustNumber);
-        productionPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
-        //模具、规格代号、生胎代码
-        String specCodeInfo = adjustPlan.getSpecCodeInfo();
-        String specCode = adjustPlan.getSpecCode();
-        productionPlan.setMouldNo(adjustPlan.getMouldNo());
-        productionPlan.setSpecCodeInfo(specCodeInfo);
-        productionPlan.setSpecCode(specCode);
-        setEmbryoCodeInfo(specCodeInfo, productionPlan, specCode);
-        //施工信息
-        ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(adjustPlan.getConstructionCode());
-        productionPlan.setConstructionStage(stage.getStage());
-        productionPlan.setMergeInfo("");
-        productionPlan.setIsImport(YesOrNoEnum.NO.getValue());
+//        productionPlan.setCuringTime(adjustPlan.getCuringTime());
+//        productionPlan.setLocationType(adjustPlan.getLocationType());
+//        productionPlan.setChannel(adjustPlan.getChannel());
+//        //排产量
+//        Long adjustNumber = Long.valueOf(adjustPlan.getAdjustNumber());
+//        productionPlan.setProdReqPlan(adjustNumber);
+//        productionPlan.setFactProdReqQty(adjustNumber);
+//        productionPlan.setTotalQty(adjustNumber);
+//        productionPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
+//        //模具、规格代号、生胎代码
+//        String specCodeInfo = adjustPlan.getSpecCodeInfo();
+//        String specCode = adjustPlan.getSpecCode();
+//        productionPlan.setMouldNo(adjustPlan.getMouldNo());
+//        productionPlan.setSpecCodeInfo(specCodeInfo);
+//        productionPlan.setSpecCode(specCode);
+//        setEmbryoCodeInfo(specCodeInfo, productionPlan, specCode);
+//        //施工信息
+//        ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(adjustPlan.getConstructionCode());
+//        productionPlan.setConstructionStage(stage.getStage());
+//        productionPlan.setMergeInfo("");
+//        productionPlan.setIsImport(YesOrNoEnum.NO.getValue());
         productionPlan.setIsDeliveryDate(YesOrNoEnum.NO.getValue());
-        BigDecimal totalCuringTime = adjustPlan.getCuringTime().multiply(BigDecimal.valueOf(adjustNumber));
+        BigDecimal totalCuringTime = BigDecimal.ONE;
         productionPlan.setTotalVulcanizationMinutes(totalCuringTime.divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP));
         return productionPlan;
     }
@@ -142,7 +142,7 @@ public class AdjustUtils {
         productionPlan.setPattern(productInfo.getPattern());
         productionPlan.setHierarchy(productInfo.getHierarchy());
         productionPlan.setSpecifications(productInfo.getSpecifications());
-        productionPlan.setProSize(productInfo.getProSize());
+        productionPlan.setProSize(String.valueOf(productInfo.getProSize()));
         productionPlan.setBrand(productInfo.getBrand());
         productionPlan.setProductTypeCode(productInfo.getProductTypeCode());
         productionPlan.setProductTypeName(productInfo.getProductTypeName());
@@ -330,9 +330,9 @@ public class AdjustUtils {
         String productCode = adjustPlan.getProductCode();
         String fieldName;
         //销售需求计划、分厂排产需求、实际排产量同降低
-        Long totalQty = productionPlan.getTotalQty();
-        Long factoryProdReqQty = productionPlan.getFactProdReqQty();
-        Long reqPlanQty = productionPlan.getProdReqPlan();
+        Long totalQty = Long.valueOf(productionPlan.getTotalQty());
+        Long factoryProdReqQty = Long.valueOf(productionPlan.getFactProdReqQty());
+        Long reqPlanQty = Long.valueOf(productionPlan.getProdReqPlan());
         for (int day = startDay; day <= endDay; day++) {
             if (adjustNumber == 0) {
                 break;
@@ -365,17 +365,17 @@ public class AdjustUtils {
             log.info(String.format("====计划调整减量：%s======", subtractNumberLog));
             adjustPlanLog.addAdjustProductionLog(adjustPlanLog.getProductionNo(), subtractNumberLog);
             //更新模具信息
-            setMouldLeftOverCuringTime(dayProductionMouldMap, day, subtractQty.intValue(), productionPlan.getCuringTime());
+            setMouldLeftOverCuringTime(dayProductionMouldMap, day, subtractQty.intValue(), BigDecimal.valueOf(productionPlan.getCuringTime()));
         }
-        BigDecimal singleCuringTime = productionPlan.getCuringTime();
-        productionPlan.setTotalVulcanizationMinutes(singleCuringTime.multiply(BigDecimal.valueOf(totalQty)).divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP));
-        //实际调减量
-        Long realAdjustNumber = productionPlan.getTotalQty() - totalQty;
-        productionPlan.setTotalQty(totalQty);
-        productionPlan.setFactProdReqQty(factoryProdReqQty - realAdjustNumber);
-        productionPlan.setProdReqPlan(reqPlanQty - realAdjustNumber);
-        //有可能超
-        productionPlan.setDifferenceQty(productionPlan.getFactProdReqQty() - totalQty);
+//        BigDecimal singleCuringTime = productionPlan.getCuringTime();
+//        productionPlan.setTotalVulcanizationMinutes(singleCuringTime.multiply(BigDecimal.valueOf(totalQty)).divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP));
+//        //实际调减量
+//        Long realAdjustNumber = productionPlan.getTotalQty() - totalQty;
+//        productionPlan.setTotalQty(totalQty);
+//        productionPlan.setFactProdReqQty(factoryProdReqQty - realAdjustNumber);
+//        productionPlan.setProdReqPlan(reqPlanQty - realAdjustNumber);
+//        //有可能超
+//        productionPlan.setDifferenceQty(productionPlan.getFactProdReqQty() - totalQty);
     }
 
     /**
@@ -387,7 +387,7 @@ public class AdjustUtils {
      * @param calculateHelper 增量辅助类
      */
     public static void addSingleMouldQty(FactoryMonthPlanAdjustPlanVo adjustPlanLog, MouldingProductionResultHelper helper, FactoryMonthPlanProdFinal addNumberPlan, SingleMouldAdjustCalculateHelper calculateHelper) {
-        BigDecimal singleCuringTime = addNumberPlan.getCuringTime();
+        BigDecimal singleCuringTime = BigDecimal.ONE;
         Integer startDay = calculateHelper.getStartDay();
         Integer maxDay = calculateHelper.getMaxDay();
         String mouldCode = calculateHelper.getMouldCode();
@@ -465,7 +465,7 @@ public class AdjustUtils {
      * @param productionDay   排产天数
      */
     public static void addSingleMouldDayQty(FactoryMonthPlanAdjustPlanVo adjustPlanLog, MouldingProductionResultHelper helper, FactoryMonthPlanProdFinal addNumberPlan, SingleMouldAdjustCalculateHelper calculateHelper, Integer productionDay) {
-        BigDecimal singleCuringTime = addNumberPlan.getCuringTime();
+        BigDecimal singleCuringTime = BigDecimal.ONE;
         String mouldCode = calculateHelper.getMouldCode();
         Integer beginDate = calculateHelper.getBeginDate();
         Integer endDay = calculateHelper.getEndDay();

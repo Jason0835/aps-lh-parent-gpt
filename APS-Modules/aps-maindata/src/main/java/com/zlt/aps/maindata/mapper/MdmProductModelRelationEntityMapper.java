@@ -64,4 +64,12 @@ public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmS
      * @return 结果
      */
     List<MdmSkuMouldRel> select4ImportAdjustData(@Param("list") List<MonthPlanProductionFinalResultVo> resultVos);
+
+    /**
+     * 根据模具编号查询
+     *
+     * @param mouldCodeList 模具编号
+     * @return 结果
+     */
+    List<MdmSkuMouldRel> selectByUniqueKeyList(@Param("list") List<MdmSkuMouldRel> mouldCodeList);
 }

@@ -561,7 +561,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         sortList.forEach(productionFinal -> {
             List<SinglePlanInfoHelper> planList = productionFinal.getMergePlanList();
             if (CollectionUtils.isEmpty(planList)) {
-                productionFinal.setProductionSequence(BigDecimal.ZERO.longValue());
+                productionFinal.setProductionSequence((int) BigDecimal.ZERO.longValue());
                 return;
             }
             Comparator comparator = Comparator.comparing(SinglePlanInfoHelper::getSeq, Comparator.nullsFirst(Comparator.naturalOrder()));
@@ -570,7 +570,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
             if (null == seq) {
                 seq = BigDecimal.ZERO.longValue();
             }
-            productionFinal.setProductionSequence(seq);
+            productionFinal.setProductionSequence(Math.toIntExact(seq));
         });
         Comparator comparator = Comparator.comparing(FactoryMonthPlanProdFinalVo::getProductionSequence, Comparator.reverseOrder())
                 .thenComparing(FactoryMonthPlanProdFinalVo::getTotalQty)
@@ -617,7 +617,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         String newProductionNo = buildProductionNo(1);
         addPlan.setProductionNo(newProductionNo);
         addPlan.setRemark("计划调整-插入新规格");
-        Long sumAddQty = addPlan.getTotalQty();
+        Long sumAddQty = Long.valueOf(addPlan.getTotalQty());
         Integer startDay = DateUtils.getDaysByMonth(adjustPlan.getStartDate());
         Integer maxDay = DateUtils.getDaysByYearMonth(year, month);
         Set<String> productionMouldSet = new HashSet<>();
@@ -770,7 +770,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         }
         //按日逐副模具增量
         for (Integer day = startDay; day <= maxDay; day++) {
-            Map<String, MouldingProductionResultHelper> dayProductionMouldMap = AdjustUtils.getDayProductionMouldInfo(productionMap, day, addNumberPlan.getCuringTime());
+            Map<String, MouldingProductionResultHelper> dayProductionMouldMap = AdjustUtils.getDayProductionMouldInfo(productionMap, day, BigDecimal.valueOf(addNumberPlan.getCuringTime()));
             if (CollectionUtils.isEmpty(dayProductionMouldMap)) {
                 continue;
             }
@@ -836,27 +836,27 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
             productionPlan.setEndDay(calculate.getEndDay());
         }
         //总排产量
-        Long totalQty = productionPlan.getTotalQty();
-        if (null == totalQty) {
-            totalQty = BigDecimal.ZERO.longValue();
-        }
-        totalQty = totalQty + adjustNumber;
-        productionPlan.setTotalQty(totalQty);
-        //总需求计划量
-        Long reqPlanQty = productionPlan.getProdReqPlan();
-        reqPlanQty = reqPlanQty + adjustNumber;
-        productionPlan.setProdReqPlan(reqPlanQty);
-        //含损耗
-        Long factoryReqPlanQty = productionPlan.getFactProdReqQty();
-        factoryReqPlanQty = factoryReqPlanQty + adjustNumber;
-        productionPlan.setFactProdReqQty(factoryReqPlanQty);
-        BigDecimal totalCuringTime = productionPlan.getTotalVulcanizationMinutes();
-        if (null == totalCuringTime) {
-            totalCuringTime = BigDecimal.ZERO;
-        }
-        BigDecimal adjustNumberCuringTime = productionPlan.getCuringTime().multiply(BigDecimal.valueOf(adjustNumber)).divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP);
-        totalCuringTime = totalCuringTime.add(adjustNumberCuringTime);
-        productionPlan.setTotalVulcanizationMinutes(totalCuringTime);
+//        Long totalQty = productionPlan.getTotalQty();
+//        if (null == totalQty) {
+//            totalQty = BigDecimal.ZERO.longValue();
+//        }
+//        totalQty = totalQty + adjustNumber;
+//        productionPlan.setTotalQty(totalQty);
+//        //总需求计划量
+//        Long reqPlanQty = productionPlan.getProdReqPlan();
+//        reqPlanQty = reqPlanQty + adjustNumber;
+//        productionPlan.setProdReqPlan(reqPlanQty);
+//        //含损耗
+//        Long factoryReqPlanQty = productionPlan.getFactProdReqQty();
+//        factoryReqPlanQty = factoryReqPlanQty + adjustNumber;
+//        productionPlan.setFactProdReqQty(factoryReqPlanQty);
+//        BigDecimal totalCuringTime = productionPlan.getTotalVulcanizationMinutes();
+//        if (null == totalCuringTime) {
+//            totalCuringTime = BigDecimal.ZERO;
+//        }
+//        BigDecimal adjustNumberCuringTime = productionPlan.getCuringTime().multiply(BigDecimal.valueOf(adjustNumber)).divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP);
+//        totalCuringTime = totalCuringTime.add(adjustNumberCuringTime);
+//        productionPlan.setTotalVulcanizationMinutes(totalCuringTime);
         baseDao.update(productionPlan);
     }
 
@@ -895,7 +895,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
         }
         //按日逐副模具增量
         for (Integer day = startDay; day <= maxDay; day++) {
-            Map<String, MouldingProductionResultHelper> dayProductionMouldMap = AdjustUtils.getDayProductionMouldInfo(addMouldHelperMap, day, addNumberPlan.getCuringTime());
+            Map<String, MouldingProductionResultHelper> dayProductionMouldMap = AdjustUtils.getDayProductionMouldInfo(addMouldHelperMap, day, BigDecimal.valueOf(addNumberPlan.getCuringTime()));
             if (CollectionUtils.isEmpty(dayProductionMouldMap)) {
                 continue;
             }
@@ -1027,7 +1027,7 @@ public class FactoryMonthPlanAdjustServiceImpl implements IFactoryMonthPlanAdjus
             if (null == originPlan.getCuringTime()) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.adjust.check.noHasCuringTime"));
             }
-            adjustPlan.setCuringTime(originPlan.getCuringTime());
+//            adjustPlan.setCuringTime(originPlan.getCuringTime());
             adjustPlan.setProductCode(originPlan.getProductCode());
             adjustPlan.setMouldNo(originPlan.getMouldNo());
             return AjaxResult.success(originPlan);

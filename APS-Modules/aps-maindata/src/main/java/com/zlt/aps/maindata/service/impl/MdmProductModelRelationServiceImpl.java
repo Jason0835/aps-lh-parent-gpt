@@ -7,10 +7,13 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.enums.OperationBusinessEnums;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.domain.dto.MouldMonthUseDto;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.*;
@@ -29,6 +32,7 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +71,12 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
     private final MdmDeviceMaintenancePlanEntityMapper maintenanceMapper;
 
     private final MdmModelInfoEntityMapper modelInfoMapper;
+
+    @Autowired
+    private RedisService redisService;
+
+    @Autowired
+    private IMesItfService iMesItfService;
 
     @Override
     protected String getDocTypeCode() {
@@ -407,8 +417,11 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
      */
     @Override
     public AjaxResult mesCapture() {
-        // steve's TODO 待接口完善后补充
-        return AjaxResult.success();
+        String redisValue = redisService.getCacheObject(OperationBusinessEnums.GRAB_PRODUCT_MOLD.getCode());
+        if (StringUtils.isNotBlank(redisValue)) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.skuMouldRel.generating"));
+        }
+        return iMesItfService.syncProductModRelation(new MdmSkuMouldRel());
     }
 }
 

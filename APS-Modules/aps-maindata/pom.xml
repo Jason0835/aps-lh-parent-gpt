@@ -49,6 +49,11 @@
             <artifactId>mssql-jdbc</artifactId>
             <version>12.8.0.jre8</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

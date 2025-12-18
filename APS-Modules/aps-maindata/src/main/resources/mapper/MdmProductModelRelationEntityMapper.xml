@@ -94,4 +94,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         LEFT JOIN T_MDM_MODEL_INFO b ON a.MOULD_CODE = b.MOULD_CODE
     </select>
 
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
+        SELECT * FROM T_MDM_SKU_MOULD_REL WHERE IS_DELETE = 0
+        <if test="list != null and list.size() > 0">
+            AND (FACTORY_CODE, MOULD_CODE, MATERIAL_CODE) IN
+            <foreach collection="list" item="item" open="(" separator="," close=")">
+                (#{item.factoryCode}, #{item.mouldCode}, #{item.materialCode})
+            </foreach>
+        </if>
+    </select>
+
 </mapper>
