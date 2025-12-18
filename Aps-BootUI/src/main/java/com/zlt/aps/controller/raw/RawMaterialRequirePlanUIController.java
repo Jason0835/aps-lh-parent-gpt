@@ -175,8 +175,9 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
 
     @PostMapping("/generate")
     @ApiOperation("生成原材料需求计划")
-    public AjaxResult generate(@RequestParam String factoryCode, @RequestParam Integer year,
-                               @RequestParam Integer month) {
+    public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
+                               @RequestParam("year") Integer year,
+                               @RequestParam("month") Integer month) {
         return iRawMaterialRequirePlanService.generate(factoryCode, year, month);
     }
 }
