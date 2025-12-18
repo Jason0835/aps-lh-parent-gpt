@@ -386,7 +386,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         LocalDate date = LocalDate.of(year, month, 1);
         LocalDate t1Date = date.plusMonths(0);
 
-        return calculatePredictionRequirements(t1Date.getYear(), t1Date.getMonthValue(), "T1", specialMaterialRecords););
+        return calculatePredictionRequirements(t1Date.getYear(), t1Date.getMonthValue(), "T1", specialMaterialRecords);
     }
 
     /**
