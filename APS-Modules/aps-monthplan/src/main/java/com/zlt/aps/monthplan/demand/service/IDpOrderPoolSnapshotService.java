@@ -3,7 +3,7 @@ package com.zlt.aps.monthplan.demand.service;
 import java.util.List;
 import com.ruoyi.common.datasource.service.IBaseService;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import org.springframework.transaction.annotation.Transactional;
@@ -110,5 +110,5 @@ public interface IDpOrderPoolSnapshotService  extends IBaseService<DpOrderPoolSn
      * @param salesOrders
      * @param supplyOrderPools
      */
-    void saveOrderPoolSnapshot(MpDemandPlan createCondition, List<SalesOrderPool> salesOrders, List<SupplyOrderPool> supplyOrderPools);
+    void saveOrderPoolSnapshot(DpDemandPlan createCondition, List<SalesOrderPool> salesOrders, List<SupplyOrderPool> supplyOrderPools);
 }

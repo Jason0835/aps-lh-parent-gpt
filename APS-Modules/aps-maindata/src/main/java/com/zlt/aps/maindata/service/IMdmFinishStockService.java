@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.IDocService;
 
@@ -37,5 +37,5 @@ public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
      * @param monthPlanVersion 需求版本号
      * @param finishedProductStockMap 成品库存记录
      */
-    void insertBatchData(MpDemandPlan createCondition,String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap);
+    void insertBatchData(DpDemandPlan createCondition,String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap);
 }

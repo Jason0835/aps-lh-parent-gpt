@@ -28,8 +28,8 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 @ApiModel(value = "需求计划对象", description = "需求计划对象 ")
 @Data
-@TableName(value = "t_mp_demand_plan")
-public class MpDemandPlan extends BaseEntity{
+@TableName(value = "T_DP_DEMAND_PLAN")
+public class DpDemandPlan extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 

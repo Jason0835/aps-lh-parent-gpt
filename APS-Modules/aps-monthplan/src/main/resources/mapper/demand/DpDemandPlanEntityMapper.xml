@@ -2,8 +2,8 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MpDemandPlanEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan" id="MpDemandPlanResult">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan" id="DpDemandPlanResult">
             <result property="id" column="ID"/>
             <result property="factoryCode" column="FACTORY_CODE"/>
             <result property="year" column="YEAR"/>
@@ -14,7 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
             <result property="locationType" column="LOCATION_TYPE"/>
             <result property="brand" column="BRAND"/>
-            <result property="isPrioritize" column="IS_PRIORITIZE"/>
+            <result property="scmPriority" column="SCM_PRIORITY"/>
             <result property="structureName" column="STRUCTURE_NAME"/>
             <result property="mainPattern" column="MAIN_PATTERN"/>
             <result property="materialCode" column="MATERIAL_CODE"/>
@@ -60,12 +60,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
 
-    <sql id="selectMpDemandPlanVo">
-        SELECT ID, FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, ORDER_PRIORITY, IS_ALTERNATE_MATERIAL, PRODUCT_TYPE_CODE, LOCATION_TYPE, BRAND, IS_PRIORITIZE, STRUCTURE_NAME, MAIN_PATTERN, MATERIAL_CODE, MATERIAL_DESC, PRODUCTION_TYPE, YEAR_WEEK, IS_DYNAMIC_BALANCE, IS_UNIFORMITY, ORDER_QTY, STOCK_QTY, PLANNED_SURPLUS, NET_QTY, IS_PRODUCTION, POSTPONE_NET_QTY, UN_POSTPONE_NET_QTY, HEIGHT_QTY, MID_QTY, POSTPONE_QTY, CYCLE_RESERVE_QTY, CONVENTION_RESERVE_QTY, IS_REACH_MIN_PRODUCTION_QTY, MIN_PRODUCTION_QTY, PLAN_TYPE, MES_MATERIAL_CODE, CHANNEL, PRO_SIZE, SPECIFICATIONS, PATTERN, HIERARCHY, SPEED, IS_IMPORTANT_CUSTOM, IS_ENSURE_PLAN, IS_EMERGENCY, IS_DEBIT_PLAN, DELIVERY_DATE_DUE, IS_IMPORT, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_DEMAND_PLAN
+    <sql id="selectDpDemandPlanVo">
+        SELECT ID, FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, ORDER_PRIORITY, IS_ALTERNATE_MATERIAL, PRODUCT_TYPE_CODE, LOCATION_TYPE, BRAND, SCM_PRIORITY, STRUCTURE_NAME, MAIN_PATTERN, MATERIAL_CODE, MATERIAL_DESC, PRODUCTION_TYPE, YEAR_WEEK, IS_DYNAMIC_BALANCE, IS_UNIFORMITY, ORDER_QTY, STOCK_QTY, PLANNED_SURPLUS, NET_QTY, IS_PRODUCTION, POSTPONE_NET_QTY, UN_POSTPONE_NET_QTY, HEIGHT_QTY, MID_QTY, POSTPONE_QTY, CYCLE_RESERVE_QTY, CONVENTION_RESERVE_QTY, IS_REACH_MIN_PRODUCTION_QTY, MIN_PRODUCTION_QTY, PLAN_TYPE, MES_MATERIAL_CODE, CHANNEL, PRO_SIZE, SPECIFICATIONS, PATTERN, HIERARCHY, SPEED, IS_IMPORTANT_CUSTOM, IS_ENSURE_PLAN, IS_EMERGENCY, IS_DEBIT_PLAN, DELIVERY_DATE_DUE, IS_IMPORT, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_DP_DEMAND_PLAN
     </sql>
 
-    <select id="selectMpDemandPlanList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan" resultMap="MpDemandPlanResult">
-        <include refid="selectMpDemandPlanVo"/>
+    <select id="selectDpDemandPlanList" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan" resultMap="DpDemandPlanResult">
+        <include refid="selectDpDemandPlanVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null "> AND YEAR = #{year}</if>
@@ -76,7 +76,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="productTypeCode != null  and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
         <if test="locationType != null  and locationType != ''"> AND LOCATION_TYPE = #{locationType}</if>
         <if test="brand != null  and brand != ''"> AND BRAND = #{brand}</if>
-        <if test="isPrioritize != null  and isPrioritize != ''"> AND IS_PRIORITIZE = #{isPrioritize}</if>
+        <if test="scmPriority != null  and scmPriority != ''"> AND SCM_PRIORITY = #{scmPriority}</if>
         <if test="structureName != null  and structureName != ''"> AND STRUCTURE_NAME LIKE CONCAT(CONCAT('%', #{structureName}), '%')</if>
         <if test="mainPattern != null  and mainPattern != ''"> AND MAIN_PATTERN = #{mainPattern}</if>
         <if test="materialCode != null  and materialCode != ''"> AND MATERIAL_CODE = #{materialCode}</if>
@@ -115,15 +115,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="isImport != null  and isImport != ''"> AND IS_IMPORT = #{isImport}</if>
     </select>
 
-    <select id="selectMpDemandPlanById" parameterType="Long" resultMap="MpDemandPlanResult">
-        <include refid="selectMpDemandPlanVo"/>
+    <select id="selectDpDemandPlanById" parameterType="Long" resultMap="DpDemandPlanResult">
+        <include refid="selectDpDemandPlanVo"/>
         WHERE ID = #{id}
     </select>
 
-    <select id="selectMpDemandPlanByIds" parameterType="list"
-            resultMap="MpDemandPlanResult">
+    <select id="selectDpDemandPlanByIds" parameterType="list"
+            resultMap="DpDemandPlanResult">
 
-        <include refid="selectMpDemandPlanVo"/>
+        <include refid="selectDpDemandPlanVo"/>
            WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{id}
@@ -131,8 +131,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     </select>
 
-    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan">
-        INSERT INTO T_MP_DEMAND_PLAN
+    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan">
+        INSERT INTO T_DP_DEMAND_PLAN
         <trim prefix="(" suffix=")" suffixOverrides=",">
             ID,
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE,</if>
@@ -144,7 +144,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="productTypeCode != null">PRODUCT_TYPE_CODE,</if>
             <if test="locationType != null">LOCATION_TYPE,</if>
             <if test="brand != null">BRAND,</if>
-            <if test="isPrioritize != null">IS_PRIORITIZE,</if>
+            <if test="scmPriority != null">SCM_PRIORITY,</if>
             <if test="structureName != null">STRUCTURE_NAME,</if>
             <if test="mainPattern != null">MAIN_PATTERN,</if>
             <if test="materialCode != null and materialCode != ''">MATERIAL_CODE,</if>
@@ -199,7 +199,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="productTypeCode != null">#{productTypeCode},</if>
             <if test="locationType != null">#{locationType},</if>
             <if test="brand != null">#{brand},</if>
-            <if test="isPrioritize != null">#{isPrioritize},</if>
+            <if test="scmPriority != null">#{scmPriority},</if>
             <if test="structureName != null">#{structureName},</if>
             <if test="mainPattern != null">#{mainPattern},</if>
             <if test="materialCode != null and materialCode != ''">#{materialCode},</if>
@@ -245,8 +245,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
     </insert>
 
-    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan">
-        UPDATE T_MP_DEMAND_PLAN
+    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan">
+        UPDATE T_DP_DEMAND_PLAN
         <trim prefix="SET" suffixOverrides=",">
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE = #{factoryCode},</if>
             <if test="year != null">YEAR = #{year},</if>
@@ -257,7 +257,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="productTypeCode != null">PRODUCT_TYPE_CODE = #{productTypeCode},</if>
             <if test="locationType != null">LOCATION_TYPE = #{locationType},</if>
             <if test="brand != null">BRAND = #{brand},</if>
-            <if test="isPrioritize != null">IS_PRIORITIZE = #{isPrioritize},</if>
+            <if test="scmPriority != null">SCM_PRIORITY = #{scmPriority},</if>
             <if test="structureName != null">STRUCTURE_NAME = #{structureName},</if>
             <if test="mainPattern != null">MAIN_PATTERN = #{mainPattern},</if>
             <if test="materialCode != null and materialCode != ''">MATERIAL_CODE = #{materialCode},</if>
@@ -304,19 +304,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ID = #{id}
     </update>
 
-    <delete id="deleteMpDemandPlanById" parameterType="Long">
-        UPDATE T_MP_DEMAND_PLAN SET IS_DELETE = 1 WHERE ID = #{id}
+    <delete id="deleteDpDemandPlanById" parameterType="Long">
+        UPDATE T_DP_DEMAND_PLAN SET IS_DELETE = 1 WHERE ID = #{id}
     </delete>
 
-    <delete id="deleteMpDemandPlanByIds" parameterType="String">
-        UPDATE T_MP_DEMAND_PLAN SET IS_DELETE = 1 WHERE ID IN
+    <delete id="deleteDpDemandPlanByIds" parameterType="String">
+        UPDATE T_DP_DEMAND_PLAN SET IS_DELETE = 1 WHERE ID IN
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
-
-    <update id="mergeSql" parameterType="list">
-
-    </update>
 </mapper>

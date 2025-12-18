@@ -176,4 +176,8 @@ public class MdmModelInfo extends BaseEntity {
     @ApiModelProperty(value = "寸口", name = "proSize")
     @TableField(exist = false)
     private String proSize;
+
+    @ApiModelProperty(value = "数据版本", name = "dataVersion")
+    @TableField(exist = false)
+    private String dataVersion;
 }
