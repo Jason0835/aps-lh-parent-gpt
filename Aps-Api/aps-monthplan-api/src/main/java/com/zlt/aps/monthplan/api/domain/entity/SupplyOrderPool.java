@@ -174,4 +174,11 @@ public class SupplyOrderPool extends BaseEntity{
     @TableField(exist = false)
     private Long averageSaleQty;
 
+    /**
+     * 以分厂+物料为维度，转换销售订单
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialCode);
+    }
 }

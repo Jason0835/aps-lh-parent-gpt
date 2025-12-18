@@ -476,6 +476,16 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
     return supplyOrderPool;
   }
 
+  @Override
+  public List<SupplyOrderPool> findCurrentSupplyOrderPool() {
+    SupplyOrderPool param = new SupplyOrderPool();
+    YearMonth yearMonth = YearMonth.now();
+    param.setYear(yearMonth.getYear());
+    param.setMonth(yearMonth.getMonthValue());
+    param.setIsDelete(YesOrNoEnum.NO.getValue());
+    return this.selectSupplyOrderPoolList(param);
+  }
+
   /**
    * 获取配置信息
    *
