@@ -42,6 +42,26 @@ public class ContinueProductInfo implements Serializable {
     private String proSize;
 
     /**
+     * 胎胚号
+     */
+    private String embryoCode;
+
+    /**
+     * 规格
+     */
+    private String specifications;
+
+    /**
+     * 主花纹
+     */
+    private String mainPattern;
+
+    /**
+     * 花纹
+     */
+    private String pattern;
+
+    /**
      * 模具使用数量变化信息
      */
     private String mouldChangeInfo;

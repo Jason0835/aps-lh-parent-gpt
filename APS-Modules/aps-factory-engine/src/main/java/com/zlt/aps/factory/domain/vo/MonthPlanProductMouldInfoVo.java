@@ -4,6 +4,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
  * 工厂月度排产物料模具信息
@@ -78,4 +79,9 @@ public class MonthPlanProductMouldInfoVo implements Serializable {
      */
     @ApiModelProperty(value = "关系类型", name = "relationType")
     private String relationType;
+
+    /**
+     * 上机日期--默认为空
+     */
+    private Date boardingDate;
 }

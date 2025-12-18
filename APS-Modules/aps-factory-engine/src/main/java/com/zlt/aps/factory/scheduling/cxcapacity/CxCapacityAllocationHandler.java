@@ -3,10 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.factory.domain.dto.ProductGroupCxCapacityInfo;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
@@ -37,11 +34,12 @@ public class CxCapacityAllocationHandler {
      * @param estimateGroupCxAllocationMap 分组计划预估分配信息
      * @param cxContinueInfoMap            续作信息
      */
-    public static void continueGroupPlanAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
+    public static Map<String, CxMachineAllocationPlanHelper> continueGroupPlanAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
         //续作分组 --TBR按结构
         if (CollectionUtils.isEmpty(cxContinueInfoMap)) {
-            return;
+            return Collections.emptyMap();
         }
+        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = new HashMap<>();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer monthDays = productionContext.getMonthDays();
         //成型基础信息
@@ -54,7 +52,6 @@ public class CxCapacityAllocationHandler {
                 return;
             }
             Integer minLhRatio = groupPlanInfo.getMinLhMachineCount();
-            Map<String, Integer> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(structureName);
             //实际需要的机台数
             BigDecimal machineCount = groupPlanInfo.getNeedCxCapacityMachineCount();
             //整数机台
@@ -69,18 +66,24 @@ public class CxCapacityAllocationHandler {
             for (int allocationIndex = BigDecimal.ZERO.intValue(); allocationIndex < wholeMachine; allocationIndex++) {
                 ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(allocationIndex);
                 CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
+                //续作Sku信息
+                Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
                 Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
                 cxMachineBaseInfo.setRemainingDays(BigDecimal.ZERO.intValue());
                 CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
                 cxMachineBaseInfo.addAllocationPlanInfo(helper);
+                continueAllocationMap.put(cxCapacityInfo.getCxMachineCode(), helper);
             }
             //不是整台部分
             ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(wholeMachineCount - BigDecimal.ONE.intValue());
             CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
+            //续作Sku信息
+            Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
             BigDecimal decimalPart = machineCount.subtract(integerPart);
             Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
             CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
             cxMachineBaseInfo.addAllocationPlanInfo(helper);
+            continueAllocationMap.put(cxMachineBaseInfo.getCxMachineCode(), helper);
             Integer newRemainingDays = cxMachineBaseInfo.getRemainingDays() - allocationDay;
             cxMachineBaseInfo.setRemainingDays(newRemainingDays);
             //加入收尾匹配
@@ -88,6 +91,7 @@ public class CxCapacityAllocationHandler {
                 productionContext.addReverseMachine(cxMachineBaseInfo.getCxMachineCode());
             }
         });
+        return continueAllocationMap;
     }
 
     /**
@@ -102,7 +106,7 @@ public class CxCapacityAllocationHandler {
      * @param monthDays         月份最大天数
      * @return
      */
-    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer lhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, Integer> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
+    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer lhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueProductInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
         Integer startAllocationDay = BigDecimal.ZERO.intValue();
         Integer endAllocationDay = BigDecimal.ZERO.intValue();
         Set<Integer> stopDayInfo = cxMachineBaseInfo.getStopDayInfo();

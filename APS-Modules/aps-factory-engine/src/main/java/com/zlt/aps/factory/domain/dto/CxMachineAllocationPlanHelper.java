@@ -41,7 +41,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     /**
      * 续作规格信息
      */
-    private Map<String, Integer> continueSkuMap;
+    private Map<String, CxContinueProductInfoHelper> continueSkuMap;
     /**
      * 当前硫化配比
      */
@@ -61,7 +61,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * @param startDay           起始天数
      * @param endDay             结束天数
      */
-    public CxMachineAllocationPlanHelper(ProductionPlanGroupInfo productionPlanInfo, Integer ratio, Map<String, Integer> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
+    public CxMachineAllocationPlanHelper(ProductionPlanGroupInfo productionPlanInfo, Integer ratio, Map<String, CxContinueProductInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
         this.productionPlanInfo = productionPlanInfo;
         this.ratio = ratio;
         this.continueSkuMap = continueSkuMap;
