@@ -3,6 +3,9 @@ package com.zlt.aps.maindata.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -20,4 +23,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmModelInfoEntityMapper extends CommBaseMapper<MdmModelInfo> {
 
+    /**
+     * 根据模具编号查询
+     *
+     * @param saveList 模具编号
+     * @return 结果
+     */
+    List<MdmModelInfo> selectByUniqueKeyList(@Param("list") List<MdmModelInfo> saveList);
 }
