@@ -653,5 +653,22 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
         mdmProductConstructionService.syncProductConstructionInfo(list, "");
         return AjaxResult.success();
     }
+
+    @Override
+    public Map<String, MdmMaterialInfo> skuToMaterialInfo() {
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMaterialInfo> materialInfos =  mdmMaterialInfoEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(materialInfos)){
+            return Collections.emptyMap();
+        }
+        return materialInfos.stream()
+            .filter(Objects::nonNull)
+            .filter(material -> org.apache.commons.lang3.StringUtils.isNotBlank(material.getMaterialCode()))
+            .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode,
+                material -> material,
+                (existing, replacement) -> existing
+            ));
+    }
 }
 

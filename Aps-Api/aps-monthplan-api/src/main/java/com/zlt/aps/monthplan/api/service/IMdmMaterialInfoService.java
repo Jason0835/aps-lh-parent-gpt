@@ -104,7 +104,7 @@ public interface IMdmMaterialInfoService {
     /**
      * 根据物料编码获取物料信息
      *
-     * @param productCode
+     * @param materialCode
      * @return
      */
     @PostMapping("/productinfo/getMaterialInfo")

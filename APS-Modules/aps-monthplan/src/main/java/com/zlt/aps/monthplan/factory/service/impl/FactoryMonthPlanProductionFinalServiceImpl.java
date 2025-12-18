@@ -495,7 +495,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                     MdmMaterialInfo productInfo = productInfoMap.get(productCode);
                     excelVo.setProductDesc(productInfo.getMaterialDesc());
                     excelVo.setBrand(productInfo.getBrand());
-                    excelVo.setProSize(productInfo.getProSize());
+                    // excelVo.setProSize(productInfo.getProSize());
                     excelVo.setSpecifications(productInfo.getSpecifications());
                     excelVo.setPattern(productInfo.getPattern());
                     excelVo.setHierarchy(productInfo.getHierarchy());
@@ -936,7 +936,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
         if (productInfo != null) {
             noticeOrder.setProductDesc(productInfo.getMaterialDesc());
             noticeOrder.setBrand(productInfo.getBrand());
-            noticeOrder.setProSize(productInfo.getProSize());
+            // noticeOrder.setProSize(productInfo.getProSize());
             noticeOrder.setProductTypeCode(productInfo.getProductTypeCode());
             noticeOrder.setProductTypeName(productInfo.getProductTypeName());
             noticeOrder.setSpecifications(productInfo.getSpecifications());
@@ -1044,7 +1044,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
             // 手动设置产品属性，避免依赖特定 BeanUtils 实现
             finalData.setProductDesc(productInfo.getMaterialDesc());
             finalData.setBrand(productInfo.getBrand());
-            finalData.setProSize(productInfo.getProSize());
+            // finalData.setProSize(productInfo.getProSize());
             finalData.setSpecifications(productInfo.getSpecifications());
             finalData.setPattern(productInfo.getPattern());
             finalData.setHierarchy(productInfo.getHierarchy());
@@ -2284,7 +2284,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                 return;
             }
             item.setProductDesc(productInfo.getMaterialDesc());
-            item.setProSize(productInfo.getProSize());
+            //item.setProSize(productInfo.getProSize());
             item.setBrand(productInfo.getBrand());
             item.setSpecifications(productInfo.getSpecifications());
             item.setPattern(productInfo.getPattern());

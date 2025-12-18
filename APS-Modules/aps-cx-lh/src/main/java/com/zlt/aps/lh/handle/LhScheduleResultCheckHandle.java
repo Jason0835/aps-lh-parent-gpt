@@ -71,18 +71,18 @@ public class LhScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.productInfo.notExist"));
         }
         // 判断物料的寸口是否为空
-        BigDecimal proSize = mdmMaterialInfo.getProSize();
+        // BigDecimal proSize = mdmMaterialInfo.getProSize();
         // 获取机台生产寸口范围
         BigDecimal dimensionMinimum = lhMachineInfo.getDimensionMinimum();
         BigDecimal dimensionMaximum = lhMachineInfo.getDimensionMaximum();
-        // 校验物料寸口是否低于机台生产下限
+       /* // 校验物料寸口是否低于机台生产下限
         if (dimensionMinimum != null && proSize.compareTo(dimensionMinimum) < 0) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.dimension.not.in.range"));
         }
         // 校验物料寸口是否超过机台生产上限
         if (dimensionMaximum != null && proSize.compareTo(dimensionMaximum) > 0) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.dimension.not.in.range"));
-        }
+        }*/
         //转入机台当日存在排程，不可转入
         LhScheduleResult lhScheduleResultMachine = lhScheduleResultService.getScheduleResultByMachineCodeAndScheduleDate(lhscheduleResult.getFactoryCode(),dto.getLhMachineCode(),lhscheduleResult.getScheduleDate());
         if(lhScheduleResultMachine != null){
@@ -133,18 +133,18 @@ public class LhScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.productInfo.notExist"));
         }
         // 判断物料的寸口是否为空
-        BigDecimal proSize = mdmMaterialInfo.getProSize();
+        // BigDecimal proSize = mdmMaterialInfo.getProSize();
         // 获取机台生产寸口范围
         BigDecimal dimensionMinimum = lhMachineInfo.getDimensionMinimum();
         BigDecimal dimensionMaximum = lhMachineInfo.getDimensionMaximum();
-        // 校验物料寸口是否低于机台生产下限
+       /* // 校验物料寸口是否低于机台生产下限
         if (dimensionMinimum != null && proSize.compareTo(dimensionMinimum) < 0) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.dimension.not.in.range"));
         }
         // 校验物料寸口是否超过机台生产上限
         if (dimensionMaximum != null && proSize.compareTo(dimensionMaximum) > 0) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.machine.dimension.not.in.range"));
-        }
+        }*/
         return ValidateResult.success();
     }
 }

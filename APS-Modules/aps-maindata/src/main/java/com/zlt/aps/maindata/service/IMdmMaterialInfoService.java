@@ -11,6 +11,7 @@ import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -175,4 +176,9 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
      * @return 结果
      */
     AjaxResult configConstruction(ConfigConstructionVo configConstructionVo);
+    /**
+     * 获取SKU对应的物料信息
+     * @return 物料信息
+     */
+    Map<String,MdmMaterialInfo>  skuToMaterialInfo();
 }

@@ -194,7 +194,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
                 addImportErrorLog(importLogId, errorNum, message, importErrorLogs);
                 continue;
             }
-            tEstimateExceedShort.setProSize(productInfo.getProSize());
+            //tEstimateExceedShort.setProSize(productInfo.getProSize());
             tEstimateExceedShort.setProductName(productInfo.getProductTypeCode());
             tEstimateExceedShort.setIsImport(Constant.TRUE);
 
@@ -318,7 +318,7 @@ public class EstimateExceedShortServiceImpl implements IEstimateExceedShortServi
                 .collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
         for (EstimateExceedShort item : shortList) {
             MdmMaterialInfo mdmMaterialInfo = infoMap.getOrDefault(GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProductCode()), new MdmMaterialInfo());
-            item.setProSize(mdmMaterialInfo.getProSize());
+            //item.setProSize(mdmMaterialInfo.getProSize());
             item.setProductName(mdmMaterialInfo.getProductTypeCode());
         }
     }
