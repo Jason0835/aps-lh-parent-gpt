@@ -687,11 +687,11 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         Map<String, RawMaterialRequirePlan> previousRequirements = getPreviousMonthRequirements(year, month);
 
         //删除旧的差异数据
-        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<RawMaterialMonthDiff> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("YEAR", year)
                 .eq("MONTH", month)
                 .eq("FACTORY_CODE", factoryCode);
-        rawMaterialRequirePlanMapper.delete(queryWrapper);
+        rawMaterialMonthDiffMapper.delete(queryWrapper);
 
         // 计算差异并保存
         calculateAndSaveDifferences(year, month, currentRequirements, previousRequirements, factoryCode);
