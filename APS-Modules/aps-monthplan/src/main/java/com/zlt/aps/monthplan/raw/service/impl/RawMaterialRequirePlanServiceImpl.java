@@ -23,6 +23,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -130,17 +131,31 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                     return predictionCheck;
                 }
 
+                //查询特殊材料清单
+                QueryWrapper<RawSpecialMaterialRecord> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("factory_code", factoryCode);
+                List<RawSpecialMaterialRecord> specialMaterialRecordsList = rawSpecialMaterialRecordMapper.selectList(queryWrapper);
+
+                // 获取所有需要预警的原材料编码
+                Set<String> specialMaterialRecords = new HashSet<>();
+                if (specialMaterialRecordsList != null && !specialMaterialRecordsList.isEmpty()) {
+                    specialMaterialRecords = specialMaterialRecordsList.stream()
+                            .map(RawSpecialMaterialRecord::getMaterialCode)
+                            .collect(Collectors.toSet());
+                }
+
+
                 // 5. 获取月度生产计划
                 List<FactoryMonthPlanProdFinal> monthPlans = getMonthProductionPlan(year, month);
 
                 // 6. 计算当月原材料需求量
-                Map<String, RawMaterialRequirePlan> currentMonthRequirements = calculateCurrentMonthRequirements(monthPlans);
+                Map<String, RawMaterialRequirePlan> currentMonthRequirements = calculateCurrentMonthRequirements(monthPlans, specialMaterialRecords);
 
                 // 7. 获取预测计划并计算需求
-                Map<String, RawMaterialRequirePlan> t1Requirements = calculateT1MonthRequirements(year, month);
-                Map<String, RawMaterialRequirePlan> t2Requirements = calculateT2MonthRequirements(year, month);
+                Map<String, RawMaterialRequirePlan> t1Requirements = calculateT1MonthRequirements(year, month, specialMaterialRecords );
+                Map<String, RawMaterialRequirePlan> t2Requirements = calculateT2MonthRequirements(year, month, specialMaterialRecords);
 
-                // 8. 计算EUDR和非EUDR
+                // 8. 计算次月的EUDR和非EUDR
                 //calculateEudrRequirements(currentMonthRequirements, t1Requirements, t2Requirements);
 
                 // 9. 特殊材料批次计算
@@ -297,7 +312,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 计算当月原材料需求量
      */
     private Map<String, RawMaterialRequirePlan> calculateCurrentMonthRequirements(
-            List<FactoryMonthPlanProdFinal> monthPlans) {
+            List<FactoryMonthPlanProdFinal> monthPlans, Set<String> specialMaterialRecords) {
 
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
 
@@ -317,7 +332,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 String materialCode = detail.getChildMaterialCode();
                 String materialDesc = detail.getChildMaterialName();
                 BigDecimal dosage = detail.getDosage();
-
+                String materialType = specialMaterialRecords.contains(materialCode) ? "01" : "02";
                 if (dosage == null) {
                     log.warn("物料 {} 的用量为空，设为0", materialCode);
                     dosage = BigDecimal.ZERO;
@@ -327,7 +342,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 BigDecimal requiredQty = BigDecimal.valueOf(totalQty).multiply(dosage);
 
                 RawMaterialRequirePlan requirement = requirements.getOrDefault(materialCode,
-                        new RawMaterialRequirePlan(materialCode, materialDesc, null));
+                        new RawMaterialRequirePlan(materialCode, materialDesc, materialType));
 
                 // 判断EUDR
                 boolean isEudr = isEudrPlan(plan);
@@ -367,17 +382,17 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 计算T+1月需求
      */
-    private Map<String, RawMaterialRequirePlan> calculateT1MonthRequirements(Integer year, Integer month) {
+    private Map<String, RawMaterialRequirePlan> calculateT1MonthRequirements(Integer year, Integer month, Set<String> specialMaterialRecords) {
         LocalDate date = LocalDate.of(year, month, 1);
         LocalDate t1Date = date.plusMonths(0);
 
-        return calculatePredictionRequirements(t1Date.getYear(), t1Date.getMonthValue(), "T1");
+        return calculatePredictionRequirements(t1Date.getYear(), t1Date.getMonthValue(), "T1", specialMaterialRecords););
     }
 
     /**
      * 计算T+2月需求
      */
-    private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(Integer year, Integer month) {
+    private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(Integer year, Integer month, Set<String> specialMaterialRecords) {
         if (!isSpringFestivalMonth(year, month)) {
             return new HashMap<>();
         }
@@ -385,13 +400,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         LocalDate date = LocalDate.of(year, month, 1);
         LocalDate t2Date = date.plusMonths(0);
 
-        return calculatePredictionRequirements(t2Date.getYear(), t2Date.getMonthValue(), "T2");
+        return calculatePredictionRequirements(t2Date.getYear(), t2Date.getMonthValue(), "T2", specialMaterialRecords);
     }
 
     /**
      * 计算预测需求
      */
-    private Map<String, RawMaterialRequirePlan> calculatePredictionRequirements(Integer year, Integer month, String type) {
+    private Map<String, RawMaterialRequirePlan> calculatePredictionRequirements(Integer year, Integer month, String type, Set<String> specialMaterialRecords) {
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
 
         // 获取预测计划
@@ -413,12 +428,18 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             for (MdmMaterialConsumeDetail detail : bomDetails) {
                 String materialCode = detail.getChildMaterialCode();
                 String materialDesc = detail.getChildMaterialName();
+                String materialType = specialMaterialRecords.contains(materialCode) ? "01" : "02";
                 BigDecimal dosage = detail.getDosage();
+
+                if (dosage == null) {
+                    log.warn("物料 {} 的用量为空，设为0", materialCode);
+                    dosage = BigDecimal.ZERO;
+                }
 
                 BigDecimal requiredQty = BigDecimal.valueOf(productionQty).multiply(dosage);
 
                 RawMaterialRequirePlan requirement = requirements.getOrDefault(materialCode,
-                        new RawMaterialRequirePlan(materialCode, materialDesc, null));
+                        new RawMaterialRequirePlan(materialCode, materialDesc, materialType));
 
                 // 根据预测月份设置不同的字段
                 //todo 预测表增加年周号区分
@@ -440,7 +461,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         // 这里需要实现根据成品物料编码查找对应的胎胚代码和BOM
         // 简化处理，查询所有相关的BOM
         QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("PARENT_MATERIAL_CODE", materialCode)
+        queryWrapper.eq("EMBRYO_CODE", materialCode)
                 .eq("IS_DELETE", 0);
         return mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
     }
