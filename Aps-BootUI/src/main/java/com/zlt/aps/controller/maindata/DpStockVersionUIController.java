@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
-import com.zlt.aps.monthplan.api.service.IMdmFinishStockRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.monthplan.api.service.IDpStockVersionRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -42,14 +42,14 @@ import java.util.Arrays;
  * @date 2025-12-08
  */
 @Slf4j
-@Api(tags = "成品库存")
+@Api(tags = "版本库存")
 @Controller
 @RequestMapping("/monthplan/mdmFinishStock")
-public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock> {
+public class DpStockVersionUIController extends BaseUIController<DpStockVersion> {
 
-    private final String prefix = "aps/monthplan/mdmFinishStock";
+    private final String prefix = "aps/monthplan/dpStockVersion";
     @Autowired
-    private IMdmFinishStockRemoteService iMdmFinishStockService;
+    private IDpStockVersionRemoteService iMdmFinishStockService;
 
     /**
      * 跳转至主页面
@@ -65,7 +65,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmFinishStock", new MdmFinishStock());
+        mmap.put("mdmFinishStock", new DpStockVersion());
         return prefix + "/add";
     }
 
@@ -85,8 +85,8 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @RequiresPermissions("monthplan:mdmFinishStock:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmFinishStock mdmFinishStock) {
-        return iMdmFinishStockService.list(mdmFinishStock);
+    public TableDataInfo list(DpStockVersion dpStockVersion) {
+        return iMdmFinishStockService.list(dpStockVersion);
     }
 
     /**
@@ -96,12 +96,12 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @RequiresPermissions("monthplan:mdmFinishStock:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmFinishStock mdmFinishStock) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmFinishStockService.checkUnique(mdmFinishStock))) {
+    public AjaxResult save(DpStockVersion dpStockVersion) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmFinishStockService.checkUnique(dpStockVersion))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmFinishStock.notUnique"));
         }
 
-        return iMdmFinishStockService.save(mdmFinishStock);
+        return iMdmFinishStockService.save(dpStockVersion);
     }
 
     /**
@@ -122,8 +122,8 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmFinishStock mdmFinishStock) {
-        return iMdmFinishStockService.checkUnique(mdmFinishStock);
+    public String checkUnique(DpStockVersion dpStockVersion) {
+        return iMdmFinishStockService.checkUnique(dpStockVersion);
     }
 
     /**
@@ -165,7 +165,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmFinishStock> util = new ExcelUtil<>(MdmFinishStock.class);
+        ExcelUtil<DpStockVersion> util = new ExcelUtil<>(DpStockVersion.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -175,7 +175,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmFinishStock entity) throws IOException {
+    public void export(HttpServletResponse response, DpStockVersion entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMdmFinishStockService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
@@ -208,8 +208,8 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @RequiresPermissions("monthplan:mdmFinishStock:list4Mes")
     @PostMapping("/list4Mes")
     @ResponseBody
-    public TableDataInfo list4Mes(MdmFinishStock mdmFinishStock) {
-        return iMdmFinishStockService.list4Mes(mdmFinishStock);
+    public TableDataInfo list4Mes(DpStockVersion dpStockVersion) {
+        return iMdmFinishStockService.list4Mes(dpStockVersion);
     }
 
     /**
@@ -223,7 +223,7 @@ public class MdmFinishStockUIController extends BaseUIController<MdmFinishStock>
     @ApiOperation("MES实时成品库存导出")
     @GetMapping({"/export4Mes"})
     @ResponseBody
-    public void export4Mes(HttpServletResponse response, MdmFinishStock entity) throws IOException {
+    public void export4Mes(HttpServletResponse response, DpStockVersion entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMdmFinishStockService.export4Mes(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

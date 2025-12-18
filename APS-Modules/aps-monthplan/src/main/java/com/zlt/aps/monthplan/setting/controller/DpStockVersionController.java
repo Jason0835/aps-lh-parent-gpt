@@ -11,9 +11,9 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.maindata.mapper.MdmFinishStockEntityMapper;
-import com.zlt.aps.maindata.service.IMdmFinishStockService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.maindata.mapper.DpStockVersionEntityMapper;
+import com.zlt.aps.maindata.service.IDpStockVersionService;
+import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -47,17 +47,17 @@ import java.util.List;
 @Slf4j
 @Api(tags = "成品库存")
 @RestController
-@RequestMapping("/mdmFinishStock")
-public class MdmFinishStockController extends AbstractDocBizController<MdmFinishStock> {
+@RequestMapping("/dpStockVersion")
+public class DpStockVersionController extends AbstractDocBizController<DpStockVersion> {
 
     @Autowired
-    private IMdmFinishStockService mdmFinishStockService;
+    private IDpStockVersionService mdmFinishStockService;
 
     @Autowired
     private IExportLogService iExportLogService;
 
     @Autowired
-    private MdmFinishStockEntityMapper entityMapper;
+    private DpStockVersionEntityMapper entityMapper;
 
     /**
      * 查询成品库存列表
@@ -65,7 +65,7 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody MdmFinishStock queryVO) {
+    public TableDataInfo list(@RequestBody DpStockVersion queryVO) {
         return super.list(queryVO);
     }
 
@@ -81,7 +81,7 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MdmFinishStock billVO) {
+    public AjaxResult save(@RequestBody DpStockVersion billVO) {
         return super.save(billVO);
     }
 
@@ -103,7 +103,7 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
-    public MdmFinishStock getInfo(@PathVariable("billId") Long billId) {
+    public DpStockVersion getInfo(@PathVariable("billId") Long billId) {
         return super.getInfo(billId);
     }
 
@@ -130,14 +130,14 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody MdmFinishStock queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody DpStockVersion queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<MdmFinishStock> listExportData(MdmFinishStock obj) {
-        QueryWrapper<MdmFinishStock> wrapper = new QueryWrapper<>();
+    protected List<DpStockVersion> listExportData(DpStockVersion obj) {
+        QueryWrapper<DpStockVersion> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         return entityMapper.selectList(wrapper);
     }
@@ -154,7 +154,7 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<MdmFinishStock> queryWrapper, MdmFinishStock queryVO) {
+    protected void builderCondition(QueryWrapper<DpStockVersion> queryWrapper, DpStockVersion queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
@@ -182,7 +182,7 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
      */
     @ApiOperation("查询MES实时成品库存列表")
     @PostMapping("/list4Mes")
-    public TableDataInfo list4Mes(@RequestBody MdmFinishStock queryVO) {
+    public TableDataInfo list4Mes(@RequestBody DpStockVersion queryVO) {
         return getDataTable(mdmFinishStockService.list4Mes(queryVO));
     }
 
@@ -192,11 +192,11 @@ public class MdmFinishStockController extends AbstractDocBizController<MdmFinish
     @Log(title = "成品库存", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/export4Mes/{fileName}")
-    public byte[] export4Mes(@RequestBody MdmFinishStock queryVO, @PathVariable("fileName") String fileName,
+    public byte[] export4Mes(@RequestBody DpStockVersion queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
-        List<MdmFinishStock> list = mdmFinishStockService.list4Mes(queryVO);
-        ExcelUtil<MdmFinishStock> util = new ExcelUtil<>(this.getTClass());
+        List<DpStockVersion> list = mdmFinishStockService.list4Mes(queryVO);
+        ExcelUtil<DpStockVersion> util = new ExcelUtil<>(this.getTClass());
         Workbook workbook = util.exportExcel2(response, list, fileName);
         byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();

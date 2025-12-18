@@ -5,10 +5,10 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MdmFinishStockEntityMapper;
-import com.zlt.aps.maindata.service.IMdmFinishStockService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.maindata.mapper.DpStockVersionEntityMapper;
+import com.zlt.aps.maindata.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -19,12 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -45,9 +40,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
-public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock> implements IMdmFinishStockService {
+public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion> implements IDpStockVersionService {
 
-    private final MdmFinishStockEntityMapper finishStockEntityMapper;
+    private final DpStockVersionEntityMapper finishStockEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MDM0139";
@@ -61,7 +56,7 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
     }
 
     @Override
-    public String checkUnique(MdmFinishStock docEntityVO) {
+    public String checkUnique(DpStockVersion docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmFinishStock.notUnique"));
@@ -82,7 +77,7 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
      * @return 结果
      */
     @Override
-    public List<MdmFinishStock> list4Mes(MdmFinishStock queryVO) {
+    public List<DpStockVersion> list4Mes(DpStockVersion queryVO) {
         // steve's TODO 查询MES实时成品库存列表
         return Collections.emptyList();
     }
@@ -92,17 +87,17 @@ public class MdmFinishStockServiceImpl extends AbstractDocService<MdmFinishStock
         if (CollectionUtils.isEmpty(finishedProductStockMap)) {
             return;
         }
-        List<MdmFinishStock> list = Lists.newArrayList();
+        List<DpStockVersion> list = Lists.newArrayList();
         List<MpFinishedProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
         finishedProductStocks.forEach(finishedProductStock -> {
-            MdmFinishStock requireStock = this.buildRequireStock(createCondition,monthPlanVersion,finishedProductStock);
+            DpStockVersion requireStock = this.buildRequireStock(createCondition, monthPlanVersion, finishedProductStock);
             list.add(requireStock);
         });
         this.baseDao.insertBatch(list);
     }
 
-    private MdmFinishStock buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MpFinishedProductStock finishedProductStock) {
-        MdmFinishStock requireStock = new MdmFinishStock();
+    private DpStockVersion buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MpFinishedProductStock finishedProductStock) {
+        DpStockVersion requireStock = new DpStockVersion();
         BeanUtils.copyProperties(finishedProductStock, requireStock);
         requireStock.setId(null);
         requireStock.setRequireVersion(monthPlanVersion);
