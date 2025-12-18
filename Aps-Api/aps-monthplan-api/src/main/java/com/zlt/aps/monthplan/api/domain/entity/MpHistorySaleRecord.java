@@ -14,7 +14,7 @@ import java.util.Date;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpHistorySaleRecord.java
- * 描    述：历史销售记录对象 t_mp_history_sale_record
+ * 描    述：历史销售记录对象 T_MDM_HISTORY_SALE_RECORD
  *@author yelq
  *@date 2025-12-11
  *@version 1.0
@@ -26,7 +26,7 @@ import java.util.Date;
  */
 @ApiModel(value = "历史销售记录对象", description = "历史销售记录对象")
 @Data
-@TableName(value = "T_MP_HISTORY_SALE_RECORD")
+@TableName(value = "T_MDM_HISTORY_SALE_RECORD")
 public class MpHistorySaleRecord extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
