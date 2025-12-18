@@ -64,7 +64,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
             if (weekUsages.isEmpty()) {
                 log.warn("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
-                return AjaxResult.error(String.format("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week));
+                return AjaxResult.error(String.format("未找到周用量数据，工厂：%s，年份：%d，周次：%d", factoryCode, year, week));
             }
 
             // 2. 获取用量偏差预警配置
@@ -129,25 +129,30 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private RawWarningRecord createUsageWarningRecord(RawWeekUsage usage, RawWarningConfig config) {
         RawWarningRecord record = new RawWarningRecord();
         record.setFactoryCode(usage.getFactoryCode());
-        record.setWarningType("1"); // 用量偏差预警
+        // 用量偏差预警
+        record.setWarningType("1");
         record.setMaterialCode(usage.getMaterialCode());
         record.setMaterialDesc(usage.getMaterialDesc());
+        record.setRelatedMonth(String.format("%d年%d月", usage.getYear(), usage.getMonth()));
         record.setWarningLevel(config.getWarningLevel());
-        record.setRelatedWeek(String.format("%d年第%02d周", usage.getYear(), usage.getWeek()));
-        record.setStatus("0"); // 未处理
-        record.setNotified(0); // 未通知
+        record.setRelatedWeek(String.format("%d年%d月第%02d周", usage.getYear(), usage.getMonth(), usage.getWeek()));
+        // 未处理
+        record.setStatus("0");
+        // 未通知
+        record.setNotified(0);
 
         // 设置预警标题和内容
         String title = String.format("原材料用量偏差预警 - %s", usage.getMaterialDesc());
         record.setWarningTitle(title);
 
         String content = String.format(
-                "工厂：%s，原材料：%s（%s），%d年第%02d周用量偏差超限。\n" +
+                "工厂：%s，原材料：%s（%s），%d年%d月第%02d周用量偏差超限。\n" +
                         "计划用量：%s，实际用量：%s，偏差量：%s，偏差率：%.2f%%",
                 usage.getFactoryCode(),
                 usage.getMaterialDesc(),
                 usage.getMaterialCode(),
                 usage.getYear(),
+                usage.getMonth(),
                 usage.getWeek(),
                 usage.getPlanQty(),
                 usage.getActualQty(),
