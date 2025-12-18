@@ -29,13 +29,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 #{specCode}
             </foreach>
         </if>
-          AND EXISTS(SELECT 1 FROM T_MDM_MODEL_INFO m where t.FACTORY_CODE = m.FACTORY_CODE and m.MOULD_STATUS = 1)
+        AND EXISTS(SELECT 1 FROM T_MDM_MOULD_INFO m where t.FACTORY_CODE = m.FACTORY_CODE and m.MOULD_STATUS = 1)
     </select>
 
     <select id="getMouldMaxList" resultType="java.lang.String">
         SELECT DISTINCT mpmr.MOULD_CODE
           FROM t_mdm_product_model_relation mpmr
-          LEFT JOIN t_mdm_model_info mmi
+                   LEFT JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mpmr.MOULD_CODE
            AND mmi.MOULD_STATUS = 1
           LEFT JOIN t_mdm_mould_use_status mmus
@@ -58,7 +58,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         FROM
             t_mdm_product_construction a
         INNER JOIN t_mdm_product_model_relation b ON a.SPEC_CODE = b.SPEC_CODE
-        INNER JOIN t_mdm_model_info c ON b.MOULD_CODE = c.MOULD_CODE
+        INNER JOIN T_MDM_MOULD_INFO c ON b.MOULD_CODE = c.MOULD_CODE
         WHERE
             a.IS_DELETE = 0
           AND a.EMBRYO_CODE IS NOT NULL
@@ -91,7 +91,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="select4ImportAdjustData" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
         SELECT a.PRODUCT_CODE, a.MOULD_CODE, b.MOULD_NO FROM t_mdm_product_model_relation a
-        LEFT JOIN T_MDM_MODEL_INFO b ON a.MOULD_CODE = b.MOULD_CODE
+                                                                 LEFT JOIN T_MDM_MOULD_INFO b ON a.MOULD_CODE = b.MOULD_CODE
     </select>
 
     <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">

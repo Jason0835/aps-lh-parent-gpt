@@ -10,7 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                mpi.PRODUCT_DESC
           FROM (SELECT mhsq.PRODUCT_CODE,
                        mhsq.FACTORY_CODE
-                  FROM t_mp_history_sale_qty mhsq
+                FROM T_MDM_HISTORY_SALE_RECORD mhsq
                  WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
                    AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )
                    AND IFNULL( mhsq.SALE_QTY, 0 ) >= 0
@@ -31,7 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         UPDATE t_mdm_min_prod mmp
          INNER JOIN (SELECT mhsq.PRODUCT_CODE,
                             mhsq.FACTORY_CODE
-                       FROM t_mp_history_sale_qty mhsq
+            FROM T_MDM_HISTORY_SALE_RECORD mhsq
                       WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
                         AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR
                             (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )
@@ -51,7 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         UPDATE t_mdm_min_prod mmp
          INNER JOIN (SELECT mhsq.PRODUCT_CODE,
                             mhsq.FACTORY_CODE
-                       FROM t_mp_history_sale_qty mhsq
+            FROM T_MDM_HISTORY_SALE_RECORD mhsq
                       WHERE IFNULL( mhsq.IS_DELETE, 0 ) = 0
                         AND (mhsq.`YEAR` > #{year,jdbcType=DECIMAL} OR
                             (mhsq.`YEAR` = #{year,jdbcType=DECIMAL} AND mhsq.`MONTH` >= #{month,jdbcType=DECIMAL} ) )

@@ -250,8 +250,8 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("samePatternPanel")), "sAME_PATTER_PANEL", queryVO.getFieldValueByFieldName("samePatternPanel"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldCategory")), "MOULD_CATEGORY", queryVO.getFieldValueByFieldName("mouldCategory"));
-        queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldNo")), " SELECT 1 FROM t_mdm_model_info WHERE" +
-                " t_mdm_model_info.MOULD_CODE = T_MDM_PRODUCT_MODEL_RELATION.MOULD_CODE AND MOULD_NO = {0}", queryVO.getFieldValueByFieldName("mouldNo"));
+        queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldNo")), " SELECT 1 FROM T_MDM_MOULD_INFO WHERE" +
+                " T_MDM_MOULD_INFO.MOULD_CODE = T_MDM_PRODUCT_MODEL_RELATION.MOULD_CODE AND MOULD_NO = {0}", queryVO.getFieldValueByFieldName("mouldNo"));
     }
 
     @Override

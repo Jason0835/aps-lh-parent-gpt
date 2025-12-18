@@ -5,7 +5,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper">
 
     <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo">
-        SELECT * FROM T_MDM_MODEL_INFO WHERE IS_DELETE = 0
+        SELECT * FROM T_MDM_MOULD_INFO WHERE IS_DELETE = 0
         <if test="list != null and list.size() > 0">
             AND (FACTORY_CODE, MOULD_CODE) IN
             <foreach collection="list" item="item" open="(" separator="," close=")">

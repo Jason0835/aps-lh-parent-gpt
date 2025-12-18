@@ -133,7 +133,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                             GROUP_CONCAT( DISTINCT(mpmr.SPEC_CODE) )  AS SPEC_CODE,
                             COUNT( DISTINCT(tmmi.MOULD_CODE) ) AS MOULD_NUMBER
                        FROM t_mdm_product_model_relation mpmr
-                       LEFT JOIN t_mdm_model_info tmmi
+        LEFT JOIN T_MDM_MOULD_INFO tmmi
                          ON tmmi.MOULD_CODE = mpmr.MOULD_CODE
                         AND tmmi.FACTORY_CODE = mpmr.FACTORY_CODE
                       WHERE 1=1

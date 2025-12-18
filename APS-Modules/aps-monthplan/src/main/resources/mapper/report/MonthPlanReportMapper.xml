@@ -33,7 +33,7 @@
 
     <sql id="saleFinishTableName">
         -- 销售订单需求完成表名
-        t_mp_history_sale_qty
+        T_MDM_HISTORY_SALE_RECORD
     </sql>
 
     <sql id="producePlanTableName">
@@ -2917,7 +2917,7 @@
                      0              AS STOCK_QTY,
                      SUM(SALE_QTY) AS ORDER_QTY,
                      0              AS PLAN_QTY
-              FROM t_mp_history_sale_qty
+            FROM T_MDM_HISTORY_SALE_RECORD
               WHERE IS_DELETE = 0
                 AND `YEAR` = #{year}
               GROUP BY `MONTH`
@@ -3102,7 +3102,7 @@
 
     <select id="selectFactoryMachine" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4MachineVo">
         SELECT '可用模具数' as typeName, count(1) as machineCount
-        FROM t_mdm_model_info
+        FROM T_MDM_MOULD_INFO
         where MOULD_STATUS = 1
         UNION ALL
         SELECT '硫化机台数' as typeName, count(1) as machineCount

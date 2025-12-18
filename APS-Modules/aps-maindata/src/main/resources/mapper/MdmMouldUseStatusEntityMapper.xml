@@ -27,7 +27,7 @@
     <sql id="selectMouldUseStatusVo">
         select id, year, month, mould_code,factory_code, mould_status, specifications, pattern, mould_type, ower_factory_code, create_time, update_time, create_by, update_by,remark from T_MDM_MOULD_USE_STATUS
     </sql>
-    
+
     <sql id="selectSqlMouldUseStatusList">
         select t.id,
         t.year,
@@ -46,7 +46,7 @@
         t.update_by,
         t.remark
         from T_MDM_MOULD_USE_STATUS t
-        left join T_MDM_MODEL_INFO m on t.mould_code=m.mould_code
+        left join T_MDM_MOULD_INFO m on t.mould_code=m.mould_code
         <where>
             <if test="year != null ">and t.year = #{year}</if>
             <if test="month != null ">and t.month = #{month}</if>
@@ -66,7 +66,7 @@
             ${params.dataScope}
         </where>
     </sql>
-    
+
     <sql id="selectSqlMouldUseStatusListForProductCode">
         SELECT * FROM (SELECT t2.id,T.MOULD_CODE,#{year} year,#{month} month,
         t2.factory_code,
@@ -101,7 +101,7 @@
         t.update_by,
         t.remark
         from T_MDM_MOULD_USE_STATUS t
-        left join T_MDM_MODEL_INFO m on t.mould_code=m.mould_code
+        left join T_MDM_MOULD_INFO m on t.mould_code=m.mould_code
         <where>
             <if test="year != null ">and t.year = #{year}</if>
             <if test="month != null ">and t.month = #{month}</if>
@@ -123,7 +123,7 @@
             resultMap="MouldUseStatusResult">
         <include refid="selectSqlMouldUseStatusList"/>
     </select>
-    
+
     <select id="checkMouldUseStatusUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus"
             resultMap="MouldUseStatusResult">
         <include refid="selectMouldUseStatusVo"/>
@@ -192,7 +192,7 @@
         t1.MOULD_TYPE          AS mouldType,
         t1.REMARK              AS remark
         FROM T_MDM_MOULD_USE_STATUS t1
-        LEFT JOIN T_MDM_MODEL_INFO t2 ON t1.MOULD_CODE = t2.MOULD_CODE AND t1.FACTORY_CODE = t2.FACTORY_CODE
+        LEFT JOIN T_MDM_MOULD_INFO t2 ON t1.MOULD_CODE = t2.MOULD_CODE AND t1.FACTORY_CODE = t2.FACTORY_CODE
         WHERE t1.FACTORY_CODE = #{factoryCode}
         AND t1.YEAR = #{year}
         AND t1.MONTH = #{month}
@@ -209,7 +209,7 @@
         SELECT mmus.MOULD_CODE,
                mmi.MOULD_NO
           FROM T_MDM_MOULD_USE_STATUS mmus
-          LEFT JOIN T_MDM_MODEL_INFO mmi
+        LEFT JOIN T_MDM_MOULD_INFO mmi
             ON mmus.MOULD_CODE = mmi.MOULD_CODE
            AND mmus.FACTORY_CODE = mmi.FACTORY_CODE
          WHERE mmi.MOULD_STATUS = 1

@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpMonthlySaleQty.java
- * 描    述：月均销量对象 t_mp_monthly_sale_qty
+ * 描    述：月均销量对象 T_MDM_MONTH_AVG_SALE_QTY
  *
  * @author zlt
  * @version 1.0
@@ -26,7 +26,7 @@ import java.util.List;
  */
 @ApiModel(value = "月均销量对象", description = "月均销量对象 ")
 @Data
-@TableName(value = "T_MP_MONTHLY_SALE_QTY")
+@TableName(value = "T_MDM_MONTH_AVG_SALE_QTY")
 public class MpMonthlySaleQty extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
