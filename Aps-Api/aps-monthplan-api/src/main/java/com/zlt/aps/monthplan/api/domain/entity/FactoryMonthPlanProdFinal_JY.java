@@ -47,19 +47,19 @@ public class FactoryMonthPlanProdFinal_JY extends BaseEntity {
     /** 年份 */
     @Excel(name = "ui.data.column.final.year")
     @ApiModelProperty(value = "年份", name = "year")
-    @TableField(value = "YEAR")
+    @TableField(value = "`YEAR`")  // 添加反引号
     private Integer year;
 
     /** 月份 */
     @Excel(name = "ui.data.column.final.month")
     @ApiModelProperty(value = "月份", name = "month")
-    @TableField(value = "MONTH")
+    @TableField(value = "`MONTH`")  // 添加反引号
     private Integer month;
 
     /** 年月:YYYYMM */
     @Excel(name = "ui.data.column.final.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "YEAR_MONTH")  // 这个不是保留字，可以不加反引号
     private Integer yearMonth;
 
     /** 销售生产需求计划版本 */
