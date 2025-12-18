@@ -6,6 +6,9 @@ nacos:
 
 # Spring
 spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   application:
     # 应用名称
     name: aps-itf

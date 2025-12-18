@@ -195,4 +195,18 @@ public class MdmSkuMouldRel extends BaseEntity {
     @ApiModelProperty(value = "寸口", name = "proSize")
     @TableField(exist = false)
     private String proSize;
+
+    /**
+     * 数据版本
+     */
+    @ApiModelProperty(value = "数据版本", name = "dataVersion")
+    @TableField(exist = false)
+    private String dataVersion;
+
+    /**
+     * 模具类型，4-型腔，5-侧板
+     */
+    @ApiModelProperty(value = "模具类型，4-型腔，5-侧板", name = "mouldType")
+    @TableField(exist = false)
+    private String mouldType;
 }
