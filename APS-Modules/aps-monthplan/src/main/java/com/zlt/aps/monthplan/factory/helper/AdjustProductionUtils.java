@@ -91,15 +91,15 @@ public class AdjustProductionUtils {
         }
         //实际调减量
         Long realSubtractQty = Math.abs(subtractInfo.getNeedAdjustNumber()) - needSubtractQty;
-        if (null != originPlan.getFactProdReqQty()) {
-            originPlan.setFactProdReqQty(originPlan.getFactProdReqQty() - realSubtractQty);
-        }
-        if (null != originPlan.getProdReqPlan()) {
-            originPlan.setProdReqPlan(originPlan.getProdReqPlan() - realSubtractQty);
-        }
-        if (null != originPlan.getTotalQty()) {
-            originPlan.setTotalQty(originPlan.getTotalQty() - realSubtractQty);
-        }
+//        if (null != originPlan.getFactProdReqQty()) {
+//            originPlan.setFactProdReqQty(originPlan.getFactProdReqQty() - realSubtractQty);
+//        }
+//        if (null != originPlan.getProdReqPlan()) {
+//            originPlan.setProdReqPlan(originPlan.getProdReqPlan() - realSubtractQty);
+//        }
+//        if (null != originPlan.getTotalQty()) {
+//            originPlan.setTotalQty(originPlan.getTotalQty() - realSubtractQty);
+//        }
     }
 
     /**
@@ -139,7 +139,7 @@ public class AdjustProductionUtils {
                 }
                 totalProductionQty = totalProductionQty + productionQty;
             }
-            needAdjustPlan.setTotalQty(totalProductionQty);
+//            needAdjustPlan.setTotalQty(totalProductionQty);
             needAdjustPlan.setBeginDate(startDay);
             needAdjustPlan.setEndDay(endDay);
         });
@@ -279,9 +279,9 @@ public class AdjustProductionUtils {
         }
         insertPlan.setBeginDate(realStartDay);
         insertPlan.setEndDay(realEndDay);
-        insertPlan.setProdReqPlan(totalProductionQty);
-        insertPlan.setFactProdReqQty(totalProductionQty);
-        insertPlan.setTotalQty(totalProductionQty);
+//        insertPlan.setProdReqPlan(totalProductionQty);
+//        insertPlan.setFactProdReqQty(totalProductionQty);
+//        insertPlan.setTotalQty(totalProductionQty);
         BigDecimal totalCuringTime = helper.getCuringTime().multiply(BigDecimal.valueOf(totalProductionQty));
         insertPlan.setTotalVulcanizationMinutes(totalCuringTime.divide(BigDecimal.valueOf(FactoryConstant.MINUTE_SECOND), 2, RoundingMode.HALF_UP));
     }

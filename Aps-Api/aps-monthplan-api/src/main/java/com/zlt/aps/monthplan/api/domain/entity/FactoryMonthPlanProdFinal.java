@@ -35,7 +35,7 @@ import java.util.List;
 @Data
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "分厂月生产计划排产结果-生产计划排产结果对象", description = "分厂月生产计划排产结果-生产计划排产结果对象 ")
-public class FactoryMonthPlanProdFinal extends BaseEntity {
+public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
 
     private static final long serialVersionUID = 1L;
 
@@ -123,7 +123,7 @@ public class FactoryMonthPlanProdFinal extends BaseEntity {
     @ImportExcelValidated(required = true, maxLength = 20)
     @ApiModelProperty(value = "施工阶段", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
-    private Integer constructionStage;
+    private String constructionStage;
 
     /**
      * 成型法
@@ -166,13 +166,7 @@ public class FactoryMonthPlanProdFinal extends BaseEntity {
     @TableField(value = "BRAND")
     private String brand;
 
-    /**
-     * 寸口
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.proSize")
-    @ApiModelProperty(value = "寸口", name = "proSize")
-    @TableField(value = "PRO_SIZE")
-    private BigDecimal proSize;
+
 
     /**
      * 规格
@@ -288,57 +282,9 @@ public class FactoryMonthPlanProdFinal extends BaseEntity {
     @TableField(value = "IS_DELIVERY_DATE")
     private Integer isDeliveryDate;
 
-    /**
-     * 是否EXCEL导入（0：默认不是，1：是）
-     */
-    // @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.isImport", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
-    @TableField(value = "IS_IMPORT")
-    private Integer isImport;
 
-    /**
-     * 单条硫化时间(包含增加间隔)-调整时使用
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.curingTime")
-    @ApiModelProperty(value = "单条硫化时间(包含增加间隔)-到秒", name = "curingTime")
-    @TableField(value = "CURING_TIME")
-    private BigDecimal curingTime;
 
-    /**
-     * 生产需求计划
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.prodReqPlan", cellType = Excel.ColumnType.NUMERIC)
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999999)
-    @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
-    @TableField(value = "PROD_REQ_PLAN")
-    private Long prodReqPlan;
 
-    /**
-     * 实际生产需求(含损耗)
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.factProdReqQty", cellType = Excel.ColumnType.NUMERIC)
-    @ImportExcelValidated(required = true, digits = true)
-    @ApiModelProperty(value = "实际生产需求(含损耗)", name = "factProdReqQty")
-    @TableField(value = "FACT_PROD_REQ_QTY")
-    private Long factProdReqQty;
-
-    /**
-     * 生产实际排产量
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.totalQty", cellType = Excel.ColumnType.NUMERIC)
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999999)
-    @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
-    @TableField(value = "TOTAL_QTY")
-    private Long totalQty;
-
-    /**
-     * 差异量(未排产数量)
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.differenceQty", cellType = Excel.ColumnType.NUMERIC)
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999999)
-    @ApiModelProperty(value = "差异量(未排产数量)", name = "differenceQty")
-    @TableField(value = "DIFFERENCE_QTY")
-    private Long differenceQty;
 
     /**
      * 未排产原因
@@ -429,253 +375,6 @@ public class FactoryMonthPlanProdFinal extends BaseEntity {
     @TableField(value = "PRE_DAY_7")
     private Long preDay7;
 
-    /**
-     * DAY_1
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day1", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_1", name = "day1")
-    @TableField(value = "DAY_1", updateStrategy = FieldStrategy.IGNORED)
-    private Long day1;
-
-    /**
-     * DAY_2
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day2", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_2", name = "day2")
-    @TableField(value = "DAY_2", updateStrategy = FieldStrategy.IGNORED)
-    private Long day2;
-
-    /**
-     * DAY_3
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day3", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_3", name = "day3")
-    @TableField(value = "DAY_3", updateStrategy = FieldStrategy.IGNORED)
-    private Long day3;
-
-    /**
-     * DAY_4
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day4", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_4", name = "day4")
-    @TableField(value = "DAY_4", updateStrategy = FieldStrategy.IGNORED)
-    private Long day4;
-
-    /**
-     * DAY_5
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day5", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_5", name = "day5")
-    @TableField(value = "DAY_5", updateStrategy = FieldStrategy.IGNORED)
-    private Long day5;
-
-    /**
-     * DAY_6
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day6", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_6", name = "day6")
-    @TableField(value = "DAY_6", updateStrategy = FieldStrategy.IGNORED)
-    private Long day6;
-
-    /**
-     * DAY_7
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day7", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_7", name = "day7")
-    @TableField(value = "DAY_7", updateStrategy = FieldStrategy.IGNORED)
-    private Long day7;
-
-    /**
-     * DAY_8
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day8", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_8", name = "day8")
-    @TableField(value = "DAY_8", updateStrategy = FieldStrategy.IGNORED)
-    private Long day8;
-
-    /**
-     * DAY_9
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day9", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_9", name = "day9")
-    @TableField(value = "DAY_9", updateStrategy = FieldStrategy.IGNORED)
-    private Long day9;
-
-    /**
-     * DAY_10
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day10", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_10", name = "day10")
-    @TableField(value = "DAY_10", updateStrategy = FieldStrategy.IGNORED)
-    private Long day10;
-
-    /**
-     * DAY_11
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day11", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_11", name = "day11")
-    @TableField(value = "DAY_11", updateStrategy = FieldStrategy.IGNORED)
-    private Long day11;
-
-    /**
-     * DAY_12
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day12", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_12", name = "day12")
-    @TableField(value = "DAY_12", updateStrategy = FieldStrategy.IGNORED)
-    private Long day12;
-
-    /**
-     * DAY_13
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day13", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_13", name = "day13")
-    @TableField(value = "DAY_13", updateStrategy = FieldStrategy.IGNORED)
-    private Long day13;
-
-    /**
-     * DAY_14
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day14", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_14", name = "day14")
-    @TableField(value = "DAY_14", updateStrategy = FieldStrategy.IGNORED)
-    private Long day14;
-
-    /**
-     * DAY_15
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day15", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_15", name = "day15")
-    @TableField(value = "DAY_15", updateStrategy = FieldStrategy.IGNORED)
-    private Long day15;
-
-    /**
-     * DAY_16
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day16", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_16", name = "day16")
-    @TableField(value = "DAY_16", updateStrategy = FieldStrategy.IGNORED)
-    private Long day16;
-
-    /**
-     * DAY_17
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day17", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_17", name = "day17")
-    @TableField(value = "DAY_17", updateStrategy = FieldStrategy.IGNORED)
-    private Long day17;
-
-    /**
-     * DAY_18
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day18", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_18", name = "day18")
-    @TableField(value = "DAY_18", updateStrategy = FieldStrategy.IGNORED)
-    private Long day18;
-
-    /**
-     * DAY_19
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day19", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_19", name = "day19")
-    @TableField(value = "DAY_19", updateStrategy = FieldStrategy.IGNORED)
-    private Long day19;
-
-    /**
-     * DAY_20
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day20", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_20", name = "day20")
-    @TableField(value = "DAY_20", updateStrategy = FieldStrategy.IGNORED)
-    private Long day20;
-
-    /**
-     * DAY_21
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day21", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_21", name = "day21")
-    @TableField(value = "DAY_21", updateStrategy = FieldStrategy.IGNORED)
-    private Long day21;
-
-    /**
-     * DAY_22
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day22", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_22", name = "day22")
-    @TableField(value = "DAY_22", updateStrategy = FieldStrategy.IGNORED)
-    private Long day22;
-
-    /**
-     * DAY_23
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day23", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_23", name = "day23")
-    @TableField(value = "DAY_23", updateStrategy = FieldStrategy.IGNORED)
-    private Long day23;
-
-    /**
-     * DAY_24
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day24", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_24", name = "day24")
-    @TableField(value = "DAY_24", updateStrategy = FieldStrategy.IGNORED)
-    private Long day24;
-
-    /**
-     * DAY_25
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day25", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_25", name = "day25")
-    @TableField(value = "DAY_25", updateStrategy = FieldStrategy.IGNORED)
-    private Long day25;
-
-    /**
-     * DAY_26
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day26", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_26", name = "day26")
-    @TableField(value = "DAY_26", updateStrategy = FieldStrategy.IGNORED)
-    private Long day26;
-
-    /**
-     * DAY_27
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day27", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_27", name = "day27")
-    @TableField(value = "DAY_27", updateStrategy = FieldStrategy.IGNORED)
-    private Long day27;
-
-    /**
-     * DAY_28
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day28", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_28", name = "day28")
-    @TableField(value = "DAY_28", updateStrategy = FieldStrategy.IGNORED)
-    private Long day28;
-
-    /**
-     * DAY_29
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day29", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_29", name = "day29")
-    @TableField(value = "DAY_29", updateStrategy = FieldStrategy.IGNORED)
-    private Long day29;
-
-    /**
-     * DAY_30
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day30", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_30", name = "day30")
-    @TableField(value = "DAY_30", updateStrategy = FieldStrategy.IGNORED)
-    private Long day30;
-
-    /**
-     * DAY_31
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.day31", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "DAY_31", name = "day31")
-    @TableField(value = "DAY_31", updateStrategy = FieldStrategy.IGNORED)
-    private Long day31;
 
     /**
      * 硫化总工时

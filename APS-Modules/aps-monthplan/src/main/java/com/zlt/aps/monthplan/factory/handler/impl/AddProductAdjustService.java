@@ -170,7 +170,7 @@ public class AddProductAdjustService implements FactoryMonthPlanAdjustHandler {
                 continue;
             }
             AdjustInfoHelperVo adjustInfoHelper = new AdjustInfoHelperVo(productCode, adjustDate, adjustQty, mouldNo, mouldQty, maxMouldSet);
-            adjustInfoHelper.setCuringTime(addProductPlan.getCuringTime());
+            adjustInfoHelper.setCuringTime(BigDecimal.valueOf(addProductPlan.getCuringTime()));
             adjustInfoHelper.setDayMaxCuringTime(addProductPlan.getDayMaxCuringTime());
             adjustInfoHelper.setChangeProductConsumeTime(addProductPlan.getChangeProductConsumeTime());
             buildSubtractPlan(addProductPlan, detailList, adjustInfoHelper, productionPlanList, needAdjustPlanMap);
@@ -406,11 +406,11 @@ public class AddProductAdjustService implements FactoryMonthPlanAdjustHandler {
         }
         addProductPlan.setBeginDate(beginDate);
         addProductPlan.setEndDay(endDay);
-        addProductPlan.setFactProdReqQty(totalValue);
-        addProductPlan.setProdReqPlan(totalValue);
-        addProductPlan.setTotalQty(totalValue);
-        addProductPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
-        addProductPlan.setTotalVulcanizationMinutes(addProductPlan.getCuringTime().multiply(BigDecimal.valueOf(totalValue)));
+//        addProductPlan.setFactProdReqQty(totalValue);
+//        addProductPlan.setProdReqPlan(totalValue);
+//        addProductPlan.setTotalQty(totalValue);
+//        addProductPlan.setDifferenceQty(BigDecimal.ZERO.longValue());
+//        addProductPlan.setTotalVulcanizationMinutes(addProductPlan.getCuringTime().multiply(BigDecimal.valueOf(totalValue)));
     }
 
     /**
