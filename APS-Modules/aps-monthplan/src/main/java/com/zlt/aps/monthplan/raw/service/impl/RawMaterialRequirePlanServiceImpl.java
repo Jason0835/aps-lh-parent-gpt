@@ -303,7 +303,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         for (FactoryMonthPlanProdFinal plan : monthPlans) {
             // 获取总产量
-            Long totalQty = plan.getTotalQty();
+            Integer totalQty = plan.getTotalQty();
             if (totalQty == null || totalQty == 0) {
                 continue;
             }

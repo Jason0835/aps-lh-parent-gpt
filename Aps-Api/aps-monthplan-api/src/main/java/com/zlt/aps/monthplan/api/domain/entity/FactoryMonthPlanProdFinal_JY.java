@@ -59,7 +59,7 @@ public class FactoryMonthPlanProdFinal_JY extends BaseEntity {
     /** 年月:YYYYMM */
     @Excel(name = "ui.data.column.final.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")  // 这个不是保留字，可以不加反引号
+    @TableField(value = "`YEAR_MONTH`")  // 这个不是保留字，可以不加反引号
     private Integer yearMonth;
 
     /** 销售生产需求计划版本 */

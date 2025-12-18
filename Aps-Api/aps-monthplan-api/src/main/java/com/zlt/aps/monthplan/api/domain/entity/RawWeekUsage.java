@@ -39,7 +39,7 @@ public class RawWeekUsage extends BaseEntity {
      */
     @Excel(name = "年份")
     @ApiModelProperty(value = "年份", name = "year")
-    @TableField(value = "YEAR")
+    @TableField(value = "`YEAR`")
     private Integer year;
 
     /**
@@ -47,7 +47,7 @@ public class RawWeekUsage extends BaseEntity {
      */
     @Excel(name = "周次")
     @ApiModelProperty(value = "周次", name = "week")
-    @TableField(value = "WEEK")
+    @TableField(value = "`WEEK`")
     private Integer week;
 
     /**
