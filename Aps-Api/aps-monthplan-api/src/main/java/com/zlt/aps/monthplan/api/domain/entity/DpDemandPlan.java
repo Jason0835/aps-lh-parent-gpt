@@ -223,7 +223,7 @@ public class DpDemandPlan extends BaseEntity{
     @Excel(name = "ui.data.column.demandPlan.minProductionQty")
     @ApiModelProperty(value = "最小投产量值", name = "minProductionQty")
     @TableField(value = "MIN_PRODUCTION_QTY")
-    private Integer minProductionQty;
+    private Long minProductionQty;
 
     /** 计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟 */
     @Excel(name = "ui.data.column.demandPlan.planType")
@@ -316,5 +316,10 @@ public class DpDemandPlan extends BaseEntity{
     public String getGroupKey() {
         String keyFormat = "%s|*|%s|*|%s|*|%s";
         return String.format(keyFormat, materialCode, isDynamicBalance,isUniformity,yearWeek);
+    }
+
+    public String getGroupFactoryAndMaterialKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialCode);
     }
 }

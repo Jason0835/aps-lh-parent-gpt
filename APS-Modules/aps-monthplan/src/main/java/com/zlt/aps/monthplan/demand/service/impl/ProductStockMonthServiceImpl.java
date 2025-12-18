@@ -110,7 +110,7 @@ public class ProductStockMonthServiceImpl implements IProductStockMonthService {
             itemStock.setBrand(productInfo.getBrand());
             itemStock.setSpecifications(productInfo.getSpecifications());
             itemStock.setPattern(productInfo.getPattern());
-            itemStock.setProSize(productInfo.getProSize());
+            //itemStock.setProSize(productInfo.getProSize());
         }
     }
 
