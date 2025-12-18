@@ -347,7 +347,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
-        List<FactoryMonthPlanProdFinal>  factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
+        List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
         Map<String,Integer> countSkuMap = this.countSkuMap(factoryMonthPlanProdFinals);
         skus.forEach(sku -> supplyOrderPools.add(buildSupplyOrderPool(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishedProductStockMap,countSkuMap)));
         this.insertBatchData(supplyOrderPools);
@@ -411,7 +411,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
-        List<FactoryMonthPlanProdFinal>  factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
+        List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
         Map<String,Integer> countSkuMap = this.countSkuMap(factoryMonthPlanProdFinals);
         intersections.forEach(sku -> supplyOrderPools.add(buildPrecedentOrder(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishedProductStockMap,countSkuMap)));
         this.insertBatchData(supplyOrderPools);

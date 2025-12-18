@@ -287,7 +287,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         String yearAndMonth = String.format("%s%02d", year, month);
         itemFinal.setYearMonth(Integer.valueOf(yearAndMonth));
       }
-      itemFinal.setIsImport(Constant.FALSE);
+      itemFinal.setIsImport(String.valueOf(Constant.FALSE));
       // 排产单号
       itemFinal.setProductionNo(monthPlanVersion + String.format("%06d", index));
       index++;
@@ -788,7 +788,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         item.setProductCode(configuration.getProductCode());
       }
     }
-    item.setIsImport(Constant.TRUE);
+    item.setIsImport(String.valueOf(Constant.TRUE));
     return true;
   }
 
@@ -832,7 +832,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         return;
       }
       item.setProductDesc(productInfo.getMaterialDesc());
-      item.setProSize(productInfo.getProSize());
+      item.setProSize(String.valueOf(productInfo.getProSize()));
       item.setSpecifications(productInfo.getSpecifications());
       item.setPattern(productInfo.getPattern());
       item.setHierarchy(productInfo.getHierarchy());
@@ -855,7 +855,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
   private boolean checkDataMouldInfoAndFullMouldNo(FactoryMonthPlanProdFinal item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmSkuMouldRel>> mouldBaseInfoMap) {
     String mouldErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNoErrorInfo");
     String mouldNumberErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNumberErrorInfo");
-    Integer constructionStage = item.getConstructionStage();
+    Integer constructionStage = Integer.valueOf(item.getConstructionStage());
     ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
     if (null == stage) {
       return true;
@@ -950,7 +950,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
     //自动生成productCode的流水号--没有物料编码时
     int index = 0;
     for (FactoryMonthPlanProdFinal finalPlan : importList) {
-      Integer constructionStage = finalPlan.getConstructionStage();
+      Integer constructionStage = Integer.valueOf(finalPlan.getConstructionStage());
       ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
       if (null == stage) {
         continue;
@@ -982,7 +982,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
    * @return
    */
   private int addProductConstructionConfiguration(String batchNo, int index, FactoryMonthPlanProdFinal importFinalPlan, List<FactoryMonthPlanProdFinal> informalConstructionStageList) {
-    Integer constructionStage = importFinalPlan.getConstructionStage();
+    Integer constructionStage = Integer.valueOf(importFinalPlan.getConstructionStage());
     ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
     if (null == stage) {
       return index;
@@ -1131,15 +1131,15 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
       }
       totalQty = totalQty + productionQty;
     }
-    item.setTotalQty(totalQty);
-    Long requireQty = item.getProdReqPlan();
-    if (null == requireQty) {
-      requireQty = BigDecimal.ZERO.longValue();
-    }
-    if (null == item.getFactProdReqQty()) {
-      item.setFactProdReqQty(requireQty);
-    }
-    item.setDifferenceQty(item.getFactProdReqQty() - totalQty);
+//    item.setTotalQty(totalQty);
+//    Long requireQty = item.getProdReqPlan();
+//    if (null == requireQty) {
+//      requireQty = BigDecimal.ZERO.longValue();
+//    }
+//    if (null == item.getFactProdReqQty()) {
+//      item.setFactProdReqQty(requireQty);
+//    }
+//    item.setDifferenceQty(item.getFactProdReqQty() - totalQty);
   }
 
   /**

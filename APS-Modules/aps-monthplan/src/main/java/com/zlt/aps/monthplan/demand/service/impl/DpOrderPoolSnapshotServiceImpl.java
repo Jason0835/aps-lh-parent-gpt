@@ -6,7 +6,7 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderPoolSnapshotEntityMapper;
@@ -253,7 +253,7 @@ public class DpOrderPoolSnapshotServiceImpl extends BaseService<DpOrderPoolSnaps
     }
 
     @Override
-    public void saveOrderPoolSnapshot(MpDemandPlan createCondition, List<SalesOrderPool> salesOrders, List<SupplyOrderPool> supplyOrderPools) {
+    public void saveOrderPoolSnapshot(DpDemandPlan createCondition, List<SalesOrderPool> salesOrders, List<SupplyOrderPool> supplyOrderPools) {
         List<DpOrderPoolSnapshot> orderPoolSnapshots = Lists.newArrayList();
         if(CollectionUtils.isNotEmpty(salesOrders)){
             salesOrders.forEach(saleOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(createCondition,saleOrder)));
@@ -268,7 +268,7 @@ public class DpOrderPoolSnapshotServiceImpl extends BaseService<DpOrderPoolSnaps
 
 
 
-    private DpOrderPoolSnapshot buildOrderPoolSnapshot(MpDemandPlan createCondition, SalesOrderPool saleOrder) {
+    private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SalesOrderPool saleOrder) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(saleOrder, entity);
         entity.setId(null);
@@ -293,7 +293,7 @@ public class DpOrderPoolSnapshotServiceImpl extends BaseService<DpOrderPoolSnaps
         return entity;
     }
 
-    private DpOrderPoolSnapshot buildOrderPoolSnapshot(MpDemandPlan createCondition, SupplyOrderPool supplyOrder) {
+    private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SupplyOrderPool supplyOrder) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(supplyOrder, entity);
         entity.setId(null);

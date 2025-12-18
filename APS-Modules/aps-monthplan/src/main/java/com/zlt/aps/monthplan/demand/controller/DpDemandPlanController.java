@@ -4,8 +4,8 @@ package com.zlt.aps.monthplan.demand.controller;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
-import com.zlt.aps.monthplan.api.domain.entity.MpDemandPlan;
-import com.zlt.aps.monthplan.demand.service.IMpDemandPlanService;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.common.controller.BusiController;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -34,7 +34,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 
 /**
 * Copyright (c) 2022, All rights reserved。
-* 文件名称：MpDemandPlanController.java
+* 文件名称：DpDemandPlanController.java
 * 描    述：需求计划 控制层类：....
 *@author yelq
 *@date 2025-12-12
@@ -49,10 +49,10 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 @Api(tags = "需求计划")
 @RestController
 @RequestMapping("/demandPlan")
-public class MpDemandPlanController extends BusiController<MpDemandPlan>
+public class DpDemandPlanController extends BusiController<DpDemandPlan>
 {
     @Autowired
-    private IMpDemandPlanService mpDemandPlanService;
+    private IDpDemandPlanService DpDemandPlanService;
 
     /**
      * 查询需求计划列表
@@ -60,10 +60,10 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @RequiresPermissions( "monthplan:demandPlan:list")
     @ApiOperation("查询需求计划列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody MpDemandPlan mpDemandPlan)
+    public TableDataInfo list(@RequestBody DpDemandPlan DpDemandPlan)
     {
         startPage("create_time desc");
-        List<MpDemandPlan> list = mpDemandPlanService.selectMpDemandPlanList(mpDemandPlan);
+        List<DpDemandPlan> list = DpDemandPlanService.selectDpDemandPlanList(DpDemandPlan);
         return getDataTable(list);
     }
 
@@ -74,15 +74,15 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @RequiresPermissions( "monthplan:demandPlan:export")
     @Log(title = "需求计划", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData/{fileName}")
-    public byte[] exportData(@RequestBody MpDemandPlan mpDemandPlan,@PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody DpDemandPlan DpDemandPlan,@PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return commonExport(mpDemandPlan,fileName,response);
+        return commonExport(DpDemandPlan,fileName,response);
     }
 
     @Override
-    public List<MpDemandPlan> listExportData(MpDemandPlan mpDemandPlan) {
+    public List<DpDemandPlan> listExportData(DpDemandPlan DpDemandPlan) {
         startPage("create_time desc");
-        return  mpDemandPlanService.selectMpDemandPlanList(mpDemandPlan);
+        return  DpDemandPlanService.selectDpDemandPlanList(DpDemandPlan);
     }
 
     /**
@@ -91,9 +91,9 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @RequiresPermissions( "monthplan:demandPlan:query")
     @ApiOperation("获取需求计划详细信息")
     @GetMapping(value = "/{id}")
-    public MpDemandPlan getInfo(@PathVariable("id") Long id)
+    public DpDemandPlan getInfo(@PathVariable("id") Long id)
     {
-        return mpDemandPlanService.selectMpDemandPlanById(id);
+        return DpDemandPlanService.selectDpDemandPlanById(id);
     }
 
     /**
@@ -103,8 +103,8 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @RequiresPermissions( "monthplan:demandPlan:add")
     @ApiOperation("新增需求计划")
     @PostMapping("/add")
-    public AjaxResult add(@RequestBody MpDemandPlan mpDemandPlan){
-        return toAjax(mpDemandPlanService.insertMpDemandPlan(mpDemandPlan));
+    public AjaxResult add(@RequestBody DpDemandPlan DpDemandPlan){
+        return toAjax(DpDemandPlanService.insertDpDemandPlan(DpDemandPlan));
     }
 
     /**
@@ -114,8 +114,8 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @RequiresPermissions( "monthplan:demandPlan:edit")
     @ApiOperation("修改需求计划")
     @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody MpDemandPlan mpDemandPlan){
-        return toAjax(mpDemandPlanService.updateMpDemandPlan(mpDemandPlan));
+    public AjaxResult edit(@RequestBody DpDemandPlan DpDemandPlan){
+        return toAjax(DpDemandPlanService.updateDpDemandPlan(DpDemandPlan));
     }
 
     /**
@@ -126,16 +126,16 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     @ApiOperation("删除需求计划")
 	@DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids){
-        return toAjax(mpDemandPlanService.deleteMpDemandPlanByIds(ids));
+        return toAjax(DpDemandPlanService.deleteDpDemandPlanByIds(ids));
     }
 
     /**
      * 校验需求计划唯一性
      */
     @ApiOperation("校验需求计划唯一性")
-    @PostMapping("/checkMpDemandPlanUnique")
-    public String checkMpDemandPlanUnique(@RequestBody MpDemandPlan mpDemandPlan){
-        return mpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan);
+    @PostMapping("/checkDpDemandPlanUnique")
+    public String checkDpDemandPlanUnique(@RequestBody DpDemandPlan DpDemandPlan){
+        return DpDemandPlanService.checkDpDemandPlanUnique(DpDemandPlan);
     }
 
     /**
@@ -152,11 +152,11 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
     }
 
     @Override
-    public AjaxResult doImportData(List<MpDemandPlan> list, boolean updateSupport, long importLogId) {
+    public AjaxResult doImportData(List<DpDemandPlan> list, boolean updateSupport, long importLogId) {
         if (CollectionUtils.isEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
-        return mpDemandPlanService.importData(list, updateSupport, importLogId);
+        return DpDemandPlanService.importData(list, updateSupport, importLogId);
     }
 
     @ApiOperation("生成需求计划")
@@ -167,14 +167,14 @@ public class MpDemandPlanController extends BusiController<MpDemandPlan>
         leaseTime = 300
     )
     @PostMapping("/createMonthRequire")
-    public AjaxResult createMonthRequire(@RequestBody MpDemandPlan createCondition){
+    public AjaxResult createMonthRequire(@RequestBody DpDemandPlan createCondition){
         if (null == createCondition) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
         }
         if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
         }
-        mpDemandPlanService.createMonthRequire(createCondition);
+        DpDemandPlanService.createMonthRequire(createCondition);
         return AjaxResult.success();
     }
 }

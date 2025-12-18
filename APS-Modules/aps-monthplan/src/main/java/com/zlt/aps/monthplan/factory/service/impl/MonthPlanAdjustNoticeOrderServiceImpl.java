@@ -810,10 +810,10 @@ public class MonthPlanAdjustNoticeOrderServiceImpl implements IMonthPlanAdjustNo
             factoryMonthPlanProdFinalService.finalUpdatePlanSurplusList(finalList);
         }
         //更新实际调整量及新增调整量的明细
-        MonthPlanNeedAdjustPlanVo addProductionPlan = AdjustNoticeUtils.buildAddAdjustPlan(noticeOrderOperate, newProductionNo);
-        addProductionPlan.setNeedAdjustNumber(insertPlan.getTotalQty());
-        noticeOrder.setProductionQty(insertPlan.getTotalQty());
-        adjustDetailList.add(addProductionPlan);
+//        MonthPlanNeedAdjustPlanVo addProductionPlan = AdjustNoticeUtils.buildAddAdjustPlan(noticeOrderOperate, newProductionNo);
+//        addProductionPlan.setNeedAdjustNumber(insertPlan.getTotalQty());
+//        noticeOrder.setProductionQty(insertPlan.getTotalQty());
+//        adjustDetailList.add(addProductionPlan);
         //调整单确认
         confirm(noticeOrder, adjustDetailList);
         return AjaxResult.success();
