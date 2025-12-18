@@ -72,13 +72,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	@Override
 	protected String getDocTypeCode() {
-		return "MP099";
+		return "DP0202";
 	}
 
 	@Override
 	protected SysDocType getSysDocType() {
 		SysDocType sysDocType = new SysDocType();
-		sysDocType.setDocTypeCode("MP099");
+		sysDocType.setDocTypeCode("DP0202");
 		return sysDocType;
 	}
 

@@ -155,11 +155,11 @@ public class SalesOrderPool extends BaseEntity{
     private Long scmDetailId;
 
     /** 年份 */
-    @TableField(value = "YEAR")
+    @TableField(exist = false)
     private Integer year;
 
     /** 月份 */
-    @TableField(value = "MONTH")
+    @TableField(exist = false)
     private Integer month;
 
     /**
