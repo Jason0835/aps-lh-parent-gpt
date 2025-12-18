@@ -1,9 +1,12 @@
 package com.zlt.aps.itf.scm.service.impl;
 
+import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
@@ -83,16 +86,16 @@ public class ScmItfServiceImpl implements ScmItfService {
 	 * @return
 	 */
 	@Override
-	public AjaxResult syncOutShipDmdOrdList(SyncPlanedNotShipParamVo planedNotShipParamVo) {
+	public AjaxResult syncOutShipDmdOrdList(SyncPlanedNotShipParamVo syncOutShipDmdOrdVo) {
 		AjaxResult ajaxResult = null;
 		try {
-			if (planedNotShipParamVo == null) {
+			if (syncOutShipDmdOrdVo == null) {
 				ajaxResult = AjaxResult.error("传入参数为空");
 				return ajaxResult;
 			}
 			// 调用供应链接口获取数据
 			String result = PostMethodUtils.sendPost(SYNC_OUT_SHIP_DMD_ORD_LIST_URL,
-					JSONObject.toJSONString(planedNotShipParamVo), null);
+					JSONObject.toJSONString(syncOutShipDmdOrdVo), null);
 			// 校验数据格式是否合法
 			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
 				String errorMsg = "syncOutShipDmdOrdList 返回数据格式校验失败：" + result;
@@ -115,16 +118,16 @@ public class ScmItfServiceImpl implements ScmItfService {
 	 * @return
 	 */
 	@Override
-	public AjaxResult publicFacScheduleVersion(SyncOutFacScheduleVersionVo planedNotShipParamVo) {
+	public AjaxResult publicFacScheduleVersion(List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList) {
 		AjaxResult ajaxResult = null;
 		try {
-			if (planedNotShipParamVo == null) {
+			if (CollectionUtils.isEmpty(outFacScheduleVersionList)) {
 				ajaxResult = AjaxResult.error("传入参数为空");
 				return ajaxResult;
 			}
 			// 调用供应链接口获取数据
 			String result = PostMethodUtils.sendPost(PUBLIC_FAC_SCHEDULE_VERSION_URL,
-					JSONObject.toJSONString(planedNotShipParamVo), null);
+					JSONObject.toJSONString(outFacScheduleVersionList), null);
 			// 校验数据格式是否合法
 			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
 				String errorMsg = "publicFacScheduleVersion 返回数据格式校验失败：" + result;

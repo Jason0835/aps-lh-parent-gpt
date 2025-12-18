@@ -29,10 +29,4 @@ public class SyncPlanedNotShipParamVo {
 	 * 数据月份
 	 */
 	private Integer month;
-
-	/**
-	 * 提报日期
-	 */
-	@JsonIgnore
-	private Date billDate;
 }

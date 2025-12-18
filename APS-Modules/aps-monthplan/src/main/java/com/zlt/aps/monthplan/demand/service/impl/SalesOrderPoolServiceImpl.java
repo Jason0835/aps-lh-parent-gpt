@@ -11,24 +11,24 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.tlt.aps.enums.YesOrNoEnum;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.AppUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
@@ -72,13 +72,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	@Override
 	protected String getDocTypeCode() {
-		return "MP099";
+		return "DP0202";
 	}
 
 	@Override
 	protected SysDocType getSysDocType() {
 		SysDocType sysDocType = new SysDocType();
-		sysDocType.setDocTypeCode("MP099");
+		sysDocType.setDocTypeCode("DP0202");
 		return sysDocType;
 	}
 
@@ -360,13 +360,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			log.error(String.valueOf(result.get(AjaxResult.MSG_TAG)));
 			return result;
 		}
-		List<SyncPlanedNotShipResultVo> syncResultList = null;
-		Object resultData = result.get(AjaxResult.DATA_TAG);
-		if (resultData instanceof List) {
-			syncResultList = JSONArray.parseArray(JSONArray.toJSONString(resultData), SyncPlanedNotShipResultVo.class);
-		}
-
-		return AjaxResult.success(syncResultList);
+		return AjaxResult.success(AjaxResultUtils.getList(result, SyncPlanedNotShipResultVo.class));
 	}
 
 	/**

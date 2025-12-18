@@ -1,5 +1,7 @@
 package com.zlt.aps.itf.scm.service;
 
+import java.util.List;
+
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
@@ -22,16 +24,16 @@ public interface ScmItfService {
 	/**
 	 * 同步发货明细数据
 	 * 
-	 * @param planedNotShipParamVo
+	 * @param syncOutShipDmdOrdVo
 	 * @return
 	 */
-	AjaxResult syncOutShipDmdOrdList(SyncPlanedNotShipParamVo planedNotShipParamVo);
+	AjaxResult syncOutShipDmdOrdList(SyncPlanedNotShipParamVo syncOutShipDmdOrdVo);
 
 	/**
 	 * 月计划排程结果推送
 	 * 
-	 * @param planedNotShipParamVo
+	 * @param outFacScheduleVersionList
 	 * @return
 	 */
-	AjaxResult publicFacScheduleVersion(SyncOutFacScheduleVersionVo planedNotShipParamVo);
+	AjaxResult publicFacScheduleVersion(List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList);
 }

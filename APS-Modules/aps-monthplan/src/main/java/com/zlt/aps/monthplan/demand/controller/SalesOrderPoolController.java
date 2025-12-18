@@ -215,7 +215,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 
     @Override
     protected String getTypeCode(){
-        return "MP099";
+        return "DP0202";
     }
 
 

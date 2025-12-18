@@ -11,7 +11,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmFinishStock.java
- * 描    述：成品库存对象 t_mdm_finish_stock
+ * 描    述：版本库存对象 T_DP_STOCK_VERSION
  *
  * @author zlt
  * @version 1.0
@@ -24,8 +24,8 @@ import lombok.Data;
  */
 @ApiModel(value = "版本库存对象", description = "版本库存对象")
 @Data
-@TableName(value = "T_MDM_FINISH_STOCK")
-public class MdmFinishStock extends BaseEntity {
+@TableName(value = "T_DP_STOCK_VERSION")
+public class DpStockVersion extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
