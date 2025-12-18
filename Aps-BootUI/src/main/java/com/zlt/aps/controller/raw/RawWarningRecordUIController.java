@@ -104,8 +104,9 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("year") Integer year,
-                                          @RequestParam("week") Integer week) {
-        return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week);
+                                          @RequestParam("week") Integer week,
+                                          @RequestParam("month") Integer month) {
+        return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week, month);
     }
 
     @RequiresPermissions("maindata:rawWarningRecord:executeNewMaterialWarning")

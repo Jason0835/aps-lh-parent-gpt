@@ -41,14 +41,16 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
     /**
      * 执行用量偏差预警
+     *
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param week 周次
+     * @param year        年份
+     * @param week        周次
+     * @param month
      * @return 预警结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult executeUsageDeviationWarning(String factoryCode, Integer year, Integer week) {
+    public AjaxResult executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month) {
         try {
             log.info("开始执行用量偏差预警，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
 
@@ -56,18 +58,20 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             QueryWrapper<RawWeekUsage> usageWrapper = new QueryWrapper<>();
             usageWrapper.eq("FACTORY_CODE", factoryCode);
             usageWrapper.eq("YEAR", year);
+            usageWrapper.eq("MONTH", month);
             usageWrapper.eq("WEEK", week);
             List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
 
             if (weekUsages.isEmpty()) {
                 log.warn("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
-                return AjaxResult.error("未找到周用量数据");
+                return AjaxResult.error(String.format("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week));
             }
 
             // 2. 获取用量偏差预警配置
             QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
             configWrapper.eq("FACTORY_CODE", factoryCode);
-            configWrapper.eq("WARNING_TYPE", "1"); // 用量偏差预警
+            // 用量偏差预警
+            configWrapper.eq("WARNING_TYPE", "1");
             configWrapper.eq("ENABLED", 1);
             List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
 

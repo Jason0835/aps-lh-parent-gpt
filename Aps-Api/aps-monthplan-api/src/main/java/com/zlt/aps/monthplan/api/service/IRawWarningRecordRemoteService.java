@@ -108,5 +108,6 @@ public interface IRawWarningRecordRemoteService {
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("year") Integer year,
-                                          @RequestParam("week") Integer week);
+                                          @RequestParam("week") Integer week,
+                                          @RequestParam("month") Integer month);
 }

@@ -146,8 +146,9 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
                                           @RequestParam("year") Integer year,
-                                          @RequestParam("week") Integer week){
-        return rawWarningService.executeUsageDeviationWarning(factoryCode, year, week);
+                                          @RequestParam("week") Integer week,
+                                          @RequestParam("month") Integer month){
+        return rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
     }
 
     @RequiresPermissions( "maindata:rawWarningRecord:executeNewMaterialWarning")
@@ -160,7 +161,7 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     }
 
     @RequiresPermissions( "maindata:rawWarningRecord:syncActualUsage")
-        @PostMapping("/sync-actual-usage")
+    @PostMapping("/sync-actual-usage")
     @ApiOperation("同步周维度原材料实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,

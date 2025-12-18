@@ -41,7 +41,7 @@ public class RawWarningSchedule {
                     rawWarningService.syncWeekActualUsage(factoryCode, year, week, month);
 
                     // 执行用量偏差预警
-                    rawWarningService.executeUsageDeviationWarning(factoryCode, year, week);
+                    rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
                 } catch (Exception e) {
                     log.error("执行用量偏差预警失败，工厂：{}", factoryCode, e);
                 }
