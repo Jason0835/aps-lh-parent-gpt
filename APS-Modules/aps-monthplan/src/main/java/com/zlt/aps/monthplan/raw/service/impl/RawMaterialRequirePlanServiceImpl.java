@@ -540,6 +540,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         plan.setMaterialDesc(requirement.getMaterialDesc());
         plan.setMaterialType(requirement.getMaterialType());
         plan.setFactoryCode(factoryCode);
+        plan.setRemark("采购批次量："+requirement.getRemark());
 
         // 处理所有BigDecimal字段，确保2位小数，不超过10位整数
         plan.setCurMonthQty(formatAndValidateBigDecimal(requirement.getCurMonthQty(), "CUR_MONTH_QTY"));
@@ -654,8 +655,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                     BigDecimal specRequirement = totalRequirement.multiply(proportion);
 
                     // 计算采购批次 = 需求量 / 标准长度，向上取整
-                    BigDecimal purchaseBatch = specRequirement.divide(standardLength,
-                            RoundingMode.CEILING);
+                    // 使用2位小数精度计算，然后向上取整到整数
+                    BigDecimal purchaseBatch = specRequirement
+                            .divide(standardLength, 2, RoundingMode.HALF_UP)
+                            .setScale(0, RoundingMode.CEILING);
 
                     // 保存批次计算结果
                     saveBatchCalculation(materialCode, ratio.getStandardLength(),
@@ -682,6 +685,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         // 计算当前月与上个月的差异
         Map<String, RawMaterialRequirePlan> currentRequirements = getRequirementsByMonth(year, month);
         Map<String, RawMaterialRequirePlan> previousRequirements = getPreviousMonthRequirements(year, month);
+
+        //删除旧的差异数据
+        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("FACTORY_CODE", factoryCode);
+        rawMaterialRequirePlanMapper.delete(queryWrapper);
 
         // 计算差异并保存
         calculateAndSaveDifferences(year, month, currentRequirements, previousRequirements, factoryCode);
