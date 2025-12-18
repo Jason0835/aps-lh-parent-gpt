@@ -22,6 +22,16 @@ public enum OperationBusinessEnums {
      */
     CREATE_MONTH_AVERAGE_SALE("CREATE_MONTH_AVERAGE_SALE", "生成月均销量"),
 
+    /**
+     * 抓取模具台账
+     */
+    GRAB_MOLD("GRAB_MOLD", "抓取模具台账"),
+
+    /**
+     * 抓取SKU与模具关系
+     */
+    GRAB_PRODUCT_MOLD("GRAB_PRODUCT_MOLD", "抓取SKU与模具关系"),
+
     ;
 
     /**

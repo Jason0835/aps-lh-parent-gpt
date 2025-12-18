@@ -4,7 +4,10 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.enums.OperationBusinessEnums;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmModelInfoService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -45,6 +48,12 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
 
     @Autowired
     private MdmProductModelRelationEntityMapper productModelRelationMapper;
+
+    @Autowired
+    private RedisService redisService;
+
+    @Autowired
+    private IMesItfService iMesItfService;
 
     private static final String MOULD_CODE_SPLIT = "-";
 
@@ -147,7 +156,10 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
      */
     @Override
     public AjaxResult mesCapture() {
-        // steve's TODO 待接口完善后补充
-        return AjaxResult.success();
+        String redisValue = redisService.getCacheObject(OperationBusinessEnums.GRAB_MOLD.getCode());
+        if (StringUtils.isNotBlank(redisValue)) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.modelInfo.generating"));
+        }
+        return iMesItfService.syncModelInfo(new MdmModelInfo());
     }
 }

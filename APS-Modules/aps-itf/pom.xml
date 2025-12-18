@@ -26,7 +26,7 @@
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>swagger-bootstrap-ui</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-base</artifactId>
@@ -37,16 +37,21 @@
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-sync-data</artifactId>
             <version>1.0.1-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-maindata</artifactId>
         </dependency>
     </dependencies>
 
@@ -93,6 +98,6 @@
             </snapshots>
         </repository>
     </repositories>
-    
-    
+
+
 </project>

@@ -33,4 +33,32 @@ public interface MpHistorySaleRecordEntityMapper extends CommBaseMapper<MpHistor
     List<MpHistorySaleRecord> selectRollMonthSaleQty(@Param("factoryCode") String factoryCode,
                                                      @Param("minYearMonth") String minYearMonth,
                                                      @Param("maxYearMonth") String maxYearMonth);
+
+    /**
+     * 查询区域销量
+     *
+     * @param factoryCode  分厂
+     * @param codeList     物料编号列表
+     * @param minYearMonth 最小统计年月
+     * @param maxYearMonth 最大统计年月
+     * @return 结果
+     */
+    List<MpHistorySaleRecord> selectSumQtyGroupByArea(@Param("factoryCode") String factoryCode,
+                                                      @Param("minYearMonth") String minYearMonth,
+                                                      @Param("maxYearMonth") String maxYearMonth,
+                                                      @Param("list") List<String> codeList);
+
+    /**
+     * 查询月销量
+     *
+     * @param factoryCode  分厂
+     * @param codeList     物料编号列表
+     * @param minYearMonth 最小统计年月
+     * @param maxYearMonth 最大统计年月
+     * @return 结果
+     */
+    List<MpHistorySaleRecord> selectSumQtyGroupByMonth(@Param("factoryCode") String factoryCode,
+                                                       @Param("minYearMonth") String minYearMonth,
+                                                       @Param("maxYearMonth") String maxYearMonth,
+                                                       @Param("list") List<String> codeList);
 }

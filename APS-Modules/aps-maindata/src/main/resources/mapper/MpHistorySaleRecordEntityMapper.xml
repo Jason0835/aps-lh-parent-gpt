@@ -10,8 +10,44 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from T_MP_HISTORY_SALE_RECORD
         where IS_DELETE = 0
           AND FACTORY_CODE = #{factoryCode}
-          AND YEAR_MONTH &gt;= #{minYearMonth}
-          AND YEAR_MONTH &lt;= #{maxYearMonth}
+          AND `YEAR_MONTH` &gt;= #{minYearMonth}
+          AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         group by MATERIAL_CODE
+    </select>
+
+    <select id="selectSumQtyGroupByArea"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
+        SELECT AREA_CODE, MATERIAL_CODE,
+        SUM(SALE_QTY) as SALE_QTY
+        from T_MP_HISTORY_SALE_RECORD
+        where IS_DELETE = 0
+        AND FACTORY_CODE = #{factoryCode}
+        AND `YEAR_MONTH` &gt;= #{minYearMonth}
+        AND `YEAR_MONTH` &lt;= #{maxYearMonth}
+        <if test="list != null and list.size() >0">
+            AND MATERIAL_CODE IN
+            <foreach collection="list" item="item" separator="," open="(" close=")">
+                #{item}
+            </foreach>
+        </if>
+        group by AREA_CODE, MATERIAL_CODE
+    </select>
+
+    <select id="selectSumQtyGroupByMonth"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
+        SELECT `MONTH`, MATERIAL_CODE,
+        SUM(SALE_QTY) as SALE_QTY
+        from T_MP_HISTORY_SALE_RECORD
+        where IS_DELETE = 0
+        AND FACTORY_CODE = #{factoryCode}
+        AND `YEAR_MONTH` &gt;= #{minYearMonth}
+        AND `YEAR_MONTH` &lt;= #{maxYearMonth}
+        <if test="list != null and list.size() >0">
+            AND MATERIAL_CODE IN
+            <foreach collection="list" item="item" separator="," open="(" close=")">
+                #{item}
+            </foreach>
+        </if>
+        group by `MONTH`, MATERIAL_CODE
     </select>
 </mapper>

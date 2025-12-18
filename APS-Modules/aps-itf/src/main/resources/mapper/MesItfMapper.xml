@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.MesItfMapper">
+
+    <select id="selectSkuMouldRelList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
+        SELECT
+        FACTORY_CODE,
+        MOULD_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        SPEC_DESC,
+        PATTERN,
+        REMARK,
+        DEL_FLAG,
+        DATA_VERSION,
+        SAME_PATTER_PANEL,
+        MOULD_TYPE
+        FROM PRODUCT_MOD_RELATION
+        WHERE DEL_FLAG = 0
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="mouldCode != null and mouldCode != ''">AND MOULD_CODE = #{mouldCode}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="mesMaterialCode != null and mesMaterialCode != ''">AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
+        <if test="specDesc != null and specDesc != ''">AND SPEC_DESC = #{specDesc}</if>
+        <if test="pattern != null and pattern != ''">AND PATTERN = #{pattern}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectModelInfoList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo">
+        SELECT
+        FACTORY_CODE,
+        MOULD_CODE,
+        MOULD_STATUS,
+        LOGISTICS_STATUS,
+        SPECIFICATIONS,
+        PATTERN,
+        MOULD_SHELL_STANDARD,
+        BRAND,
+        MOULD_TYPE,
+        MAIN_TRADEMARK,
+        MOULD_REMARK,
+        MOULD_SLEEVE,
+        MOULD_AIR_TYPE,
+        DEL_FLAG,
+        DATA_VERSION
+        FROM TIRE_MOD_INFO
+        WHERE DEL_FLAG = 0
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="mouldCode != null and mouldCode != ''">AND MOULD_CODE = #{mouldCode}</if>
+        <if test="mouldStatus != null and mouldStatus != ''">AND MOULD_STATUS = #{mouldStatus}</if>
+        <if test="logisticsStatus != null and logisticsStatus != ''">AND LOGISTICS_STATUS = #{logisticsStatus}</if>
+        <if test="specifications != null and specifications != ''">AND SPECIFICATIONS = #{specifications}</if>
+        <if test="pattern != null and pattern != ''">AND PATTERN = #{pattern}</if>
+        <if test="mouldShellStandard != null and mouldShellStandard != ''">AND MOULD_SHELL_STANDARD =
+            #{mouldShellStandard}
+        </if>
+        <if test="brand != null and brand != ''">AND BRAND = #{brand}</if>
+        <if test="mouldType != null and mouldType != ''">AND MOULD_TYPE = #{mouldType}</if>
+        <if test="mainTrademark != null and mainTrademark != ''">AND MAIN_TRADEMARK = #{mainTrademark}</if>
+        <if test="mouldSleeve != null and mouldSleeve != ''">AND MOULD_SLEEVE = #{mouldSleeve}</if>
+        <if test="mouldAirType != null and mouldAirType != ''">AND MOULD_AIR_TYPE = #{mouldAirType}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+</mapper>
