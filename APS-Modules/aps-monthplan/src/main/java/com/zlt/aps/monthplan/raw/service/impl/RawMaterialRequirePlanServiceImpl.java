@@ -332,7 +332,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 String materialCode = detail.getChildMaterialCode();
                 String materialDesc = detail.getChildMaterialName();
                 BigDecimal dosage = detail.getDosage();
-                String materialType = specialMaterialRecords.contains(materialCode) ? "01" : "02";
+                String materialType = specialMaterialRecords.contains(materialCode) ? "02" : "01";
                 if (dosage == null) {
                     log.warn("物料 {} 的用量为空，设为0", materialCode);
                     dosage = BigDecimal.ZERO;
@@ -428,7 +428,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             for (MdmMaterialConsumeDetail detail : bomDetails) {
                 String materialCode = detail.getChildMaterialCode();
                 String materialDesc = detail.getChildMaterialName();
-                String materialType = specialMaterialRecords.contains(materialCode) ? "01" : "02";
+                String materialType = specialMaterialRecords.contains(materialCode) ? "02" : "01";
                 BigDecimal dosage = detail.getDosage();
 
                 if (dosage == null) {
