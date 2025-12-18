@@ -30,6 +30,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.MpDemandPlanEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.monthplan.demand.service.IMpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpOrderOffsetAllocationService;
 import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
@@ -91,6 +92,8 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
     private final IMpSkuProductionTypeService mpSkuProductionTypeService;
     // 供应链订单
     private final ISupplyOrderPoolService supplyOrderPoolService;
+    // 订单快照
+    private final IDpOrderPoolSnapshotService dpOrderPoolSnapshotService;
 
     /**
      * 查询需求计划
@@ -397,6 +400,8 @@ public class MpDemandPlanServiceImpl extends BaseService<MpDemandPlan>  implemen
         if(CollectionUtils.isNotEmpty(mergedDemandPlans)){
             this.insertBatchData(mergedDemandPlans);
         }
+        // 12、记录保存销售订单池+供应链订单池的订单数据
+        dpOrderPoolSnapshotService.saveOrderPoolSnapshot(createCondition,salesOrders,supplyOrderPools);
     }
 
     private List<MpDemandPlan> mergedDemandPlan(List<MpDemandPlan> demandPlans) {
