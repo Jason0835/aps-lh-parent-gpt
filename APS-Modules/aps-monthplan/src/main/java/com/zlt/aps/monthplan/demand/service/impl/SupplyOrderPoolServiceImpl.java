@@ -558,8 +558,8 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
             salesOrder -> createCompositeKey(
                 salesOrder.getOriMaterialCode(),
                 salesOrder.getWeekYear(),
-                salesOrder.getDynamicBalance(),
-                salesOrder.getUniformity()
+                salesOrder.getIsDynamicBalance(),
+                salesOrder.getIsUniformity()
             ),
             Collectors.summingLong(item -> item.getOrdQty().longValue())
         ));

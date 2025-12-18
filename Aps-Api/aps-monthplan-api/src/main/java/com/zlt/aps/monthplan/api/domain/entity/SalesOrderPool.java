@@ -28,7 +28,7 @@ import lombok.Data;
  */
 
 @Data
-@TableName(value = "T_MP_SALES_ORDER_POOL")
+@TableName(value = "T_DP_SALES_ORDER_POOL")
 @ApiModel(value = "销售订单池对象", description = "销售订单池对象 ")
 public class SalesOrderPool extends BaseEntity{
 
@@ -120,22 +120,22 @@ public class SalesOrderPool extends BaseEntity{
     private String weekYear;
 
     /** 动平衡，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.dynamicBalance")
-    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "dynamicBalance")
-    @TableField(value = "DYNAMIC_BALANCE")
-    private String dynamicBalance;
+    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance")
+    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
 
     /** 均匀性，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.uniformity")
-    @ApiModelProperty(value = "均匀性，1 是 0 否", name = "uniformity")
-    @TableField(value = "UNIFORMITY")
-    private String uniformity;
+    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity")
+    @ApiModelProperty(value = "均匀性，1 是 0 否", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
 
     /** EUDR，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.eudr")
-    @ApiModelProperty(value = "EUDR，1 是 0 否", name = "eudr")
-    @TableField(value = "EUDR")
-    private String eudr;
+    @Excel(name = "ui.data.column.SalesOrderPool.isEudr")
+    @ApiModelProperty(value = "EUDR，1 是 0 否", name = "isEudr")
+    @TableField(value = "IS_EUDR")
+    private String isEudr;
 
     /** 发货模式，数据字典：biz_deliver_goods_type，01 分批交货 02 整单发货 */
     @Excel(name = "ui.data.column.SalesOrderPool.deliverGoodsType", dictType = "biz_deliver_goods_type")

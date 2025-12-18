@@ -284,8 +284,8 @@ public class DpOrderPoolSnapshotServiceImpl extends BaseService<DpOrderPoolSnaps
         entity.setCustomNationCode(saleOrder.getSalNCode());
         entity.setDemandQty(saleOrder.getOrdQty() == null?0L:saleOrder.getOrdQty().longValue());
         entity.setDestinationNationCode(saleOrder.getNatCode());
-        entity.setIsDynamicBalance(saleOrder.getDynamicBalance());
-        entity.setIsUniformity(saleOrder.getUniformity());
+        entity.setIsDynamicBalance(saleOrder.getIsDynamicBalance());
+        entity.setIsUniformity(saleOrder.getIsUniformity());
         entity.setPoNumber(saleOrder.getSalCodePo());
         entity.setSubmitDate(saleOrder.getBillDate());
         entity.setScmId(saleOrder.getScmDetailId());

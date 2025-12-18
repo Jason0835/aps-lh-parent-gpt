@@ -238,7 +238,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setBillDate(vo.getBillDate());
 			newVO.setBrand(vo.getBrandName());
 			newVO.setDeliverGoodsType(shipType);
-			newVO.setEudr(vo.getEudrFlag());
+			newVO.setIsEudr(vo.getEudrFlag());
 			newVO.setMaterialDesc(vo.getSpecDesc());
 			newVO.setNatCode(vo.getNatCode());
 			newVO.setOrderPriority(salPriority);
