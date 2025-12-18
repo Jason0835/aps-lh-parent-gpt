@@ -296,13 +296,17 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
             RawWarningRecord record = new RawWarningRecord();
             record.setFactoryCode(factoryCode);
-            record.setWarningType("2"); // 新材料预警
+            // 新材料预警
+            record.setWarningType("2");
             record.setMaterialCode(diff.getMaterialCode());
             record.setMaterialDesc(diff.getMaterialDesc());
-            record.setWarningLevel("2"); // 中等级别
+            // 中等级别
+            record.setWarningLevel("2");
             record.setRelatedMonth(currentMonthStr);
-            record.setStatus("0"); // 未处理
-            record.setNotified(0); // 未通知
+            // 未处理
+            record.setStatus("0");
+            // 未通知
+            record.setNotified(0);
 
             // 设置预警标题和内容
             String title = "新增".equals(diffType) ?
