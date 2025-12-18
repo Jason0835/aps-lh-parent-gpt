@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpMonthlySaleQty.java
@@ -120,5 +122,11 @@ public class MpMonthlySaleQty extends BaseEntity {
     @TableField(value = "SALE_AREA")
     private String saleArea;
 
+    @ApiModelProperty(value = "区域(往前12个月所有区域)月均销量总和", name = "areaGroupList")
+    @TableField(exist = false)
+    private List<MpHistorySaleRecord> areaGroupList;
 
+    @ApiModelProperty(value = "月份(往前12个月)月均销量总和", name = "monthGroupList")
+    @TableField(exist = false)
+    private List<MpHistorySaleRecord> monthGroupList;
 }

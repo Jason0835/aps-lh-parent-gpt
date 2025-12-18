@@ -106,8 +106,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         Calendar instance = Calendar.getInstance();
         instance.setTime(new Date());
         int year = instance.get(Calendar.YEAR);
-        int month = instance.get(Calendar.MONTH) + 1;
-        String maxYearMonth = year + "" + month;
+        String month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
+        String maxYearMonth = year + month;
         // 上个月
         instance.add(Calendar.MONTH, -1);
         int lastYear = instance.get(Calendar.YEAR);
