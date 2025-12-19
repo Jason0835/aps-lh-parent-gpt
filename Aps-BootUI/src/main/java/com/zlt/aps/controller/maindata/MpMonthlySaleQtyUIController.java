@@ -207,6 +207,7 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
      */
     @PostMapping("/getShowTableTitleList")
     @ApiOperation("获取表头展示列表")
+    @ResponseBody
     public AjaxResult getShowTableTitleList(MpMonthlySaleQty queryVO) {
         return iMpMonthlySaleQtyService.getShowTableTitleList(queryVO);
     }
