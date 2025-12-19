@@ -1,0 +1,299 @@
+
+<template>
+  <basic-container>
+    <page-table
+      tableRef="cxMoldingLossMainTable"
+      :calcHeight="true"
+      v-loading="loading"
+      :columns="columns"
+      :searchColumns="searchColumns"
+      :data="data"
+      :page="page"
+      :search="search"
+      @refresh="getList"
+      @search="handleSearch"
+      @pageChange="handlePageChange"
+      @sort-change="handleSortChange"
+      @selection-change="handleSelectionChange"
+      :showSummary="false"
+      :selectArea="false"
+    >
+      <template slot="header">
+        <el-button
+          type="primary"
+          v-hasPermi="['cx:loss:add']"
+          @click="handleAdd"
+          >{{ $t("ui.frame.btn.add") }}</el-button
+        >
+        <!-- <el-button
+          type="warning"
+          v-hasPermi="['cx:machine:edit']"
+          @click="handleEdit(selection[0])"
+          >{{ $t("ui.frame.btn.modify") }}</el-button
+        > -->
+        <el-button
+          v-hasPermi="['cx:loss:import']"
+          @click="$refs.tltUpload.handleImport()"
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
+        <el-button @click="handleExport" v-hasPermi="['cx:loss:export']">{{
+          $t("ui.frame.btn.export")
+        }}</el-button>
+      </template>
+    </page-table>
+    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
+    <tlt-upload
+      ref="tltUpload"
+      downloadUrl="/cx/loss/importTemplate"
+      uploadUrl="/cx/loss/importData"
+      @uploadSuccess="getList"
+    />
+    <infoDialog ref="infoRef" @success="getList" />
+  </basic-container>
+</template>
+<script>
+//lib
+// import moment from "moment";
+import { mapState } from "vuex";
+//utils
+import { downloadLink } from "@/utils/request";
+//interface
+import { listLoss, removeLoss } from "@/api/cx/loss";
+//components
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
+
+import infoDialog from "./components/infoDialog.vue";
+
+export default {
+ name: "MoldingLoss",
+  components: {
+    tltUpload,
+    infoDialog,
+  },
+  dicts: [],
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
+  data() {
+    return {
+      loading: false,
+      data: [],
+      selection: [],
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+      },
+      sort: {},
+      search: {},
+      query: {},
+      importDefaultValue: {},
+      importRules: {},
+    };
+  },
+  computed: {
+    ...mapState({
+      moldingMachines: (state) => state.molding.machines,
+    }),
+    columns() {
+      let columns = [
+        { type: "selection", fixed: "left" },
+        {
+          prop: "embryoCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.loss.embryoCode"),
+          sortable: true,
+        },
+        {
+          prop: "machineName",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.machine.machineName"),
+          sortable: true,
+        },
+        {
+          prop: "lossRate",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.loss.lossRate"),
+          sortable: true,
+          formatter: function (row) {
+            let value = row.lossRate;
+            if (value == 0 || value == null) {
+              return "0%";
+            }
+            var str = value.toFixed(2);
+            return (str += "%");
+          },
+        },
+        {
+          prop: "remark",
+          halign: "center",
+          label: this.$t("ui.common.column.remark"),
+          sortable: true,
+        },
+        {
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.btn.option"),
+          minWidth: 180,
+          width: 180,
+          fixed: "right",
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
+                </el-button>
+                <el-button
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
+            );
+          },
+        },
+      ];
+
+      return columns;
+    },
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.loss.embryoCode"),
+          prop: "embryoCode",
+        },
+        {
+          label: this.$t("ui.data.column.machine.machineName"),
+          prop: "machineCode",
+          type: "select",
+          dictData: this.moldingMachines,
+          labelKey: "moldingMachineCode",
+          valueKey: "moldingMachineCode",
+          filterable: true,
+        },
+      ];
+    },
+  },
+  methods: {
+    handleAdd() {
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show();
+      }
+    },
+    handleEdit(row) {
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show(row);
+      }
+    },
+    handleDelete(row) {
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = row.id;
+        this.loading = true;
+        removeLoss({ ids })
+          .then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          })
+          .catch((error) => {
+            console.log(error);
+            this.loading = false;
+          });
+      });
+    },
+
+    handleSearch(data) {
+      this.query = data;
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
+    handlePageChange(current, pageSize) {
+      this.$set(this.page, "current", current);
+      this.$set(this.page, "pageSize", pageSize);
+      this.getList();
+    },
+    handelSuccess() {
+      this.getList();
+    },
+    handleSortChange({ column, prop, order }) {
+      if (order) {
+        this.sort = {
+          orderByColumn: prop,
+          isAsc: order == "ascending" ? "asc" : "desc",
+        };
+      } else {
+        //默认排序
+        this.sort = {};
+      }
+      this.getList();
+    },
+    handleSelectionChange(rows) {
+      this.selection = rows;
+    },
+    handleExport() {
+      downloadLink("/cx/loss/export", this.formatParams(false));
+    },
+
+    // utils
+    formatParams(hasPage = true) {
+      const params = {
+        ...this.query,
+        ...this.sort,
+      };
+
+      if (hasPage) {
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
+      }
+
+      if (params.createTime && params.createTime[0]) {
+        params.createTimeStart = params.createTime[0];
+        params.createTimeEnd = params.createTime[1];
+        params.createTime = undefined;
+      }
+
+      return params;
+    },
+    // api
+    async getList() {
+      try {
+        this.loading = true;
+        const data = await listLoss(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+  created() {
+    if (!this.moldingMachines.length) {
+      this.$store.dispatch("molding/getMachineList");
+    }
+  },
+  activated() {
+    this.getList();
+  },
+};
+</script>
+<style lang="scss" scoped>
+.more-btn {
+  margin: 2px 0;
+  width: 100%;
+}
+</style>
