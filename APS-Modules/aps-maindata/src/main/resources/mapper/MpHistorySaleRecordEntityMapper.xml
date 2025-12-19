@@ -9,7 +9,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                SUM(SALE_QTY) as SALE_QTY
         from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
---           AND FACTORY_CODE = #{factoryCode}
           AND `YEAR_MONTH` &gt;= #{minYearMonth}
           AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         group by MATERIAL_CODE
@@ -21,7 +20,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SUM(SALE_QTY) as SALE_QTY
         from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
-        -- AND FACTORY_CODE = #{factoryCode}
         AND `YEAR_MONTH` &gt;= #{minYearMonth}
         AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         <if test="list != null and list.size() >0">
@@ -39,7 +37,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SUM(SALE_QTY) as SALE_QTY
         from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
-        -- AND FACTORY_CODE = #{factoryCode}
         AND `YEAR_MONTH` &gt;= #{minYearMonth}
         AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         <if test="list != null and list.size() >0">

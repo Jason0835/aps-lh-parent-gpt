@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
@@ -13,7 +15,9 @@ import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +69,8 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         TableDataInfo tableDataInfo = super.list(queryVO);
         List<MpMonthlySaleQty> list = (List<MpMonthlySaleQty>) tableDataInfo.getRows();
         List<String> codeList = list.stream().map(MpMonthlySaleQty::getMaterialCode).collect(Collectors.toList());
+
+//        list.stream().map(MpMonthlySaleQty::getSaleArea)
         // 查询历史销售记录
         int passTwelveMonth = 12;
         Calendar instance = Calendar.getInstance();
@@ -80,6 +86,17 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
 
         String factoryCode = queryVO.getFactoryCode();
         List<MpHistorySaleRecord> sumQtyGroupByAreaList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByArea(factoryCode, last12YearMonth, maxYearMonth, codeList);
+
+        // 执行表达式，转义区域
+        try {
+            QueryFormulaUtil.execFormula(sumQtyGroupByAreaList, new String[]{
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+            });
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("转换区域，执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(sumQtyGroupByAreaList, MpHistorySaleRecord.class);
 
         Map<String, List<MpHistorySaleRecord>> sumQtyGroupByAreaMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(sumQtyGroupByAreaList)) {
@@ -206,6 +223,15 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     @Override
     protected String getTypeCode() {
         return "MP1209";
+    }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "createByName->getcolvalue(SYS_USER, nick_name, user_name, createBy)",
+                "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
+                "saleAreaName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+        };
     }
 
     /**

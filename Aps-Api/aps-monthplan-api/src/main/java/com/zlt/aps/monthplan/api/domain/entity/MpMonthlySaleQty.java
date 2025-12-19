@@ -117,10 +117,17 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 适销区域，多个英文逗号分隔
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.saleArea")
     @ApiModelProperty(value = "适销区域，多个英文逗号分隔", name = "saleArea")
     @TableField(value = "SALE_AREA")
     private String saleArea;
+
+    /**
+     * 适销区域，多个英文逗号分隔
+     */
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.saleArea")
+    @ApiModelProperty(value = "适销区域，多个英文逗号分隔", name = "saleAreaName")
+    @TableField(exist = false)
+    private String saleAreaName;
 
     @ApiModelProperty(value = "区域(往前12个月所有区域)月均销量总和", name = "areaGroupList")
     @TableField(exist = false)
