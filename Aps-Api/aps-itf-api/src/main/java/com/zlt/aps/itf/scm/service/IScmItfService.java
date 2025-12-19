@@ -9,6 +9,8 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 /**
  * 分厂月度计划控制台业务
  *
@@ -30,7 +32,7 @@ public interface IScmItfService {
     /**
      * 发货明细表同步接口
      *
-     * @param planedNotShipParamVo 查询条件
+     * @param syncOutShipDmdOrdVo 查询条件
      * @return 结果集合
      */
     @ApiOperation("发货明细表同步接口")
@@ -40,7 +42,7 @@ public interface IScmItfService {
     /**
      * 月计划排程结果推送
      *
-     * @param outFacScheduleVersionVo
+     * @param outFacScheduleVersionList
      * @return 结果集合
      */
     @ApiOperation("月计划排程结果推送")
