@@ -1,4 +1,4 @@
-package com.zlt.aps.rpt.controller;
+package com.zlt.aps.controller.report;
 
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,13 +16,13 @@ import io.swagger.annotations.ApiOperation;
 
 @Api(tags = { "报表控制器" })
 @Controller
-@RequestMapping("/rpt")
+@RequestMapping("/report")
 public class FinereportUIController extends BaseController {
 	@Autowired
 	private IFinereportService iFinereportService;
 
 	@ApiOperation("库存库龄分析报表")
-	@RequiresPermissions("rpt:inventoryAgeAnalysis")
+	@RequiresPermissions("report:inventoryAgeAnalysis")
 	@PostMapping("/inventoryAgeAnalysis")
 	@ResponseBody
 	public AjaxResult inventoryAgeAnalysis() {
