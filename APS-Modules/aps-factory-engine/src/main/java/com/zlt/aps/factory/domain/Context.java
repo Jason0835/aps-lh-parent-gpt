@@ -9,9 +9,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 工厂月度生产计划排产
@@ -172,5 +170,26 @@ public class Context {
             return monthDays;
         }
         return monthDays - stopDays.size();
+    }
+
+    /**
+     * 获取排产周期内可排产天的集合
+     * 根据排产周期及停产日，得到排产天集合
+     *
+     * @return
+     */
+    public Set<Integer> getProductionDay() {
+        Integer monthDays = com.zlt.aps.factory.utils.DateUtils.getIntervalDays(productionStartDate, productionEndDate);
+        if (monthDays < BigDecimal.ONE.intValue()) {
+            return Collections.emptySet();
+        }
+        Set<Integer> productionDaySet = new HashSet<>(monthDays);
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= monthDays; day++) {
+            if (null != stopDays && stopDays.contains(day)) {
+                continue;
+            }
+            productionDaySet.add(day);
+        }
+        return productionDaySet;
     }
 }

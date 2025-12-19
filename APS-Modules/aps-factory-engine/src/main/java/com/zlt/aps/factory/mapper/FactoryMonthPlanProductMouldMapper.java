@@ -1,6 +1,8 @@
 package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MouldAllocationInfoVo;
+import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -90,4 +92,24 @@ public interface FactoryMonthPlanProductMouldMapper {
                                                                  @Param("productionVersion") String productionVersion,
                                                                  @Param("productionStartDate") Date productionStartDate,
                                                                  @Param("productionEndDate") Date productionEndDate);
+
+    /**
+     * 获取工厂的模壳台账信息
+     *
+     * @param factoryCode 工厂编码
+     * @return
+     */
+    List<MouldShellBaseInfoVo> getMouldShellInfo(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 获取工厂某个年份、月份的模具分配比例配置
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return
+     */
+    List<MouldAllocationInfoVo> getMouldAllocationInfo(@Param("factoryCode") String factoryCode,
+                                                       @Param("year") Integer year,
+                                                       @Param("month") Integer month);
 }

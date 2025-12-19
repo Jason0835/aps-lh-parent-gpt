@@ -5,6 +5,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
@@ -218,6 +219,65 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 判断计划是否为续作Sku排产计划
+     * 同规格同花纹或是同生胎
+     *
+     * @param continueProductInfo
+     * @return
+     */
+    public boolean hasContinueProduction(CxContinueProductInfoHelper continueProductInfo) {
+        boolean isSameSpecificationsAndPattern = isSameSpecificationsAndPattern(continueProductInfo);
+        if (!isSameSpecificationsAndPattern) {
+            return false;
+        }
+        return isSameEmbryoCode(continueProductInfo);
+    }
+
+    /**
+     * 是否是续作Sku-同规格同花纹
+     * 前提是先达到共用模具
+     *
+     * @param continueProductInfo 续作Sku信息
+     * @return
+     */
+    public boolean isSameSpecificationsAndPattern(CxContinueProductInfoHelper continueProductInfo) {
+        if (null == continueProductInfo) {
+            return false;
+        }
+        //规格
+        String specifications = continueProductInfo.getSpecifications();
+        //花纹
+        String pattern = continueProductInfo.getPattern();
+        if (StringUtils.isBlank(specifications) || StringUtils.isBlank(pattern)) {
+            return false;
+        }
+        //同规格同花纹
+        if (specifications.equals(getSpecifications()) && pattern.equals(getPattern())) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 是否是续作Sku-共生胎
+     * 前提是先达到共用模具
+     *
+     * @param continueProductInfo 续作Sku信息
+     * @return
+     */
+    public boolean isSameEmbryoCode(CxContinueProductInfoHelper continueProductInfo) {
+        if (null == continueProductInfo) {
+            return false;
+        }
+        //同生胎
+        String embryoCode = continueProductInfo.getEmbryoCode();
+        if (StringUtils.isBlank(embryoCode)) {
+            return false;
+        }
+        return embryoCode.equals(getEmbryoCode());
     }
 
     /**

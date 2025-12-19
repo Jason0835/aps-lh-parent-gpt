@@ -2,8 +2,10 @@ package com.zlt.aps.common.core.utils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import com.alibaba.fastjson.JSONArray;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 
 /**
@@ -28,5 +30,25 @@ public class AjaxResultUtils {
 			return JSONArray.parseArray(JSONArray.toJSONString(resultData), clazz);
 		}
 		return Collections.EMPTY_LIST;
+	}
+
+	/**
+	 * 判断Ajax请求是否成功
+	 *
+	 * @param ajaxResult Ajax请求
+	 * @return 结果
+	 */
+	public static boolean checkAjaxSuccess(AjaxResult ajaxResult) {
+		return ajaxResult != null && Objects.equals(HttpStatus.SUCCESS, ajaxResult.get(AjaxResult.CODE_TAG));
+	}
+
+	/**
+	 * 判断Ajax请求是否失败
+	 *
+	 * @param ajaxResult Ajax请求
+	 * @return 结果
+	 */
+	public static boolean checkAjaxError(AjaxResult ajaxResult) {
+		return ajaxResult == null || !Objects.equals(HttpStatus.SUCCESS, ajaxResult.get(AjaxResult.CODE_TAG));
 	}
 }
