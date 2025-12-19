@@ -1,10 +1,15 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 排产计划-在机结构续作信息
@@ -63,6 +68,32 @@ public class CxContinueProductInfoHelper implements Serializable {
      * 模具数
      */
     private Integer mouldNumber;
+
+    /**
+     * 先从排产计划中获取materialDesc,如果没有匹配到，从续作中获取
+     *
+     * @param productionPlanList 分组排产计划
+     * @param continueSkuMap     成型初始的续作Sku信息
+     * @return
+     */
+    public static CxContinueProductInfoHelper buildContinueProductInfo(String materialDesc, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueProductInfoHelper> continueSkuMap) {
+        if (CollectionUtils.isEmpty(productionPlanList)) {
+            return continueSkuMap.get(materialDesc);
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanList = productionPlanList.stream().filter(groupPlan -> materialDesc.equals(groupPlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(groupPlanList)) {
+            return continueSkuMap.get(materialDesc);
+        }
+        MonthPlanProductionRequirePlanVo plan = groupPlanList.get(BigDecimal.ZERO.intValue());
+        CxContinueProductInfoHelper continueProductInfo = new CxContinueProductInfoHelper();
+        continueProductInfo.setEmbryoCode(plan.getEmbryoCode());
+        continueProductInfo.setSpecifications(plan.getSpecifications());
+        continueProductInfo.setPattern(plan.getPattern());
+        continueProductInfo.setMainPattern(plan.getMainPattern());
+        continueProductInfo.setProSize(plan.getProSize());
+        continueProductInfo.setGroupName(plan.getStructureName());
+        return continueProductInfo;
+    }
 
     /**
      * 创建续作sku信息

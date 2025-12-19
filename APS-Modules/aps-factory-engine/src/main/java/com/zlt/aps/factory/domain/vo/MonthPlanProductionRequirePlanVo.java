@@ -200,6 +200,22 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 匹配的sku是否还有需排产的计划
+     *
+     * @param selectedMaterialDesc 物料描述
+     * @return
+     */
+    public boolean hasSelectedProduction(String selectedMaterialDesc) {
+        if (StringUtils.isBlank(selectedMaterialDesc)) {
+            return false;
+        }
+        if (!selectedMaterialDesc.equals(getMaterialDesc())) {
+            return false;
+        }
+        return hasProduction();
+    }
+
+    /**
      * 是否还需排产
      * 排产标记 = 1 且还有可排产量
      * true表示还需排产 false表示无需排产
