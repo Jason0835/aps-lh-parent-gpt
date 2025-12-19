@@ -14,14 +14,14 @@ import com.zlt.aps.itf.finereport.IFinereportService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
-@Api(tags = { "帆软报表控制器" })
+@Api(tags = { "报表控制器" })
 @Controller
-@RequestMapping("/finereport")
+@RequestMapping("/rpt")
 public class FinereportUIController extends BaseController {
 	@Autowired
 	private IFinereportService iFinereportService;
 
-	@ApiOperation("根据条件查询外协规格管理列表")
+	@ApiOperation("库存库龄分析报表")
 	@RequiresPermissions("rpt:inventoryAgeAnalysis")
 	@PostMapping("/inventoryAgeAnalysis")
 	@ResponseBody
