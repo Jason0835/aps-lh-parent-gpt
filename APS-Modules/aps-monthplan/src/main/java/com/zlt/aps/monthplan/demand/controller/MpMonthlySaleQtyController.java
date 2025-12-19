@@ -13,6 +13,7 @@ import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;
@@ -70,7 +71,9 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         List<MpMonthlySaleQty> list = (List<MpMonthlySaleQty>) tableDataInfo.getRows();
         List<String> codeList = list.stream().map(MpMonthlySaleQty::getMaterialCode).collect(Collectors.toList());
 
-//        list.stream().map(MpMonthlySaleQty::getSaleArea)
+        // 把区域都转成名称
+        Map<String, String> areaNameMap = getAreaNameMap(list);
+
         // 查询历史销售记录
         int passTwelveMonth = 12;
         Calendar instance = Calendar.getInstance();
@@ -109,6 +112,16 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         }
 
         for (MpMonthlySaleQty monthlySaleQty : list) {
+            String saleArea = monthlySaleQty.getSaleArea();
+            String[] areaSplitArr = saleArea.split(",");
+            List<String> areaNameList = new ArrayList<>();
+            for (String areaCode : areaSplitArr) {
+                if (areaNameMap.containsKey(areaCode)) {
+                    String name = areaNameMap.get(areaCode);
+                    areaNameList.add(name);
+                }
+            }
+            monthlySaleQty.setSaleAreaName(String.join(",", areaNameList));
             String materialCode = monthlySaleQty.getMaterialCode();
             if (sumQtyGroupByAreaMap.containsKey(materialCode)) {
                 List<MpHistorySaleRecord> areaGroupList = sumQtyGroupByAreaMap.get(materialCode);
@@ -120,6 +133,28 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
             }
         }
         return tableDataInfo;
+    }
+
+    private Map<String, String> getAreaNameMap(List<MpMonthlySaleQty> list) {
+        List<AreaConvertVo> convertVoList = list.stream().map(MpMonthlySaleQty::getSaleArea)
+                .flatMap(item -> Arrays.stream(item.split(",")))
+                .distinct()
+                .map(item -> {
+                    AreaConvertVo areaConvertVo = new AreaConvertVo();
+                    areaConvertVo.setAreaCode(item);
+                    return areaConvertVo;
+                }).collect(Collectors.toList());
+        // 执行表达式，转义区域
+        try {
+            QueryFormulaUtil.execFormula(convertVoList, new String[]{
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+            });
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("转换区域，执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
+        return convertVoList.stream().collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n));
     }
 
     @Override
