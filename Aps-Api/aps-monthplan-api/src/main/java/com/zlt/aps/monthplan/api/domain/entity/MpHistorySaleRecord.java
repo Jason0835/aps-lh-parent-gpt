@@ -108,4 +108,11 @@ public class MpHistorySaleRecord extends BaseEntity{
     @ApiModelProperty(value = "区域名称国际化后", name = "areaCodeNameI18n")
     @TableField(exist = false)
     private String areaCodeNameI18n;
+
+    /**
+     * area拼接区域编号，前端使用
+     */
+    @ApiModelProperty(value = "area拼接区域编号，前端使用", name = "areaCodeShow")
+    @TableField(exist = false)
+    private String areaCodeShow;
 }
