@@ -82,10 +82,10 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 滚动12个月销量
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.rollMonthSaleQty")
-    @ApiModelProperty(value = "滚动12个月销量", name = "rollMonthSaleQty")
-    @TableField(value = "ROLL_MONTH_SALE_QTY")
-    private Long rollMonthSaleQty;
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty")
+    @ApiModelProperty(value = "滚动12个月销量", name = "rollTwelveMonthSaleQty")
+    @TableField(value = "ROLL_TWELVE_MONTH_SALE_QTY")
+    private Long rollTwelveMonthSaleQty;
 
     /**
      * 月均销量

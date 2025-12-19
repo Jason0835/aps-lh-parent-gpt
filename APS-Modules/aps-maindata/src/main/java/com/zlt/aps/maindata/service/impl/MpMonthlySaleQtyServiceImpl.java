@@ -266,7 +266,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 // 滚动月销量
                 if (rollMonthSaleQtyMap.containsKey(materialCode)) {
                     Integer saleQty = rollMonthSaleQtyMap.get(materialCode);
-                    monthlySaleQty.setRollMonthSaleQty(saleQty.longValue());
+                    monthlySaleQty.setRollTwelveMonthSaleQty(saleQty.longValue());
                 }
 
                 // 根据物料信息回写物料信息
