@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -10,6 +11,7 @@ import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
@@ -30,7 +32,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -257,6 +260,82 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     }
 
     /**
+     * 合并表头单元格
+     *
+     * @param cellNum             动态列开始列数
+     * @param sheet               表
+     * @param areaTitleSize       区域表头列表
+     * @param monthTableTitleList 月表头列表
+     */
+    private static void mergeHeadTitleCell(int cellNum, Sheet sheet, int areaTitleSize, List<MpHistorySaleRecord> monthTableTitleList) {
+        for (int mergeCellNum = 0; mergeCellNum < cellNum; mergeCellNum++) {
+            // 上下0,1两行合并
+            CellRangeAddress mergeRegion = new CellRangeAddress(0, 1, mergeCellNum, mergeCellNum);
+            sheet.addMergedRegion(mergeRegion);
+        }
+
+        int areaMergeEndCellNum = cellNum + areaTitleSize - 1;
+        CellRangeAddress areaMergeRegion = new CellRangeAddress(0, 0, cellNum, areaMergeEndCellNum);
+        sheet.addMergedRegion(areaMergeRegion);
+        int monthMergeStartCellNum = areaMergeEndCellNum + 1;
+        int monthMergeEndCellNum = monthMergeStartCellNum + monthTableTitleList.size() - 1;
+        CellRangeAddress monthMergeRegion = new CellRangeAddress(0, 0, monthMergeStartCellNum, monthMergeEndCellNum);
+        sheet.addMergedRegion(monthMergeRegion);
+    }
+
+    /**
+     * 填充表体数据
+     *
+     * @param list                待填充的数据
+     * @param dataOffset          数据行偏移量
+     * @param sheet               工作簿
+     * @param cellNum             列号
+     * @param areaTableTitleList  区域表头
+     * @param monthTableTitleList 月份表头
+     */
+    private static void fillTableData(List<MpMonthlySaleQty> list, int dataOffset, Sheet sheet, int cellNum, List<MpHistorySaleRecord> areaTableTitleList, List<MpHistorySaleRecord> monthTableTitleList) {
+        for (int i = 0; i < list.size(); i++) {
+            int rowNum = i + dataOffset;
+            MpMonthlySaleQty mpMonthlySaleQty = list.get(i);
+
+            Row dataRow = sheet.getRow(rowNum);
+            CellStyle dataCellStyle = dataRow.getCell(cellNum - 2).getCellStyle();
+
+            int areaDataSize = areaTableTitleList.size();
+
+            List<MpHistorySaleRecord> areaGroupList = mpMonthlySaleQty.getAreaGroupList();
+            Map<String, Integer> areaGroupMap = areaGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getAreaCode, MpHistorySaleRecord::getSaleQty));
+
+            for (int j = 0; j < areaDataSize; j++) {
+                MpHistorySaleRecord mpHistorySaleRecord = areaTableTitleList.get(j);
+                String areaCode = mpHistorySaleRecord.getAreaCode();
+                Cell cell = dataRow.createCell(cellNum + j);
+                if (areaGroupMap.containsKey(areaCode)) {
+                    cell.setCellValue(areaGroupMap.get(areaCode));
+                } else {
+                    cell.setCellValue("");
+                }
+                cell.setCellStyle(dataCellStyle);
+            }
+
+            List<MpHistorySaleRecord> monthGroupList = mpMonthlySaleQty.getMonthGroupList();
+            Map<Integer, Integer> monthGroupMap = monthGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getMonth, MpHistorySaleRecord::getSaleQty));
+
+            for (int j = 0; j < monthTableTitleList.size(); j++) {
+                MpHistorySaleRecord mpHistorySaleRecord = monthTableTitleList.get(j);
+                Integer month = mpHistorySaleRecord.getMonth();
+                Cell cell = dataRow.createCell(cellNum + areaDataSize + j);
+                if (monthGroupMap.containsKey(month)) {
+                    cell.setCellValue(monthGroupMap.get(month));
+                } else {
+                    cell.setCellValue("");
+                }
+                cell.setCellStyle(dataCellStyle);
+            }
+        }
+    }
+
+    /**
      * 导出列表
      */
     @Log(title = "月均销量", businessType = BusinessType.EXPORT)
@@ -268,7 +347,46 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         Date beginTime = DateUtils.getNowDate();
         List<MpMonthlySaleQty> list = this.listExportData(queryVO);
         ExcelUtil<MpMonthlySaleQty> util = new ExcelUtil<>(this.getTClass());
-        Workbook workbook = util.exportExcel2(response, list, fileName);
+        Workbook workbook = util.exportExcel2(response, list, fileName, 2);
+        Sheet sheet = workbook.getSheetAt(0);
+        // 获取表头
+        int headRowIndex = 0;
+        Row row = sheet.getRow(headRowIndex);
+        // 插入一行二级表头
+        int insertRowIndex = headRowIndex + 1;
+        Row twoHeadRow = sheet.createRow(insertRowIndex);
+        // 原有表头的列后，添加要新增的二级表头
+        int cellNum = row.getLastCellNum();
+        CellStyle headCellStyle = row.getCell(cellNum - 2).getCellStyle();
+        Map<String, Object> showTableTitleMap = this.getShowTableTitleMap(queryVO);
+        List<MpHistorySaleRecord> areaTableTitleList = JSON.parseArray(JSON.toJSONString(showTableTitleMap.get("areaTableTitle")), MpHistorySaleRecord.class);
+        List<MpHistorySaleRecord> monthTableTitleList = JSON.parseArray(JSON.toJSONString(showTableTitleMap.get("monthTableTitle")), MpHistorySaleRecord.class);
+        int areaTitleSize = areaTableTitleList.size();
+        for (int i = 0; i < areaTitleSize; i++) {
+            MpHistorySaleRecord areaTitle = areaTableTitleList.get(i);
+            Cell headCell = row.createCell(cellNum + i);
+            headCell.setCellValue(I18nUtil.getMessage("ui.data.column.mpMonthlySaleQty.areaTitle"));
+            headCell.setCellStyle(headCellStyle);
+            Cell cell = twoHeadRow.createCell(cellNum + i);
+            cell.setCellValue(areaTitle.getAreaCodeNameI18n());
+            cell.setCellStyle(headCellStyle);
+        }
+        for (int i = 0; i < monthTableTitleList.size(); i++) {
+            MpHistorySaleRecord monthTitle = monthTableTitleList.get(i);
+            Cell headCell = row.createCell(cellNum + areaTitleSize + i);
+            headCell.setCellValue(I18nUtil.getMessage("ui.data.column.mpMonthlySaleQty.monthTitle"));
+            headCell.setCellStyle(headCellStyle);
+            Cell cell = twoHeadRow.createCell(cellNum + areaTitleSize + i);
+            cell.setCellValue(monthTitle.getMonth() + "月");
+            cell.setCellStyle(headCellStyle);
+        }
+
+        // 合并表头单元格
+        mergeHeadTitleCell(cellNum, sheet, areaTitleSize, monthTableTitleList);
+
+        int dataOffset = insertRowIndex + 1;
+        // 填充表体对应数据
+        fillTableData(list, dataOffset, sheet, cellNum, areaTableTitleList, monthTableTitleList);
         byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
@@ -342,6 +460,16 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     @PostMapping("/getShowTableTitleList")
     @ApiOperation("获取表头展示列表")
     public AjaxResult getShowTableTitleList(@RequestBody MpMonthlySaleQty queryVO) {
+        Map<String, Object> map = getShowTableTitleMap(queryVO);
+        return AjaxResult.success(map);
+    }
+
+    /**
+     * 获取表头展示Map
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    private Map<String, Object> getShowTableTitleMap(MpMonthlySaleQty queryVO) {
         // 查询列表
         TableDataInfo tableDataInfo = super.list(queryVO);
         List<MpMonthlySaleQty> list = (List<MpMonthlySaleQty>) tableDataInfo.getRows();
@@ -404,8 +532,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
 
         map.put("areaTableTitle", areaMapList);
         map.put("monthTableTitle", monthMapList);
-
-        return AjaxResult.success(map);
+        return map;
     }
 
     /**

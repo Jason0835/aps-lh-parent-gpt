@@ -115,4 +115,11 @@ public class MpHistorySaleRecord extends BaseEntity{
     @ApiModelProperty(value = "area拼接区域编号，前端使用", name = "areaCodeShow")
     @TableField(exist = false)
     private String areaCodeShow;
+
+    /**
+     * month拼接月，前端使用
+     */
+    @ApiModelProperty(value = "month拼接月，前端使用", name = "monthShow")
+    @TableField(exist = false)
+    private String monthShow;
 }

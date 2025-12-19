@@ -51,7 +51,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 内外销
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.locationType")
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "内外销", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -59,7 +59,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.brand")
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;

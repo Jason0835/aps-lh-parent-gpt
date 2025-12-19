@@ -465,6 +465,45 @@ public class ExcelUtil<T> {
         exportExcel(response.getOutputStream());
     }
 
+
+    /**
+     * 复制行
+     *
+     * @param sourceRow 源行
+     * @param targetRow 目标行
+     */
+    public static void copyRow(Row sourceRow, Row targetRow) {
+        // 复制行高
+        targetRow.setHeight(sourceRow.getHeight());
+        // 复制每个单元格
+        for (int colIndex = 0; colIndex < sourceRow.getLastCellNum(); colIndex++) {
+            Cell sourceCell = sourceRow.getCell(colIndex);
+            if (sourceCell == null) {
+                continue;
+            }
+            Cell targetCell = targetRow.createCell(colIndex);
+            // 复制单元格样式
+            targetCell.setCellStyle(sourceCell.getCellStyle());
+            // 复制单元格值（兼容不同类型）
+            switch (sourceCell.getCellType()) {
+                case STRING:
+                    targetCell.setCellValue(sourceCell.getStringCellValue());
+                    break;
+                case NUMERIC:
+                    targetCell.setCellValue(sourceCell.getNumericCellValue());
+                    break;
+                case BOOLEAN:
+                    targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                    break;
+                case FORMULA:
+                    targetCell.setCellFormula(sourceCell.getCellFormula());
+                    break;
+                default:
+                    targetCell.setCellValue(sourceCell.getStringCellValue());
+            }
+        }
+    }
+
     /**
      * 对list数据源将其里面的数据导入到excel表单
      *
@@ -496,62 +535,42 @@ public class ExcelUtil<T> {
     }
 
     /**
+     * 对list数据源将其里面的数据导入到excel表单
+     *
+     * @param response 返回数据
+     * @param list     导出数据集合
+     * @param fileName 文件名
+     * @return 结果
+     * @throws IOException
+     */
+    public Workbook exportExcel2(HttpServletResponse response, List<T> list, String fileName, Integer dataStartRowNum) throws IOException {
+
+        ExcelUtil.setResponseHeader(response, fileName, ExcelUtil.XLSX_FILE);
+
+        return exportExcelFromList(list, fileName, dataStartRowNum);
+    }
+
+    /**
+     * 对list数据源将其里面的数据导入到excel表单
+     *
+     * @param list     导出数据集合
+     * @param fileName 文件名
+     * @return 结果
+     * @throws IOException
+     */
+    public Workbook exportExcelFromList(List<T> list, String fileName, Integer dataStartRowNum) throws IOException {
+
+        this.init(list, fileName, Type.EXPORT);
+        return exportExcel2(dataStartRowNum);
+    }
+
+    /**
      * 填充 Workbook
      *
      * @return Workbook
      */
     public Workbook exportExcel2() {
-        try {
-
-            //获取下拉数据集、下拉列位置集
-            List<String[]> downDataList = new ArrayList<>();
-            List<Integer> downDataLocations = new ArrayList<>();
-            getDownDataList(downDataList, downDataLocations);
-
-            // 取出一共有多少个sheet.
-            double sheetNo = Math.ceil(list.size() / SHEET_SIZE);
-            for (int index = 0; index <= sheetNo; index++) {
-
-                //创建工作表sheet、单元格样式、设置sheetName
-                if (CollectionUtils.isNotEmpty(downDataList)) {
-                    createSheetWithDict(sheetNo, index);
-                } else {
-                    createSheet(sheetNo, index);
-                }
-
-                //填充表头
-                Row row = sheet.createRow(0);
-                int column = 0;
-                for (Object[] os : fields) {
-                    Excel excel = (Excel) os[1];
-                    this.createCell(excel, row, column++);
-                }
-
-                //为工作页绑定下拉框，并且填充字典页
-                if (CollectionUtils.isNotEmpty(downDataList)) {
-                    createExcelWithDict(sheet, dictSheet, downDataList, downDataLocations);
-                }
-
-                Long bmin = System.currentTimeMillis();
-
-                //填充数据
-                if (Type.EXPORT.equals(type)) {
-                    dictDataCach.set(new HashMap<>());
-                    fillExcelData(index, row);
-                    // //自适应宽度(中文支持)
-                    //setSizeColumn((SXSSFSheet) this.sheet, column);
-                    dictDataCach.remove();
-                    addStatisticsRow();
-                }
-                log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
-            }
-            return wb;
-        } catch (Exception e) {
-            String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.exception"), e.getMessage());
-            log.error(errorMsg);
-        } finally {
-            return wb;
-        }
+        return exportExcel2(1);
     }
 
     //自适应宽度(中文支持)
@@ -813,6 +832,64 @@ public class ExcelUtil<T> {
         }
     }
 
+    /**
+     * 填充 Workbook
+     *
+     * @return Workbook
+     */
+    public Workbook exportExcel2(Integer dataStartRowNum) {
+        try {
+
+            //获取下拉数据集、下拉列位置集
+            List<String[]> downDataList = new ArrayList<>();
+            List<Integer> downDataLocations = new ArrayList<>();
+            getDownDataList(downDataList, downDataLocations);
+
+            // 取出一共有多少个sheet.
+            double sheetNo = Math.ceil(list.size() / SHEET_SIZE);
+            for (int index = 0; index <= sheetNo; index++) {
+
+                //创建工作表sheet、单元格样式、设置sheetName
+                if (CollectionUtils.isNotEmpty(downDataList)) {
+                    createSheetWithDict(sheetNo, index);
+                } else {
+                    createSheet(sheetNo, index);
+                }
+
+                //填充表头
+                Row row = sheet.createRow(0);
+                int column = 0;
+                for (Object[] os : fields) {
+                    Excel excel = (Excel) os[1];
+                    this.createCell(excel, row, column++);
+                }
+
+                //为工作页绑定下拉框，并且填充字典页
+                if (CollectionUtils.isNotEmpty(downDataList)) {
+                    createExcelWithDict(sheet, dictSheet, downDataList, downDataLocations);
+                }
+
+                Long bmin = System.currentTimeMillis();
+
+                //填充数据
+                if (Type.EXPORT.equals(type)) {
+                    dictDataCach.set(new HashMap<>());
+                    fillExcelData(index, row, dataStartRowNum);
+                    // //自适应宽度(中文支持)
+                    //setSizeColumn((SXSSFSheet) this.sheet, column);
+                    dictDataCach.remove();
+                    addStatisticsRow();
+                }
+                log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
+            }
+            return wb;
+        } catch (Exception e) {
+            String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.exception"), e.getMessage());
+            log.error(errorMsg);
+        } finally {
+            return wb;
+        }
+    }
 
     /**
      * 填充excel数据
@@ -821,28 +898,7 @@ public class ExcelUtil<T> {
      * @param row   单元格行
      */
     public void fillExcelData(int index, Row row) {
-        int startNo = index * SHEET_SIZE;
-        int endNo = Math.min(startNo + SHEET_SIZE, list.size());
-
-        //只取一次语言,存到缓存
-        this.lang = SecurityUtils.getUserLang().toString();
-
-        for (int i = startNo; i < endNo; i++) {
-            row = sheet.createRow(i + 1 - startNo);
-            // 得到导出对象.
-            T vo = list.get(i);
-            int column = 0;
-            for (Object[] os : fields) {
-                Field field = (Field) os[0];
-                Excel excel = (Excel) os[1];
-                // 设置实体类私有属性可访问
-                field.setAccessible(true);
-                this.addCell(excel, row, vo, field, column++);
-//                SXSSFSheet sxssfSheet = (SXSSFSheet) sheet;
-//                sxssfSheet.trackAllColumnsForAutoSizing();
-//                sxssfSheet.autoSizeColumn(column);
-            }
-        }
+        fillExcelData(index, row, 1);
     }
 
     /**
@@ -1566,5 +1622,36 @@ public class ExcelUtil<T> {
             return val;
         }
         return val;
+    }
+
+    /**
+     * 填充excel数据
+     *
+     * @param index 序号
+     * @param row   单元格行
+     */
+    public void fillExcelData(int index, Row row, Integer dataStartRowNum) {
+        int startNo = index * SHEET_SIZE;
+        int endNo = Math.min(startNo + SHEET_SIZE, list.size());
+
+        //只取一次语言,存到缓存
+        this.lang = SecurityUtils.getUserLang().toString();
+
+        for (int i = startNo; i < endNo; i++) {
+            row = sheet.createRow(i + dataStartRowNum - startNo);
+            // 得到导出对象.
+            T vo = list.get(i);
+            int column = 0;
+            for (Object[] os : fields) {
+                Field field = (Field) os[0];
+                Excel excel = (Excel) os[1];
+                // 设置实体类私有属性可访问
+                field.setAccessible(true);
+                this.addCell(excel, row, vo, field, column++);
+//                SXSSFSheet sxssfSheet = (SXSSFSheet) sheet;
+//                sxssfSheet.trackAllColumnsForAutoSizing();
+//                sxssfSheet.autoSizeColumn(column);
+            }
+        }
     }
 }
