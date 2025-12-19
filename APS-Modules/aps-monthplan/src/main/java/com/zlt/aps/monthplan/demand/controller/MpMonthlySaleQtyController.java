@@ -230,7 +230,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         return new String[]{
                 "createByName->getcolvalue(SYS_USER, nick_name, user_name, createBy)",
                 "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
-                "saleAreaName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+                "saleAreaName->getcolvaluewithcondition(t_dp_area, area_name, area_code, saleArea, is_delete = 0)",
         };
     }
 
