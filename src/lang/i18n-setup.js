@@ -1,12 +1,12 @@
 import axios from 'axios'
 import i18n from '@/lang'
 import store from '@/store'
-// import elementEnLocale from "element-ui/lib/locale/lang/en"; // element-ui lang
+import elementEnLocale from "element-ui/lib/locale/lang/en"; // element-ui lang
 import elementZhLocale from "element-ui/lib/locale/lang/zh-CN";
-// import elementViLocale from "element-ui/lib/locale/lang/vi"
+import elementViLocale from "element-ui/lib/locale/lang/vi"
 import tltZhLocale from "tlt-ui/src/locale/lang/zh-CN"
-// import tltEnLocale from "tlt-ui/src/locale/lang/en"
-// import tltViLocale from "tlt-ui/src/locale/lang/vi"
+import tltEnLocale from "tlt-ui/src/locale/lang/en"
+import tltViLocale from "tlt-ui/src/locale/lang/vi"
 // import enLocale from "./en";
 import zhLocale from "./zh";
 // import zhLocale from "./zh/web_zh_CN.json"
@@ -17,21 +17,19 @@ import { pageJson } from "@/api/bd/i18nChange"
 
 // vue组件默认语言
 let messages = {
-  // en_US: {
-  //   ...elementEnLocale,
-  //   ...tltEnLocale,
-  //   ...enLocale,
-  // },
+  en_US: {
+    ...elementEnLocale,
+    ...tltEnLocale,
+  },
   zh_CN: {
     ...elementZhLocale,
     ...tltZhLocale,
     ...zhLocale,
   },
-  // vi_VN: {
-  //   ...elementViLocale,
-  //   ...tltViLocale,
-  //   ...viLocale,
-  // }
+  vi_VN: {
+    ...elementViLocale,
+    ...tltViLocale,
+  }
 };
 
 // if (process.env.NODE_ENV === "development") {

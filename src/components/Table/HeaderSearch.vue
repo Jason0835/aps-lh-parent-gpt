@@ -94,6 +94,7 @@ export default {
             v-model={this.form[item.prop]}
             clearable={item.clearable == false ? false : true}
             disabled={item.disabled}
+            placeholder={this.$t("common.rule.select")}
             filterable={item.filterable}
           >
             {item.dictData.map((row) => {

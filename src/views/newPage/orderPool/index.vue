@@ -23,7 +23,7 @@
           plain
           v-hasPermi="['monthplan:SalesOrderPool:getSCMData']"
           @click="SCMBtn"
-          >{{ $t("SCM抓取") }}
+          >{{ $t("ui.data.column.moldLedger.scm") }}
         </el-button>
         <!-- <el-button
           type="primary"

@@ -128,7 +128,7 @@ export default {
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型机类型"),
+          label: this.$t("ui.data.column.docMoldingMachine.moldingMachineClassName"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
           },

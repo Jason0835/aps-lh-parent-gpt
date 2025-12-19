@@ -168,11 +168,11 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("ui.remark"),
+          label: this.$t("common.remark"),
         },
         {
           align: "center",
-          label: this.$t("ui.data.btn.option"),
+          label: this.$t("common.option"),
           fixed: "right",
           render: ({ row }) => {
             return (

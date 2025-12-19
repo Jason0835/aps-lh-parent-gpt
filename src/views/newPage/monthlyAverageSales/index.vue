@@ -115,59 +115,59 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "locationType",
-          label: this.$t("内外销"),
+          label: this.$t("ui.data.column.finishStock.wai"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
         },
         {
           prop: "brand",
-          label: this.$t("品牌"),
+          label: this.$t("common.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
         },
         {
           prop: "materialCode",
-          label: this.$t("NC物料编码"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width:200
         },
         {
           prop: "rollTwelveMonthSaleQty",
-          label: this.$t("滚动12个月销量"),
+          label: this.$t("ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty"),
         },
         {
           prop: "averageSaleQty",
-          label: this.$t("月均销量"),
+          label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
         },
         {
           prop: "saleArea",
-          label: this.$t("适销区域（前三）"),
+          label: this.$t("ui.data.column.mpMonthlySaleQty.saleArea"),
         },
         {
-          prop: "mouldCode",
-          label: this.$t("区域(往前12个月所有区域)"),
+          prop: "areaAll",
+          label: this.$t("ui.data.column.mpMonthlySaleQty.areaAll"),
           children: [],
         },
         {
-          prop: "往前12个月",
-          label: this.$t("往前12个月(所有)"),
+          prop: "monthAll",
+          label: this.$t("ui.data.column.mpMonthlySaleQty.monthAll"),
           children: [],
         },
         {
           prop: "updateTime",
-          label: this.$t("更新日期"),
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width:200
         },
       ];
@@ -196,21 +196,23 @@ export default {
 
         {
           prop: "productTypeCode",
-          label: this.$t("产品分类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "brand",
-          label: this.$t("品牌"),
+          label: this.$t("common.brand"),
+          type: "select",
+          dictData: this.dict.type.biz_brand_type,
         },
         {
           prop: "materialCode",
-          label: this.$t("NC物料编码"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
       ];
     },

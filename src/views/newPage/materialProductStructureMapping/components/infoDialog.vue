@@ -42,6 +42,35 @@ export default {
   components: { infoForm },
   inject: ["parentDict"],
   data() {
+       // 验证大于0的整数
+       const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error("输入不能为空"));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error("只能输入大于等于0的整数，不能有小数点和负号")
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 999999) {
+        return callback(new Error("输入数值过大"));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error("请输入整数"));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -63,28 +92,34 @@ export default {
             trigger: "change",
           },
         ],
-        embryoCode: [
+        materialDesc: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        machineCode: [
+        standardLength: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        ratio: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        lineType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        jobType: [
+        unit: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -127,7 +162,7 @@ export default {
         },
         {
           prop: "ratio",
-          label: this.$t("ui.data.column.capsuleChuck.ratio"),
+          label: this.$t("ui.data.column.capsuleChuck.ratio")+'%',
           type: "number",
           max: 100,
           min:0

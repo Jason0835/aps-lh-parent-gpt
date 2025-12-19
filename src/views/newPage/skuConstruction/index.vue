@@ -23,7 +23,7 @@
           type="primary"
           @click="mesCaptureing"
           plain
-          >{{ $t("MES抓取") }}</el-button
+          >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
         >
         <!-- <el-button
           type="primary"
@@ -160,7 +160,7 @@ export default {
         },
         {
           prop: "isZeroRack",
-          label: this.$t("是否零度材料"),
+          label: this.$t("ui.data.column.mpMonthlySaleQty.isZeroRack"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },

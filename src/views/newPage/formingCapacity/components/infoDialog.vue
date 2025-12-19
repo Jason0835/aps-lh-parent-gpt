@@ -115,7 +115,7 @@ export default {
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型机类型"),
+          label: this.$t("ui.data.column.docMoldingMachine.moldingMachineClassName"),
           type: "select",
           dictData: this.parentDict.type.biz_machine_brand,
         },

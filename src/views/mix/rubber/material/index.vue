@@ -288,7 +288,7 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.remark"),
+          label: this.$t("common.remark"),
         },
         {
           prop: "updateTime",
@@ -300,7 +300,7 @@ export default {
            {
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.btn.option"),
+          label: this.$t("common.option"),
           minWidth: 180,
           width: 180,
           fixed: "right",

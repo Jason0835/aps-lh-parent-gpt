@@ -13,6 +13,7 @@
   "ui.data.column.moldLedger.pattern": "花纹代号",
   "ui.data.column.moldLedger.shellStandard": "模壳标准",
   "ui.data.column.moldLedger.mes": "MES抓取",
+  "ui.data.column.moldLedger.scm": "SCM抓取",
   "ui.data.column.scheduledShutdown.machineStopType": "停机类型",
   "ui.data.column.scheduledShutdown.beginDate": "计划开始时间",
   "ui.data.column.scheduledShutdown.endDate": "计划结束时间",
@@ -168,5 +169,14 @@
   "ui.data.column.rawMaterial.monthGen": "按月份生成",
   "ui.data.column.rawMaterial.deviationQty": "偏差量",
   "ui.data.column.rawMaterial.deviationRate": "偏差率",
-  "ui.data.column.rawMaterial.hasWarning": "是否预警"
+  "ui.data.column.rawMaterial.hasWarning": "是否预警",
+
+
+  "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty": "滚动12个月销量",
+  "ui.data.column.mpMonthlySaleQty.averageSaleQty": "月均销量",
+  "ui.data.column.mpMonthlySaleQty.saleArea": "适销区域（前三）",
+  "ui.data.column.mpMonthlySaleQty.areaAll": "区域(往前12个月所有区域)",
+  "ui.data.column.mpMonthlySaleQty.monthAll": "往前12个月(所有)",
+  "ui.data.column.mpMonthlySaleQty.isZeroRack": "是否零度材料"
+
 }
