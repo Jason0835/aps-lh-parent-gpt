@@ -150,7 +150,7 @@ public class MdmStructureLhRatioController extends AbstractDocBizController<MdmS
     @Override
     protected void builderCondition(QueryWrapper<MdmStructureLhRatio> queryWrapper, MdmStructureLhRatio queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineTypeCode")), "CX_MACHINE_TYPE_CODE", queryVO.getFieldValueByFieldName("cxMachineTypeCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineBrandCode")), "CX_MACHINE_BRAND_CODE", queryVO.getFieldValueByFieldName("cxMachineBrandCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhMachineMaxQty")), "LH_MACHINE_MAX_QTY", queryVO.getFieldValueByFieldName("lhMachineMaxQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("maxEmbryoQty")), "MAX_EMBRYO_QTY", queryVO.getFieldValueByFieldName("maxEmbryoQty"));
