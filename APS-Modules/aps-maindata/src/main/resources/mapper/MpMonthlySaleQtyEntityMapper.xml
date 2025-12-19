@@ -4,4 +4,15 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper">
 
+    <select id="selectSumQtyByMonthAndArea" resultType="com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool">
+        SELECT FACTORY_CODE,
+               AREA,
+               ORI_MATERIAL_CODE,
+               SUM(ORD_QTY) AS ORD_QTY
+        FROM T_DP_SALES_ORDER_POOL
+        WHERE IS_DELETE = 0
+          AND BILL_DATE &gt;= STR_TO_DATE(CONCAT(#{billDateStartTime}, ' 00:00:00'), '%Y-%m-%d %H:%i:%s')
+          AND BILL_DATE &lt;= STR_TO_DATE(CONCAT(#{billDateStartTime}, ' 00:00:00'), '%Y-%m-%d %H:%i:%s')
+        GROUP BY FACTORY_CODE, AREA, ORI_MATERIAL_CODE
+    </select>
 </mapper>

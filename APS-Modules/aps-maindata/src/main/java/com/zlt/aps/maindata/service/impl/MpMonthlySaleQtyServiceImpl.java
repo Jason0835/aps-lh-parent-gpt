@@ -1,9 +1,11 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
@@ -13,6 +15,10 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.itf.scm.service.IScmItfService;
+import com.zlt.aps.itf.scm.vo.SyncOutShipDmdOrdResultVo;
+import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
@@ -20,6 +26,7 @@ import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +70,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     @Autowired
     private MpHistorySaleRecordEntityMapper mpHistorySaleRecordEntityMapper;
 
+    @Autowired
+    private IScmItfService iScmItfService;
+
     @Override
     protected String getDocTypeCode() {
         return "MP1209";
@@ -104,7 +114,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         }
         String factoryCode = mpMonthlySaleQty.getFactoryCode();
         Calendar instance = Calendar.getInstance();
-        instance.setTime(new Date());
+        Date nowDate = new Date();
+        instance.setTime(nowDate);
         int year = instance.get(Calendar.YEAR);
         String month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
         String maxYearMonth = year + month;
@@ -113,7 +124,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         int lastYear = instance.get(Calendar.YEAR);
         String lastMonth = String.format("%02d", instance.get(Calendar.MONTH) + 1);
         String lastYearMonth = lastYear + lastMonth;
-        // steve's TODO 查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表
+        Date lastMonthDate = instance.getTime();
+        // 查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表
+        genMpHistorySaleRecord(factoryCode, nowDate, lastMonthDate, lastYear, lastMonth);
 
         // 获取当前年月及之前6个月的历史销售记录
         int passThreeMonth = 3;
@@ -136,6 +149,44 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         // 生成SKU排产分类
         genSkuClassify(factoryCode, last12YearMonth, maxYearMonth);
         return AjaxResult.success();
+    }
+
+    /**
+     * 生成月均销量
+     *
+     * @param nowDate       当前时间
+     * @param lastMonthDate 上个月对应时间
+     * @param lastYear      上个月对应年份
+     * @param lastMonth     上月
+     */
+    private void genMpHistorySaleRecord(String factoryCode, Date nowDate, Date lastMonthDate, int lastYear, String lastMonth) {
+        String nowDateStr = DateUtils.parseDateToStr("yyyy-MM-dd", nowDate);
+        String lastDateStr = DateUtils.parseDateToStr("yyyy-MM-dd", lastMonthDate);
+        SalesOrderPool param = new SalesOrderPool();
+        param.setBillDateStartTime(lastDateStr);
+        param.setBillDateEndTime(nowDateStr);
+        SyncPlanedNotShipParamVo paramVo = new SyncPlanedNotShipParamVo();
+        paramVo.setFactory(factoryCode);
+        paramVo.setYear(lastYear);
+        paramVo.setMonth(Integer.parseInt(lastMonth));
+        AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
+        AjaxResultUtils.getList(ajaxResult, SyncOutShipDmdOrdResultVo.class);
+        List<SalesOrderPool> salesOrderPoolList = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SalesOrderPool.class);
+
+        List<MpHistorySaleRecord> saveList = new ArrayList<>();
+        for (SalesOrderPool salesOrderPool : salesOrderPoolList) {
+            MpHistorySaleRecord mpHistorySaleRecord = new MpHistorySaleRecord();
+            mpHistorySaleRecord.setBaseVale(null);
+            mpHistorySaleRecord.setFactoryCode(salesOrderPool.getFactoryCode());
+            mpHistorySaleRecord.setYear(lastYear);
+            mpHistorySaleRecord.setMonth(Integer.parseInt(lastMonth));
+            mpHistorySaleRecord.setAreaCode(salesOrderPool.getArea());
+            mpHistorySaleRecord.setMaterialCode(salesOrderPool.getOriMaterialCode());
+            mpHistorySaleRecord.setSaleQty(salesOrderPool.getOrdQty().intValue());
+            mpHistorySaleRecord.setGenerationDate(nowDate);
+            saveList.add(mpHistorySaleRecord);
+        }
+        baseDao.saveBatch(saveList);
     }
 
     @Override
