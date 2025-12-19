@@ -36,7 +36,7 @@ public class RawMaterialRequirePlan extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.rawMaterialRequirePlan.factoryCode")
+    @Excel(name = "ui.data.column.rawMaterialRequirePlan.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
