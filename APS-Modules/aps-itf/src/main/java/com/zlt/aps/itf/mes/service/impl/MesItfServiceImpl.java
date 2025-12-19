@@ -9,6 +9,7 @@ import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -118,5 +119,29 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmSkuMouldRel> getMdmSkuMouldRelList(MdmSkuMouldRel mdmSkuMouldRel) {
         return mesItfMapper.selectSkuMouldRelList(mdmSkuMouldRel);
+    }
+
+    /**
+     * 查询成品库存
+     *
+     * @param productStockMonth 参数
+     * @return 结果
+     */
+    @Override
+    public List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth) {
+        // 查询视图
+        return mesItfMapper.selectProductStock(productStockMonth);
+    }
+
+    /**
+     * 同步不合格库存
+     *
+     * @param productStockMonth 参数
+     * @return 结果
+     */
+    @Override
+    public List<ProductStockMonth> syncUnqualifiedStock(ProductStockMonth productStockMonth) {
+        // 查询视图
+        return mesItfMapper.selectUnqualifiedStock(productStockMonth);
     }
 }

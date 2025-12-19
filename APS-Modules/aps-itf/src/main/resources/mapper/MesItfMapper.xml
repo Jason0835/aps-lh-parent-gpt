@@ -62,4 +62,16 @@
         <if test="mouldAirType != null and mouldAirType != ''">AND MOULD_AIR_TYPE = #{mouldAirType}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectProductStock" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
+        SELECT *
+        FROM mes_product_stock
+        WHERE DEL_FLAG = 0
+    </select>
+
+    <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
+        SELECT *
+        FROM mes_unqualified_stock
+        WHERE DEL_FLAG = 0
+    </select>
 </mapper>
