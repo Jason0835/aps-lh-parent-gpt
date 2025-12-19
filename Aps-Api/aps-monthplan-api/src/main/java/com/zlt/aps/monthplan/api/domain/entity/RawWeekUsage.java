@@ -70,9 +70,9 @@ public class RawWeekUsage extends BaseEntity {
      * 原材料名称
      */
     @Excel(name = "原材料名称")
-    @ApiModelProperty(value = "原材料名称", name = "materialName")
-    @TableField(value = "MATERIAL_NAME")
-    private String materialName;
+    @ApiModelProperty(value = "原材料名称", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /**
      * 计划用量

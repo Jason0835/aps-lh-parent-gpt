@@ -79,7 +79,7 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("week")), "WEEK", queryVO.getFieldValueByFieldName("week"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialName")), "MATERIAL_NAME", queryVO.getFieldValueByFieldName("materialName"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planQty")), "PLAN_QTY", queryVO.getFieldValueByFieldName("planQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("actualQty")), "ACTUAL_QTY", queryVO.getFieldValueByFieldName("actualQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deviationQty")), "DEVIATION_QTY", queryVO.getFieldValueByFieldName("deviationQty"));

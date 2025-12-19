@@ -21,6 +21,16 @@ public enum MesInterfaceCodeEnum {
      */
     SYNC_MODEL_INFO("TIRE_MOD_INFO", "syncModelInfo", "TIRE_MOD_INFO", "同步模具台账"),
 
+    /**
+     * 同步成品库存-MES提供视图同步，不通过MQ
+     */
+    SYNC_PRODUCT_STOCK("MES_PRODUCT_STOCK", "syncProductStock", "MES_PRODUCT_STOCK", "同步成品库存"),
+
+    /**
+     * 同步不合格库存-MES提供视图同步，不通过MQ
+     */
+    SYNC_UNQUALIFIED_STOCK("MES_UNQUALIFIED_STOCK", "syncUnqualifiedStock", "MES_UNQUALIFIED_STOCK", "同步不合格库存"),
+
     ;
 
     private final String code;

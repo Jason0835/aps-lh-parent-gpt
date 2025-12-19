@@ -15,7 +15,7 @@
                mmi.LOGISTICS_STATUS,
                '01' AS RELATION_TYPE
           FROM t_mdm_sku_mould_rel msm
-                   LEFT JOIN T_MDM_MOULD_INFO mmi
+          LEFT JOIN t_mdm_model_info mmi
             ON mmi.FACTORY_CODE = msm.FACTORY_CODE
            AND mmi.MOULD_CODE = msm.MOULD_CODE
            AND IFNULL(mmi.IS_DELETE, 0) = 0
@@ -44,7 +44,7 @@
                '-99' AS SHELL_STANDARD,
                1 AS LOGISTICS_STATUS,
                '02' AS RELATION_TYPE
-        FROM T_MDM_MOULD_DELIVERY_PLAN mdp
+          FROM t_mp_mould_delivery_plan mdp
          WHERE IFNULL(mdp.IS_DELETE, 0) = 0
            AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
            AND mdp.BOARDING_DATE  &lt;= #{productionEndDate,jdbcType=DATE}
@@ -65,6 +65,7 @@
                msm.MATERIAL_DESC,
                msm.MOULD_CODE,
                msm.MAIN_PATTERN,
+               null AS BOARDING_DATE,
                mmi.MOULD_CODE AS BASE_MOULD_CODE,
                mmi.MOULD_TYPE,
                mmi.MOULD_STATUS,
@@ -72,7 +73,7 @@
                mmi.LOGISTICS_STATUS,
                '01' AS RELATION_TYPE
           FROM t_mdm_sku_mould_rel msm
-                   LEFT JOIN T_MDM_MOULD_INFO mmi
+          LEFT JOIN t_mdm_model_info mmi
             ON mmi.FACTORY_CODE = msm.FACTORY_CODE
            AND mmi.MOULD_CODE = msm.MOULD_CODE
            AND IFNULL(mmi.IS_DELETE, 0) = 0
@@ -97,6 +98,7 @@
                mdp.MATERIAL_CODE,
                mdp.MATERIAL_DESC,
                mdp.MOULD_CODE,
+               mdp.BOARDING_DATE,
                '' AS MAIN_PATTERN,
                mdp.MOULD_CODE AS BASE_MOULD_CODE,
                '' AS MOULD_TYPE,
@@ -104,7 +106,7 @@
                '-99' AS SHELL_STANDARD,
                1 AS LOGISTICS_STATUS,
                '02' AS RELATION_TYPE
-        FROM T_MDM_MOULD_DELIVERY_PLAN mdp
+          FROM t_mp_mould_delivery_plan mdp
          WHERE IFNULL(mdp.IS_DELETE, 0) = 0
            AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
            AND mdp.BOARDING_DATE  &lt;= #{productionEndDate,jdbcType=DATE}
@@ -121,4 +123,27 @@
                           AND mdp.FACTORY_CODE = mpi.FACTORY_CODE)
     </select>
 
+    <select id="getMouldShellInfo" resultType="com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo">
+        SELECT FACTORY_CODE,
+               MOLD_MODEL_CODE,
+               MACHINE_QTY,
+               ON_HAND_QTY
+          FROM t_mdm_mould_shell_info
+         WHERE IFNULL(IS_DELETE, 0) = 0
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getMouldAllocationInfo" resultType="com.zlt.aps.factory.domain.vo.MouldAllocationInfoVo">
+        SELECT mma.FACTORY_CODE,
+               mma.MAIN_PATTERN,
+               mma.PATTERN,
+               mma.STRUCTURE_NAME,
+               mma.SPECIFICATIONS,
+               mma.ALLOCATION_QTY
+          FROM t_mdm_mould_allocation mma
+         WHERE IFNULL(mma.IS_DELETE, 0) = 0
+           AND mma.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mma.YEAR = #{year,jdbcType=DECIMAL}
+           AND mma.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
 </mapper>

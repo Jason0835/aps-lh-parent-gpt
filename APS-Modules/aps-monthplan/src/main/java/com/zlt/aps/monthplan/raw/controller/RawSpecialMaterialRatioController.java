@@ -155,7 +155,7 @@ public class RawSpecialMaterialRatioController extends AbstractDocBizController<
     protected void builderCondition(QueryWrapper<RawSpecialMaterialRatio> queryWrapper, RawSpecialMaterialRatio queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialName")), "MATERIAL_NAME", queryVO.getFieldValueByFieldName("materialName"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("standardLength")), "STANDARD_LENGTH", queryVO.getFieldValueByFieldName("standardLength"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ratio")), "RATIO", queryVO.getFieldValueByFieldName("ratio"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unit")), "UNIT", queryVO.getFieldValueByFieldName("unit"));

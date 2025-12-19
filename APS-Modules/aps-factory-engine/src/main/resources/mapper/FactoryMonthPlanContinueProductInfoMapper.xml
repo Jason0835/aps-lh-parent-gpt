@@ -7,6 +7,10 @@
                ppf.MATERIAL_DESC,
                ppf.STRUCTURE_NAME AS GROUP_NAME,
                ppf.PRO_SIZE,
+               ppf.MAIN_MATERIAL_DESC AS EMBRYO_CODE,
+               ppf.SPECIFICATIONS,
+               ppf.MAIN_PATTERN,
+               ppf.PATTERN,
                ppf.CX_MACHINE_CODE,
                ppf.DAY_VULCANIZATION_QTY,
                ppf.DAY_${lastDay} AS PRODUCTION_QTY

@@ -1,17 +1,16 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.math.BigDecimal;
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -169,4 +168,18 @@ public class SalesOrderPool extends BaseEntity{
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, factoryCode, oriMaterialCode);
     }
+
+    /**
+     * 提报日期开始时间
+     */
+    @ApiModelProperty(value = "提报日期开始时间", name = "billDateStartTime")
+    @TableField(exist = false)
+    private String billDateStartTime;
+
+    /**
+     * 提报日期结束时间
+     */
+    @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
+    @TableField(exist = false)
+    private String billDateEndTime;
 }

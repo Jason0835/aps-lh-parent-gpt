@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
@@ -32,7 +33,10 @@ public class TbrProductionContext extends Context {
      * 反向匹配成型机台
      */
     Set<String> reverseFindSet;
-
+    /**
+     * 模具信息
+     */
+    Map<String, ProductionMouldInfoVo> mouldInfoMap;
     /**
      * 加入收尾，方向匹配结构集合
      *

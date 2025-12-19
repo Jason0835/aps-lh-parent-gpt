@@ -82,10 +82,10 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 滚动12个月销量
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.rollMonthSaleQty")
-    @ApiModelProperty(value = "滚动12个月销量", name = "rollMonthSaleQty")
-    @TableField(value = "ROLL_MONTH_SALE_QTY")
-    private Long rollMonthSaleQty;
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty")
+    @ApiModelProperty(value = "滚动12个月销量", name = "rollTwelveMonthSaleQty")
+    @TableField(value = "ROLL_TWELVE_MONTH_SALE_QTY")
+    private Long rollTwelveMonthSaleQty;
 
     /**
      * 月均销量
@@ -117,10 +117,17 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 适销区域，多个英文逗号分隔
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.saleArea")
     @ApiModelProperty(value = "适销区域，多个英文逗号分隔", name = "saleArea")
     @TableField(value = "SALE_AREA")
     private String saleArea;
+
+    /**
+     * 适销区域，多个英文逗号分隔
+     */
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.saleArea")
+    @ApiModelProperty(value = "适销区域，多个英文逗号分隔", name = "saleAreaName")
+    @TableField(exist = false)
+    private String saleAreaName;
 
     @ApiModelProperty(value = "区域(往前12个月所有区域)月均销量总和", name = "areaGroupList")
     @TableField(exist = false)
