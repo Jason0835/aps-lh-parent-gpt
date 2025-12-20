@@ -34,19 +34,19 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     private static final long serialVersionUID = 1L;
 
      /** 生产分厂编号 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.factoryCode")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "生产分厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.year")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.month")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -94,7 +94,7 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     private String scmPriority;
 
     /** 需求量 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.demandQty")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.demandQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "需求量", name = "demandQty")
     @TableField(value = "DEMAND_QTY")
     private Long demandQty;
@@ -149,13 +149,13 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     private String weekYear;
 
     /** 均匀性 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.isDynamicBalance")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
 
     /** 动平衡 */
-    @Excel(name = "ui.data.column.orderPoolSnapshot.isUniformity")
+    @Excel(name = "ui.data.column.orderPoolSnapshot.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;

@@ -27,7 +27,7 @@ import java.util.Date;
 
 @ApiModel(value = "订单冲减分配对象", description = "订单冲减分配对象 ")
 @Data
-@TableName(value = "t_mp_order_offset_allocation")
+@TableName(value = "T_DP_ORDER_OFFSET_DETAIL")
 public class MpOrderOffsetAllocation extends BaseEntity{
 
     private static final long serialVersionUID = 1L;

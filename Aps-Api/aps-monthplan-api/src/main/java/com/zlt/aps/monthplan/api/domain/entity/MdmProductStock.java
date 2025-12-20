@@ -11,10 +11,10 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpFinishedProductStock.java
- * 描    述：成品库存对象 t_mp_finished_product_stock
+ * 文件名称：MdmProductStock.java
+ * 描    述：成品库存对象 t_mdm_product_stock
  *@author yelq
- *@date 2025-12-15
+ *@date 2025-12-20
  *@version 1.0
  *
  *  修改记录：
@@ -22,112 +22,113 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
  *     修 改 人：yelq
  *     修改内容：...
  */
-@TableName(value = "T_MP_FINISHED_PRODUCT_STOCK")
+
 @ApiModel(value = "成品库存对象", description = "成品库存对象 ")
 @Data
-public class MpFinishedProductStock extends BaseEntity{
+@TableName(value = "T_MDM_PRODUCT_STOCK")
+public class MdmProductStock extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.finishedProductStock.factoryCode")
+    @Excel(name = "ui.data.column.productStock.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /** 产品品类 TBR 全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.finishedProductStock.productTypeCode")
+    /** 产品品类            TBR 全钢 PCR 半钢 */
+    @Excel(name = "ui.data.column.productStock.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
-    @TableField(value = "FACTORY_CODE")
+    @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.finishedProductStock.brand")
+    @Excel(name = "ui.data.column.productStock.brand")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
 
     /** 产品结构 */
-    @Excel(name = "ui.data.column.finishedProductStock.structureName")
+    @Excel(name = "ui.data.column.productStock.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
     /** 库位类别 */
-    @Excel(name = "ui.data.column.finishedProductStock.locationType")
+    @Excel(name = "ui.data.column.productStock.locationType")
     @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.finishedProductStock.mesMaterialCode")
+    @Excel(name = "ui.data.column.productStock.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     /** 物料编码 */
-    @Excel(name = "ui.data.column.finishedProductStock.materialCode")
+    @Excel(name = "ui.data.column.productStock.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.finishedProductStock.materialDesc")
+    @Excel(name = "ui.data.column.productStock.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
     /** 库存数量 */
-    @Excel(name = "ui.data.column.finishedProductStock.stockQty")
+    @Excel(name = "ui.data.column.productStock.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存数量", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Long stockQty;
+    private Integer stockQty;
 
     /** 年周号 */
-    @Excel(name = "ui.data.column.finishedProductStock.weekYear")
+    @Excel(name = "ui.data.column.productStock.weekYear")
     @ApiModelProperty(value = "年周号", name = "weekYear")
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
     /** 均匀性 */
-    @Excel(name = "ui.data.column.finishedProductStock.dynamicBalance")
-    @ApiModelProperty(value = "均匀性", name = "dynamicBalance")
-    @TableField(value = "DYNAMIC_BALANCE")
-    private String dynamicBalance;
+    @Excel(name = "ui.data.column.productStock.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
 
     /** 动平衡 */
-    @Excel(name = "ui.data.column.finishedProductStock.uniformity")
-    @ApiModelProperty(value = "动平衡", name = "uniformity")
-    @TableField(value = "UNIFORMITY")
-    private String uniformity;
+    @Excel(name = "ui.data.column.productStock.isUniformity", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "均匀性", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
 
     /** 是否超3个月胎 */
-    @Excel(name = "ui.data.column.finishedProductStock.isExceedThreeMonth")
+    @Excel(name = "ui.data.column.productStock.isExceedThreeMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超3个月胎", name = "isExceedThreeMonth")
     @TableField(value = "IS_EXCEED_THREE_MONTH")
     private String isExceedThreeMonth;
 
     /** 是否超6个月胎 */
-    @Excel(name = "ui.data.column.finishedProductStock.isExceedSixMonth")
+    @Excel(name = "ui.data.column.productStock.isExceedSixMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超6个月胎", name = "isExceedSixMonth")
     @TableField(value = "IS_EXCEED_SIX_MONTH")
     private String isExceedSixMonth;
 
     /** 是否超9个月胎 */
-    @Excel(name = "ui.data.column.finishedProductStock.isExceedNineMonth")
+    @Excel(name = "ui.data.column.productStock.isExceedNineMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超9个月胎", name = "isExceedNineMonth")
     @TableField(value = "IS_EXCEED_NINE_MONTH")
     private String isExceedNineMonth;
 
     /** 是否超12个月胎 */
-    @Excel(name = "ui.data.column.finishedProductStock.isExceedTwelveMonth")
+    @Excel(name = "ui.data.column.productStock.isExceedTwelveMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超12个月胎", name = "isExceedTwelveMonth")
     @TableField(value = "IS_EXCEED_TWELVE_MONTH")
     private String isExceedTwelveMonth;
 
     /** 是否超龄胎 */
-    @Excel(name = "ui.data.column.finishedProductStock.isExceedTire")
-    @ApiModelProperty(value = "是否超龄胎", name = "isExceedTire")
+    @Excel(name = "ui.data.column.productStock.isExceedTire", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否超龄胎 ", name = "isExceedTire")
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
 

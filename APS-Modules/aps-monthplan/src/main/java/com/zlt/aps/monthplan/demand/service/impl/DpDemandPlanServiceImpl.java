@@ -24,15 +24,14 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
-import com.zlt.aps.maindata.service.IMdmFinishStockService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMpFinishedProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
+
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
@@ -40,6 +39,8 @@ import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
+import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
+import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.demand.service.IMpOrderOffsetAllocationService;
 import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -88,13 +89,13 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
-    private final IMpFinishedProductStockService finishedProductStockService;
+    private final IMdmProductStockService mdmProductStockService;
     // 定稿的月度排产计划
     private final IMpMonthPlanProdFinalService mpMonthPlanProdFinalService;
     // 订单分配表
     private final IMpOrderOffsetAllocationService mpOrderOffsetAllocationService;
     // 版本库存
-    private final IMdmFinishStockService mdmFinishStockService;
+    private final IDpStockVersionService dpStockVersionService;
     // 区域产能分配
     private final IMdmAreaCapaAllocationService mdmAreaCapaAllocationService;
     // SKU排产分类
@@ -407,7 +408,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
             CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
 
-        CompletableFuture<List<MpFinishedProductStock>> stocksFuture =
+        CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
 
         CompletableFuture<Map<String, String>> productionTypeFuture =
@@ -427,17 +428,17 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
-            List<MpFinishedProductStock> finishedProductStocks = stocksFuture.get();
+            List<MdmProductStock> finishedProductStocks = stocksFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
 
             // 处理成品库存映射
-            Map<String, List<MpFinishedProductStock>> finishedProductStockMap =
+            Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
-                        .collect(Collectors.groupingBy(MpFinishedProductStock::getGroupKey));
+                        .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
 
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
@@ -466,7 +467,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     private OrderAllocationResult processSalesOrderAllocation(
         String monthPlanVersion,
         List<SalesOrderPool> allocationOrders,
-        Map<String, List<MpFinishedProductStock>> finishedProductStockMap,
+        Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Long> monthSurplusMap) {
 
         if (CollectionUtils.isEmpty(allocationOrders)) {
@@ -507,7 +508,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         }
 
         // 批量插入库存版本
-        mdmFinishStockService.insertBatchData(
+        dpStockVersionService.insertBatchData(
             createCondition, monthPlanVersion, allocationResult.getStockMap());
     }
 
@@ -649,8 +650,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     /**
      * 获取成品库存
      */
-    private List<MpFinishedProductStock> fetchFinishedProductStocks() {
-        return this.finishedProductStockService.findCurrentFinishStock();
+    private List<MdmProductStock> fetchFinishedProductStocks() {
+        return this.mdmProductStockService.findCurrentFinishStock();
     }
 
     /**
@@ -691,7 +692,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MpFinishedProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap) {
+    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -715,7 +716,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         List<DpDemandPlan> groupPlans,
         long minProductionQty,
         Map<String, MdmMaterialInfo> skuMap,
-        Map<String, List<MpFinishedProductStock>> finishedProductStockMap,
+        Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Long> mdmMonthSurplusMap,
         Map<String, String> productionTypeMap) {
 
@@ -779,7 +780,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      */
     private void setStockAndSurplusInfo(
         DpDemandPlan demandPlan,
-        Map<String, List<MpFinishedProductStock>> finishedProductStockMap,
+        Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Long> mdmMonthSurplusMap) {
 
         String factoryMaterialKey = demandPlan.getGroupFactoryAndMaterialKey();
@@ -824,12 +825,12 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
 
 
-    private Long calculateStockQty(Map<String, List<MpFinishedProductStock>> finishedProductStockMap, String groupKey) {
+    private Long calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
         if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
             return BigDecimal.ZERO.longValue();
         }
-        List<MpFinishedProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().mapToLong(MpFinishedProductStock::getStockQty).sum();
+        List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
+        return finishedProductStocks.stream().mapToLong(MdmProductStock::getStockQty).sum();
     }
 
     private Long calculatePlannedSurplus(Map<String, Long> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
@@ -1037,8 +1038,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     @Getter
     private static class DataCollection {
         private final List<SalesOrderPool> salesOrders;
-        private final List<MpFinishedProductStock> finishedProductStocks;
-        private final Map<String, List<MpFinishedProductStock>> finishedProductStockMap;
+        private final List<MdmProductStock> finishedProductStocks;
+        private final Map<String, List<MdmProductStock>> finishedProductStockMap;
         private final Map<String, String> productionTypeMap;
         private final List<SupplyOrderPool> supplyOrderPools;
         private final List<SalesOrderPool> allocationOrders;
@@ -1047,8 +1048,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         public DataCollection(
             List<SalesOrderPool> salesOrders,
-            List<MpFinishedProductStock> finishedProductStocks,
-            Map<String, List<MpFinishedProductStock>> finishedProductStockMap,
+            List<MdmProductStock> finishedProductStocks,
+            Map<String, List<MdmProductStock>> finishedProductStockMap,
             Map<String, String> productionTypeMap,
             List<SupplyOrderPool> supplyOrderPools,
             List<SalesOrderPool> allocationOrders,
@@ -1072,12 +1073,12 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     private static class OrderAllocationResult {
         private final List<MpOrderOffsetAllocation> allocations;
         private final List<MpOrderOffsetAllocation> netDemands;
-        private final Map<String, List<MpFinishedProductStock>> stockMap;
+        private final Map<String, List<MdmProductStock>> stockMap;
 
         public OrderAllocationResult(
             List<MpOrderOffsetAllocation> allocations,
             List<MpOrderOffsetAllocation> netDemands,
-            Map<String, List<MpFinishedProductStock>> stockMap) {
+            Map<String, List<MdmProductStock>> stockMap) {
             this.allocations = allocations != null ? allocations : Collections.emptyList();
             this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
             this.stockMap = stockMap != null ? stockMap : new HashMap<>();

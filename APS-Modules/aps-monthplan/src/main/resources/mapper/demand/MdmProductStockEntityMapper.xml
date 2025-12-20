@@ -2,8 +2,8 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.maindata.mapper.MpFinishedProductStockEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock" id="MpFinishedProductStockResult">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MdmProductStockEntityMapper">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock" id="MdmProductStockResult">
             <result property="id" column="ID"/>
             <result property="factoryCode" column="FACTORY_CODE"/>
             <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
@@ -15,7 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <result property="materialDesc" column="MATERIAL_DESC"/>
             <result property="stockQty" column="STOCK_QTY"/>
             <result property="weekYear" column="WEEK_YEAR"/>
-            <result property="dynamicBalance" column="DYNAMIC_BALANCE"/>
+            <result property="isDynamicBalance" column="IS_DYNAMIC_BALANCE"/>
             <result property="uniformity" column="UNIFORMITY"/>
             <result property="isExceedThreeMonth" column="IS_EXCEED_THREE_MONTH"/>
             <result property="isExceedSixMonth" column="IS_EXCEED_SIX_MONTH"/>
@@ -31,12 +31,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
 
-    <sql id="selectMpFinishedProductStockVo">
-        SELECT ID, FACTORY_CODE, PRODUCT_TYPE_CODE, BRAND, STRUCTURE_NAME, LOCATION_TYPE, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, STOCK_QTY, WEEK_YEAR, DYNAMIC_BALANCE, UNIFORMITY, IS_EXCEED_THREE_MONTH, IS_EXCEED_SIX_MONTH, IS_EXCEED_NINE_MONTH, IS_EXCEED_TWELVE_MONTH, IS_EXCEED_TIRE, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_FINISHED_PRODUCT_STOCK
+    <sql id="selectMdmProductStockVo">
+        SELECT ID, FACTORY_CODE, PRODUCT_TYPE_CODE, BRAND, STRUCTURE_NAME, LOCATION_TYPE, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, STOCK_QTY, WEEK_YEAR, IS_DYNAMIC_BALANCE, UNIFORMITY, IS_EXCEED_THREE_MONTH, IS_EXCEED_SIX_MONTH, IS_EXCEED_NINE_MONTH, IS_EXCEED_TWELVE_MONTH, IS_EXCEED_TIRE, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MDM_PRODUCT_STOCK
     </sql>
 
-    <select id="selectMpFinishedProductStockList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock" resultMap="MpFinishedProductStockResult">
-        <include refid="selectMpFinishedProductStockVo"/>
+    <select id="selectMdmProductStockList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock" resultMap="MdmProductStockResult">
+        <include refid="selectMdmProductStockVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
         <if test="productTypeCode != null  and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
@@ -48,7 +48,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="materialDesc != null  and materialDesc != ''"> AND MATERIAL_DESC = #{materialDesc}</if>
         <if test="stockQty != null "> AND STOCK_QTY = #{stockQty}</if>
         <if test="weekYear != null  and weekYear != ''"> AND WEEK_YEAR = #{weekYear}</if>
-        <if test="dynamicBalance != null  and dynamicBalance != ''"> AND DYNAMIC_BALANCE = #{dynamicBalance}</if>
+        <if test="isDynamicBalance != null  and isDynamicBalance != ''"> AND IS_DYNAMIC_BALANCE = #{isDynamicBalance}</if>
         <if test="uniformity != null  and uniformity != ''"> AND UNIFORMITY = #{uniformity}</if>
         <if test="isExceedThreeMonth != null  and isExceedThreeMonth != ''"> AND IS_EXCEED_THREE_MONTH = #{isExceedThreeMonth}</if>
         <if test="isExceedSixMonth != null  and isExceedSixMonth != ''"> AND IS_EXCEED_SIX_MONTH = #{isExceedSixMonth}</if>
@@ -57,15 +57,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="isExceedTire != null  and isExceedTire != ''"> AND IS_EXCEED_TIRE = #{isExceedTire}</if>
     </select>
 
-    <select id="selectMpFinishedProductStockById" parameterType="Long" resultMap="MpFinishedProductStockResult">
-        <include refid="selectMpFinishedProductStockVo"/>
+    <select id="selectMdmProductStockById" parameterType="Long" resultMap="MdmProductStockResult">
+        <include refid="selectMdmProductStockVo"/>
         WHERE ID = #{id}
     </select>
 
-    <select id="selectMpFinishedProductStockByIds" parameterType="list"
-            resultMap="MpFinishedProductStockResult">
+    <select id="selectMdmProductStockByIds" parameterType="list"
+            resultMap="MdmProductStockResult">
 
-        <include refid="selectMpFinishedProductStockVo"/>
+        <include refid="selectMdmProductStockVo"/>
            WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{id}
@@ -73,8 +73,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     </select>
 
-    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock">
-        INSERT INTO T_MP_FINISHED_PRODUCT_STOCK
+    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock">
+        INSERT INTO T_MDM_PRODUCT_STOCK
         <trim prefix="(" suffix=")" suffixOverrides=",">
             ID,
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE,</if>
@@ -87,7 +87,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="materialDesc != null">MATERIAL_DESC,</if>
             <if test="stockQty != null">STOCK_QTY,</if>
             <if test="weekYear != null">WEEK_YEAR,</if>
-            <if test="dynamicBalance != null">DYNAMIC_BALANCE,</if>
+            <if test="isDynamicBalance != null">IS_DYNAMIC_BALANCE,</if>
             <if test="uniformity != null">UNIFORMITY,</if>
             <if test="isExceedThreeMonth != null">IS_EXCEED_THREE_MONTH,</if>
             <if test="isExceedSixMonth != null">IS_EXCEED_SIX_MONTH,</if>
@@ -102,7 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">UPDATE_BY,</if>
          </trim>
         <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
-            SEQ_INISHED_PRODUCT_STOCK.NEXTVAL,
+            SEQ_PRODUCT_STOCK.NEXTVAL,
             <if test="factoryCode != null and factoryCode != ''">#{factoryCode},</if>
             <if test="productTypeCode != null">#{productTypeCode},</if>
             <if test="brand != null">#{brand},</if>
@@ -113,7 +113,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="materialDesc != null">#{materialDesc},</if>
             <if test="stockQty != null">#{stockQty},</if>
             <if test="weekYear != null">#{weekYear},</if>
-            <if test="dynamicBalance != null">#{dynamicBalance},</if>
+            <if test="isDynamicBalance != null">#{isDynamicBalance},</if>
             <if test="uniformity != null">#{uniformity},</if>
             <if test="isExceedThreeMonth != null">#{isExceedThreeMonth},</if>
             <if test="isExceedSixMonth != null">#{isExceedSixMonth},</if>
@@ -129,8 +129,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
     </insert>
 
-    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock">
-        UPDATE T_MP_FINISHED_PRODUCT_STOCK
+    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock">
+        UPDATE T_MDM_PRODUCT_STOCK
         <trim prefix="SET" suffixOverrides=",">
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE = #{factoryCode},</if>
             <if test="productTypeCode != null">PRODUCT_TYPE_CODE = #{productTypeCode},</if>
@@ -142,7 +142,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="materialDesc != null">MATERIAL_DESC = #{materialDesc},</if>
             <if test="stockQty != null">STOCK_QTY = #{stockQty},</if>
             <if test="weekYear != null">WEEK_YEAR = #{weekYear},</if>
-            <if test="dynamicBalance != null">DYNAMIC_BALANCE = #{dynamicBalance},</if>
+            <if test="isDynamicBalance != null">IS_DYNAMIC_BALANCE = #{isDynamicBalance},</if>
             <if test="uniformity != null">UNIFORMITY = #{uniformity},</if>
             <if test="isExceedThreeMonth != null">IS_EXCEED_THREE_MONTH = #{isExceedThreeMonth},</if>
             <if test="isExceedSixMonth != null">IS_EXCEED_SIX_MONTH = #{isExceedSixMonth},</if>
@@ -159,15 +159,110 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ID = #{id}
     </update>
 
-    <delete id="deleteMpFinishedProductStockById" parameterType="Long">
-        UPDATE T_MP_FINISHED_PRODUCT_STOCK SET IS_DELETE = 1 WHERE ID = #{id}
+    <delete id="deleteMdmProductStockById" parameterType="Long">
+        UPDATE T_MDM_PRODUCT_STOCK SET IS_DELETE = 1 WHERE ID = #{id}
     </delete>
 
-    <delete id="deleteMpFinishedProductStockByIds" parameterType="String">
-        UPDATE T_MP_FINISHED_PRODUCT_STOCK SET IS_DELETE = 1 WHERE ID IN
+    <delete id="deleteMdmProductStockByIds" parameterType="String">
+        UPDATE T_MDM_PRODUCT_STOCK SET IS_DELETE = 1 WHERE ID IN
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
 
+
+    <update id="mergeSql" parameterType="list">
+        MERGE INTO T_MDM_PRODUCT_STOCK a USING (
+        <foreach collection="list" item="item" separator=" union ">
+            SELECT
+            #{item.id, jdbcType=DOUBLE} id,
+            #{item.factoryCode,jdbcType=VARCHAR} factory_code,
+            #{item.productTypeCode,jdbcType=VARCHAR} product_type_code,
+            #{item.brand,jdbcType=VARCHAR} brand,
+            #{item.structureName,jdbcType=VARCHAR} structure_name,
+            #{item.locationType,jdbcType=VARCHAR} location_type,
+            #{item.mesMaterialCode,jdbcType=VARCHAR} mes_material_code,
+            #{item.materialCode,jdbcType=VARCHAR} material_code,
+            #{item.materialDesc,jdbcType=VARCHAR} material_desc,
+            #{item.stockQty,} stock_qty,
+            #{item.weekYear,jdbcType=VARCHAR} week_year,
+            #{item.isDynamicBalance,jdbcType=VARCHAR} is_dynamic_balance,
+            #{item.uniformity,jdbcType=VARCHAR} uniformity,
+            #{item.isExceedThreeMonth,jdbcType=VARCHAR} is_exceed_three_month,
+            #{item.isExceedSixMonth,jdbcType=VARCHAR} is_exceed_six_month,
+            #{item.isExceedNineMonth,jdbcType=VARCHAR} is_exceed_nine_month,
+            #{item.isExceedTwelveMonth,jdbcType=VARCHAR} is_exceed_twelve_month,
+            #{item.isExceedTire,jdbcType=VARCHAR} is_exceed_tire,
+            #{item.remark,jdbcType=VARCHAR} remark,
+            #{item.isDelete,} is_delete,
+            #{item.createTime, jdbcType=DATE} create_time,
+            #{item.updateTime, jdbcType=DATE} update_time,
+            #{item.createBy,jdbcType=VARCHAR} create_by,
+            #{item.updateBy,jdbcType=VARCHAR} update_by,
+            FROM dual
+        </foreach>
+        ) b ON (
+        此处需要手动关联唯一性条件
+        AND a.IS_DELETE = 0 )
+        WHEN MATCHED THEN
+        UPDATE
+        <set>
+            a.ID = b.ID
+,
+            a.FACTORY_CODE = b.FACTORY_CODE
+,
+            a.PRODUCT_TYPE_CODE = b.PRODUCT_TYPE_CODE
+,
+            a.BRAND = b.BRAND
+,
+            a.STRUCTURE_NAME = b.STRUCTURE_NAME
+,
+            a.LOCATION_TYPE = b.LOCATION_TYPE
+,
+            a.MES_MATERIAL_CODE = b.MES_MATERIAL_CODE
+,
+            a.MATERIAL_CODE = b.MATERIAL_CODE
+,
+            a.MATERIAL_DESC = b.MATERIAL_DESC
+,
+            a.STOCK_QTY = b.STOCK_QTY
+,
+            a.WEEK_YEAR = b.WEEK_YEAR
+,
+            a.IS_DYNAMIC_BALANCE = b.IS_DYNAMIC_BALANCE
+,
+            a.UNIFORMITY = b.UNIFORMITY
+,
+            a.IS_EXCEED_THREE_MONTH = b.IS_EXCEED_THREE_MONTH
+,
+            a.IS_EXCEED_SIX_MONTH = b.IS_EXCEED_SIX_MONTH
+,
+            a.IS_EXCEED_NINE_MONTH = b.IS_EXCEED_NINE_MONTH
+,
+            a.IS_EXCEED_TWELVE_MONTH = b.IS_EXCEED_TWELVE_MONTH
+,
+            a.IS_EXCEED_TIRE = b.IS_EXCEED_TIRE
+,
+            a.REMARK = b.REMARK
+,
+            a.IS_DELETE = b.IS_DELETE
+,
+            a.CREATE_TIME = b.CREATE_TIME
+,
+            a.UPDATE_TIME = sysdate
+,
+            a.CREATE_BY = b.CREATE_BY
+,
+            a.UPDATE_BY = b.CREATE_BY
+,
+            需删除 a.ID = b.ID, a.CREATE_BY = b.CREATE_BY,a.CREATE_TIME = b.CREATE_TIME,
+        </set>
+        WHEN NOT MATCHED THEN
+        INSERT (
+ a.ID, a.FACTORY_CODE, a.PRODUCT_TYPE_CODE, a.BRAND, a.STRUCTURE_NAME, a.LOCATION_TYPE, a.MES_MATERIAL_CODE, a.MATERIAL_CODE, a.MATERIAL_DESC, a.STOCK_QTY, a.WEEK_YEAR, a.IS_DYNAMIC_BALANCE, a.UNIFORMITY, a.IS_EXCEED_THREE_MONTH, a.IS_EXCEED_SIX_MONTH, a.IS_EXCEED_NINE_MONTH, a.IS_EXCEED_TWELVE_MONTH, a.IS_EXCEED_TIRE, a.REMARK, a.IS_DELETE, a.CREATE_TIME, a.UPDATE_TIME, a.CREATE_BY, a.UPDATE_BY,            需删除 a.UPDATE_BY,a.UPDATE_TIME
+        )
+        values (
+ SEQ_PUBLIC.NEXTVAL,  b.FACTORY_CODE,   b.PRODUCT_TYPE_CODE,   b.BRAND,   b.STRUCTURE_NAME,   b.LOCATION_TYPE,   b.MES_MATERIAL_CODE,   b.MATERIAL_CODE,   b.MATERIAL_DESC,   b.STOCK_QTY,   b.WEEK_YEAR,   b.IS_DYNAMIC_BALANCE,   b.UNIFORMITY,   b.IS_EXCEED_THREE_MONTH,   b.IS_EXCEED_SIX_MONTH,   b.IS_EXCEED_NINE_MONTH,   b.IS_EXCEED_TWELVE_MONTH,   b.IS_EXCEED_TIRE,   b.REMARK,   0,  sysdate,  b.UPDATE_TIME,   b.CREATE_BY,   b.UPDATE_BY,              需将SEQ_PUBLIC更换为对应序列,并删除 b.UPDATE_BY,b.UPDATE_TIME
+        )
+    </update>
 </mapper>

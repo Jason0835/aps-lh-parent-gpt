@@ -2,7 +2,8 @@ package com.zlt.aps.monthplan.factory.helper;
 
 
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+
 import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import lombok.AllArgsConstructor;
@@ -38,7 +39,7 @@ public class StockAllocationHelper {
   public static List<MpOrderOffsetAllocation> calculateStockAllocation(
       String monthPlanVersion,
       Map<String, List<SalesOrderPool>> saleOrderGroupMap,
-      Map<String,List<MpFinishedProductStock>> finishedProductStockMap,
+      Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Long> mdmMonthSurplusMap) {
     List<MpOrderOffsetAllocation> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(saleOrderGroupMap)) {
@@ -66,11 +67,11 @@ public class StockAllocationHelper {
    */
   private static List<MpOrderOffsetAllocation> processOrderGroup(
       String monthPlanVersion,
-      Map<String,List<MpFinishedProductStock>> finishedProductStockMap,
+      Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Long> mdmMonthSurplusMap,
       String groupKey,
       List<SalesOrderPool> saleOrders) {
-    List<MpFinishedProductStock> stockInfos = finishedProductStockMap.get(groupKey);
+    List<MdmProductStock> stockInfos = finishedProductStockMap.get(groupKey);
     // 无库存情况处理
     if (CollectionUtils.isEmpty(stockInfos)) {
       log.warn("No stock found for group: {}", groupKey);
@@ -211,7 +212,7 @@ public class StockAllocationHelper {
   /**
    * 为订单列表执行库存分配
    */
-  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,String groupKey,Map<String,Long> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MpFinishedProductStock> stockInfos) {
+  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,String groupKey,Map<String,Long> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
     Long plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0L);
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
@@ -244,7 +245,7 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static MpOrderOffsetAllocation allocateStockForSingleOrder(String monthPlanVersion,SalesOrderPool order, StockAllocationContext context) {
-    long stockQty = context.getStockInfos().stream().mapToLong(MpFinishedProductStock::getLeftOverQty).sum();
+    long stockQty = context.getStockInfos().stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
     // 库存分配量
@@ -281,7 +282,7 @@ public class StockAllocationHelper {
    * 计算单个订单的分配数量
    */
   private static long calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
-    List<MpFinishedProductStock> stockInfos = context.getStockInfos();
+    List<MdmProductStock> stockInfos = context.getStockInfos();
     // 订单有年周号要求
     if(StringUtils.isNotBlank(order.getWeekYear())) {
         return reduceInventoryByWeekYear(
@@ -311,7 +312,7 @@ public class StockAllocationHelper {
    * @param stockInfos 库存
    * @return 冲减结果
    */
-  private static long reduceInventoryByWeekYear(SalesOrderPool order, List<MpFinishedProductStock> stockInfos) {
+  private static long reduceInventoryByWeekYear(SalesOrderPool order, List<MdmProductStock> stockInfos) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
@@ -319,7 +320,7 @@ public class StockAllocationHelper {
     }
     int orderWeekYear = Integer.parseInt(order.getWeekYear());
     // 3. 过滤和排序库存
-    List<MpFinishedProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
+    List<MdmProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
       return BigDecimal.ZERO.longValue();
@@ -329,14 +330,14 @@ public class StockAllocationHelper {
     return orderQty.subtract(detail.getRemainingOrderQty()).longValue();
   }
 
-  private static long reduceInventory(SalesOrderPool order, List<MpFinishedProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
+  private static long reduceInventory(SalesOrderPool order, List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
       return BigDecimal.ZERO.longValue();
     }
     // 3. 过滤和排序库存
-    List<MpFinishedProductStock> eligibleStocks = intelligentStockSelection(stockInfos, requiresDynamicBalance,requiresUniformity);
+    List<MdmProductStock> eligibleStocks = intelligentStockSelection(stockInfos, requiresDynamicBalance,requiresUniformity);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
       return BigDecimal.ZERO.longValue();
@@ -350,8 +351,8 @@ public class StockAllocationHelper {
   /**
    * 高级算法：智能动平衡库存选择（考虑多个维度）
    */
-  private static List<MpFinishedProductStock> intelligentStockSelection(
-      List<MpFinishedProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
+  private static List<MdmProductStock> intelligentStockSelection(
+      List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
     return stockInfos.stream()
         .filter(StockAllocationHelper::isValidStock)
         .sorted(buildIntelligentComparator(requiresDynamicBalance,requiresUniformity))
@@ -361,7 +362,7 @@ public class StockAllocationHelper {
   /**
    * 判断库存是否有效
    */
-  private static boolean isValidStock(MpFinishedProductStock stock) {
+  private static boolean isValidStock(MdmProductStock stock) {
     return stock.getLeftOverQty() != null
         && stock.getLeftOverQty() > 0;
   }
@@ -369,9 +370,9 @@ public class StockAllocationHelper {
   /**
    * 构建智能比较器
    */
-  private static Comparator<MpFinishedProductStock> buildIntelligentComparator(
+  private static Comparator<MdmProductStock> buildIntelligentComparator(
       boolean requiresDynamicBalance,boolean requiresUniformity) {
-    List<Comparator<MpFinishedProductStock>> comparators = new ArrayList<>();
+    List<Comparator<MdmProductStock>> comparators = new ArrayList<>();
     if (requiresDynamicBalance) {
       // 优先级1：动平衡库存优先
       comparators.add(Comparator.comparing(
@@ -386,35 +387,35 @@ public class StockAllocationHelper {
     }
     // 优先级3：库存数量大的优先（提高冲减效率）
     comparators.add(Comparator.comparing(
-        MpFinishedProductStock::getLeftOverQty,
+        MdmProductStock::getLeftOverQty,
         Comparator.reverseOrder()
     ));
     // 优先级4：库存ID小的优先（先进先出，假设ID递增）
-    comparators.add(Comparator.comparing(MpFinishedProductStock::getId));
+    comparators.add(Comparator.comparing(MdmProductStock::getId));
     // 组合所有比较器
-    Comparator<MpFinishedProductStock> result = null;
-    for (Comparator<MpFinishedProductStock> comparator : comparators) {
+    Comparator<MdmProductStock> result = null;
+    for (Comparator<MdmProductStock> comparator : comparators) {
       if (result == null) {
         result = comparator;
       } else {
         result = result.thenComparing(comparator);
       }
     }
-    return result != null ? result : Comparator.comparing(MpFinishedProductStock::getId);
+    return result != null ? result : Comparator.comparing(MdmProductStock::getId);
   }
 
   /**
    * 判断库存是否为动平衡库存
    */
-  private static boolean isDynamicBalanceStock(MpFinishedProductStock stock) {
-    return YesOrNoEnum.YES.getCode().equals(stock.getDynamicBalance());
+  private static boolean isDynamicBalanceStock(MdmProductStock stock) {
+    return YesOrNoEnum.YES.getCode().equals(stock.getIsDynamicBalance());
   }
 
   /**
    * 判断库存是否为均匀性库存
    */
-  private static boolean isUniformityStock(MpFinishedProductStock stock) {
-    return YesOrNoEnum.YES.getCode().equals(stock.getUniformity());
+  private static boolean isUniformityStock(MdmProductStock stock) {
+    return YesOrNoEnum.YES.getCode().equals(stock.getIsUniformity());
   }
 
 
@@ -423,12 +424,12 @@ public class StockAllocationHelper {
    * 执行冲减逻辑
    */
   private static ReductionDetail performReduction(
-      List<MpFinishedProductStock> eligibleStocks,
+      List<MdmProductStock> eligibleStocks,
       BigDecimal orderQty) {
     ReductionDetail detail = new ReductionDetail();
     BigDecimal remainingQty = orderQty;
     List<ReductionItem> reductionItems = new ArrayList<>();
-    for (MpFinishedProductStock stock : eligibleStocks) {
+    for (MdmProductStock stock : eligibleStocks) {
       if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
         break;
       }
@@ -459,8 +460,8 @@ public class StockAllocationHelper {
     return detail;
   }
 
-  private static List<MpFinishedProductStock> filterAndSortStocksByWeekYear(List<MpFinishedProductStock> stockInfos, int orderWeekYear) {
-    List<MpFinishedProductStock> result =  stockInfos.stream()
+  private static List<MdmProductStock> filterAndSortStocksByWeekYear(List<MdmProductStock> stockInfos, int orderWeekYear) {
+    List<MdmProductStock> result =  stockInfos.stream()
         // 过滤：库存年周号晚于订单年周号
         .filter(stock -> {
           if (StringUtils.isBlank(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
@@ -476,7 +477,7 @@ public class StockAllocationHelper {
         return Collections.emptyList();
       }
      // 排序：年周号从早到晚（升序）
-      result.sort(Comparator.comparing(MpFinishedProductStock::getStockWeekYear));
+      result.sort(Comparator.comparing(MdmProductStock::getStockWeekYear));
       return result;
   }
 
@@ -515,9 +516,9 @@ public class StockAllocationHelper {
   @Getter
   private static class StockAllocationContext {
     private Long plannedSurplus;
-    private List<MpFinishedProductStock> stockInfos;
+    private List<MdmProductStock> stockInfos;
 
-    public StockAllocationContext(Long plannedSurplus,List<MpFinishedProductStock> stockInfos) {
+    public StockAllocationContext(Long plannedSurplus,List<MdmProductStock> stockInfos) {
       this.plannedSurplus = plannedSurplus;
       this.stockInfos = stockInfos;
     }

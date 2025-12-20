@@ -1,13 +1,13 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.monthplan.demand.service.impl;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MpFinishedProductStockEntityMapper;
-import com.zlt.aps.maindata.service.IMpFinishedProductStockService;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.demand.mapper.MdmProductStockEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.ruoyi.common.datasource.service.BaseService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +23,10 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpFinishedProductStockServiceImpl.java
- * 描    述：MpFinishedProductStockServiceImpl成品库存业务层处理
+ * 文件名称：MdmProductStockServiceImpl.java
+ * 描    述：MdmProductStockServiceImpl成品库存业务层处理
  *@author yelq
- *@date 2025-12-15
+ *@date 2025-12-20
  *@version 1.0
  *
  *  修改记录：
@@ -36,10 +36,10 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
  */
 @Slf4j
 @Service
-public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedProductStock>  implements IMpFinishedProductStockService
+public class MdmProductStockServiceImpl extends BaseService<MdmProductStock>  implements IMdmProductStockService
 {
     @Autowired
-    private MpFinishedProductStockEntityMapper mpFinishedProductStockEntityMapper;
+    private MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
 
 
@@ -50,21 +50,21 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @return 成品库存
      */
     @Override
-    public MpFinishedProductStock selectMpFinishedProductStockById(Long id)
+    public MdmProductStock selectMdmProductStockById(Long id)
     {
-        return mpFinishedProductStockEntityMapper.selectMpFinishedProductStockById(id);
+        return mdmProductStockEntityMapper.selectMdmProductStockById(id);
     }
 
     /**
      * 查询成品库存列表
      * 
-     * @param mpFinishedProductStock 成品库存
+     * @param mdmProductStock 成品库存
      * @return 成品库存
      */
     @Override
-    public List<MpFinishedProductStock> selectMpFinishedProductStockList(MpFinishedProductStock mpFinishedProductStock)
+    public List<MdmProductStock> selectMdmProductStockList(MdmProductStock mdmProductStock)
     {
-        return mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(mpFinishedProductStock);
+        return mdmProductStockEntityMapper.selectMdmProductStockList(mdmProductStock);
     }
 
     /**
@@ -74,10 +74,10 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @return 成品库存集合
      */
     @Override
-    public List<MpFinishedProductStock> selectMpFinishedProductStockByIds(List<Long> ids)
+    public List<MdmProductStock> selectMdmProductStockByIds(List<Long> ids)
     {
         return super.executeSelectIn(
-                    mpFinishedProductStockEntityMapper::selectMpFinishedProductStockByIds
+                    mdmProductStockEntityMapper::selectMdmProductStockByIds
                     ,ids
         );
     }
@@ -86,27 +86,27 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
     /**
      * 新增成品库存
      * 
-     * @param mpFinishedProductStock 成品库存
+     * @param mdmProductStock 成品库存
      * @return 结果
      */
     @Override
-    public int insertMpFinishedProductStock(MpFinishedProductStock mpFinishedProductStock)
+    public int insertMdmProductStock(MdmProductStock mdmProductStock)
     {
-        mpFinishedProductStock.setBaseVale(null);
-        return mpFinishedProductStockEntityMapper.insert(mpFinishedProductStock);
+        mdmProductStock.setBaseVale(null);
+        return mdmProductStockEntityMapper.insert(mdmProductStock);
     }
 
     /**
      * 修改成品库存
      * 
-     * @param mpFinishedProductStock 成品库存
+     * @param mdmProductStock 成品库存
      * @return 结果
      */
     @Override
-    public int updateMpFinishedProductStock(MpFinishedProductStock mpFinishedProductStock)
+    public int updateMdmProductStock(MdmProductStock mdmProductStock)
     {
-        mpFinishedProductStock.setBaseVale(mpFinishedProductStock.getId());
-        return mpFinishedProductStockEntityMapper.update(mpFinishedProductStock);
+        mdmProductStock.setBaseVale(mdmProductStock.getId());
+        return mdmProductStockEntityMapper.update(mdmProductStock);
     }
 
     /**
@@ -116,9 +116,9 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @return 结果
      */
     @Override
-    public int deleteMpFinishedProductStockByIds(Long[] ids)
+    public int deleteMdmProductStockByIds(Long[] ids)
     {
-        return mpFinishedProductStockEntityMapper.deleteMpFinishedProductStockByIds(ids);
+        return mdmProductStockEntityMapper.deleteMdmProductStockByIds(ids);
     }
 
     /**
@@ -128,11 +128,11 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @return 结果
      */
     @Override
-    public int deleteMpFinishedProductStockByIds(List<Long> ids)
+    public int deleteMdmProductStockByIds(List<Long> ids)
     {
         Long[] arrayids = ids.toArray(new Long[0]);
 
-        return this.deleteMpFinishedProductStockByIds(arrayids);
+        return this.deleteMdmProductStockByIds(arrayids);
     }
 
     /**
@@ -142,39 +142,39 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @return 结果
      */
     @Override
-    public int deleteMpFinishedProductStockById(Long id)
+    public int deleteMdmProductStockById(Long id)
     {
-        return mpFinishedProductStockEntityMapper.deleteMpFinishedProductStockById(id);
+        return mdmProductStockEntityMapper.deleteMdmProductStockById(id);
     }
 
     @Override
-    public void insertBatchData(Collection<MpFinishedProductStock> dataList) {
+    public void insertBatchData(Collection<MdmProductStock> dataList) {
 
-        this.insertBatchData(dataList, MpFinishedProductStockEntityMapper.class);
+        this.insertBatchData(dataList, MdmProductStockEntityMapper.class);
     }
 
     @Override
-    public void updateBatchData(Collection<MpFinishedProductStock> dataList) {
+    public void updateBatchData(Collection<MdmProductStock> dataList) {
 
-        this.updateBatchData(dataList, MpFinishedProductStockEntityMapper.class);
+        this.updateBatchData(dataList, MdmProductStockEntityMapper.class);
     }
 
     @Override
-    public void mergerIntoBatchData(List<MpFinishedProductStock> list) {
-        this.mergerIntoBatchData(list, MpFinishedProductStockEntityMapper.class);
+    public void mergerIntoBatchData(List<MdmProductStock> list) {
+        this.mergerIntoBatchData(list, MdmProductStockEntityMapper.class);
     }
 
     /**
      * 校验成品库存唯一性
      */
     @Override
-    public String checkMpFinishedProductStockUnique(MpFinishedProductStock mpFinishedProductStock) {
-        if (mpFinishedProductStock == null) {
+    public String checkMdmProductStockUnique(MdmProductStock mdmProductStock) {
+        if (mdmProductStock == null) {
             return UserConstants.NOT_UNIQUE;
         }
-        List<MpFinishedProductStock> list = mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(mpFinishedProductStock);
+        List<MdmProductStock> list = mdmProductStockEntityMapper.selectMdmProductStockList(mdmProductStock);
         if (CollectionUtils.isNotEmpty(list)) {
-            long iCount = list.stream().filter(x->!x.getId().equals(mpFinishedProductStock.getId())).count();
+            long iCount = list.stream().filter(x->!x.getId().equals(mdmProductStock.getId())).count();
             return iCount == 0 ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
@@ -187,26 +187,26 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
      * @param importLogId   导入日志id
      */
     @Override
-    public AjaxResult importData(List<MpFinishedProductStock> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<MdmProductStock> list, boolean updateSupport, Long importLogId) {
         //初始化
         int successNum = 0;
         int failureNum = 0;
-        List<MpFinishedProductStock> importList = new ArrayList<>();
+        List<MdmProductStock> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
 
         //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            MpFinishedProductStock mpFinishedProductStock = list.get(i);
-            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, mpFinishedProductStock);
-            ImportExcelValidatedUtils.validatedRepeat(list,mpFinishedProductStock,i,2,importLogId,validated);
+            MdmProductStock mdmProductStock = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, mdmProductStock);
+            ImportExcelValidatedUtils.validatedRepeat(list,mdmProductStock,i,2,importLogId,validated);
             if (CollectionUtils.isNotEmpty(validated)) {
-                mpFinishedProductStock.setId(-999L);
+                mdmProductStock.setId(-999L);
                 failureNum++;
                 importErrorLogs.addAll(validated);
             } else{
-                mpFinishedProductStock.setBaseVale(null);
-                importList.add(mpFinishedProductStock);
+                mdmProductStock.setBaseVale(null);
+                importList.add(mdmProductStock);
             }
         }
 
@@ -214,19 +214,19 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
             //勾选更新记录，调用mergeOrInsert
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
-                    mpFinishedProductStockEntityMapper.mergeSql(importList);
+                    mdmProductStockEntityMapper.mergeSql(importList);
             } else {
                 //唯一则新增
                 for (int i = 0; i < list.size(); i++) {
-                    MpFinishedProductStock mpFinishedProductStock = list.get(i);
+                    MdmProductStock mdmProductStock = list.get(i);
                     // 错误记录跳过
-                    if (mpFinishedProductStock.getId() != null && mpFinishedProductStock.getId().equals(-999L)) {
+                    if (mdmProductStock.getId() != null && mdmProductStock.getId().equals(-999L)) {
                         continue;
                     }
-                    String unique = this.checkMpFinishedProductStockUnique(mpFinishedProductStock);
+                    String unique = this.checkMdmProductStockUnique(mdmProductStock);
                     if (UserConstants.UNIQUE.equals(unique)) {
                         successNum++;
-                        this.insertMpFinishedProductStock(mpFinishedProductStock);
+                        this.insertMdmProductStock(mdmProductStock);
                     } else {
                         failureNum++;
                         //TODO:此处需手动填写唯一校验失败国际化信息
@@ -252,17 +252,17 @@ public class MpFinishedProductStockServiceImpl extends BaseService<MpFinishedPro
     }
 
     @Override
-    public List<MpFinishedProductStock> findCurrentFinishStock() {
-        MpFinishedProductStock param = new MpFinishedProductStock();
+    public List<MdmProductStock> findCurrentFinishStock() {
+        MdmProductStock param = new MdmProductStock();
         param.setIsDelete(YesOrNoEnum.NO.getValue());
-        return this.mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(param);
+        return this.mdmProductStockEntityMapper.selectMdmProductStockList(param);
     }
 
     @Override
-    public List<MpFinishedProductStock> getMpFinishedProductStockByMaterialCode(String materialCode) {
-        MpFinishedProductStock param = new MpFinishedProductStock();
+    public List<MdmProductStock> getMpFinishedProductStockByMaterialCode(String materialCode) {
+        MdmProductStock param = new MdmProductStock();
         param.setMaterialCode(materialCode);
         param.setIsDelete(YesOrNoEnum.NO.getValue());
-        return this.mpFinishedProductStockEntityMapper.selectMpFinishedProductStockList(param);
+        return this.mdmProductStockEntityMapper.selectMdmProductStockList(param);
     }
 }

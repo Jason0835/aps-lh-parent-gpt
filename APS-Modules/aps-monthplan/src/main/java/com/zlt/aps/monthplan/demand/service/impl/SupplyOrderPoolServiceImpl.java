@@ -25,18 +25,18 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
-import com.zlt.aps.maindata.service.IMpFinishedProductStockService;
 import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.demand.service.IMpOverdueSkuService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
@@ -84,7 +84,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
     // 月均销量
     private final IMpMonthlySaleQtyService monthlySaleQtyService;
     // 成品库存
-    private final IMpFinishedProductStockService finishedProductStockService;
+    private final IMdmProductStockService mdmProductStockService;
     // 销售订单
     private final ISalesOrderPoolService salesOrderPoolService;
     // 定稿的月度排产计划
@@ -342,8 +342,8 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         List<SupplyOrderPool> supplyOrderPools = Lists.newArrayList();
         Map<String,MdmMaterialInfo> sku2StructureMap  = sku2Structure(materialInfos);
         Map<String, Integer> structure2TurnoverMonthMap = structure2TurnoverMonth(cycleSchStruConfs);
-        List<MpFinishedProductStock> finishedProductStocks = this.finishedProductStockService.findCurrentFinishStock();
-        Map<String,List<MpFinishedProductStock>> finishedProductStockMap = this.getFinishedProductMap(finishedProductStocks);
+        List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.findCurrentFinishStock();
+        Map<String,List<MdmProductStock>> finishedProductStockMap = this.getFinishedProductMap(finishedProductStocks);
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
@@ -406,8 +406,8 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         List<SupplyOrderPool> supplyOrderPools = Lists.newArrayList();
         Map<String,MdmMaterialInfo> sku2StructureMap  = sku2Structure(materialInfos);
         Map<String, Integer> structure2TurnoverMonthMap = structure2TurnoverMonth(cycleSchStruConfs);
-        List<MpFinishedProductStock> finishedProductStocks = this.finishedProductStockService.findCurrentFinishStock();
-        Map<String,List<MpFinishedProductStock>> finishedProductStockMap  = this.getFinishedProductMap(finishedProductStocks);
+        List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.findCurrentFinishStock();
+        Map<String,List<MdmProductStock>> finishedProductStockMap  = this.getFinishedProductMap(finishedProductStocks);
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
@@ -458,12 +458,12 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
       supplyOrderPool.setStockLimit(stockLimit);
     }
     //   (3)通过成品库存表，获取超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
-    List<MpFinishedProductStock> finishedProductStocks = this.finishedProductStockService.getMpFinishedProductStockByMaterialCode(supplyOrderPool.getMaterialCode());
+    List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.getMpFinishedProductStockByMaterialCode(supplyOrderPool.getMaterialCode());
     if(CollectionUtils.isNotEmpty(finishedProductStocks)) {
-      long threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      long sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      long nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      long twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
+      long threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      long sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      long nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      long twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MdmProductStock::getStockQty).sum();
       supplyOrderPool.setThreeOverdueStockQty(threeOverdueStockQty);
       supplyOrderPool.setSixOverdueStockQty(sixOverdueStockQty);
       supplyOrderPool.setNightOverdueStockQty(nightOverdueStockQty);
@@ -565,17 +565,17 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         ));
   }
 
-  private Map<String,List<MpFinishedProductStock>> getFinishedProductMap(List<MpFinishedProductStock> finishedProductStocks) {
+  private Map<String,List<MdmProductStock>> getFinishedProductMap(List<MdmProductStock> finishedProductStocks) {
     if (CollectionUtils.isEmpty(finishedProductStocks)) {
       return Collections.emptyMap();
     }
     return finishedProductStocks.stream()
         .filter(Objects::nonNull)
         .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()))
-        .collect(Collectors.groupingBy(MpFinishedProductStock::getMaterialCode));
+        .collect(Collectors.groupingBy(MdmProductStock::getMaterialCode));
   }
 
-  public Map<String, Long> convertToGroupedSumStockQtyMap(List<MpFinishedProductStock> finishedProductStocks) {
+  public Map<String, Long> convertToGroupedSumStockQtyMap(List<MdmProductStock> finishedProductStocks) {
     if (CollectionUtils.isEmpty(finishedProductStocks)) {
       return Collections.emptyMap();
     }
@@ -587,10 +587,10 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
             stock -> createCompositeKey(
                 stock.getMaterialCode(),
                 stock.getWeekYear(),
-                stock.getDynamicBalance(),
-                stock.getUniformity()
+                stock.getIsDynamicBalance(),
+                stock.getIsUniformity()
             ),
-            Collectors.summingLong(MpFinishedProductStock::getStockQty)
+            Collectors.summingLong(MdmProductStock::getStockQty)
         ));
   }
 
@@ -620,7 +620,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         ));
   }
 
-  private SupplyOrderPool buildSupplyOrderPool(String materialCode,Map<String,MdmMaterialInfo> sku2StructureMap,Map<String,MpMonthlySaleQty> sku2AverageSaleQty,Map<String, Integer> structure2TurnoverMonthMap,Map<String, Long> stockMap,Map<String, Long> saleOrderMap,Map<String,List<MpFinishedProductStock>> finishedProductStockMap,Map<String,Integer> countSkuMap) {
+  private SupplyOrderPool buildSupplyOrderPool(String materialCode,Map<String,MdmMaterialInfo> sku2StructureMap,Map<String,MpMonthlySaleQty> sku2AverageSaleQty,Map<String, Integer> structure2TurnoverMonthMap,Map<String, Long> stockMap,Map<String, Long> saleOrderMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> countSkuMap) {
          SupplyOrderPool entity = new SupplyOrderPool();
          MdmMaterialInfo materialInfo = sku2StructureMap.get(materialCode);
          String structureName = materialInfo.getStructureName();
@@ -673,11 +673,11 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         long twelveOverdueStockQty = 0;
         // 6、查询成品库存表，汇总计算超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
         if(finishedProductStockMap.containsKey(materialCode)) {
-            List<MpFinishedProductStock> finishedProductStocks = finishedProductStockMap.get(materialCode);
-            threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-            sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-            nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-            twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
+            List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(materialCode);
+            threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+            sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+            nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+            twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MdmProductStock::getStockQty).sum();
         }
         entity.setThreeOverdueStockQty(threeOverdueStockQty);
         entity.setSixOverdueStockQty(sixOverdueStockQty);
@@ -693,7 +693,7 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
         return entity;
   }
 
-  private SupplyOrderPool buildPrecedentOrder(String materialCode, Map<String, MdmMaterialInfo> sku2StructureMap, Map<String, MpMonthlySaleQty> sku2AverageSaleQty, Map<String, Integer> structure2TurnoverMonthMap, Map<String, Long> stockMap, Map<String, Long> saleOrderMap,Map<String,List<MpFinishedProductStock>> finishedProductStockMap, Map<String, Integer> countSkuMap) {
+  private SupplyOrderPool buildPrecedentOrder(String materialCode, Map<String, MdmMaterialInfo> sku2StructureMap, Map<String, MpMonthlySaleQty> sku2AverageSaleQty, Map<String, Integer> structure2TurnoverMonthMap, Map<String, Long> stockMap, Map<String, Long> saleOrderMap,Map<String,List<MdmProductStock>> finishedProductStockMap, Map<String, Integer> countSkuMap) {
     SupplyOrderPool entity = new SupplyOrderPool();
     MdmMaterialInfo materialInfo = sku2StructureMap.get(materialCode);
     String structureName = materialInfo.getStructureName();
@@ -747,11 +747,11 @@ public class SupplyOrderPoolServiceImpl extends BaseService<SupplyOrderPool>  im
     long twelveOverdueStockQty = 0;
     // 6、查询成品库存表，汇总计算超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
     if(finishedProductStockMap.containsKey(materialCode)) {
-      List<MpFinishedProductStock> finishedProductStocks = finishedProductStockMap.get(materialCode);
-      threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
-      twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MpFinishedProductStock::getStockQty).sum();
+      List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(materialCode);
+      threeOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      sixOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      nightOverdueStockQty = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToLong(MdmProductStock::getStockQty).sum();
+      twelveOverdueStockQty  = finishedProductStocks.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToLong(MdmProductStock::getStockQty).sum();
     }
     entity.setThreeOverdueStockQty(threeOverdueStockQty);
     entity.setSixOverdueStockQty(sixOverdueStockQty);

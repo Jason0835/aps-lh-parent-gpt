@@ -1,12 +1,9 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MpFinishedProductStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -31,11 +28,4 @@ public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
      * @return 结果
      */
     List<MdmFinishStock> list4Mes(MdmFinishStock queryVO);
-    /**
-     * 将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
-     * @param createCondition 需求参数
-     * @param monthPlanVersion 需求版本号
-     * @param finishedProductStockMap 成品库存记录
-     */
-    void insertBatchData(DpDemandPlan createCondition,String monthPlanVersion, Map<String, List<MpFinishedProductStock>> finishedProductStockMap);
 }
