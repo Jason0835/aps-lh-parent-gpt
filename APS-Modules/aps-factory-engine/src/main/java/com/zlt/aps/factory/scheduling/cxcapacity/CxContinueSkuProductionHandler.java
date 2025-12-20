@@ -355,12 +355,14 @@ public class CxContinueSkuProductionHandler {
      * @param skuProductionPlanList sku的排产计划
      */
     private static void lhProductionHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         Long sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
         Long realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
         Long dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         CxMachineBaseInfoVo cxMachineInfo = lhProductionQtyHelper.getCxMachineInfo();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        String skuMaterialDesc = skuProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         //进行排产
         for (int day = startDay; day <= endDay; day++) {
             if (sumProductionQty <= BigDecimal.ZERO.longValue()) {
@@ -381,6 +383,8 @@ public class CxContinueSkuProductionHandler {
             cxLhGroup.setProductionDay(day);
             cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
             cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
+            //记录已排产量及损耗量
+            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.longValue());
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);

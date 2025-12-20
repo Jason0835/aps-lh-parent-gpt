@@ -83,4 +83,8 @@ public class ProductionCapacityParamConfiguration {
      * 换活字块-收尾量与日硫化量大于差量,后SKU的首日排产量
      */
     private Integer changeTypeBlockMaxQty;
+    /**
+     * 最小批量值
+     */
+    private Integer minQty;
 }

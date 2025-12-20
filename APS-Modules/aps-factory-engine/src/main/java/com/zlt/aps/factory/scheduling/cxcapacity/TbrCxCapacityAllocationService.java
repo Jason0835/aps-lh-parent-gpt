@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.ruoyi.common.core.utils.DateUtils;
+import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
@@ -65,28 +66,19 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //todo 记录日志-开始进行成型产能分配-结构排产
 
-        //获取排产初始化信息
+        //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
-        //获取周期内的生产日历信息
-        setMonthProductionDays(context);
-        //获取排产参数设定
-        ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        //初始排产需要的基础数据，成型、模具关系、计划初始库销比
+        initProductionBaseData(productionContext, requirePlanList);
         //获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
-        //获取成型机台信息--日产信息
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
-        productionContext.setCxMachineBaseInfo(cxMachineBaseInfo);
-        //获取SKU模具配置信息
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = getProductionMouldInfo(productionContext);
-        Map<String, ProductionMouldInfoVo> mouldInfoMap = createProductionMouldInfo(productionContext, mouldRelationMap);
-        productionContext.setMouldInfoMap(mouldInfoMap);
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         //结构模具配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         //todo 记录日志-粗算成型机台数
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
-        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, cxMachineBaseInfo, structureLhRatioList);
+        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
         //按结构分组，汇总结构净需求量，粗算需要的机台数
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(context, requirePlanList, structureLhRatioList);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
@@ -95,7 +87,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
-        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, mouldRelationMap, mouldShellMap);
+        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, mouldShellMap);
         //对收尾成型机台，反向匹配待排结构
         CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
         //对还需排产结构，获取优先级最高的结构--结构新增
@@ -118,6 +110,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //主要为-半钢业务
         return buildDefaultProductionContext(context);
+    }
+
+    /**
+     * 排产前基础数据初始化
+     *
+     * @param productionContext 排产上下文
+     * @param requirePlanList   排产计划
+     */
+    private void initProductionBaseData(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        //获取排产参数设定
+        ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        productionContext.setParamConfiguration(paramConfiguration);
+        //初始化库销比、标记是否按总需求排产
+        initProductionRequirePlanInfo(productionContext, requirePlanList);
+        //获取周期内的生产日历信息
+        setMonthProductionDays(productionContext);
+        //获取成型机台信息--日产信息
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
+        productionContext.setCxMachineBaseInfo(cxMachineBaseInfo);
+        //获取SKU模具配置信息
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = getProductionMouldInfo(productionContext);
+        Map<String, ProductionMouldInfoVo> mouldInfoMap = createProductionMouldInfo(productionContext, mouldRelationMap);
+        productionContext.setMouldInfoMap(mouldInfoMap);
+        productionContext.setSkuMouldRelationMap(mouldRelationMap);
     }
 
     /**
@@ -270,13 +286,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param context               排产上下文
      * @param continueAllocationMap 在机结构排产分配信息
      * @param cxContinueInfoMap     在机结构续作信息
-     * @param mouldInfoMap          模具信息
      * @param mouldShellMap         模壳台账信息
      */
-    private void mouldProductionByCxMachine(Context context, Map<String, CxMachineAllocationPlanHelper> continueAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private void mouldProductionByCxMachine(Context context, Map<String, CxMachineAllocationPlanHelper> continueAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         if (CollectionUtils.isEmpty(continueAllocationMap)) {
             return;
         }
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = ((TbrProductionContext) context).getSkuMouldRelationMap();
         continueAllocationMap.forEach((cxMachineCode, productionGroupPlan) -> {
             String structureName = productionGroupPlan.getProductionPlanInfo().getGroupName();
             CxContinueInfoHelper cxContinueInfoHelper = cxContinueInfoMap.get(structureName);
@@ -335,6 +351,48 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //下一新增结构
         addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+    }
+
+    /**
+     * 初始化排产计划，主要进行按sku分组和初始化库销比
+     *
+     * @param productionContext 排产上下文
+     * @param requirePlanList   需求计划列表
+     */
+    private void initProductionRequirePlanInfo(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        productionContext.setAllSkuProductionPlan(new HashMap<>());
+        productionContext.setSkuPlannedQtyMap(new HashMap<>());
+        productionContext.setSkuWastageQtyMap(new HashMap<>());
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        ProductionCapacityParamConfiguration param = productionContext.getParamConfiguration();
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuRequirePlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        productionContext.setAllSkuProductionPlan(skuRequirePlanMap);
+        //已排产量和损耗量为零
+        skuRequirePlanMap.forEach((materialDesc, productionPlanList) -> {
+            productionContext.getSkuPlannedQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
+            productionContext.getSkuWastageQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
+            if (CollectionUtils.isEmpty(productionPlanList)) {
+                return;
+            }
+            //是否按总需求排产-默认 = 否
+            productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.FALSE));
+            List<MonthPlanProductionRequirePlanVo> effectiveList = productionPlanList.stream().filter(plan -> plan.hasProduction()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(effectiveList)) {
+                return;
+            }
+            Long sumProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+            if (sumProductionQty <= param.getSumProductionQty()) {
+                productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
+            }
+            Long sumHeightProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
+            if (sumProductionQty - sumHeightProductionQty <= param.getHeightDiffQty()) {
+                productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
+            }
+        });
+        //计算初始的库销比
+        requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.longValue()));
     }
 
     /**
@@ -402,11 +460,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * CxContinueInfoHelper.cxMachineGroup = { key = cxMachineCode : value = {key = materialDesc : value = 硫化机台数(模具数)}}
      *
      * @param context              排产上下文
-     * @param cxMachineBaseInfo    成型基础信息
      * @param structureLhRatioList 成型结构硫化配比信息
      * @return
      */
-    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context, Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
         //获取前一个月的排产版本信息
         String factoryCode = context.getFactoryCode();
         LocalDate previousMonth = context.getPreviousMonth();
@@ -433,6 +490,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取上个排产周期最后排产日的排产信息
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         //构建续作信息
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getCxMachineBaseInfo();
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
     }
 

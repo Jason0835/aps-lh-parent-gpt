@@ -53,7 +53,12 @@ public class CxMouldProductionHandler {
         if (!CollectionUtils.isEmpty(continueSkuMap)) {
             CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, continueSkuMap, productionPlan, mouldInfoMap, mouldShellMap);
         }
-        //排产收尾新增规格
+        //排产收尾新增规格-重新获取需求需排产计划信息
+        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = hasProductionPlanList.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(leftOverHasProductionList)){
+            //todo 记录日志
+            return ;
+        }
 
 
     }

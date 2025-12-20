@@ -455,6 +455,22 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private Long dayVulcanizationQty;
 
     /**
+     * 库存数量(成品总库存)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.stockQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "库存数量(成品总库存)", name = "stockQty")
+    @TableField(value = "STOCK_QTY")
+    private Long stockQty;
+
+    /**
+     * 月均销量
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Long averageSaleQty;
+
+    /**
      * 可用模具数量
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.mouldQty", cellType = Excel.ColumnType.NUMERIC)
