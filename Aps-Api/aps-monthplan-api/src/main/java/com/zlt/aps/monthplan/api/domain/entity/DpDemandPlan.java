@@ -312,10 +312,17 @@ public class DpDemandPlan extends BaseEntity{
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.averageSaleQty")
+    @Excel(name = "ui.data.column.demandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
     private Long averageSaleQty;
+    /**
+     * 需求对冲后-余量库存
+     */
+    @Excel(name = "ui.data.column.demandPlan.remainingQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
+    @TableField(value = "REMAINING_QTY")
+    private Long remainingQty;
 
     /**
      * 按SKU、动平衡、均匀性、年周号为维度分组合并

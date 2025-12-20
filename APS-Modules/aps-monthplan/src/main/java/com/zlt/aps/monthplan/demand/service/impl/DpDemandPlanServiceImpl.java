@@ -861,8 +861,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         demandPlan.setProductTypeCode(postponeOrder.getProductType());
         demandPlan.setMaterialCode(postponeOrder.getOriMaterialCode());
         demandPlan.setYearWeek(postponeOrder.getWeekYear());
-        demandPlan.setIsDynamicBalance(postponeOrder.getDynamicBalance());
-        demandPlan.setIsUniformity(postponeOrder.getUniformity());
+        demandPlan.setIsDynamicBalance(postponeOrder.getIsDynamicBalance());
+        demandPlan.setIsUniformity(postponeOrder.getIsUniformity());
         demandPlan.setOrderQty(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.longValue() : postponeOrder.getOrdQty().longValue());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
