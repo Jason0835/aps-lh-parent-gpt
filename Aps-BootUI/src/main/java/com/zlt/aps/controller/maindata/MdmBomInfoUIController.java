@@ -178,7 +178,6 @@ public class MdmBomInfoUIController extends BaseUIController<MdmBomInfo> {
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmBomInfo:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -192,7 +191,6 @@ public class MdmBomInfoUIController extends BaseUIController<MdmBomInfo> {
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mdmBomInfo:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

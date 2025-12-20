@@ -1,5 +1,7 @@
 package com.zlt.aps.itf.scm.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,8 +44,8 @@ public class ScmItfController {
 	 */
 	@ApiOperation("发货明细表同步接口")
 	@PostMapping("/syncOutShipDmdOrdList")
-	public AjaxResult syncOutShipDmdOrdList(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo) {
-		return scmItfService.syncOutShipDmdOrdList(planedNotShipParamVo);
+	public AjaxResult syncOutShipDmdOrdList(@RequestBody SyncPlanedNotShipParamVo syncOutShipDmdOrdVo) {
+		return scmItfService.syncOutShipDmdOrdList(syncOutShipDmdOrdVo);
 	}
 
 
@@ -52,7 +54,7 @@ public class ScmItfController {
 	 */
 	@ApiOperation("月计划排程结果推送")
 	@PostMapping("/publicFacScheduleVersion")
-	public AjaxResult publicFacScheduleVersion(@RequestBody SyncOutFacScheduleVersionVo planedNotShipParamVo) {
-		return scmItfService.publicFacScheduleVersion(planedNotShipParamVo);
+	public AjaxResult publicFacScheduleVersion(@RequestBody List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList) {
+		return scmItfService.publicFacScheduleVersion(outFacScheduleVersionList);
 	}
 }

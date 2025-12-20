@@ -214,6 +214,40 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanProductMouldInfoVo> getProductionMouldDeliveryInfo(Context context);
 
     /**
+     * 根据排产初始化，获取可排产SKU的模具关系信息
+     * 其包含的信息为物料配置的模具(模具编号、模壳标准、主花纹)
+     *
+     * @param context
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getEnableProductionMouldInfo(Context context);
+
+    /**
+     * 根据排产初始化，获取在排产周期范围内可到货的新模具-物料关系信息
+     * 1、上机日期在排产周期范围 [productionStartDate,productionEndDate]
+     * 2、新模具到货中的物料在本次可排产范围内
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getEnableProductionMouldDeliveryInfo(Context context);
+
+    /**
+     * 根据工厂，获取工厂的模壳台账信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MouldShellBaseInfoVo> getMouldShellInfo(Context context);
+
+    /**
+     * 根据工厂，获取工厂的模具分配比例配置
+     *
+     * @param context
+     * @return
+     */
+    List<MouldAllocationInfoVo> getMouldAllocationInfo(Context context);
+    /**
      * 获取对应SKU的日硫化量信息
      *
      * @param context 排产上下文

@@ -58,6 +58,10 @@ public class ProductionPlanGroupInfo {
      */
     private BigDecimal needCxCapacityMachineCount;
     /**
+     * 估算需要的天数
+     */
+    private Integer theoryDays;
+    /**
      * 成型-硫化配比信息
      */
     private Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap;
@@ -89,10 +93,10 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
-        //提取结构下最小的硫化配比信息
+        //根据结构成型硫化配比信息，提取结构最小的硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
-        //1、对计划按结构分组
+        //1、对计划按结构分组，构建结构分组对象ProductionPlanGroupInfo
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
@@ -104,7 +108,8 @@ public class ProductionPlanGroupInfo {
             if (CollectionUtils.isEmpty(cxLhRatioList)) {
                 groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
             } else {
-                groupInfo.setCxMachineLhRationMap(cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity())));
+                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity()));
+                groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
             }
             groupInfoMap.put(structureName, groupInfo);
         });
@@ -133,6 +138,7 @@ public class ProductionPlanGroupInfo {
                 return;
             }
             groupInfo.setMinLhMachineCount(ratioInfo.getLhMachineMaxQty());
+            //粗算所需成型机台数
             groupInfo.calculateNeedCxCapacityMachineCount(context.getMaxProductionDays());
         });
         return groupInfoMap;
@@ -149,16 +155,24 @@ public class ProductionPlanGroupInfo {
      */
     public void calculateNeedCxCapacityMachineCount(Integer monthMaxProductionDays) {
         if (sumPlanQty <= BigDecimal.ZERO.intValue()) {
-            needCxCapacityMachineCount = BigDecimal.ZERO;
+            setAllocationZero();
+            return;
         }
         if (minLhMachineCount <= BigDecimal.ZERO.intValue()) {
-            needCxCapacityMachineCount = BigDecimal.ZERO;
+            setAllocationZero();
+            return;
         }
         if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue()) {
-            needCxCapacityMachineCount = BigDecimal.ZERO;
+            setAllocationZero();
+            return;
         }
-        //单台成型月产能 = 最低硫化机台数 * 最小硫化量(单模) * 2 * 月份可排产天数
-        BigDecimal singleCxMonthCapacity = BigDecimal.valueOf(minLhMachineCount).multiply(BigDecimal.valueOf(minLhDayCapacityQty)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).multiply(BigDecimal.valueOf(Long.valueOf(monthMaxProductionDays)));
+        BigDecimal monthMaxDays = BigDecimal.valueOf(Long.valueOf(monthMaxProductionDays));
+        //单台成型日产能 = 最低硫化机台数 * 最小硫化量(单模) * 2
+        BigDecimal singleMinDayCapacity = getDayCapacityByLhRatio(minLhMachineCount);
+        //理论需排产天数
+        Integer theoryDays = BigDecimal.valueOf(sumPlanQty).divide(singleMinDayCapacity, 0, RoundingMode.UP).intValue();
+        //单台成型月产能 = 单台成型日产能 * 月份可排产天数(排除停产日)
+        BigDecimal singleCxMonthCapacity = singleMinDayCapacity.multiply(monthMaxDays);
         BigDecimal machineCount = BigDecimal.valueOf(sumPlanQty).divide(singleCxMonthCapacity, 2, RoundingMode.HALF_UP);
         //取整数部分，向下取整
         BigDecimal integerPart = machineCount.setScale(0, RoundingMode.DOWN);
@@ -166,15 +180,18 @@ public class ProductionPlanGroupInfo {
         BigDecimal decimalPart = machineCount.subtract(integerPart);
         if (decimalPart.compareTo(BigDecimal.valueOf(ProductionConstant.REPAIR_WHOLE)) > BigDecimal.ZERO.intValue()) {
             needCxCapacityMachineCount = integerPart.add(BigDecimal.ONE);
+            theoryDays = needCxCapacityMachineCount.multiply(monthMaxDays).intValue();
+            this.theoryDays = theoryDays;
             return;
         }
+        this.theoryDays = theoryDays;
         needCxCapacityMachineCount = machineCount.setScale(1, RoundingMode.UP);
     }
 
     /**
      * 根据成型对应硫化配比，得到剩余需求量需要分配的天数
      *
-     * @param lhRatio
+     * @param lhRatio 硫化配比
      * @return
      */
     public Integer calculateNeedDays(Integer lhRatio) {
@@ -186,8 +203,8 @@ public class ProductionPlanGroupInfo {
         if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
-        BigDecimal monthCapacity = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(lhRatio));
-        return BigDecimal.valueOf(remainingProductionQty).divide(monthCapacity, 0, RoundingMode.UP).intValue();
+        BigDecimal dayCapacity = getDayCapacityByLhRatio(lhRatio);
+        return BigDecimal.valueOf(remainingProductionQty).divide(dayCapacity, 0, RoundingMode.UP).intValue();
     }
 
     /**
@@ -386,5 +403,24 @@ public class ProductionPlanGroupInfo {
             minLhRatioMap.put(structureName, ratioList.get(BigDecimal.ZERO.intValue()));
         });
         return minLhRatioMap;
+    }
+
+    /**
+     * 根据硫化配比，计算成型单日产能量
+     * = 最小日硫化量(单模) * 2 * lhRatio
+     *
+     * @param lhRatio
+     * @return
+     */
+    private BigDecimal getDayCapacityByLhRatio(Integer lhRatio) {
+        return BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).multiply(BigDecimal.valueOf(lhRatio));
+    }
+
+    /**
+     * 设置估算的机台数和天数为零
+     */
+    private void setAllocationZero() {
+        needCxCapacityMachineCount = BigDecimal.ZERO;
+        theoryDays = BigDecimal.ZERO.intValue();
     }
 }

@@ -74,6 +74,12 @@ public class FactoryMonthPlanProdFinal_JY extends BaseEntity {
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
+    /** 成型机编码 */
+    @Excel(name = "ui.data.column.final.cxMachineCode")
+    @ApiModelProperty(value = "成型机编码", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private String cxMachineCode;
+
     /** 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢 */
     @Excel(name = "ui.data.column.final.productTypeCode")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")

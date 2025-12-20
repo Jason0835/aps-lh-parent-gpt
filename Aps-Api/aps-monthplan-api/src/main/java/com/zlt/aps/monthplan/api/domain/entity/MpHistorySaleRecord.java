@@ -14,7 +14,7 @@ import java.util.Date;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpHistorySaleRecord.java
- * 描    述：历史销售记录对象 t_mp_history_sale_record
+ * 描    述：历史销售记录对象 T_MDM_HISTORY_SALE_RECORD
  *@author yelq
  *@date 2025-12-11
  *@version 1.0
@@ -26,7 +26,7 @@ import java.util.Date;
  */
 @ApiModel(value = "历史销售记录对象", description = "历史销售记录对象")
 @Data
-@TableName(value = "T_MP_HISTORY_SALE_RECORD")
+@TableName(value = "T_MDM_HISTORY_SALE_RECORD")
 public class MpHistorySaleRecord extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
@@ -96,9 +96,30 @@ public class MpHistorySaleRecord extends BaseEntity{
     private Date generationDate;
 
     /**
-     * 区域名称
+     * 区域名称国际化字符串
      */
-    @ApiModelProperty(value = "区域名称", name = "areaCodeName")
+    @ApiModelProperty(value = "区域名称国际化字符串", name = "areaCodeName")
     @TableField(exist = false)
     private String areaCodeName;
+
+    /**
+     * 区域名称国际化后
+     */
+    @ApiModelProperty(value = "区域名称国际化后", name = "areaCodeNameI18n")
+    @TableField(exist = false)
+    private String areaCodeNameI18n;
+
+    /**
+     * area拼接区域编号，前端使用
+     */
+    @ApiModelProperty(value = "area拼接区域编号，前端使用", name = "areaCodeShow")
+    @TableField(exist = false)
+    private String areaCodeShow;
+
+    /**
+     * month拼接月，前端使用
+     */
+    @ApiModelProperty(value = "month拼接月，前端使用", name = "monthShow")
+    @TableField(exist = false)
+    private String monthShow;
 }

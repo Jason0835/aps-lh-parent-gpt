@@ -372,6 +372,32 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
+    public List<MonthPlanProductMouldInfoVo> getEnableProductionMouldInfo(Context context) {
+        return factoryMonthPlanProductMouldMapper.getEnableProductionMouldInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+    }
+
+    @Override
+    public List<MonthPlanProductMouldInfoVo> getEnableProductionMouldDeliveryInfo(Context context) {
+        return factoryMonthPlanProductMouldMapper.getEnableMouldDeliveryInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), context.getProductionStartDate(), context.getProductionEndDate());
+    }
+
+    @Override
+    public List<MouldShellBaseInfoVo> getMouldShellInfo(Context context) {
+        if (isEmptyFactoryCode(context)) {
+            return Collections.emptyList();
+        }
+        return factoryMonthPlanProductMouldMapper.getMouldShellInfo(context.getFactoryCode());
+    }
+
+    @Override
+    public List<MouldAllocationInfoVo> getMouldAllocationInfo(Context context) {
+        if (isEmptyFactoryAndYearMonth(context)) {
+            return Collections.emptyList();
+        }
+        return factoryMonthPlanProductMouldMapper.getMouldAllocationInfo(context.getFactoryCode(), context.getYear(), context.getMonth());
+    }
+
+    @Override
     public List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context) {
         return factoryMonthPlanProductLhCapacityMapper.getProductionLhCapacityInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
     }
@@ -656,4 +682,32 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         });
         return cxStopMap;
     }
+
+    /**
+     * 是否空的工厂及年份、月份查询条件
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    private boolean isEmptyFactoryAndYearMonth(Context context) {
+        boolean isEmptyFactoryCode = isEmptyFactoryCode(context);
+        if (isEmptyFactoryCode) {
+            return true;
+        }
+        return null == context.getYear() || null == context.getMonth();
+    }
+
+    /**
+     * 是否空的工厂查询条件
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    private boolean isEmptyFactoryCode(Context context) {
+        if (null == context) {
+            return true;
+        }
+        return StringUtils.isBlank(context.getFactoryCode());
+    }
+
 }

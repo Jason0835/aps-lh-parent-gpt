@@ -291,12 +291,12 @@ public class StockAllocationHelper {
     }
     //   (3)订单中有动平衡要求的，则可冲减的库存必须是动平衡库存，
     //   (3.3）注：有动平衡、均匀性的，可以冲减库存不带动平衡和均匀性标志的，但需要做提醒；
-    if(StringUtils.isNotBlank(order.getDynamicBalance())) {
+    if(StringUtils.isNotBlank(order.getIsDynamicBalance())) {
       return reduceInventory(
           order,
           stockInfos,true,false);
     }
-    if(StringUtils.isNotBlank(order.getUniformity())) {
+    if(StringUtils.isNotBlank(order.getIsUniformity())) {
       return reduceInventory(
           order,
           stockInfos,false,true);

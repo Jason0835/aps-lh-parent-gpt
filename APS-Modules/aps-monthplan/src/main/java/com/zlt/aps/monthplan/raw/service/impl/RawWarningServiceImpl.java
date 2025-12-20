@@ -64,7 +64,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
             if (weekUsages.isEmpty()) {
                 log.warn("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
-                return AjaxResult.error(String.format("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week));
+                return AjaxResult.error(String.format("未找到周用量数据，工厂：%s，年份：%d，周次：%d", factoryCode, year, week));
             }
 
             // 2. 获取用量偏差预警配置
@@ -129,25 +129,30 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private RawWarningRecord createUsageWarningRecord(RawWeekUsage usage, RawWarningConfig config) {
         RawWarningRecord record = new RawWarningRecord();
         record.setFactoryCode(usage.getFactoryCode());
-        record.setWarningType("1"); // 用量偏差预警
+        // 用量偏差预警
+        record.setWarningType("1");
         record.setMaterialCode(usage.getMaterialCode());
-        record.setMaterialName(usage.getMaterialName());
+        record.setMaterialDesc(usage.getMaterialDesc());
+        record.setRelatedMonth(String.format("%d年%d月", usage.getYear(), usage.getMonth()));
         record.setWarningLevel(config.getWarningLevel());
-        record.setRelatedWeek(String.format("%d年第%02d周", usage.getYear(), usage.getWeek()));
-        record.setStatus("0"); // 未处理
-        record.setNotified(0); // 未通知
+        record.setRelatedWeek(String.format("%d年%d月第%02d周", usage.getYear(), usage.getMonth(), usage.getWeek()));
+        // 未处理
+        record.setStatus("0");
+        // 未通知
+        record.setNotified(0);
 
         // 设置预警标题和内容
-        String title = String.format("原材料用量偏差预警 - %s", usage.getMaterialName());
+        String title = String.format("原材料用量偏差预警 - %s", usage.getMaterialDesc());
         record.setWarningTitle(title);
 
         String content = String.format(
-                "工厂：%s，原材料：%s（%s），%d年第%02d周用量偏差超限。\n" +
+                "工厂：%s，原材料：%s（%s），%d年%d月第%02d周用量偏差超限。\n" +
                         "计划用量：%s，实际用量：%s，偏差量：%s，偏差率：%.2f%%",
                 usage.getFactoryCode(),
-                usage.getMaterialName(),
+                usage.getMaterialDesc(),
                 usage.getMaterialCode(),
                 usage.getYear(),
+                usage.getMonth(),
                 usage.getWeek(),
                 usage.getPlanQty(),
                 usage.getActualQty(),
@@ -208,7 +213,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             // 3. 获取新材料预警配置
             QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
             configWrapper.eq("FACTORY_CODE", factoryCode);
-            configWrapper.eq("WARNING_TYPE", "2"); // 新材料预警
+            // 新材料预警
+            configWrapper.eq("WARNING_TYPE", "2");
             configWrapper.eq("ENABLED", 1);
             List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
 
@@ -290,18 +296,22 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
             RawWarningRecord record = new RawWarningRecord();
             record.setFactoryCode(factoryCode);
-            record.setWarningType("2"); // 新材料预警
+            // 新材料预警
+            record.setWarningType("2");
             record.setMaterialCode(diff.getMaterialCode());
-            record.setMaterialName(diff.getMaterialName());
-            record.setWarningLevel("2"); // 中等级别
+            record.setMaterialDesc(diff.getMaterialDesc());
+            // 中等级别
+            record.setWarningLevel("2");
             record.setRelatedMonth(currentMonthStr);
-            record.setStatus("0"); // 未处理
-            record.setNotified(0); // 未通知
+            // 未处理
+            record.setStatus("0");
+            // 未通知
+            record.setNotified(0);
 
             // 设置预警标题和内容
             String title = "新增".equals(diffType) ?
-                    String.format("新增原材料预警 - %s", diff.getMaterialName()) :
-                    String.format("减少原材料预警 - %s", diff.getMaterialName());
+                    String.format("新增原材料预警 - %s", diff.getMaterialDesc()) :
+                    String.format("减少原材料预警 - %s", diff.getMaterialDesc());
             record.setWarningTitle(title);
 
             String content = "新增".equals(diffType) ?
@@ -311,7 +321,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                     "比较周期：%s（%d-%02d）→ %s（%d-%02d）\n" +
                                     "上个月用量：%s，本月计划：%s，差异量：%s",
                             factoryCode,
-                            diff.getMaterialName(),
+                            diff.getMaterialDesc(),
                             diff.getMaterialCode(),
                             previousMonthStr, previousYear, previousMonth,
                             currentMonthStr, currentYear, currentMonth,
@@ -325,7 +335,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                     "比较周期：%s（%d-%02d）→ %s（%d-%02d）\n" +
                                     "上个月用量：%s，本月计划：%s，差异量：%s",
                             factoryCode,
-                            diff.getMaterialName(),
+                            diff.getMaterialDesc(),
                             diff.getMaterialCode(),
                             previousMonthStr, previousYear, previousMonth,
                             currentMonthStr, currentYear, currentMonth,

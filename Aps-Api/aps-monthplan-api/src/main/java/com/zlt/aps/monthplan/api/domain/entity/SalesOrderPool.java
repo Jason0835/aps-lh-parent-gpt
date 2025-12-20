@@ -1,17 +1,16 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.math.BigDecimal;
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -28,7 +27,7 @@ import lombok.Data;
  */
 
 @Data
-@TableName(value = "T_MP_SALES_ORDER_POOL")
+@TableName(value = "T_DP_SALES_ORDER_POOL")
 @ApiModel(value = "销售订单池对象", description = "销售订单池对象 ")
 public class SalesOrderPool extends BaseEntity{
 
@@ -120,22 +119,22 @@ public class SalesOrderPool extends BaseEntity{
     private String weekYear;
 
     /** 动平衡，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.dynamicBalance")
-    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "dynamicBalance")
-    @TableField(value = "DYNAMIC_BALANCE")
-    private String dynamicBalance;
+    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance")
+    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
 
     /** 均匀性，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.uniformity")
-    @ApiModelProperty(value = "均匀性，1 是 0 否", name = "uniformity")
-    @TableField(value = "UNIFORMITY")
-    private String uniformity;
+    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity")
+    @ApiModelProperty(value = "均匀性，1 是 0 否", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
 
     /** EUDR，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.eudr")
-    @ApiModelProperty(value = "EUDR，1 是 0 否", name = "eudr")
-    @TableField(value = "EUDR")
-    private String eudr;
+    @Excel(name = "ui.data.column.SalesOrderPool.isEudr")
+    @ApiModelProperty(value = "EUDR，1 是 0 否", name = "isEudr")
+    @TableField(value = "IS_EUDR")
+    private String isEudr;
 
     /** 发货模式，数据字典：biz_deliver_goods_type，01 分批交货 02 整单发货 */
     @Excel(name = "ui.data.column.SalesOrderPool.deliverGoodsType", dictType = "biz_deliver_goods_type")
@@ -155,11 +154,11 @@ public class SalesOrderPool extends BaseEntity{
     private Long scmDetailId;
 
     /** 年份 */
-    @TableField(value = "YEAR")
+    @TableField(exist = false)
     private Integer year;
 
     /** 月份 */
-    @TableField(value = "MONTH")
+    @TableField(exist = false)
     private Integer month;
 
     /**
@@ -169,4 +168,18 @@ public class SalesOrderPool extends BaseEntity{
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, factoryCode, oriMaterialCode);
     }
+
+    /**
+     * 提报日期开始时间
+     */
+    @ApiModelProperty(value = "提报日期开始时间", name = "billDateStartTime")
+    @TableField(exist = false)
+    private String billDateStartTime;
+
+    /**
+     * 提报日期结束时间
+     */
+    @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
+    @TableField(exist = false)
+    private String billDateEndTime;
 }

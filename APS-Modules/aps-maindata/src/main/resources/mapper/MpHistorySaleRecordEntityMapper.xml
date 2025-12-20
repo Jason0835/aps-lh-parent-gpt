@@ -7,9 +7,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectRollMonthSaleQty" resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
         select MATERIAL_CODE,
                SUM(SALE_QTY) as SALE_QTY
-        from T_MP_HISTORY_SALE_RECORD
+        from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
-          AND FACTORY_CODE = #{factoryCode}
           AND `YEAR_MONTH` &gt;= #{minYearMonth}
           AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         group by MATERIAL_CODE
@@ -17,11 +16,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSumQtyGroupByArea"
             resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
-        SELECT AREA_CODE, MATERIAL_CODE,
+        SELECT AREA_CODE, MATERIAL_CODE, CONCAT('areaCode', AREA_CODE) as AREA_CODE_SHOW,
         SUM(SALE_QTY) as SALE_QTY
-        from T_MP_HISTORY_SALE_RECORD
+        from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
-        AND FACTORY_CODE = #{factoryCode}
         AND `YEAR_MONTH` &gt;= #{minYearMonth}
         AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         <if test="list != null and list.size() >0">
@@ -35,11 +33,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSumQtyGroupByMonth"
             resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
-        SELECT `MONTH`, MATERIAL_CODE,
+        SELECT `MONTH`, MATERIAL_CODE, CONCAT('month', `MONTH`) as AREA_CODE_SHOW,
         SUM(SALE_QTY) as SALE_QTY
-        from T_MP_HISTORY_SALE_RECORD
+        from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
-        AND FACTORY_CODE = #{factoryCode}
         AND `YEAR_MONTH` &gt;= #{minYearMonth}
         AND `YEAR_MONTH` &lt;= #{maxYearMonth}
         <if test="list != null and list.size() >0">

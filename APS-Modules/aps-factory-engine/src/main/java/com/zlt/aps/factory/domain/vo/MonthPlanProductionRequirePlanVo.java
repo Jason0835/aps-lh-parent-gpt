@@ -5,6 +5,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
@@ -15,6 +16,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -74,6 +76,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 是否含有特殊材料 1 含有 0 不含有
      */
     private String isSpecialMaterials;
+    /**
+     * 库销比-动态计算，每次排产后变化
+     */
+    private Double inventorySalesRatio;
+    /**
+     * 是否按总需求量排产 1 是 0 否
+     */
+    private Integer isProductionBySum;
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)
@@ -95,6 +105,52 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             sum = sum + getFactProdReqQty();
         }
         return sum;
+    }
+
+    /**
+     * 虚拟的还需排产量值
+     * 如果有高优先级值，则为高优先级，否则为净需求值
+     *
+     * @return
+     */
+    public Long getVirtualProductionQty() {
+        if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
+            return getHeightProductionQty();
+        }
+        return getProductionQty();
+    }
+
+    /**
+     * 是否小于minQty
+     * 如果有高优先级排产量则使用高优先级排产量比较，否则使用排产量比较
+     *
+     * @param minQty
+     * @return
+     */
+    public boolean isLess(Long minQty) {
+        if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
+            return getHeightProductionQty() < minQty;
+        }
+        return getProductionQty() < minQty;
+    }
+
+    /**
+     * 计算库销比
+     * (当前库存+排产量)/月均销量的比例
+     *
+     * @param productionQty
+     */
+    public void calculateInventorySalesRatio(Long productionQty) {
+        //月均销量没有或是为零，则表示库销比越低，最高
+        Long averageSaleQty = getAverageSaleQty();
+        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.longValue()) {
+            inventorySalesRatio = BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
+        }
+        if (null == productionQty || productionQty < BigDecimal.ZERO.longValue()) {
+            productionQty = BigDecimal.ZERO.longValue();
+        }
+        Long sumStockQty = getStockQty() + productionQty;
+        inventorySalesRatio = BigDecimal.valueOf(sumStockQty).divide(BigDecimal.valueOf(averageSaleQty), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**
@@ -199,6 +255,22 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 匹配的sku是否还有需排产的计划
+     *
+     * @param selectedMaterialDesc 物料描述
+     * @return
+     */
+    public boolean hasSelectedProduction(String selectedMaterialDesc) {
+        if (StringUtils.isBlank(selectedMaterialDesc)) {
+            return false;
+        }
+        if (!selectedMaterialDesc.equals(getMaterialDesc())) {
+            return false;
+        }
+        return hasProduction();
+    }
+
+    /**
      * 是否还需排产
      * 排产标记 = 1 且还有可排产量
      * true表示还需排产 false表示无需排产
@@ -218,6 +290,65 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 判断计划是否为续作Sku排产计划
+     * 同规格同花纹或是同生胎
+     *
+     * @param continueProductInfo
+     * @return
+     */
+    public boolean hasContinueProduction(CxContinueProductInfoHelper continueProductInfo) {
+        boolean isSameSpecificationsAndPattern = isSameSpecificationsAndPattern(continueProductInfo);
+        if (!isSameSpecificationsAndPattern) {
+            return false;
+        }
+        return isSameEmbryoCode(continueProductInfo);
+    }
+
+    /**
+     * 是否是续作Sku-同规格同花纹
+     * 前提是先达到共用模具
+     *
+     * @param continueProductInfo 续作Sku信息
+     * @return
+     */
+    public boolean isSameSpecificationsAndPattern(CxContinueProductInfoHelper continueProductInfo) {
+        if (null == continueProductInfo) {
+            return false;
+        }
+        //规格
+        String specifications = continueProductInfo.getSpecifications();
+        //花纹
+        String pattern = continueProductInfo.getPattern();
+        if (StringUtils.isBlank(specifications) || StringUtils.isBlank(pattern)) {
+            return false;
+        }
+        //同规格同花纹
+        if (specifications.equals(getSpecifications()) && pattern.equals(getPattern())) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 是否是续作Sku-共生胎
+     * 前提是先达到共用模具
+     *
+     * @param continueProductInfo 续作Sku信息
+     * @return
+     */
+    public boolean isSameEmbryoCode(CxContinueProductInfoHelper continueProductInfo) {
+        if (null == continueProductInfo) {
+            return false;
+        }
+        //同生胎
+        String embryoCode = continueProductInfo.getEmbryoCode();
+        if (StringUtils.isBlank(embryoCode)) {
+            return false;
+        }
+        return embryoCode.equals(getEmbryoCode());
     }
 
     /**

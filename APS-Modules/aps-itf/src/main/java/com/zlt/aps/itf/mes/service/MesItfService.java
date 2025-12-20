@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
 
 import java.util.List;
 
@@ -43,4 +44,20 @@ public interface MesItfService {
      * @return 结果
      */
     List<MdmSkuMouldRel> getMdmSkuMouldRelList(MdmSkuMouldRel mdmSkuMouldRel);
+
+    /**
+     * 同步成品库存
+     *
+     * @param productStockMonth 参数
+     * @return 结果
+     */
+    List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth);
+
+    /**
+     * 同步不合格库存
+     *
+     * @param productStockMonth 参数
+     * @return 结果
+     */
+    List<ProductStockMonth> syncUnqualifiedStock(ProductStockMonth productStockMonth);
 }

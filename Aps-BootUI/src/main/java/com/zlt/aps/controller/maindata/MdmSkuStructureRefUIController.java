@@ -178,7 +178,6 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -192,7 +191,6 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

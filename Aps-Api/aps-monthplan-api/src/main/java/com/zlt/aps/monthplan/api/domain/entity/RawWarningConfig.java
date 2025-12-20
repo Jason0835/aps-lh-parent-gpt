@@ -45,9 +45,9 @@ public class RawWarningConfig extends BaseEntity {
      */
     @Excel(name = "原材料名称")
     @ImportExcelValidated(required = true, maxLength = 100)
-    @ApiModelProperty(value = "原材料名称", name = "materialName")
-    @TableField(value = "MATERIAL_NAME")
-    private String materialName;
+    @ApiModelProperty(value = "原材料名称", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     /**
      * 预警类型：1-用量偏差预警 2-新材料预警

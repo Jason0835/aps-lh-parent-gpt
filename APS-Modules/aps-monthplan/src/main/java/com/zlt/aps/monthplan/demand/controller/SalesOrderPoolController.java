@@ -204,9 +204,9 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ordQty")), "ORD_QTY", queryVO.getFieldValueByFieldName("ordQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("weekYear")), "WEEK_YEAR", queryVO.getFieldValueByFieldName("weekYear"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dynamicBalance")), "DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("dynamicBalance"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("uniformity")), "UNIFORMITY", queryVO.getFieldValueByFieldName("uniformity"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("eudr")), "EUDR", queryVO.getFieldValueByFieldName("eudr"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isUniformity")), "IS_UNIFORMITY", queryVO.getFieldValueByFieldName("isUniformity"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isEudr")), "IS_EUDR", queryVO.getFieldValueByFieldName("isEudr"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliverGoodsType")), "DELIVER_GOODS_TYPE", queryVO.getFieldValueByFieldName("deliverGoodsType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmDetailId")), "SCM_DETAIL_ID", queryVO.getFieldValueByFieldName("scmDetailId"));
@@ -215,7 +215,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 
     @Override
     protected String getTypeCode(){
-        return "MP099";
+        return "DP0202";
     }
 
 

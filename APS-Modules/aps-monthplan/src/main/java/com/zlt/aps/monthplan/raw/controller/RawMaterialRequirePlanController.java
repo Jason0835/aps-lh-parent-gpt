@@ -58,7 +58,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     /**
      * 查询原材料需求计划列表
      */
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -75,7 +74,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
      * 保存
      */
     @Log(title = "ui.data.column.rawMaterialRequirePlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -87,7 +85,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
      * 删除
      */
     @Log(title = "ui.data.column.rawMaterialRequirePlan.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -99,7 +96,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     /**
      * 获取原材料需求计划详细信息
      */
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -114,7 +110,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:import")
     @Log(title = "ui.data.column.rawMaterialRequirePlan.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -126,7 +121,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     /**
      * 导出列表
      */
-    @RequiresPermissions( "maindata:rawMaterialRequirePlan:export")
     @Log(title = "原材料需求计划", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
@@ -159,8 +153,9 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productCode")), "PRODUCT_CODE", queryVO.getFieldValueByFieldName("productCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("category")), "CATEGORY", queryVO.getFieldValueByFieldName("category"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMaterialType()), "MATERIAL_TYPE", queryVO.getMaterialType());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("curMonthQty")), "CUR_MONTH_QTY", queryVO.getFieldValueByFieldName("curMonthQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("curMonthRudrQty")), "CUR_MONTH_RUDR_QTY", queryVO.getFieldValueByFieldName("curMonthRudrQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("tMonthQty")), "T_MONTH_QTY", queryVO.getFieldValueByFieldName("tMonthQty"));
