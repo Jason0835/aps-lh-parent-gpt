@@ -2,9 +2,9 @@ package com.zlt.aps.monthplan.factory.helper;
 
 
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,12 +36,12 @@ public class StockAllocationHelper {
   /**
    * 根据库存对冲顺序配置，进行库存分配
    */
-  public static List<MpOrderOffsetAllocation> calculateStockAllocation(
+  public static List<DpOrderOffsetDetail> calculateStockAllocation(
       String monthPlanVersion,
       Map<String, List<SalesOrderPool>> saleOrderGroupMap,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Long> mdmMonthSurplusMap) {
-    List<MpOrderOffsetAllocation> result = new ArrayList<>();
+    List<DpOrderOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(saleOrderGroupMap)) {
       return result;
     }
@@ -49,7 +49,7 @@ public class StockAllocationHelper {
       String groupKey = entry.getKey();
       List<SalesOrderPool> saleOrders = entry.getValue();
 
-      List<MpOrderOffsetAllocation> groupAllocations = processOrderGroup(
+      List<DpOrderOffsetDetail> groupAllocations = processOrderGroup(
           monthPlanVersion,
           finishedProductStockMap,
           mdmMonthSurplusMap,
@@ -65,7 +65,7 @@ public class StockAllocationHelper {
   /**
    * 处理单个订单组的库存分配
    */
-  private static List<MpOrderOffsetAllocation> processOrderGroup(
+  private static List<DpOrderOffsetDetail> processOrderGroup(
       String monthPlanVersion,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Long> mdmMonthSurplusMap,
@@ -87,8 +87,8 @@ public class StockAllocationHelper {
   /**
    * 为无库存订单创建零分配记录
    */
-  private static List<MpOrderOffsetAllocation> createZeroAllocations(String monthPlanVersion,Map<String,Long> mdmMonthSurplusMap,String groupKey, List<SalesOrderPool> saleOrders) {
-    List<MpOrderOffsetAllocation> allocations = new ArrayList<>();
+  private static List<DpOrderOffsetDetail> createZeroAllocations(String monthPlanVersion,Map<String,Long> mdmMonthSurplusMap,String groupKey, List<SalesOrderPool> saleOrders) {
+    List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     long plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0L);
     if(plannedSurplus == 0L) {
       for (SalesOrderPool order : saleOrders) {
@@ -218,9 +218,9 @@ public class StockAllocationHelper {
         plannedSurplus,
         stockInfos
     );
-    List<MpOrderOffsetAllocation> allocations = new ArrayList<>();
+    List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
-      MpOrderOffsetAllocation allocation = allocateStockForSingleOrder(monthPlanVersion,order,context);
+      DpOrderOffsetDetail allocation = allocateStockForSingleOrder(monthPlanVersion,order,context);
       allocations.add(allocation);
     }
     return new StockAllocationResult(allocations);
@@ -231,9 +231,9 @@ public class StockAllocationHelper {
         plannedSurplus,
         null
     );
-    List<MpOrderOffsetAllocation> allocations = new ArrayList<>();
+    List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
-      MpOrderOffsetAllocation allocation = allocateMonthSurplusForSingleOrder(monthPlanVersion,order,context);
+      DpOrderOffsetDetail allocation = allocateMonthSurplusForSingleOrder(monthPlanVersion,order,context);
       allocations.add(allocation);
     }
     return new StockAllocationResult(allocations);
@@ -244,7 +244,7 @@ public class StockAllocationHelper {
   /**
    * 为单个订单分配库存
    */
-  private static MpOrderOffsetAllocation allocateStockForSingleOrder(String monthPlanVersion,SalesOrderPool order, StockAllocationContext context) {
+  private static DpOrderOffsetDetail allocateStockForSingleOrder(String monthPlanVersion,SalesOrderPool order, StockAllocationContext context) {
     long stockQty = context.getStockInfos().stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
@@ -263,7 +263,7 @@ public class StockAllocationHelper {
     return buildAllocation(order, monthPlanVersion,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
-  private static MpOrderOffsetAllocation allocateMonthSurplusForSingleOrder(String monthPlanVersion, SalesOrderPool order, StockAllocationContext context) {
+  private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion, SalesOrderPool order, StockAllocationContext context) {
     // 5、库存冲减后，继续扣减月底计划余量部分
     long produceQtyDue = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
     Long plannedSurplus =  context.plannedSurplus;
@@ -484,8 +484,8 @@ public class StockAllocationHelper {
   /**
    * 构建分配记录
    */
-  private static MpOrderOffsetAllocation buildAllocation(SalesOrderPool order, String version,long stockQty,long plannedSurplus,long allocationQty,long produceQtyDue) {
-    MpOrderOffsetAllocation allocation = new MpOrderOffsetAllocation();
+  private static DpOrderOffsetDetail buildAllocation(SalesOrderPool order, String version,long stockQty,long plannedSurplus,long allocationQty,long produceQtyDue) {
+    DpOrderOffsetDetail allocation = new DpOrderOffsetDetail();
     BeanUtils.copyProperties(order, allocation);
     allocation.setId(null);
     allocation.setBaseVale(null);
@@ -505,7 +505,7 @@ public class StockAllocationHelper {
     allocation.setOrderQty(order.getOrdQty().longValue());
     allocation.setStockQty(stockQty);
     allocation.setAllocationQty(allocationQty);
-    allocation.setProduceQtyDue(produceQtyDue);
+    allocation.setProducionQty(produceQtyDue);
     return allocation;
   }
 
@@ -529,9 +529,9 @@ public class StockAllocationHelper {
    */
   @Getter
   private static class StockAllocationResult {
-    private final List<MpOrderOffsetAllocation> allocations;
+    private final List<DpOrderOffsetDetail> allocations;
 
-    public StockAllocationResult(List<MpOrderOffsetAllocation> allocations) {
+    public StockAllocationResult(List<DpOrderOffsetDetail> allocations) {
       this.allocations = allocations;
     }
 

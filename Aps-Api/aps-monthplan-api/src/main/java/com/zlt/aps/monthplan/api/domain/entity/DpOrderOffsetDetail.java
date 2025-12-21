@@ -13,10 +13,10 @@ import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpOrderOffsetAllocation.java
- * 描    述：订单冲减分配对象 t_mp_order_offset_allocation
+ * 文件名称：DpOrderOffsetDetail.java
+ * 描    述：S1-0604订单冲减分配对象 t_dp_order_offset_detail
  *@author yelq
- *@date 2025-12-15
+ *@date 2025-12-21
  *@version 1.0
  *
  *  修改记录：
@@ -25,170 +25,170 @@ import java.util.Date;
  *     修改内容：...
  */
 
-@ApiModel(value = "订单冲减分配对象", description = "订单冲减分配对象 ")
+@ApiModel(value = "S1-0604订单冲减分配对象", description = "S1-0604订单冲减分配对象 ")
 @Data
 @TableName(value = "T_DP_ORDER_OFFSET_DETAIL")
-public class MpOrderOffsetAllocation extends BaseEntity{
+public class DpOrderOffsetDetail extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.factoryCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
-    @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.year")
+    @Excel(name = "ui.data.column.orderOffsetDetail.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.month")
+    @Excel(name = "ui.data.column.orderOffsetDetail.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
 
     /** 需求版本号 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.monthPlanVersion")
+    @Excel(name = "ui.data.column.orderOffsetDetail.monthPlanVersion")
     @ApiModelProperty(value = "需求版本号", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
     /** 产品品类 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.productTypeCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.productTypeCode")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 库位类别 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.locationType")
+    @Excel(name = "ui.data.column.orderOffsetDetail.locationType")
     @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
 
     /** 区域 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.areaCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.areaCode")
     @ApiModelProperty(value = "区域", name = "areaCode")
     @TableField(value = "AREA_CODE")
     private String areaCode;
 
     /** 客户编号 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.customCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.customCode")
     @ApiModelProperty(value = "客户编号", name = "customCode")
     @TableField(value = "CUSTOM_CODE")
     private String customCode;
 
     /** 客户名称 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.customName")
+    @Excel(name = "ui.data.column.orderOffsetDetail.customName")
     @ApiModelProperty(value = "客户名称", name = "customName")
     @TableField(value = "CUSTOM_NAME")
     private String customName;
 
     /** 客户国别 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.customNationCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.customNationCode")
     @ApiModelProperty(value = "客户国别", name = "customNationCode")
     @TableField(value = "CUSTOM_NATION_CODE")
     private String customNationCode;
 
     /** 目的国 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.destinationNationCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.destinationNationCode")
     @ApiModelProperty(value = "目的国", name = "destinationNationCode")
     @TableField(value = "DESTINATION_NATION_CODE")
     private String destinationNationCode;
 
     /** PO号 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.poNumber")
+    @Excel(name = "ui.data.column.orderOffsetDetail.poNumber")
     @ApiModelProperty(value = "PO号", name = "poNumber")
     @TableField(value = "PO_NUMBER")
     private String poNumber;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.brand")
+    @Excel(name = "ui.data.column.orderOffsetDetail.brand")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.mesMaterialCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     /** 物料编码 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.materialCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.materialDesc")
+    @Excel(name = "ui.data.column.orderOffsetDetail.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
     /** 订单数量 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.orderQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.orderQty")
     @ApiModelProperty(value = "订单数量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Long orderQty;
 
     /** 库存总数 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.stockQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.stockQty")
     @ApiModelProperty(value = "库存总数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Long stockQty;
 
     /** 库存分配量 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.allocationQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.allocationQty")
     @ApiModelProperty(value = "库存分配量", name = "allocationQty")
     @TableField(value = "ALLOCATION_QTY")
     private Long allocationQty;
 
     /** 月底计划余量分配量 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.plannedSurplus")
+    @Excel(name = "ui.data.column.orderOffsetDetail.plannedSurplus")
     @ApiModelProperty(value = "月底计划余量分配量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
     private Long plannedSurplus;
 
-    /** 预计需要生产量 */
-    @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
-    @TableField(value = "PRODUCE_QTY_DUE")
-    private Long produceQtyDue;
+    /** 计划排产量 */
+    @Excel(name = "ui.data.column.orderOffsetDetail.productionQty")
+    @ApiModelProperty(value = "计划排产量", name = "productionQty")
+    @TableField(value = "PRODUCTION_QTY")
+    private Long producionQty;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.scmPriority")
+    @Excel(name = "ui.data.column.orderOffsetDetail.scmPriority")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
 
     /** 年周号 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.weekYear")
+    @Excel(name = "ui.data.column.orderOffsetDetail.weekYear")
     @ApiModelProperty(value = "年周号", name = "weekYear")
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
     /** 均匀性 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.dynamicBalance")
-    @ApiModelProperty(value = "均匀性", name = "dynamicBalance")
-    @TableField(value = "DYNAMIC_BALANCE")
-    private String dynamicBalance;
+    @Excel(name = "ui.data.column.orderOffsetDetail.isDynamicBalance")
+    @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
 
     /** 动平衡 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.uniformity")
-    @ApiModelProperty(value = "动平衡", name = "uniformity")
-    @TableField(value = "UNIFORMITY")
-    private String uniformity;
+    @Excel(name = "ui.data.column.orderOffsetDetail.uniformity")
+    @ApiModelProperty(value = "均匀性", name = "uniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
 
     /** 发货模式 */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.deliverGoodsType")
+    @Excel(name = "ui.data.column.orderOffsetDetail.deliverGoodsType")
     @ApiModelProperty(value = "发货模式", name = "deliverGoodsType")
     @TableField(value = "DELIVER_GOODS_TYPE")
     private String deliverGoodsType;
 
     /** SCMID */
-    @Excel(name = "ui.data.column.orderOffsetAllocation.scmId")
+    @Excel(name = "ui.data.column.orderOffsetDetail.scmId")
     @ApiModelProperty(value = "SCMID", name = "scmId")
     @TableField(value = "SCM_ID")
     private Long scmId;

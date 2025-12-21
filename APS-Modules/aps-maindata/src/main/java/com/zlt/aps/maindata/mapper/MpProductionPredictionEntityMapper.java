@@ -2,6 +2,7 @@ package com.zlt.aps.maindata.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -11,6 +12,7 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
  * @author zlt
  * @version 1.0
  */
+@Mapper
 public interface MpProductionPredictionEntityMapper extends CommBaseMapper<MpProductionPrediction> {
 
 }

@@ -26,22 +26,23 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation;
+
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
-import com.zlt.aps.monthplan.demand.service.IMpOrderOffsetAllocationService;
 import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
@@ -83,7 +84,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 @RequiredArgsConstructor
 public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implements IDpDemandPlanService
 {
-
+    private static final String PREFIX = "REQ";
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
@@ -93,7 +94,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     // 定稿的月度排产计划
     private final IMpMonthPlanProdFinalService mpMonthPlanProdFinalService;
     // 订单分配表
-    private final IMpOrderOffsetAllocationService mpOrderOffsetAllocationService;
+    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
     private final IDpStockVersionService dpStockVersionService;
     // 区域产能分配
@@ -323,7 +324,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         validateProductionVersionFinalized(createCondition);
 
         // 2. 生成版本号
-        String monthPlanVersion = requirementVersionService.generateVersion();
+        String monthPlanVersion = requirementVersionService.generateVersion(PREFIX);
         createCondition.setMonthPlanVersion(monthPlanVersion);
 
         // 3. 并行获取数据
@@ -483,12 +484,12 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             SaleRequirePlanHelper.getGroupSalesOrder(allocationOrders);
 
         // 计算库存分配
-        List<MpOrderOffsetAllocation> allocations = StockAllocationHelper.calculateStockAllocation(
+        List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
 
         // 过滤净需求
-        List<MpOrderOffsetAllocation> netDemands = allocations.stream()
-            .filter(allocation -> allocation.getProduceQtyDue() > 0)
+        List<DpOrderOffsetDetail> netDemands = allocations.stream()
+            .filter(allocation -> allocation.getProducionQty() > 0)
             .collect(Collectors.toList());
 
         return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
@@ -504,7 +505,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         // 批量插入分配结果
         if (CollectionUtils.isNotEmpty(allocationResult.getAllocations())) {
-            mpOrderOffsetAllocationService.insertBatchData(allocationResult.getAllocations());
+            this.dpOrderOffsetDetailService.insertBatchData(allocationResult.getAllocations());
         }
 
         // 批量插入库存版本
@@ -517,7 +518,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      */
     private List<DpDemandPlan> generateDemandPlans(
         DpDemandPlan createCondition,
-        List<MpOrderOffsetAllocation> netDemands,
+        List<DpOrderOffsetDetail> netDemands,
         DataCollection data) {
 
         List<DpDemandPlan> demandPlans = new ArrayList<>();
@@ -571,7 +572,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      */
     private List<DpDemandPlan> processNetDemands(
         DpDemandPlan createCondition,
-        List<MpOrderOffsetAllocation> netDemands) {
+        List<DpOrderOffsetDetail> netDemands) {
 
         List<MdmAreaCapaAllocation> areaCapaAllocations =
             mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition);
@@ -587,7 +588,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      * 转换订单分配为需求计划
      */
     private List<DpDemandPlan> transformAllocationsToDemandPlans(
-        List<MpOrderOffsetAllocation> orders) {
+        List<DpOrderOffsetDetail> orders) {
 
         return orders.stream()
             .map(this::buildDemandPlanFromAllocation)
@@ -598,18 +599,18 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      * 处理有产能配置的净需求
      */
     private List<DpDemandPlan> processNetDemandsWithCapacity(
-        List<MpOrderOffsetAllocation> netDemands,
+        List<DpOrderOffsetDetail> netDemands,
         List<MdmAreaCapaAllocation> areaCapaAllocations) {
         List<DpDemandPlan> result = new ArrayList<>();
         // 按区域分组净需求
-        Map<String, List<MpOrderOffsetAllocation>> demandsByArea = netDemands.stream()
-            .collect(Collectors.groupingBy(MpOrderOffsetAllocation::getAreaCode));
+        Map<String, List<DpOrderOffsetDetail>> demandsByArea = netDemands.stream()
+            .collect(Collectors.groupingBy(DpOrderOffsetDetail::getAreaCode));
         // 按区域分组产能配置
         Map<String, List<MdmAreaCapaAllocation>> capacityByArea = areaCapaAllocations.stream()
             .collect(Collectors.groupingBy(MdmAreaCapaAllocation::getAreaCode));
         // 处理每个区域
         demandsByArea.forEach((areaCode, orders) -> {
-            List<MpOrderOffsetAllocation> sortedOrders = sortOrdersByPriority(orders);
+            List<DpOrderOffsetDetail> sortedOrders = sortOrdersByPriority(orders);
             List<MdmAreaCapaAllocation> areaCapacities = capacityByArea.get(areaCode);
 
             if (CollectionUtils.isEmpty(areaCapacities)) {
@@ -623,7 +624,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
                 .sum();
 
             long totalDemand = sortedOrders.stream()
-                .mapToLong(MpOrderOffsetAllocation::getProduceQtyDue)
+                .mapToLong(DpOrderOffsetDetail::getProducionQty)
                 .sum();
 
             // 调整优先级
@@ -876,7 +877,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      * @param overAreaCapacityValue 超出区域产能值
      */
     public void processDemandPriorityExcludingLast(
-        List<MpOrderOffsetAllocation> sortedOrders,
+        List<DpOrderOffsetDetail> sortedOrders,
         long overAreaCapacityValue) {
 
         if (CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
@@ -885,14 +886,14 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         long accumulatedQty = 0;
         // 从列表尾端开始遍历
         for (int i = sortedOrders.size() - 1; i >= 0; i--) {
-            MpOrderOffsetAllocation order = sortedOrders.get(i);
+            DpOrderOffsetDetail order = sortedOrders.get(i);
             // 跳过已处理或无效的订单
-            if (order == null || order.getProduceQtyDue() == null || order.getProduceQtyDue() <= 0) {
+            if (order == null || order.getProducionQty() == null || order.getProducionQty() <= 0) {
                 continue;
             }
             // 检查当前累加值是否已经达到或超过阈值
             // 注意：先检查，再累加
-            long currentOrderQty = order.getProduceQtyDue();
+            long currentOrderQty = order.getProducionQty();
             if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
                 break;
             } else {
@@ -903,7 +904,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         }
     }
 
-    private List<MpOrderOffsetAllocation> sortOrdersByPriority(List<MpOrderOffsetAllocation> saleOrders) {
+    private List<DpOrderOffsetDetail> sortOrdersByPriority(List<DpOrderOffsetDetail> saleOrders) {
         return saleOrders.stream()
             .sorted(getHighPerformanceComparator())
             .collect(Collectors.toList());
@@ -912,7 +913,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     /**
      * 高性能自定义比较器（适用于大数据量）
      */
-    private  Comparator<MpOrderOffsetAllocation> getHighPerformanceComparator() {
+    private  Comparator<DpOrderOffsetDetail> getHighPerformanceComparator() {
         return new SalesOrderComparator();
     }
 
@@ -920,10 +921,10 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      * 自定义高性能比较器实现
      * 避免重复解析和lambda开销
      */
-    private static class SalesOrderComparator implements Comparator<MpOrderOffsetAllocation> {
+    private static class SalesOrderComparator implements Comparator<DpOrderOffsetDetail> {
 
         @Override
-        public int compare(MpOrderOffsetAllocation o1, MpOrderOffsetAllocation o2) {
+        public int compare(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
             // 1. 比较供应链优先级
             int scmPriorityCompare = compareScmPriority(o1, o2);
             if (scmPriorityCompare != 0) {
@@ -940,7 +941,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             return compareOrdQty(o1, o2);
         }
 
-        private int compareScmPriority(MpOrderOffsetAllocation o1, MpOrderOffsetAllocation o2) {
+        private int compareScmPriority(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
             Integer p1 = parseScmPriority(o1.getScmPriority());
             Integer p2 = parseScmPriority(o2.getScmPriority());
 
@@ -957,7 +958,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             return Integer.compare(p1, p2);
         }
 
-        private int compareBillDate(MpOrderOffsetAllocation o1, MpOrderOffsetAllocation o2) {
+        private int compareBillDate(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
             Date d1 = o1.getBillDate();
             Date d2 = o2.getBillDate();
 
@@ -975,9 +976,9 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             return d1.compareTo(d2);
         }
 
-        private int compareOrdQty(MpOrderOffsetAllocation o1, MpOrderOffsetAllocation o2) {
-            Long q1 = o1.getProduceQtyDue();
-            Long q2 = o2.getProduceQtyDue();
+        private int compareOrdQty(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
+            Long q1 = o1.getProducionQty();
+            Long q2 = o2.getProducionQty();
 
             if (q1 == null && q2 == null) {
                 return 0;
@@ -1004,13 +1005,11 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         }
     }
 
-    private DpDemandPlan buildDemandPlanFromAllocation(MpOrderOffsetAllocation netDemand) {
+    private DpDemandPlan buildDemandPlanFromAllocation(DpOrderOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
-        demandPlan.setNetQty(netDemand.getProduceQtyDue());
+        demandPlan.setNetQty(netDemand.getProducionQty());
         demandPlan.setYearWeek(netDemand.getWeekYear());
-        demandPlan.setIsDynamicBalance(netDemand.getDynamicBalance());
-        demandPlan.setIsUniformity(netDemand.getUniformity());
         return demandPlan;
     }
 
@@ -1071,13 +1070,13 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      */
     @Getter
     private static class OrderAllocationResult {
-        private final List<MpOrderOffsetAllocation> allocations;
-        private final List<MpOrderOffsetAllocation> netDemands;
+        private final List<DpOrderOffsetDetail> allocations;
+        private final List<DpOrderOffsetDetail> netDemands;
         private final Map<String, List<MdmProductStock>> stockMap;
 
         public OrderAllocationResult(
-            List<MpOrderOffsetAllocation> allocations,
-            List<MpOrderOffsetAllocation> netDemands,
+            List<DpOrderOffsetDetail> allocations,
+            List<DpOrderOffsetDetail> netDemands,
             Map<String, List<MdmProductStock>> stockMap) {
             this.allocations = allocations != null ? allocations : Collections.emptyList();
             this.netDemands = netDemands != null ? netDemands : Collections.emptyList();

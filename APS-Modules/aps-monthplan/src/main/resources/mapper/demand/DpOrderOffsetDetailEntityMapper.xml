@@ -2,8 +2,8 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MpOrderOffsetAllocationEntityMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation" id="MpOrderOffsetAllocationResult">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper">
+    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail" id="DpOrderOffsetDetailResult">
             <result property="id" column="ID"/>
             <result property="factoryCode" column="FACTORY_CODE"/>
             <result property="year" column="YEAR"/>
@@ -25,9 +25,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <result property="stockQty" column="STOCK_QTY"/>
             <result property="allocationQty" column="ALLOCATION_QTY"/>
             <result property="plannedSurplus" column="PLANNED_SURPLUS"/>
+            <result property="productionQty" column="PRODUCTION_QTY"/>
             <result property="scmPriority" column="SCM_PRIORITY"/>
             <result property="weekYear" column="WEEK_YEAR"/>
-            <result property="dynamicBalance" column="DYNAMIC_BALANCE"/>
+            <result property="isDynamicBalance" column="IS_DYNAMIC_BALANCE"/>
             <result property="uniformity" column="UNIFORMITY"/>
             <result property="deliverGoodsType" column="DELIVER_GOODS_TYPE"/>
             <result property="scmId" column="SCM_ID"/>
@@ -40,12 +41,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
 
-    <sql id="selectMpOrderOffsetAllocationVo">
-        SELECT ID, FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, PRODUCT_TYPE_CODE, LOCATION_TYPE, AREA_CODE, CUSTOM_CODE, CUSTOM_NAME, CUSTOM_NATION_CODE, DESTINATION_NATION_CODE, PO_NUMBER, BRAND, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, ORDER_QTY, STOCK_QTY, ALLOCATION_QTY, PLANNED_SURPLUS, SCM_PRIORITY, WEEK_YEAR, DYNAMIC_BALANCE, UNIFORMITY, DELIVER_GOODS_TYPE, SCM_ID, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_MP_ORDER_OFFSET_ALLOCATION
+    <sql id="selectDpOrderOffsetDetailVo">
+        SELECT ID, FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, PRODUCT_TYPE_CODE, LOCATION_TYPE, AREA_CODE, CUSTOM_CODE, CUSTOM_NAME, CUSTOM_NATION_CODE, DESTINATION_NATION_CODE, PO_NUMBER, BRAND, MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, ORDER_QTY, STOCK_QTY, ALLOCATION_QTY, PLANNED_SURPLUS, PRODUCTION_QTY, SCM_PRIORITY, WEEK_YEAR, IS_DYNAMIC_BALANCE, UNIFORMITY, DELIVER_GOODS_TYPE, SCM_ID, REMARK, IS_DELETE, CREATE_TIME, UPDATE_TIME, CREATE_BY, UPDATE_BY, FROM T_DP_ORDER_OFFSET_DETAIL
     </sql>
 
-    <select id="selectMpOrderOffsetAllocationList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation" resultMap="MpOrderOffsetAllocationResult">
-        <include refid="selectMpOrderOffsetAllocationVo"/>
+    <select id="selectDpOrderOffsetDetailList" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail" resultMap="DpOrderOffsetDetailResult">
+        <include refid="selectDpOrderOffsetDetailVo"/>
         WHERE NVL(IS_DELETE,0) = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null "> AND YEAR = #{year}</if>
@@ -67,23 +68,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="stockQty != null "> AND STOCK_QTY = #{stockQty}</if>
         <if test="allocationQty != null "> AND ALLOCATION_QTY = #{allocationQty}</if>
         <if test="plannedSurplus != null "> AND PLANNED_SURPLUS = #{plannedSurplus}</if>
+        <if test="productionQty != null "> AND PRODUCTION_QTY = #{productionQty}</if>
         <if test="scmPriority != null  and scmPriority != ''"> AND SCM_PRIORITY = #{scmPriority}</if>
         <if test="weekYear != null  and weekYear != ''"> AND WEEK_YEAR = #{weekYear}</if>
-        <if test="dynamicBalance != null  and dynamicBalance != ''"> AND DYNAMIC_BALANCE = #{dynamicBalance}</if>
+        <if test="isDynamicBalance != null  and isDynamicBalance != ''"> AND IS_DYNAMIC_BALANCE = #{isDynamicBalance}</if>
         <if test="uniformity != null  and uniformity != ''"> AND UNIFORMITY = #{uniformity}</if>
         <if test="deliverGoodsType != null  and deliverGoodsType != ''"> AND DELIVER_GOODS_TYPE = #{deliverGoodsType}</if>
         <if test="scmId != null "> AND SCM_ID = #{scmId}</if>
     </select>
 
-    <select id="selectMpOrderOffsetAllocationById" parameterType="Long" resultMap="MpOrderOffsetAllocationResult">
-        <include refid="selectMpOrderOffsetAllocationVo"/>
+    <select id="selectDpOrderOffsetDetailById" parameterType="Long" resultMap="DpOrderOffsetDetailResult">
+        <include refid="selectDpOrderOffsetDetailVo"/>
         WHERE ID = #{id}
     </select>
 
-    <select id="selectMpOrderOffsetAllocationByIds" parameterType="list"
-            resultMap="MpOrderOffsetAllocationResult">
+    <select id="selectDpOrderOffsetDetailByIds" parameterType="list"
+            resultMap="DpOrderOffsetDetailResult">
 
-        <include refid="selectMpOrderOffsetAllocationVo"/>
+        <include refid="selectDpOrderOffsetDetailVo"/>
            WHERE  NVL(IS_DELETE,0) = 0  AND ID IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{id}
@@ -91,8 +93,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     </select>
 
-    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation">
-        INSERT INTO T_MP_ORDER_OFFSET_ALLOCATION
+    <insert id="insert" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail">
+        INSERT INTO T_DP_ORDER_OFFSET_DETAIL
         <trim prefix="(" suffix=")" suffixOverrides=",">
             ID,
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE,</if>
@@ -115,9 +117,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="stockQty != null">STOCK_QTY,</if>
             <if test="allocationQty != null">ALLOCATION_QTY,</if>
             <if test="plannedSurplus != null">PLANNED_SURPLUS,</if>
+            <if test="productionQty != null">PRODUCTION_QTY,</if>
             <if test="scmPriority != null">SCM_PRIORITY,</if>
             <if test="weekYear != null">WEEK_YEAR,</if>
-            <if test="dynamicBalance != null">DYNAMIC_BALANCE,</if>
+            <if test="isDynamicBalance != null">IS_DYNAMIC_BALANCE,</if>
             <if test="uniformity != null">UNIFORMITY,</if>
             <if test="deliverGoodsType != null">DELIVER_GOODS_TYPE,</if>
             <if test="scmId != null">SCM_ID,</if>
@@ -129,7 +132,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">UPDATE_BY,</if>
          </trim>
         <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
-            SEQ_RDER_OFFSET_ALLOCATION.NEXTVAL,
+            SEQ_RDER_OFFSET_DETAIL.NEXTVAL,
             <if test="factoryCode != null and factoryCode != ''">#{factoryCode},</if>
             <if test="year != null">#{year},</if>
             <if test="month != null">#{month},</if>
@@ -150,9 +153,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="stockQty != null">#{stockQty},</if>
             <if test="allocationQty != null">#{allocationQty},</if>
             <if test="plannedSurplus != null">#{plannedSurplus},</if>
+            <if test="productionQty != null">#{productionQty},</if>
             <if test="scmPriority != null">#{scmPriority},</if>
             <if test="weekYear != null">#{weekYear},</if>
-            <if test="dynamicBalance != null">#{dynamicBalance},</if>
+            <if test="isDynamicBalance != null">#{isDynamicBalance},</if>
             <if test="uniformity != null">#{uniformity},</if>
             <if test="deliverGoodsType != null">#{deliverGoodsType},</if>
             <if test="scmId != null">#{scmId},</if>
@@ -165,8 +169,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
     </insert>
 
-    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpOrderOffsetAllocation">
-        UPDATE T_MP_ORDER_OFFSET_ALLOCATION
+    <update id="update" parameterType="com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail">
+        UPDATE T_DP_ORDER_OFFSET_DETAIL
         <trim prefix="SET" suffixOverrides=",">
             <if test="factoryCode != null and factoryCode != ''">FACTORY_CODE = #{factoryCode},</if>
             <if test="year != null">YEAR = #{year},</if>
@@ -188,9 +192,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="stockQty != null">STOCK_QTY = #{stockQty},</if>
             <if test="allocationQty != null">ALLOCATION_QTY = #{allocationQty},</if>
             <if test="plannedSurplus != null">PLANNED_SURPLUS = #{plannedSurplus},</if>
+            <if test="productionQty != null">PRODUCTION_QTY = #{productionQty},</if>
             <if test="scmPriority != null">SCM_PRIORITY = #{scmPriority},</if>
             <if test="weekYear != null">WEEK_YEAR = #{weekYear},</if>
-            <if test="dynamicBalance != null">DYNAMIC_BALANCE = #{dynamicBalance},</if>
+            <if test="isDynamicBalance != null">IS_DYNAMIC_BALANCE = #{isDynamicBalance},</if>
             <if test="uniformity != null">UNIFORMITY = #{uniformity},</if>
             <if test="deliverGoodsType != null">DELIVER_GOODS_TYPE = #{deliverGoodsType},</if>
             <if test="scmId != null">SCM_ID = #{scmId},</if>
@@ -204,15 +209,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ID = #{id}
     </update>
 
-    <delete id="deleteMpOrderOffsetAllocationById" parameterType="Long">
-        UPDATE T_MP_ORDER_OFFSET_ALLOCATION SET IS_DELETE = 1 WHERE ID = #{id}
+    <delete id="deleteDpOrderOffsetDetailById" parameterType="Long">
+        UPDATE T_DP_ORDER_OFFSET_DETAIL SET IS_DELETE = 1 WHERE ID = #{id}
     </delete>
 
-    <delete id="deleteMpOrderOffsetAllocationByIds" parameterType="String">
-        UPDATE T_MP_ORDER_OFFSET_ALLOCATION SET IS_DELETE = 1 WHERE ID IN
+    <delete id="deleteDpOrderOffsetDetailByIds" parameterType="String">
+        UPDATE T_DP_ORDER_OFFSET_DETAIL SET IS_DELETE = 1 WHERE ID IN
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
     </delete>
-
 </mapper>
