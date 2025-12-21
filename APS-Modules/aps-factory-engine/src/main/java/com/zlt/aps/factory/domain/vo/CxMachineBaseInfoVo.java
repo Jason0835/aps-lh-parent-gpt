@@ -281,7 +281,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
         //按最后排产日，进行升序排序
-        cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay));
+        cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
         return cxLhGroupList.get(BigDecimal.ZERO.intValue());
     }

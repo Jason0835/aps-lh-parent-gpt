@@ -3,11 +3,9 @@ package com.zlt.aps.factory.scheduling;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -24,9 +22,9 @@ import java.util.*;
 @Data
 public class TbrProductionContext extends Context {
     /**
-     * 排产参数配置信息
+     * 基础数据容器对象
      */
-    ProductionCapacityParamConfiguration paramConfiguration;
+    private BaseDataContainer baseDataContainer;
     /**
      * 排产计划信息
      */
@@ -44,23 +42,11 @@ public class TbrProductionContext extends Context {
      * key 结构名 value 排产计划集合
      */
     Map<String, ProductionPlanGroupInfo> groupProductionInfo;
-    /**
-     * 成型产能信息集合
-     * key cxMachineCode value 成型机信息
-     */
-    Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
+
     /**
      * 反向匹配成型机台
      */
     Set<String> reverseFindSet;
-    /**
-     * 模具信息
-     */
-    Map<String, ProductionMouldInfoVo> mouldInfoMap;
-    /**
-     * Sku与模具关系
-     */
-    Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
 
     /**
      * 加入收尾，方向匹配结构集合
@@ -107,7 +93,7 @@ public class TbrProductionContext extends Context {
         if (StringUtils.isBlank(materialDesc) || null == startDay || null == endDay || startDay > endDay) {
             return Collections.emptyList();
         }
-        List<MonthPlanProductMouldInfoVo> skuRelationList = skuMouldRelationMap.get(materialDesc);
+        List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
         if (CollectionUtils.isEmpty(skuRelationList)) {
             return Collections.emptyList();
         }
@@ -143,7 +129,7 @@ public class TbrProductionContext extends Context {
         }
         Set<String> enableSet = new HashSet<>();
         materialDescSet.forEach(materialDesc -> {
-            List<MonthPlanProductMouldInfoVo> skuRelationList = skuMouldRelationMap.get(materialDesc);
+            List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
             if (CollectionUtils.isEmpty(skuRelationList)) {
                 return;
             }
@@ -167,7 +153,7 @@ public class TbrProductionContext extends Context {
         if (StringUtils.isBlank(materialDesc) || null == startDay || null == endDay || startDay > endDay) {
             return Collections.emptySet();
         }
-        List<MonthPlanProductMouldInfoVo> skuRelationList = skuMouldRelationMap.get(materialDesc);
+        List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
         if (CollectionUtils.isEmpty(skuRelationList)) {
             return Collections.emptySet();
         }
@@ -183,7 +169,7 @@ public class TbrProductionContext extends Context {
             if (materialDesc.equals(shareMaterialDesc)) {
                 return;
             }
-            List<MonthPlanProductMouldInfoVo> shareOtherRelationList = skuMouldRelationMap.get(shareMaterialDesc);
+            List<MonthPlanProductMouldInfoVo> shareOtherRelationList = baseDataContainer.getSkuMouldRelationMap().get(shareMaterialDesc);
             if (CollectionUtils.isEmpty(shareOtherRelationList)) {
                 return;
             }
@@ -247,7 +233,7 @@ public class TbrProductionContext extends Context {
     private List<ProductionMouldInfoVo> getEffectiveByRange(List<MonthPlanProductMouldInfoVo> skuRelationList, Integer startDay, Integer endDay) {
         List<ProductionMouldInfoVo> effectiveList = new ArrayList<>();
         skuRelationList.forEach(skuRelation -> {
-            ProductionMouldInfoVo mouldInfo = mouldInfoMap.get(skuRelation.getMouldCode());
+            ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
             if (null == mouldInfo) {
                 return;
             }
