@@ -16,6 +16,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
+import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;

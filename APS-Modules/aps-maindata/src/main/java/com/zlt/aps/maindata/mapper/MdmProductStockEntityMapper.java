@@ -1,12 +1,12 @@
-package com.zlt.aps.monthplan.demand.mapper;
+package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：DpStockVersionMapper.java
+ * 文件名称：MdmProductStockMapper.java
  * 描    述：成品库存Mapper接口
  *
  * @author zlt
@@ -16,10 +16,9 @@ import org.apache.ibatis.annotations.Mapper;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-12-08
+ * @date 2025-12-22
  */
 @Mapper
-public interface DpStockVersionEntityMapper extends CommBaseMapper<DpStockVersion> {
+public interface MdmProductStockEntityMapper extends CommBaseMapper<MdmProductStock> {
 
 }
-
