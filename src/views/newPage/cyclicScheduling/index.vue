@@ -87,7 +87,6 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
-import { gen } from "../../../../dist/static/js/chunk-libs.ec4764f8";
 
 export default {
   name: "RegionalCapacityAllocation",

@@ -1,7 +1,8 @@
 import request from '@/utils/request'
 export function getListMes(query) {
   return request({
-    url: '/monthplan/mdmFinishStock/list4Mes',
+    // url: '/monthplan/mdmFinishStock/list4Mes',
+    url: '/monthplan/mdmProductStock/list',
     method: 'post',
     data: query
   })

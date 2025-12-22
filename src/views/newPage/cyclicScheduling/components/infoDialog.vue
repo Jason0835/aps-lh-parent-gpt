@@ -31,7 +31,6 @@
 <script>
 import { mapState } from "vuex";
 
-// import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
 import { saveSupplyOrderPool ,queryRelationByMaterialCode} from "@/api/monthplan/supplyOrderPool";
 
 import infoForm from "@/views/components/infoForm.vue";

@@ -69,7 +69,7 @@ export default {
     tltUpload,
     // infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no",'biz_stor_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -123,8 +123,11 @@ export default {
           label: this.$t("ui.data.column.finishStock.structureName"),
         },
         {
-          prop: "domesticExportSale",
+          prop: "locationType",
           label: this.$t("ui.data.column.finishStock.wai"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
+          },
         },
         {
           prop: "materialCode",
@@ -140,19 +143,19 @@ export default {
           label: this.$t("ui.data.column.finishStock.stockQty"),
         },
         {
-          prop: "uniformity",
+          prop: "weekYear",
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
 
         {
-          prop: "dynamicBalance",
+          prop: "isDynamicBalance",
           label: this.$t("ui.data.column.monthplan.dynamicBalance"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
-          prop: "uniformity",
+          prop: "isUniformity",
           label: this.$t("ui.data.column.monthplan.uniformity"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -284,7 +287,7 @@ export default {
     },
     handleExport() {
       downloadLink(
-        "/monthplan/mdmFinishStock/export4Mes",
+        "/monthplan/mdmProductStock/export",
         this.formatParams(false)
       );
     },
@@ -355,9 +358,10 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.getList();
   },
   activated() {
-    this.getList();
+
   },
 };
 </script>
