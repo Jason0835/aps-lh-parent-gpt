@@ -8,6 +8,7 @@ import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfigur
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -40,4 +41,8 @@ public class BaseDataContainer implements Serializable {
      * 模壳总数信息
      */
     Map<String, MouldShellBaseInfoVo> mouldShellMap;
+    /**
+     * 生胎对应的特殊原材料配置信息
+     */
+    Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
 }

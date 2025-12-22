@@ -20,7 +20,6 @@ import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -848,17 +847,17 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
                 BigDecimal result = BigDecimalUtils.multiply(singleTireWeight, totalProductQty);
                 resultVo.setMonthPlanTireWeight(result);
                 // 单胎硫化时间
-                MonthPlanManufacturingRequirementVo requirementVo = new MonthPlanManufacturingRequirementVo();
-                int summerMonth = Integer.parseInt(summerMonthParam.toString());
-                int winterMonth = Integer.parseInt(winterMonthParam.toString());
-                if (currentMonth >= summerMonth && currentMonth < winterMonth) {
-                    requirementVo.setCuringTime(resultVo.getCuringTime());
-                } else {
-                    requirementVo.setCuringTime(resultVo.getCuringTime2());
-                }
-                if (requirementVo.getCuringTime() == null) {
-                    requirementVo.setCuringTime(BigDecimal.ZERO);
-                }
+//                MonthPlanManufacturingRequirementVo requirementVo = new MonthPlanManufacturingRequirementVo();
+//                int summerMonth = Integer.parseInt(summerMonthParam.toString());
+//                int winterMonth = Integer.parseInt(winterMonthParam.toString());
+//                if (currentMonth >= summerMonth && currentMonth < winterMonth) {
+//                    requirementVo.setCuringTime(resultVo.getCuringTime());
+//                } else {
+//                    requirementVo.setCuringTime(resultVo.getCuringTime2());
+//                }
+//                if (requirementVo.getCuringTime() == null) {
+//                    requirementVo.setCuringTime(BigDecimal.ZERO);
+//                }
 //                BigDecimal singleCuringTime = ProductUtils.getSingleCuringTime(requirementVo, productionContext);
 //                // 计算硫化产能
 //                Long singleMouldCapacity = MouldUtils.getSingleMouldCapacity(productionContext, singleCuringTime);

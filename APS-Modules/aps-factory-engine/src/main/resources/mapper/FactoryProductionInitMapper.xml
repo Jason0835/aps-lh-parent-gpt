@@ -2,11 +2,4 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionInitMapper">
 
-    <update id="updateProductionSequence" parameterType="java.util.List">
-        <foreach collection="sequenceList" item="productionInit" index="index" open="" close="" separator=";">
-            UPDATE t_mp_proc_month_plan_init
-               SET PRODUCTION_SEQUENCE = #{productionInit.productionSequence,jdbcType=DECIMAL}
-             WHERE ID = #{productionInit.id,jdbcType=DECIMAL}
-        </foreach>
-    </update>
 </mapper>

@@ -137,6 +137,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
+        //特殊材料的胎胚配置信息
+        specialMaterialInfoHandler(productionContext);
+
     }
 
     /**
@@ -221,6 +224,75 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             return Collections.emptyMap();
         }
         return allMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
+    }
+
+    /**
+     * 根据排产信息，获取特殊原材料的配置信息
+     * 包含：1、特殊原材料的胎胚
+     * 2、特殊原材料的库存及可转化的轮胎条数
+     *
+     * @param productionContext 排产单位
+     */
+    private void specialMaterialInfoHandler(TbrProductionContext productionContext) {
+        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
+        if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
+            return;
+        }
+        //转化胎胚号-特殊材料
+        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
+        Map<String, SpecialMaterialInfoVo> specialMaterialInfoMap = new HashMap<>();
+        Map<String, BigDecimal> specialMaterialMaxMap = new HashMap<>();
+        Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
+        allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
+            if (CollectionUtils.isEmpty(rawMaterialList)) {
+                return;
+            }
+            Map<String, BigDecimal> rawMaterialConfigurationMap = embryoSpecialMaterialMap.get(embryoCode);
+            if (null == rawMaterialConfigurationMap) {
+                rawMaterialConfigurationMap = new HashMap<>();
+                embryoSpecialMaterialMap.put(embryoCode, rawMaterialConfigurationMap);
+            }
+            for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
+                String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
+                if (StringUtils.isBlank(specialMaterialCode)) {
+                    continue;
+                }
+                BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();
+                rawMaterialConfigurationMap.put(specialMaterialCode, dosage);
+                //构建特殊原材料初始化信息
+                if (!specialMaterialInfoMap.containsKey(specialMaterialCode)) {
+                    specialMaterialInfoMap.put(specialMaterialCode, SpecialMaterialInfoVo.createInitInfo(specialMaterialCode, embryoSpecialMaterialInfo.getChildMaterialName()));
+                }
+                BigDecimal maxDosage = specialMaterialMaxMap.get(specialMaterialCode);
+                if (null == maxDosage) {
+                    specialMaterialMaxMap.put(specialMaterialCode, dosage);
+                } else {
+                    if (maxDosage.compareTo(dosage) < BigDecimal.ZERO.intValue()) {
+                        specialMaterialMaxMap.put(specialMaterialCode, dosage);
+                    }
+                }
+            }
+        });
+        productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
+        productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
+        //同时获取特殊材料库存信息
+        List<SpecialMaterialStockVo> specialMaterialStockList = getDataService().getSpecialMaterialStockInfo(productionContext);
+        if (CollectionUtils.isEmpty(specialMaterialStockList)) {
+            return;
+        }
+        //构建库存对应的可生产量
+        specialMaterialStockList.forEach(specialMaterialStockInfo -> {
+            String specialMaterialCode = specialMaterialStockInfo.getMaterialCode();
+            if (StringUtils.isBlank(specialMaterialCode)) {
+                return;
+            }
+            Long stock = specialMaterialStockInfo.getStock();
+            if (!specialMaterialInfoMap.containsKey(specialMaterialCode)) {
+                return;
+            }
+            BigDecimal maxDosage = specialMaterialMaxMap.get(specialMaterialCode);
+            specialMaterialInfoMap.get(specialMaterialCode).addInventoryCapacity(stock, maxDosage);
+        });
     }
 
     /**

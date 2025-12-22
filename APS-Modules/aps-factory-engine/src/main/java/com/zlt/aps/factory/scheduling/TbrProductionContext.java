@@ -6,6 +6,7 @@ import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -43,6 +44,11 @@ public class TbrProductionContext extends Context {
      */
     Map<String, ProductionPlanGroupInfo> groupProductionInfo;
 
+    /**
+     * 特殊原材料信息
+     * key 特殊原材料编码 value 特殊原材料对象实例
+     */
+    Map<String, SpecialMaterialInfoVo> specialMaterialInfoMap;
     /**
      * 反向匹配成型机台
      */

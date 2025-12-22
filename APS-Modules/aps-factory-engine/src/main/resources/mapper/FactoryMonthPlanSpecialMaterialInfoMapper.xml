@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.factory.mapper.FactoryMonthPlanSpecialMaterialInfoMapper">
+
+    <select id="getSpecialMaterialEmbryoInfo" resultType="com.zlt.aps.factory.domain.vo.EmbryoSpecialMaterialInfoVo">
+        SELECT mcd.FACTORY_CODE,
+               mcd.EMBRYO_CODE,
+               mcd.CHILD_MATERIAL_CODE,
+               mcd.CHILD_MATERIAL_NAME,
+               mcd.DOSAGE
+          FROM t_mdm_material_consume_detail mcd
+         WHERE IFNULL(mcd.IS_DELETE, 0) = 0
+           AND mcd.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND EXISTS (SELECT 1
+                         FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
+                        WHERE IFNULL(smr.IS_DELETE, 0) = 0)
+                          AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND smr.MATERIAL_CODE = mcd.CHILD_MATERIAL_CODE)
+           AND EXISTS (SELECT 1
+                         FROM t_mp_proc_month_plan_init mpi
+                        WHERE IFNULL(mpi.IS_DELETE, 0) = 0
+                          AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND mpi.YEAR = #{year,jdbcType=DECIMAL}
+                          AND mpi.MONTH = #{month,jdbcType=DECIMAL}
+                          AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                          AND mpi.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                          AND mcd.EMBRYO_CODE = mpi.EMBRYO_CODE)
+
+    </select>
+
+    <select id="getSpecialMaterialStockInfo" resultType="com.zlt.aps.factory.domain.vo.SpecialMaterialStockVo">
+        SELECT sms.MATERIAL_CODE,
+               sms.MATERIAL_DESC,
+               sms.STANDARD_LENGTH,
+               sms.STOCK
+          FROM t_mdm_special_material_stock sms
+         WHERE IFNULL(sms.IS_DELETE, 0) = 0
+           AND sms.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+</mapper>
