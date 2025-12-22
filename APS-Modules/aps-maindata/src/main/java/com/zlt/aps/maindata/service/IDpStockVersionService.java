@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmFinishStock;
+import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -19,7 +19,7 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-08
  */
-public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
+public interface IDpStockVersionService extends IDocService<DpStockVersion> {
 
     /**
      * 查询MES实时成品库存列表
@@ -27,5 +27,5 @@ public interface IMdmFinishStockService extends IDocService<MdmFinishStock> {
      * @param queryVO 查询参数
      * @return 结果
      */
-    List<MdmFinishStock> list4Mes(MdmFinishStock queryVO);
+    List<DpStockVersion> list4Mes(DpStockVersion queryVO);
 }
