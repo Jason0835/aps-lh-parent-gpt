@@ -12,6 +12,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -270,6 +271,33 @@ public class DpStockVersionServiceImpl extends BaseService<DpStockVersion>  impl
             list.add(requireStock);
         });
         this.insertBatchData(list);
+    }
+
+    @Override
+    public void insertBatchData(MpProductionPrediction createCondition, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+        if (org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
+            return;
+        }
+        List<DpStockVersion> list = Lists.newArrayList();
+        List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
+        finishedProductStocks.forEach(finishedProductStock -> {
+            DpStockVersion requireStock = this.buildRequireStock(createCondition,finishedProductStock);
+            list.add(requireStock);
+        });
+        this.insertBatchData(list);
+    }
+
+    private DpStockVersion buildRequireStock(MpProductionPrediction createCondition, MdmProductStock finishedProductStock) {
+        DpStockVersion requireStock = new DpStockVersion();
+        BeanUtils.copyProperties(finishedProductStock, requireStock);
+        requireStock.setId(null);
+        requireStock.setRequireVersion(createCondition.getPredictionVersion());
+        requireStock.setIsDelete(YesOrNoEnum.NO.getValue());
+        requireStock.setRemainingQty(finishedProductStock.getLeftOverQty());
+        requireStock.setBaseVale(null);
+        requireStock.setYear(createCondition.getYear());
+        requireStock.setMonth(createCondition.getMonth());
+        return requireStock;
     }
 
     private DpStockVersion buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MdmProductStock finishedProductStock) {

@@ -26,4 +26,9 @@ public interface IMonthPlanSurplusService {
    * @param mdmMonthSurpluses
    */
   void batchInsertPlanSurplusList(List<MdmMonthSurplus> mdmMonthSurpluses);
+  /**
+   *  获取当前年月月底计划余量
+   * @return 当前年月月底计划余量
+   */
+  List<MdmMonthSurplus> findCurrentMonthPlanSurplus();
 }

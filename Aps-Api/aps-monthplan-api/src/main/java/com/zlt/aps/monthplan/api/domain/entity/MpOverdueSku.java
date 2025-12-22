@@ -28,7 +28,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 @ApiModel(value = "超期SKU对象", description = "超期SKU对象 ")
 @Data
-@TableName(value = "t_mp_overdue_sku")
+@TableName(value = "t_mdm_overdue_sku")
 public class MpOverdueSku extends BaseEntity{
 
     private static final long serialVersionUID = 1L;

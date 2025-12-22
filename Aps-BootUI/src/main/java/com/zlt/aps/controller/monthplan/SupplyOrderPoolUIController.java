@@ -52,7 +52,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      * 根据条件查询供应链订单池列表
      */
     @ApiOperation("根据条件查询供应链订单池列表")
-    @RequiresPermissions("monthplan:pool:list")
+    @RequiresPermissions("monthplan:supplyOrderPool:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(SupplyOrderPool entity) {
@@ -63,7 +63,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      * 修改或新增供应链订单池
      */
     @ApiOperation("修改或新增供应链订单池")
-    @RequiresPermissions("monthplan:pool:edit")
+    @RequiresPermissions("monthplan:supplyOrderPool:edit")
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(SupplyOrderPool supplyOrderPool) {
@@ -83,7 +83,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      * 删除供应链订单池
      */
     @ApiOperation("删除供应链订单池（id不为空）")
-    @RequiresPermissions("monthplan:pool:remove")
+    @RequiresPermissions("monthplan:supplyOrderPool:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
@@ -134,6 +134,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
 
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
+    @RequiresPermissions("monthplan:supplyOrderPool:export")
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, SupplyOrderPool entity) throws IOException {
@@ -167,6 +168,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
    */
   @ApiOperation("生成周期排产储备")
   @PostMapping("/createCycleStockUp")
+  @RequiresPermissions("monthplan:supplyOrderPool:createCycleStockUp")
   @ResponseBody
   public AjaxResult createCycleStockUp(SupplyOrderPool supplyOrderPool) {
     return iSupplyOrderPoolService.createCycleStockUp(supplyOrderPool);
@@ -176,6 +178,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
    * 生成常规储备
    */
   @ApiOperation("生成常规储备")
+  @RequiresPermissions("monthplan:supplyOrderPool:createPrecedentStockUp")
   @PostMapping("/createPrecedentStockUp")
   @ResponseBody
   public AjaxResult createPrecedentStockUp(SupplyOrderPool supplyOrderPool) {

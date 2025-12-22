@@ -4,24 +4,41 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
+import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
+import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
+import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
+import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.ruoyi.common.datasource.service.BaseService;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.apache.commons.collections4.CollectionUtils;
@@ -60,6 +77,12 @@ public class MpProductionPredictionServiceImpl extends BaseService<MpProductionP
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
     private final IMdmProductStockService mdmProductStockService;
+    // 月底计划余量
+    private final IMonthPlanSurplusService monthPlanSurplusService;
+    // 订单分配表
+    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
+    // 版本库存
+    private final IDpStockVersionService dpStockVersionService;
 
     /**
      * 查询S2-1002.未来产量预测
@@ -275,14 +298,143 @@ public class MpProductionPredictionServiceImpl extends BaseService<MpProductionP
         MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges();
         // 3、检查是否已有T月月度计划(定稿)
         //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-        validateProductionVersionFinalized(monthRangeResult.getTMonth());
+        List<FactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRangeResult.getTMonth());
+        if (CollectionUtils.isEmpty(finalVersions)) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
+        }
+        FactoryProductionVersion finalVersion =  finalVersions.get(0);
+        createCondition.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
+        createCondition.setProductionVersion(finalVersion.getProductionVersion());
         // 4、生成预测版本号(PRE+yyyymmdd+3位流水号)
         String predictionVersion = requirementVersionService.generateVersion(PREFIX);
-        // 5、查询截止预测日，在销售订单池中的所有订单；
-        List<SalesOrderPool> salesOrders = salesOrderPoolService.findCurrentSalesOrderPool();
-        // 6、从成品库存表中获取库存；同时，获取T-1月新的月底计划余量(如果库存日期 > T-1月，则月底计划余量 = 0)；
+        createCondition.setPredictionVersion(predictionVersion);
+        createCondition.setYear(monthRangeResult.getTMonth().getYear());
+        createCondition.setMonth(monthRangeResult.getTMonth().getMonthValue());
+        // 5. 并行获取数据
+        DataCollection data = fetchRequiredDataInParallel();
+        // 7、对销售订单池的订单(高优先级、中优先级、暂缓订单)，进行库存(包含当月底计划余量)冲减【参见生成需求计划的库存冲减逻辑】，注：暂缓订单也参与冲减
+        //  (1) 得到对冲后的销售订单净需求数据(包含暂缓订单+高优先级+中优先级的净需求)
+        //   (2) 同时，保存预测版本号T月的订单分配结果
+        // 4. 处理销售订单分配
+        OrderAllocationResult allocationResult = processSalesOrderAllocation(
+            predictionVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
+            data.getMonthSurplusMap());
+        // 5. 批量保存分配结果
+        saveAllocationResults(createCondition,allocationResult);
 
         return null;
+    }
+
+
+    /**
+     * 处理销售订单分配
+     */
+    private OrderAllocationResult processSalesOrderAllocation(
+        String monthPlanVersion,
+        List<SalesOrderPool> allocationOrders,
+        Map<String, List<MdmProductStock>> finishedProductStockMap,
+        Map<String, Long> monthSurplusMap) {
+        if (CollectionUtils.isEmpty(allocationOrders)) {
+            return new OrderAllocationResult(
+                Collections.emptyList(),
+                Collections.emptyList(),
+                finishedProductStockMap
+            );
+        }
+        // 分组销售订单
+        Map<String, List<SalesOrderPool>> saleOrderGroupMap =
+            SaleRequirePlanHelper.getGroupSalesOrder(allocationOrders);
+        // 计算库存分配
+        List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
+            monthPlanVersion, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
+        // 过滤净需求
+        List<DpOrderOffsetDetail> netDemands = allocations.stream()
+            .filter(allocation -> allocation.getProducionQty() > 0)
+            .collect(Collectors.toList());
+        return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
+    }
+
+    /**
+     * 批量保存分配结果
+     */
+    private void saveAllocationResults(
+        MpProductionPrediction createCondition,
+        OrderAllocationResult allocationResult) {
+        // 批量插入分配结果
+        if (CollectionUtils.isNotEmpty(allocationResult.getAllocations())) {
+            this.dpOrderOffsetDetailService.insertBatchData(allocationResult.getAllocations());
+        }
+        // 批量插入库存版本
+        dpStockVersionService.insertBatchData(createCondition,allocationResult.getStockMap());
+    }
+
+    /**
+     * 并行获取所有必要数
+     */
+    private DataCollection fetchRequiredDataInParallel() {
+        CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
+            CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
+        CompletableFuture<List<MdmProductStock>> stocksFuture =
+            CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
+        CompletableFuture<Map<String, Long>> monthSurplusFuture =
+            CompletableFuture.supplyAsync(this::fetchMonthSurplusMap);
+
+        // 等待所有任务完成
+        CompletableFuture.allOf(
+            salesOrdersFuture, stocksFuture, monthSurplusFuture
+        ).join();
+
+        try {
+            List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
+            List<MdmProductStock> finishedProductStocks = stocksFuture.get();
+            Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
+            // 处理成品库存映射
+            Map<String, List<MdmProductStock>> finishedProductStockMap =
+                CollectionUtils.isEmpty(finishedProductStocks) ?
+                    new HashMap<>(16) :
+                    finishedProductStocks.stream()
+                        .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
+
+            return new DataCollection(
+                salesOrders,
+                finishedProductStocks,
+                finishedProductStockMap,
+                monthSurplusMap
+            );
+
+        } catch (Exception e) {
+            log.error("并行获取数据失败", e);
+            throw new BusinessException("获取数据失败");
+        }
+    }
+
+    private Map<String, Long> fetchMonthSurplusMap() {
+        List<MdmMonthSurplus> mdmMonthSurpluses = monthPlanSurplusService.findCurrentMonthPlanSurplus();
+        if(CollectionUtils.isEmpty(mdmMonthSurpluses)){
+            return Collections.emptyMap();
+        }
+        return mdmMonthSurpluses.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.groupingBy(
+                MdmMonthSurplus::getGroupKey,
+                Collectors.summingLong(MdmMonthSurplus::getPlanSurplusQty)
+            ));
+    }
+
+    /**
+     *  6、从成品库存表中获取库存；同时，获取T-1月新的月底计划余量(如果库存日期 > T-1月，则月底计划余量 = 0)；
+     * @return 成品库存
+     */
+    private List<MdmProductStock> fetchFinishedProductStocks() {
+        return mdmProductStockService.findCurrentFinishStock();
+    }
+
+    /**
+     *  5、查询截止预测日，在销售订单池中的所有订单；
+     * @return 销售订单
+     */
+    private List<SalesOrderPool> fetchSalesOrderPool() {
+        return salesOrderPoolService.findCurrentSalesOrderPool();
     }
 
     /**
@@ -290,16 +442,55 @@ public class MpProductionPredictionServiceImpl extends BaseService<MpProductionP
      *       (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
      * @param tMonth T月
      */
-    private void validateProductionVersionFinalized(YearMonth tMonth) {
-        Long count = factoryProductionVersionMapper.selectCount(
-            Wrappers.<FactoryProductionVersion>lambdaQuery()
-                .eq(FactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
-                .eq(FactoryProductionVersion::getYear, tMonth.getYear())
-                .eq(FactoryProductionVersion::getMonth, tMonth.getMonthValue())
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)
-        );
-        if (count == 0) {
-            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
+    private List<FactoryProductionVersion> validateProductionVersionFinalized(YearMonth tMonth) {
+      return factoryProductionVersionMapper.selectList(
+          Wrappers.<FactoryProductionVersion>lambdaQuery()
+              .eq(FactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
+              .eq(FactoryProductionVersion::getYear, tMonth.getYear())
+              .eq(FactoryProductionVersion::getMonth, tMonth.getMonthValue())
+              .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)
+      );
+    }
+
+    /**
+     * 数据集合
+     */
+    @Getter
+    private static class DataCollection {
+        private final List<SalesOrderPool> salesOrders;
+        private final List<MdmProductStock> finishedProductStocks;
+        private final Map<String, List<MdmProductStock>> finishedProductStockMap;
+        private final Map<String, Long> monthSurplusMap;
+
+        public DataCollection(
+            List<SalesOrderPool> salesOrders,
+            List<MdmProductStock> finishedProductStocks,
+            Map<String, List<MdmProductStock>> finishedProductStockMap,
+            Map<String, Long> monthSurplusMap) {
+            this.salesOrders = CollectionUtils.isNotEmpty(salesOrders)? salesOrders : Collections.emptyList();
+            this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
+            this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
+            this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
         }
     }
+
+    /**
+     * 订单分配结果
+     */
+    @Getter
+    private static class OrderAllocationResult {
+        private final List<DpOrderOffsetDetail> allocations;
+        private final List<DpOrderOffsetDetail> netDemands;
+        private final Map<String, List<MdmProductStock>> stockMap;
+
+        public OrderAllocationResult(
+            List<DpOrderOffsetDetail> allocations,
+            List<DpOrderOffsetDetail> netDemands,
+            Map<String, List<MdmProductStock>> stockMap) {
+            this.allocations = allocations != null ? allocations : Collections.emptyList();
+            this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
+            this.stockMap = stockMap != null ? stockMap : new HashMap<>();
+        }
+    }
+
 }

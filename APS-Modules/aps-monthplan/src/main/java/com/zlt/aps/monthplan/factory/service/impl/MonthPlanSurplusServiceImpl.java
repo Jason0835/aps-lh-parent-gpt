@@ -1,11 +1,16 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.LocationTypeEnum;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.LhMonthPlanSurplusDetailMapper;
 import com.zlt.aps.maindata.mapper.LhMonthPlanSurplusEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.maindata.service.ICxEmbryoMonthPlanSurplusService;
 import com.zlt.aps.maindata.service.ILhMonthPlanSurplusService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
@@ -25,8 +30,10 @@ import org.apache.commons.collections4.ListUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +60,9 @@ public class MonthPlanSurplusServiceImpl implements IMonthPlanSurplusService {
   private final IMdmProductConstructionService mdmProductConstructionService;
 
   private final ICxEmbryoMonthPlanSurplusService iCxEmbryoMonthPlanSurplusService;
+
+  private final MdmMonthSurplusEntityMapper mdmMonthSurplusEntityMapper;
+
 
   @Override
   public void savePlanSurplusList(List<FactoryMonthPlanProdFinal> finalList) {
@@ -93,6 +103,21 @@ public class MonthPlanSurplusServiceImpl implements IMonthPlanSurplusService {
   @Override
   public void batchInsertPlanSurplusList(List<MdmMonthSurplus> mdmMonthSurpluses) {
     this.baseDao.insertBatch(mdmMonthSurpluses);
+  }
+
+  @Override
+  public List<MdmMonthSurplus> findCurrentMonthPlanSurplus() {
+    LambdaQueryWrapper<MdmMonthSurplus> wrapper = Wrappers.lambdaQuery();
+    wrapper.eq(MdmMonthSurplus::getIsDelete, YesOrNoEnum.NO.getValue());
+    // 获取当前月的第一天和最后一天
+    LocalDate now = LocalDate.now();
+    LocalDate firstDayOfMonth = now.withDayOfMonth(1);
+    LocalDate lastDayOfMonth = now.withDayOfMonth(now.lengthOfMonth());
+    // 转换为Date类型（如果createTime是Date类型）
+    Date startDate = DateUtils.toDate(firstDayOfMonth);
+    Date endDate = DateUtils.toDate(lastDayOfMonth);
+    wrapper.between(MdmMonthSurplus::getCreateTime, startDate, endDate);
+    return mdmMonthSurplusEntityMapper.selectList(wrapper);
   }
 
   /**

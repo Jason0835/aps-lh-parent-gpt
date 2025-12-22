@@ -7,6 +7,7 @@ import com.ruoyi.common.datasource.service.IBaseService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 /**
@@ -113,4 +114,10 @@ public interface IDpStockVersionService  extends IBaseService<DpStockVersion>
      * @param finishedProductStockMap 成品库存记录
      */
     void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
+    /**
+     * 将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
+     * @param createCondition 需求参数
+     * @param finishedProductStockMap 成品库存记录
+     */
+    void insertBatchData(MpProductionPrediction createCondition, Map<String, List<MdmProductStock>> finishedProductStockMap);
 }
