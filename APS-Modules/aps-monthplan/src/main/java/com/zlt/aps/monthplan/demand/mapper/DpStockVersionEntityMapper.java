@@ -1,10 +1,8 @@
 package com.zlt.aps.monthplan.demand.mapper;
 
-import java.util.List;
-import java.util.Collection;
-import com.ruoyi.common.datasource.service.IBaseMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
-
+import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,46 +17,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
  *     修 改 人：yelq
  *     修改内容：...
  */
+@Mapper
+public interface DpStockVersionEntityMapper extends CommBaseMapper<DpStockVersion> {
 
-public interface DpStockVersionEntityMapper extends IBaseMapper<DpStockVersion>
-{
-    /**
-     * 查询需求计划_版本库存
-     * 
-     * @param id 需求计划_版本库存主键
-     * @return 需求计划_版本库存
-     */
-    DpStockVersion selectDpStockVersionById(Long id);
-
-    /**
-     * 查询需求计划_版本库存列表
-     * 
-     * @param dpStockVersion 需求计划_版本库存
-     * @return 需求计划_版本库存集合
-     */
-    List<DpStockVersion> selectDpStockVersionList(DpStockVersion dpStockVersion);
-
-    /**
-     * 批量查询需求计划_版本库存列表
-     *
-     * @param ids 需要查询的数据主键集合
-     * @return 需求计划_版本库存集合
-     */
-    List<DpStockVersion> selectDpStockVersionByIds(List<Long> ids);
-
-    /**
-     * 删除需求计划_版本库存
-     * 
-     * @param id 需求计划_版本库存主键
-     * @return 结果
-     */
-    int deleteDpStockVersionById(Long id);
-
-    /**
-     * 批量删除需求计划_版本库存
-     * 
-     * @param ids 需要删除的数据主键集合
-     * @return 结果
-     */
-    int deleteDpStockVersionByIds(Long[] ids);
 }

@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 
 
@@ -15,45 +16,39 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：ISupplyOrderPoolRemoteService.java
  * 描    述：ISupplyOrderPoolRemoteService供应链订单池前端接口
- *@author zlt
- *@date 2025-12-06
+ *@author yelq
+ *@date 2025-12-22
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：zlt
+ *     修 改 人：yelq
  *     修改内容：...
  */
-@FeignClient(contextId = "ISalesOrderPoolRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
+@FeignClient(contextId = "ISupplyOrderPoolRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
 public interface ISupplyOrderPoolRemoteService {
 
     /**
-     * 查询供应链订单池列表
+     * 查询列表
      */
-    @ApiOperation("查询供应链订单池列表")
+    @ApiOperation("查询列表")
     @PostMapping("/supplyOrderPool/list")
-    TableDataInfo list(@RequestBody SupplyOrderPool supplyOrderPool);
+    TableDataInfo list(@RequestBody SupplyOrderPool QueryVO);
 
     /**
-    * 新增供应链订单池
+    * 保存
     */
-    @ApiOperation("新增供应链订单池")
-    @PostMapping("/supplyOrderPool/add")
-    AjaxResult add(@RequestBody SupplyOrderPool supplyOrderPool);
+    @ApiOperation("保存")
+    @PostMapping("/supplyOrderPool/save")
+    AjaxResult save(@RequestBody SupplyOrderPool supplyOrderPool);
+
 
     /**
-     * 修改供应链订单池
+     * 删除
      */
-    @ApiOperation("修改供应链订单池")
-    @PostMapping("/supplyOrderPool/edit")
-    AjaxResult edit(@RequestBody SupplyOrderPool supplyOrderPool);
-
-    /**
-     * 删除供应链订单池
-     */
-    @ApiOperation("删除供应链订单池")
-    @DeleteMapping("/supplyOrderPool/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @ApiOperation("删除")
+    @DeleteMapping("/supplyOrderPool/remove")
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
@@ -63,25 +58,26 @@ public interface ISupplyOrderPoolRemoteService {
     SupplyOrderPool getInfo(@PathVariable("id") Long id);
 
     /**
-     * 校验供应链订单池唯一性
+     * 校验唯一性
      */
-    @ApiOperation("校验供应链订单池唯一性")
-    @PostMapping("/supplyOrderPool/checkSupplyOrderPoolUnique")
-    String checkSupplyOrderPoolUnique(@RequestBody SupplyOrderPool supplyOrderPool);
+    @ApiOperation("校验唯一性")
+    @PostMapping("/supplyOrderPool/checkUnique")
+    String checkUnique(@RequestBody SupplyOrderPool supplyOrderPoolVO);
 
     /**
      * 导出供应链订单池列表
     */
-    @ApiOperation("导出供应链订单池列表")
+    @ApiOperation("导出列表")
     @PostMapping("/supplyOrderPool/exportData/{fileName}")
-    byte[] exportData(@RequestBody SupplyOrderPool supplyOrderPool,@PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody SupplyOrderPool queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入供应链订单池数据
      */
     @ApiOperation("导入供应链订单池")
     @PostMapping("/supplyOrderPool/importData")
-    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
     /**
      * 生成周期排产储备
      */
