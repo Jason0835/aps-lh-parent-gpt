@@ -14,34 +14,34 @@ public enum MesInterfaceCodeEnum {
     /**
      * 同步SAP与模具关系
      */
-    SYNC_PRODUCT_MOD_RELATION("PRODUCT_MOD_RELATION", "syncProductModRelation", "PRODUCT_MOD_RELATION", "同步SAP与模具关系"),
+    SYNC_PRODUCT_MOD_RELATION("PRODUCT_MOD_RELATION", "mesItfService", "syncProductModRelation", "同步SAP与模具关系"),
 
     /**
      * 同步模具台账
      */
-    SYNC_MODEL_INFO("TIRE_MOD_INFO", "syncModelInfo", "TIRE_MOD_INFO", "同步模具台账"),
+    SYNC_MODEL_INFO("TIRE_MOD_INFO", "mesItfService", "syncModelInfo", "同步模具台账"),
 
     /**
      * 同步成品库存-MES提供视图同步，不通过MQ
      */
-    SYNC_PRODUCT_STOCK("MES_PRODUCT_STOCK", "syncProductStock", "MES_PRODUCT_STOCK", "同步成品库存"),
+    SYNC_PRODUCT_STOCK("MES_PRODUCT_STOCK", "mesItfService", "syncProductStock", "同步成品库存"),
 
     /**
      * 同步不合格库存-MES提供视图同步，不通过MQ
      */
-    SYNC_UNQUALIFIED_STOCK("MES_UNQUALIFIED_STOCK", "syncUnqualifiedStock", "MES_UNQUALIFIED_STOCK", "同步不合格库存"),
+    SYNC_UNQUALIFIED_STOCK("MES_UNQUALIFIED_STOCK", "mesItfService", "syncUnqualifiedStock", "同步不合格库存"),
 
     ;
 
     private final String code;
+    private final String serviceName;
     private final String methodName;
-    private final String tableName;
     private final String desc;
 
-    MesInterfaceCodeEnum(String code, String methodName, String tableName, String desc) {
+    MesInterfaceCodeEnum(String code, String serviceName, String methodName, String desc) {
         this.code = code;
+        this.serviceName = serviceName;
         this.methodName = methodName;
-        this.tableName = tableName;
         this.desc = desc;
     }
 

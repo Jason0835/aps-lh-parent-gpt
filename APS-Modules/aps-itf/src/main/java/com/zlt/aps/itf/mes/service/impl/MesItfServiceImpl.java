@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * @since 2025/12/16
  */
 @Slf4j
-@Service
+@Service("mesItfService")
 public class MesItfServiceImpl implements MesItfService {
 
     @Autowired

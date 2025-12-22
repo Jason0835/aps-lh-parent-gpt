@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.sync.mapper.AuxDataVersionsMapper">
+
+    <insert id="insert" parameterType="com.zlt.sync.domain.AuxDataVersions">
+        INSERT INTO AUX_DATA_VERSIONS
+        (<include refid="fields"/>)
+        VALUES(<include refid="values"/>)
+    </insert>
+
+    <sql id="fields">
+        <trim suffixOverrides=",">
+            <if test="auxDataVersions.verId != null and auxDataVersions.verId != '' ">
+                VER_ID,
+            </if>
+            <if test="auxDataVersions.fromSys != null and auxDataVersions.fromSys != '' ">
+                FROM_SYS,
+            </if>
+            <if test="auxDataVersions.toSys != null and auxDataVersions.toSys != '' ">
+                TO_SYS,
+            </if>
+            <if test="auxDataVersions.dataVersion != null and auxDataVersions.dataVersion != '' ">
+                DATA_VERSION,
+            </if>
+            <if test="auxDataVersions.createDate != null">
+                CREATE_DATE,
+            </if>
+            <if test="auxDataVersions.updateDate != null">
+                UPDATE_DATE,
+            </if>
+            <if test="auxDataVersions.isDelete != null">
+                IS_DELETE,
+            </if>
+
+            <if test="auxDataVersions.ymdVersion != null and auxDataVersions.ymdVersion != '' ">
+                YMD_VERSION,
+            </if>
+
+            <if test="auxDataVersions.verVersion != null">
+                VER_VERSION,
+            </if>
+        </trim>
+    </sql>
+
+    <sql id="values">
+        <trim suffixOverrides=",">
+            <if test="auxDataVersions.verId != null and auxDataVersions.verId != '' ">
+                #{auxDataVersions.verId},
+            </if>
+            <if test="auxDataVersions.fromSys != null and auxDataVersions.fromSys != '' ">
+                #{auxDataVersions.fromSys},
+            </if>
+            <if test="auxDataVersions.toSys != null and auxDataVersions.toSys != '' ">
+                #{auxDataVersions.toSys},
+            </if>
+            <if test="auxDataVersions.dataVersion != null and auxDataVersions.dataVersion != '' ">
+                #{auxDataVersions.dataVersion},
+            </if>
+            <if test="auxDataVersions.createDate != null">
+                #{auxDataVersions.createDate},
+            </if>
+            <if test="auxDataVersions.updateDate != null">
+                #{auxDataVersions.updateDate},
+            </if>
+            <if test="auxDataVersions.isDelete != null">
+                #{auxDataVersions.isDelete},
+            </if>
+
+            <if test="auxDataVersions.ymdVersion != null and auxDataVersions.ymdVersion != '' ">
+                #{auxDataVersions.ymdVersion},
+            </if>
+
+            <if test="auxDataVersions.verVersion != null">
+                #{auxDataVersions.verVersion},
+            </if>
+        </trim>
+    </sql>
+
+    <select id="queryDataVersion" parameterType="Map" resultType="com.zlt.sync.domain.vo.AuxDataVersionsVO">
+        SELECT  v.VER_ID AS verId <!-- 主键id --> ,
+                v.FROM_SYS AS fromSys <!-- 来源系统 --> ,
+                v.TO_SYS AS toSys <!-- 目标系统 --> ,
+                v.DATA_VERSION AS dataVersion <!-- 数据版本号 --> ,
+                v.CREATE_DATE AS createDate <!-- 创建日期 --> ,
+                v.UPDATE_DATE AS updateDate <!-- 更新日期 --> ,
+                v.IS_DELETE AS isDelete <!-- 删除标志 --> ,
+                v.YMD_VERSION as ymdVersion <!-- 版本年月日 --> ,
+                v.VER_VERSION as verVersion <!-- 版本号 --> ,
+                DATE_FORMAT(NOW(), '%Y%m%d') as yyyyMMdd
+        FROM (SELECT 1 DUMP) d
+        LEFT JOIN AUX_DATA_VERSIONS v ON 1=1
+        <if test="fromSys != null and fromSys != ''">
+            AND FROM_SYS=#{fromSys}
+        </if>
+        <if test="toSys != null and toSys != ''">
+            AND TO_SYS=#{toSys}
+        </if>
+    </select>
+
+    <update id="update" parameterType="com.zlt.sync.domain.AuxDataVersions">
+        UPDATE AUX_DATA_VERSIONS
+        <set>
+            <if test="auxDataVersions.verId != null and auxDataVersions.verId != '' ">
+                VER_ID=#{auxDataVersions.verId},
+            </if>
+            <if test="auxDataVersions.fromSys != null and auxDataVersions.fromSys != '' ">
+                FROM_SYS=#{auxDataVersions.fromSys},
+            </if>
+            <if test="auxDataVersions.toSys != null and auxDataVersions.toSys != '' ">
+                TO_SYS=#{auxDataVersions.toSys},
+            </if>
+            <if test="auxDataVersions.dataVersion != null and auxDataVersions.dataVersion != '' ">
+                DATA_VERSION=#{auxDataVersions.dataVersion},
+            </if>
+            <if test="auxDataVersions.createDate != null">
+                CREATE_DATE=#{auxDataVersions.createDate},
+            </if>
+            <if test="auxDataVersions.updateDate != null">
+                UPDATE_DATE=#{auxDataVersions.updateDate},
+            </if>
+            <if test="auxDataVersions.isDelete != null">
+                IS_DELETE=#{auxDataVersions.isDelete},
+            </if>
+
+            <if test="auxDataVersions.ymdVersion != null and auxDataVersions.ymdVersion != '' ">
+                YMD_VERSION = #{auxDataVersions.ymdVersion},
+            </if>
+
+            <if test="auxDataVersions.verVersion != null">
+                VER_VERSION = #{auxDataVersions.verVersion},
+            </if>
+        </set>
+        WHERE VER_ID=#{auxDataVersions.verId}
+    </update>
+</mapper>
