@@ -76,7 +76,7 @@
                mmi.MOULD_NO,
                mmi.MOULD_AIR_TYPE
           FROM t_mdm_device_maintenance_plan mdmp
-                   INNER JOIN T_MDM_MOULD_INFO mmi
+         INNER JOIN T_MDM_MOULD_INFO mmi
             ON mmi.MOULD_CODE = mdmp.MACHINE_CODE
            AND mmi.FACTORY_CODE = mdmp.FACTORY_CODE
          INNER JOIN t_mdm_product_model_relation pmr
@@ -93,34 +93,6 @@
            AND mdmp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND mdmp.BEGIN_DATE >= #{startDate,jdbcType=DATE}
            AND mdmp.END_DAY &lt;= #{endDate,jdbcType=DATE}
-    </select>
-
-    <select id="getMonthEnableMouldConfiguration" resultType="com.zlt.aps.factory.domain.vo.MouldInfoVO">
-        SELECT DISTINCT mus.FACTORY_CODE,
-               mus.YEAR,
-               mus.MONTH,
-               mus.MOULD_CODE,
-               mus.MOULD_TYPE,
-               mmi.MOULD_NO,
-               mmi.MOULD_AIR_TYPE
-          FROM t_mdm_mould_use_status mus
-                   INNER JOIN T_MDM_MOULD_INFO mmi
-            ON mmi.MOULD_CODE = mus.MOULD_CODE
-           AND mmi.FACTORY_CODE = mus.FACTORY_CODE
-         INNER JOIN t_mdm_product_model_relation pmr
-            ON pmr.MOULD_CODE = mus.MOULD_CODE
-           AND pmr.FACTORY_CODE = mus.FACTORY_CODE
-         INNER JOIN t_mp_product_require_plan prp
-            ON prp.PRODUCT_CODE = pmr.PRODUCT_CODE
-           AND IFNULL(prp.IS_DELETE, 0) = 0
-           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND prp.YEAR = #{year,jdbcType=DECIMAL}
-           AND prp.MONTH = #{month,jdbcType=DECIMAL}
-           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-         WHERE mus.MOULD_STATUS = 1
-           AND mus.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND mus.YEAR = #{year,jdbcType=DECIMAL}
-           AND mus.MONTH = #{month,jdbcType=DECIMAL}
     </select>
 
     <delete id="deleteProductionInitVersion">

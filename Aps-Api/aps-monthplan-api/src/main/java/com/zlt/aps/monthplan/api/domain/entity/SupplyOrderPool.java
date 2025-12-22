@@ -1,20 +1,19 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：SupplyOrderPool.java
- * 描    述：供应链订单池对象 t_mp_supply_order_pool
+ * 描    述：供应链订单池对象 t_dp_supply_order_pool
  *@author yelq
- *@date 2025-12-12
+ *@date 2025-12-22
  *@version 1.0
  *
  *  修改记录：
@@ -26,38 +25,32 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 @ApiModel(value = "供应链订单池对象", description = "供应链订单池对象 ")
 @Data
 @TableName(value = "T_DP_SUPPLY_ORDER_POOL")
-public class SupplyOrderPool extends BaseEntity{
+public class SupplyOrderPool extends CommonBusiEntity{
 
     private static final long serialVersionUID = 1L;
 
-     /** 工厂编号 */
-    @Excel(name = "ui.data.column.supplyOrderPool.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+     /** 工厂 */
+    @Excel(name = "ui.data.column.supplyOrderPool.factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.supplyOrderPool.year", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.supplyOrderPool.month", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
-    /**
-     * 年月:YYYYMM
-     */
-    @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "`YEAR_MONTH`")
-    private Integer yearMonth;
 
-    /** 产品品类 */
+    /** 产品品类，TBR 全钢 PCR 半钢 */
     @Excel(name = "ui.data.column.supplyOrderPool.productTypeCode")
-    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
-    @TableField(value = "FACTORY_CODE")
+    @ApiModelProperty(value = "产品品类，TBR 全钢 PCR 半钢", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 库位 */
@@ -72,9 +65,9 @@ public class SupplyOrderPool extends BaseEntity{
     @TableField(value = "PRODUCT_CATEGORY")
     private String productCategory;
 
-    /** 订单类型 */
+    /** 订单类型:数据字典：biz_order_type */
     @Excel(name = "ui.data.column.supplyOrderPool.orderType")
-    @ApiModelProperty(value = "订单类型", name = "orderType")
+    @ApiModelProperty(value = "订单类型:数据字典：biz_order_type", name = "orderType")
     @TableField(value = "ORDER_TYPE")
     private String orderType;
 
@@ -90,12 +83,6 @@ public class SupplyOrderPool extends BaseEntity{
     @TableField(value = "BRAND")
     private String brand;
 
-    /** MES物料编码 */
-    @Excel(name = "ui.data.column.supplyOrderPool.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
-
     /** 物料编码 */
     @Excel(name = "ui.data.column.supplyOrderPool.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
@@ -109,64 +96,65 @@ public class SupplyOrderPool extends BaseEntity{
     private String materialDesc;
 
     /** 数量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.qty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.qty")
     @ApiModelProperty(value = "数量", name = "qty")
     @TableField(value = "QTY")
     private Long qty;
 
     /** 近3个月月均销量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.threeAverageQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.threeAverageQty")
     @ApiModelProperty(value = "近3个月月均销量", name = "threeAverageQty")
     @TableField(value = "THREE_AVERAGE_QTY")
     private Long threeAverageQty;
 
     /** 近6个月月均销量 */
-    @Excel(name = "ui.data.column.supplyOrderPool.sixAverageQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.sixAverageQty")
     @ApiModelProperty(value = "近6个月月均销量", name = "sixAverageQty")
     @TableField(value = "SIX_AVERAGE_QTY")
     private Long sixAverageQty;
 
     /** 滚动12个月发货频次 */
-    @Excel(name = "ui.data.column.supplyOrderPool.deliveryFrequency", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.deliveryFrequency")
     @ApiModelProperty(value = "滚动12个月发货频次", name = "deliveryFrequency")
     @TableField(value = "DELIVERY_FREQUENCY")
     private Integer deliveryFrequency;
 
     /** 滚动12个月结构上机频次 */
-    @Excel(name = "ui.data.column.supplyOrderPool.structureFrequency", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.structureFrequency")
     @ApiModelProperty(value = "滚动12个月结构上机频次", name = "structureFrequency")
     @TableField(value = "STRUCTURE_FREQUENCY")
     private Integer structureFrequency;
 
     /** 超3个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.threeOverdueStockQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.threeOverdueStockQty")
     @ApiModelProperty(value = "超3个月库存", name = "threeOverdueStockQty")
     @TableField(value = "THREE_OVERDUE_STOCK_QTY")
     private Long threeOverdueStockQty;
 
     /** 超6个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.sixOverdueStockQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.sixOverdueStockQty")
     @ApiModelProperty(value = "超6个月库存", name = "sixOverdueStockQty")
     @TableField(value = "SIX_OVERDUE_STOCK_QTY")
     private Long sixOverdueStockQty;
 
     /** 超9个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.nightOverdueStockQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.nightOverdueStockQty")
     @ApiModelProperty(value = "超9个月库存", name = "nightOverdueStockQty")
     @TableField(value = "NIGHT_OVERDUE_STOCK_QTY")
     private Long nightOverdueStockQty;
 
     /** 超12个月库存 */
-    @Excel(name = "ui.data.column.supplyOrderPool.twelveOverdueStockQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.twelveOverdueStockQty")
     @ApiModelProperty(value = "超12个月库存", name = "twelveOverdueStockQty")
     @TableField(value = "TWELVE_OVERDUE_STOCK_QTY")
     private Long twelveOverdueStockQty;
 
     /** 备库上限 */
-    @Excel(name = "ui.data.column.supplyOrderPool.stockLimit", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.supplyOrderPool.stockLimit")
     @ApiModelProperty(value = "备库上限", name = "stockLimit")
     @TableField(value = "STOCK_LIMIT")
     private Long stockLimit;
+
     /**
      * 月均销量
      */

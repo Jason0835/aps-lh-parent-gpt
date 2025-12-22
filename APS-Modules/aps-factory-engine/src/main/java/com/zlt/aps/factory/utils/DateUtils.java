@@ -11,7 +11,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
 /**
@@ -181,49 +180,6 @@ public class DateUtils {
      */
     public static Set<Integer> calculateStopDays(List<ProductionDayInfoVo> productionCalendarList, FactoryMonthPlanFinalVersionInfoVo finalVersion) {
         return Collections.emptySet();
-    }
-
-    /**
-     * 20250519 ZLT 根据日期，计算其在排产月份中的天数
-     * 1、自然月，则直接为其日期在月份天数
-     * 2 非自然月，重新计算天数值
-     * 2.1、月份与排产月份一致，则 月份天数 = 原月份天数 + 上月最大天数 - 起始天数 + 1
-     * 2.2、月份与排产月份不一致，则月份天数 = 上月最大天数 - 起始天数 + 1
-     *
-     * @param context   排产上下文
-     * @param beginDate 开始日
-     * @param endDate   结束日
-     * @return
-     */
-    public static Map<String, Integer> calculateDaysByMonth(ProductionContext context, LocalDate beginDate, LocalDate endDate) {
-        Map<String, Integer> daysMap = new HashMap<>();
-        Integer beginDay = beginDate.getDayOfMonth();
-        Integer endDay = endDate.getDayOfMonth();
-        daysMap.put(DateUtils.START_DAY, beginDay);
-        daysMap.put(DateUtils.END_DAY, endDay);
-        //自然月排产
-        if (context.isNaturalMonth()) {
-            return daysMap;
-        }
-        //非自然月
-        Integer startDay = context.getProductionParam().getMonthCycleStartDay();
-        //前一个月的最大天数
-        Integer previousMonthDays = context.getPreviousMonth().with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
-        //下个月起始天数值
-        Integer nextMonthStartDays = previousMonthDays - startDay + BigDecimal.ONE.intValue();
-        if (DateUtils.isProductionMonth(context, beginDate)) {
-            beginDay = nextMonthStartDays + beginDay;
-        } else {
-            beginDay = beginDay - startDay + BigDecimal.ONE.intValue();
-        }
-        if (DateUtils.isProductionMonth(context, endDate)) {
-            endDay = nextMonthStartDays + endDay;
-        } else {
-            endDay = endDay - startDay + BigDecimal.ONE.intValue();
-        }
-        daysMap.put(DateUtils.START_DAY, beginDay);
-        daysMap.put(DateUtils.END_DAY, endDay);
-        return daysMap;
     }
 
     /**
