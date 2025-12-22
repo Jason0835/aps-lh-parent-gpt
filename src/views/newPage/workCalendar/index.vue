@@ -3,9 +3,9 @@
   <basic-container>
     <div class="form">
       <div class="itemForm">
-        工厂：
+        {{$t('ui.data.workCalendar.today')}}：
         <el-select
-          placeholder="请选择"
+         :placeholder="$t('common.rule.select')"
           v-model="search.factoryCode"
           @change="getList"
         >
@@ -25,7 +25,7 @@
           @click="genYearlPlan"
           :disabled="genDisable"
           :loading="loading"
-          >生成整年日历</el-button
+          >{{$t('ui.data.workCalendar.genAnnualPlan')}}</el-button
         >
       </div>
     </div>
@@ -70,7 +70,7 @@
                       arg.event.extendedProps.oneShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">夜</span>
+                  }">{{$t('ui.data.workCalendar.night')}}</span>
 
                 <!-- <div
                   class="statusDiv"
@@ -89,7 +89,7 @@
                       arg.event.extendedProps.twoShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">早</span>
+                  }">{{$t('ui.data.workCalendar.morning')}}</span>
 
                 <!-- <div
                   class="statusDiv"
@@ -113,7 +113,7 @@
                       arg.event.extendedProps.threeShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">中</span>
+                  }">{{$t('ui.data.workCalendar.noon')}}</span>
 
 <!--
                 <div
@@ -135,7 +135,7 @@
 
     <infoDialog ref="infoRef" @success="getList" />
     <el-dialog
-      title="调整比例值"
+      :title="$t('ui.data.workCalendar.adjustTitle')"
       :visible="visible"
       width="400px"
       @close="hide"
@@ -144,7 +144,7 @@
       :append-to-body="true"
     >
       <el-input
-        placeholder="请输入内容"
+        :placeholder="$t('common.rule.input')"
         type="number"
         v-model="actionRate"
         min="1"
@@ -226,9 +226,10 @@ export default {
       selectList: [],
 
       calendarOptions: {
-        locale: "zh-cn",
+
         plugins: [dayGridPlugin, interactionPlugin],
         initialView: "dayGridMonth",
+        locale:this.$i18n.locale=='zh_CN'?'zh-cn': "vi",
         contentHeight: "auto",
         // weekends: false,
         events: [],
@@ -245,10 +246,10 @@ export default {
           };
         },
         buttonText: {
-          today: "今天",
-          month: "月",
-          week: "周",
-          day: "日",
+          today:this.$t("ui.data.workCalendar.today"),
+          // month: "月",
+          // week: "周",
+          // day: "日",
         },
       },
       dateList:[]
@@ -276,15 +277,15 @@ export default {
       obj.id = obj.editId;
       let title=''
       if(type=='oneShiftFlag'){
-       title=obj.oneShiftFlag==0?'是否夜班开产':'是否夜班停产'
+       title=obj.oneShiftFlag==0? this.$t("ui.data.workCalendar.isNightStart"):this.$t("ui.data.workCalendar.isNightStop")
        obj.oneShiftFlag=obj.oneShiftFlag==0?1:0
       }
       if(type=='twoShiftFlag'){
-       title=obj.twoShiftFlag==0?'是否早班开产':'是否早班停产'
+       title=obj.twoShiftFlag==0?this.$t("ui.data.workCalendar.isMorningStart"):this.$t("ui.data.workCalendar.isMorningStop")
        obj.twoShiftFlag=obj.twoShiftFlag==0?1:0
       }
       if(type=='threeShiftFlag'){
-       title=obj.threeShiftFlag==0?'是否中班开产':'是否中班停产'
+       title=obj.threeShiftFlag==0?this.$t("ui.data.workCalendar.isNoongStart"):this.$t("ui.data.workCalendar.isNoongStop")
        obj.threeShiftFlag=obj.threeShiftFlag==0?1:0
       }
       this.$confirm(title, {
@@ -315,7 +316,7 @@ export default {
       let obj = JSON.parse(JSON.stringify(info));
       obj.id = obj.editId;
       this.$confirm(
-        obj.dayFlag == 1 ? this.$t("是否停产") : this.$t("是否开产"),
+        obj.dayFlag == 1 ? this.$t("ui.data.workCalendar.isStop") : this.$t("ui.data.workCalendar.isStart"),
         {
           type: "warning",
         }
@@ -457,7 +458,7 @@ export default {
     async changeRateNumber() {
       try {
         if(this.actionRate<1||this.actionRate>100 || this.actionRate.includes('.')||isNaN(this.actionRate)){
-          this.$modal.msgError("请输入1-100之间的整数")
+          this.$modal.msgError(this.$t('ui.data.workCalendar.peleaseInteger'));
           return
         }
         const processedData = JSON.parse(JSON.stringify(this.actionData));
@@ -473,7 +474,8 @@ export default {
     },
   },
   created() {
-
+    console.log('$i18n:', this.$i18n) // 应该输出 i18n 实例
+    console.log('$t:', this.$t) // 应该输出函数
     this.getCodeList();
   },
   activated() {},

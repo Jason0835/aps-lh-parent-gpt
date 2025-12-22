@@ -108,9 +108,9 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     title: function () {
-      return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+      return this.isType=='week'
+        ? this.$t("ui.data.rawWarningRecord.executeUsageWarning")
+        : this.$t("ui.data.rawWarningRecord.executeNewMaterialWarning");
     },
     columns() {
       let columnsDate = [
@@ -132,12 +132,12 @@ export default {
       ];
       if(this.isType=='week'){
         columnsDate.push(
-
           {
-            prop: "week ",
+            prop: "week",
             label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
             type: "number",
             min: 1,
+            max: 5,
           },
 
         );

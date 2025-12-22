@@ -46,7 +46,7 @@ export default {
        const validatePositiveInteger = (rule, value, callback) => {
       if (value === "" || value === null || value === undefined) {
         if (rule.required) {
-          return callback(new Error("输入不能为空"));
+          return callback(new Error(this.$t("common.rule.noData")));
         }
         return callback();
       }
@@ -55,18 +55,18 @@ export default {
       // 检查是否只包含数字
       if (!/^\d+$/.test(strValue)) {
         return callback(
-          new Error("只能输入大于等于0的整数，不能有小数点和负号")
+          new Error(this.$t("common.rule.noPoint"))
         );
       }
 
       // 转换为数字
       const numValue = Number(strValue);
       if (numValue > 999999) {
-        return callback(new Error("输入数值过大"));
+        return callback(new Error(this.$t("common.rule.inoutMax")));
       }
 
       if (!Number.isInteger(numValue)) {
-        return callback(new Error("请输入整数"));
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
       }
 
       callback();

@@ -32,7 +32,7 @@
 import { mapState } from "vuex";
 
 // import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
-import { editProductMoldingLimit } from "@/api/mdm/productMoldingLimit";
+import { saveSupplyOrderPool ,queryRelationByMaterialCode} from "@/api/monthplan/supplyOrderPool";
 
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -47,28 +47,28 @@ export default {
       editType: null,
       form: {},
       rules: {
-        工厂: [
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        年月: [
+        yearMonth: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        embryoCode: [
+        orderType: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        machineCode: [
+        materialCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -104,83 +104,112 @@ export default {
     columns() {
       return [
         {
-          prop: "工厂",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
           type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          prop: "年月",
-          label: this.$t("年月"),
+          prop: "yearMonth",
+          label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
+          dateType: "month",
           format: "yyyy-MM",
         },
         {
-          prop: "订单类型",
-          label: this.$t("订单类型"),
+          prop: "orderType",
+          label: this.$t("ui.data.defectiveStock.orderType"),
           type: "select",
+          dictData: this.parentDict.type.biz_order_type,
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
-          type:'number'
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          listeners: {
+            blur: this.blurMaterialCode,
+          },
         },
         {
-          prop: "储备数量",
-          label: this.$t("储备数量"),
-          type:'number'
+          prop: "qty",
+          label: this.$t("ui.data.defectiveStock.qty"),
+          type: "number",
+          min: 0,
+          max: 99999999,
         },
         {
-          prop: "物料描述",
-          label: this.$t("物料描述"),
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          disabled: true,
         },
         {
-          prop: "产品分类",
-          label: this.$t("产品分类"),
+          prop: "productCategory",
+          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          disabled: true,
+          type: "select",
+          dictData: this.parentDict.type.product_category,
         },
         {
-          prop: "品牌",
-          label: this.$t("品牌"),
+          prop: "brand",
+          label: this.$t("common.brand"),
+          disabled: true,
+          type: "select",
+          dictData: this.parentDict.type.biz_brand_type,
         },
         {
-          prop: "月均销量",
-          label: this.$t("月均销量"),
-          type:'number'
-        },  {
-          prop: "滚动12个月发货频次",
-          label: this.$t("滚动12个月发货频次"),
-          type:'number'
+          prop: "averageSaleQty",
+          label: this.$t("ui.data.defectiveStock.averageSaleQty"),
+          disabled: true,
+          type: "number",
         },
         {
-          prop: "适销区域",
-          label: this.$t("适销区域"),
+          prop: "deliveryFrequency",
+          label: this.$t("ui.data.defectiveStock.deliveryFrequency"),
+          disabled: true,
+          type: "number",
         },
         {
-          prop: "超6个月库存",
-          label: this.$t("超6个月库存"),
-          type:'number'
+          prop: "saleArea",
+          label: this.$t("ui.data.defectiveStock.saleArea"),
+          disabled: true,
         },
         {
-          prop: "超9个月库存",
-          label: this.$t("超9个月库存"),
-          type:'number'
+          prop: "sixOverdueStockQty",
+          label: this.$t("ui.data.defectiveStock.sixOverdueStockQty"),
+          disabled: true,
+          type: "number",
         },
         {
-          prop: "备库上限",
-          label: this.$t("备库上限"),
-        },  {
-          prop: "备注",
-          label: this.$t("备注"),
+          prop: "nightOverdueStockQty",
+          label: this.$t("ui.data.defectiveStock.nightOverdueStockQty"),
+          disabled: true,
+          type: "number",
+        },
+        {
+          prop: "stockLimit",
+          label: this.$t("ui.data.defectiveStock.stockLimit"),
+          disabled: true,
+        },
+        {
+          prop: "remark",
+          label: this.$t("common.remark"),
         },
       ];
     },
   },
   methods: {
+   async blurMaterialCode(){
+
+      let res=await queryRelationByMaterialCode({materialCode:this.form.materialCode});
+      console.log(res);
+    },
     // api
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await editProductMoldingLimit(params);
+        let arr=params.yearMonth.split("-");
+        params.year=arr[0];
+        params.month=arr[1];
+        const res = await saveSupplyOrderPool(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -202,7 +231,7 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "",
+          factoryCode: "116",
         };
       }
     },

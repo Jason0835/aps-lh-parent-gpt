@@ -139,12 +139,14 @@ export default {
           label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
           type: "number",
           min: 0,
+          max:999999,
         },
         {
           prop: "deviationLower",
           label: this.$t("ui.data.column.rawMaterial.deviationLower"),
           type: "number",
           min: 0,
+          max:999999,
         },
         {
           prop: "warningLevel",
@@ -185,6 +187,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enabled: data.enabled+'',
         };
       } else {
         this.form = {

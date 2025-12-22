@@ -152,7 +152,7 @@ export default {
           label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
         },
         {
-          prop: "saleArea",
+          prop: "saleAreaName",
           label: this.$t("ui.data.column.mpMonthlySaleQty.saleArea"),
         },
         {
