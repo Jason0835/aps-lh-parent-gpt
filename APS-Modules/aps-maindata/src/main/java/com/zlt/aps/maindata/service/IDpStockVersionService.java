@@ -1,9 +1,12 @@
 package com.zlt.aps.maindata.service;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -20,6 +23,8 @@ import java.util.List;
  * @date 2025-12-08
  */
 public interface IDpStockVersionService extends IDocService<DpStockVersion> {
+
+    void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
 
     /**
      * 查询MES实时成品库存列表

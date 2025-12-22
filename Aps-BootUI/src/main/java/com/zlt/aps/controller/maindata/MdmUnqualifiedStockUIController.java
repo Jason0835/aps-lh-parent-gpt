@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.monthplan;
+package com.zlt.aps.controller.maindata;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -8,9 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.ruoyi.common4ui.exception.base.BaseException;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.service.IMpDemandPlanRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.monthplan.api.service.IMdmUnqualifiedStockRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -26,38 +25,38 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpDemandPlanUIController.java
- * 描    述：需求计划 UI控制层类：....
- *@author yelq
- *@date 2025-12-12
+ * 文件名称：MdmUnqualifiedStockUIController.java
+ * 描    述：不合格品库存 UI控制层类：....
+ *@author zlt
+ *@date 2025-12-22
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：yelq
+ *     修 改 人：zlt
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "需求计划")
+@Api(tags = "不合格品库存")
 @Controller
-@RequestMapping("/monthplan/demandPlan")
-public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
+@RequestMapping("/monthplan/mdmUnqualifiedStock")
+public class MdmUnqualifiedStockUIController extends BaseUIController<MdmUnqualifiedStock> {
 
+    private final String prefix = "aps/monthplan/mdmUnqualifiedStock";
     @Autowired
-    private IMpDemandPlanRemoteService iMpDemandPlanService;
-
-    private final String prefix = "monthplan/monthplan/demandPlan";
+    private IMdmUnqualifiedStockRemoteService iMdmUnqualifiedStockService;
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:demandPlan:view")
+    @RequiresPermissions("monthplan:mdmUnqualifiedStock:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/demandPlan";
+        return prefix + "/mdmUnqualifiedStock";
     }
 
     /**
@@ -65,7 +64,7 @@ public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mpDemandPlan", new DpDemandPlan());
+        mmap.put("mdmUnqualifiedStock", new MdmUnqualifiedStock());
         return prefix + "/add";
     }
 
@@ -74,61 +73,56 @@ public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mpDemandPlan", iMpDemandPlanService.getInfo(id));
+        mmap.put("mdmUnqualifiedStock", iMdmUnqualifiedStockService.getInfo(id));
         return prefix + "/edit";
     }
 
     /**
-     * 根据条件查询需求计划列表
+     * 根据条件查询主表数据
      */
-    @ApiOperation("根据条件查询需求计划列表")
-    @RequiresPermissions("monthplan:demandPlan:list")
+    @ApiOperation("根据条件查询主表数据")
+    @RequiresPermissions("monthplan:mdmUnqualifiedStock:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DpDemandPlan entity) {
-        return iMpDemandPlanService.list(entity);
+    public TableDataInfo list(MdmUnqualifiedStock mdmUnqualifiedStock) {
+        return iMdmUnqualifiedStockService.list(mdmUnqualifiedStock);
     }
 
     /**
-     * 修改或新增需求计划
+     * 修改或新增
      */
-    @ApiOperation("修改或新增需求计划")
-    @RequiresPermissions("monthplan:demandPlan:edit")
-    @PostMapping("/edit")
+    @ApiOperation("修改或新增")
+    @RequiresPermissions("monthplan:mdmUnqualifiedStock:edit")
+    @PostMapping("/save")
     @ResponseBody
-    public AjaxResult editSave(DpDemandPlan mpDemandPlan) {
-        AjaxResult ajaxResult;
-        if (UserConstants.NOT_UNIQUE.equals(iMpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpDemandPlan.checkUnique"));
+    public AjaxResult save(MdmUnqualifiedStock mdmUnqualifiedStock) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmUnqualifiedStockService.checkUnique(mdmUnqualifiedStock))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmUnqualifiedStock.notUnique"));
         }
-        if (mpDemandPlan.getId() != null){
-            ajaxResult = iMpDemandPlanService.edit(mpDemandPlan);
-        } else{
-            ajaxResult = iMpDemandPlanService.add(mpDemandPlan);
-        }
-        return ajaxResult;
+
+        return iMdmUnqualifiedStockService.save(mdmUnqualifiedStock);
     }
 
     /**
-     * 删除需求计划
+     * 删除不合格品库存
      */
-    @ApiOperation("删除需求计划（id不为空）")
-    @RequiresPermissions("monthplan:demandPlan:remove")
+    @ApiOperation("删除,id不为空")
+    @RequiresPermissions("monthplan:mdmUnqualifiedStock:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMpDemandPlanService.remove(arr);
+        return iMdmUnqualifiedStockService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验需求计划唯一性
+     * 校验不合格品库存唯一性
      */
-    @ApiOperation("校验需求计划唯一性")
-    @PostMapping("/checkMpDemandPlanUnique")
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkMpDemandPlanUnique(DpDemandPlan mpDemandPlan) {
-        return iMpDemandPlanService.checkMpDemandPlanUnique(mpDemandPlan);
+    public String checkUnique(MdmUnqualifiedStock mdmUnqualifiedStock) {
+        return iMdmUnqualifiedStockService.checkUnique(mdmUnqualifiedStock);
     }
 
     /**
@@ -138,15 +132,15 @@ public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getExportTemplateFileName(){
-        throw new BaseException("没有定义导出模板的文件名");
+        return this.getFunctionName();
     }
 
 
     /**
- * 继承时重写方法。
- *
- * @return
- */
+     * 继承时重写方法。
+     *
+     * @return
+     */
     @Override
     public String getProcedureCode() {
         return "0";
@@ -159,16 +153,28 @@ public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.mdmUnqualifiedStock.modelName");
+    }
+
+    /**
+     * 重写导入模板的生成逻辑
+     */
+    @ApiOperation("下载导入模板")
+    @Override
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        ExcelUtil<MdmUnqualifiedStock> util = new ExcelUtil<>(MdmUnqualifiedStock.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
     }
 
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
+    public void export(HttpServletResponse response, MdmUnqualifiedStock entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMpDemandPlanService.exportData(entity,fileName);
+        byte[] excelBytes = iMdmUnqualifiedStockService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -188,7 +194,7 @@ public class MpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpDemandPlanService.importData(context,false);
+        AjaxResult ajaxResult = iMdmUnqualifiedStockService.importData(context, false);
         return ajaxResult;
     }
 }

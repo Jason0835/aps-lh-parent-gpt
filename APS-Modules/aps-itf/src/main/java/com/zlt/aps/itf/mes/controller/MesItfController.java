@@ -2,8 +2,10 @@ package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.mes.service.MesItfService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.text.ParseException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -39,25 +43,61 @@ public class MesItfController {
     /**
      * 同步SAP与模具关系
      *
-     * @param mdmSkuMouldRel SAP与模具关系
+     * @param syncDataLogs SAP与模具关系
      * @return 结果
      */
     @ApiOperation("同步SAP与模具关系")
     @PostMapping("/syncProductModRelation")
-    public AjaxResult syncProductModRelation(@RequestBody MdmSkuMouldRel mdmSkuMouldRel) {
-        return mesItfService.syncProductModRelation(mdmSkuMouldRel);
+    public AjaxResult syncProductModRelation(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncProductModRelation(syncDataLogs);
     }
 
     /**
      * 同步模具台账
      *
-     * @param modelInfo 模具台账
+     * @param syncDataLogs 模具台账
      * @return 结果
      */
     @ApiOperation("同步模具台账")
     @PostMapping("/syncModelInfo")
-    public AjaxResult syncModelInfo(@RequestBody MdmModelInfo modelInfo) {
-        return mesItfService.syncModelInfo(modelInfo);
+    public AjaxResult syncModelInfo(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncModelInfo(syncDataLogs);
+    }
+
+    /**
+     * 同步成品库存
+     *
+     * @param productStockMonth 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成品库存")
+    @PostMapping("/syncProductStock")
+    public AjaxResult syncProductStock(@RequestBody ProductStockMonth productStockMonth) {
+        return mesItfService.syncProductStock(productStockMonth);
+    }
+
+    /**
+     * 同步不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @return 结果
+     */
+    @ApiOperation("同步不合格库存")
+    @PostMapping("/syncUnqualifiedStock")
+    public AjaxResult syncUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException {
+        return mesItfService.syncUnqualifiedStock(mdmUnqualifiedStock);
+    }
+
+    /**
+     * 同步特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    @ApiOperation("同步特殊材料库存")
+    @PostMapping("/syncRawSpecialMaterialStock")
+    public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
+        return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
 

@@ -69,9 +69,22 @@
         WHERE DEL_FLAG = 0
     </select>
 
-    <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
+    <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock">
         SELECT *
         FROM mes_unqualified_stock
         WHERE DEL_FLAG = 0
+    </select>
+
+    <select id="selectRawSpecialMaterialStock"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock">
+        SELECT STOCK_DATE,
+               SPEC_MATERIAL_CODE AS MATERIAL_CODE,
+               STANDARD_CODE      AS STANDARD_LENGTH,
+               STOCK_NUM          AS STOCK,
+               DATA_VERSION,
+               COMPANY_CODE,
+               FACTORY_CODE
+        FROM SPEC_STOCK_SYNC
+        WHERE STOCK_DATE = #{stockDate}
     </select>
 </mapper>

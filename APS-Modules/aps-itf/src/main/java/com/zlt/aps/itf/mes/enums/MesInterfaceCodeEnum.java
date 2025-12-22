@@ -31,6 +31,16 @@ public enum MesInterfaceCodeEnum {
      */
     SYNC_UNQUALIFIED_STOCK("MES_UNQUALIFIED_STOCK", "mesItfService", "syncUnqualifiedStock", "同步不合格库存"),
 
+    /**
+     * 同步特殊材料库存-MES提供视图同步，不通过MQ
+     */
+    SYNC_SPEC_STOCK("SPEC_STOCK_SYNC", "mesItfService", "syncRawSpecialMaterialStock", "同步特殊材料库存"),
+
+    /**
+     * 同步原材料出库-MES提供视图同步，不通过MQ
+     */
+    SYNC_ORI_MATERIAL_OUT("ORI_MATERIAL_OUT_SYNC", "mesItfService", "syncRawSpecialMaterialStock", "同步特殊材料库存"),
+
     ;
 
     private final String code;

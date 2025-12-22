@@ -1,22 +1,25 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.maindata.service.IDpStockVersionService;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -64,6 +67,45 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "requireVersion", "materialCode"));
+    }
+
+    @Override
+    public void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+        if (org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
+            return;
+        }
+        List<DpStockVersion> list = Lists.newArrayList();
+        List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
+        finishedProductStocks.forEach(finishedProductStock -> {
+            DpStockVersion requireStock = this.buildRequireStock(createCondition, monthPlanVersion, finishedProductStock);
+            list.add(requireStock);
+        });
+        baseDao.insertBatch(list);
+    }
+
+    private DpStockVersion buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MdmProductStock finishedProductStock) {
+        DpStockVersion requireStock = new DpStockVersion();
+        BeanUtils.copyProperties(finishedProductStock, requireStock);
+        requireStock.setId(null);
+        requireStock.setRequireVersion(monthPlanVersion);
+        requireStock.setIsDelete(YesOrNoEnum.NO.getValue());
+        requireStock.setRemainingQty(finishedProductStock.getLeftOverQty());
+        requireStock.setBaseVale(null);
+        requireStock.setYear(createCondition.getYear());
+        requireStock.setMonth(createCondition.getMonth());
+        return requireStock;
+    }
+
+    /**
+     * 将Map转换为List<MpFinishedProductStock>
+     */
+    public List<MdmProductStock> flattenStockMap(
+            Map<String, List<MdmProductStock>> finishedProductStockMap) {
+        // 使用Stream扁平化转换
+        return finishedProductStockMap.values().stream()
+                .flatMap(List::stream)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     /**

@@ -1,20 +1,11 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.datasource.service.BaseService;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
@@ -22,49 +13,32 @@ import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.service.IDpStockVersionService;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
-import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
-import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
-import com.zlt.aps.monthplan.demand.service.IMdmProductStockService;
-import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
-import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
-import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
+import com.zlt.aps.monthplan.demand.service.*;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IMpMonthPlanProdFinalService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
-import com.ruoyi.common.datasource.service.BaseService;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import org.apache.commons.collections4.CollectionUtils;
-import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import lombok.extern.slf4j.Slf4j;
 
-import com.zlt.common.utils.ImportExcelValidatedUtils;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -112,7 +86,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 查询需求计划
-     * 
+     *
      * @param id 需求计划主键
      * @return 需求计划
      */
@@ -124,7 +98,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 查询需求计划列表
-     * 
+     *
      * @param dpDemandPlan 需求计划
      * @return 需求计划
      */
@@ -152,7 +126,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 新增需求计划
-     * 
+     *
      * @param dpDemandPlan 需求计划
      * @return 结果
      */
@@ -165,7 +139,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 修改需求计划
-     * 
+     *
      * @param dpDemandPlan 需求计划
      * @return 结果
      */
@@ -178,7 +152,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 批量删除需求计划
-     * 
+     *
      * @param ids 需要删除的需求计划主键
      * @return 结果
      */
@@ -204,7 +178,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
     /**
      * 删除需求计划信息
-     * 
+     *
      * @param id 需求计划主键
      * @return 结果
      */

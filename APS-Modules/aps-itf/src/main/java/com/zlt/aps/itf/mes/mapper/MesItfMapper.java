@@ -1,8 +1,6 @@
 package com.zlt.aps.itf.mes.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -46,5 +44,13 @@ public interface MesItfMapper {
      * @param productStockMonth 查询参数
      * @return 列表
      */
-    List<ProductStockMonth> selectUnqualifiedStock(ProductStockMonth productStockMonth);
+    List<MdmUnqualifiedStock> selectUnqualifiedStock(MdmUnqualifiedStock productStockMonth);
+
+    /**
+     * 查询不合格库存列表
+     *
+     * @param rawSpecialMaterialStock 查询参数
+     * @return 列表
+     */
+    List<RawSpecialMaterialStock> selectRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
 }
