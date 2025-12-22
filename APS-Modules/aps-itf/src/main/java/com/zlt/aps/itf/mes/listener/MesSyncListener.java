@@ -48,9 +48,9 @@ public class MesSyncListener {
         	AuxReqSyncDataLogs syncDataLogs = syncDataMQService.handleMQProcess(data);
             MesInterfaceCodeEnum mesInterfaceCodeEnum = MesInterfaceCodeEnum.getByCode(data);
             if (mesInterfaceCodeEnum != null) {
-            	String methodName = mesInterfaceCodeEnum.getMethodName();
-            	Object beanObj = SpringUtils.getBean(mesInterfaceCodeEnum.getServiceName());
-            	Object[] params = new Object[] {syncDataLogs.getDataVersion()};
+            	Object beanObj = SpringUtils.getBean(mesInterfaceCodeEnum.getServiceName()); // 从接口配置枚举获取处理类
+            	String methodName = mesInterfaceCodeEnum.getMethodName(); // 从接口配置枚举获取处理方法
+            	Object[] params = new Object[] {syncDataLogs}; // 接口处理类入参，统一为AuxReqSyncDataLogs
                 ReflectUtils.invokeMethodByName(beanObj, methodName, params);
             }
         } catch (Exception e) {

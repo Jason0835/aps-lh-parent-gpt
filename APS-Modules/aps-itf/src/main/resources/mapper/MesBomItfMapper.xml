@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.MesBomItfMapper">
+	<!-- 查询SKU与模具关系列表 -->
+    <select id="syncLhConstructionInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef">
+        SELECT
+            MATERIAL_CODE,
+            MES_MATERIAL_CODE,
+            EMBRYO_VERSION BOM_VERSION,
+            EMBRYO_CODE,
+            SPEC_DESC,
+            EMBRYO_DESC,
+            CURING_TIME,
+            CURING_TIME2 HYDRAULIC_PRESSURE_CURING_TIME,
+            CURING_TIME CURING_TIME2,
+            CURING_TIME2 HYDRAULIC_PRESSURE_CURING_TIME2,
+            DEL_FLAG IS_DELETE,
+            FACTORY_CODE,
+            CREATE_TIME
+        FROM LH_CONSTRUCTION_INFO
+        WHERE DEL_FLAG = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND DATA_VERSION = #{dataVersion}
+    </select>
+
+	<!-- 半部件BOM信息 -->
+    <select id="selectMesConstructionInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo">
+        SELECT
+            EMBRYO_VERSION CONSTRUCTION_VERSION,
+            EMBRYO_CODE MATERIAL_CODE,
+            EMBRYO_CODE MES_MATERIAL_CODE,
+            EMBRYO_CODE CONSTRUCTION_CODE,
+            EMBRYO_DESC SPEC_CODE,
+            PATTERN,
+            SPEC SPECIFICATIONS,
+            FORMING_METHOD MOULD_METHOD,
+            DRUM_TYPE BUILDING_DRUM_TYPE,
+            RUBBER_PAD PADDING_CODE,
+            SIDE_WALL SIDEWALL_CODE,
+            WIRE_LOOP BEAD_CODE,
+            RUBBER_CORE RUBBER_CORE_CODE,
+            BEAD TIRE_RING_CODE,
+            INNER_LINER INSIDE_CODE,
+            ZERO_DEGREE ZERO_BELT_CODE,
+            CLOTH_WRAPPING CLOTH_WRAPPING_CODE,
+            CARCROSS TIRE_BODY_CODE,
+            FIRST_LAYER BELT_CODE1,
+            SECOND_LAYER BELT_CODE2,
+            THREE_LAYER BELT_CODE3,
+            FOUR_LAYER BELT_CODE4,
+            LEFT_REINFORCE_LAYER BELT_CODE_LEFT_CODE,
+            RIGHT_REINFORCE BELT_CODE_RIGHT_CODE,
+            TYPE_GLUE TYPE_ADHESIVE_CODE,
+            DEL_FLAG IS_DELETE,
+            FACTORY_CODE,
+            CREATE_TIME
+        FROM MES_CONSTRUCTION_INFO
+        WHERE DEL_FLAG = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND DATA_VERSION = #{dataVersion}
+    </select>
+
+	<!-- 成型及半部件BOM施工信息同步 -->
+    <select id="selectMesBomInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo">
+        SELECT
+            CHILD_MATERIAL_CODE,
+            CHILD_MATERIAL_NAME,
+            CHILD_MATERIAL_NAME_CODE,
+            CHILD_CODE,
+            CHILD_MATERIAL_VERSION,
+            UNIT,
+            DOSAGE,
+            DOSAGE_FORM,
+            PARENT_MATERIAL_CODE,
+            PARENT_MATERIAL_NAME,
+            PARENT_CODE,
+            PARENT_VERSION,
+            PRODUCTION_STAGE,
+            BOM_VERSION,
+            REMARK,
+            STATUS,
+            CREATE_DATE,
+            UPDATE_DATE,
+            DATA_VERSION,
+            COMPANY_CODE,
+            FACTORY_CODE
+        FROM MES_BOM_INFO
+        WHERE IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND DATA_VERSION = #{dataVersion}
+    </select>
+</mapper>

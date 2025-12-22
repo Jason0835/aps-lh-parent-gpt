@@ -35,6 +35,11 @@ public class MdmBomInfo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    /** 工厂编号 */
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
      /** 子物料品号 */
     @Excel(name = "ui.data.column.mdmBomInfo.childMaterialCode")
     @ApiModelProperty(value = "子物料品号", name = "childMaterialCode")
@@ -94,6 +99,11 @@ public class MdmBomInfo extends BaseEntity {
     @ApiModelProperty(value = "父物料代码", name = "parentCode")
     @TableField(value = "PARENT_CODE")
     private String parentCode;
+
+    /** 父物料版本 */
+    @ApiModelProperty(value = "父物料版本", name = "parentVersion")
+    @TableField(value = "PARENT_VERSION")
+    private String parentVersion;
 
     /** 生产阶段 */
     @Excel(name = "ui.data.column.mdmBomInfo.productionStage")

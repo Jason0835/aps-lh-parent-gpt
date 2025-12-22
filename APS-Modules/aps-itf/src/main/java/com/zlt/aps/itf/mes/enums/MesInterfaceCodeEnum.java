@@ -41,6 +41,21 @@ public enum MesInterfaceCodeEnum {
      */
     SYNC_ORI_MATERIAL_OUT("ORI_MATERIAL_OUT_SYNC", "mesItfService", "syncRawSpecialMaterialStock", "同步特殊材料库存"),
 
+    /**
+     * SKU与施工关系表
+     */
+    LH_CONSTRUCTION_INFO("LH_CONSTRUCTION_INFO", "mesBomItfService", "syncLhConstructionInfo", "SKU与施工关系表"),
+
+    /**
+     * 半部件BOM接口
+     */
+    CONSTRUCTION_INFO("CONSTRUCTION_INFO", "mesBomItfService", "syncConstructionInfo", "半部件BOM接口"),
+
+    /**
+     * 成型及半部件BOM施工信息同步
+     */
+    BOM_INFO("BOM_INFO", "mesBomItfService", "syncBomInfo", "成型及半部件BOM施工信息同步"),
+
     ;
 
     private final String code;
