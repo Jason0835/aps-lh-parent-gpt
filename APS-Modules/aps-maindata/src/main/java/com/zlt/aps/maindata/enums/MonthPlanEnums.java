@@ -118,7 +118,16 @@ public enum MonthPlanEnums {
     /**
      * SYS0204008 常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾
      */
-    NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER("SYS0204008", "常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾");
+    NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER("SYS0204008", "常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾"),
+    /**
+     * SYS0209003 超期常规储备排产月数
+     */
+    OVERDUE_REGULAR("SYS0209001", "单位：月,超期常规储备排产月数"),
+    /**
+     * SYS0209004 超期周期储备排产月数
+     */
+    OVERDUE_CYCLE("SYS0209001", "单位：月,超期周期储备排产月数"),
+    ;
 
     private final String code;
     private final String name;

@@ -3,6 +3,7 @@ package com.zlt.aps.job.task;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,14 @@ public class MesTask {
     @ApiOperation("同步特殊材料库存-默认当前日期")
     public void syncRawSpecialMaterialStock() {
         iMesItfService.syncRawSpecialMaterialStock(new RawSpecialMaterialStock());
+    }
+
+    /**
+     * 同步原材料出库
+     */
+    @ApiOperation("同步原材料出库-默认当前日期")
+    public void syncRawMaterialOutboundRecord() {
+        iMesItfService.syncRawMaterialOutboundRecord(new RawMaterialOutboundRecord());
     }
 
 }

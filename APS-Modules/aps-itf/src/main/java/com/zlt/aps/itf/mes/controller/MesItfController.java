@@ -2,8 +2,9 @@ package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
 import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import io.swagger.annotations.Api;
@@ -67,13 +68,13 @@ public class MesItfController {
     /**
      * 同步成品库存
      *
-     * @param productStockMonth 参数
+     * @param mdmProductStock 参数
      * @return 结果
      */
     @ApiOperation("同步成品库存")
     @PostMapping("/syncProductStock")
-    public AjaxResult syncProductStock(@RequestBody ProductStockMonth productStockMonth) {
-        return mesItfService.syncProductStock(productStockMonth);
+    public AjaxResult syncProductStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException {
+        return mesItfService.syncProductStock(mdmProductStock);
     }
 
     /**
@@ -98,6 +99,18 @@ public class MesItfController {
     @PostMapping("/syncRawSpecialMaterialStock")
     public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
         return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
+    }
+
+    /**
+     * 同步原材料出库
+     *
+     * @param materialOutboundRecord 参数
+     * @return 结果
+     */
+    @ApiOperation("同步原材料出库")
+    @PostMapping("/syncRawMaterialOutboundRecord")
+    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody RawMaterialOutboundRecord materialOutboundRecord) throws ParseException {
+        return mesItfService.syncRawMaterialOutboundRecord(materialOutboundRecord);
     }
 
 

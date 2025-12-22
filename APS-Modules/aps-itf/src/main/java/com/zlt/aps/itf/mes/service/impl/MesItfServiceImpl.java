@@ -2,11 +2,14 @@ package com.zlt.aps.itf.mes.service.impl;
 
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
+import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -37,6 +40,8 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmModelInfoEntityMapper modelInfoEntityMapper;
     @Autowired
     private BaseDao baseDao;
+    @Autowired
+    private IFactoryParamService iFactoryParamService;
 
     /**
      * 同步SAP与模具关系
@@ -125,33 +130,172 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 添加超期SKU
+     *
+     * @param productStock       成品库存
+     * @param stockYear          库存年
+     * @param stockMonth         库存月
+     * @param overdueRegularTime 超期定期时间
+     * @param overdueCycleTime   超期周期时间
+     * @param time               时间
+     * @param mpOverdueSkuList   要添加的列表
+     */
+    private static List<MpOverdueSku> addOverdueSku(MdmProductStock productStock, int stockYear, int stockMonth, Date overdueRegularTime, Date overdueCycleTime, Date time, List<MpOverdueSku> mpOverdueSkuList) {
+        if (YesOrNoEnum.YES.getCode().equals(productStock.getIsExceedTire())) {
+            MpOverdueSku mpOverdueSku = new MpOverdueSku();
+            mpOverdueSku.setFactoryCode(productStock.getFactoryCode());
+            mpOverdueSku.setYear(stockYear);
+            mpOverdueSku.setMonth(stockMonth);
+            mpOverdueSku.setMesMaterialCode(productStock.getMesMaterialCode());
+            mpOverdueSku.setMaterialCode(productStock.getMaterialCode());
+            mpOverdueSku.setMaterialDesc(productStock.getMaterialDesc());
+            mpOverdueSku.setWeekYear(productStock.getWeekYear());
+            mpOverdueSku.setStockDate(productStock.getStockDate());
+            mpOverdueSku.setIsOverdueRegular(YesOrNoEnum.NO.getCode());
+            mpOverdueSku.setIsOverdueCycle(YesOrNoEnum.NO.getCode());
+            mpOverdueSku.setOverdueRegularDate(overdueRegularTime);
+            mpOverdueSku.setOverdueCycleDate(overdueCycleTime);
+            if (time.before(overdueRegularTime)) {
+                mpOverdueSku.setIsOverdueRegular(YesOrNoEnum.YES.getCode());
+            }
+            if (time.before(overdueCycleTime)) {
+                mpOverdueSku.setIsOverdueCycle(YesOrNoEnum.YES.getCode());
+            }
+            mpOverdueSkuList.add(mpOverdueSku);
+        }
+        return mpOverdueSkuList;
+    }
+
+    /**
      * 同步成品库存
      *
-     * @param productStockMonth 参数
+     * @param mdmProductStock 参数
      * @return 结果
      */
     @Override
-    public AjaxResult syncProductStock(ProductStockMonth productStockMonth) {
-        List<ProductStockMonth> productStockList = this.getProductStock(productStockMonth);
+    public AjaxResult syncProductStock(MdmProductStock mdmProductStock) throws ParseException {
+        List<MdmProductStock> productStockList = this.getProductStock(mdmProductStock);
         // 先删后增，日期
-        Calendar instance = Calendar.getInstance();
-        instance.setTime(new Date());
-        if (productStockMonth.getYear() == null) {
-            productStockMonth.setYear(instance.get(Calendar.YEAR));
+        Date stockDate = mdmProductStock.getStockDate();
+        if (stockDate == null) {
+            stockDate = DateUtils.getNowDate("yyyy-MM-dd");
         }
-        if (productStockMonth.getMonth() == null) {
-            productStockMonth.setMonth(instance.get(Calendar.MONTH) + 1);
-        }
-        Map<String, Object> map = new HashMap<>();
-        map.put("YEAR", productStockMonth.getYear());
-        map.put("MONTH", productStockMonth.getMonth());
-        baseDao.deleteByMap(ProductStockMonth.class, map);
-        List<List<ProductStockMonth>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
-        for (List<ProductStockMonth> importList : splitList) {
+        String factoryCode = mdmProductStock.getFactoryCode();
+
+        Calendar stockDateCalendar = Calendar.getInstance();
+        stockDateCalendar.setTime(stockDate);
+        int stockYear = stockDateCalendar.get(Calendar.YEAR);
+        int stockMonth = stockDateCalendar.get(Calendar.MONTH) + 1;
+
+        this.deleteMdmProductStock(factoryCode, stockDate);
+
+        this.deleteOverDueSku(factoryCode, stockYear, stockMonth);
+
+        int subMonthParam1 = 3, subMonthParam2 = 6, subMonthParam3 = 9, subMonthParam4 = 12;
+
+        stockDateCalendar.add(Calendar.MONTH, -subMonthParam1);
+        Date subTime1 = stockDateCalendar.getTime();
+
+        stockDateCalendar.setTime(stockDate);
+        stockDateCalendar.add(Calendar.MONTH, -subMonthParam2);
+        Date subTime2 = stockDateCalendar.getTime();
+
+        stockDateCalendar.setTime(stockDate);
+        stockDateCalendar.add(Calendar.MONTH, -subMonthParam3);
+        Date subTime3 = stockDateCalendar.getTime();
+
+        stockDateCalendar.setTime(stockDate);
+        stockDateCalendar.add(Calendar.MONTH, -subMonthParam4);
+        Date subTime4 = stockDateCalendar.getTime();
+
+        FactoryParam param = new FactoryParam();
+        param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
+        Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+        param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
+        Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+        List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
+        for (List<MdmProductStock> importList : splitList) {
+            List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
+            for (MdmProductStock productStock : importList) {
+                String weekYear = productStock.getWeekYear();
+                if (weekYear.length() != 4) {
+                    continue;
+                }
+                int week, year;
+                try {
+                    week = Integer.parseInt(weekYear.substring(2));
+                    year = Integer.parseInt("20" + weekYear.substring(2, 4));
+                } catch (NumberFormatException e) {
+                    log.error("解析年周号失败：{}", weekYear);
+                    continue;
+                }
+                Calendar instance = Calendar.getInstance();
+                instance.set(Calendar.YEAR, year);
+                instance.set(Calendar.WEEK_OF_YEAR, week);
+                // 根据年周号对应月份判断超期时间
+                Date time = instance.getTime();
+                // 赋值是否超期胎
+                productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
+                if (time.before(subTime4)) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, true);
+                } else if (time.before(subTime3)) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, false);
+                } else if (time.before(subTime2)) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, false, false);
+                } else if (time.before(subTime1)) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, false, false, false);
+                }
+                mpOverdueSkuList = addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
+            }
             baseDao.insertBatch(importList);
+            baseDao.insertBatch(mpOverdueSkuList);
         }
-        // steve's TODO 根据年周号计算是否超期胎
         return AjaxResult.success();
+    }
+
+    /**
+     * 获取超期时间
+     *
+     * @param param             查询参数
+     * @param stockDateCalendar 库存日期
+     * @param stockDate         库存日期
+     * @return 结果
+     */
+    private Date getOverdueTime(FactoryParam param, Calendar stockDateCalendar, Date stockDate) {
+        FactoryParam overdueParam = iFactoryParamService.getFacParamSingle(param);
+        stockDateCalendar.setTime(stockDate);
+        stockDateCalendar.add(Calendar.MONTH, -Integer.parseInt(overdueParam.getParamValue()));
+        return stockDateCalendar.getTime();
+    }
+
+    /**
+     * 删除超期SKU
+     *
+     * @param factoryCode 工厂代码
+     * @param stockYear   库存年
+     * @param stockMonth  库存月
+     */
+    private void deleteOverDueSku(String factoryCode, int stockYear, int stockMonth) {
+        Map<String, Object> overdueSkuMap = new HashMap<>();
+        overdueSkuMap.put("FACTORY_CODE", factoryCode);
+        overdueSkuMap.put("YEAR", stockYear);
+        overdueSkuMap.put("MONTH", stockMonth);
+        baseDao.deleteByMap(MpOverdueSku.class, overdueSkuMap);
+    }
+
+    /**
+     * 删除成品库存
+     *
+     * @param factoryCode 工厂代码
+     * @param stockDate   库存日期
+     */
+    private void deleteMdmProductStock(String factoryCode, Date stockDate) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("FACTORY_CODE", factoryCode);
+        map.put("STOCK_DATE", stockDate);
+        baseDao.deleteByMap(MdmProductStock.class, map);
     }
 
     /**
@@ -161,7 +305,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth) {
+    public List<MdmProductStock> getProductStock(MdmProductStock productStockMonth) {
         // 查询视图
         return mesItfMapper.selectProductStock(productStockMonth);
     }
@@ -238,5 +382,23 @@ public class MesItfServiceImpl implements MesItfService {
         return mesItfMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
-
+    /**
+     * 同步原材料出库
+     *
+     * @param materialOutboundRecord 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord) throws ParseException {
+        Date outboundDate = materialOutboundRecord.getOutboundDate();
+        if (outboundDate == null) {
+            outboundDate = DateUtils.getNowDate("yyyy-MM-dd");
+        }
+        List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesItfMapper.syncRawMaterialOutboundRecord(materialOutboundRecord);
+        Map<String, Object> map = new HashMap<>(16);
+        map.put("OUTBOUND_DATE", outboundDate);
+        baseDao.deleteByMap(RawMaterialOutboundRecord.class, map);
+        baseDao.insertBatch(rawMaterialOutboundRecords);
+        return AjaxResult.success();
+    }
 }

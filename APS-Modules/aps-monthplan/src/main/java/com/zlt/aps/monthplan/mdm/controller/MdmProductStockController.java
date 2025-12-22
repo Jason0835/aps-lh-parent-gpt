@@ -1,12 +1,8 @@
 package com.zlt.aps.monthplan.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
-import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.ServletUtils;
-import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -17,18 +13,15 @@ import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
-import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -197,35 +190,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
     @PostMapping("/list4Mes")
     public TableDataInfo list4Mes(@RequestBody MdmProductStock queryVO) {
         return getDataTable(mdmProductStockService.list4Mes(queryVO));
-    }
-
-    /**
-     * 导出列表
-     */
-    @Log(title = "成品库存", businessType = BusinessType.EXPORT)
-    @ApiOperation("导入数据")
-    @PostMapping("/export4Mes/{fileName}")
-    public byte[] export4Mes(@RequestBody MdmProductStock queryVO, @PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
-        Date beginTime = DateUtils.getNowDate();
-        List<MdmProductStock> list = mdmProductStockService.list4Mes(queryVO);
-        ExcelUtil<MdmProductStock> util = new ExcelUtil<>(this.getTClass());
-        Workbook workbook = util.exportExcel2(response, list, fileName);
-        byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
-        Date endTime = DateUtils.getNowDate();
-        ExportLog exportLog = new ExportLog();
-        exportLog.setProcedureCode("0");
-        exportLog.setExportParams(queryVO.toString());
-        String uri = ServletUtils.getRequest().getRequestURI();
-        exportLog.setFunctionCode(uri.split("/")[1]);
-        exportLog.setFunctionName(fileName);
-        exportLog.setFileName(fileName + ".xlsx");
-        exportLog.setRowCount(list.size());
-        exportLog.setBeginTime(beginTime);
-        exportLog.setEndTime(endTime);
-        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        this.iExportLogService.add(exportLog);
-        return resultBytes;
     }
 
 }

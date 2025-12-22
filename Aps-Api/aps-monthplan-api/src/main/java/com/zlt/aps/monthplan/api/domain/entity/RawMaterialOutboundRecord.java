@@ -1,18 +1,17 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.math.BigDecimal;
-import java.util.Date;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -27,8 +26,7 @@ import com.zlt.common.domain.CommonBusiEntity;
  *     修 改 人：zlt
  *     修改内容：...
  */
-
-@ApiModel(value = "原材料出库量对象", description = "原材料出库量对象 ")
+@ApiModel(value = "原材料出库量对象", description = "原材料出库量对象")
 @Data
 @TableName(value = "T_RAW_MATERIAL_OUTBOUND_RECORD")
 public class RawMaterialOutboundRecord extends BaseEntity {
@@ -56,7 +54,9 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
-    /** 物料类型            数据字典 biz_rawMaterial_type 01 常规产品 02 特殊材料            匹配特殊原材料，则 类型 = 02 */
+    /**
+     * 物料类型，数据字典 biz_rawMaterial_type 01 常规产品 02 特殊材料，匹配特殊原材料，则 类型 = 02
+     */
     @Excel(name = "ui.data.column.rawMaterialOutboundRecord.materialType")
     @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
     @ApiModelProperty(value = "物料类型  biz_rawMaterial_type")
@@ -92,5 +92,10 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     @TableField(value = "OUTBOUND_QTY")
     private BigDecimal outboundQty;
 
-
+    /**
+     * 数据版本
+     */
+    @ApiModelProperty(value = "数据版本", name = "dataVersion")
+    @TableField(exist = false)
+    private String dataVersion;
 }

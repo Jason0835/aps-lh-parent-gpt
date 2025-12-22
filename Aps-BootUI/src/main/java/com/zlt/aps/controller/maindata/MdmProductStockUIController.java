@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
-import com.zlt.aps.monthplan.api.service.IDpStockVersionRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.IMdmProductStockRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,7 +29,7 @@ import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmFinishStockUIController.java
+ * 文件名称：MdmProductStockUIController.java
  * 描    述：成品库存 UI控制层类：....
  *
  * @author zlt
@@ -39,25 +39,25 @@ import java.util.Arrays;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-12-08
+ * @date 2025-12-22
  */
 @Slf4j
-@Api(tags = "版本库存")
+@Api(tags = "成品库存")
 @Controller
-@RequestMapping("/monthplan/mdmFinishStock")
-public class DpStockVersionUIController extends BaseUIController<DpStockVersion> {
+@RequestMapping("/monthplan/mdmProductStock")
+public class MdmProductStockUIController extends BaseUIController<MdmProductStock> {
 
-    private final String prefix = "aps/monthplan/dpStockVersion";
+    private final String prefix = "aps/monthplan/mdmProductStock";
     @Autowired
-    private IDpStockVersionRemoteService iMdmFinishStockService;
+    private IMdmProductStockRemoteService iMdmProductStockService;
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmFinishStock:view")
+    @RequiresPermissions("monthplan:mdmProductStock:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmFinishStock";
+        return prefix + "/mdmProductStock";
     }
 
     /**
@@ -65,7 +65,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmFinishStock", new DpStockVersion());
+        mmap.put("mdmProductStock", new MdmProductStock());
         return prefix + "/add";
     }
 
@@ -74,7 +74,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmFinishStock", iMdmFinishStockService.getInfo(id));
+        mmap.put("mdmProductStock", iMdmProductStockService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -82,38 +82,38 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmFinishStock:list")
+    @RequiresPermissions("monthplan:mdmFinishStock:list4Mes")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DpStockVersion dpStockVersion) {
-        return iMdmFinishStockService.list(dpStockVersion);
+    public TableDataInfo list(MdmProductStock mdmProductStock) {
+        return iMdmProductStockService.list(mdmProductStock);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmFinishStock:edit")
+    @RequiresPermissions("monthplan:mdmProductStock:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(DpStockVersion dpStockVersion) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmFinishStockService.checkUnique(dpStockVersion))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmFinishStock.notUnique"));
+    public AjaxResult save(MdmProductStock mdmProductStock) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmProductStockService.checkUnique(mdmProductStock))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmProductStock.checkUnique"));
         }
 
-        return iMdmFinishStockService.save(dpStockVersion);
+        return iMdmProductStockService.save(mdmProductStock);
     }
 
     /**
      * 删除成品库存
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmFinishStock:remove")
+    @RequiresPermissions("monthplan:mdmProductStock:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmFinishStockService.removeByIds(Arrays.asList(arr));
+        return iMdmProductStockService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -122,8 +122,8 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(DpStockVersion dpStockVersion) {
-        return iMdmFinishStockService.checkUnique(dpStockVersion);
+    public String checkUnique(MdmProductStock mdmProductStock) {
+        return iMdmProductStockService.checkUnique(mdmProductStock);
     }
 
     /**
@@ -155,7 +155,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mdmFinishStock.modelName");
+        return I18nUtil.getMessage("ui.data.column.productStock.modelName");
     }
 
     /**
@@ -165,19 +165,19 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<DpStockVersion> util = new ExcelUtil<>(DpStockVersion.class);
+        ExcelUtil<MdmProductStock> util = new ExcelUtil<>(MdmProductStock.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmFinishStock:export")
+    @RequiresPermissions("monthplan:mdmFinishStock:export4Mes")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, DpStockVersion entity) throws IOException {
+    public void export(HttpServletResponse response, MdmProductStock entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmFinishStockService.exportData(entity, fileName);
+        byte[] excelBytes = iMdmProductStockService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -197,8 +197,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmFinishStockService.importData(context, false);
+        AjaxResult ajaxResult = iMdmProductStockService.importData(context, false);
         return ajaxResult;
     }
-
 }

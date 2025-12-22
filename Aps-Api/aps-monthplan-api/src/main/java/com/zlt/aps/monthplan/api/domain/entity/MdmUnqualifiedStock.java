@@ -25,7 +25,7 @@ import java.util.Date;
  * 修改内容：...
  * @date 2025-12-22
  */
-@ApiModel(value = "不合格品库存对象", description = "不合格品库存对象 ")
+@ApiModel(value = "不合格品库存对象", description = "不合格品库存对象")
 @Data
 @TableName(value = "T_MDM_UNQUALIFIED_STOCK")
 public class MdmUnqualifiedStock extends BaseEntity {

@@ -67,5 +67,14 @@ public interface IMesItfService {
     @PostMapping("/mesItf/syncRawSpecialMaterialStock")
     public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock);
 
+    /**
+     * 同步原材料出库
+     *
+     * @param materialOutboundRecord 参数
+     * @return 结果
+     */
+    @ApiOperation("同步原材料出库")
+    @PostMapping("/mesItf/syncRawMaterialOutboundRecord")
+    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody RawMaterialOutboundRecord materialOutboundRecord);
 
 }

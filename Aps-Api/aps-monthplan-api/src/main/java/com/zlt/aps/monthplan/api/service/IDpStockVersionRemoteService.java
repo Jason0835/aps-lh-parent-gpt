@@ -77,21 +77,4 @@ public interface IDpStockVersionRemoteService {
     @ApiOperation("导入成品库存")
     @PostMapping("/dpStockVersion/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
-
-    /**
-     * 查询MES实时成品库存列表
-     *
-     * @param dpStockVersion 查询参数
-     * @return 结果
-     */
-    @ApiOperation("查询MES实时成品库存列表")
-    @PostMapping("/dpStockVersion/list4Mes")
-    TableDataInfo list4Mes(@RequestBody DpStockVersion dpStockVersion);
-
-    /**
-     * 导出成品库存列表
-     */
-    @ApiOperation("导出列表")
-    @PostMapping("/dpStockVersion/export4Mes/{fileName}")
-    byte[] export4Mes(@RequestBody DpStockVersion queryVO, @PathVariable("fileName") String fileName);
 }

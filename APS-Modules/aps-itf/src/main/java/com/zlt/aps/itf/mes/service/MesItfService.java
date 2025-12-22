@@ -51,7 +51,7 @@ public interface MesItfService {
      * @param productStockMonth 参数
      * @return 结果
      */
-    AjaxResult syncProductStock(ProductStockMonth productStockMonth);
+    AjaxResult syncProductStock(MdmProductStock productStockMonth) throws ParseException;
 
     /**
      * 获取成品库存
@@ -59,7 +59,7 @@ public interface MesItfService {
      * @param productStockMonth 参数
      * @return 结果
      */
-    List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth);
+    List<MdmProductStock> getProductStock(MdmProductStock productStockMonth);
 
     /**
      * 获取不合格库存
@@ -93,4 +93,13 @@ public interface MesItfService {
      * @return 结果
      */
     List<RawSpecialMaterialStock> getRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
+
+    /**
+     * 同步原材料出库
+     *
+     * @param materialOutboundRecord 参数
+     * @return 结果
+     */
+    AjaxResult syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord) throws ParseException;
+
 }

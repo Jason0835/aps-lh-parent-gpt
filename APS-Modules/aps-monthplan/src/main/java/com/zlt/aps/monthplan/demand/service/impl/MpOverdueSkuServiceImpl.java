@@ -1,22 +1,21 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
-import java.time.YearMonth;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Sets;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku;
 import com.zlt.aps.monthplan.demand.mapper.MpOverdueSkuEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpOverdueSkuService;
-import com.ruoyi.common.datasource.service.BaseService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+
+import java.time.YearMonth;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -33,10 +32,15 @@ import org.springframework.util.CollectionUtils;
  */
 @Slf4j
 @Service
-public class MpOverdueSkuServiceImpl extends BaseService<MpOverdueSku>  implements IMpOverdueSkuService
+public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> implements IMpOverdueSkuService
 {
     @Autowired
     private MpOverdueSkuEntityMapper mpOverdueSkuEntityMapper;
+
+    @Override
+    protected String getDocTypeCode() {
+        return "MDM0218";
+    }
 
     @Override
     public Set<String> excludeOverdueCycleProduction() {
@@ -112,20 +116,5 @@ public class MpOverdueSkuServiceImpl extends BaseService<MpOverdueSku>  implemen
             return Sets.newHashSet();
         }
         return list.stream().map(MpOverdueSku::getMaterialCode).collect(Collectors.toSet());
-    }
-
-    @Override
-    public void insertBatchData(Collection<MpOverdueSku> collection) {
-
-    }
-
-    @Override
-    public void updateBatchData(Collection<MpOverdueSku> collection) {
-
-    }
-
-    @Override
-    public void mergerIntoBatchData(List<MpOverdueSku> list) {
-
     }
 }

@@ -36,7 +36,7 @@ public interface MesItfMapper {
      * @param productStockMonth 查询参数
      * @return 结果
      */
-    List<ProductStockMonth> selectProductStock(ProductStockMonth productStockMonth);
+    List<MdmProductStock> selectProductStock(MdmProductStock productStockMonth);
 
     /**
      * 查询不合格库存列表
@@ -53,4 +53,12 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<RawSpecialMaterialStock> selectRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
+
+    /**
+     * 获取原材料出库记录列表
+     *
+     * @param materialOutboundRecord 同步数据日志
+     * @return 列表
+     */
+    List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord);
 }
