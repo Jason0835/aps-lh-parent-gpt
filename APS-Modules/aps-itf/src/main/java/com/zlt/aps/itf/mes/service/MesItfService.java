@@ -1,10 +1,10 @@
 package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.sync.domain.AuxReqSyncDataLogs;
 
+import java.text.ParseException;
 import java.util.List;
 
 /**
@@ -19,7 +19,7 @@ public interface MesItfService {
      * @param mdmSkuMouldRel SAP与模具关系
      * @return 结果
      */
-    AjaxResult syncProductModRelation(MdmSkuMouldRel mdmSkuMouldRel);
+    AjaxResult syncProductModRelation(AuxReqSyncDataLogs mdmSkuMouldRel);
 
     /**
      * 同步模具台账
@@ -27,7 +27,7 @@ public interface MesItfService {
      * @param modelInfo 模具台账
      * @return 结果
      */
-    AjaxResult syncModelInfo(MdmModelInfo modelInfo);
+    AjaxResult syncModelInfo(AuxReqSyncDataLogs modelInfo);
 
     /**
      * 获取模具台账List
@@ -51,13 +51,46 @@ public interface MesItfService {
      * @param productStockMonth 参数
      * @return 结果
      */
-    List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth);
+    AjaxResult syncProductStock(ProductStockMonth productStockMonth);
 
     /**
-     * 同步不合格库存
+     * 获取成品库存
      *
      * @param productStockMonth 参数
      * @return 结果
      */
-    List<ProductStockMonth> syncUnqualifiedStock(ProductStockMonth productStockMonth);
+    List<ProductStockMonth> getProductStock(ProductStockMonth productStockMonth);
+
+    /**
+     * 获取不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @return 结果
+     */
+    List<MdmUnqualifiedStock> getUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock);
+
+    /**
+     * 同步不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @throws ParseException 异常
+     * @return 结果
+     */
+    AjaxResult syncUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException;
+
+    /**
+     * 同步特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    AjaxResult syncRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException;
+
+    /**
+     * 查询特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    List<RawSpecialMaterialStock> getRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
 }

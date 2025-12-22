@@ -1,13 +1,23 @@
 package com.zlt.aps.itf.mes.listener;
 
-import com.ruoyi.common.core.utils.reflect.ReflectUtils;
-import com.zlt.aps.itf.mes.enums.MesInterfaceCodeEnum;
-import com.zlt.aps.itf.mes.service.impl.MesItfServiceImpl;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.*;
+import javax.annotation.Resource;
+
+import org.springframework.amqp.rabbit.annotation.EnableRabbit;
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+
+import com.ruoyi.common.core.utils.SpringUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
+import com.zlt.aps.itf.mes.enums.MesInterfaceCodeEnum;
+import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.sync.service.SyncDataMQService;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Chen
@@ -17,7 +27,9 @@ import org.springframework.stereotype.Component;
 @EnableRabbit
 @Component
 public class MesSyncListener {
-
+    @Resource(name = "syncDataMQService")
+    private SyncDataMQService syncDataMQService;
+    
     /**
      * 接收MES消息
      *
@@ -33,9 +45,13 @@ public class MesSyncListener {
     }, ackMode = "AUTO")
     public void processor(String data, @Header(AmqpHeaders.CONSUMER_QUEUE) String queue) {
         try {
+        	AuxReqSyncDataLogs syncDataLogs = syncDataMQService.handleMQProcess(data);
             MesInterfaceCodeEnum mesInterfaceCodeEnum = MesInterfaceCodeEnum.getByCode(data);
             if (mesInterfaceCodeEnum != null) {
-                ReflectUtils.invokeMethodByName(MesItfServiceImpl.class, mesInterfaceCodeEnum.getMethodName(), new Object[]{new Object()});
+            	String methodName = mesInterfaceCodeEnum.getMethodName();
+            	Object beanObj = SpringUtils.getBean(mesInterfaceCodeEnum.getServiceName());
+            	Object[] params = new Object[] {syncDataLogs.getDataVersion()};
+                ReflectUtils.invokeMethodByName(beanObj, methodName, params);
             }
         } catch (Exception e) {
             log.error(e.getMessage(), e);

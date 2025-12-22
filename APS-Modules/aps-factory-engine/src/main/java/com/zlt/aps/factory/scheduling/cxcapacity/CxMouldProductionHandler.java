@@ -1,17 +1,17 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.dto.*;
+import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,12 +55,93 @@ public class CxMouldProductionHandler {
         }
         //排产收尾新增规格-重新获取需求需排产计划信息
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = hasProductionPlanList.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
-        if(CollectionUtils.isEmpty(leftOverHasProductionList)){
+        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
             //todo 记录日志
-            return ;
+            return;
         }
+        CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
+    }
 
+    /**
+     * 非在机结构，模具排产
+     *
+     * @param context
+     * @param cxMachineCode
+     * @param productionPlan
+     */
+    public static void noContinueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlan.getProductionPlanInfo().getGroupPlanData();
+        List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionPlanList)) {
+            //todo 记录日志
+            return;
+        }
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            //todo 记录日志
+            return;
+        }
+        //根据新的分组计划，构建新的硫化配比
+        Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = productionPlan.getProductionPlanInfo().getCxMachineLhRationMap();
+        if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
+            //todo 记录日志
+            return;
+        }
+        MonthPlanStructureLhRatioVo cxLhRatio = cxMachineLhRationMap.get(cxMachineInfo.getCxMachineBrandCode());
+        if (null == cxLhRatio) {
+            //todo 记录日志
+            return;
+        }
+        cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
+        buildNewLhConclusionInfo(cxMachineInfo, cxLhRatio.getLhMachineMaxQty(), productionPlan);
+        CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+    }
 
+    /**
+     * 重新构建成型对应的收尾信息，重分配的起始天数开始
+     *
+     * @param cxMachineInfo  成型机台
+     * @param maxLhCount     最大硫化数
+     * @param productionPlan 排产计划
+     */
+    private static void buildNewLhConclusionInfo(CxMachineBaseInfoVo cxMachineInfo, Integer maxLhCount, CxMachineAllocationPlanHelper productionPlan) {
+        ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
+        Integer startDay = productionPlan.getStartDay();
+        Set<Integer> newCxLhGroupNo = new HashSet<>();
+        Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
+        for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
+            newCxLhGroupNo.add(cxLhGroupNo);
+            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), startDay);
+        }
+        Set<Integer> needDeletedGroupNo = new HashSet<>();
+        cxLhRatioMap.forEach((cxLhGroupNo, helper) -> {
+            if (!newCxLhGroupNo.contains(cxLhGroupNo)) {
+                needDeletedGroupNo.add(cxLhGroupNo);
+            }
+        });
+        if (CollectionUtils.isEmpty(needDeletedGroupNo)) {
+            return;
+        }
+        needDeletedGroupNo.forEach(deletedGroupNo -> cxLhRatioMap.remove(deletedGroupNo));
+    }
+
+    /**
+     * @param cxLhRatioMap
+     * @param cxLhGroupNo
+     * @param groupName
+     * @param startDay
+     */
+    private static void updateProductionInfo(Map<Integer, CxLhProductionHelper> cxLhRatioMap, Integer cxLhGroupNo, String groupName, Integer startDay) {
+        if (cxLhRatioMap.containsKey(cxLhGroupNo)) {
+            CxLhProductionHelper helper = cxLhRatioMap.get(cxLhGroupNo);
+            helper.resetProductionInfoByNewGroupName(groupName, startDay);
+            return;
+        }
+        CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo);
+        newHelper.setProductionDay(startDay);
+        newHelper.setProductionQty(BigDecimal.ZERO.longValue());
+        cxLhRatioMap.put(cxLhGroupNo, newHelper);
     }
 
 }

@@ -121,6 +121,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 是否有供应链优先排产量
+     * @return
+     */
+    public boolean hasPrioritizeQty(){
+        if( !YesOrNoEnum.YES.getCode().equals(getIsPrioritize())){
+            return false;
+        }
+        return hasProduction();
+    }
+    /**
      * 是否小于minQty
      * 如果有高优先级排产量则使用高优先级排产量比较，否则使用排产量比较
      *

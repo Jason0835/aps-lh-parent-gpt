@@ -43,7 +43,7 @@ public class CxCapacityAllocationHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer monthDays = productionContext.getMonthDays();
         //成型基础信息
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfoMap = productionContext.getCxMachineBaseInfo();
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         cxContinueInfoMap.forEach((structureName, cxContinueInfo) -> {
             //预估成型机台的计划分组信息
             ProductionPlanGroupInfo groupPlanInfo = estimateGroupCxAllocationMap.get(structureName);
@@ -158,7 +158,7 @@ public class CxCapacityAllocationHandler {
             return;
         }
         List<CxMachineBaseInfoVo> reverseCxMachineList = new ArrayList<>();
-        reverseFindSet.forEach(cxMachineCode -> reverseCxMachineList.add(productionContext.getCxMachineBaseInfo().get(cxMachineCode)));
+        reverseFindSet.forEach(cxMachineCode -> reverseCxMachineList.add(productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode)));
         //最先收尾的先-剩余天数多的
         if (CollectionUtils.isEmpty(reverseCxMachineList)) {
             //todo 记录日志
@@ -227,7 +227,7 @@ public class CxCapacityAllocationHandler {
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatio, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(addHelper);
         //todo 对成型机台进行模拟模具排产
-
+        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
         if (leftOver >= 5) {
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
@@ -285,7 +285,7 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getCxMachineBaseInfo();
+        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         if (CollectionUtils.isEmpty(allCxMachineMap)) {
             return null;
         }

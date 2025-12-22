@@ -3,6 +3,7 @@ package com.zlt.aps.factory.domain.dto;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Set;
 
 /**
@@ -65,5 +66,21 @@ public class CxLhProductionHelper implements Serializable {
         cxLh.setGroupName(groupName);
         cxLh.setLhGroupNo(lhGroupNo);
         return cxLh;
+    }
+
+    /**
+     * 重新设置成型硫化排产信息
+     *
+     * @param groupName 分组计划名-TBR为结构
+     * @param startDay  排产开始日-即在排产周期的第几天
+     */
+    public void resetProductionInfoByNewGroupName(String groupName, Integer startDay) {
+        this.groupName = groupName;
+        this.productionDay = startDay;
+        this.productionQty = BigDecimal.ZERO.longValue();
+        this.dayMaxProductionQty = null;
+        this.materialCode = null;
+        this.materialDesc = null;
+        //排产模具是否要清空？
     }
 }

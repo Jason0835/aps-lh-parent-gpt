@@ -3,11 +3,16 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.utils.CxLhMouldProductionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -38,7 +43,7 @@ public class CxAddSkuProductionHandler {
     public static void productionAddSku(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxMachineAllocationPlanHelper productionPlan, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //获取最先收尾的硫化组
-        CxMachineBaseInfoVo cxMachineInfo = productionContext.getCxMachineBaseInfo().get(cxMachineCode);
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
             //todo 记录日志
             return;
@@ -53,25 +58,51 @@ public class CxAddSkuProductionHandler {
         }
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
-        if(StringUtils.isBlank(materialDesc)){
+        if (StringUtils.isBlank(materialDesc)) {
             //todo 记录日志
-            return ;
+            return;
         }
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
         //计算需要排产的量
-        Long sumProductionQty = BigDecimal.ZERO.longValue();
-//        List<MonthPlanProductionRequirePlanVo> selectedPlanList = productionPlanList.stream().filter()
-
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(productionPlanList, materialDesc);
+        if (null == needProductionInfo) {
+            //todo 记录日志
+            return;
+        }
+        Long sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        Long dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
+        //实际排产量
+        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
-
-
+        CxLhMouldProductionUtils.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+        //递归：重新获取下一组
+        productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
     }
 
+    /**
+     * 从排产计划中挑选出在startDay~endDay能进行排产的sku计划
+     * 1、挑选在startDay~endDay还可进行双模排产的sku
+     * 2、有供应链优先字样的计划最优先
+     * 3、其次考虑先高优先级再排产其它净需求
+     * 4、库销比低的优先
+     * 5、小于50条的优先
+     * 6、净需求量大的优先
+     * 7、如果挑选的sku与其它sku是共用模具，且是存在其它sku最后两副模具(即模具受限)
+     * 则，需排产量小的优先
+     *
+     * @param productionContext  排产上下文
+     * @param startDay           排产开始日
+     * @param endDay             排产结束日
+     * @param productionPlanList 排产计划
+     * @return
+     */
     private static String getSelectedAddSku(TbrProductionContext productionContext, Integer startDay, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList) {
         if (CollectionUtils.isEmpty(productionPlanList)) {
             return "";
         }
+        //提取所有sku的物料描述
         Set<String> allMaterialDescSet = productionPlanList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
         Set<String> enableMaterialDescSet = productionContext.getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
         if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
@@ -104,7 +135,7 @@ public class CxAddSkuProductionHandler {
             minInventorySalesRatioList = heightRequireList;
         }
         //小于50条的优先
-        List<MonthPlanProductionRequirePlanVo> lessMinQtyList = minInventorySalesRatioList.stream().filter(plan -> plan.isLess(Long.valueOf(productionContext.getParamConfiguration().getMinQty()))).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> lessMinQtyList = minInventorySalesRatioList.stream().filter(plan -> plan.isLess(Long.valueOf(productionContext.getBaseDataContainer().getParamConfiguration().getMinQty()))).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(lessMinQtyList)) {
             lessMinQtyList = minInventorySalesRatioList;
         }
@@ -131,6 +162,41 @@ public class CxAddSkuProductionHandler {
         limitShareMap.forEach((limitMaterial, planList) -> limitGroup.put(limitMaterial, planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getVirtualProductionQty).sum()));
         Optional<Map.Entry<String, Long>> minEntry = limitGroup.entrySet().stream().min(Map.Entry.comparingByValue());
         return minEntry.get().getKey();
+    }
+
+    /**
+     * 从分组计划中获取选中Sku(selectedMaterialDesc)还需排产量
+     * 如果需整个排产，则为所有未排量，否则先排产高优级量
+     *
+     * @param productionPlanList   分组排产计划(TBR-结构名)
+     * @param selectedMaterialDesc 选中的Sku
+     * @return
+     */
+    private static SkuNeedProductionInfo getNeedProductionQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc) {
+        if (CollectionUtils.isEmpty(productionPlanList) || StringUtils.isBlank(selectedMaterialDesc)) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(selectedPlanList)) {
+            return null;
+        }
+        //需按净需求一起排产
+        if (YesOrNoEnum.YES.getValue().equals(selectedPlanList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum())) {
+            return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
+        }
+        //是否有供应链优先标记
+        List<MonthPlanProductionRequirePlanVo> hasPrioritizeList = selectedPlanList.stream().filter(plan -> plan.hasPrioritizeQty()).collect(Collectors.toList());
+        //供应链优先
+        if (!CollectionUtils.isEmpty(hasPrioritizeList)) {
+            return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, hasPrioritizeList);
+        }
+        //是否有高优级排产量
+        List<MonthPlanProductionRequirePlanVo> heightList = selectedPlanList.stream().filter(plan -> plan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
+        //高优先级优先
+        if (!CollectionUtils.isEmpty(heightList)) {
+            return new SkuNeedProductionInfo(ProductionQtyModelEnum.HEIGHT_QTY, heightList);
+        }
+        return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
     }
 
 }
