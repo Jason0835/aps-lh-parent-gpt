@@ -169,8 +169,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         param.setBillDateEndTime(nowDateStr);
         SyncPlanedNotShipParamVo paramVo = new SyncPlanedNotShipParamVo();
         paramVo.setFactory(factoryCode);
-        paramVo.setYear(2024);
-        paramVo.setMonth(6);
+        paramVo.setYear(lastYear);
+        paramVo.setMonth(Integer.parseInt(lastMonth));
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
         AjaxResultUtils.getList(ajaxResult, SyncOutShipDmdOrdResultVo.class);
         List<SyncOutShipDmdOrdResultVo> outShipDmdOrdResultVos = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SyncOutShipDmdOrdResultVo.class);
