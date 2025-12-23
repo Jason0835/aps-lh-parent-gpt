@@ -81,7 +81,21 @@ public class MonthPlanProductMouldInfoVo implements Serializable {
     private String relationType;
 
     /**
+     * 结构名，与计划匹配后补充
+     */
+    private String structureName;
+    /**
      * 上机日期--默认为空
      */
     private Date boardingDate;
+
+    /**
+     * 结构|*|主花纹
+     *
+     * @return
+     */
+    public String getStructureNameAndMainPattern() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, structureName, mainPattern);
+    }
 }
