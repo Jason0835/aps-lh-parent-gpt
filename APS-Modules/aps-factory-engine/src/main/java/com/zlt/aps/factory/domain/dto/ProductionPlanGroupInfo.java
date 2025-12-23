@@ -5,8 +5,10 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 
@@ -80,7 +82,7 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 粗步计算 结构需求量需要的成型产能分配
-     * 结构总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
+     * 结构有效总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
      * 保留1位小数
      * 如果 小数部分 > 0.9，则向上取整
      *
@@ -93,44 +95,13 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
-        //根据结构成型硫化配比信息，提取结构最小的硫化配比
+        //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
         //1、对计划按结构分组，构建结构分组对象ProductionPlanGroupInfo
-        Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
-        Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
-        groupPlanMap.forEach((structureName, planList) -> {
-            ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
-            groupInfo.setGroupName(structureName);
-            groupInfo.setProductType(context.getProductType());
-            groupInfo.setGroupPlanData(planList);
-            List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
-            if (CollectionUtils.isEmpty(cxLhRatioList)) {
-                groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
-            } else {
-                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity()));
-                groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
-            }
-            groupInfoMap.put(structureName, groupInfo);
-        });
-        //2、提取有效净需求--剔除不可排产的-汇总需求量，并获得分组下最小日硫化产能
-        groupInfoMap.forEach((structureName, groupInfo) -> {
-            List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
-            if (CollectionUtils.isEmpty(groupPlanData)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
-                return;
-            }
-            //剔除不排产的计划
-            List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction())).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(productionPlanList)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
-                return;
-            }
-            Long sumPlanQty = productionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
-            Long minDayLhCapacity = productionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().getAsLong();
-            groupInfo.setSumPlanQty(sumPlanQty);
-            groupInfo.setMinLhDayCapacityQty(minDayLhCapacity);
-        });
+        Map<String, ProductionPlanGroupInfo> groupInfoMap = buildGroupPlanInfoMap(context, requirePlanList, structureGroupMap);
+        //2、提取有效净需求--剔除不可排产的，且没有超出模具产能-汇总需求量，并获得分组下最小日硫化产能
+        calculateEffectiveByMouldMaxCapacity(context, groupInfoMap);
         //3、根据结构的硫化配比及最小的硫化机台数 估算需要的成型机台数
         groupInfoMap.forEach((structureName, groupInfo) -> {
             MonthPlanStructureLhRatioVo ratioInfo = minLhRatioMap.get(structureName);
@@ -163,7 +134,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 计算需要分配的成型产能机台数，保留1位小数
      * 双模方式
-     * 总需求量 / (SKU最小日硫化量 * 2 * 结构最小硫化配比 * 月度可排产天数),两位小数
+     * 有效总需求量 / (SKU最小日硫化量 * 2 * 结构最小硫化配比 * 月度可排产天数),两位小数
      * 如果 小数部分 >0.9，则向上取整
      * 否则 = 保留1位小数
      *
@@ -419,6 +390,119 @@ public class ProductionPlanGroupInfo {
             minLhRatioMap.put(structureName, ratioList.get(BigDecimal.ZERO.intValue()));
         });
         return minLhRatioMap;
+    }
+
+    /**
+     * 构建结构分组基础信息
+     * 结构对应的计划，已经结构下所有的硫化配比信息
+     *
+     * @param context            排产上下文
+     * @param allRequirePlanList 所有排产计划
+     * @param structureGroupMap  结构硫化配比配置信息
+     */
+    private static Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(Context context, List<MonthPlanProductionRequirePlanVo> allRequirePlanList, Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap) {
+        if (CollectionUtils.isEmpty(allRequirePlanList)) {
+            return Collections.emptyMap();
+        }
+        //TBR-按结构名分组排产计划
+        Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = allRequirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
+        Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
+        groupPlanMap.forEach((structureName, planList) -> {
+            ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
+            groupInfo.setGroupName(structureName);
+            groupInfo.setProductType(context.getProductType());
+            groupInfo.setGroupPlanData(planList);
+            //设置对应的硫化配比信息：分不同机型有不同配比
+            List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
+            if (CollectionUtils.isEmpty(cxLhRatioList)) {
+                groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
+            } else {
+                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity()));
+                groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
+            }
+            groupInfoMap.put(structureName, groupInfo);
+        });
+        return groupInfoMap;
+    }
+
+    /**
+     * 计算结构的有效需求量，需要根据模具信息
+     *
+     * @param context      排产上下文
+     * @param groupInfoMap 结构分组计划
+     */
+    private static void calculateEffectiveByMouldMaxCapacity(Context context, Map<String, ProductionPlanGroupInfo> groupInfoMap) {
+        //得到结构主花纹下最大可用模具数
+        Map<String, Integer> structureMainPatternMaxMouldGroup = getStructureMainPatternMaxMouldNumber(context);
+        /**
+         * 1、剔除不可排产的
+         * 2、剔除超出模具产能部分
+         * 3、设置结构分组的总的有效需求和最小日硫化量
+         */
+        //按结构+主花纹分组
+        String groupKeyFormat = "%s|*|%s";
+        groupInfoMap.forEach((structureName, groupInfo) -> {
+            List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
+            if (CollectionUtils.isEmpty(groupPlanData)) {
+                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
+                return;
+            }
+            //剔除不排产的计划
+            List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(productionPlanList)) {
+                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
+                return;
+            }
+            //最小日硫化量
+            Long minDayLhCapacity = productionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().getAsLong();
+            groupInfo.setMinLhDayCapacityQty(minDayLhCapacity);
+            List<Long> mainPatternEffectiveQty = new ArrayList<>();
+            //按主花纹分组需求
+            Map<String, List<MonthPlanProductionRequirePlanVo>> mainPatternGroup = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMainPattern));
+            mainPatternGroup.forEach((mainPattern, groupPlanList) -> {
+                String groupKey = String.format(groupKeyFormat, structureName, mainPattern);
+                Integer maxMouldNumber = structureMainPatternMaxMouldGroup.get(groupKey);
+                if (null == maxMouldNumber) {
+                    maxMouldNumber = BigDecimal.ZERO.intValue();
+                }
+                Integer lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+                Long sumPlanQty = groupPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
+                Long maxMouldCapacity = lhMachineCount * minDayLhCapacity * ProductionConstant.DOUBLE_MOULD_PRODUCTION * context.getMaxProductionDays();
+                mainPatternEffectiveQty.add(Math.min(sumPlanQty, maxMouldCapacity));
+            });
+            Long sumPlanQty = mainPatternEffectiveQty.stream().mapToLong(Long::longValue).sum();
+            groupInfo.setSumPlanQty(sumPlanQty);
+        });
+    }
+
+    /**
+     * 获取 结构 + 主花纹下可使用的模具最大数量
+     *
+     * @param context
+     * @return
+     */
+    private static Map<String, Integer> getStructureMainPatternMaxMouldNumber(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<MonthPlanProductMouldInfoVo> allMouldRelation = productionContext.getBaseDataContainer().getSkuMouldRelationMap().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(allMouldRelation)) {
+            return Collections.emptyMap();
+        }
+        //按结构+主花纹分组模具信息
+        Map<String, List<MonthPlanProductMouldInfoVo>> structureMainPatternGroup = allMouldRelation.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getStructureNameAndMainPattern));
+        Map<String, Integer> structureAndMainPatternMap = new HashMap<>();
+        structureMainPatternGroup.forEach((structureAndMainPattern, mouldRelationList) -> {
+            Integer maxMouldNumber = BigDecimal.ZERO.intValue();
+            if (CollectionUtils.isEmpty(mouldRelationList)) {
+                structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
+                return;
+            }
+            Map<String, Long> materialGroup = mouldRelationList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc, Collectors.counting()));
+            List<Long> mouldNumberList = new ArrayList<>(materialGroup.values());
+            mouldNumberList.sort(Comparator.comparing(Long::valueOf));
+            maxMouldNumber = mouldNumberList.get(BigDecimal.ZERO.intValue()).intValue();
+            structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
+        });
+        return structureAndMainPatternMap;
     }
 
     /**

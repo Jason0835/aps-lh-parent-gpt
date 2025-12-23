@@ -112,4 +112,12 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs);
 }

@@ -65,9 +65,9 @@ public class MdmSkuScheduleCategory extends BaseEntity {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.mdmSkuScheduleCategory.generateDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "生成日期", name = "generateDate")
-    @TableField(value = "GENERATE_DATE")
-    private Date generateDate;
+    @ApiModelProperty(value = "生成日期", name = "genrateDate")
+    @TableField(value = "GENRATE_DATE")
+    private Date genrateDate;
 
 
 }

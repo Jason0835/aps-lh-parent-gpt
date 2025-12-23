@@ -146,7 +146,7 @@ public class MpHistorySaleRecordController extends AbstractDocBizController<MpHi
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("areaCode")), "AREA_CODE", queryVO.getFieldValueByFieldName("areaCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("generationDate")), "GENERATION_DATE", queryVO.getFieldValueByFieldName("generationDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("genrateDate")), "GENRATE_DATE", queryVO.getFieldValueByFieldName("genrateDate"));
     }
 
     @Override
