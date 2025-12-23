@@ -52,12 +52,16 @@ public class RawWarningConfigServiceImpl extends AbstractDocService<RawWarningCo
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawWarningConfig.notUnique"));
         }
+        //materialCode 不能含有空格
+        if (docEntityVO.getMaterialCode().contains(" ")) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawWarningConfig.notUnique1"));
+        }
         return unique;
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode","warningType","warningLevel"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode","warningType"));
     }
 }
