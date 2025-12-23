@@ -33,6 +33,12 @@ public class FactoryConstant {
      * 2 多层胎体布标记
      */
     public final static Integer MULTILAYER_TIRE_FABRIC = 2;
+
+    /**
+     * 日期前缀
+     */
+    public static final String DAY_FIELD = "DAY_";
+
     /**
      * Y 值
      */
