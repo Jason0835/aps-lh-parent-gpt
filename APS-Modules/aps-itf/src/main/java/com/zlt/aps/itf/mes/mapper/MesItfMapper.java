@@ -1,6 +1,7 @@
 package com.zlt.aps.itf.mes.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -61,4 +62,12 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord);
+
+    /**
+     * 获取成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    List<MdmMaterialInfo> selectMaterialList(AuxReqSyncDataLogs syncDataLogs);
 }

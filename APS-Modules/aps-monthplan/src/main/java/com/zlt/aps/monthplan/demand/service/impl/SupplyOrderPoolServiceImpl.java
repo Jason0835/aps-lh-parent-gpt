@@ -18,7 +18,7 @@ import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
@@ -32,7 +32,7 @@ import com.zlt.aps.monthplan.demand.service.IMpOverdueSkuService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.enums.SupplyOrderTypeEnum;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
@@ -87,7 +87,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     // 销售订单
     private final ISalesOrderPoolService salesOrderPoolService;
     // 定稿的月度排产计划
-    private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
+    private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
     // 历史销售记录
     private final IMpHistorySaleRecordService historySaleRecordService;
     // 排产设定
@@ -164,7 +164,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
-        List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.factoryMonthPlanProductionFinalResultService.findLastTwelveMonthProdFinalPlan();
         Map<String,Integer> countSkuMap = this.countSkuMap(factoryMonthPlanProdFinals);
         skus.forEach(sku -> supplyOrderPools.add(buildSupplyOrderPool(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishedProductStockMap,countSkuMap)));
         this.baseDao.insertBatch(supplyOrderPools);
@@ -228,7 +228,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         Map<String, Long> stockMap = this.convertToGroupedSumStockQtyMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String, Long> saleOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
-        List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalService.findLastTwelveMonthProdFinalPlan();
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.factoryMonthPlanProductionFinalResultService.findLastTwelveMonthProdFinalPlan();
         Map<String,Integer> countSkuMap = this.countSkuMap(factoryMonthPlanProdFinals);
         intersections.forEach(sku -> supplyOrderPools.add(buildPrecedentOrder(sku,sku2StructureMap,sku2AverageSaleQty,structure2TurnoverMonthMap,stockMap,saleOrderMap,finishedProductStockMap,countSkuMap)));
         this.baseDao.insertBatch(supplyOrderPools);
@@ -250,7 +250,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         YearMonth now = YearMonth.now();
         supplyOrderPool.setYear(now.getYear());
         supplyOrderPool.setMonth(now.getMonthValue());
-        String yearMonth = String.format("%s%02d", supplyOrderPool.getYear(), supplyOrderPool.getMonth());
         supplyOrderPool.setLocationType(materialInfo.getCommonType());
         supplyOrderPool.setMaterialDesc(materialInfo.getMaterialDesc());
         supplyOrderPool.setBrand(materialInfo.getBrand());
@@ -286,7 +285,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
         //通过月度生产计划表，获取近12个月有排产的月份个数
         // 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
-        int  productionMonth = factoryMonthPlanProdFinalService.getProductionMonthInLastTwelveMonth(supplyOrderPool.getMaterialCode());
+        int  productionMonth = this.factoryMonthPlanProductionFinalResultService.getProductionMonthInLastTwelveMonth(supplyOrderPool.getMaterialCode());
         supplyOrderPool.setStructureFrequency(productionMonth);
         return supplyOrderPool;
     }
@@ -337,19 +336,19 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
 
-    private Map<String, Integer> countSkuMap(List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals) {
+    private Map<String, Integer> countSkuMap(List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals) {
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
         }
 
         return factoryMonthPlanProdFinals.stream()
             .filter(Objects::nonNull)
-            .filter(item -> item.getProductCode() != null)
+            .filter(item -> item.getMaterialCode() != null)
             .filter(item -> item.getYearMonth() != null)
             .collect(Collectors.groupingBy(
-                FactoryMonthPlanProdFinal::getProductCode,
+                FactoryMonthPlanProductionFinalResult::getMaterialCode,
                 Collectors.mapping(
-                    FactoryMonthPlanProdFinal::getYearMonth,
+                    FactoryMonthPlanProductionFinalResult::getYearMonth,
                     Collectors.collectingAndThen(
                         Collectors.toSet(),
                         Set::size

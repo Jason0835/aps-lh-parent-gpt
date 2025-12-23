@@ -137,4 +137,8 @@
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectMaterialList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+
+    </select>
 </mapper>

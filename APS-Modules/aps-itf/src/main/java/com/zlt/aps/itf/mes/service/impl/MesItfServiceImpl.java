@@ -7,6 +7,7 @@ import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -38,6 +39,8 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmProductModelRelationEntityMapper productModelRelationEntityMapper;
     @Autowired
     private MdmModelInfoEntityMapper modelInfoEntityMapper;
+    @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -401,4 +404,47 @@ public class MesItfServiceImpl implements MesItfService {
         baseDao.insertBatch(rawMaterialOutboundRecords);
         return AjaxResult.success();
     }
+
+    /**
+     * 同步成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表
+        List<MdmMaterialInfo> list = getMaterialInfoList(syncDataLogs);
+        // 工厂+物料编码作为匹配条件，如果存在，则更新，不存在则插入
+        List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+        for (List<MdmMaterialInfo> saveList : splitList) {
+            List<String> uniqueKeyList = saveList.stream().map(productInfo ->
+                    String.join("|", productInfo.getFactoryCode(), productInfo.getMaterialCode())).collect(Collectors.toList());
+            List<MdmMaterialInfo> existsList = materialInfoEntityMapper.selectByUniqueKeyList(uniqueKeyList);
+            Map<String, MdmMaterialInfo> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity()));
+            }
+            for (MdmMaterialInfo entity : saveList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
+                if (existsMap.containsKey(mapKey)) {
+                    MdmMaterialInfo existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+            baseDao.saveBatch(saveList);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 查询成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    private List<MdmMaterialInfo> getMaterialInfoList(AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfMapper.selectMaterialList(syncDataLogs);
+    }
+
 }
