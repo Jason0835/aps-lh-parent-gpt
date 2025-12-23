@@ -1,7 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.vo;
 
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -15,7 +15,7 @@ import lombok.Data;
 
 @Data
 @ApiModel(value = "分厂月生产计划排产结果-列表查询对象Vo", description = "分厂月生产计划排产结果-列表查询对象Vo")
-public class MonthPlanProductionFinalResultVo extends MonthPlanProductionFinalResult {
+public class MonthPlanProductionFinalResultVo extends FactoryMonthPlanProdFinal {
 
     /**
      * OE提报量

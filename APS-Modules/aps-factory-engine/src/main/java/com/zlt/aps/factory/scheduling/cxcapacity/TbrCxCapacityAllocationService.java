@@ -74,7 +74,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
 
-        //结构模具配比
+        //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         //todo 记录日志-粗算成型机台数
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
@@ -93,7 +93,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
         //todo 记录日志
+
+        //todo 第二轮排产
         //得到结构成型排程结果
+        saveStructureInfo(productionContext);
     }
 
     /**
@@ -122,6 +125,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取排产参数设定
         ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
         productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
+        //特殊材料的胎胚配置信息
+        specialMaterialInfoHandler(productionContext);
         //初始化库销比、标记是否按总需求排产
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
@@ -137,9 +142,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
-        //特殊材料的胎胚配置信息
-        specialMaterialInfoHandler(productionContext);
-
     }
 
     /**
@@ -429,6 +431,26 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
+     * 根据成型信息，得到结构排产结果
+     *
+     * @param productionContext
+     */
+    private void saveStructureInfo(TbrProductionContext productionContext){
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if(CollectionUtils.isEmpty(cxMachineBaseInfo)){
+            return ;
+        }
+        List<CxMachineAllocationPlanHelper> allAllocationList = new ArrayList<>();
+        cxMachineBaseInfo.forEach((cxMachineCode, cxMachineInfo) ->{
+            List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+            if(CollectionUtils.isEmpty(allAllocationList)){
+                return ;
+            }
+
+        });
+    }
+
+    /**
      * 初始化排产计划，主要进行按sku分组和初始化库销比
      *
      * @param productionContext 排产上下文
@@ -451,8 +473,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             if (CollectionUtils.isEmpty(productionPlanList)) {
                 return;
             }
-            //是否按总需求排产-默认 = 否
-            productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.FALSE));
+            //是否含有特殊原材料的SKU 是否按总需求排产-默认 = 否
+            productionPlanList.forEach(requirePlan -> {
+                requirePlan.setIsProductionBySum(Constant.FALSE);
+                requirePlan.setIsSpecialMaterials(YesOrNoEnum.NO.getCode());
+                if (productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap().containsKey(requirePlan.getEmbryoCode())) {
+                    requirePlan.setIsSpecialMaterials(YesOrNoEnum.YES.getCode());
+                }
+            });
             List<MonthPlanProductionRequirePlanVo> effectiveList = productionPlanList.stream().filter(plan -> plan.hasProduction()).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(effectiveList)) {
                 return;
@@ -473,6 +501,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     /**
      * 设置工厂的排产日信息
      * 包含 停产日及开停产的产能比例
+     * t_mdm_work_calendar
      *
      * @param context
      */
@@ -525,7 +554,28 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //提取结构查询条件
         Set<String> structureNameMap = requirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getStructureName).collect(Collectors.toSet());
         List<String> structureNameList = new ArrayList<>(structureNameMap);
-        return getDataService().getLhRatioInfo(context, structureNameList);
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getDataService().getLhRatioInfo(context, structureNameList);
+        if (CollectionUtils.isEmpty(structureLhRatioList)) {
+            return Collections.emptyList();
+        }
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
+        Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
+            cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
+                cycleStructureMinLhRatioMap.put(cycleStructureMinLhRatio.getStructureName(), null == cycleStructureMinLhRatio.getMonthMinLhMachineQty() ? cycleStructureMinLhRatio.getMinLhMachineQty() : cycleStructureMinLhRatio.getMonthMinLhMachineQty());
+            });
+        }
+        //常规结构的最低硫化配比
+        Integer defaultMinLhRatio = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getNoCycleProductionMinLhMachineNumber();
+        structureLhRatioList.forEach(structureLhRatio -> {
+            String structureName = structureLhRatio.getStructureName();
+            structureLhRatio.setLhMachineMinQty(defaultMinLhRatio);
+            if (cycleStructureMinLhRatioMap.containsKey(structureName)) {
+                structureLhRatio.setLhMachineMinQty(cycleStructureMinLhRatioMap.get(structureName));
+                return;
+            }
+        });
+        return structureLhRatioList;
     }
 
     /**

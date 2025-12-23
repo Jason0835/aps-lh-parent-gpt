@@ -1,78 +1,68 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
-import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 import com.google.common.collect.Lists;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.datasource.service.BaseService;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanProdFinal;
 import com.zlt.aps.monthplan.factory.mapper.MpMonthPlanProdFinalEntityMapper;
-import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
 import com.zlt.aps.monthplan.factory.service.IMpMonthPlanProdFinalService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
-import com.ruoyi.common.datasource.service.BaseService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.apache.commons.collections4.CollectionUtils;
-import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import lombok.extern.slf4j.Slf4j;
-
 import com.zlt.common.utils.ImportExcelValidatedUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.stereotype.Service;
+
+import java.time.YearMonth;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpMonthPlanProdFinalServiceImpl.java
  * 描    述：MpMonthPlanProdFinalServiceImpl工厂月生产计划-最终排产计划定稿业务层处理
- *@author yelq
- *@date 2025-12-16
- *@version 1.0
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：yelq
- *     修改内容：...
+ * @author yelq
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：yelq
+ * 修改内容：...
+ * @date 2025-12-16
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProdFinal>  implements IMpMonthPlanProdFinalService
-{
-    private final  MpMonthPlanProdFinalEntityMapper mpMonthPlanProdFinalEntityMapper;
-    private final IMonthPlanSurplusService monthPlanSurplusService;
+public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProdFinal> implements IMpMonthPlanProdFinalService {
+    private final MpMonthPlanProdFinalEntityMapper mpMonthPlanProdFinalEntityMapper;
 
 
     /**
      * 查询工厂月生产计划-最终排产计划定稿
-     * 
+     *
      * @param id 工厂月生产计划-最终排产计划定稿主键
      * @return 工厂月生产计划-最终排产计划定稿
      */
     @Override
-    public MpMonthPlanProdFinal selectMpMonthPlanProdFinalById(Integer id)
-    {
+    public MpMonthPlanProdFinal selectMpMonthPlanProdFinalById(Integer id) {
         return mpMonthPlanProdFinalEntityMapper.selectMpMonthPlanProdFinalById(id);
     }
 
     /**
      * 查询工厂月生产计划-最终排产计划定稿列表
-     * 
+     *
      * @param mpMonthPlanProdFinal 工厂月生产计划-最终排产计划定稿
      * @return 工厂月生产计划-最终排产计划定稿
      */
     @Override
-    public List<MpMonthPlanProdFinal> selectMpMonthPlanProdFinalList(MpMonthPlanProdFinal mpMonthPlanProdFinal)
-    {
+    public List<MpMonthPlanProdFinal> selectMpMonthPlanProdFinalList(MpMonthPlanProdFinal mpMonthPlanProdFinal) {
         return mpMonthPlanProdFinalEntityMapper.selectMpMonthPlanProdFinalList(mpMonthPlanProdFinal);
     }
 
@@ -83,50 +73,46 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
      * @return 工厂月生产计划-最终排产计划定稿集合
      */
     @Override
-    public List<MpMonthPlanProdFinal> selectMpMonthPlanProdFinalByIds(List<Integer> ids)
-    {
+    public List<MpMonthPlanProdFinal> selectMpMonthPlanProdFinalByIds(List<Integer> ids) {
         return super.executeSelectIn(
-                    mpMonthPlanProdFinalEntityMapper::selectMpMonthPlanProdFinalByIds
-                    ,ids
+                mpMonthPlanProdFinalEntityMapper::selectMpMonthPlanProdFinalByIds
+                , ids
         );
     }
 
 
     /**
      * 新增工厂月生产计划-最终排产计划定稿
-     * 
+     *
      * @param mpMonthPlanProdFinal 工厂月生产计划-最终排产计划定稿
      * @return 结果
      */
     @Override
-    public int insertMpMonthPlanProdFinal(MpMonthPlanProdFinal mpMonthPlanProdFinal)
-    {
+    public int insertMpMonthPlanProdFinal(MpMonthPlanProdFinal mpMonthPlanProdFinal) {
         mpMonthPlanProdFinal.setBaseVale(null);
         return mpMonthPlanProdFinalEntityMapper.insert(mpMonthPlanProdFinal);
     }
 
     /**
      * 修改工厂月生产计划-最终排产计划定稿
-     * 
+     *
      * @param mpMonthPlanProdFinal 工厂月生产计划-最终排产计划定稿
      * @return 结果
      */
     @Override
-    public int updateMpMonthPlanProdFinal(MpMonthPlanProdFinal mpMonthPlanProdFinal)
-    {
+    public int updateMpMonthPlanProdFinal(MpMonthPlanProdFinal mpMonthPlanProdFinal) {
         mpMonthPlanProdFinal.setBaseVale(mpMonthPlanProdFinal.getId());
         return mpMonthPlanProdFinalEntityMapper.update(mpMonthPlanProdFinal);
     }
 
     /**
      * 批量删除工厂月生产计划-最终排产计划定稿
-     * 
+     *
      * @param ids 需要删除的工厂月生产计划-最终排产计划定稿主键
      * @return 结果
      */
     @Override
-    public int deleteMpMonthPlanProdFinalByIds(Integer[] ids)
-    {
+    public int deleteMpMonthPlanProdFinalByIds(Integer[] ids) {
         return mpMonthPlanProdFinalEntityMapper.deleteMpMonthPlanProdFinalByIds(ids);
     }
 
@@ -137,8 +123,7 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
      * @return 结果
      */
     @Override
-    public int deleteMpMonthPlanProdFinalByIds(List<Integer> ids)
-    {
+    public int deleteMpMonthPlanProdFinalByIds(List<Integer> ids) {
         Integer[] arrayids = ids.toArray(new Integer[0]);
 
         return this.deleteMpMonthPlanProdFinalByIds(arrayids);
@@ -146,13 +131,12 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
 
     /**
      * 删除工厂月生产计划-最终排产计划定稿信息
-     * 
+     *
      * @param id 工厂月生产计划-最终排产计划定稿主键
      * @return 结果
      */
     @Override
-    public int deleteMpMonthPlanProdFinalById(Integer id)
-    {
+    public int deleteMpMonthPlanProdFinalById(Integer id) {
         return mpMonthPlanProdFinalEntityMapper.deleteMpMonthPlanProdFinalById(id);
     }
 
@@ -183,11 +167,12 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
         }
         List<MpMonthPlanProdFinal> list = mpMonthPlanProdFinalEntityMapper.selectMpMonthPlanProdFinalList(mpMonthPlanProdFinal);
         if (CollectionUtils.isNotEmpty(list)) {
-            long iCount = list.stream().filter(x->!x.getId().equals(mpMonthPlanProdFinal.getId())).count();
+            long iCount = list.stream().filter(x -> !x.getId().equals(mpMonthPlanProdFinal.getId())).count();
             return iCount == 0 ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
     }
+
     /**
      * 导入工厂月生产计划-最终排产计划定稿数据
      *
@@ -208,12 +193,12 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
             int errorNum = i + 2;
             MpMonthPlanProdFinal mpMonthPlanProdFinal = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, mpMonthPlanProdFinal);
-            ImportExcelValidatedUtils.validatedRepeat(list,mpMonthPlanProdFinal,i,2,importLogId,validated);
+            ImportExcelValidatedUtils.validatedRepeat(list, mpMonthPlanProdFinal, i, 2, importLogId, validated);
             if (CollectionUtils.isNotEmpty(validated)) {
                 mpMonthPlanProdFinal.setId(-999L);
                 failureNum++;
                 importErrorLogs.addAll(validated);
-            } else{
+            } else {
                 mpMonthPlanProdFinal.setBaseVale(null);
                 importList.add(mpMonthPlanProdFinal);
             }
@@ -223,7 +208,7 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
             //勾选更新记录，调用mergeOrInsert
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
-                    mpMonthPlanProdFinalEntityMapper.mergeSql(importList);
+                mpMonthPlanProdFinalEntityMapper.mergeSql(importList);
             } else {
                 //唯一则新增
                 for (int i = 0; i < list.size(); i++) {
@@ -240,7 +225,7 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
                         failureNum++;
                         //TODO:此处需手动填写唯一校验失败国际化信息
                         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(),i + 2,
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), i + 2,
                                 String.format(uniqueMsg, i + 2), importErrorLogs);
                     }
                 }
@@ -261,7 +246,7 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
     }
 
     @Override
-    public Map<String,Long> calculateMonthSurplus(String requireVersion) {
+    public Map<String, Long> calculateMonthSurplus(String requireVersion) {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         String yearMonth = String.format("%s%02d", currentYearMonth.getYear(), currentYearMonth.getMonthValue());
@@ -274,7 +259,7 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
         }
         List<MdmMonthSurplus> result = Lists.newArrayList();
         Map<String, List<MpMonthPlanProdFinal>> groupByMaterialCode = this.getGroupMonthProdFinalPlanByMaterialCode(factoryMonthPlanProdFinals);
-        groupByMaterialCode.forEach((key,value) -> {
+        groupByMaterialCode.forEach((key, value) -> {
             MdmMonthSurplus entity = new MdmMonthSurplus();
             entity.setBaseVale(null);
             entity.setIsDelete(ApsConstant.APS_YES_NO_0);
@@ -291,7 +276,6 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
             entity.setStructureName(value.get(0).getStructureName());
             result.add(entity);
         });
-        monthPlanSurplusService.batchInsertPlanSurplusList(result);
         return calculateMonthSurplus(result);
     }
 
@@ -300,11 +284,11 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
             return Collections.emptyMap();
         }
         return monthSurpluses.stream()
-            .filter(Objects::nonNull)
-            .collect(Collectors.groupingBy(
-                MdmMonthSurplus::getGroupKey,
-                Collectors.summingLong(MdmMonthSurplus::getPlanSurplusQty)
-            ));
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(
+                        MdmMonthSurplus::getGroupKey,
+                        Collectors.summingLong(MdmMonthSurplus::getPlanSurplusQty)
+                ));
     }
 
     private Map<String, List<MpMonthPlanProdFinal>> getGroupMonthProdFinalPlanByMaterialCode(List<MpMonthPlanProdFinal> factoryMonthPlanProdFinals) {
@@ -312,12 +296,12 @@ public class MpMonthPlanProdFinalServiceImpl extends BaseService<MpMonthPlanProd
             return Collections.emptyMap();
         }
         return factoryMonthPlanProdFinals
-            .parallelStream()
-            .filter(Objects::nonNull)
-            .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
-            .collect(Collectors.groupingByConcurrent(
-                MpMonthPlanProdFinal::getMaterialCode,
-                Collectors.toCollection(ArrayList::new)
-            ));
+                .parallelStream()
+                .filter(Objects::nonNull)
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .collect(Collectors.groupingByConcurrent(
+                        MpMonthPlanProdFinal::getMaterialCode,
+                        Collectors.toCollection(ArrayList::new)
+                ));
     }
 }

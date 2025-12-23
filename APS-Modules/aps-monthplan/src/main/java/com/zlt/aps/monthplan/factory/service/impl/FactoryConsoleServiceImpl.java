@@ -1,8 +1,6 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
@@ -14,28 +12,21 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductMinConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ProductStockInfo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.aps.monthplan.api.domain.vo.*;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.demand.mapper.MonthPlanSaleOrderMapper;
-import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireMapper;
-import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper;
-import com.zlt.aps.monthplan.demand.service.IProductStockMonthService;
 import com.zlt.aps.monthplan.enums.StockHedgingComparatorEnum;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.dto.YearSaleMinProdVo;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryConsoleMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
-import com.zlt.aps.monthplan.factory.mapper.MdmStockUpPlanMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
-import com.zlt.aps.monthplan.factory.service.IMdmProductionGenerateService;
-import com.zlt.aps.monthplan.factory.service.IMdmStockUpPlanService;
-import com.zlt.aps.monthplan.mdm.service.IEstimateExceedShortService;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,13 +55,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
 
-    private final MdmStockUpPlanMapper stockUpPlanMapper;
-
     private final MonthPlanSaleOrderMapper monthPlanSaleOrderMapper;
-
-    private final SaleMonthPlanRequireMapper saleMonthPlanRequireMapper;
-
-    private final SaleMonthPlanRequireStockMapper saleMonthPlanRequireStockMapper;
 
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
 
@@ -78,17 +63,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
 
     private final BaseDao baseDao;
 
-    private final IMdmStockUpPlanService stockUpPlanService;
-
-    private final IProductStockMonthService productStockMonthService;
-
-    private final IEstimateExceedShortService estimateExceedShortService;
-
     private final IProductMinConfigurationService productMinConfigurationService;
-
-    private final IPlanOrderSortConfigurationService planOrderSortConfigurationService;
-
-    private final IMdmProductionGenerateService iMdmProductionGenerateService;
 
     private final IFactoryParamService iFactoryParamService;
 
@@ -96,7 +71,6 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
 
     private final IMdmMaterialInfoService iMdmMaterialInfoService;
 
-    private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
 
     /**
      * 不加超欠产量
@@ -129,95 +103,6 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         return factoryConsoleMapper.getNoSelectedVersionList(queryCondition);
     }
 
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult createSaleRequirePlan(MonthPlanSaleRequirePlanVo createCondition) {
-        // 如果已经定稿，不能重新生成销售需求计划
-        if (factoryProductionVersionMapper.selectCount(Wrappers.lambdaQuery(FactoryProductionVersion.class)
-                .eq(FactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
-                .eq(FactoryProductionVersion::getYear, createCondition.getYear())
-                .eq(FactoryProductionVersion::getMonth, createCondition.getMonth())
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)) > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.saleRequirePlan.checkFinal"));
-        }
-        String factoryCode = createCondition.getFactoryCode();
-        Integer year = createCondition.getYear();
-        Integer month = createCondition.getMonth();
-        YearMonth requirePlanDate = YearMonth.of(year, month);
-        YearMonth lastMothDate = requirePlanDate.minusMonths(1);
-        String monthPlanVersion = DateUtils.dateTimeNow();
-        QueryWrapper condition = new QueryWrapper();
-        condition.eq("FACTORY_CODE", factoryCode);
-        condition.eq("YEAR", year);
-        condition.eq("MONTH", month);
-        Long count = monthPlanSaleOrderMapper.selectCount(condition);
-        if (count < 1) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.saleRequirePlan.noSaleOrder"));
-        }
-        //库存对冲顺序配置
-        List<PlanOrderSortConfiguration> sortConfigurationList = planOrderSortConfigurationService.getStockHedgingConfiguration();
-        if (CollectionUtils.isEmpty(sortConfigurationList)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.saleRequirePlan.stockSort"));
-        }
-        //20250506 总备货阀值 = 库容阀值 - 月结库存 + 对冲库存量 获取库容阀值
-        Integer storageCapacityThreshold = getStorageCapacityThreshold(factoryCode);
-        if (storageCapacityThreshold == null || storageCapacityThreshold <= 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.saleRequirePlan.storageCapacityThreshold"));
-        }
-        //20250506 生成备货计划，参照上个月的配置
-        autoCreateStockUpPlan(factoryCode, requirePlanDate);
-        //20250427 根据近12个月总销量值更新上调控制水位值
-        updateMinProdUpQty(factoryCode, lastMothDate.minusYears(1));
-        Map<String, Map<SortHierarchyEnum, List<PlanOrderSortConfiguration>>> factoryGroupMap = getGroupStockHedgingConfiguration(sortConfigurationList);
-        //更新补充物料基础数据、重要客户及必保计划标记
-        monthPlanSaleOrderMapper.updateProductInfo(createCondition);
-        monthPlanSaleOrderMapper.updateImportantCustomFlag(createCondition);
-        //20250911 ZLT 必保采用订单导入直接使用
-        // 生成超欠产
-        iMdmProductionGenerateService.generateEstimateExceedShort(lastMothDate.getYear(), lastMothDate.getMonthValue(), createCondition.getFactoryCode());
-        // 20250427 ZLT 计划时是否加入超欠产
-        boolean isAddShort = isAddShort(factoryCode);
-        //重新获取销售订单数据，并根据分厂+物料维度分组
-        List<MonthPlanSaleOrder> saleOrderList = monthPlanSaleOrderMapper.selectList(condition);
-        Map<String, List<MonthPlanSaleOrder>> saleOrderGroupMap = SaleRequirePlanHelper.getGroupOrder(saleOrderList, factoryGroupMap);
-        //获取上个月度库存信息，并根据分厂+物料维度分组
-        MonthPlanSaleRequirePlanVo lastMonthCondition = new MonthPlanSaleRequirePlanVo();
-        lastMonthCondition.setFactoryCode(createCondition.getFactoryCode());
-        lastMonthCondition.setYear(lastMothDate.getYear());
-        lastMonthCondition.setMonth(lastMothDate.getMonthValue());
-        List<ProductStockMonth> monthStockList = productStockMonthService.getMothStock(lastMonthCondition);
-        Map<String, ProductStockInfo> stockReverseMap = SaleRequirePlanHelper.getProductMonthStock(monthStockList);
-        //按照库存冲销顺序进行对冲
-        List<OrderPlanAllocation> allocationList = calculateStockAllocation(monthPlanVersion, factoryGroupMap, saleOrderGroupMap, stockReverseMap);
-        //保存库存分配结果
-        baseDao.insertBatch(allocationList);
-        //保存版本库存信息--月结库存及剩余库存量
-        List<MonthPlanRequireStock> monthPlanRequireStockList = SaleRequirePlanHelper.buildRequireStock(stockReverseMap, monthPlanVersion);
-        baseDao.insertBatch(monthPlanRequireStockList);
-        saleMonthPlanRequireStockMapper.updateProductInfo(factoryCode, monthPlanVersion);
-        //20250506 ZLT 计算总备货阀值: 总备货阀值 = 库容阀值 - （库存冲销后剩余的月结库存） = 库容阀值 - 月结库存 + 冲销库存总量
-        Long totalStockThreshold = calculateStockThreshold(factoryCode, storageCapacityThreshold, allocationList, monthStockList);
-        //销售提报量
-        Map<String, Long> submissionQtyMap = getSubmissionQtyGroup(saleOrderGroupMap);
-        //记录分厂+物料-对应分厂+胎别
-        Map<String, String> productTypeCodeMap = saleOrderList.stream()
-                .collect(Collectors.toMap(MonthPlanSaleOrder::getGroupKey, v -> getProductTypeCodeKey(v.getFactoryCode(), v.getProductTypeCode()), (v1, v2) -> v1));
-        //最小批量配置（分厂+物料）、最小批量通配符配置（分厂+胎别）
-        Map<String, ProductMinConfiguration> minConfigurationMap = new HashMap<>();
-        Map<String, ProductMinConfiguration> minWildcardConfigMap = new HashMap<>();
-        getMinConfigurationGroup(minConfigurationMap, minWildcardConfigMap);
-        //获取备货量
-        List<MdmStockUpPlan> stockUpPlanList = stockUpPlanService.getStockUpByYearAndMonth(year, month);
-        //获取上个月的预计欠产量
-        List<EstimateExceedShort> estimateExceedShortList = estimateExceedShortService.getEstimateExceedShortByYearAndMonth(lastMonthCondition.getYear(), lastMonthCondition.getMonth());
-        //计算排产需求量，提报数量需大于等于最小批量的上调控制水位，再之后需要生产量 - 预计欠产量 +备货量 小于最小批量，则理论生产量 = 最小批量，否则 理论生产量 = 需要生产量 + 备货量 - 预计欠产量
-        List<SaleMonthPlanRequire> requireResultList = getSaleMonthPlanRequire(factoryCode, isAddShort, monthPlanVersion, submissionQtyMap, minConfigurationMap, minWildcardConfigMap, productTypeCodeMap, stockUpPlanList, estimateExceedShortList, allocationList, totalStockThreshold, stockReverseMap);
-        baseDao.insertBatch(requireResultList);
-        //保存版本信息
-        insertProductionVersion(createCondition.getFactoryCode(), year, month, monthPlanVersion, saleOrderList);
-        return AjaxResult.success();
-    }
 
     @Override
     public AjaxResult factoryWholeCourseProduction(FactoryProductionParamVo factoryProductionParam) {
@@ -313,64 +198,6 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
             factoryProductionVersionMapper.deletedProductionVersionByLast(factoryProductionParam);
         }
         return AjaxResult.success();
-    }
-
-    /**
-     * 20250506 自动生成备货计划
-     * 如果已经有备货计划，则不自动生成
-     * 否则取上个月的备货规则(近几个月)生成备份计划
-     * 取备货月数
-     *
-     * @param factoryCode
-     * @param yearMonth
-     */
-    private void autoCreateStockUpPlan(String factoryCode, YearMonth yearMonth) {
-        Integer year = yearMonth.getYear();
-        Integer month = yearMonth.getMonthValue();
-        FactoryParam factoryParam = new FactoryParam();
-        factoryParam.setFactoryCode(factoryCode);
-        factoryParam.setParamCode(FactoryConstant.SYS_PARAM_IS_AUTO_CREATE_STOCK_UP);
-        FactoryParam isAutoCreateParam = iFactoryParamService.getFacParamSingle(factoryParam);
-        if (null == isAutoCreateParam || StringUtils.isBlank(isAutoCreateParam.getParamValue())) {
-            log.info(String.format("没有开启自动生成备货计划功能，无需自动生成%s-%s备货计划", year, month));
-            return;
-        }
-        if (!IS_AUTO_CREATE_STOCK_UP_PLAN.equalsIgnoreCase(isAutoCreateParam.getParamValue())) {
-            log.info(String.format("没有开启自动生成备货计划功能，无需自动生成%s-%s备货计划", year, month));
-            return;
-        }
-        QueryWrapper<MdmStockUpPlan> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("FACTORY_CODE", factoryCode);
-        queryWrapper.eq("YEAR", year);
-        queryWrapper.eq("MONTH", month);
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        Long exist = stockUpPlanMapper.selectCount(queryWrapper);
-        if (exist > BigDecimal.ZERO.intValue()) {
-            log.info(String.format("当前已经有备货计划，无需自动生成%s-%s备货计划", year, month));
-            return;
-        }
-        //按上个月的规则 自动生成
-        YearMonth lastMothDate = yearMonth.minusMonths(1);
-        QueryWrapper<MdmStockUpPlan> lastQuery = new QueryWrapper<>();
-        lastQuery.eq("FACTORY_CODE", factoryCode);
-        lastQuery.eq("YEAR", lastMothDate.getYear());
-        lastQuery.eq("MONTH", lastMothDate.getMonthValue());
-        lastQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        List<MdmStockUpPlan> planList = stockUpPlanMapper.selectList(lastQuery);
-        if (CollectionUtils.isEmpty(planList)) {
-            log.info(String.format("没有上个月的备货计划，故而不能自动生成%s-%s备货计划", year, month));
-            return;
-        }
-        MdmStockUpPlan lastMonth = planList.get(0);
-        Integer monthRange = lastMonth.getAverageType();
-        if (null == monthRange) {
-            log.info(String.format("上个月的备货计划没有备货规则，故而不能自动生成%s-%s备货计划", year, month));
-            return;
-        }
-        QueryCalcStockingParamVo createCondition = new QueryCalcStockingParamVo();
-        createCondition.setMonthRange(Long.valueOf(monthRange));
-        createCondition.setFactoryCode(factoryCode);
-        stockUpPlanService.createStockUpPlan(createCondition);
     }
 
     /**

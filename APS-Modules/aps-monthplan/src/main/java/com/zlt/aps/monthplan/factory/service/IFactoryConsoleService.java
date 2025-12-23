@@ -32,18 +32,6 @@ public interface IFactoryConsoleService {
      * @return
      */
     List<FactoryMonthPlanVersionVo> getNoSelectedVersionList(FactoryProductionPlanVo queryCondition);
-    /**
-     * 按分厂 + 年月的方式生成销售需求月度计划
-     * 1、获取分厂、年、月提报的销售需求订单
-     * 2、根据重要客户、是否必保计划，更新其重要客户、必保计划标记
-     * 3、获取库存信息记录，并根据库存对冲顺序进行库存分配
-     * 4、记录库存分配结果
-     * 5、获取备货计划、最小批量的上调控制水位及最小批量值得到最终计划需求量
-     *
-     * @param createCondition
-     * @return
-     */
-    AjaxResult createSaleRequirePlan(MonthPlanSaleRequirePlanVo createCondition);
 
     /**
      * 一键排产，生产模具排产计划

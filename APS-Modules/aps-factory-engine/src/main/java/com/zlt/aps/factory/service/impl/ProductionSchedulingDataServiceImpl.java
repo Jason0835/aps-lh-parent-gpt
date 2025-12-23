@@ -19,7 +19,6 @@ import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductALevelService;
-import com.zlt.aps.maindata.service.ITireCapacityConfigurationService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
@@ -81,8 +80,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IProductALevelService productALevelService;
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
-
-    private final ITireCapacityConfigurationService tireCapacityConfigurationService;
 
     private final IFactoryProductionGroupResultService factoryProductionGroupResultService;
 
@@ -194,6 +191,17 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyList();
         }
         return configurationList;
+    }
+
+    @Override
+    public List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context) {
+        if (isEmptyFactoryAndYearMonth(context)) {
+            return Collections.emptyList();
+        }
+        String factoryCode = context.getFactoryCode();
+        Integer year = context.getYear();
+        Integer month = context.getMonth();
+        return factoryMonthPlanProductLhCapacityMapper.getCycleStructureMinLhRatioInfo(factoryCode, year, month);
     }
 
     @Override
@@ -433,11 +441,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyMap();
         }
         return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getProductCode, Function.identity()));
-    }
-
-    @Override
-    public List<TireCapacityConfiguration> getTireCapacityConfiguration(String factoryCode, Integer year, Integer month) {
-        return tireCapacityConfigurationService.getConfigurationByFactoryYearAndMonth(factoryCode, year, month);
     }
 
     @Override

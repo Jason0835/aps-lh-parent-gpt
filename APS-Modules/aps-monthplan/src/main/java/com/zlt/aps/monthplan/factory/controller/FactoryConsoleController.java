@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
@@ -134,31 +133,6 @@ public class FactoryConsoleController extends BaseController {
         version.setMonth(month);
         factoryProductionVersionService.setProductionVersionCycleDate(version);
         return version;
-    }
-
-    /**
-     * 按分厂 + 年月的方式生成销售需求月度计划
-     * 会进行库存对冲、备货计算
-     *
-     * @param createCondition
-     * @return
-     */
-    @ApiOperation("按分厂 + 年月的方式生成销售需求月度计划")
-    @RedissonLockAnno(uniqueMark = "redissonLock:factoryConsole:createSaleRequirePlan:",
-            expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-            msgKey = "ui.data.alert.saleRequirePlan.run",
-            waitTime = 5,
-            leaseTime = 300
-    )
-    @PostMapping("/createSaleRequirePlan")
-    public AjaxResult createSaleRequirePlan(@RequestBody MonthPlanSaleRequirePlanVo createCondition) {
-        if (null == createCondition) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
-        }
-        if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
-        }
-        return factoryConsoleService.createSaleRequirePlan(createCondition);
     }
 
     @ApiOperation("按分厂+ 日期获取分厂的定稿排产版本信息")

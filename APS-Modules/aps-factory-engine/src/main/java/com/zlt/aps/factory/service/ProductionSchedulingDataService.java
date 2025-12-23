@@ -98,6 +98,14 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList);
 
     /**
+     * 获取周期结构的最低硫化配比信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context);
+
+    /**
      * 获取续作SKU信息，包含续作机台及使用的模具数
      *
      * @param factoryCode 工厂编码
@@ -277,17 +285,6 @@ public interface ProductionSchedulingDataService {
      */
     @Deprecated
     Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
-
-    /**
-     * 获取分厂在指定年份、月份的轮胎类型产能分配配置
-     *
-     * @param factoryCode 分厂
-     * @param year        年份
-     * @param month       月份
-     * @return
-     */
-    @Deprecated
-    List<TireCapacityConfiguration> getTireCapacityConfiguration(String factoryCode, Integer year, Integer month);
 
     /**
      * 获取利率优先值配置
