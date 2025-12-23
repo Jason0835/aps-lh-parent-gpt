@@ -30,7 +30,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -762,9 +762,19 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         // 计算库存数量（优化getStockQty方法）
         demandPlan.setStockQty(calculateStockQty(finishedProductStockMap, factoryMaterialKey));
+        // 结余库存
+        demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
         demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
+    }
+
+    private Long calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
+        if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
+            return BigDecimal.ZERO.longValue();
+        }
+        List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
+        return finishedProductStocks.stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
     }
 
     /**
