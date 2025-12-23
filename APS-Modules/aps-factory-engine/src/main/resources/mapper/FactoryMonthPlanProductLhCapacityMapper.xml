@@ -36,4 +36,20 @@
         </foreach>
     </select>
 
+    <select id="getCycleStructureMinLhRatioInfo" resultType="com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo">
+        SELECT csc.FACTORY_CODE,
+               csc.STRUCTURE_NAME,
+               csc.MIN_VULCANIZING_MACHINE AS MIN_LH_MACHINE_QTY,
+               msc.MIN_VULCANIZING_MACHINE AS MONTH_MIN_LH_MACHINE_QTY
+          FROM t_dp_cycle_struct_config csc
+          LEFT JOIN t_dp_month_cycle_struct_config msc
+            ON msc.FACTORY_CODE = csc.FACTORY_CODE
+           AND msc.STRUCTURE_NAME = csc.STRUCTURE_NAME
+           AND IFNULL(msc.IS_DELETE, 0) = 0
+         WHERE IFNULL(csc.IS_DELETE, 0) = 0
+           AND csc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND csc.YEAR = #{year,jdbcType=DECIMAL}
+           AND csc.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
+
 </mapper>

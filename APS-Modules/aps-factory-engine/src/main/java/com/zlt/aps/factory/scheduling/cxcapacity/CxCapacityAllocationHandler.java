@@ -98,7 +98,7 @@ public class CxCapacityAllocationHandler {
      * 对成型机台创建分配集合对象-按最小硫化配比分配
      *
      * @param cxMachineBaseInfo 成型机台信息
-     * @param lhRatio           硫化配比
+     * @param maxLhRatio        最高硫化配比
      * @param groupPlanInfo     分配的分组计划
      * @param continueSkuMap    续作规格信息
      * @param allocationDay     分配天数
@@ -106,7 +106,7 @@ public class CxCapacityAllocationHandler {
      * @param monthDays         月份最大天数
      * @return
      */
-    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer lhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueProductInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
+    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer maxLhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueProductInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
         Integer startAllocationDay = BigDecimal.ZERO.intValue();
         Integer endAllocationDay = BigDecimal.ZERO.intValue();
         Set<Integer> stopDayInfo = cxMachineBaseInfo.getStopDayInfo();
@@ -135,7 +135,7 @@ public class CxCapacityAllocationHandler {
         if (null == continueSkuMap) {
             continueSkuMap = new HashMap<>();
         }
-        return new CxMachineAllocationPlanHelper(groupPlanInfo, lhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
+        return new CxMachineAllocationPlanHelper(groupPlanInfo, maxLhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
     }
 
     /**

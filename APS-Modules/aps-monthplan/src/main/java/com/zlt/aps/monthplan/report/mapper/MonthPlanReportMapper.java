@@ -449,13 +449,6 @@ public interface MonthPlanReportMapper {
     List<MdmSkuMouldRel> selectProductMoldeRealList(BaseReportDto queryDto);
 
     /**
-     * 查询调整通知单数据
-     * @param queryDto 查询参数
-     * @return 结果
-     */
-    List<MonthPlanNoticeOrder> selectMonthPlanAdjustNotice(BaseReportDto queryDto);
-
-    /**
      * 查询理论备货数据
      *
      * @param queryDto 查询参数

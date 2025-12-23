@@ -12,6 +12,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ChangeSpecCodeMouldingDayResultParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanMouldingDayResult;
@@ -20,8 +21,6 @@ import com.zlt.aps.monthplan.api.domain.vo.MonthPlanMouldingDayResultVo;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanStatisticsVo;
 import com.zlt.aps.monthplan.common.utils.CustomerExcelUtils;
 import com.zlt.aps.monthplan.common.utils.ExcelExportUtils;
-import com.tlt.aps.utils.JsonUtils;
-import com.zlt.aps.monthplan.factory.helper.ProductionPlanExcelUtils;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanMouldingDayResultService;
 import com.zlt.common.controller.BusiController;
@@ -35,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -147,7 +147,7 @@ public class MonthPlanMouldingDayResultController extends BusiController<MonthPl
         if (YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
             return super.commonExport(queryVO, fileName, response);
         }
-        List<Integer> dayList = ProductionPlanExcelUtils.getCycleDayList(version);
+        List<Integer> dayList = new ArrayList<>();
         String startWithName = "ui.data.column.monthPlanMouldingDayResult.day";
         List<MonthPlanMouldingDayResult> list = this.listExportData(queryVO);
         CustomerExcelUtils<MonthPlanMouldingDayResult> util = new CustomerExcelUtils<>(MonthPlanMouldingDayResult.class, dayList, startWithName, MonthPlanMouldingDayResult.class);
@@ -227,7 +227,7 @@ public class MonthPlanMouldingDayResultController extends BusiController<MonthPl
         if (YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
             return super.commonExport(queryVO, fileName, response);
         }
-        List<Integer> dayList = ProductionPlanExcelUtils.getCycleDayList(version);
+        List<Integer> dayList = new ArrayList<>();
         String startWithName = "ui.data.column.monthPlanMouldingDayResult.day";
         List<MonthPlanMouldingDayResultVo> list = monthPlanMouldingDayResultService.listFacProduct(queryVO);
         CustomerExcelUtils<MonthPlanMouldingDayResultVo> util = new CustomerExcelUtils<>(MonthPlanMouldingDayResultVo.class, dayList, startWithName, MonthPlanMouldingDayResultVo.class);
@@ -259,7 +259,7 @@ public class MonthPlanMouldingDayResultController extends BusiController<MonthPl
     @ApiOperation("导出月计划排产统计")
     @PostMapping("/exportFacProductStatisticsData/{fileName}")
     public byte[] exportFacProductStatisticsData(@RequestBody MonthPlanMouldingDayResult queryVO, @PathVariable("fileName") String fileName,
-                                       HttpServletResponse response) throws IOException {
+                                                 HttpServletResponse response) throws IOException {
         FactoryProductionVersion version = factoryProductionVersionService.getProductionVersion(queryVO.getProductionVersion());
         if (null == version) {
             return super.commonExport(queryVO, fileName, response);
@@ -267,7 +267,7 @@ public class MonthPlanMouldingDayResultController extends BusiController<MonthPl
         if (YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
             return super.commonExport(queryVO, fileName, response);
         }
-        List<Integer> dayList = ProductionPlanExcelUtils.getCycleDayList(version);
+        List<Integer> dayList = new ArrayList<>();
         String startWithName = "ui.data.column.monthPlanMouldingDayResult.day";
         List<MonthPlanDayResultStatisticsVo> list = monthPlanMouldingDayResultService.listFacProductStatistics(queryVO);
         CustomerExcelUtils<MonthPlanDayResultStatisticsVo> util = new CustomerExcelUtils<>(MonthPlanDayResultStatisticsVo.class, dayList, startWithName, MonthPlanDayResultStatisticsVo.class);

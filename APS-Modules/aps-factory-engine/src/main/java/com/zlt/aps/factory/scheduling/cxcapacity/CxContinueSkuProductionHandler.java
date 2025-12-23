@@ -39,7 +39,7 @@ public class CxContinueSkuProductionHandler {
      */
     public static void productionContinue(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueProductInfoHelper> continueSkuMap, CxMachineAllocationPlanHelper productionPlan, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         //构建成型机台对应的空硫化分组
-        createCxLhRatioMapByContinue(context, cxMachineCode, productionPlan.getRatio(), productionPlan.getProductionPlanInfo().getGroupName());
+        createCxLhRatioMapByContinue(context, cxMachineCode, productionPlan.getMaxRatio(), productionPlan.getProductionPlanInfo().getGroupName());
         //成型分配的排产日
         Integer startDay = productionPlan.getStartDay();
         Integer endDay = productionPlan.getEndDay();

@@ -130,6 +130,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String structureName;
 
     /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    @ApiModelProperty(value = "产品结构", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
+    /**
      * 施工阶段
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.constructionStage", dictType = "biz_construction_stage")

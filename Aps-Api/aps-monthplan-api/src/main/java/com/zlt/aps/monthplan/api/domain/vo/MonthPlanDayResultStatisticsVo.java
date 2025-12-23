@@ -6,6 +6,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
@@ -13,8 +14,7 @@ import java.math.BigDecimal;
  * @since 2025/10/10
  */
 @Data
-@EqualsAndHashCode(callSuper = true)
-public class MonthPlanDayResultStatisticsVo extends MonthPlanMouldingDayResultVo {
+public class MonthPlanDayResultStatisticsVo implements Serializable {
 
     /**
      * 累计完成量

@@ -145,6 +145,22 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取结构提前收尾的最低硫化配比信息
+     *
+     * @return
+     */
+    public Integer getClosureMinLhRatio() {
+        if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
+            return null;
+        }
+        List<MonthPlanStructureLhRatioVo> lhRatioList = new ArrayList<>(cxMachineLhRationMap.values());
+        if (CollectionUtils.isEmpty(lhRatioList)) {
+            return null;
+        }
+        return lhRatioList.get(BigDecimal.ZERO.intValue()).getLhMachineMinQty();
+    }
+
+    /**
      * 计算需要分配的成型产能机台数，保留1位小数
      * 双模方式
      * 总需求量 / (SKU最小日硫化量 * 2 * 结构最小硫化配比 * 月度可排产天数),两位小数
