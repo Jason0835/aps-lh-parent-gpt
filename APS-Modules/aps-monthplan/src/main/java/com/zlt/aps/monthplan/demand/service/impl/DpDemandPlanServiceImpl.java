@@ -17,6 +17,7 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
+import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
@@ -83,6 +84,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     private final IFactoryParamService factoryParamService;
     // 物料信息
     private final IMdmMaterialInfoService materialInfoService;
+    // 月均销量
+    private final IMpMonthlySaleQtyService monthlySaleQtyService;
 
     /**
      * 查询需求计划

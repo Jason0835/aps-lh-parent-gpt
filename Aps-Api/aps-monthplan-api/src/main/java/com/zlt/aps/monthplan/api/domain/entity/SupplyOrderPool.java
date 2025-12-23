@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -25,7 +26,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "供应链订单池对象", description = "供应链订单池对象 ")
 @Data
 @TableName(value = "T_DP_SUPPLY_ORDER_POOL")
-public class SupplyOrderPool extends CommonBusiEntity{
+public class SupplyOrderPool extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
