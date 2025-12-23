@@ -171,18 +171,18 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         paramVo.setMonth(Integer.parseInt(lastMonth));
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
         AjaxResultUtils.getList(ajaxResult, SyncOutShipDmdOrdResultVo.class);
-        List<SalesOrderPool> salesOrderPoolList = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SalesOrderPool.class);
+        List<SyncOutShipDmdOrdResultVo> outShipDmdOrdResultVos = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SyncOutShipDmdOrdResultVo.class);
 
         List<MpHistorySaleRecord> saveList = new ArrayList<>();
-        for (SalesOrderPool salesOrderPool : salesOrderPoolList) {
+        for (SyncOutShipDmdOrdResultVo outShipDmdOrdResultVo : outShipDmdOrdResultVos) {
             MpHistorySaleRecord mpHistorySaleRecord = new MpHistorySaleRecord();
             mpHistorySaleRecord.setBaseVale(null);
-            mpHistorySaleRecord.setFactoryCode(salesOrderPool.getFactoryCode());
+            mpHistorySaleRecord.setFactoryCode(outShipDmdOrdResultVo.getFactory());
             mpHistorySaleRecord.setYear(lastYear);
             mpHistorySaleRecord.setMonth(Integer.parseInt(lastMonth));
-            mpHistorySaleRecord.setAreaCode(salesOrderPool.getArea());
-            mpHistorySaleRecord.setMaterialCode(salesOrderPool.getOriMaterialCode());
-            mpHistorySaleRecord.setSaleQty(salesOrderPool.getOrdQty().intValue());
+            mpHistorySaleRecord.setAreaCode(outShipDmdOrdResultVo.getEmployeeDept().toString());
+            mpHistorySaleRecord.setMaterialCode(outShipDmdOrdResultVo.getOriMaterialCode());
+            mpHistorySaleRecord.setSaleQty(outShipDmdOrdResultVo.getDnNum().intValue());
             mpHistorySaleRecord.setGenerationDate(nowDate);
             saveList.add(mpHistorySaleRecord);
         }
