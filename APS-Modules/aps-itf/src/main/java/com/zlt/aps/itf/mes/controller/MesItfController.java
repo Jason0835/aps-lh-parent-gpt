@@ -42,12 +42,12 @@ public class MesItfController {
     private MesItfService mesItfService;
 
     /**
-     * 同步SAP与模具关系
+     * 同步SKU与模具关系
      *
-     * @param syncDataLogs SAP与模具关系
+     * @param syncDataLogs SKU与模具关系
      * @return 结果
      */
-    @ApiOperation("同步SAP与模具关系")
+    @ApiOperation("同步SKU与模具关系")
     @PostMapping("/syncProductModRelation")
     public AjaxResult syncProductModRelation(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncProductModRelation(syncDataLogs);

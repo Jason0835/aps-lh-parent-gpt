@@ -14,7 +14,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmSkuMouldRel.java
- * 描    述：SAP与模具关系对象 t_mdm_product_model_relation
+ * 描    述：SKU与模具关系对象 t_mdm_product_model_relation
  *
  * @author zlt
  * @version 1.0
@@ -25,7 +25,7 @@ import lombok.Data;
  * 修改内容：...
  * @date 2025-02-18
  */
-@ApiModel(value = "SAP与模具关系对象", description = "SAP与模具关系对象")
+@ApiModel(value = "SKU与模具关系对象", description = "SKU与模具关系对象")
 @Data
 @TableName(value = "T_MDM_SKU_MOULD_REL")
 public class MdmSkuMouldRel extends BaseEntity {
@@ -119,9 +119,17 @@ public class MdmSkuMouldRel extends BaseEntity {
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.relation.samePatternPanel", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "是否共用花纹/侧板块，字典：biz_yes_no，0否1是", name = "samePatternPanel")
-    @TableField(value = "SAME_PATTER_PANEL")
-    private String samePatternPanel;
+    @ApiModelProperty(value = "是否共用花纹/侧板块，字典：biz_yes_no，0否1是", name = "isSamePatternPanel")
+    @TableField(value = "IS_SAME_PATTER_PANEL")
+    private String isSamePatternPanel;
+
+    /**
+     * 共用模具号
+     */
+    @Excel(name = "ui.data.column.relation.shareMouldCode")
+    @ApiModelProperty(value = "共用模具号", name = "shareMouldCode")
+    @TableField(value = "SHARE_MOULD_CODE")
+    private String shareMouldCode;
 
     /**
      * 品牌

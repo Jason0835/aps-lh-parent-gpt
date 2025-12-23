@@ -12,9 +12,9 @@ import lombok.Getter;
 public enum MesInterfaceCodeEnum {
 
     /**
-     * 同步SAP与模具关系
+     * 同步SKU与模具关系
      */
-    SYNC_PRODUCT_MOD_RELATION("PRODUCT_MOD_RELATION", "mesItfService", "syncProductModRelation", "同步SAP与模具关系"),
+    SYNC_PRODUCT_MOD_RELATION("PRODUCT_MOD_RELATION", "mesItfService", "syncProductModRelation", "同步SKU与模具关系"),
 
     /**
      * 同步模具台账

@@ -32,7 +32,7 @@ import java.util.Arrays;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmProductModelRelationUIController.java
- * 描    述：SAP与模具关系 UI控制层类：....
+ * 描    述：SKU与模具关系 UI控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -44,7 +44,7 @@ import java.util.Arrays;
  * @date 2025-02-24
  */
 @Slf4j
-@Api(tags = "SAP与模具关系")
+@Api(tags = "SKU与模具关系")
 @Controller
 @RequestMapping("/maindata/relation")
 public class MdmProductModelRelationUIController extends BaseUIController<MdmSkuMouldRel> {
@@ -123,7 +123,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
     }
 
     /**
-     * 删除SAP与模具关系
+     * 删除SKU与模具关系
      */
     @ApiOperation("删除,id不为空")
     @RequiresPermissions("maindata:relation:remove")
@@ -135,7 +135,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
     }
 
     /**
-     * 校验SAP与模具关系唯一性
+     * 校验SKU与模具关系唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")

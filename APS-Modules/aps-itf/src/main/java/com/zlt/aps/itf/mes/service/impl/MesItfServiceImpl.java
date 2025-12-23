@@ -44,9 +44,9 @@ public class MesItfServiceImpl implements MesItfService {
     private IFactoryParamService iFactoryParamService;
 
     /**
-     * 同步SAP与模具关系
+     * 同步SKU与模具关系
      *
-     * @param syncDataLogs SAP与模具关系
+     * @param syncDataLogs SKU与模具关系
      * @return 结果
      */
     @Override
@@ -121,7 +121,7 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 获取AP与模具关系
      *
-     * @param mdmSkuMouldRel SAP与模具关系
+     * @param mdmSkuMouldRel SKU与模具关系
      * @return 结果
      */
     @Override

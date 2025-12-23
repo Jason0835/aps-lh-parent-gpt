@@ -1031,7 +1031,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
   }
 
   /**
-   * 保存SAP与模具关系
+   * 保存SKU与模具关系
    *
    * @param informalMouldList
    *     试制量试计划

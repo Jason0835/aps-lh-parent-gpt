@@ -16,7 +16,7 @@ public interface MesItfService {
     /**
      * 同步产品模型关系
      *
-     * @param mdmSkuMouldRel SAP与模具关系
+     * @param mdmSkuMouldRel SKU与模具关系
      * @return 结果
      */
     AjaxResult syncProductModRelation(AuxReqSyncDataLogs mdmSkuMouldRel);
@@ -40,7 +40,7 @@ public interface MesItfService {
     /**
      * 获取AP与模具关系
      *
-     * @param mdmSkuMouldRel SAP与模具关系
+     * @param mdmSkuMouldRel SKU与模具关系
      * @return 结果
      */
     List<MdmSkuMouldRel> getMdmSkuMouldRelList(MdmSkuMouldRel mdmSkuMouldRel);

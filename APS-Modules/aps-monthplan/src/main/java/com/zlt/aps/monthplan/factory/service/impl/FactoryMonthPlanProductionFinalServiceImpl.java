@@ -451,7 +451,7 @@ public class FactoryMonthPlanProductionFinalServiceImpl extends ServiceImpl<Fact
                 if (!CollectionUtils.isEmpty(productConstructionList)) {
                     productConstructionMap = productConstructionList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getProductCode(), item.getSpecCode(), item.getEmbryoCode()), Function.identity()));
                 }
-                // 查询SAP与模具关系
+                // 查询SKU与模具关系
                 List<MdmSkuMouldRel> modelRelationList = productModelRelationEntityMapper.select4ImportAdjustData(resultVos);
                 if (!CollectionUtils.isEmpty(modelRelationList)) {
                     modelRelationMap = modelRelationList.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getMaterialCode(), item.getMouldNo())));

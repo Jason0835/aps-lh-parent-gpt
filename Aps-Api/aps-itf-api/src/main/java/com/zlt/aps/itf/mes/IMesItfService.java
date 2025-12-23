@@ -18,12 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface IMesItfService {
 
     /**
-     * 同步SAP与模具关系
+     * 同步SKU与模具关系
      *
-     * @param mdmSkuMouldRel SAP与模具关系
+     * @param mdmSkuMouldRel SKU与模具关系
      * @return 结果
      */
-    @ApiOperation("同步SAP与模具关系")
+    @ApiOperation("同步SKU与模具关系")
     @PostMapping("/mesItf/syncProductModRelation")
     public AjaxResult syncProductModRelation(@RequestBody MdmSkuMouldRel mdmSkuMouldRel);
 

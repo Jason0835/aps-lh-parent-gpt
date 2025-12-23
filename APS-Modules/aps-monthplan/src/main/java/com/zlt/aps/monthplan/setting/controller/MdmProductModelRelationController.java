@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmProductModelRelationController.java
- * 描    述：SAP与模具关系 控制层类：....
+ * 描    述：SKU与模具关系 控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
  * @date 2025-02-24
  */
 @Slf4j
-@Api(tags = "SAP与模具关系")
+@Api(tags = "SKU与模具关系")
 @RestController
 @RequestMapping("/relation")
 public class MdmProductModelRelationController extends AbstractDocBizController<MdmSkuMouldRel> {
@@ -72,7 +72,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     private MdmModelInfoEntityMapper mdmModelInfoEntityMapper;
 
     /**
-     * 查询SAP与模具关系列表
+     * 查询SKU与模具关系列表
      */
 //    @RequiresPermissions("maindata:relation:list")
     @ApiOperation("查询列表")
@@ -183,7 +183,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     }
 
     /**
-     * 获取SAP与模具关系详细信息
+     * 获取SKU与模具关系详细信息
      */
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
@@ -194,7 +194,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
 
 
     /**
-     * 根据集合导入SAP与模具关系数据
+     * 根据集合导入SKU与模具关系数据
      *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
@@ -211,7 +211,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     /**
      * 导出列表
      */
-    @Log(title = "SAP与模具关系", businessType = BusinessType.EXPORT)
+    @Log(title = "SKU与模具关系", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
     @Override

@@ -38,7 +38,7 @@ public class ProductionConstant {
      */
     public final static Integer MULTILAYER_TIRE_FABRIC = 2;
     /**
-     * 1 单模规格即SAP与模具关系中只有一副模具
+     * 1 单模规格即SKU与模具关系中只有一副模具
      */
     public final static Integer SINGLE_MOULD_PRODUCT_CODE = 1;
     /**
