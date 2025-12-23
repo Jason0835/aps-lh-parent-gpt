@@ -113,5 +113,15 @@ public class MesItfController {
         return mesItfService.syncRawMaterialOutboundRecord(materialOutboundRecord);
     }
 
-
+    /**
+     * 同步成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成品物料信息")
+    @PostMapping("/syncMaterial")
+    public AjaxResult syncMaterial(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncMaterial(syncDataLogs);
+    }
 }

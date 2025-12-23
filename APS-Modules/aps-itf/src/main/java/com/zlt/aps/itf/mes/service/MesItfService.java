@@ -49,6 +49,7 @@ public interface MesItfService {
      * 同步成品库存
      *
      * @param productStockMonth 参数
+     * @throws ParseException 异常
      * @return 结果
      */
     AjaxResult syncProductStock(MdmProductStock productStockMonth) throws ParseException;
@@ -82,6 +83,7 @@ public interface MesItfService {
      * 同步特殊材料库存
      *
      * @param rawSpecialMaterialStock 参数
+     * @throws ParseException 异常
      * @return 结果
      */
     AjaxResult syncRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException;
@@ -98,8 +100,16 @@ public interface MesItfService {
      * 同步原材料出库
      *
      * @param materialOutboundRecord 参数
+     * @throws ParseException 异常
      * @return 结果
      */
     AjaxResult syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord) throws ParseException;
 
+    /**
+     * 同步成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs);
 }
