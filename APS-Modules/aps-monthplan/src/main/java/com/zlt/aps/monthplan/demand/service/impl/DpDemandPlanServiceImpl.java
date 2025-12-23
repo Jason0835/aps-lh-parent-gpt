@@ -17,6 +17,7 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
+import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
@@ -30,7 +31,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -83,6 +84,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     private final IFactoryParamService factoryParamService;
     // 物料信息
     private final IMdmMaterialInfoService materialInfoService;
+    // 月均销量
+    private final IMpMonthlySaleQtyService monthlySaleQtyService;
 
     /**
      * 查询需求计划
@@ -762,9 +765,19 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         // 计算库存数量（优化getStockQty方法）
         demandPlan.setStockQty(calculateStockQty(finishedProductStockMap, factoryMaterialKey));
+        // 结余库存
+        demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
         demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
+    }
+
+    private Long calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
+        if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
+            return BigDecimal.ZERO.longValue();
+        }
+        List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
+        return finishedProductStocks.stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
     }
 
     /**

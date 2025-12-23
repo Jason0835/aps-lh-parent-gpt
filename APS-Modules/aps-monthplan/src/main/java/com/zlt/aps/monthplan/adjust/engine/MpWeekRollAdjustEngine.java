@@ -107,46 +107,41 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         //注：实单减量，先扣月计划的已排实单
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = mpProdFinalList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode()));
-        List<FactoryMonthPlanFinalAdjustVo> mpFinalList;
+        Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = mpProdFinalList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
         int reAdjustQty,needDeductQty;
         //1、按结构内调整记录依次匹配月计划定稿表
         for (MpAdjustStructureIn deductAdjust:deductAdjustList){
-            mpFinalList = mpProdFinalMap.get(deductAdjust.getMaterialCode());
-            if (PubUtil.isEmpty(mpFinalList)){
+            mpFinalVo = mpProdFinalMap.get(deductAdjust.getMaterialCode());
+            if (mpFinalVo == null){
                 continue;
             }
             //剩余调整量绝对值
             reAdjustQty =  Math.abs(deductAdjust.getConfirmAdjustQty());
-            //2、按成型机编号排序
-            mpFinalList = mpFinalList.stream().sorted(Comparator.comparing(FactoryMonthPlanFinalAdjustVo::getCxMachineCode, Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
-            for (FactoryMonthPlanFinalAdjustVo prodFinal:mpFinalList){
-                //设置锁定量
-                setLockQty(contextDTO.getLockEndDay(),prodFinal);
-                //允许扣减量,高优先级+中优先级-锁定量
-                int allowDeductQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() - prodFinal.getLockQty();
-                if (allowDeductQty >= reAdjustQty){
-                    //若允许扣减量 >= 剩余调整量
-                    //需要扣减量 = 剩余调整量;
-                    needDeductQty = reAdjustQty;
-                    needDeductProductionQty(needDeductQty, prodFinal);
-                    //2.1 遍历31天日排产量，根据实际扣减量依次扣减
-                    deductScheduleQtyByDay(reAdjustQty,contextDTO.getLockEndDay(), prodFinal);
-                    reAdjustQty = 0;
-                }else{
-                    //若允许扣减量 < 剩余调整量,允许扣减量 可以全扣
-                    needDeductQty = allowDeductQty;
-                    //根据 需要扣减量，从高优先级->中优先级
-                    needDeductProductionQty(needDeductQty, prodFinal);
-                    //2.1 遍历31天日排产量，根据实际扣减量依次扣减
-                    deductScheduleQtyByDay(allowDeductQty,contextDTO.getLockEndDay(), prodFinal);
-                    reAdjustQty -= allowDeductQty;
-                }
-
-                if (reAdjustQty == 0){
-                    // 剩余调整量=0,退出
-                    break;
-                }
+            //2、先设置锁定量，再按高到中依次扣减排产量
+            //设置锁定量
+            setLockQty(contextDTO.getLockEndDay(),mpFinalVo);
+            //允许扣减量,高优先级+中优先级-锁定量
+            int allowDeductQty = mpFinalVo.getHeightProductionQty() + mpFinalVo.getMidProductionQty() - mpFinalVo.getLockQty();
+            if (allowDeductQty >= reAdjustQty){
+                //若允许扣减量 >= 剩余调整量
+                //需要扣减量 = 剩余调整量;
+                needDeductQty = reAdjustQty;
+                needDeductProductionQty(needDeductQty, mpFinalVo);
+                //2.1 遍历31天日排产量，根据实际扣减量依次扣减
+                deductScheduleQtyByDay(reAdjustQty,contextDTO.getLockEndDay(), mpFinalVo);
+                //reAdjustQty = 0;
+            }else{
+                //若允许扣减量 < 剩余调整量,允许扣减量 可以全扣
+                needDeductQty = allowDeductQty;
+                //根据 需要扣减量，从高优先级->中优先级
+                needDeductProductionQty(needDeductQty, mpFinalVo);
+                //2.1 遍历31天日排产量，根据实际扣减量依次扣减
+                deductScheduleQtyByDay(allowDeductQty,contextDTO.getLockEndDay(), mpFinalVo);
+                //reAdjustQty -= allowDeductQty;
             }
         }
     }
@@ -166,6 +161,8 @@ public class MpWeekRollAdjustEngine {
             prodFinal.setMidProductionQty(prodFinal.getMidProductionQty() - needDeductQty);
         }
         prodFinal.setTotalQty(prodFinal.getTotalQty() - needDeductQty);
+        //将调减量置到空产能
+        prodFinal.setEmptyQty(needDeductQty);
     }
 
     /**
