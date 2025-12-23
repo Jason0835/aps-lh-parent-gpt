@@ -70,7 +70,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /**
