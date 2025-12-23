@@ -511,32 +511,6 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
     }
 
     @Override
-    public List<FactoryMonthPlanProdFinal> findLastTwelveMonthProdFinalPlan() {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
-        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
-        LambdaQueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProdFinal.class)
-                .ge(FactoryMonthPlanProdFinal::getYearMonth, Integer.valueOf(yearMonth))
-                .eq(FactoryMonthPlanProdFinal::getIsDelete, ApsConstant.APS_YES_NO_0);
-        return this.factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
-    }
-
-    @Override
-    public int getProductionMonthInLastTwelveMonth(String materialCode) {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
-        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
-        LambdaQueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProdFinal.class)
-                .eq(FactoryMonthPlanProdFinal::getProductCode, materialCode)
-                .ge(FactoryMonthPlanProdFinal::getYearMonth, Integer.valueOf(yearMonth))
-                .eq(FactoryMonthPlanProdFinal::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinals = this.factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
-        return CollectionUtils.isEmpty(factoryMonthPlanProdFinals) ? 0 : factoryMonthPlanProdFinals.size();
-    }
-
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult doImportData(List<FactoryMonthPlanProdFinal> list, boolean updateSupport, long importLogId) {
         // 只能导入一个分厂版本
