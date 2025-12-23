@@ -86,7 +86,14 @@
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        <if test="params != null">
+            <if test="params.materialCodeList != null and params.materialCodeList.size() > 0">
+                AND stock.MATERIAL_CODE IN
+                <foreach item="item" collection="params.materialCodeList" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </if>
     </select>
 
     <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock">
@@ -104,7 +111,6 @@
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
     <select id="selectRawSpecialMaterialStock"
@@ -117,7 +123,10 @@
                COMPANY_CODE,
                FACTORY_CODE
         FROM SPEC_STOCK_SYNC
-        WHERE STOCK_DATE = #{stockDate}
+        WHERE 1 = 1
+        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
     </select>
 
     <select id="syncRawMaterialOutboundRecord"
