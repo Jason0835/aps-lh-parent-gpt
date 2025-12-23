@@ -200,8 +200,10 @@ export default {
 
       let res=await queryRelationByMaterialCode({materialCode:this.form.materialCode});
       console.log(res);
+      let defultdata=JSON.parse(JSON.stringify(this.form))
       this.form={
-        ...res.data
+        ...res.data,
+        ...defultdata
       }
     },
     // api

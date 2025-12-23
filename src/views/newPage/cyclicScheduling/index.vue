@@ -94,7 +94,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["product_category", "biz_product_type", "biz_factory_name",'biz_order_type','biz_stor_type'],
+  dicts: ["product_category", "biz_product_type", "biz_factory_name",'biz_order_type','biz_stor_type','biz_brand_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -407,7 +407,7 @@ export default {
         );
         console.log(data);
         this.data = data.rows;
-        this.page.total = data.total;
+        // this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

@@ -2,6 +2,8 @@
   <basic-container>
     <page-table
       tableRef="cxFixedMachineMainTable"
+      key="cxFixedMachineMainTable"
+      ref="tableRef"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -13,9 +15,9 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
-      @selection-change="handleSelectionChange"
-      :showSummary="false"
-      :selectArea="false"
+      row-key="id"
+      :expand-row-keys="expands"
+      @expand-change="handleExpandChange"
     >
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
@@ -32,16 +34,15 @@
             <el-button @click="handleShowSpecial">{{
               $t("特殊材料生产情况")
             }}</el-button>
-             <el-button @click="handleAddSpecial">{{
+            <el-button @click="handleAddSpecial">{{
               $t("新增结构")
             }}</el-button>
           </el-tab-pane>
-          <el-tab-pane label="调整结果" name="three">
-
-          </el-tab-pane>
+          <el-tab-pane label="调整结果" name="three"> </el-tab-pane>
         </el-tabs>
       </template>
     </page-table>
+
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
@@ -50,9 +51,9 @@
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
-    <result ref="resultRef"></result>
+
     <special ref="specialRef"></special>
-    <addModal ref="addModalRef"/>
+    <addModal ref="addModalRef" />
   </basic-container>
 </template>
 <script>
@@ -81,7 +82,7 @@ export default {
     infoDialog,
     result,
     special,
-    addModal
+    addModal,
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
   provide() {
@@ -91,7 +92,14 @@ export default {
   },
   data() {
     return {
+      show: true,
+      subLoading: false,
       activeName: "first",
+      expands: [],
+      tableData: [],
+
+      subLoading: false,
+      subTableData: [],
       loading: false,
       data: [],
       selection: [],
@@ -105,6 +113,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      testCloumn: [],
     };
   },
   computed: {
@@ -112,9 +121,12 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     columns() {
-      let columns = [];
+
+      if(!this.show){
+        return []
+      }
       if (this.activeName == "first") {
-        columns = [
+       return [
           {
             prop: "productStructure",
             label: this.$t("产品结构"),
@@ -209,25 +221,31 @@ export default {
             },
           },
         ];
-      } else {
-        columns = [
+      }
+      if (this.activeName == "second") {
+        return [
           {
-            align: "center",
-            label: this.$t("ui.data.btn.option"),
-            fixed: "left",
-            render: ({ row }) => {
+            prop: "expand",
+            type: "expand",
+            render: () => {
               return (
-                <div>
-                  <el-button class="minus" type="success">
-                    {this.$t("展开")}
-                  </el-button>
-                  <el-button class="minus" type="danger">
-                    {this.$t("收缩")}
-                  </el-button>
+                <div class="expend-table" v-loading={this.subLoading}>
+                  <el-table border data={this.subTableData} max-height="200px">
+                    {this.subColumns.map((item) => {
+                      return (
+                        <el-table-column
+                          prop={item.prop}
+                          label={item.label}
+                          minWidth={80}
+                        />
+                      );
+                    })}
+                  </el-table>
                 </div>
               );
             },
           },
+
           {
             prop: "formingMachine",
             label: this.$t("成型机台"),
@@ -259,6 +277,46 @@ export default {
           {
             prop: "adjustEndDate",
             label: this.$t("调整后结束日期"),
+          },
+        ];
+      }
+      if (this.activeName == "three") {
+        return [
+          {
+            prop: "formingMachine",
+            label: this.$t("成型机台"),
+          },
+          {
+            prop: "productStructure",
+            label: this.$t("产品结构"),
+          },
+          {
+            prop: "planQuantity",
+            label: this.$t("NC物料编码"),
+          },
+          {
+            prop: "startDate",
+            label: this.$t("物料描述"),
+          },
+          {
+            prop: "endDate",
+            label: this.$t("是否含材料"),
+          },
+          {
+            prop: "adjustPlanQuantity",
+            label: this.$t("计划量"),
+          },
+          {
+            prop: "adjustStartDate",
+            label: this.$t("开始日期"),
+          },
+          {
+            prop: "adjustEndDate",
+            label: this.$t("结束日期"),
+          },
+          {
+            prop: "adjustEndDate",
+            label: this.$t("锁定上机日期"),
           },
         ];
       }
@@ -297,21 +355,73 @@ export default {
         },
       ];
     },
+    subColumns() {
+      return [
+        {
+          label: "机台号",
+          prop: "deviceCode",
+        },
+        {
+          label: "设备组分类",
+          prop: "deviceGroupDetailName",
+        },
+        {
+          label: "计划执行月",
+          prop: "planMonth",
+        },
+        {
+          label: "执行人",
+          prop: "execByName",
+        },
+        {
+          label: "实际执行月",
+          prop: "execMonth",
+        },
+        {
+          label: "完成状态",
+          prop: "status",
+          formatter: (row, column, cellValue) => {
+            return this.selectDictLabel(this.dict.type.task_type, cellValue);
+          },
+        },
+      ];
+    },
   },
   methods: {
-    handleAddSpecial(){
-
+    handleExpandChange(row, expandedRows) {
+      // console.log(row, expandedRows, this.expands);
+      this.expands = [];
+      //通过当前的行获取
+      if (expandedRows.length > 0) {
+        this.subTableData = [];
+        this.expands.push(row ? row.id : []);
+        // this.getSubList(row.id);
+      }
+    },
+    handleAddSpecial() {
       if (this.$refs.addModalRef) {
         this.$refs.addModalRef.show(true);
       }
-
     },
-    handleClick() {},
+    handleClick(tab, event) {
+      this.loading=true
+      this.show = false;
+      setTimeout(() => {
+        // this.$refs.tableRef.onReset()
+        this.show = true;
+        this.loading = false;
+      }, 300);
+    },
     handShowResult() {
-      this.$router.push("/new/rollingCycleResult");
-      // if (this.$refs.resultRef) {
-      //   this.$refs.resultRef.show(true);
-      // }
+      this.show = false;
+      setTimeout(() => {
+        this.show = true;
+      }, 1000);
+      // this.$router.push("/new/rollingCycleResult");
+      // // if (this.$refs.resultRef) {
+      // //   this.$refs.resultRef.show(true);
+      // // }
+      this.activeName = "three";
     },
     handleShowSpecial() {
       if (this.$refs.specialRef) {
@@ -394,8 +504,9 @@ export default {
         this.loading = true;
         const data = [
           {
+            id: 1,
             productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101\H1102",
+            schedulingMachine: "H1101H1102",
             ncMaterialCode: "3302000915",
             materialDescription: "315/80R22.5 156/153K 20PR JD755 BL0EJY",
             isContainMaterials: "否",
@@ -418,8 +529,9 @@ export default {
             adjustEndDate: "10",
           },
           {
+            id: 2,
             productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101\H1102",
+            schedulingMachine: "H1101H1102",
             ncMaterialCode: "3302002306",
             materialDescription: "315/80R22.5 156/150J 20PR JD755 BL0EJY DL",
             isContainMaterials: "否",
@@ -442,8 +554,9 @@ export default {
             adjustEndDate: "10",
           },
           {
+            id: 3,
             productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101\H1102",
+            schedulingMachine: "H1101H1102",
             ncMaterialCode: "3302002356",
             materialDescription: "315/80R22.5 156/150J 20PR BD290 BL0EBL DL",
             isContainMaterials: "否",
@@ -479,11 +592,10 @@ export default {
     },
   },
   mounted() {
-    console.log('mounted')
+    console.log("mounted");
     this.getList();
   },
   created() {
-
     this.getList();
   },
   activated() {
