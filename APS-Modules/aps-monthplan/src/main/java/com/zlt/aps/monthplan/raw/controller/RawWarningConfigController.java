@@ -158,7 +158,7 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
     @Override
     protected void builderCondition(QueryWrapper<RawWarningConfig> queryWrapper, RawWarningConfig queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningType")), "WARNING_TYPE", queryVO.getFieldValueByFieldName("warningType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deviationUpper")), "DEVIATION_UPPER", queryVO.getFieldValueByFieldName("deviationUpper"));
@@ -173,7 +173,5 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
     protected String getTypeCode(){
         return "S3520";
     }
-
-
 
 }
