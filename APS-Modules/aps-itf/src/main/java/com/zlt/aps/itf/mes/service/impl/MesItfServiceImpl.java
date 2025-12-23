@@ -9,6 +9,7 @@ import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -41,6 +42,8 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmModelInfoEntityMapper modelInfoEntityMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+    @Autowired
+    private MdmMouldShellInfoEntityMapper mouldShellInfoEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -447,4 +450,43 @@ public class MesItfServiceImpl implements MesItfService {
         return mesItfMapper.selectMaterialList(syncDataLogs);
     }
 
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表
+        List<MdmMouldShellInfo> list = getMoldShellList(syncDataLogs);
+        // 工厂+模套型号作为匹配条件，如果存在，则更新，不存在则插入
+        List<List<MdmMouldShellInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+        for (List<MdmMouldShellInfo> saveList : splitList) {
+            List<MdmMouldShellInfo> existsList = mouldShellInfoEntityMapper.selectByUniqueKeyList(saveList);
+            Map<String, MdmMouldShellInfo> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMoldModelCode()), Function.identity()));
+            }
+            for (MdmMouldShellInfo entity : saveList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMoldModelCode());
+                if (existsMap.containsKey(mapKey)) {
+                    MdmMouldShellInfo existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+            baseDao.saveBatch(saveList);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 查询模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    private List<MdmMouldShellInfo> getMoldShellList(AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfMapper.selectMoldShellList(syncDataLogs);
+    }
 }

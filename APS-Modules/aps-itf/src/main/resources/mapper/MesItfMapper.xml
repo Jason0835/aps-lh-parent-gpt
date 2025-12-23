@@ -139,6 +139,40 @@
     </select>
 
     <select id="selectMaterialList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+        SELECT MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        SPEC_DESC AS MATERIAL_DESC,
+        SPECIFICATIONS,
+        PRO_SIZE,
+        EMBRYO_CODE,
+        EMBRYO_DESC,
+        PATTERN,
+        HIERARCHY,
+        SPEED_LEVEL AS SPEED,
+        SECTION_WIDTH,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_BAS_MATERIAL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
 
+    <select id="selectMoldShellList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo">
+        SELECT STOCK_DATE,
+        MOLD_SLEEVE AS MOLD_MODEL_CODE,
+        TOTAL_NUM AS QTY,
+        MACHINE_NUM AS MACHINE_QTY,
+        WAREHOUSE_NUM AS ON_HAND_QTY,
+        OUT_NUM AS OUT_BOUND_QTY,
+        PLAN_OUT_NUM AS OUT_BOUND_PLAN_QTY,
+        DOWN_MACHINE_NUM AS DEPLANE_QTY,
+        FORCE_OUT_NUM AS FORCE_OUT_BOUND_QTY,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MOLD_SHELL_SYNC
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 </mapper>

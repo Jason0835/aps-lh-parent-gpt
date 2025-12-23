@@ -70,4 +70,12 @@ public interface MesItfMapper {
      * @return 结果
      */
     List<MdmMaterialInfo> selectMaterialList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 获取模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    List<MdmMouldShellInfo> selectMoldShellList(AuxReqSyncDataLogs syncDataLogs);
 }

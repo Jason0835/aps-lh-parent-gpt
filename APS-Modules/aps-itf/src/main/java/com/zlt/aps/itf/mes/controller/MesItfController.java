@@ -124,4 +124,16 @@ public class MesItfController {
     public AjaxResult syncMaterial(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncMaterial(syncDataLogs);
     }
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模壳台账信息")
+    @PostMapping("/syncMoldShell")
+    public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncMoldShell(syncDataLogs);
+    }
 }

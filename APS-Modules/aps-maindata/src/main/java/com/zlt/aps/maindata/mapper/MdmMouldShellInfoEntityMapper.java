@@ -3,6 +3,9 @@ package com.zlt.aps.maindata.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,4 +24,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmMouldShellInfoEntityMapper extends CommBaseMapper<MdmMouldShellInfo> {
 
+    /**
+     * 根据唯一键查询
+     *
+     * @param uniqueKeyList 唯一键列表
+     * @return 列表
+     */
+    List<MdmMouldShellInfo> selectByUniqueKeyList(@Param("list") List<MdmMouldShellInfo> uniqueKeyList);
 }
