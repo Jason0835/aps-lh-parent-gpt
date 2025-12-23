@@ -34,11 +34,11 @@ import { mapState } from "vuex";
 import {
   saveCapacity
 } from "@/api/monthplan/mdmSkuLhCapacity";
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm,materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -115,12 +115,23 @@ export default {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           span: 12,
-          disabled: this.isEdit,
+
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                disabled={this.isEdit}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           span: 12,
+          disabled: true,
         },
         {
           prop: "classCapacity",
@@ -268,6 +279,13 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
     },
   },
 };

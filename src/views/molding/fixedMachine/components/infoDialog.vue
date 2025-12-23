@@ -31,7 +31,7 @@
 <script>
 import { mapState } from "vuex";
 
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import {
   editCxMachineFixed
 } from "@/api/monthplan/mdmCxMachineFixed";
@@ -41,7 +41,7 @@ import infoForm from "@/views/components/infoForm.vue";
 
 
 export default {
-  components: { infoForm },
+  components: { infoForm,materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -55,7 +55,7 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         sapCode: [
@@ -138,6 +138,15 @@ export default {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
           maxlength: 500,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.fixedMaterialCode}
+                multiple={true}
+                v-model={form.fixedMaterialCode}
+              />
+            );
+          },
         },
         {
           prop: "disableStructure",
@@ -148,6 +157,15 @@ export default {
           prop: "disableMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
           maxlength: 500,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.disableMaterialCode}
+                multiple={true}
+                v-model={form.disableMaterialCode}
+              />
+            );
+          },
         },
       ];
     },
@@ -193,6 +211,13 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "disableMaterialCode", val);
+      } else {
+        this.$set(this.form, "disableMaterialCode", '');
+      }
     },
   },
 };

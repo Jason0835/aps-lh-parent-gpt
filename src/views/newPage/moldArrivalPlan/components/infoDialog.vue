@@ -33,11 +33,12 @@ import { mapState } from "vuex";
 
 import { editMpMouldShellInfo ,getBoardingDate} from "@/api/monthplan/mpMouldDeliveryPlan";
 
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 import { max } from "lodash";
 
 export default {
-  components: { infoForm },
+  components: { infoForm,materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -118,11 +119,21 @@ export default {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           maxlength: 32,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           maxlength: 64,
+          disabled: true,
         },
         {
           prop: "shipmentDate",
@@ -153,7 +164,8 @@ export default {
       if(this.form.shipmentDate){
         try {
           const res = await getBoardingDate({shipmentDate:this.form.shipmentDate});
-          this.$set(this.form, 'boardingDate', res.msg)
+
+          this.$set(this.form, 'boardingDate', res)
         } catch (error) {
           console.log(error);
         }
@@ -186,7 +198,7 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "",
+          factoryCode: "116",
         };
       }
     },
@@ -199,6 +211,13 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
     },
   },
 };

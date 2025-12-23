@@ -3,7 +3,7 @@
   <basic-container>
     <div class="form">
       <div class="itemForm">
-        {{$t('ui.data.workCalendar.today')}}：
+        {{$t('common.factory')}}：
         <el-select
          :placeholder="$t('common.rule.select')"
           v-model="search.factoryCode"

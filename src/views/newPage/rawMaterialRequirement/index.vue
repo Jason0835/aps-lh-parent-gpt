@@ -264,7 +264,7 @@ export default {
   },
   methods: {
     goRawUsage(){
-      this.$router.push("/masterdata/rawWeekUsage");
+      this.$router.push("/rawMaterial/rawWeekUsage");
     },
     async generatePlan() {
       try {

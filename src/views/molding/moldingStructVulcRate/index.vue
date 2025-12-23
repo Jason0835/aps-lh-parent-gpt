@@ -223,9 +223,10 @@ export default {
         if (i == this.selection.length - 1) {
           ids = ids + this.selection[i].id;
         } else {
-          ids = ids + ids + this.selection[i].id + ",";
+          ids = ids +  this.selection[i].id + ",";
         }
       }
+
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {

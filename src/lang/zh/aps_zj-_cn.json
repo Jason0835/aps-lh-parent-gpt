@@ -195,11 +195,10 @@
   "ui.data.workCalendar.isStop": "是否停产",
   "ui.data.workCalendar.isStart": "是否开产",
   "ui.data.workCalendar.peleaseInteger": "请输入1-100之间的整数",
-
   "ui.data.defectiveStock.stockDate": "库存日期",
   "ui.data.defectiveStock.mesMaterialCode": "MES物料编码",
   "ui.data.defectiveStock.stockQty": "不合格库存数量",
-  "ui.data.defectiveStock.mesMaterialCode": "物料编码",
+  "ui.data.defectiveStock.materialCode": "物料编码",
   "ui.data.defectiveStock.createCycleStockUp": "生成周期排产储备",
   "ui.data.defectiveStock.createPrecedentStockUp": "生成常规储备",
   "ui.data.defectiveStock.orderType": "订单类型",
@@ -216,7 +215,11 @@
   "ui.data.defectiveStock.averageSaleQty": "月均销量",
   "ui.data.defectiveStock.nightOverdueStockQty": "超9个月库存",
   "ui.data.rawWarningRecord.executeNewMaterialWarning": "执行新材料预警",
-  "ui.data.rawWarningRecord.executeUsageWarning": "执行用量偏差预警"
+  "ui.data.rawWarningRecord.executeUsageWarning": "执行用量偏差预警",
+
+
+
+  "common.materialCodeSelect.title": "物料信息"
 
 
 

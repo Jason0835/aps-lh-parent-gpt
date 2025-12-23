@@ -107,7 +107,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+          label: this.$t("ui.data.defectiveStock.materialCode"),
         },
 
         {

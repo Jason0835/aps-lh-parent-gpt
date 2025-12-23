@@ -200,6 +200,9 @@ export default {
 
       let res=await queryRelationByMaterialCode({materialCode:this.form.materialCode});
       console.log(res);
+      this.form={
+        ...res.data
+      }
     },
     // api
     async save(params) {

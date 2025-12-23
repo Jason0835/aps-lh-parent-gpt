@@ -36,6 +36,34 @@ export default {
   components: { infoForm },
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error(this.$t("common.rule.noPoint"))
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -49,63 +77,69 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         machineCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         machineName: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         dimension: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         dimensionMinimum: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         dimensionMinimum: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         maxMoldNum: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         single: [
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         quota: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
       },
@@ -195,14 +229,15 @@ export default {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quota",
           type: "number",
-          attrs: {
-            class: "w100",
-            controls: true,
-            "controls-position": "right",
-            precision: 2,
-            min: 0,
-            max: 999999,
-          },
+          // attrs: {
+          //   class: "w100",
+          //   controls: true,
+          //   "controls-position": "right",
+          //   precision: 2,
+
+          // },
+          min: 0,
+          max: 999999,
         },
         // {
         //   label: this.$t("ui.data.column.machine.single"),
@@ -220,7 +255,7 @@ export default {
             "controls-position": "right",
             precision: 0,
             min: 0,
-            max: 99999999999,
+            max: 999999,
           },
         },
         {

@@ -336,7 +336,7 @@ export default {
     this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>

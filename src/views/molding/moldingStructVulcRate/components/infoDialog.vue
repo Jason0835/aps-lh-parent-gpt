@@ -26,6 +26,34 @@ export default {
   components: { infoForm },
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error(this.$t("common.rule.noPoint"))
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -60,12 +88,24 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
         ],
-        lineType: [
+        lhMachineMaxQty: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "blur",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
         jobType: [

@@ -32,11 +32,11 @@
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import { editRelation } from "@/api/maindata/relation";
 
 export default {
-  components: { infoForm },
+  components: { infoForm,materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -50,42 +50,42 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         samePatternPanel: [
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         materialCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         mainPattern: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         mouldCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
         materialDesc: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
       },
@@ -101,7 +101,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.productmodelrelation.factoryCode"),
+          label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -112,10 +112,20 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
+          disabled:true
         },
         {
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
@@ -159,6 +169,10 @@ export default {
         this.form = {
           ...data,
         };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
@@ -182,6 +196,13 @@ export default {
 
         this.save(params);
       });
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
     },
   },
 };

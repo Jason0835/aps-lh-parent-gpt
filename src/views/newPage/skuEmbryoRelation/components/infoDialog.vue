@@ -30,15 +30,13 @@
 
 <script>
 import { mapState } from "vuex";
-import {
-  editSkuStructure
-} from "@/api/monthplan/skuStructure";
+import { editSkuStructure } from "@/api/monthplan/skuStructure";
 
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -98,21 +96,33 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     title: function () {
-      return (
-        (this.isEdit
-          ? this.$t("common.button.edit")
-          : this.$t("common.button.add"))
-      );
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
     columns() {
       return [
-      {
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
         },
         {
           prop: "mesMaterialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.mesMaterialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          disabled: true,
         },
 
         {
@@ -148,9 +158,9 @@ export default {
         this.form = {
           ...data,
         };
+        this.$set(this.form, "mesMaterialCode", data.mesMaterialCode);
       } else {
-        this.form = {
-        };
+        this.form = {};
       }
     },
     hide() {
@@ -162,6 +172,13 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
     },
   },
 };
