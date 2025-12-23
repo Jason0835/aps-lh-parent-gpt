@@ -27,7 +27,7 @@
             <artifactId>ruoyi-modules-job</artifactId>
             <version>3.5.2-SNAPSHOT</version>
         </dependency>
-        
+
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-kettle</artifactId>
@@ -43,6 +43,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
         </dependency>
     </dependencies>
 

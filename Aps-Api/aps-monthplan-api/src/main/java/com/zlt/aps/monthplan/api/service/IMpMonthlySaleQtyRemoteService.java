@@ -7,10 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-
 
 import java.util.List;
 
@@ -79,6 +76,13 @@ public interface IMpMonthlySaleQtyRemoteService {
     @ApiOperation("导入月均销量")
     @PostMapping("/mpMonthlySaleQty/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 获取表头展示列表
+     */
+    @ApiOperation("获取表头展示列表")
+    @PostMapping("/mpMonthlySaleQty/getShowTableTitleList")
+    AjaxResult getShowTableTitleList(@RequestBody MpMonthlySaleQty queryVO);
 
     /**
      * 生成月均销量

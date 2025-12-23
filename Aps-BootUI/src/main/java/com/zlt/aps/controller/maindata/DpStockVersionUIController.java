@@ -201,35 +201,4 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
         return ajaxResult;
     }
 
-    /**
-     * 查询MES实时成品库存列表
-     */
-    @ApiOperation("查询MES实时成品库存列表")
-    @RequiresPermissions("monthplan:mdmFinishStock:list4Mes")
-    @PostMapping("/list4Mes")
-    @ResponseBody
-    public TableDataInfo list4Mes(DpStockVersion dpStockVersion) {
-        return iMdmFinishStockService.list4Mes(dpStockVersion);
-    }
-
-    /**
-     * MES实时成品库存导出
-     *
-     * @param response 响应
-     * @param entity   查询参数
-     * @throws IOException 异常
-     */
-    @RequiresPermissions("monthplan:mdmFinishStock:export4Mes")
-    @ApiOperation("MES实时成品库存导出")
-    @GetMapping({"/export4Mes"})
-    @ResponseBody
-    public void export4Mes(HttpServletResponse response, DpStockVersion entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmFinishStockService.export4Mes(entity, fileName);
-        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
-        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
-        IOUtils.copy(in, response.getOutputStream());
-        response.flushBuffer();
-    }
-
 }

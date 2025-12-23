@@ -1,0 +1,19 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.zlt.mq.rabbit.config.RabbitMQConfig,\
+  com.zlt.sync.configuration.SyncRabbitMqConfig,\
+  com.zlt.sync.service.SyncMsgSenderService,\
+  com.zlt.sync.service.impl.SyncDataMQServiceImpl,\
+  com.zlt.mq.rabbit.service.MsgSenderService,\
+  com.zlt.sync.constants.SyncConstants,\
+  com.zlt.sync.configuration.QueueConfigDatas,\
+  com.zlt.sync.scheduled.SchedulingClusterConfiguration,\
+  com.zlt.sync.handle.SyncScheduleTask,\
+  com.zlt.sync.handle.dockSys.MesHandle,\
+  com.zlt.sync.aspectj.AspectSyncHandle,\
+  com.zlt.sync.worker.processor.SyncDataReTryeProcessor,\
+  com.zlt.sync.controller.SyncScheduleController,\
+  com.zlt.sync.handle.dockSys.DockCommonHandle
+
+#spring.autoconfigure.exclude=\
+# com.zlt.mq.rabbit.service.impl.SimpleMQServiceImpl,\
+# com.zlt.mq.rabbit.listener.DefaultMsgListener

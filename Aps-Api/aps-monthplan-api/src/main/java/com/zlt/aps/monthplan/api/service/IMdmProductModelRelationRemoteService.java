@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmProductModelRelationRemoteService.java
- * 描    述：IMdmProductModelRelationRemoteServiceSAP与模具关系前端接口
+ * 描    述：IMdmProductModelRelationRemoteServiceSKU与模具关系前端接口
  *
  * @author zlt
  * @version 1.0
@@ -68,16 +68,16 @@ public interface IMdmProductModelRelationRemoteService {
     String checkUnique(@RequestBody MdmSkuMouldRel mdmProductModelRelationVO);
 
     /**
-     * 导出SAP与模具关系列表
+     * 导出SKU与模具关系列表
      */
     @ApiOperation("导出列表")
     @PostMapping("/relation/exportData/{fileName}")
     byte[] exportData(@RequestBody MdmSkuMouldRel queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 导入SAP与模具关系数据
+     * 导入SKU与模具关系数据
      */
-    @ApiOperation("导入SAP与模具关系")
+    @ApiOperation("导入SKU与模具关系")
     @PostMapping("/relation/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 

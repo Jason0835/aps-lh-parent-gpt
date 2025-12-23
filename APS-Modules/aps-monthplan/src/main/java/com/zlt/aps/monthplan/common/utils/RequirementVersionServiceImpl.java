@@ -1,7 +1,7 @@
 package com.zlt.aps.monthplan.common.utils;
 
 import com.tlt.aps.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -17,9 +17,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class RequirementVersionServiceImpl implements RequirementVersionService {
 
-  private static final String PREFIX = "REQ";
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMdd");
   private static final Pattern VERSION_PATTERN =
@@ -27,11 +27,10 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
 
   private final ReentrantLock lock = new ReentrantLock();
 
-  @Autowired
-  private RedisSequenceStorageService sequenceService;
+  private final RedisSequenceStorageService sequenceService;
 
   @Override
-  public String generateVersion() {
+  public String generateVersion(String prefix) {
     lock.lock();
     try {
       String dateStr = getTodayDate();
@@ -42,14 +41,14 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
       // 记录每日生成计数
       sequenceService.incrementDailyCounter();
 
-      return formatVersion(dateStr, sequence);
+      return formatVersion(prefix,dateStr, sequence);
     } finally {
       lock.unlock();
     }
   }
 
   @Override
-  public List<String> generateBatchVersions(int count) {
+  public List<String> generateBatchVersions(String prefix,int count) {
     if (count <= 0 || count > 1000) {
       throw new BusinessException("生成数量必须在1到1000之间");
     }
@@ -62,7 +61,7 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
       for (int i = 0; i < count; i++) {
         long sequence = sequenceService.incrementAndGet(dateStr);
         validateSequence(sequence);
-        versions.add(formatVersion(dateStr, sequence));
+        versions.add(formatVersion(prefix,dateStr, sequence));
       }
 
       // 批量更新每日计数
@@ -108,8 +107,8 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
     return new VersionInfo(prefix, date, sequence, version);
   }
 
-  private String formatVersion(String dateStr, long sequence) {
-    return String.format("%s%s%03d", PREFIX, dateStr, sequence);
+  private String formatVersion(String prefix,String dateStr, long sequence) {
+    return String.format("%s%s%03d", prefix, dateStr, sequence);
   }
 
   private String getTodayDate() {

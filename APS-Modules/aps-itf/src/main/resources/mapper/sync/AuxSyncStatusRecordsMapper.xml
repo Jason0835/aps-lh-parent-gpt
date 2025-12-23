@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.sync.mapper.AuxSyncStatusRecordsMapper">
+
+    <select id="selectList" parameterType="Map" resultType="com.zlt.sync.domain.AuxSyncStatusRecords">
+        SELECT  ST_ID AS stId <!-- 主键id --> ,
+                ST_TYPE AS stType <!-- 状态类型 --> ,
+                ST_NAME AS stName <!-- 状态名称 --> ,
+                ST_VALUE AS stValue <!-- 状态值 --> ,
+                DATA_VERSION AS dataVersion <!-- 数据版本号 --> ,
+                CREATE_DATE AS createDate <!-- 创建日期 --> ,
+                UPDATE_DATE AS updateDate <!-- 更新日期 --> ,
+                IS_DELETE AS isDelete <!-- 删除标志 -->
+        FROM AUX_SYNC_STATUS_RECORDS
+        WHERE 1=1
+        <if test="stType!=null and stType != ''">
+            AND ST_TYPE = #{stType}
+        </if>
+
+        <if test="stName!=null and stName != ''">
+            AND ST_NAME = #{stName}
+        </if>
+
+        <if test="stValue!=null and stValue != ''">
+            AND ST_VALUE = #{stValue}
+        </if>
+    </select>
+
+    <insert id="insert" parameterType="com.zlt.sync.domain.AuxSyncStatusRecords">
+        INSERT INTO AUX_SYNC_STATUS_RECORDS
+        (<include refid="fields"/>)
+        VALUES(<include refid="values"/>)
+    </insert>
+
+    <sql id="fields">
+        <trim suffixOverrides=",">
+            <if test="auxSyncStatusRecords.stId != null and auxSyncStatusRecords.stId != '' ">
+                ST_ID,
+            </if>
+            <if test="auxSyncStatusRecords.stType != null and auxSyncStatusRecords.stType != '' ">
+                ST_TYPE,
+            </if>
+            <if test="auxSyncStatusRecords.stName != null and auxSyncStatusRecords.stName != '' ">
+                ST_NAME,
+            </if>
+            <if test="auxSyncStatusRecords.stValue != null and auxSyncStatusRecords.stValue != '' ">
+                ST_VALUE,
+            </if>
+            <if test="auxSyncStatusRecords.dataVersion != null and auxSyncStatusRecords.dataVersion != '' ">
+                DATA_VERSION,
+            </if>
+            <if test="auxSyncStatusRecords.createDate != null">
+                CREATE_DATE,
+            </if>
+            <if test="auxSyncStatusRecords.updateDate != null">
+                UPDATE_DATE,
+            </if>
+            <if test="auxSyncStatusRecords.isDelete != null">
+                IS_DELETE,
+            </if>
+        </trim>
+    </sql>
+
+    <sql id="values">
+        <trim suffixOverrides=",">
+            <if test="auxSyncStatusRecords.stId != null and auxSyncStatusRecords.stId != '' ">
+                #{auxSyncStatusRecords.stId},
+            </if>
+            <if test="auxSyncStatusRecords.stType != null and auxSyncStatusRecords.stType != '' ">
+                #{auxSyncStatusRecords.stType},
+            </if>
+            <if test="auxSyncStatusRecords.stName != null and auxSyncStatusRecords.stName != '' ">
+                #{auxSyncStatusRecords.stName},
+            </if>
+            <if test="auxSyncStatusRecords.stValue != null and auxSyncStatusRecords.stValue != '' ">
+                #{auxSyncStatusRecords.stValue},
+            </if>
+            <if test="auxSyncStatusRecords.dataVersion != null and auxSyncStatusRecords.dataVersion != '' ">
+                #{auxSyncStatusRecords.dataVersion},
+            </if>
+            <if test="auxSyncStatusRecords.createDate != null">
+                #{auxSyncStatusRecords.createDate},
+            </if>
+            <if test="auxSyncStatusRecords.updateDate != null">
+                #{auxSyncStatusRecords.updateDate},
+            </if>
+            <if test="auxSyncStatusRecords.isDelete != null">
+                #{auxSyncStatusRecords.isDelete},
+            </if>
+        </trim>
+    </sql>
+
+    <update id="update" parameterType="com.zlt.sync.domain.AuxSyncStatusRecords">
+        UPDATE AUX_SYNC_STATUS_RECORDS
+        <set>
+            <if test="auxSyncStatusRecords.stId != null and auxSyncStatusRecords.stId != '' ">
+                ST_ID=#{auxSyncStatusRecords.stId},
+            </if>
+            <if test="auxSyncStatusRecords.stType != null and auxSyncStatusRecords.stType != '' ">
+                ST_TYPE=#{auxSyncStatusRecords.stType},
+            </if>
+            <if test="auxSyncStatusRecords.stName != null and auxSyncStatusRecords.stName != '' ">
+                ST_NAME=#{auxSyncStatusRecords.stName},
+            </if>
+            <if test="auxSyncStatusRecords.stValue != null and auxSyncStatusRecords.stValue != '' ">
+                ST_VALUE=#{auxSyncStatusRecords.stValue},
+            </if>
+            <if test="auxSyncStatusRecords.dataVersion != null and auxSyncStatusRecords.dataVersion != '' ">
+                DATA_VERSION=#{auxSyncStatusRecords.dataVersion},
+            </if>
+            <if test="auxSyncStatusRecords.createDate != null">
+                CREATE_DATE=#{auxSyncStatusRecords.createDate},
+            </if>
+            <if test="auxSyncStatusRecords.updateDate != null">
+                UPDATE_DATE=#{auxSyncStatusRecords.updateDate},
+            </if>
+            <if test="auxSyncStatusRecords.isDelete != null">
+                IS_DELETE=#{auxSyncStatusRecords.isDelete},
+            </if>
+        </set>
+        WHERE ST_ID=#{auxSyncStatusRecords.stId}
+
+    </update>
+</mapper>

@@ -2675,21 +2675,6 @@
         WHERE IS_DELETE = 0 AND PRODUCTION_VERSION = #{monthPlanVersion}
     </select>
 
-    <select id="selectMonthPlanAdjustNotice" resultType="com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoticeOrder">
-        SELECT *
-        FROM t_mp_month_plan_adjust_notice
-        WHERE IS_DELETE = 0
-          AND `STATUS` = 1
-          AND `YEAR` = #{year}
-          AND `MONTH` = #{month}
-        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
-            AND BRAND IS NOT NULL
-        </if>
-        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
-            AND PRO_SIZE IS NOT NULL
-        </if>
-    </select>
-
     <select id="selectStockUpPlanQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};

@@ -10,7 +10,6 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.*;
 import com.tlt.aps.utils.BeanCopyUtils;
-import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
@@ -255,13 +254,13 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         List<MonthFinishRateRangeVo> saleResultList = monthPlanReportMapper.listSaleMonthFinishRate(queryDto);
         MonthFinishRateVo monthFinishRateVo = monthPlanReportMapper.selectProduceAndSale(queryDto);
         // 调整通知单数量
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            Long sumAdjustNoticePlan = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
-            // 添加调整通知单计划数
-            monthFinishRateVo.setProducePlanQty(monthFinishRateVo.getProducePlanQty() + sumAdjustNoticePlan.intValue());
-        }
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            Long sumAdjustNoticePlan = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
+//            // 添加调整通知单计划数
+//            monthFinishRateVo.setProducePlanQty(monthFinishRateVo.getProducePlanQty() + sumAdjustNoticePlan.intValue());
+//        }
 
         Integer producePlanQty = monthFinishRateVo.getProducePlanQty();
         Integer produceFinishPlanQty = monthFinishRateVo.getProduceFinishPlanQty();
@@ -419,29 +418,29 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         List<MonthFinishRateBrandVo> brandVoList = monthPlanReportMapper.selectMonthPlanFinishBrand(queryDto);
         Map<String, String> brandDictMap = getDictMapByType(BRAND_DICT_TYPE);
         // 调整通知单数量
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getBrand));
-        }
-
-        for (MonthFinishRateBrandVo monthFinishRateBrandVo : brandVoList) {
-            String brand = monthFinishRateBrandVo.getBrand();
-            if (adjustNoticeMap.containsKey(brand)) {
-                List<MonthPlanNoticeOrder> noticeList = adjustNoticeMap.get(brand);
-                int sumAdjustQty = 0;
-                for (MonthPlanNoticeOrder planNoticeOrder : noticeList) {
-                    sumAdjustQty += planNoticeOrder.getNeedQty();
-                }
-                // 添加调整通知单计划数
-                monthFinishRateBrandVo.setSalePlanQty(monthFinishRateBrandVo.getSalePlanQty() + sumAdjustQty);
-                monthFinishRateBrandVo.setSalePlanSkuCount(monthFinishRateBrandVo.getSalePlanSkuCount() + noticeList.size());
-            }
-            calculateFinishRateBrandRate(monthFinishRateBrandVo);
-            String dictLabel = brandDictMap.getOrDefault(brand, brand);
-            monthFinishRateBrandVo.setBrandName(dictLabel);
-        }
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getBrand));
+//        }
+//
+//        for (MonthFinishRateBrandVo monthFinishRateBrandVo : brandVoList) {
+//            String brand = monthFinishRateBrandVo.getBrand();
+//            if (adjustNoticeMap.containsKey(brand)) {
+//                List<MonthPlanNoticeOrder> noticeList = adjustNoticeMap.get(brand);
+//                int sumAdjustQty = 0;
+//                for (MonthPlanNoticeOrder planNoticeOrder : noticeList) {
+//                    sumAdjustQty += planNoticeOrder.getNeedQty();
+//                }
+//                // 添加调整通知单计划数
+//                monthFinishRateBrandVo.setSalePlanQty(monthFinishRateBrandVo.getSalePlanQty() + sumAdjustQty);
+//                monthFinishRateBrandVo.setSalePlanSkuCount(monthFinishRateBrandVo.getSalePlanSkuCount() + noticeList.size());
+//            }
+//            calculateFinishRateBrandRate(monthFinishRateBrandVo);
+//            String dictLabel = brandDictMap.getOrDefault(brand, brand);
+//            monthFinishRateBrandVo.setBrandName(dictLabel);
+//        }
         return brandVoList;
     }
 
@@ -739,6 +738,7 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         produceSkuSummaryVo.setAvgDailyFinish(avgDailyFinish);
         produceSkuSummaryVo.setFinishAvgSkuCount(finishAvgSkuCount);
     }
+
     /**
      * 胎类区分-排产受限满足率，白胎侧规格后缀
      */
@@ -1048,34 +1048,35 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         List<MonthFinishRateProSizeVo> brandProSizeVoList = monthPlanReportMapper.selectMonthPlanFinishBrandSize(queryDto);
         Map<String, String> brandDictMap = getDictMapByType(BRAND_DICT_TYPE);
         // 调整通知单数量
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getBrand(), item.getProSize())));
-        }
-        for (MonthFinishRateProSizeVo monthFinishRateBrandVo : brandProSizeVoList) {
-            String brand = monthFinishRateBrandVo.getBrand();
-            String proSize = monthFinishRateBrandVo.getProSize();
-            String mapKey = GenerageMapKeyUtils.createMapKey(brand, proSize);
-            if (adjustNoticeMap.containsKey(mapKey)) {
-                List<MonthPlanNoticeOrder> noticeList = adjustNoticeMap.get(mapKey);
-                int sumAdjustQty = 0;
-                for (MonthPlanNoticeOrder planNoticeOrder : noticeList) {
-                    sumAdjustQty += planNoticeOrder.getNeedQty();
-                }
-                // 添加调整通知单计划数
-                monthFinishRateBrandVo.setSalePlanQty(monthFinishRateBrandVo.getSalePlanQty() + sumAdjustQty);
-            }
-            calculateMonthSkuSummaryList(monthFinishRateBrandVo);
-            String dictLabel = brandDictMap.getOrDefault(brand, brand);
-            monthFinishRateBrandVo.setBrandName(dictLabel);
-        }
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getBrand(), item.getProSize())));
+//        }
+//        for (MonthFinishRateProSizeVo monthFinishRateBrandVo : brandProSizeVoList) {
+//            String brand = monthFinishRateBrandVo.getBrand();
+//            String proSize = monthFinishRateBrandVo.getProSize();
+//            String mapKey = GenerageMapKeyUtils.createMapKey(brand, proSize);
+//            if (adjustNoticeMap.containsKey(mapKey)) {
+//                List<MonthPlanNoticeOrder> noticeList = adjustNoticeMap.get(mapKey);
+//                int sumAdjustQty = 0;
+//                for (MonthPlanNoticeOrder planNoticeOrder : noticeList) {
+//                    sumAdjustQty += planNoticeOrder.getNeedQty();
+//                }
+//                // 添加调整通知单计划数
+//                monthFinishRateBrandVo.setSalePlanQty(monthFinishRateBrandVo.getSalePlanQty() + sumAdjustQty);
+//            }
+//            calculateMonthSkuSummaryList(monthFinishRateBrandVo);
+//            String dictLabel = brandDictMap.getOrDefault(brand, brand);
+//            monthFinishRateBrandVo.setBrandName(dictLabel);
+//        }
         return brandProSizeVoList;
     }
 
     /**
      * 查询品牌-尺寸汇总分析
+     *
      * @param queryDto 查询条件
      * @return 结果
      */
@@ -1108,17 +1109,17 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         Map<String, BigDecimal> salePlanMap = this.getSummaryTypeMap(brandProSizeSummaryType, salePlanBrandProSizeSummaryList, BrandProSizeSummaryVo::getSalePlanQty);
         Map<String, Long> salePlanCountMap = this.getSummaryTypeMap4Long(brandProSizeSummaryType, salePlanBrandProSizeSummaryList, BrandProSizeSummaryVo::getSalePlanCount);
         // 调整通知单数量
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_BRAND.getTypeCode().equals(brandProSizeSummaryType)) {
-                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                        .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getBrand));
-            } else if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_PRO_SIZE.getTypeCode().equals(brandProSizeSummaryType)) {
-                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                        .collect(Collectors.groupingBy(item -> item.getProSize().toString()));
-            }
-        }
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_BRAND.getTypeCode().equals(brandProSizeSummaryType)) {
+//                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                        .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getBrand));
+//            } else if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_PRO_SIZE.getTypeCode().equals(brandProSizeSummaryType)) {
+//                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                        .collect(Collectors.groupingBy(item -> item.getProSize().toString()));
+//            }
+//        }
         long timeMillis5 = System.currentTimeMillis();
         log.info("查询：品牌-尺寸汇总分析，销售计划耗时{}", timeMillis5 - timeMillis4);
 
@@ -1142,7 +1143,7 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
 
             setQtyAndCalculateRate(brandProSizeSummaryVo, brandProSizeSummaryType, proPlanMap, proFinishMap, salePlanMap, saleFinishMap, stockMap);
             setCountAndCalculateRate(brandProSizeSummaryVo, brandProSizeSummaryType, proPlanCountMap, proFinishCountMap, salePlanCountMap, saleFinishCountMap, stockCountMap);
-            addAdjustNoticeAndCalculateRate(brandProSizeSummaryVo, brandProSizeSummaryType, adjustNoticeMap);
+            addAdjustNoticeAndCalculateRate(brandProSizeSummaryVo, brandProSizeSummaryType, null);
         }
         long timeMillis8 = System.currentTimeMillis();
         log.info("查询：品牌-尺寸汇总分析，数据处理耗时{}", timeMillis8 - timeMillis7);
@@ -1234,6 +1235,7 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
 
     /**
      * 导出品牌-尺寸汇总分析
+     *
      * @param queryDto 查询条件
      * @return 结果
      */
@@ -1597,22 +1599,22 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
      * @param brandProSizeSummaryVo 要添加的对象
      * @param adjustNoticeMap       调整通知单计划 map
      */
-    private void addAdjustNoticeAndCalculateRate(BrandProSizeSummaryVo brandProSizeSummaryVo, String brandProSizeSummaryType, Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap) {
+    private void addAdjustNoticeAndCalculateRate(BrandProSizeSummaryVo brandProSizeSummaryVo, String brandProSizeSummaryType, Map<String, List<Object>> adjustNoticeMap) {
         long adjustSum = 0L;
         int adjustCount = 0;
-        if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_BRAND.getTypeCode().equals(brandProSizeSummaryType)) {
-            String brand = brandProSizeSummaryVo.getBrand();
-            List<MonthPlanNoticeOrder> adjustNoticeList = adjustNoticeMap.getOrDefault(brand, Collections.emptyList());
-            adjustSum = adjustNoticeList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
-            adjustCount = adjustNoticeList.size();
-        } else if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_PRO_SIZE.getTypeCode().equals(brandProSizeSummaryType)) {
-            String proSize = brandProSizeSummaryVo.getProSize();
-            List<MonthPlanNoticeOrder> adjustNoticeList = adjustNoticeMap.getOrDefault(proSize, Collections.emptyList());
-            adjustSum = adjustNoticeList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
-            adjustCount = adjustNoticeList.size();
-        }
+//        if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_BRAND.getTypeCode().equals(brandProSizeSummaryType)) {
+//            String brand = brandProSizeSummaryVo.getBrand();
+//            List<MonthPlanNoticeOrder> adjustNoticeList = adjustNoticeMap.getOrDefault(brand, Collections.emptyList());
+//            adjustSum = adjustNoticeList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
+//            adjustCount = adjustNoticeList.size();
+//        } else if (BrandProSizeSummaryTypeEnum.SUMMARY_TYPE_PRO_SIZE.getTypeCode().equals(brandProSizeSummaryType)) {
+//            String proSize = brandProSizeSummaryVo.getProSize();
+//            List<MonthPlanNoticeOrder> adjustNoticeList = adjustNoticeMap.getOrDefault(proSize, Collections.emptyList());
+//            adjustSum = adjustNoticeList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .mapToLong(MonthPlanNoticeOrder::getNeedQty).sum();
+//            adjustCount = adjustNoticeList.size();
+//        }
         brandProSizeSummaryVo.setSalePlanQty(BigDecimalUtils.add(brandProSizeSummaryVo.getSalePlanQty(), adjustSum));
         brandProSizeSummaryVo.setSalePlanCount(brandProSizeSummaryVo.getSalePlanCount() + adjustCount);
         brandProSizeSummaryVo.setProFinishRate(BigDecimalUtils.div(brandProSizeSummaryVo.getProFinishQty(), brandProSizeSummaryVo.getProPlanQty(), 2, true, BigDecimal.ROUND_HALF_UP));
@@ -1667,40 +1669,40 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         log.info("获取分类差异列表，获取库存map耗时{}", timeMillis4 - timeMillis3);
 
         // 调整通知单数量
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeListMap = new HashMap<>(16);
-        Map<String, ClassificationGapVo> adjustNoticeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            adjustNoticeListMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                    .collect(Collectors.groupingBy(item -> String.join("|", item.getProductCode(),
-                            item.getBrand(), item.getProSize().toString(), item.getLocationType(), item.getChannel())));
-            for (Map.Entry<String, List<MonthPlanNoticeOrder>> entry : adjustNoticeListMap.entrySet()) {
-                String key = entry.getKey();
-                List<MonthPlanNoticeOrder> value = entry.getValue();
-                long skuCount = value.stream().map(MonthPlanNoticeOrder::getProductCode).distinct().count();
-                long salePlan = 0L;
-                for (MonthPlanNoticeOrder monthPlanNoticeOrder : value) {
-                    Long needQty = monthPlanNoticeOrder.getNeedQty();
-                    salePlan += needQty;
-                }
-                ClassificationGapVo classificationGapVo;
-                if (adjustNoticeMap.containsKey(key)) {
-                    classificationGapVo = adjustNoticeMap.get(key);
-                    BigDecimal salePlanQty = classificationGapVo.getSalePlanQty();
-                    BigDecimal saleSkuCount = classificationGapVo.getSaleSkuCount();
-                    BigDecimal salePlanQtyResult = BigDecimalUtils.add(salePlanQty, salePlan);
-                    BigDecimal saleSkuCountResult = BigDecimalUtils.add(saleSkuCount, skuCount);
-                    classificationGapVo.setSalePlanQty(salePlanQtyResult);
-                    classificationGapVo.setSaleSkuCount(saleSkuCountResult);
-                } else {
-                    classificationGapVo = new ClassificationGapVo();
-                    classificationGapVo.setSalePlanQty(BigDecimal.valueOf(salePlan));
-                    classificationGapVo.setSaleSkuCount(BigDecimal.valueOf(skuCount));
-                }
-                adjustNoticeMap.put(key, classificationGapVo);
-            }
-        }
-        setFieldValueByMap(classificationGapVos, salePlanMap, proPlanMap, stockPlanMap, adjustNoticeMap);
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeListMap = new HashMap<>(16);
+//        Map<String, ClassificationGapVo> adjustNoticeMap = new HashMap<>(16);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            adjustNoticeListMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                    .collect(Collectors.groupingBy(item -> String.join("|", item.getProductCode(),
+//                            item.getBrand(), item.getProSize().toString(), item.getLocationType(), item.getChannel())));
+//            for (Map.Entry<String, List<MonthPlanNoticeOrder>> entry : adjustNoticeListMap.entrySet()) {
+//                String key = entry.getKey();
+//                List<MonthPlanNoticeOrder> value = entry.getValue();
+//                long skuCount = value.stream().map(MonthPlanNoticeOrder::getProductCode).distinct().count();
+//                long salePlan = 0L;
+//                for (MonthPlanNoticeOrder monthPlanNoticeOrder : value) {
+//                    Long needQty = monthPlanNoticeOrder.getNeedQty();
+//                    salePlan += needQty;
+//                }
+//                ClassificationGapVo classificationGapVo;
+//                if (adjustNoticeMap.containsKey(key)) {
+//                    classificationGapVo = adjustNoticeMap.get(key);
+//                    BigDecimal salePlanQty = classificationGapVo.getSalePlanQty();
+//                    BigDecimal saleSkuCount = classificationGapVo.getSaleSkuCount();
+//                    BigDecimal salePlanQtyResult = BigDecimalUtils.add(salePlanQty, salePlan);
+//                    BigDecimal saleSkuCountResult = BigDecimalUtils.add(saleSkuCount, skuCount);
+//                    classificationGapVo.setSalePlanQty(salePlanQtyResult);
+//                    classificationGapVo.setSaleSkuCount(saleSkuCountResult);
+//                } else {
+//                    classificationGapVo = new ClassificationGapVo();
+//                    classificationGapVo.setSalePlanQty(BigDecimal.valueOf(salePlan));
+//                    classificationGapVo.setSaleSkuCount(BigDecimal.valueOf(skuCount));
+//                }
+//                adjustNoticeMap.put(key, classificationGapVo);
+//            }
+//        }
+        setFieldValueByMap(classificationGapVos, salePlanMap, proPlanMap, stockPlanMap, null);
 
         long timeMillis5 = System.currentTimeMillis();
         log.info("获取分类差异列表，根据map赋值属性耗时{}", timeMillis5 - timeMillis4);
@@ -1760,8 +1762,8 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
      * @param obj              要赋值的对象
      * @param map              要存入的map
      * @param ignoreFieldNames 忽略的属性名
-     * @param fileNameSuffix 后缀
-     * @param ignoreZero 是否忽略为0的值
+     * @param fileNameSuffix   后缀
+     * @param ignoreZero       是否忽略为0的值
      */
     private static void putFieldToMap(Object obj, Map<String, Object> map, List<String> ignoreFieldNames, String fileNameSuffix, Boolean ignoreZero) {
         // 获取对象的所有属性名，并且将属性名放入map中，忽略某些属性
@@ -2018,38 +2020,38 @@ public class MonthPlanReportServiceImpl implements IMonthPlanReportService {
         }
 
         // 添加调整通知单计划数
-        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
-        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-            // 调整通知单数量
-            if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
-                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
-                        .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getProductCode));
-            }
-            Set<Map.Entry<String, List<MonthPlanNoticeOrder>>> entrySet = adjustNoticeMap.entrySet();
-            for (Map.Entry<String, List<MonthPlanNoticeOrder>> entry : entrySet) {
-                String productCode = entry.getKey();
-                List<MonthPlanNoticeOrder> value = entry.getValue();
-                long needQty = 0;
-                TireTypeReportSatisfyRateVo defaultValue = new TireTypeReportSatisfyRateVo();
-                for (MonthPlanNoticeOrder planNoticeOrder : value) {
-                    needQty += planNoticeOrder.getNeedQty();
-                    defaultValue.setProductCode(productCode);
-                    defaultValue.setProductDesc(planNoticeOrder.getProductDesc());
-                    defaultValue.setProSize(planNoticeOrder.getProSize());
-                    defaultValue.setBrand(planNoticeOrder.getBrand());
-                    defaultValue.setPattern(planNoticeOrder.getPattern());
-                    defaultValue.setLocationType(planNoticeOrder.getLocationType());
-                    defaultValue.setChannel(planNoticeOrder.getChannel());
-                }
-                defaultValue.setSalePlanQty(BigDecimal.ZERO);
-                defaultValue.setSaleSkuCount(BigDecimal.ZERO);
-                TireTypeReportSatisfyRateVo productVo = baseGroupMap.getOrDefault(productCode, defaultValue);
-                productVo.setSalePlanQty(BigDecimalUtils.add(needQty, productVo.getSalePlanQty()));
-                productVo.setSaleSkuCount(baseGroupMap.containsKey(productCode) ? BigDecimal.ONE : BigDecimalUtils.add(1, productVo.getSaleSkuCount()));
-                baseGroupMap.put(productCode, productVo);
-            }
-        }
+//        List<MonthPlanNoticeOrder> monthPlanNoticeOrderList = monthPlanReportMapper.selectMonthPlanAdjustNotice(queryDto);
+//        Map<String, List<MonthPlanNoticeOrder>> adjustNoticeMap = new HashMap<>(16);
+//        if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//            // 调整通知单数量
+//            if (CollectionUtils.isNotEmpty(monthPlanNoticeOrderList)) {
+//                adjustNoticeMap = monthPlanNoticeOrderList.stream().filter(item -> item.getNeedQty() != null && item.getNeedQty() > 0)
+//                        .collect(Collectors.groupingBy(MonthPlanNoticeOrder::getProductCode));
+//            }
+//            Set<Map.Entry<String, List<MonthPlanNoticeOrder>>> entrySet = adjustNoticeMap.entrySet();
+//            for (Map.Entry<String, List<MonthPlanNoticeOrder>> entry : entrySet) {
+//                String productCode = entry.getKey();
+//                List<MonthPlanNoticeOrder> value = entry.getValue();
+//                long needQty = 0;
+//                TireTypeReportSatisfyRateVo defaultValue = new TireTypeReportSatisfyRateVo();
+//                for (MonthPlanNoticeOrder planNoticeOrder : value) {
+//                    needQty += planNoticeOrder.getNeedQty();
+//                    defaultValue.setProductCode(productCode);
+//                    defaultValue.setProductDesc(planNoticeOrder.getProductDesc());
+//                    defaultValue.setProSize(planNoticeOrder.getProSize());
+//                    defaultValue.setBrand(planNoticeOrder.getBrand());
+//                    defaultValue.setPattern(planNoticeOrder.getPattern());
+//                    defaultValue.setLocationType(planNoticeOrder.getLocationType());
+//                    defaultValue.setChannel(planNoticeOrder.getChannel());
+//                }
+//                defaultValue.setSalePlanQty(BigDecimal.ZERO);
+//                defaultValue.setSaleSkuCount(BigDecimal.ZERO);
+//                TireTypeReportSatisfyRateVo productVo = baseGroupMap.getOrDefault(productCode, defaultValue);
+//                productVo.setSalePlanQty(BigDecimalUtils.add(needQty, productVo.getSalePlanQty()));
+//                productVo.setSaleSkuCount(baseGroupMap.containsKey(productCode) ? BigDecimal.ONE : BigDecimalUtils.add(1, productVo.getSaleSkuCount()));
+//                baseGroupMap.put(productCode, productVo);
+//            }
+//        }
 
         // 库存列表
         List<TireTypeReportSatisfyRateVo> stockList = monthPlanReportMapper.selectStock4TireTypeSatisfyRate(queryDto);

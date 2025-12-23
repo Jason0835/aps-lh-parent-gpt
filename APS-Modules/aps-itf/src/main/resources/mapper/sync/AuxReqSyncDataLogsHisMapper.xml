@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper">
+
+    <!-- 插入数据 -->
+    <insert id="insert" parameterType="com.zlt.sync.domain.AuxReqSyncDataLogsHis">
+        INSERT INTO AUX_REQ_SYNC_DATA_LOGS_HIS
+        (<include refid="fields"/>)
+        VALUES(<include refid="values"/>)
+    </insert>
+
+    <sql id="fields">
+        <trim suffixOverrides=",">
+            <if test="auxReqSyncDataLogsHis.msgId != null and auxReqSyncDataLogsHis.msgId != '' ">
+                MSG_ID,
+            </if>
+            <if test="auxReqSyncDataLogsHis.syncKey != null and auxReqSyncDataLogsHis.syncKey != '' ">
+                SYNC_KEY,
+            </if>
+            <if test="auxReqSyncDataLogsHis.dockSys != null and auxReqSyncDataLogsHis.dockSys != '' ">
+                DOCK_SYS,
+            </if>
+            <if test="auxReqSyncDataLogsHis.params != null and auxReqSyncDataLogsHis.params != '' ">
+                PARAMS,
+            </if>
+            <if test="auxReqSyncDataLogsHis.msgCode != null">
+                MSG_CODE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.msg != null and auxReqSyncDataLogsHis.msg != '' ">
+                MSG,
+            </if>
+            <if test="auxReqSyncDataLogsHis.msgKey != null and auxReqSyncDataLogsHis.msgKey != '' ">
+                MSG_KEY,
+            </if>
+            <if test="auxReqSyncDataLogsHis.status != null">
+                STATUS,
+            </if>
+            <if test="auxReqSyncDataLogsHis.hasData != null">
+                HAS_DATA,
+            </if>
+            <if test="auxReqSyncDataLogsHis.dataSys != null and auxReqSyncDataLogsHis.dataSys != '' ">
+                DATA_SYS,
+            </if>
+            <if test="auxReqSyncDataLogsHis.backIssue != null">
+                BACK_ISSUE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.dataVersion != null and auxReqSyncDataLogsHis.dataVersion != '' ">
+                DATA_VERSION,
+            </if>
+            <if test="auxReqSyncDataLogsHis.createDate != null">
+                CREATE_DATE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.updateDate != null">
+                UPDATE_DATE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.isDelete != null">
+                IS_DELETE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.companyCode != null and auxReqSyncDataLogsHis.companyCode != '' ">
+                COMPANY_CODE,
+            </if>
+            <if test="auxReqSyncDataLogsHis.factoryCode != null and auxReqSyncDataLogsHis.factoryCode != '' ">
+                FACTORY_CODE,
+            </if>
+        </trim>
+    </sql>
+
+    <sql id="values">
+        <trim suffixOverrides=",">
+            <if test="auxReqSyncDataLogsHis.msgId != null and auxReqSyncDataLogsHis.msgId != '' ">
+                #{auxReqSyncDataLogsHis.msgId},
+            </if>
+            <if test="auxReqSyncDataLogsHis.syncKey != null and auxReqSyncDataLogsHis.syncKey != '' ">
+                #{auxReqSyncDataLogsHis.syncKey},
+            </if>
+            <if test="auxReqSyncDataLogsHis.dockSys != null and auxReqSyncDataLogsHis.dockSys != '' ">
+                #{auxReqSyncDataLogsHis.dockSys},
+            </if>
+            <if test="auxReqSyncDataLogsHis.params != null and auxReqSyncDataLogsHis.params != '' ">
+                #{auxReqSyncDataLogsHis.params},
+            </if>
+            <if test="auxReqSyncDataLogsHis.msgCode != null">
+                #{auxReqSyncDataLogsHis.msgCode},
+            </if>
+            <if test="auxReqSyncDataLogsHis.msg != null and auxReqSyncDataLogsHis.msg != '' ">
+                #{auxReqSyncDataLogsHis.msg},
+            </if>
+            <if test="auxReqSyncDataLogsHis.msgKey != null and auxReqSyncDataLogsHis.msgKey != '' ">
+                #{auxReqSyncDataLogsHis.msgKey},
+            </if>
+            <if test="auxReqSyncDataLogsHis.status != null">
+                #{auxReqSyncDataLogsHis.status},
+            </if>
+            <if test="auxReqSyncDataLogsHis.hasData != null">
+                #{auxReqSyncDataLogsHis.hasData},
+            </if>
+            <if test="auxReqSyncDataLogsHis.dataSys != null and auxReqSyncDataLogsHis.dataSys != '' ">
+                #{auxReqSyncDataLogsHis.dataSys},
+            </if>
+            <if test="auxReqSyncDataLogsHis.backIssue != null">
+                #{auxReqSyncDataLogsHis.backIssue},
+            </if>
+            <if test="auxReqSyncDataLogsHis.dataVersion != null and auxReqSyncDataLogsHis.dataVersion != '' ">
+                #{auxReqSyncDataLogsHis.dataVersion},
+            </if>
+            <if test="auxReqSyncDataLogsHis.createDate != null">
+                #{auxReqSyncDataLogsHis.createDate},
+            </if>
+            <if test="auxReqSyncDataLogsHis.updateDate != null">
+                #{auxReqSyncDataLogsHis.updateDate},
+            </if>
+            <if test="auxReqSyncDataLogsHis.isDelete != null">
+                #{auxReqSyncDataLogsHis.isDelete},
+            </if>
+            <if test="auxReqSyncDataLogsHis.companyCode != null and auxReqSyncDataLogsHis.companyCode != '' ">
+                #{auxReqSyncDataLogsHis.companyCode},
+            </if>
+            <if test="auxReqSyncDataLogsHis.factoryCode != null and auxReqSyncDataLogsHis.factoryCode != '' ">
+                #{auxReqSyncDataLogsHis.factoryCode},
+            </if>
+        </trim>
+    </sql>
+
+    <delete id="deleteByParams" parameterType="Map">
+        DELETE FROM AUX_REQ_SYNC_DATA_LOGS_HIS t
+         WHERE 1=1
+         <if test="msgId != null and msgId != ''">
+             AND t.MSG_ID=#{msgId}
+         </if>
+    </delete>
+</mapper>

@@ -1,9 +1,24 @@
+import com.ruoyi.common.core.utils.DateUtils;
+
 import java.io.*;
+import java.text.ParseException;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Scanner;
-import java.util.regex.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class OracleToMySQLConverter {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws ParseException {
+        Calendar stockDateCalendar = Calendar.getInstance();
+        stockDateCalendar.setTime(DateUtils.getNowDate("yyyy-MM"));
+
+        stockDateCalendar.add(Calendar.MONTH, -3);
+        Date subTime1 = stockDateCalendar.getTime();
+        System.out.println(DateUtils.parseDateToStr("yyyy-MM-dd", subTime1));
+    }
+
+    private static void oracleToMysql() {
         Scanner scanner = new Scanner(System.in);
 
         // 从控制台获取输入文件路径

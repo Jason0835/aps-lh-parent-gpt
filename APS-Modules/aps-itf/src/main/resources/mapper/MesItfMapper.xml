@@ -63,15 +63,116 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectProductStock" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
-        SELECT *
-        FROM mes_product_stock
-        WHERE DEL_FLAG = 0
+    <select id="selectProductStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock">
+        SELECT stock.STOCK_DATE,
+        stock.MATERIAL_CODE,
+        stock.MES_MATERIAL_CODE,
+        stock.STOCK_NUM,
+        stock.WEEK_YEAR,
+        stock.IS_UNIFORMITY,
+        stock.IS_DYNAMIC_BALANCE,
+        stock.STOCK_END_TIME,
+        stock.DATA_VERSION,
+        stock.COMPANY_CODE,
+        stock.FACTORY_CODE,
+        info.PRODUCT_TYPE_CODE,
+        info.BRAND,
+        info.STRUCTURE_NAME,
+        info.LOCATION_TYPE,
+        info.MATERIAL_DESC
+        FROM mes_product_stock stock
+        LEFT JOIN T_MDM_MATERIAL_INFO info ON stock.MATERIAL_CODE = info.MATERIAL_CODE
+        WHERE 1 = 1
+        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
-        SELECT *
-        FROM mes_unqualified_stock
-        WHERE DEL_FLAG = 0
+    <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock">
+        SELECT stockSTOCK_DATE,
+        stock.MATERIAL_CODE,
+        stock.MES_MATERIAL_CODE,
+        stock.STOCK_NUM,
+        stock.DATA_VERSION,
+        stock.COMPANY_CODE,
+        stock.FACTORY_CODE,
+        info.MATERIAL_DESC
+        FROM mes_unqualified_stock stock
+        LEFT JOIN T_MDM_MATERIAL_INFO info ON stock.MATERIAL_CODE = info.MATERIAL_CODE
+        WHERE 1 = 1
+        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectRawSpecialMaterialStock"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock">
+        SELECT STOCK_DATE,
+               SPEC_MATERIAL_CODE AS MATERIAL_CODE,
+               STANDARD_CODE      AS STANDARD_LENGTH,
+               STOCK_NUM          AS STOCK,
+               DATA_VERSION,
+               COMPANY_CODE,
+               FACTORY_CODE
+        FROM SPEC_STOCK_SYNC
+        WHERE STOCK_DATE = #{stockDate}
+    </select>
+
+    <select id="syncRawMaterialOutboundRecord"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord">
+        SELECT STOCK_DATE AS OUTBOUND_DATE,
+        MATERIAL_CODE,
+        TYPE_CODE AS MATERIAL_TYPE,
+        MATERIAL_NAME AS MATERIAL_NAME,
+        STOCK_NUM AS OUTBOUND_QTY,
+        UNIT,
+        DATA_VERSION,
+        FACTORY_CODE
+        FROM ORI_MATERIAL_OUT_SYNC
+        WHERE 1 = 1
+        <if test="outboundDate != null">AND STOCK_DATE = #{outboundDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectMaterialList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+        SELECT MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        SPEC_DESC AS MATERIAL_DESC,
+        SPECIFICATIONS,
+        PRO_SIZE,
+        EMBRYO_CODE,
+        EMBRYO_DESC,
+        PATTERN,
+        HIERARCHY,
+        SPEED_LEVEL AS SPEED,
+        SECTION_WIDTH,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_BAS_MATERIAL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectMoldShellList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo">
+        SELECT STOCK_DATE,
+        MOLD_SLEEVE AS MOLD_MODEL_CODE,
+        TOTAL_NUM AS QTY,
+        MACHINE_NUM AS MACHINE_QTY,
+        WAREHOUSE_NUM AS ON_HAND_QTY,
+        OUT_NUM AS OUT_BOUND_QTY,
+        PLAN_OUT_NUM AS OUT_BOUND_PLAN_QTY,
+        DOWN_MACHINE_NUM AS DEPLANE_QTY,
+        FORCE_OUT_NUM AS FORCE_OUT_BOUND_QTY,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MOLD_SHELL_SYNC
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 </mapper>

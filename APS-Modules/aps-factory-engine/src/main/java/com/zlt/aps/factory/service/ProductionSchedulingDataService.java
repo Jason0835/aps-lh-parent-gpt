@@ -98,6 +98,14 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList);
 
     /**
+     * 获取周期结构的最低硫化配比信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context);
+
+    /**
      * 获取续作SKU信息，包含续作机台及使用的模具数
      *
      * @param factoryCode 工厂编码
@@ -125,12 +133,13 @@ public interface ProductionSchedulingDataService {
      *
      * @return
      */
+    @Deprecated
     Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo();
 
     /**
      * 根据查询条件，获取分厂的排产制造需求计划数据
      *
-     * @param context
+     * @param context 排产上下文
      * @return
      */
     List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context);
@@ -138,7 +147,7 @@ public interface ProductionSchedulingDataService {
     /**
      * 获取需求计划对应的物料基础信息
      *
-     * @param context
+     * @param context 排产上下文
      * @return
      */
     List<ProductBaseInfoVo> getProductionMaterialInfo(Context context);
@@ -146,10 +155,26 @@ public interface ProductionSchedulingDataService {
     /**
      * 获取需求计划对应的施工配置关系信息
      *
-     * @param context
+     * @param context 排产上下文
      * @return
      */
     List<MonthPlanProductConstructionInfoVo> getProductionConstructionInfo(Context context);
+
+    /**
+     * 获取含有特殊材料的生胎配置信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<EmbryoSpecialMaterialInfoVo> getEmbryoSpecialMaterialInfo(Context context);
+
+    /**
+     * 获取特殊材料库存
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(Context context);
 
     /**
      * 根据查询条件，获取工厂的排产计划信息
@@ -167,6 +192,7 @@ public interface ProductionSchedulingDataService {
      * @param productTypeCode
      * @return
      */
+    @Deprecated
     Map<String, ProductALevelVo> getProductDamageConfiguration(String factoryCode, String productTypeCode);
 
     /**
@@ -175,6 +201,7 @@ public interface ProductionSchedulingDataService {
      * @param productionContext
      * @return
      */
+    @Deprecated
     Map<String, Long> getMinimumLotSizeConfiguration(ProductionContext productionContext);
 
     /**
@@ -183,16 +210,8 @@ public interface ProductionSchedulingDataService {
      * @param factoryCode 分厂编码
      * @return
      */
+    @Deprecated
     List<ProductionGroupVo> getFactoryProductionGroupConfiguration(String factoryCode);
-
-    /**
-     * 获取分厂、年份、月份的可用模具信息
-     * 没有，则返回空集合
-     *
-     * @param context
-     * @return
-     */
-    List<MouldInfoVO> getMonthEnableMouldConfiguration(ProductionContext context);
 
     /**
      * 根据需求计划，获取对应的需求模具配置信息
@@ -247,6 +266,7 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<MouldAllocationInfoVo> getMouldAllocationInfo(Context context);
+
     /**
      * 获取对应SKU的日硫化量信息
      *
@@ -263,39 +283,15 @@ public interface ProductionSchedulingDataService {
      * @param month
      * @return
      */
+    @Deprecated
     Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
-
-    /**
-     * 获取分厂在指定年份、月份的轮胎类型产能分配配置
-     *
-     * @param factoryCode 分厂
-     * @param year        年份
-     * @param month       月份
-     * @return
-     */
-    List<TireCapacityConfiguration> getTireCapacityConfiguration(String factoryCode, Integer year, Integer month);
-
-    /**
-     * 获取物料可用模具配置信息
-     *
-     * @param context
-     * @return
-     */
-    List<ProductMouldInfoVO> getEnableUseProductMouldConfiguration(ProductionContext context);
-
-    /**
-     * 获取模具维修返厂配置信息
-     *
-     * @param context
-     * @return
-     */
-    List<MouldInfoVO> getMouldMaintenanceConfiguration(ProductionContext context);
 
     /**
      * 获取利率优先值配置
      *
      * @return
      */
+    @Deprecated
     List<MdmInterestRate> getInterestRateConfiguration();
 
     /**
@@ -325,14 +321,8 @@ public interface ProductionSchedulingDataService {
      * @param context
      * @return
      */
+    @Deprecated
     List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context);
-
-    /**
-     * 更新排产计划初始化的排产顺序
-     *
-     * @param productionSequenceList
-     */
-    void updateProductionSequence(List<MonthPlanManufacturingRequirementVo> productionSequenceList);
 
     /**
      * 保存明细
@@ -390,6 +380,7 @@ public interface ProductionSchedulingDataService {
      * @param factoryCode 分厂
      * @return
      */
+    @Deprecated
     Set<String> getExportOemBrand(String factoryCode);
 
     /**
@@ -401,5 +392,6 @@ public interface ProductionSchedulingDataService {
      * @param averageValue 月均销量
      * @return
      */
+    @Deprecated
     Set<String> getGreaterAverageValueProductInfo(String factoryCode, Integer year, Integer month, Integer averageValue);
 }

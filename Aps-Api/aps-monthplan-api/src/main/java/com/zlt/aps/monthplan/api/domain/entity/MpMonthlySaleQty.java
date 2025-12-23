@@ -8,6 +8,7 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -50,7 +51,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 内外销
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.locationType")
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "内外销", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -58,7 +59,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.brand")
+    @Excel(name = "ui.data.column.mpMonthlySaleQty.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -131,9 +132,9 @@ public class MpMonthlySaleQty extends BaseEntity {
 
     @ApiModelProperty(value = "区域(往前12个月所有区域)月均销量总和", name = "areaGroupList")
     @TableField(exist = false)
-    private List<MpHistorySaleRecord> areaGroupList;
+    private List<MpHistorySaleRecord> areaGroupList = new ArrayList<>();
 
     @ApiModelProperty(value = "月份(往前12个月)月均销量总和", name = "monthGroupList")
     @TableField(exist = false)
-    private List<MpHistorySaleRecord> monthGroupList;
+    private List<MpHistorySaleRecord> monthGroupList = new ArrayList<>();
 }

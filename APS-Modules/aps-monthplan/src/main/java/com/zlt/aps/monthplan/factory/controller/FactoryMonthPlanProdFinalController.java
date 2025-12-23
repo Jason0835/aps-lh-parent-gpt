@@ -16,6 +16,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
@@ -26,10 +27,7 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanStatisticsVo;
 import com.zlt.aps.monthplan.common.utils.CustomerExcelUtils;
 import com.zlt.aps.monthplan.common.utils.ExcelExportUtils;
-import com.tlt.aps.utils.JsonUtils;
-import com.zlt.aps.monthplan.factory.helper.ProductionPlanExcelUtils;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalService;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import com.zlt.common.controller.BusiController;
 import com.zlt.common.exception.QueryExprException;
@@ -79,8 +77,6 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
     private final IFactoryMonthPlanProdFinalService factoryMonthPlanProdFinalService;
 
     private final IFactoryProductionVersionService factoryProductionVersionService;
-
-    private final IFactoryMonthPlanProductionFinalService factoryMonthPlanProductionFinalService;
 
     /**
      * 查询分厂月生产计划排产结果-生产计划排产结果列表
@@ -135,7 +131,7 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
     public List<FactoryMonthPlanProdFinalVo> getProdResult(@RequestBody FactoryMonthPlanProdFinalQueryDto queryCondition) {
         QueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, queryCondition);
-        return factoryMonthPlanProductionFinalService.getProdResult(queryCondition);
+        return null;
     }
 
     /**
@@ -158,7 +154,7 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
         queryCondition.setMonth(finalVersion.getMonth());
         QueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, queryCondition);
-        List<FactoryMonthPlanProdFinalVo> dataList = factoryMonthPlanProductionFinalService.getMonthPlanProdResult(queryCondition);
+        List<FactoryMonthPlanProdFinalVo> dataList = null;
         if (CollectionUtils.isEmpty(dataList)) {
             return Collections.emptyList();
         }
@@ -209,6 +205,7 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
         }
         return factoryMonthPlanProdFinalService.getSaleMonthPlanRequireStock(monthPlanVersion);
     }
+
     /**
      * 导入调整计划
      *
@@ -246,7 +243,7 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
             this.iExportLogService.add(exportLog);
             return resultBytes;
         }
-        List<Integer> dayList = ProductionPlanExcelUtils.getCycleDayList(version);
+        List<Integer> dayList = null;
         String startWithName = "ui.data.column.factoryMonthPlanProdFinal.day";
         CustomerExcelUtils<FactoryMonthPlanProdFinal> util = new CustomerExcelUtils<>(FactoryMonthPlanProdFinal.class, dayList, startWithName, FactoryMonthPlanProdFinal.class);
         byte[] resultBytes = ExcelExportUtils.fillExcelAndLog(response, util, list, fileName, queryVO, exportLog, "0");

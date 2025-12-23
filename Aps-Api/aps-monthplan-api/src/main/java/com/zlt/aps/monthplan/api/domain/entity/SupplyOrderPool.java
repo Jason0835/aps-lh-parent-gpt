@@ -1,20 +1,20 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：SupplyOrderPool.java
- * 描    述：供应链订单池对象 t_mp_supply_order_pool
+ * 描    述：供应链订单池对象 t_dp_supply_order_pool
  *@author yelq
- *@date 2025-12-12
+ *@date 2025-12-22
  *@version 1.0
  *
  *  修改记录：
@@ -25,14 +25,14 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 @ApiModel(value = "供应链订单池对象", description = "供应链订单池对象 ")
 @Data
-@TableName(value = "T_MP_SUPPLY_ORDER_POOL")
-public class SupplyOrderPool extends BaseEntity{
+@TableName(value = "T_DP_SUPPLY_ORDER_POOL")
+public class SupplyOrderPool extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-     /** 工厂编号 */
+     /** 工厂 */
     @Excel(name = "ui.data.column.supplyOrderPool.factoryCode")
-    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -47,17 +47,11 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
-    /**
-     * 年月:YYYYMM
-     */
-    @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "`YEAR_MONTH`")
-    private Integer yearMonth;
 
-    /** 产品品类 */
+    /** 产品品类，TBR 全钢 PCR 半钢 */
     @Excel(name = "ui.data.column.supplyOrderPool.productTypeCode")
-    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
-    @TableField(value = "FACTORY_CODE")
+    @ApiModelProperty(value = "产品品类，TBR 全钢 PCR 半钢", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 库位 */
@@ -72,9 +66,9 @@ public class SupplyOrderPool extends BaseEntity{
     @TableField(value = "PRODUCT_CATEGORY")
     private String productCategory;
 
-    /** 订单类型 */
+    /** 订单类型:数据字典：biz_order_type */
     @Excel(name = "ui.data.column.supplyOrderPool.orderType")
-    @ApiModelProperty(value = "订单类型", name = "orderType")
+    @ApiModelProperty(value = "订单类型:数据字典：biz_order_type", name = "orderType")
     @TableField(value = "ORDER_TYPE")
     private String orderType;
 
@@ -89,12 +83,6 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
-
-    /** MES物料编码 */
-    @Excel(name = "ui.data.column.supplyOrderPool.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
 
     /** 物料编码 */
     @Excel(name = "ui.data.column.supplyOrderPool.materialCode")
@@ -167,6 +155,7 @@ public class SupplyOrderPool extends BaseEntity{
     @ApiModelProperty(value = "备库上限", name = "stockLimit")
     @TableField(value = "STOCK_LIMIT")
     private Long stockLimit;
+
     /**
      * 月均销量
      */

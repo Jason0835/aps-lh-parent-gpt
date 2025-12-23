@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.ruoyi.common.core.utils.DateUtils;
+import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
@@ -9,6 +10,7 @@ import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
@@ -65,43 +67,36 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //todo 记录日志-开始进行成型产能分配-结构排产
 
-        //获取排产初始化信息
+        //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
-        //获取周期内的生产日历信息
-        setMonthProductionDays(context);
-        //获取排产参数设定
-        ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        //初始排产需要的基础数据，成型、模具关系、计划初始库销比
+        initProductionBaseData(productionContext, requirePlanList);
         //获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
-        //获取成型机台信息--日产信息
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
-        productionContext.setCxMachineBaseInfo(cxMachineBaseInfo);
-        //获取SKU模具配置信息
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = getProductionMouldInfo(productionContext);
-        Map<String, ProductionMouldInfoVo> mouldInfoMap = createProductionMouldInfo(productionContext, mouldRelationMap);
-        productionContext.setMouldInfoMap(mouldInfoMap);
-        //获取模壳配置信息
-        Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
-        //结构模具配比
+        //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         //todo 记录日志-粗算成型机台数
-        //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
-        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, cxMachineBaseInfo, structureLhRatioList);
         //按结构分组，汇总结构净需求量，粗算需要的机台数
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(context, requirePlanList, structureLhRatioList);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         //todo 记录日志 续作结构排产分配
+        //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
+        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
+        //todo 计算在机结构续作SKU的使用硫化机台数
         //先对续作结构进行成型机台分配
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
-        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, mouldRelationMap, mouldShellMap);
+        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
         //对收尾成型机台，反向匹配待排结构
         CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
         //对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
         //todo 记录日志
+
+        //todo 第二轮排产
         //得到结构成型排程结果
+        saveStructureInfo(productionContext);
     }
 
     /**
@@ -118,6 +113,57 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //主要为-半钢业务
         return buildDefaultProductionContext(context);
+    }
+
+    /**
+     * 排产前基础数据初始化
+     *
+     * @param productionContext 排产上下文
+     * @param requirePlanList   排产计划
+     */
+    private void initProductionBaseData(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        //获取排产参数设定
+        ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
+        //特殊材料的胎胚配置信息
+        specialMaterialInfoHandler(productionContext);
+        //初始化库销比、标记是否按总需求排产
+        initProductionRequirePlanInfo(productionContext, requirePlanList);
+        //获取周期内的生产日历信息
+        setMonthProductionDays(productionContext);
+        //获取成型机台信息--日产信息
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
+        productionContext.getBaseDataContainer().setCxMachineBaseInfo(cxMachineBaseInfo);
+        //获取SKU模具配置信息
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = getProductionMouldInfo(productionContext);
+        Map<String, ProductionMouldInfoVo> mouldInfoMap = createProductionMouldInfo(productionContext, mouldRelationMap);
+        productionContext.getBaseDataContainer().setMouldInfoMap(mouldInfoMap);
+        productionContext.getBaseDataContainer().setSkuMouldRelationMap(mouldRelationMap);
+        //获取模壳配置信息
+        Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
+        productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        Set<String> isSetStructureNameSet = new HashSet<>();
+        //根据计划，补充模具关系中的物料结构名
+        requirePlanList.forEach(requirePlan -> {
+            String materialDesc = requirePlan.getMaterialDesc();
+            if (StringUtils.isBlank(materialDesc)) {
+                return;
+            }
+            if (isSetStructureNameSet.contains(materialDesc)) {
+                return;
+            }
+            isSetStructureNameSet.add(materialDesc);
+            List<MonthPlanProductMouldInfoVo> mouldRelationList = mouldRelationMap.get(requirePlan.getMaterialDesc());
+            if (CollectionUtils.isEmpty(mouldRelationList)) {
+                return;
+            }
+            mouldRelationList.forEach(mouldRelation -> {
+                mouldRelation.setStructureName(requirePlan.getStructureName());
+            });
+        });
     }
 
     /**
@@ -205,6 +251,75 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
+     * 根据排产信息，获取特殊原材料的配置信息
+     * 包含：1、特殊原材料的胎胚
+     * 2、特殊原材料的库存及可转化的轮胎条数
+     *
+     * @param productionContext 排产单位
+     */
+    private void specialMaterialInfoHandler(TbrProductionContext productionContext) {
+        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
+        if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
+            return;
+        }
+        //转化胎胚号-特殊材料
+        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
+        Map<String, SpecialMaterialInfoVo> specialMaterialInfoMap = new HashMap<>();
+        Map<String, BigDecimal> specialMaterialMaxMap = new HashMap<>();
+        Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
+        allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
+            if (CollectionUtils.isEmpty(rawMaterialList)) {
+                return;
+            }
+            Map<String, BigDecimal> rawMaterialConfigurationMap = embryoSpecialMaterialMap.get(embryoCode);
+            if (null == rawMaterialConfigurationMap) {
+                rawMaterialConfigurationMap = new HashMap<>();
+                embryoSpecialMaterialMap.put(embryoCode, rawMaterialConfigurationMap);
+            }
+            for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
+                String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
+                if (StringUtils.isBlank(specialMaterialCode)) {
+                    continue;
+                }
+                BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();
+                rawMaterialConfigurationMap.put(specialMaterialCode, dosage);
+                //构建特殊原材料初始化信息
+                if (!specialMaterialInfoMap.containsKey(specialMaterialCode)) {
+                    specialMaterialInfoMap.put(specialMaterialCode, SpecialMaterialInfoVo.createInitInfo(specialMaterialCode, embryoSpecialMaterialInfo.getChildMaterialName()));
+                }
+                BigDecimal maxDosage = specialMaterialMaxMap.get(specialMaterialCode);
+                if (null == maxDosage) {
+                    specialMaterialMaxMap.put(specialMaterialCode, dosage);
+                } else {
+                    if (maxDosage.compareTo(dosage) < BigDecimal.ZERO.intValue()) {
+                        specialMaterialMaxMap.put(specialMaterialCode, dosage);
+                    }
+                }
+            }
+        });
+        productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
+        productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
+        //同时获取特殊材料库存信息
+        List<SpecialMaterialStockVo> specialMaterialStockList = getDataService().getSpecialMaterialStockInfo(productionContext);
+        if (CollectionUtils.isEmpty(specialMaterialStockList)) {
+            return;
+        }
+        //构建库存对应的可生产量
+        specialMaterialStockList.forEach(specialMaterialStockInfo -> {
+            String specialMaterialCode = specialMaterialStockInfo.getMaterialCode();
+            if (StringUtils.isBlank(specialMaterialCode)) {
+                return;
+            }
+            Long stock = specialMaterialStockInfo.getStock();
+            if (!specialMaterialInfoMap.containsKey(specialMaterialCode)) {
+                return;
+            }
+            BigDecimal maxDosage = specialMaterialMaxMap.get(specialMaterialCode);
+            specialMaterialInfoMap.get(specialMaterialCode).addInventoryCapacity(stock, maxDosage);
+        });
+    }
+
+    /**
      * 根据物料可用模具关系，构建排产信息
      *
      * @param productionContext   排产上下文
@@ -270,13 +385,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param context               排产上下文
      * @param continueAllocationMap 在机结构排产分配信息
      * @param cxContinueInfoMap     在机结构续作信息
-     * @param mouldInfoMap          模具信息
      * @param mouldShellMap         模壳台账信息
      */
-    private void mouldProductionByCxMachine(Context context, Map<String, CxMachineAllocationPlanHelper> continueAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private void mouldProductionByCxMachine(Context context, Map<String, CxMachineAllocationPlanHelper> continueAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         if (CollectionUtils.isEmpty(continueAllocationMap)) {
             return;
         }
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = ((TbrProductionContext) context).getBaseDataContainer().getSkuMouldRelationMap();
         continueAllocationMap.forEach((cxMachineCode, productionGroupPlan) -> {
             String structureName = productionGroupPlan.getProductionPlanInfo().getGroupName();
             CxContinueInfoHelper cxContinueInfoHelper = cxContinueInfoMap.get(structureName);
@@ -328,7 +443,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatio, addNewGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(addHelper);
         //TODO 对成型机台进行模拟模具排产
-
+        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
@@ -338,8 +453,81 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
+     * 根据成型信息，得到结构排产结果
+     *
+     * @param productionContext
+     */
+    private void saveStructureInfo(TbrProductionContext productionContext) {
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(cxMachineBaseInfo)) {
+            return;
+        }
+        List<CxMachineAllocationPlanHelper> allAllocationList = new ArrayList<>();
+        cxMachineBaseInfo.forEach((cxMachineCode, cxMachineInfo) -> {
+            List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+            if (CollectionUtils.isEmpty(allAllocationList)) {
+                return;
+            }
+            allAllocationList.addAll(allAllocationList);
+        });
+        Map<String, ProductionMouldInfoVo> mouldProductionList = productionContext.getBaseDataContainer().getMouldInfoMap();
+        List<ProductionMouldInfoVo> allMouldProductionInfoList = new ArrayList<>();
+
+
+    }
+
+    /**
+     * 初始化排产计划，主要进行按sku分组和初始化库销比
+     *
+     * @param productionContext 排产上下文
+     * @param requirePlanList   需求计划列表
+     */
+    private void initProductionRequirePlanInfo(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        productionContext.setAllSkuProductionPlan(new HashMap<>());
+        productionContext.setSkuPlannedQtyMap(new HashMap<>());
+        productionContext.setSkuWastageQtyMap(new HashMap<>());
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuRequirePlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        productionContext.setAllSkuProductionPlan(skuRequirePlanMap);
+        //已排产量和损耗量为零
+        skuRequirePlanMap.forEach((materialDesc, productionPlanList) -> {
+            productionContext.getSkuPlannedQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
+            productionContext.getSkuWastageQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
+            if (CollectionUtils.isEmpty(productionPlanList)) {
+                return;
+            }
+            //是否含有特殊原材料的SKU 是否按总需求排产-默认 = 否
+            productionPlanList.forEach(requirePlan -> {
+                requirePlan.setIsProductionBySum(Constant.FALSE);
+                requirePlan.setIsSpecialMaterials(YesOrNoEnum.NO.getCode());
+                if (productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap().containsKey(requirePlan.getEmbryoCode())) {
+                    requirePlan.setIsSpecialMaterials(YesOrNoEnum.YES.getCode());
+                }
+            });
+            List<MonthPlanProductionRequirePlanVo> effectiveList = productionPlanList.stream().filter(plan -> plan.hasProduction()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(effectiveList)) {
+                return;
+            }
+            Long sumProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+            if (sumProductionQty <= param.getSumProductionQty()) {
+                productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
+            }
+            Long sumHeightProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
+            if (sumProductionQty - sumHeightProductionQty <= param.getHeightDiffQty()) {
+                productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
+            }
+        });
+        //计算初始的库销比
+        requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.longValue()));
+    }
+
+    /**
      * 设置工厂的排产日信息
      * 包含 停产日及开停产的产能比例
+     * t_mdm_work_calendar
      *
      * @param context
      */
@@ -392,7 +580,28 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //提取结构查询条件
         Set<String> structureNameMap = requirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getStructureName).collect(Collectors.toSet());
         List<String> structureNameList = new ArrayList<>(structureNameMap);
-        return getDataService().getLhRatioInfo(context, structureNameList);
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getDataService().getLhRatioInfo(context, structureNameList);
+        if (CollectionUtils.isEmpty(structureLhRatioList)) {
+            return Collections.emptyList();
+        }
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
+        Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
+            cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
+                cycleStructureMinLhRatioMap.put(cycleStructureMinLhRatio.getStructureName(), null == cycleStructureMinLhRatio.getMonthMinLhMachineQty() ? cycleStructureMinLhRatio.getMinLhMachineQty() : cycleStructureMinLhRatio.getMonthMinLhMachineQty());
+            });
+        }
+        //常规结构的最低硫化配比
+        Integer defaultMinLhRatio = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getNoCycleProductionMinLhMachineNumber();
+        structureLhRatioList.forEach(structureLhRatio -> {
+            String structureName = structureLhRatio.getStructureName();
+            structureLhRatio.setLhMachineMinQty(defaultMinLhRatio);
+            if (cycleStructureMinLhRatioMap.containsKey(structureName)) {
+                structureLhRatio.setLhMachineMinQty(cycleStructureMinLhRatioMap.get(structureName));
+                return;
+            }
+        });
+        return structureLhRatioList;
     }
 
     /**
@@ -402,11 +611,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * CxContinueInfoHelper.cxMachineGroup = { key = cxMachineCode : value = {key = materialDesc : value = 硫化机台数(模具数)}}
      *
      * @param context              排产上下文
-     * @param cxMachineBaseInfo    成型基础信息
      * @param structureLhRatioList 成型结构硫化配比信息
      * @return
      */
-    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context, Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
         //获取前一个月的排产版本信息
         String factoryCode = context.getFactoryCode();
         LocalDate previousMonth = context.getPreviousMonth();
@@ -433,6 +641,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取上个排产周期最后排产日的排产信息
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         //构建续作信息
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo();
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
     }
 
@@ -449,6 +658,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private TbrProductionContext buildTbrProductionContext(Context context) {
         TbrProductionContext productionContext = new TbrProductionContext();
         BeanUtils.copyProperties(context, productionContext);
+        //基础数据容器存储
+        productionContext.setBaseDataContainer(new BaseDataContainer());
         productionContext.createNewProductionVersion();
         productionContext.setOperationWorkNo(DateUtils.dateTimeNow());
         productionContext.setLogBuilder(new StringBuilder());

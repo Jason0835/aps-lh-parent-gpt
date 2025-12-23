@@ -18,9 +18,6 @@ import com.tlt.aps.enums.CommonTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.tlt.aps.utils.JsonI18nConvertUtils;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.factory.domain.vo.MonthPlanManufacturingRequirementVo;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -34,7 +31,6 @@ import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.demand.mapper.OrderPlanAllocationMapper;
 import com.zlt.aps.monthplan.demand.service.IOrderPlanAllocationService;
-import com.zlt.aps.monthplan.factory.helper.ProductionPlanExcelUtils;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanMouldingDayResultMapper;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanProductionResultDetailMapper;
@@ -140,7 +136,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         //校验对应版本号在版本表是否存在，如果不存在后面需要插入一条记录
         FactoryProductionVersion productionVersion = checkInsertVersion(list);
         //根据版本信息，调整起始日，开始日及day排产量的值
-        ProductionPlanExcelUtils.handlerProductionDayQty(productionVersion, list);
+//        ProductionPlanExcelUtils.handlerProductionDayQty(productionVersion, list);
         //定稿后不能导入
         Optional<MonthPlanMouldingDayResult> first = list.stream()
                 .filter(v -> StringUtils.isNotBlank(v.getProductionVersion()) && v.getYear() != null && v.getMonth() != null)
@@ -649,7 +645,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         if (YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
             return;
         }
-        List<Integer> daySortList = ProductionPlanExcelUtils.getCycleDayList(version);
+        List<Integer> daySortList = null;
         Integer monthMaxDays = daySortList.size();
         resultData.stream().forEach(queryData -> {
             Integer startDay = queryData.getBeginDay();
@@ -692,64 +688,6 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         Map<String, String> brandDictMap = brandSysDictData.stream()
                 .filter(item -> language.equals(item.getLocale())).collect(Collectors
                         .toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-        // 赋值展示标识
-        for (MonthPlanMouldingDayResultVo resultVo : resultList) {
-            List<String> flagList = new ArrayList<>();
-            String continueFlag = resultVo.getContinueFlag();
-            if (StringUtils.isNotBlank(continueFlag)) {
-                flagList.add(continueFlag);
-            }
-            String importantCustomFlag = resultVo.getImportantCustomFlag();
-            if (StringUtils.isNotBlank(importantCustomFlag)) {
-                flagList.add(importantCustomFlag);
-            }
-            String ensurePlanFlag = resultVo.getEnsurePlanFlag();
-            if (StringUtils.isNotBlank(ensurePlanFlag)) {
-                flagList.add(ensurePlanFlag);
-            }
-            String emergencyFlag = resultVo.getEmergencyFlag();
-            if (StringUtils.isNotBlank(emergencyFlag)) {
-                flagList.add(emergencyFlag);
-            }
-            String debitPlanFlag = resultVo.getDebitPlanFlag();
-            if (StringUtils.isNotBlank(debitPlanFlag)) {
-                flagList.add(debitPlanFlag);
-            }
-            String stockUpFlag = resultVo.getStockUpFlag();
-            if (StringUtils.isNotBlank(stockUpFlag)) {
-                flagList.add(stockUpFlag);
-            }
-            String dateDueFlag = resultVo.getDateDueFlag();
-            if (StringUtils.isNotBlank(dateDueFlag)) {
-                flagList.add(dateDueFlag);
-            }
-            resultVo.setShowFlag(String.join(",", flagList));
-            // 赋值贴牌、非贴牌数量，参数值的为字典名称，需根据字典值转成字典名称匹配
-            String brand = resultVo.getBrand();
-            if (brandDictMap.containsKey(brand)) {
-                String dictLabel = brandDictMap.get(brand);
-                if (brandList.contains(dictLabel)) {
-                    resultVo.setWmBrandPlanQty(resultVo.getWmPlanQty());
-                } else {
-                    resultVo.setWmUnBrandPlanQty(resultVo.getWmPlanQty());
-                }
-            }
-            String reason = resultVo.getReason();
-            if (StringUtils.isNotBlank(reason)) {
-                if (reason.contains("|")) {
-                    String[] split = reason.split("\\|");
-                    List<String> reasonList = new ArrayList<>(split.length);
-                    for (String reasonI18n : split) {
-                        String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
-                        reasonList.add(convertValue);
-                    }
-                    resultVo.setReason(String.join(",", reasonList));
-                } else {
-                    String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
-                    resultVo.setReason(convertValue);
-                }
-            }
-        }
 
         // 处理开始结束日期
         handlerData4Vo(resultList, queryVO.getProductionVersion());
@@ -773,18 +711,7 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         if (YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
             return;
         }
-        List<Integer> daySortList = ProductionPlanExcelUtils.getCycleDayList(version);
-        int monthMaxDays = daySortList.size();
-        resultData.forEach(queryData -> {
-            Integer startDay = queryData.getBeginDate();
-            if (null != startDay && startDay <= monthMaxDays) {
-                queryData.setBeginDate(daySortList.get(startDay - BigDecimal.ONE.intValue()));
-            }
-            Integer endDay = queryData.getEndDay();
-            if (null != endDay && endDay <= monthMaxDays) {
-                queryData.setEndDay(daySortList.get(endDay - BigDecimal.ONE.intValue()));
-            }
-        });
+
     }
 
     /**
@@ -837,106 +764,6 @@ public class MonthPlanMouldingDayResultServiceImpl implements IMonthPlanMoulding
         Map<String, String> modelRelationMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(modelRelationList)) {
             modelRelationMap = modelRelationList.stream().collect(Collectors.toMap(MdmSkuMouldRel::getMouldNo, MdmSkuMouldRel::getEmbryoCode));
-        }
-
-        for (List<MonthPlanDayResultStatisticsVo> vos : splitList) {
-
-            for (MonthPlanDayResultStatisticsVo resultVo : vos) {
-                // 月度计划重量
-                BigDecimal singleTireWeight = resultVo.getSingleTireWeight();
-                BigDecimal totalProductQty = resultVo.getTotalProductQty();
-                BigDecimal result = BigDecimalUtils.multiply(singleTireWeight, totalProductQty);
-                resultVo.setMonthPlanTireWeight(result);
-                // 单胎硫化时间
-                MonthPlanManufacturingRequirementVo requirementVo = new MonthPlanManufacturingRequirementVo();
-                int summerMonth = Integer.parseInt(summerMonthParam.toString());
-                int winterMonth = Integer.parseInt(winterMonthParam.toString());
-                if (currentMonth >= summerMonth && currentMonth < winterMonth) {
-                    requirementVo.setCuringTime(resultVo.getCuringTime());
-                } else {
-                    requirementVo.setCuringTime(resultVo.getCuringTime2());
-                }
-                if (requirementVo.getCuringTime() == null) {
-                    requirementVo.setCuringTime(BigDecimal.ZERO);
-                }
-//                BigDecimal singleCuringTime = ProductUtils.getSingleCuringTime(requirementVo, productionContext);
-//                // 计算硫化产能
-//                Long singleMouldCapacity = MouldUtils.getSingleMouldCapacity(productionContext, singleCuringTime);
-                BigDecimal singleCuringTime = BigDecimal.ZERO;
-                Long singleMouldCapacity = BigDecimal.ZERO.longValue();
-                Long remainingQty = resultVo.getRemainingQty();
-                resultVo.setNeedProductionDay(BigDecimalUtils.div(totalProductQty, singleMouldCapacity).longValue());
-                resultVo.setRemainingProductionDay(BigDecimalUtils.div(remainingQty, singleMouldCapacity).longValue());
-
-                List<String> flagList = new ArrayList<>();
-                String continueFlag = resultVo.getContinueFlag();
-                if (StringUtils.isNotBlank(continueFlag)) {
-                    flagList.add(continueFlag);
-                }
-                String importantCustomFlag = resultVo.getImportantCustomFlag();
-                if (StringUtils.isNotBlank(importantCustomFlag)) {
-                    flagList.add(importantCustomFlag);
-                }
-                String ensurePlanFlag = resultVo.getEnsurePlanFlag();
-                if (StringUtils.isNotBlank(ensurePlanFlag)) {
-                    flagList.add(ensurePlanFlag);
-                }
-                String emergencyFlag = resultVo.getEmergencyFlag();
-                if (StringUtils.isNotBlank(emergencyFlag)) {
-                    flagList.add(emergencyFlag);
-                }
-                String debitPlanFlag = resultVo.getDebitPlanFlag();
-                if (StringUtils.isNotBlank(debitPlanFlag)) {
-                    flagList.add(debitPlanFlag);
-                }
-                String stockUpFlag = resultVo.getStockUpFlag();
-                if (StringUtils.isNotBlank(stockUpFlag)) {
-                    flagList.add(stockUpFlag);
-                }
-                String dateDueFlag = resultVo.getDateDueFlag();
-                if (StringUtils.isNotBlank(dateDueFlag)) {
-                    flagList.add(dateDueFlag);
-                }
-                resultVo.setShowFlag(String.join(",", flagList));
-                // 赋值贴牌、非贴牌数量，参数值的为字典名称，需根据字典值转成字典名称匹配
-                String brand = resultVo.getBrand();
-                if (brandDictMap.containsKey(brand)) {
-                    String dictLabel = brandDictMap.get(brand);
-                    if (brandList.contains(dictLabel)) {
-                        resultVo.setWmBrandPlanQty(resultVo.getWmPlanQty());
-                    } else {
-                        resultVo.setWmUnBrandPlanQty(resultVo.getWmPlanQty());
-                    }
-                }
-                String reason = resultVo.getReason();
-                if (StringUtils.isNotBlank(reason)) {
-                    if (reason.contains("|")) {
-                        String[] split = reason.split("\\|");
-                        List<String> reasonList = new ArrayList<>(split.length);
-                        for (String reasonI18n : split) {
-                            String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
-                            reasonList.add(convertValue);
-                        }
-                        resultVo.setReason(String.join(",", reasonList));
-                    } else {
-                        String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
-                        resultVo.setReason(convertValue);
-                    }
-                }
-
-                String mouldNo = resultVo.getMouldNo();
-                String embryoCode = resultVo.getEmbryoCode();
-                if (modelRelationMap.containsKey(mouldNo)) {
-                    String embryoCodeStr = modelRelationMap.get(mouldNo);
-                    if (embryoCodeStr.contains(embryoCode)) {
-                        embryoCodeStr = embryoCodeStr.replaceAll(embryoCode, "").replaceAll(",,", ",");
-                    }
-                    if (StringUtils.isNotBlank(embryoCodeStr)) {
-                        resultVo.setSharedMold("与" + embryoCodeStr + "共用模具");
-                    }
-                }
-            }
-            transformJsonField(vos);
         }
         return statisticsVos;
     }

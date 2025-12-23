@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmProductModelRelationMapper.java
- * 描    述：SAP与模具关系Mapper接口
+ * 描    述：SKU与模具关系Mapper接口
  *
  * @author zlt
  * @version 1.0
@@ -59,7 +59,7 @@ public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmS
     List<MdmSkuMouldRel> selectByMouldCode(@Param("list") List<String> mouldCodeList);
 
     /**
-     * 查询SAP与模具关系，关联模具信息
+     * 查询SKU与模具关系，关联模具信息
      * @param resultVos 查询条件
      * @return 结果
      */

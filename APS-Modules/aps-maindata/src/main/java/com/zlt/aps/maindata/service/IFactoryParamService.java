@@ -4,7 +4,6 @@ package com.zlt.aps.maindata.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.tlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.maindata.domain.vo.SizeCapacityParamVo;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryParamVo;
 
@@ -46,6 +45,7 @@ public interface IFactoryParamService extends IService<FactoryParam> {
      * @return
      */
     List<FactoryParam> getFactoryParamByCondition(String factoryCode, String productTypeCode, List<String> paramCodeList);
+
     /**
      * 复制分厂排产设定
      *
@@ -163,12 +163,4 @@ public interface IFactoryParamService extends IService<FactoryParam> {
      * @return
      */
     Integer getMonthStartDay(String factoryCode, ProductTypeEnum productType);
-
-    /**
-     * 获取分厂的寸口产能分配参数
-     *
-     * @param factoryCode 工厂编码
-     * @return
-     */
-    SizeCapacityParamVo getSizeCapacityAllocationParam(String factoryCode);
 }

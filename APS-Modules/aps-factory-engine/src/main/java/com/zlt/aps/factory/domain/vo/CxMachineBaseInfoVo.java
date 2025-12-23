@@ -2,6 +2,7 @@ package com.zlt.aps.factory.domain.vo;
 
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
+import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import lombok.Data;
@@ -9,9 +10,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -120,6 +120,11 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 计划是否断面宽范围
      */
     private String sectionWidthCondition;
+    /**
+     * 成型硫化配比最后一天排产分组信息
+     */
+    private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
+
     /**
      * 获取固定信息的优先级
      * 固定SKU的优先级最高，其次是固定结构1,
@@ -262,5 +267,22 @@ public class CxMachineBaseInfoVo implements Serializable {
             allocationList = new ArrayList<>();
         }
         allocationList.add(addAllocationPlan);
+    }
+
+    /**
+     * 获取成型机台下，最早收尾的硫化机台组
+     *
+     * @return
+     */
+    public CxLhProductionHelper getEarliestConclusionLhGroup() {
+        //获取成型硫化组
+        if (CollectionUtils.isEmpty(cxLhRatioMap)) {
+            return null;
+        }
+        List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
+        //按最后排产日，进行升序排序
+        cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
+        //取得第一条：即最早收尾的硫化组
+        return cxLhGroupList.get(BigDecimal.ZERO.intValue());
     }
 }

@@ -13,7 +13,7 @@ import java.util.Set;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmProductModelRelationService.java
- * 描    述：IMdmProductModelRelationServiceSAP与模具关系后端接口
+ * 描    述：IMdmProductModelRelationServiceSKU与模具关系后端接口
  *
  * @author zlt
  * @version 1.0

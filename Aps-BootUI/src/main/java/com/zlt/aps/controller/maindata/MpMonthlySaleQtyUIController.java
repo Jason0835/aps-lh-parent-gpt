@@ -199,6 +199,19 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
         return ajaxResult;
     }
 
+
+    /**
+     * 获取表头展示列表
+     *
+     * @return 结果
+     */
+    @PostMapping("/getShowTableTitleList")
+    @ApiOperation("获取表头展示列表")
+    @ResponseBody
+    public AjaxResult getShowTableTitleList(MpMonthlySaleQty queryVO) {
+        return iMpMonthlySaleQtyService.getShowTableTitleList(queryVO);
+    }
+
     /**
      * 生成月均销量
      *

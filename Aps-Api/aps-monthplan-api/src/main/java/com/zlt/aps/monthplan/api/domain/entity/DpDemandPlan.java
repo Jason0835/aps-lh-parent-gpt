@@ -34,19 +34,19 @@ public class DpDemandPlan extends BaseEntity{
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.demandPlan.factoryCode")
+    @Excel(name = "ui.data.column.demandPlan.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.demandPlan.year")
+    @Excel(name = "ui.data.column.demandPlan.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.demandPlan.month")
+    @Excel(name = "ui.data.column.demandPlan.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -64,13 +64,13 @@ public class DpDemandPlan extends BaseEntity{
     private String orderPriority;
 
     /** 是否替换料 */
-    @Excel(name = "ui.data.column.demandPlan.isAlternateMaterial")
+    @Excel(name = "ui.data.column.demandPlan.isAlternateMaterial", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
     @TableField(value = "IS_ALTERNATE_MATERIAL")
     private String isAlternateMaterial;
 
     /** 产品品类 */
-    @Excel(name = "ui.data.column.demandPlan.productTypeCode")
+    @Excel(name = "ui.data.column.demandPlan.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -130,97 +130,97 @@ public class DpDemandPlan extends BaseEntity{
     private String yearWeek;
 
     /** 动平衡 */
-    @Excel(name = "ui.data.column.demandPlan.isDynamicBalance")
+    @Excel(name = "ui.data.column.demandPlan.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
 
     /** 均匀性 */
-    @Excel(name = "ui.data.column.demandPlan.isUniformity")
+    @Excel(name = "ui.data.column.demandPlan.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
     /** 订单量 */
-    @Excel(name = "ui.data.column.demandPlan.orderQty")
+    @Excel(name = "ui.data.column.demandPlan.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Long orderQty;
 
     /** 库存数 */
-    @Excel(name = "ui.data.column.demandPlan.stockQty")
+    @Excel(name = "ui.data.column.demandPlan.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Long stockQty;
 
     /** 月底余量 */
-    @Excel(name = "ui.data.column.demandPlan.plannedSurplus")
+    @Excel(name = "ui.data.column.demandPlan.plannedSurplus", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月底余量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
     private Long plannedSurplus;
 
     /** 排产净需求 */
-    @Excel(name = "ui.data.column.demandPlan.netQty")
+    @Excel(name = "ui.data.column.demandPlan.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Long netQty;
 
     /** 是否排产 */
-    @Excel(name = "ui.data.column.demandPlan.isProduction")
+    @Excel(name = "ui.data.column.demandPlan.isProduction", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否排产", name = "isProduction")
     @TableField(value = "IS_PRODUCTION")
     private String isProduction;
 
     /** 净需求(含暂缓) */
-    @Excel(name = "ui.data.column.demandPlan.postponeNetQty")
+    @Excel(name = "ui.data.column.demandPlan.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
     @TableField(value = "POSTPONE_NET_QTY")
     private Long postponeNetQty;
 
     /** 净需求(不含暂缓) */
-    @Excel(name = "ui.data.column.demandPlan.unPostponeNetQty")
+    @Excel(name = "ui.data.column.demandPlan.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
     private Long unPostponeNetQty;
 
     /** 高优先级 */
-    @Excel(name = "ui.data.column.demandPlan.heightQty")
+    @Excel(name = "ui.data.column.demandPlan.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Long heightQty;
 
     /** 中优先级 */
-    @Excel(name = "ui.data.column.demandPlan.midQty")
+    @Excel(name = "ui.data.column.demandPlan.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
     private Long midQty;
 
     /** 暂缓订单 */
-    @Excel(name = "ui.data.column.demandPlan.postponeQty")
+    @Excel(name = "ui.data.column.demandPlan.postponeQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
     @TableField(value = "POSTPONE_QTY")
     private Long postponeQty;
 
     /** 周期排产储备 */
-    @Excel(name = "ui.data.column.demandPlan.cycleReserveQty")
+    @Excel(name = "ui.data.column.demandPlan.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
     @TableField(value = "CYCLE_RESERVE_QTY")
     private Long cycleReserveQty;
 
     /** 常规储备 */
-    @Excel(name = "ui.data.column.demandPlan.conventionReserveQty")
+    @Excel(name = "ui.data.column.demandPlan.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
     private Long conventionReserveQty;
 
     /** 是否满足最小投产量 */
-    @Excel(name = "ui.data.column.demandPlan.isReachMinProductionQty")
+    @Excel(name = "ui.data.column.demandPlan.isReachMinProductionQty", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否满足最小投产量", name = "isReachMinProductionQty")
     @TableField(value = "IS_REACH_MIN_PRODUCTION_QTY")
     private String isReachMinProductionQty;
 
     /** 最小投产量值 */
-    @Excel(name = "ui.data.column.demandPlan.minProductionQty")
+    @Excel(name = "ui.data.column.demandPlan.minProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最小投产量值", name = "minProductionQty")
     @TableField(value = "MIN_PRODUCTION_QTY")
     private Long minProductionQty;
@@ -274,25 +274,25 @@ public class DpDemandPlan extends BaseEntity{
     private String speed;
 
     /** 是否重要客户 0 不重要 1 重要 */
-    @Excel(name = "ui.data.column.demandPlan.isImportantCustom")
+    @Excel(name = "ui.data.column.demandPlan.isImportantCustom", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否重要客户 0 不重要 1 重要", name = "isImportantCustom")
     @TableField(value = "IS_IMPORTANT_CUSTOM")
     private String isImportantCustom;
 
     /** 是否必保计划 0 不必保 1 必保 */
-    @Excel(name = "ui.data.column.demandPlan.isEnsurePlan")
+    @Excel(name = "ui.data.column.demandPlan.isEnsurePlan", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否必保计划 0 不必保 1 必保", name = "isEnsurePlan")
     @TableField(value = "IS_ENSURE_PLAN")
     private String isEnsurePlan;
 
     /** 是否紧急订单 0 不紧急 1 紧急 */
-    @Excel(name = "ui.data.column.demandPlan.isEmergency")
+    @Excel(name = "ui.data.column.demandPlan.isEmergency", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否紧急订单 0 不紧急 1 紧急", name = "isEmergency")
     @TableField(value = "IS_EMERGENCY")
     private String isEmergency;
 
     /** 是否欠产（0：默认不是，1：是） */
-    @Excel(name = "ui.data.column.demandPlan.isDebitPlan", readConverterExp = "0=：默认不是，1：是")
+    @Excel(name = "ui.data.column.demandPlan.isDebitPlan", readConverterExp = "0=：默认不是，1：是", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否欠产", name = "isDebitPlan")
     @TableField(value = "IS_DEBIT_PLAN")
     private String isDebitPlan;
@@ -305,10 +305,24 @@ public class DpDemandPlan extends BaseEntity{
     private Date deliveryDateDue;
 
     /** 是否EXCEL导入（0：默认不是，1：是） */
-    @Excel(name = "ui.data.column.demandPlan.isImport", readConverterExp = "0=：默认不是，1：是")
+    @Excel(name = "ui.data.column.demandPlan.isImport", readConverterExp = "0=：默认不是，1：是", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
+    /**
+     * 月均销量
+     */
+    @Excel(name = "ui.data.column.demandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Long averageSaleQty;
+    /**
+     * 需求对冲后-余量库存
+     */
+    @Excel(name = "ui.data.column.demandPlan.remainingQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
+    @TableField(value = "REMAINING_QTY")
+    private Long remainingQty;
 
     /**
      * 按SKU、动平衡、均匀性、年周号为维度分组合并

@@ -31,6 +31,11 @@ public class MdmConstructionInfo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    /** 工厂编号 */
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
      /** 物料编码 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
@@ -635,6 +640,4 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "生产阶段", name = "productionStage")
     @TableField(value = "PRODUCTION_STAGE")
     private String productionStage;
-
-
 }

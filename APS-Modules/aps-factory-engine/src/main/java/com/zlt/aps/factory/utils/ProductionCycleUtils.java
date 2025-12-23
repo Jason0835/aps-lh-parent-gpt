@@ -1,12 +1,9 @@
 package com.zlt.aps.factory.utils;
 
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.factory.domain.vo.CxDevicePlanShutInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;

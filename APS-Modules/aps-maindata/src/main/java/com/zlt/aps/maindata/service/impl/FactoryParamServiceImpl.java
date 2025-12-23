@@ -14,7 +14,6 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.domain.dto.ProductBrandDto;
-import com.zlt.aps.maindata.domain.vo.SizeCapacityParamVo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamTemplateMapper;
@@ -358,53 +357,6 @@ public class FactoryParamServiceImpl extends ServiceImpl<FactoryParamMapper, Fac
             return null;
         }
         return (Integer) FactoryParamUtils.getParamValue(monthStartDayParam);
-    }
-
-    @Override
-    public SizeCapacityParamVo getSizeCapacityAllocationParam(String factoryCode) {
-        if (StringUtils.isBlank(factoryCode)) {
-            return null;
-        }
-        List<String> paramCodeList = Arrays.asList(FactoryConstant.SYS_PARAM_ONE_SUBTRACT_QTY, FactoryConstant.SYS_PARAM_TWO_SUBTRACT_QTY, FactoryConstant.SYS_PARAM_ADDITIONAL_COUNT,
-                FactoryConstant.SYS_PARAM_MOLDING_MACHINE_CHANGE_COUNT, FactoryConstant.SYS_CHANGE_SIZE_ALLOCATION_MIN_DAYS, FactoryConstant.SYS_OPEN_CROWD_OUT,
-                FactoryConstant.SYS_BIG_DRUM_CAPACITY_VALUE, FactoryConstant.SYS_MAX_LIMIT_CAPACITY, FactoryConstant.SYS_MAX_20_ONE_LIMIT_CAPACITY,
-                FactoryConstant.SYS_MIN_CAPACITY_DAYS);
-        List<FactoryParam> paramList = factoryParamMapper.selectList(Wrappers.lambdaQuery(FactoryParam.class)
-                .eq(FactoryParam::getFactoryCode, factoryCode)
-                .eq(FactoryParam::getProductTypeCode, ProductTypeEnum.SEMI_STEEL.getValue())
-                .in(FactoryParam::getParamCode, paramCodeList)
-                .eq(FactoryParam::getIsDelete, ApsConstant.DEL_FLAG_NORMAL));
-        if (CollectionUtils.isEmpty(paramList)) {
-            return null;
-        }
-        Map<String, FactoryParam> paramMap = paramList.stream().collect(Collectors.toMap(FactoryParam::getParamCode, param -> param));
-        SizeCapacityParamVo param = new SizeCapacityParamVo();
-        param.setDefaultCount((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_PARAM_MOLDING_MACHINE_CHANGE_COUNT)));
-        param.setOneMouldMethodSubtractQty((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_PARAM_ONE_SUBTRACT_QTY)));
-        param.setTwoMouldMethodSubtractQty((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_PARAM_TWO_SUBTRACT_QTY)));
-        param.setAdditionalCount((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_PARAM_ADDITIONAL_COUNT)));
-        param.setMaxLeftOverDays((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_CHANGE_SIZE_ALLOCATION_MIN_DAYS)));
-        param.setOpenCrowdOut((String) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_OPEN_CROWD_OUT)));
-        //18寸 二次法限制
-        param.setMaxLimitCapacity((Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_MAX_LIMIT_CAPACITY)));
-        param.setBigDrumCapacityValue((String) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_BIG_DRUM_CAPACITY_VALUE)));
-        param.setSpecialRestrictionSet(new HashSet<>());
-        //20寸 一次法限制
-        Integer max20OneLimitCapacity = (Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_MAX_20_ONE_LIMIT_CAPACITY));
-        if (null == max20OneLimitCapacity || FactoryConstant.NO_LIMIT_VALUE.equals(max20OneLimitCapacity)) {
-            param.setMaxWorkWeekNumber(Integer.MIN_VALUE);
-        } else {
-            param.setMaxWorkWeekNumber(max20OneLimitCapacity);
-        }
-        //最小产能分配数
-        Integer minCapacityDays = (Integer) FactoryParamUtils.getParamValue(paramMap.get(FactoryConstant.SYS_MIN_CAPACITY_DAYS));
-        if (null == minCapacityDays && FactoryConstant.NO_LIMIT_VALUE.equals(minCapacityDays)) {
-            param.setMinAllocationDay(Integer.MAX_VALUE);
-        } else {
-            param.setMinAllocationDay(minCapacityDays);
-        }
-        param.setLimitRestrictionSet(new HashSet<>());
-        return param;
     }
 
     /**

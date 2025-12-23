@@ -15,14 +15,14 @@ public interface RequirementVersionService {
    * 生成单个需求版本号
    * @return REQ+yyyymmdd+3位流水号
    */
-  String generateVersion();
+  String generateVersion(String prefix);
 
   /**
    * 批量生成需求版本号
    * @param count 生成数量
    * @return 版本号列表
    */
-  List<String> generateBatchVersions(int count);
+  List<String> generateBatchVersions(String prefix,int count);
 
   /**
    * 获取当前日期已生成的版本号数量

@@ -25,7 +25,7 @@ import lombok.Data;
  */
 @ApiModel(value = "月周期排产结构配置对象", description = "月周期排产结构配置对象 ")
 @Data
-@TableName(value = "T_MDM_MON_CYCLE_SCH_STRU_CONF")
+@TableName(value = "t_dp_month_cycle_struct_config")
 public class MdmMonCycleSchStruConf extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

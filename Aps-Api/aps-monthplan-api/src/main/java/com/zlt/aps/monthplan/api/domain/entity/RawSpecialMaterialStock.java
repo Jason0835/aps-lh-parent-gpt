@@ -1,15 +1,16 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -38,6 +39,16 @@ public class RawSpecialMaterialStock extends BaseEntity {
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /**
+     * 库存日期
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.stockDate")
+    @ImportExcelValidated(required = true, date = true)
+    @ApiModelProperty(value = "库存日期", name = "stockDate")
+    @TableField(value = "STOCK_DATE")
+    private Date stockDate;
 
     /** 物料代码 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialCode")

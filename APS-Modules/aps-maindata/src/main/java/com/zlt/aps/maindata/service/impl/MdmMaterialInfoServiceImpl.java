@@ -17,6 +17,7 @@ import com.tlt.aps.enums.CommonTypeEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.tlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
@@ -266,7 +267,21 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     }
 
     @Override
+    protected Map<Object, Object> getServiceCheckParams(List<MdmMaterialInfo> list, List<MdmMaterialInfo> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        serviceCheckParams.put("list", list);
+        return serviceCheckParams;
+    }
+
+    @Override
     protected Boolean serviceCheckAndDataHandle(MdmMaterialInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (serviceCheckParams.containsKey("list")) {
+            List<MdmMaterialInfo> list = (List<MdmMaterialInfo>) serviceCheckParams.get("list");
+            ImportExcelValidatedUtils.validatedRepeat(list, importDocEntity, errorRowNum - 2, 2, importLogId, importErrorLogs, this.getCheckUniqueFields().toArray(new String[0]));
+            if (CollectionUtils.isNotEmpty(importErrorLogs)) {
+                return Boolean.FALSE;
+            }
+        }
         if (StringUtils.isBlank(importDocEntity.getProductTypeCode())) {
             importDocEntity.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
         }

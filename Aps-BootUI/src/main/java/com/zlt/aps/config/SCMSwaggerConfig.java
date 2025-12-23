@@ -136,6 +136,14 @@ public class SCMSwaggerConfig {
                 .paths(PathSelectors.any()).build().groupName("主数据").pathMapping("/");
     }
 
+
+    @Bean
+    public Docket createRestApiForMonthPlan() {
+        return new Docket(DocumentationType.SWAGGER_2).enable(true).apiInfo(apiInfo()).select()
+            .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.controller.monthplan"))
+            .paths(PathSelectors.any()).build().groupName("月计划").pathMapping("/");
+    }
+
     /**
      * 每个新模块就新建立一个Docket
      * 每个模块单独分组

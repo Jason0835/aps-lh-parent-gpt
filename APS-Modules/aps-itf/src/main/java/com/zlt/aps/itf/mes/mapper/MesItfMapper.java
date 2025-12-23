@@ -1,8 +1,7 @@
 package com.zlt.aps.itf.mes.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -38,7 +37,7 @@ public interface MesItfMapper {
      * @param productStockMonth 查询参数
      * @return 结果
      */
-    List<ProductStockMonth> selectProductStock(ProductStockMonth productStockMonth);
+    List<MdmProductStock> selectProductStock(MdmProductStock productStockMonth);
 
     /**
      * 查询不合格库存列表
@@ -46,5 +45,37 @@ public interface MesItfMapper {
      * @param productStockMonth 查询参数
      * @return 列表
      */
-    List<ProductStockMonth> selectUnqualifiedStock(ProductStockMonth productStockMonth);
+    List<MdmUnqualifiedStock> selectUnqualifiedStock(MdmUnqualifiedStock productStockMonth);
+
+    /**
+     * 查询原材料库存列表
+     *
+     * @param rawSpecialMaterialStock 查询参数
+     * @return 列表
+     */
+    List<RawSpecialMaterialStock> selectRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
+
+    /**
+     * 获取原材料出库记录列表
+     *
+     * @param materialOutboundRecord 同步数据日志
+     * @return 列表
+     */
+    List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord);
+
+    /**
+     * 获取成品物料信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    List<MdmMaterialInfo> selectMaterialList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 获取模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    List<MdmMouldShellInfo> selectMoldShellList(AuxReqSyncDataLogs syncDataLogs);
 }

@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmProductModelRelationServiceImpl.java
- * 描    述：MdmProductModelRelationServiceImplSAP与模具关系业务层处理
+ * 描    述：MdmProductModelRelationServiceImplSKU与模具关系业务层处理
  *
  * @author zlt
  * @version 1.0

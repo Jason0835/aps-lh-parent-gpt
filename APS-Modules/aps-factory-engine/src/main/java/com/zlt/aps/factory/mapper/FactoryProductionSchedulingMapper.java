@@ -75,20 +75,6 @@ public interface FactoryProductionSchedulingMapper {
                                                                                              @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
-     * 根据制造需求计划版本，获取对应的月度可用模具列表
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<MouldInfoVO> getMonthEnableMouldConfiguration(@Param("factoryCode") String factoryCode,
-                                                       @Param("year") Integer year,
-                                                       @Param("month") Integer month,
-                                                       @Param("monthPlanVersion") String monthPlanVersion);
-
-    /**
      * 根据制造需求版本及排产版本，删除对应的排产初始化数据
      *
      * @param factoryCode       分厂编码

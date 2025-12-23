@@ -29,6 +29,10 @@ public class MonthPlanStructureLhRatioVo implements Serializable {
      * 最大胎胚数
      */
     private Integer maxEmbryoQty;
+    /**
+     * 硫化机台最低配比值
+     */
+    private Integer lhMachineMinQty;
 
     /**
      * 结构成型硫化是否匹配

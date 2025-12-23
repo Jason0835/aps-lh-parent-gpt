@@ -16,6 +16,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -75,6 +76,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 是否含有特殊材料 1 含有 0 不含有
      */
     private String isSpecialMaterials;
+    /**
+     * 库销比-动态计算，每次排产后变化
+     */
+    private Double inventorySalesRatio;
+    /**
+     * 是否按总需求量排产 1 是 0 否
+     */
+    private Integer isProductionBySum;
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)
@@ -96,6 +105,62 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             sum = sum + getFactProdReqQty();
         }
         return sum;
+    }
+
+    /**
+     * 虚拟的还需排产量值
+     * 如果有高优先级值，则为高优先级，否则为净需求值
+     *
+     * @return
+     */
+    public Long getVirtualProductionQty() {
+        if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
+            return getHeightProductionQty();
+        }
+        return getProductionQty();
+    }
+
+    /**
+     * 是否有供应链优先排产量
+     * @return
+     */
+    public boolean hasPrioritizeQty(){
+        if( !YesOrNoEnum.YES.getCode().equals(getIsPrioritize())){
+            return false;
+        }
+        return hasProduction();
+    }
+    /**
+     * 是否小于minQty
+     * 如果有高优先级排产量则使用高优先级排产量比较，否则使用排产量比较
+     *
+     * @param minQty
+     * @return
+     */
+    public boolean isLess(Long minQty) {
+        if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
+            return getHeightProductionQty() < minQty;
+        }
+        return getProductionQty() < minQty;
+    }
+
+    /**
+     * 计算库销比
+     * (当前库存+排产量)/月均销量的比例
+     *
+     * @param productionQty
+     */
+    public void calculateInventorySalesRatio(Long productionQty) {
+        //月均销量没有或是为零，则表示库销比越低，最高
+        Long averageSaleQty = getAverageSaleQty();
+        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.longValue()) {
+            inventorySalesRatio = BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
+        }
+        if (null == productionQty || productionQty < BigDecimal.ZERO.longValue()) {
+            productionQty = BigDecimal.ZERO.longValue();
+        }
+        Long sumStockQty = getStockQty() + productionQty;
+        inventorySalesRatio = BigDecimal.valueOf(sumStockQty).divide(BigDecimal.valueOf(averageSaleQty), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**
@@ -197,6 +262,22 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             setMouldQty(enableMouldList.size());
         }
+    }
+
+    /**
+     * 匹配的sku是否还有需排产的计划
+     *
+     * @param selectedMaterialDesc 物料描述
+     * @return
+     */
+    public boolean hasSelectedProduction(String selectedMaterialDesc) {
+        if (StringUtils.isBlank(selectedMaterialDesc)) {
+            return false;
+        }
+        if (!selectedMaterialDesc.equals(getMaterialDesc())) {
+            return false;
+        }
+        return hasProduction();
     }
 
     /**

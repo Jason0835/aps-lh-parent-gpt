@@ -130,6 +130,12 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String structureName;
 
     /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    @ApiModelProperty(value = "产品结构", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
+    /**
      * 施工阶段
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.constructionStage", dictType = "biz_construction_stage")
@@ -453,6 +459,22 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
     @TableField(value = "DAY_VULCANIZATION_QTY")
     private Long dayVulcanizationQty;
+
+    /**
+     * 库存数量(成品总库存)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.stockQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "库存数量(成品总库存)", name = "stockQty")
+    @TableField(value = "STOCK_QTY")
+    private Long stockQty;
+
+    /**
+     * 月均销量
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Long averageSaleQty;
 
     /**
      * 可用模具数量
