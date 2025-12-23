@@ -306,6 +306,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private Integer prodReqPlan;
 
     /**
+     * 试制量试计划需求量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialQty")
+    @ApiModelProperty(value = "试制量试计划需求量", name = "trialQty")
+    @TableField(value = "TRIAL_QTY")
+    private Integer trialQty;
+
+    /**
      * 高优先级排产数量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.heightProductionQty")
@@ -360,6 +368,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @ApiModelProperty(value = "暂缓订单排产数量", name = "postponeProductionQty")
     @TableField(value = "POSTPONE_PRODUCTION_QTY")
     private Integer postponeProductionQty;
+
+    /**
+     * 试制量试排产量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialProductionQty")
+    @ApiModelProperty(value = "试制量试排产量", name = "trialProductionQty")
+    @TableField(value = "TRIAL_PRODUCTION_QTY")
+    private Integer trialProductionQty;
 
     /**
      * 差异量(未排产数量)
