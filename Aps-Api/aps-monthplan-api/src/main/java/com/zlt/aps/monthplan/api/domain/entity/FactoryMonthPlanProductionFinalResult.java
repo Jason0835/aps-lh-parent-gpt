@@ -242,6 +242,22 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private Integer dayVulcanizationQty;
 
     /**
+     * 成型机台信息 多个以，分隔
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.cxMachineCode")
+    @ApiModelProperty(value = "成型机台信息", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private Integer cxMachineCode;
+
+    /**
+     * 模具使用变化信息如2-4-2,或是2-4或是2
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mouldChangeInfo")
+    @ApiModelProperty(value = "模具使用变化信息", name = "mouldChangeInfo")
+    @TableField(value = "MOULD_CHANGE_INFO")
+    private Integer mouldChangeInfo;
+
+    /**
      * 动平衡数量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dynamicBalanceQty")
