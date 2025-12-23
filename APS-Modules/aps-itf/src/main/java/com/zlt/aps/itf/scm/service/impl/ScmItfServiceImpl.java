@@ -28,6 +28,9 @@ public class ScmItfServiceImpl implements ScmItfService {
 	@Value("${itf.scm.syncPlanedNotShipList.url}")
 	private String SYNC_PLANED_NOTSHIP_URL;
 
+	@Value("${itf.scm.lockSalesOrderPool.url}")
+	private String SYNC_LOCK_SALES_ORDER_POOL_URL;
+
 	@Value("${itf.scm.syncOutShipDmdOrdList.url}")
 	private String SYNC_OUT_SHIP_DMD_ORD_LIST_URL;
 
@@ -78,6 +81,36 @@ public class ScmItfServiceImpl implements ScmItfService {
 		return ajaxResult;
 	}
 
+	/**
+	 * 锁定订单池
+	 * 
+	 * @param planedNotShipParamVo
+	 * @return
+	 */
+	@Override
+	public AjaxResult lockSalesOrderPool(SyncPlanedNotShipParamVo planedNotShipParamVo) {
+		AjaxResult ajaxResult = null;
+		try {
+			if (planedNotShipParamVo == null) {
+				ajaxResult = AjaxResult.error("传入参数为空");
+				return ajaxResult;
+			}
+			// 调用供应链接口获取数据
+			String result = PostMethodUtils.sendPost(SYNC_LOCK_SALES_ORDER_POOL_URL,
+					JSONObject.toJSONString(planedNotShipParamVo), null);
+			// 校验数据格式是否合法
+			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
+				String errorMsg = "lockSalesOrderPool 返回数据格式校验失败：" + result;
+				log.error(errorMsg);
+				ajaxResult = AjaxResult.error(errorMsg);
+				return ajaxResult;
+			}
+			ajaxResult = JSONObject.parseObject(result, AjaxResult.class);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+		}
+		return ajaxResult;
+	}
 
 	/**
 	 * 同步发货明细数据
@@ -109,7 +142,6 @@ public class ScmItfServiceImpl implements ScmItfService {
 		}
 		return ajaxResult;
 	}
-
 
 	/**
 	 * 月计划排程结果推送

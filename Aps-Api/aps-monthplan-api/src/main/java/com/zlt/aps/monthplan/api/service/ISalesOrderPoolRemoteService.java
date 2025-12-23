@@ -58,6 +58,13 @@ public interface ISalesOrderPoolRemoteService {
     AjaxResult editBySalCodePo(@RequestBody SalesOrderPool salesOrderPool);
 
     /**
+    * 锁定订单池
+    */
+    @ApiOperation("锁定订单池")
+    @PostMapping("/SalesOrderPool/lockSalesOrderPool")
+    AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool salesOrderPool);
+    
+    /**
      * 删除
      */
     @ApiOperation("删除")
