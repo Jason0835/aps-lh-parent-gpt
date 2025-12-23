@@ -51,7 +51,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 总数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.qty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "总数量", name = "qty")
     @TableField(value = "QTY")
@@ -60,7 +60,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 机台数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.machineQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "机台数量", name = "machineQty")
     @TableField(value = "MACHINE_QTY")
@@ -69,7 +69,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 在库数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.onHandQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "在库数量", name = "onHandQty")
     @TableField(value = "ON_HAND_QTY")
@@ -78,7 +78,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 出库数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.outBoundQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "出库数量", name = "outBoundQty")
     @TableField(value = "OUT_BOUND_QTY")
@@ -87,7 +87,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 计划出库数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.outBoundPlanQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "计划出库数量", name = "outBoundPlanQty")
     @TableField(value = "OUT_BOUND_PLAN_QTY")
@@ -96,7 +96,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 下机数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.deplaneQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "下机数量", name = "deplaneQty")
     @TableField(value = "DEPLANE_QTY")
@@ -105,7 +105,7 @@ public class MdmMouldShellInfo extends BaseEntity {
     /**
      * 强制出库数量
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.forceOutBoundQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "强制出库数量", name = "forceOutBoundQty")
     @TableField(value = "FORCE_OUT_BOUND_QTY")
