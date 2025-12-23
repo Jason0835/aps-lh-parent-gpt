@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.ParseException;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -78,6 +79,18 @@ public class MesItfController {
     }
 
     /**
+     * 获取实时成品库存
+     *
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @ApiOperation("获取实时成品库存")
+    @PostMapping("/getProductStock")
+    public List<MdmProductStock> getProductStock(@RequestBody MdmProductStock mdmProductStock) {
+        return mesItfService.getProductStock(mdmProductStock);
+    }
+
+    /**
      * 同步不合格库存
      *
      * @param mdmUnqualifiedStock 参数
@@ -90,6 +103,18 @@ public class MesItfController {
     }
 
     /**
+     * 获取不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @return 结果
+     */
+    @ApiOperation("获取不合格库存")
+    @PostMapping("/getUnqualifiedStock")
+    public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) {
+        return mesItfService.getUnqualifiedStock(mdmUnqualifiedStock);
+    }
+
+    /**
      * 同步特殊材料库存
      *
      * @param rawSpecialMaterialStock 参数
@@ -99,6 +124,18 @@ public class MesItfController {
     @PostMapping("/syncRawSpecialMaterialStock")
     public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
         return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
+    }
+
+    /**
+     * 查询特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    @ApiOperation("同步特殊材料库存")
+    @PostMapping("/getRawSpecialMaterialStock")
+    public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) {
+        return mesItfService.getRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
     /**

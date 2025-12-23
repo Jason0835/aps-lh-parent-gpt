@@ -48,7 +48,7 @@ public interface MesItfMapper {
     List<MdmUnqualifiedStock> selectUnqualifiedStock(MdmUnqualifiedStock productStockMonth);
 
     /**
-     * 查询不合格库存列表
+     * 查询原材料库存列表
      *
      * @param rawSpecialMaterialStock 查询参数
      * @return 列表

@@ -1,8 +1,8 @@
 package com.zlt.aps.job.task;
 
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
 import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
 import io.swagger.annotations.ApiOperation;
@@ -26,7 +26,7 @@ public class MesTask {
      */
     @ApiOperation("同步成品库存-默认当前年月")
     public void syncProductStock() {
-        iMesItfService.syncProductStock(new ProductStockMonth());
+        iMesItfService.syncProductStock(new MdmProductStock());
     }
 
     /**
