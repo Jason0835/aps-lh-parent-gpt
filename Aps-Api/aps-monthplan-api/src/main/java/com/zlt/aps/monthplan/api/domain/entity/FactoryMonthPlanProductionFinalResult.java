@@ -242,6 +242,22 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private Integer dayVulcanizationQty;
 
     /**
+     * 成型机台信息 多个以，分隔
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.cxMachineCode")
+    @ApiModelProperty(value = "成型机台信息", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private Integer cxMachineCode;
+
+    /**
+     * 模具使用变化信息如2-4-2,或是2-4或是2
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mouldChangeInfo")
+    @ApiModelProperty(value = "模具使用变化信息", name = "mouldChangeInfo")
+    @TableField(value = "MOULD_CHANGE_INFO")
+    private Integer mouldChangeInfo;
+
+    /**
      * 动平衡数量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dynamicBalanceQty")
@@ -288,6 +304,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
+
+    /**
+     * 试制量试计划需求量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialQty")
+    @ApiModelProperty(value = "试制量试计划需求量", name = "trialQty")
+    @TableField(value = "TRIAL_QTY")
+    private Integer trialQty;
 
     /**
      * 高优先级排产数量
@@ -344,6 +368,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @ApiModelProperty(value = "暂缓订单排产数量", name = "postponeProductionQty")
     @TableField(value = "POSTPONE_PRODUCTION_QTY")
     private Integer postponeProductionQty;
+
+    /**
+     * 试制量试排产量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialProductionQty")
+    @ApiModelProperty(value = "试制量试排产量", name = "trialProductionQty")
+    @TableField(value = "TRIAL_PRODUCTION_QTY")
+    private Integer trialProductionQty;
 
     /**
      * 差异量(未排产数量)

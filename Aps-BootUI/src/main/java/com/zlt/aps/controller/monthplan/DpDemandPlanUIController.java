@@ -171,6 +171,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
 
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
+    @RequiresPermissions("monthplan:demandPlan:export")
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
@@ -185,6 +186,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
+    @RequiresPermissions("monthplan:demandPlan:import")
     @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
@@ -204,6 +206,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @ApiOperation("生成需求计划")
     @PostMapping("/createMonthRequire")
+    @RequiresPermissions("monthplan:demandPlan:createMonthRequire")
     @ResponseBody
     public AjaxResult createMonthRequire(DpDemandPlan createCondition) {
         if (null == createCondition) {
