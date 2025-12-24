@@ -314,10 +314,10 @@ export default {
         params.isExceedNineMonth = 1;
         params.isExceedTwelveMonth = 1;
       } else {
-        params.isExceedThreeMonth = 0;
-        params.isExceedSixMonth = 0;
-        params.isExceedNineMonth = 0;
-        params.isExceedTwelveMonth = 0;
+        // params.isExceedThreeMonth = 0;
+        // params.isExceedSixMonth = 0;
+        // params.isExceedNineMonth = 0;
+        // params.isExceedTwelveMonth = 0;
       }
       if (hasPage) {
         params.pageSize = this.page.pageSize;

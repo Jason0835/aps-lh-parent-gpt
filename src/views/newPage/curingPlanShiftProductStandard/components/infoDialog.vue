@@ -31,16 +31,40 @@
 <script>
 import { mapState } from "vuex";
 
-import {
-  saveCapacity
-} from "@/api/monthplan/mdmSkuLhCapacity";
+import { saveCapacity } from "@/api/monthplan/mdmSkuLhCapacity";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm,materialCodeSelect },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(new Error(this.$t("common.rule.noPoint")));
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -76,20 +100,86 @@ export default {
             trigger: "change",
           },
         ],
-        lineType: [
+        standardCapacity: [
           {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
-        jobType: [
+        classCapacity: [
           {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
+        sumVulcanization: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        vulcanizationTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        mechanicalTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        checkTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        clearTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        dineTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        standardTime: [
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ],
+        productionTime:[
+        {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
+          },
+        ]
       },
     };
   },
@@ -104,7 +194,7 @@ export default {
     },
     columns() {
       return [
-      {
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -137,6 +227,7 @@ export default {
           prop: "classCapacity",
           label: this.$t("ui.data.column.curingPlan.classCapacity"),
           span: 12,
+          type: "number",
         },
         {
           prop: "standardCapacity",

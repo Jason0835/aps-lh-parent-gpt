@@ -32,11 +32,11 @@
 import { mapState } from "vuex";
 
 import { saveSupplyOrderPool ,queryRelationByMaterialCode} from "@/api/monthplan/supplyOrderPool";
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm ,materialCodeSelect},
   inject: ["parentDict"],
   data() {
     return {
@@ -124,8 +124,14 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          listeners: {
-            blur: this.blurMaterialCode,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
           },
         },
         {
@@ -248,6 +254,19 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+        this.$set(this.form, "productTypeCode", row.productTypeCode);
+        this.$set(this.form, "materialbrandDesc", row.brand);
+        this.blurMaterialCode()
+
+      } else {
+        this.$set(this.form, "materialDesc", '');
+        this.$set(this.form, "productTypeCode", '');
+        this.$set(this.form, "materialbrandDesc", '');
+      }
     },
   },
 };

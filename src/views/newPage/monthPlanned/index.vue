@@ -294,6 +294,7 @@ export default {
           this.formatParams()
         );
         this.data = data.rows;
+        this.page.total = data.total;
 
       } catch (error) {
         console.error(error);
@@ -312,9 +313,9 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.getList();
   },
   activated() {
-    this.getList();
   },
 };
 </script>

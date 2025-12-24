@@ -216,10 +216,25 @@
   "ui.data.defectiveStock.nightOverdueStockQty": "超9个月库存",
   "ui.data.rawWarningRecord.executeNewMaterialWarning": "执行新材料预警",
   "ui.data.rawWarningRecord.executeUsageWarning": "执行用量偏差预警",
+  "common.materialCodeSelect.title": "物料信息",
 
 
-
-  "common.materialCodeSelect.title": "物料信息"
+  "ui.data.DemandPlan.order": "优先级(订单类型)",
+  "ui.data.DemandPlan.productionType": "排产分类",
+  "ui.data.DemandPlan.orderQty": "订单量",
+  "ui.data.DemandPlan.stockQty": "库存",
+  "ui.data.DemandPlan.plannedSurplus": "月底余量",
+  "ui.data.DemandPlan.netQty": "排产净需求",
+  "ui.data.DemandPlan.isProduction": "是否排产",
+  "ui.data.DemandPlan.postponeNetQty": "净需求(含暂缓)",
+  "ui.data.DemandPlan.unPostponeNetQty": "净需求(不含暂缓)",
+  "ui.data.DemandPlan.heightQty": "高优先级",
+  "ui.data.DemandPlan.midQty": "中优先级",
+  "ui.data.DemandPlan.postponeQty": "暂缓订单",
+  "ui.data.DemandPlan.cycleReserveQty": "周期排产储备",
+  "ui.data.DemandPlan.conventionReserveQty": "常规排产储备",
+  "ui.data.DemandPlan.isReachMinProductionQty": "是否满足最小投产量",
+  "ui.data.DemandPlan.minProductionQty": "最小投产量值"
 
 
 

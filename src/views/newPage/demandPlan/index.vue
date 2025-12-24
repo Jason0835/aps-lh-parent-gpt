@@ -21,8 +21,8 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:productionMouldConfiguration:add']"
-
+          @click="generPlan"
+          v-hasPermi="['monthplan:demandPlan:createMonthRequire']"
           >{{ $t("生成需求计划") }}
         </el-button>
         <!-- <el-button
@@ -32,13 +32,13 @@
           @click="handleAdd"
           >{{ $t("生成周度需求计划") }}
         </el-button> -->
-        <el-button
+        <!-- <el-button
           type="success"
           plain
           v-hasPermi="['monthplan:productionMouldConfiguration:add']"
           @click="handleChanged"
           >{{ $t("优先级调整") }}
-        </el-button>
+        </el-button> -->
         <!-- <el-button
           type="primary"
           plain
@@ -62,7 +62,7 @@
         </el-button> -->
         <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:productionMouldConfiguration:export']"
+          v-hasPermi="['monthplan:demandPlan:export']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
       </template>
@@ -84,34 +84,35 @@
       :close-on-press-escape="false"
       :append-to-body="true"
     >
-    <info-form
-      class="form-item-height"
-      ref="form"
-      :form="form"
-      :rules="rules"
-      :columns="formColumns"
-      label-position="right"
-      label-width="160px"
-      v-loading="loading"
-    >
-    </info-form>
-    <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        this.$t("common.button.confirm")
-      }}</el-button>
-    </template>
+      <info-form
+        class="form-item-height"
+        ref="form"
+        :form="form"
+        :rules="rules"
+        :columns="formColumns"
+        label-position="right"
+        label-width="160px"
+        v-loading="loading"
+      >
+      </info-form>
+      <template slot="footer">
+        <el-button @click="hide">{{
+          this.$t("common.button.cancel")
+        }}</el-button>
+        <el-button type="primary" :loading="loading" @click="handleConfirm">{{
+          this.$t("common.button.confirm")
+        }}</el-button>
+      </template>
     </el-dialog>
   </basic-container>
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
 import {
-  listProductionMouldConfiguration,
-  editProductionMouldConfiguration,
-  removeProductionMouldConfiguration,
-  buildMouldingProduct,
-} from "@/api/monthplan/productionMouldConfiguration";
+  listDemandPlan,
+  saveDemandPlan,
+  genenrDemandPlan,
+} from "@/api/monthplan/demandPlan";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoForm from "@/views/components/infoForm.vue";
@@ -121,10 +122,18 @@ export default {
   name: "DemandPlan",
   components: {
     tltUpload,
-    infoForm
+    infoForm,
     // infoDialog,
   },
-  dicts: [],
+  dicts: [
+    "biz_factory_name",
+    "biz_product_type",
+    "biz_order_type",
+    "biz_yes_no",
+    "biz_sale_type",
+    "biz_brand_type",
+    "biz_product_characteristics",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -132,9 +141,9 @@ export default {
   },
   data() {
     return {
-      title:"优先级调整",
+      title: "优先级调整",
       loading: false,
-      visible:false,
+      visible: false,
       data: [],
       selection: [],
       page: {
@@ -151,31 +160,29 @@ export default {
       },
       importDefaultValue: {},
       importRules: {},
-      form:{},
+      form: {},
       rules: {
-        供应链优先级: [
+        scam: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        是否排产: [
+        isIOne: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-
       },
       formColumns: [
         {
-          prop: "供应链优先级",
-          label: this.$t("供应链优先级"),
+          prop: "sam",
+          label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
         },
-
       ],
     };
   },
@@ -184,8 +191,11 @@ export default {
       let columns = [
         // { type: "selection", fixed: "left" },
         {
-          prop: "origin",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
         },
         {
           prop: "year",
@@ -196,117 +206,166 @@ export default {
           label: this.$t("ui.data.column.productionMouldConfiguration.month"),
         },
         {
-          prop: "version",
-          label: this.$t("产品分类"),
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
         },
 
         {
-          prop: "productCode",
-          label: this.$t("类型"),
+          prop: "locationType",
+          label: this.$t("common.type"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_sale_type, value);
+          },
         },
         {
-          prop: "mouldCode",
-          label: this.$t("品牌"),
+          prop: "brand",
+          label: this.$t("common.brand"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
         },
         {
-          prop: "供应链优先级",
-          label: this.$t("供应链优先级"),
+          prop: "scmPriority",
+          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-select
+                  v-if={this.hasPermission("monthplan:demandPlan:edit")}
+                  placeholder="请选择"
+                  v-model={row.scmPriority}
+                  onChange={(val) => this.handlePriorityChange(row, val)}
+                >
+                  {this.dict.type.biz_order_type.map((item) => (
+                    <el-option
+                      key={item.value}
+                      label={item.label}
+                      value={item.value}
+                    ></el-option>
+                  ))}
+                </el-select>
+                <span v-else>{this.selectDictLabel(this.dict.type.biz_order_type, row.scmPriority)}</span>
+              </div>
+            );
+          },
         },
         {
-          prop: "产品结构",
-          label: this.$t("产品结构"),
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
         },
         {
-          prop: "主花纹",
-          label: this.$t("主花纹"),
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
-          prop: "物料描述",
-          label: this.$t("物料描述"),
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
         {
-          prop: "排产分类",
-          label: this.$t("排产分类"),
+          prop: "productionType",
+          label: this.$t("ui.data.DemandPlan.productionType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_product_characteristics,
+              value
+            );
+          },
         },
         {
-          prop: "年周号",
-          label: this.$t("年周号"),
+          prop: "yearWeek",
+          label: this.$t("ui.data.column.monthplan.weekYear"),
         },
         {
-          prop: "均匀性",
-          label: this.$t("均匀性"),
+          prop: "isUniformity",
+          label: this.$t("ui.data.column.monthplan.dynamicBalance"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
-          prop: "动平衡",
-          label: this.$t("动平衡"),
+          prop: "isDynamicBalance",
+          label: this.$t("ui.data.column.monthplan.uniformity"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
-          prop: "订单量",
-          label: this.$t("订单量"),
+          prop: "orderQty",
+          label: this.$t("ui.data.DemandPlan.orderQty"),
         },
         {
-          prop: "库存",
-          label: this.$t("库存"),
+          prop: "stockQty",
+          label: this.$t("ui.data.DemandPlan.stockQty"),
         },
         {
-          prop: "月底余量",
-          label: this.$t("月底余量"),
+          prop: "plannedSurplus",
+          label: this.$t("ui.data.DemandPlan.plannedSurplus"),
         },
         {
-          prop: "排产净需求",
-          label: this.$t("排产净需求"),
+          prop: "netQty",
+          label: this.$t("ui.data.DemandPlan.netQty"),
         },
         {
-          prop: "是否排产",
-          label: this.$t("是否排产"),
+          prop: "isProduction",
+          label: this.$t("ui.data.DemandPlan.isProduction"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
-          prop: "净需求",
-          label: this.$t("净需求(含暂缓)"),
+          prop: "postponeNetQty",
+          label: this.$t("ui.data.DemandPlan.postponeNetQty"),
         },
         {
-          prop: "净需求No",
-          label: this.$t("净需求(不含暂缓)"),
+          prop: "unPostponeNetQty",
+          label: this.$t("ui.data.DemandPlan.unPostponeNetQty"),
         },
         {
-          prop: "高优先级",
-          label: this.$t("高优先级"),
+          prop: "heightQty",
+          label: this.$t("ui.data.DemandPlan.heightQty"),
         },
         {
-          prop: "中优先级",
-          label: this.$t("中优先级"),
+          prop: "midQty",
+          label: this.$t("ui.data.DemandPlan.midQty"),
         },
         {
-          prop: "暂缓订单",
-          label: this.$t("暂缓订单"),
+          prop: "postponeQty",
+          label: this.$t("ui.data.DemandPlan.postponeQty"),
         },
         {
-          prop: "周期排产储备",
-          label: this.$t("周期排产储备"),
+          prop: "cycleReserveQty",
+          label: this.$t("ui.data.DemandPlan.cycleReserveQty"),
         },
         {
-          prop: "常规排产储备",
-          label: this.$t("常规排产储备"),
+          prop: "conventionReserveQty",
+          label: this.$t("ui.data.DemandPlan.conventionReserveQty"),
         },
         {
-          prop: "是否满足最小投产量",
-          label: this.$t("是否满足最小投产量"),
+          prop: "isReachMinProductionQty",
+          label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
-          prop: "最小投产量值",
-          label: this.$t("最小投产量值"),
+          prop: "minProductionQty",
+          label: this.$t("ui.data.DemandPlan.minProductionQty"),
         },
         {
-          prop: "备注",
-          label: this.$t("备注"),
+          prop: "remark",
+          label: this.$t("common.remark"),
         },
         {
-          prop: "更新日期",
-          label: this.$t("更新日期"),
+          prop: "updateTime",
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          width: 180,
         },
       ];
 
@@ -315,84 +374,103 @@ export default {
     searchColumns() {
       return [
         {
-          prop: "origin",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
           type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          clearable: false,
         },
         {
-          label: "年月",
           prop: "yearMonth",
+          label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
-          format: "YYYY-MM",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
         },
 
         {
-          prop: "需求计划版本号",
+          prop: "monthPlanVersion",
           label: this.$t("需求计划版本号"),
+        },
+        {
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
+          dictData: this.dict.type.biz_product_type,
         },
         {
-          prop: "mouldCode",
-          label: this.$t("产品分类"),
+          prop: "orderPriority)",
+          label: this.$t("ui.data.DemandPlan.order"),
           type: "select",
+          dictData: this.dict.type.biz_order_type,
         },
         {
-          prop: "优先级(订单类型)",
-          label: this.$t("优先级(订单类型)"),
-        },
-        {
-          prop: "是否替换料",
+          prop: "isAlternateMaterial",
           label: this.$t("是否替换料"),
-          type: "checkbox",
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
         },
         {
-          prop: "不足最小投产量",
+          prop: "isReachMinProductionQty",
           label: this.$t("不足最小投产量"),
-          type: "checkbox",
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
-          prop: "物料描述",
-          label: this.$t("物料描述"),
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
       ];
     },
   },
   methods: {
-    save(){},
+    hasPermission(permission) {
+      const permissions = this.$store.state.user.permissions || [];
+      if (Array.isArray(permission)) {
+        return permission.some((perm) => permissions.includes(perm));
+      }
+      return permissions.includes(permission);
+    },
+    async generPlan() {
+      try {
+        let res = await genenrDemandPlan(this.formatParams());
+        console.log(res);
+        this.getList();
+      } catch (err) {}
+    },
+    save() {},
     hide() {
       this.$refs.form.triggerResetForm();
       this.visible = false;
-
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
     },
     handleChanged() {
-      this.formColumns= [
+      (this.formColumns = [
         {
-          prop: "供应链优先级",
-          label: this.$t("供应链优先级"),
+          prop: "scm",
+          label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
         },
-
-      ],
-      this.title="优先级调整"
+      ]),
+        (this.title = "优先级调整");
       this.visible = true;
     },
-    handleRow(){
-      this.formColumns= [
+    handleRow() {
+      (this.formColumns = [
         {
-          prop: "是否排产",
-          label: this.$t("是否排产"),
+          prop: "ui.data.DemandPlan.isProduction",
+          label: this.$t("ui.data.DemandPlan.isProduction"),
           type: "select",
         },
-
-      ],
-      this.title="是否排产"
+      ]),
+        (this.title = "ui.data.DemandPlan.isProduction");
       this.visible = true;
     },
     handleAdd() {
@@ -408,38 +486,22 @@ export default {
     handleDelete(rows) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
-      }).then(() => {
-        const ids = rows.map((row) => row.id).join(",");
-        console.log(ids);
-        removeProductionMouldConfiguration({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
-          this.$set(this.page, "current", 1);
-          this.getList();
-        });
-      });
+      }).then(() => {});
     },
-    handleChangeStatus(status, row) {
-      console.log(status);
-      let label =
-        status === "0"
-          ? this.$t("ui.biz.alter.isOpen")
-          : this.$t("ui.biz.alter.isStop");
-
-      this.$confirm(label, {
-        type: "warning",
-      }).then(async () => {
-        try {
-          this.loading = true;
-          const res = await editProductionMouldConfiguration({
-            ...row,
-            status,
-          });
+    handlePriorityChange(row, val) {
+      console.log(row, val);
+      // let params = {
+      //   id: row.id,
+      //   orderPriority: val,
+      // };
+      saveDemandPlan(row)
+        .then((res) => {
           this.$modal.msgSuccess(res.msg);
           this.getList();
-        } catch (error) {
-          this.loading = false;
-        }
-      });
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     },
     handleSearch(data) {
       this.query = data;
@@ -467,10 +529,7 @@ export default {
       this.getList();
     },
     handleExport() {
-      downloadLink(
-        "/monthplan/productionMouldConfiguration/export",
-        this.formatParams(false)
-      );
+      downloadLink("/monthplan/demandPlan/export", this.formatParams(false));
     },
 
     handleSelectionChange(rows) {
@@ -495,10 +554,10 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
+      if (params.yearMonth) {
+        const [year, month] = params.yearMonth.split("-");
+        params.year = year;
+        params.month = month;
       }
 
       return params;
@@ -507,113 +566,10 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        let list=[
-          {
-            origin:'116',
-            year:'2025',
-            month:'11',
-            version:'导向',
-            productCode:'正规',
-            mouldCode:'AMULET',
-            供应链优先级:12,
-            产品结构:'ST235/80R16',
-            主花纹:'AT505',
-            NC物料编码:'3302002547',
-            物料描述:'ST235/80R16 129/125M 14PR AT505 BL3HAM',
-            排产分类:'周期排产',
-            年周号:'2586',
-            均匀性:'是',
-            动平衡:'是',
-            订单量:'1247',
-            库存:'256',
-            月底余量:'158',
-            排产净需求:'3425',
-            是否排产:'是',
-            净需求:'3425',
-            净需求No:'3425',
-            高优先级:'300',
-            中优先级:'120',
-            暂缓订单:'10',
-            周期排产储备:'3000',
-            常规排产储备:'2000',
-            是否满足最小投产量:'是',
-            最小投产量值:'1000',
-            备注:'',
-            更新日期:'2025-11-20'
-          },
-          {
-            origin:'116',
-            year:'2025',
-            month:'11',
-            version:'导向',
-            productCode:'正规',
-            mouldCode:'AMULET',
-            供应链优先级:12,
-            产品结构:'11R22.5-JD571四层',
-            主花纹:'JF568',
-            NC物料编码:'330201108',
-            物料描述:'11R22.5 146/143L 16PR JD571 BL4HJY',
-            排产分类:'按单产',
-            年周号:'2586',
-            均匀性:'是',
-            动平衡:'是',
-            订单量:'1247',
-            库存:'256',
-            月底余量:'158',
-            排产净需求:'3425',
-            是否排产:'是',
-            净需求:'3425',
-            净需求No:'3425',
-            高优先级:'300',
-            中优先级:'120',
-            暂缓订单:'10',
-            周期排产储备:'3000',
-            常规排产储备:'2000',
-            是否满足最小投产量:'是',
-            最小投产量值:'1000',
-            备注:'',
-            更新日期:'2025-11-20'
-          },
-          {
-            origin:'116',
-            year:'2025',
-            month:'11',
-            version:'导向',
-            productCode:'正规',
-            mouldCode:'AMULET',
-            供应链优先级:12,
-            产品结构:'ST235/80R16',
-            主花纹:'AT505',
-            NC物料编码:'3302002547',
-            物料描述:'ST235/80R16 129/125M 14PR AT505 BL3HAM',
-            排产分类:'常规产品',
-            年周号:'2586',
-            均匀性:'是',
-            动平衡:'是',
-            订单量:'1247',
-            库存:'256',
-            月底余量:'158',
-            排产净需求:'3425',
-            是否排产:'是',
-            净需求:'3425',
-            净需求No:'3425',
-            高优先级:'300',
-            中优先级:'120',
-            暂缓订单:'10',
-            周期排产储备:'3000',
-            常规排产储备:'2000',
-            是否满足最小投产量:'是',
-            最小投产量值:'1000',
-            备注:'',
-            更新日期:'2025-11-20'
-          },
-        ]
-        // const data = await listProductionMouldConfiguration(
-        //   this.formatParams()
-        // );
-        // console.log(data);
-        this.data = list;
-        this.page.total = 3
+
+        const data = await listDemandPlan(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {
@@ -621,10 +577,23 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
+  created() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
+    let defaultParams = {
+      factoryCode: "116",
+      yearMonth: `${year}-${month}`,
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

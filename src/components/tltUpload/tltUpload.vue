@@ -17,6 +17,7 @@
       :on-exceed="handleExceed"
       accept=".xls,.xlsx"
       :headers="upload.headers"
+      :before-upload="beforeUpload"
       :action="upload.url + uploadUrl + '?updateSupport=' + updateSupport"
       :disabled="upload.isUploading"
       :on-progress="handleFileUploadProgress"
@@ -95,24 +96,38 @@ export default {
   },
 
   methods: {
-      // 超过限制时的处理
-      handleExceed(files, fileList) {
-        // this.$message.warning('正在替换文件...')
+    //上传前校验
+    beforeUpload(file) {
+      // 或者通过文件后缀名校验（更可靠）
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+      const isExcelByExtension = ["xlsx", "xls"].includes(fileExtension);
+
+      if (!isExcelByExtension) {
+        console.log('aaa')
+        this.$message.error(this.$t("common.upload.onlyXlsXlsx"));
+        this.upload.isUploading = false;
+        this.upload.submitLoading = false;
+        return false; // 阻止上传
+      }
+    },
+    // 超过限制时的处理
+    handleExceed(files, fileList) {
+      // this.$message.warning('正在替换文件...')
 
       // 清空当前文件
-      this.fileList = []
+      this.fileList = [];
 
       // 使用 $nextTick 确保UI更新
       this.$nextTick(() => {
-        const uploadRef = this.$refs.upload
+        const uploadRef = this.$refs.upload;
         if (uploadRef) {
           // 清空组件内部状态
-          uploadRef.clearFiles()
+          uploadRef.clearFiles();
 
           // 触发新文件上传
-          uploadRef.handleStart(files[0])
+          uploadRef.handleStart(files[0]);
         }
-      })
+      });
     },
     handleTemplateDownload() {
       let downloadDom = document.createElement("a");

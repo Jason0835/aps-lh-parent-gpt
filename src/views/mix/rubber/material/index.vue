@@ -79,7 +79,7 @@ import {
 export default {
   name: "RubberMaterial",
   components: { InfoDialog, tltUpload },
-  dicts: ["GLUE_TYPE", "MAJOR_TYPE", "biz_factory_name","material_type",'biz_brand_type','biz_yes_no'],
+  dicts: ["GLUE_TYPE", "MAJOR_TYPE", "biz_factory_name","material_type",'biz_brand_type','biz_yes_no','biz_product_type','product_category'],
   provide() {
     return {
       parentDict: this.dict,
@@ -173,6 +173,13 @@ export default {
           label: this.$t("common.factory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
+          prop: "productCategory",
+          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.product_category, value);
           },
         },
         {
