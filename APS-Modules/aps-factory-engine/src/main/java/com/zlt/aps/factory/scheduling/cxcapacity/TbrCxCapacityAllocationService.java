@@ -82,7 +82,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //todo 记录日志 续作结构排产分配
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
-        //todo 计算在机结构续作SKU的使用硫化机台数
         //先对续作结构进行成型机台分配
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);

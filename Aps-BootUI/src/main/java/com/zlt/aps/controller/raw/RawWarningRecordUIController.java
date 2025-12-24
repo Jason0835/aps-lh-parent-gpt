@@ -106,6 +106,18 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
                                           @RequestParam("year") Integer year,
                                           @RequestParam("week") Integer week,
                                           @RequestParam("month") Integer month) {
+        if (week == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName.week"));
+        }
+
+        if (month == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName.month"));
+        }
+
+        if (year == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName.year"));
+        }
+
         return iRawWarningRecordService.executeUsageWarning(factoryCode, year, week, month);
     }
 
@@ -116,6 +128,14 @@ public class RawWarningRecordUIController extends BaseUIController<RawWarningRec
     public AjaxResult executeNewMaterialWarning(@RequestParam("factoryCode") String factoryCode,
                                                 @RequestParam("year") Integer year,
                                                 @RequestParam("month") Integer month) {
+        if (month == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName.month"));
+        }
+
+        if (year == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName.year"));
+        }
+
         return iRawWarningRecordService.executeNewMaterialWarning(factoryCode, year, month);
     }
 

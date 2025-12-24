@@ -94,4 +94,36 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
         return capacityInfo;
     }
+
+    /**
+     * 构建在机结构-在机机台的产能相关信息，结构成型硫化配比
+     *
+     * @param structureName        结构名
+     * @param cxMachineCode        成型机台编码
+     * @param baseInfo             机台基础信息
+     * @param structureLhRatioList 结构成型硫化配比集合
+     * @return
+     */
+    public static ProductGroupCxCapacityInfo buildContinueCxCapacityInfo(String structureName, String cxMachineCode, CxMachineBaseInfoVo baseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        ProductGroupCxCapacityInfo capacityInfo = new ProductGroupCxCapacityInfo();
+        capacityInfo.setGroupName(structureName);
+        capacityInfo.setCxMachineCode(cxMachineCode);
+        //原始配置的胎胚种类数和硫化机台配比
+        capacityInfo.setMaxEmbryoCodeCount(BigDecimal.ZERO.intValue());
+        capacityInfo.setMaxLhMachineCount(BigDecimal.ZERO.intValue());
+        if (CollectionUtils.isEmpty(structureLhRatioList)) {
+            return capacityInfo;
+        }
+        if (null == baseInfo) {
+            return capacityInfo;
+        }
+        //得到结构成型类型的配比
+        MonthPlanStructureLhRatioVo lhRatio = structureLhRatioList.stream().filter(match -> match.isMatch(structureName, baseInfo.getCxMachineBrandCode())).findFirst().orElse(null);
+        if (null == lhRatio) {
+            return capacityInfo;
+        }
+        capacityInfo.setMaxEmbryoCodeCount(lhRatio.getMaxEmbryoQty());
+        capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
+        return capacityInfo;
+    }
 }

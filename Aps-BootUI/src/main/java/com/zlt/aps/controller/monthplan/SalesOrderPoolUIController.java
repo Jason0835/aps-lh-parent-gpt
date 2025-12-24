@@ -14,6 +14,7 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -127,6 +128,18 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
             return AjaxResult.error("请输入PO号！");	
     	}
     	return iSalesOrderPoolService.editBySalCodePo(salesOrderPool);
+    }
+    
+	/**
+	 * 锁定订单池
+	 * @return
+	 */
+    @ApiOperation("锁定订单池")
+    @RequiresPermissions( "monthplan:SalesOrderPool:lock")
+    @PostMapping("/lockSalesOrderPool")
+    @ResponseBody
+    public AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool billVO){
+        return iSalesOrderPoolService.lockSalesOrderPool(billVO);
     }
 
     /**

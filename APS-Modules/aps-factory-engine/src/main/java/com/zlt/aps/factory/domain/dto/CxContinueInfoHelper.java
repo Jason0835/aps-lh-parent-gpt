@@ -27,6 +27,14 @@ public class CxContinueInfoHelper implements Serializable {
     private String groupName;
 
     /**
+     * 对应的成型机台
+     */
+    private Set<String> cxMachineCodeSet;
+    /**
+     * 续作SKU及模具数
+     */
+    private Map<String, Integer> continueSkuMouldNumberMap;
+    /**
      * 对应成型产能续作信息
      * 成型上在产的SKU和使用的模具数
      * key=cxMachineCode : value = { key = 物料描述 : value = cxContinueProductInfoHelper}
@@ -46,11 +54,11 @@ public class CxContinueInfoHelper implements Serializable {
      * CxContinueInfoHelper.cxMachineGroup = { key = cxMachineCode : value = {key = materialDesc : value = 硫化机台数(模具数)}}
      *
      * @param continueProductionInfoList 排产续作信息
-     * @param cxMachineBaseInfo          成型基础信息
+     * @param allCxMachineInfo           成型基础信息
      * @param structureLhRatioList       结构成型硫化配比
      * @return
      */
-    public static Map<String, CxContinueInfoHelper> createGroupInfo(List<ContinueProductInfo> continueProductionInfoList, Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    public static Map<String, CxContinueInfoHelper> createGroupInfo(List<ContinueProductInfo> continueProductionInfoList, Map<String, CxMachineBaseInfoVo> allCxMachineInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
         if (CollectionUtils.isEmpty(continueProductionInfoList)) {
             return Collections.emptyMap();
         }
@@ -64,16 +72,36 @@ public class CxContinueInfoHelper implements Serializable {
             }
             CxContinueInfoHelper helper = new CxContinueInfoHelper();
             helper.setGroupName(structureName);
-            //按成型机台分组
-            Map<String, List<ContinueProductInfo>> cxContinueGroup = productionSkuList.stream().collect(Collectors.groupingBy(ContinueProductInfo::getCxMachineCode));
-            //提前成型机台对应的续作SKU和SKU使用的模具数
-            Map<String, Map<String, CxContinueProductInfoHelper>> cxMachineGroup = getCxMachineGroup(cxContinueGroup);
-            helper.setCxMachineGroup(cxMachineGroup);
+            setContinueInfo(helper, allCxMachineInfo, productionSkuList);
             //在机结构的硫化配比(多机台情形下-用于续作判断优先下机的机台)
-            helper.setCxCapacityInfoList(createGroupCxCapacityInfo(structureName, cxMachineGroup, cxMachineBaseInfo, structureLhRatioList));
+            helper.setCxCapacityInfoList(createGroupCxCapacityInfo(structureName, helper.getCxMachineCodeSet(), allCxMachineInfo, structureLhRatioList));
             structureContinueGroup.put(structureName, helper);
         });
         return structureContinueGroup;
+    }
+
+    /**
+     * 根据续作排产信息，提取续作成型机台
+     *
+     * @param cxContinueInfoHelper 续作信息对象
+     * @param allCxMachineGroup    所有成型机信息
+     * @param continueSkuList      续作Sku信息
+     * @return
+     */
+    private static void setContinueInfo(CxContinueInfoHelper cxContinueInfoHelper, Map<String, CxMachineBaseInfoVo> allCxMachineGroup, List<ContinueProductInfo> continueSkuList) {
+        if (CollectionUtils.isEmpty(continueSkuList)) {
+            cxContinueInfoHelper.setCxMachineCodeSet(new HashSet<>());
+            cxContinueInfoHelper.setContinueSkuMouldNumberMap(new HashMap<>());
+            return;
+        }
+        Set<String> cxMachineCodeSet = new HashSet<>();
+        Map<String, Integer> continueSkuMouldNumberMap = new HashMap<>();
+        continueSkuList.forEach(continueProductInfo -> {
+            continueProductInfo.extractEffectiveCxMachineCode(cxMachineCodeSet, allCxMachineGroup);
+            continueProductInfo.extractSkuProductionMouldNumber(continueSkuMouldNumberMap);
+        });
+        cxContinueInfoHelper.setCxMachineCodeSet(cxMachineCodeSet);
+        cxContinueInfoHelper.setContinueSkuMouldNumberMap(continueSkuMouldNumberMap);
     }
 
     /**
@@ -118,23 +146,23 @@ public class CxContinueInfoHelper implements Serializable {
      * 构建在机结构的续作成型产能信息
      * 即每台成型对应的在产硫化机台数
      *
-     * @param structureName        结构
-     * @param cxMachineGroup       续作成型-硫化信息
-     * @param cxMachineBaseInfo    成型基础信息
-     * @param structureLhRatioList 结构成型配比信息
+     * @param structureName         结构
+     * @param continueCxMachineInfo 续作成型
+     * @param allCxMachineInfo      成型基础信息
+     * @param structureLhRatioList  结构成型配比信息
      * @return
      */
-    private static List<ProductGroupCxCapacityInfo> createGroupCxCapacityInfo(String structureName, Map<String, Map<String, CxContinueProductInfoHelper>> cxMachineGroup, Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        if (CollectionUtils.isEmpty(cxMachineGroup)) {
+    private static List<ProductGroupCxCapacityInfo> createGroupCxCapacityInfo(String structureName, Set<String> continueCxMachineInfo, Map<String, CxMachineBaseInfoVo> allCxMachineInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        if (CollectionUtils.isEmpty(continueCxMachineInfo)) {
             return Collections.emptyList();
         }
-        List<ProductGroupCxCapacityInfo> cxCapacityList = new ArrayList<>(cxMachineGroup.size());
-        cxMachineGroup.forEach((cxMachineCode, continueSkuInfo) -> {
-            CxMachineBaseInfoVo baseInfo = cxMachineBaseInfo.get(cxMachineCode);
+        List<ProductGroupCxCapacityInfo> cxCapacityList = new ArrayList<>(continueCxMachineInfo.size());
+        continueCxMachineInfo.forEach(cxMachineCode -> {
+            CxMachineBaseInfoVo baseInfo = allCxMachineInfo.get(cxMachineCode);
             if (null == baseInfo) {
                 return;
             }
-            ProductGroupCxCapacityInfo capacityInfo = ProductGroupCxCapacityInfo.buildContinueCxCapacityInfo(structureName, cxMachineCode, continueSkuInfo, baseInfo, structureLhRatioList);
+            ProductGroupCxCapacityInfo capacityInfo = ProductGroupCxCapacityInfo.buildContinueCxCapacityInfo(structureName, cxMachineCode, baseInfo, structureLhRatioList);
             capacityInfo.setGroupName(structureName);
             capacityInfo.setCxMachineCode(cxMachineCode);
             cxCapacityList.add(capacityInfo);

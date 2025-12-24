@@ -38,6 +38,15 @@ public class ScmItfController {
 		return scmItfService.syncPlanedNotShipList(planedNotShipParamVo);
 	}
 
+	/**
+	 * 锁定订单池
+	 */
+	@ApiOperation("锁定订单池")
+	@PostMapping("/lockSalesOrderPool")
+	public AjaxResult lockSalesOrderPool(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo) {
+		return scmItfService.lockSalesOrderPool(planedNotShipParamVo);
+	}
+
 
 	/**
 	 * 发货明细表同步接口

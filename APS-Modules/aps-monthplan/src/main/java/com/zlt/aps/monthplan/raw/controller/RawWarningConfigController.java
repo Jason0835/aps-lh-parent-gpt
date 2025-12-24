@@ -55,11 +55,9 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
     @Autowired
     private RawWarningConfigEntityMapper entityMapper;
 
-
     /**
      * 查询原材料预警配置列表
      */
-    @RequiresPermissions( "maindata:rawWarningConfig:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -76,7 +74,6 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
      * 保存
      */
     @Log(title = "ui.data.column.rawWarningConfig.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "maindata:rawWarningConfig:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -88,7 +85,6 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
      * 删除
      */
     @Log(title = "ui.data.column.rawWarningConfig.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "maindata:rawWarningConfig:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -100,7 +96,6 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
     /**
      * 获取原材料预警配置详细信息
      */
-    @RequiresPermissions( "maindata:rawWarningConfig:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -115,7 +110,6 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "maindata:rawWarningConfig:import")
     @Log(title = "ui.data.column.rawWarningConfig.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -127,7 +121,6 @@ public class RawWarningConfigController extends AbstractDocBizController<RawWarn
     /**
      * 导出列表
      */
-    @RequiresPermissions( "maindata:rawWarningConfig:export")
     @Log(title = "原材料预警配置", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
