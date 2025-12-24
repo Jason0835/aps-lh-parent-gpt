@@ -122,11 +122,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209003 超期常规储备排产月数
      */
-    OVERDUE_REGULAR("SYS0209001", "单位：月,超期常规储备排产月数"),
+    OVERDUE_REGULAR("SYS0101001", "单位：月,超期常规储备排产月数"),
     /**
      * SYS0209004 超期周期储备排产月数
      */
-    OVERDUE_CYCLE("SYS0209001", "单位：月,超期周期储备排产月数"),
+    OVERDUE_CYCLE("SYS0101002", "单位：月,超期周期储备排产月数"),
     ;
 
     private final String code;

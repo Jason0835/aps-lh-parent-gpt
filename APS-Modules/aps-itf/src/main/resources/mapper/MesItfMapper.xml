@@ -78,14 +78,14 @@
         info.PRODUCT_TYPE_CODE,
         info.BRAND,
         info.STRUCTURE_NAME,
-        info.LOCATION_TYPE,
+        -- info.LOCATION_TYPE,
         info.MATERIAL_DESC
         FROM mes_product_stock stock
         LEFT JOIN T_MDM_MATERIAL_INFO info ON stock.MATERIAL_CODE = info.MATERIAL_CODE
         WHERE 1 = 1
-        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
-        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="stockDate != null">AND stock.STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND stock.MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND stock.FACTORY_CODE = #{factoryCode}</if>
         <if test="params != null">
             <if test="params.materialCodeList != null and params.materialCodeList.size() > 0">
                 AND stock.MATERIAL_CODE IN
@@ -97,10 +97,10 @@
     </select>
 
     <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock">
-        SELECT stockSTOCK_DATE,
+        SELECT stock.STOCK_DATE,
         stock.MATERIAL_CODE,
         stock.MES_MATERIAL_CODE,
-        stock.STOCK_NUM,
+        stock.STOCK_NUM AS STOCK_QTY,
         stock.DATA_VERSION,
         stock.COMPANY_CODE,
         stock.FACTORY_CODE,
@@ -108,9 +108,9 @@
         FROM mes_unqualified_stock stock
         LEFT JOIN T_MDM_MATERIAL_INFO info ON stock.MATERIAL_CODE = info.MATERIAL_CODE
         WHERE 1 = 1
-        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
-        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="stockDate != null">AND stock.STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND stock.MATERIAL_CODE = #{materialCode}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND stock.FACTORY_CODE = #{factoryCode}</if>
     </select>
 
     <select id="selectRawSpecialMaterialStock"
@@ -131,15 +131,18 @@
 
     <select id="syncRawMaterialOutboundRecord"
             resultType="com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord">
-        SELECT STOCK_DATE AS OUTBOUND_DATE,
-        MATERIAL_CODE,
-        TYPE_CODE AS MATERIAL_TYPE,
-        MATERIAL_NAME AS MATERIAL_NAME,
-        STOCK_NUM AS OUTBOUND_QTY,
-        UNIT,
-        DATA_VERSION,
-        FACTORY_CODE
-        FROM ORI_MATERIAL_OUT_SYNC
+        SELECT a.STOCK_DATE AS OUTBOUND_DATE,
+        a.MATERIAL_CODE,
+        a.TYPE_CODE AS MATERIAL_TYPE,
+        a.MATERIAL_NAME AS MATERIAL_NAME,
+        a.STOCK_NUM AS OUTBOUND_QTY,
+        a.UNIT,
+        a.DATA_VERSION,
+        a.FACTORY_CODE,
+        b.MES_MATERIAL_CODE,
+        b.MATERIAL_DESC
+        FROM ORI_MATERIAL_OUT_SYNC a
+        LEFT JOIN T_MDM_MATERIAL_INFO b ON a.MATERIAL_CODE = b.MATERIAL_CODE
         WHERE 1 = 1
         <if test="outboundDate != null">AND STOCK_DATE = #{outboundDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
@@ -163,14 +166,15 @@
         COMPANY_CODE,
         FACTORY_CODE
         FROM MES_BAS_MATERIAL
+        WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
     <select id="selectMoldShellList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo">
         SELECT STOCK_DATE,
-        MOLD_SLEEVE AS MOLD_MODEL_CODE,
-        TOTAL_NUM AS QTY,
+        MOLD_SLEEVE AS MOULD_SET_CODE,
+        TOTAL_NUM AS TOTAL_QTY,
         MACHINE_NUM AS MACHINE_QTY,
         WAREHOUSE_NUM AS ON_HAND_QTY,
         OUT_NUM AS OUT_BOUND_QTY,
@@ -181,6 +185,7 @@
         COMPANY_CODE,
         FACTORY_CODE
         FROM MOLD_SHELL_SYNC
+        WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
