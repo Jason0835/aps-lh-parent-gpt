@@ -165,7 +165,7 @@ export default {
         try {
           const res = await getBoardingDate({shipmentDate:this.form.shipmentDate});
 
-          this.$set(this.form, 'boardingDate', res)
+          this.$set(this.form, 'boardingDate', res.msg)
         } catch (error) {
           console.log(error);
         }
