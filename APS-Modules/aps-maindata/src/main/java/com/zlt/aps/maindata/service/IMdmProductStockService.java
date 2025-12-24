@@ -22,14 +22,6 @@ import java.util.List;
 public interface IMdmProductStockService extends IDocService<MdmProductStock> {
 
     /**
-     * 查询MES实时成品库存列表
-     *
-     * @param queryVO 查询参数
-     * @return 结果
-     */
-    List<MdmProductStock> list4Mes(MdmProductStock queryVO);
-
-    /**
      * 查询成品库存表，汇总计算超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
      *
      * @return

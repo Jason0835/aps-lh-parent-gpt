@@ -2,6 +2,7 @@ package com.zlt.aps.itf.mes;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -108,4 +109,14 @@ public interface IMesItfService {
     @ApiOperation("同步特殊材料库存")
     @PostMapping("/mesItf/getRawSpecialMaterialStock")
     public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock);
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模壳台账信息")
+    @PostMapping("/mesItf/syncMoldShell")
+    public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

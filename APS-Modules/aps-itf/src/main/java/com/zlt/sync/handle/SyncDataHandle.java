@@ -1,26 +1,14 @@
 package com.zlt.sync.handle;
 
-import java.security.NoSuchAlgorithmException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
-
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.nacos.common.utils.MD5Utils;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.constants.SyncConstants;
 import com.zlt.sync.domain.AuxDataVersions;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
 import com.zlt.sync.domain.vo.AuxDataVersionsVO;
 import com.zlt.sync.handle.dockSys.DockCommonHandle;
@@ -31,6 +19,13 @@ import com.zlt.sync.povo.SyncDataVO;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.utils.RedisLock;
 import com.zlt.sync.utils.SpringBeanUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
+
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 
 /**
  * 公共同步调用接口方法

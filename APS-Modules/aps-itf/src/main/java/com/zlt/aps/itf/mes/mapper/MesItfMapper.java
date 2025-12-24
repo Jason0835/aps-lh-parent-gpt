@@ -1,7 +1,7 @@
 package com.zlt.aps.itf.mes.mapper;
 
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

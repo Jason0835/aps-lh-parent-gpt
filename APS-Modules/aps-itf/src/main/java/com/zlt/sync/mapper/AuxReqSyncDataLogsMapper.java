@@ -1,11 +1,10 @@
 package com.zlt.sync.mapper;
 
-import java.util.List;
-import java.util.Map;
-
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import org.apache.ibatis.annotations.Param;
 
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 请求数据历史记录

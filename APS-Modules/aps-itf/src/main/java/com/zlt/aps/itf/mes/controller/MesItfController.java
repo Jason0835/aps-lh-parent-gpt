@@ -2,11 +2,11 @@ package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;

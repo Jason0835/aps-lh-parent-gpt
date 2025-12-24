@@ -1,5 +1,6 @@
 package com.zlt.sync.domain;
 
+import com.zlt.aps.itf.vo.SyncBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Getter;
