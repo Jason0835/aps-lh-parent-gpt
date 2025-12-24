@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -74,6 +75,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
     @Autowired
     private IScmItfService iScmItfService;
+
+    @Autowired
+    private ISysConfigService sysConfigService;
 
     @Override
     protected String getDocTypeCode() {
@@ -169,6 +173,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         param.setBillDateEndTime(nowDateStr);
         SyncPlanedNotShipParamVo paramVo = new SyncPlanedNotShipParamVo();
         paramVo.setFactory(factoryCode);
+        try {
+            String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
+            String[] split = config.split("-");
+            lastYear = Integer.parseInt(split[0]);
+            paramVo.setMonth(Integer.parseInt(split[1]));
+        } catch (NumberFormatException e) {
+            log.error("获取配置失败", e);
+        }
         paramVo.setYear(lastYear);
         paramVo.setMonth(Integer.parseInt(lastMonth));
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
