@@ -331,7 +331,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
 
     /**
-     * 设置其他值
+     * 设置其他字段
      * @param contextDTO
      */
     private void setOtherField(MpRollAdjustContextDTO contextDTO) {

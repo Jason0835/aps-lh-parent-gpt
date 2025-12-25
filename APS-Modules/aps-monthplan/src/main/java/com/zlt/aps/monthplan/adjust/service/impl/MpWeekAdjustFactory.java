@@ -4,8 +4,6 @@ import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +24,11 @@ public class MpWeekAdjustFactory {
     private static Map<WeekAdjustTypeEnum, IMpWeekAdjustService> strategyMap = new ConcurrentHashMap<>();
 
     public IMpWeekAdjustService getStrategy(String code) {
-        return strategyMap.get(WeekAdjustTypeEnum.getByCode(code));
+        WeekAdjustTypeEnum weekAdjustTypeEnum = WeekAdjustTypeEnum.getByCode(code);
+        if (weekAdjustTypeEnum == null) {
+            return null;
+        }
+        return strategyMap.get(weekAdjustTypeEnum);
     }
 
     @PostConstruct
