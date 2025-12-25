@@ -2,13 +2,13 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -27,7 +27,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @ApiModel(value = "需求计划对象", description = "需求计划对象 ")
 @Data
 @TableName(value = "T_DP_DEMAND_PLAN")
-public class DpDemandPlan extends CommonBusiEntity{
+public class DpDemandPlan extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
