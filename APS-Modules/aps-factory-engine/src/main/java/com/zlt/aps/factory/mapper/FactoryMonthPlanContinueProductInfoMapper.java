@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.mapper;
 
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,8 +16,8 @@ import java.util.List;
 @Mapper
 public interface FactoryMonthPlanContinueProductInfoMapper {
     /**
-     * 根据需求计划，获取对应的SKU的日硫化量
-     * 包含MES日硫化量，标准的日硫化量，APS计算的日硫化量，硫化总时间单位(s)
+     * 根据上个月最后一天的排产信息，获得对应在产的Sku信息
+     * 即续作Sku信息
      *
      * @param factoryCode 工厂编码
      * @param year        年份
@@ -29,4 +30,17 @@ public interface FactoryMonthPlanContinueProductInfoMapper {
                                                      @Param("month") Integer month,
                                                      @Param("lastDay") Integer lastDay);
 
+    /**
+     * 根据上个月最后一天，获取在机结构信息
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    List<ContinueGroupInfo> getContinueGroupInfo(@Param("factoryCode") String factoryCode,
+                                                 @Param("year") Integer year,
+                                                 @Param("month") Integer month,
+                                                 @Param("lastDay") Integer lastDay);
 }

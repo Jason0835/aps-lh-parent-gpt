@@ -21,5 +21,16 @@
            AND ppf.MONTH = #{month,jdbcType=DECIMAL}
            AND ppf.DAY_${lastDay} > 0
     </select>
-
+    
+    <select id="getContinueGroupInfo" resultType="com.zlt.aps.factory.domain.dto.ContinueGroupInfo">
+        SELECT msa.CX_MACHINE_CODE,
+               msa.STRUCTURE_NAME
+          FROM t_mp_structure_allocation msa
+         WHERE IFNULL(msa.IS_DELETE, 0) = 0
+           AND msa.PLAN_TYPE = '01'
+           AND msa.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND msa.YEAR = #{year,jdbcType=DECIMAL}
+           AND msa.MONTH = #{month,jdbcType=DECIMAL}
+           AND msa.END_DAY = #{lastDay,jdbcType=DECIMAL}
+    </select>
 </mapper>
