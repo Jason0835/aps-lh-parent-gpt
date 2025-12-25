@@ -123,7 +123,7 @@ public class MpAdjustStructureIn extends BaseEntity {
     private Integer confirmAdjustQty;
 
     /** 调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑； */
-    @Excel(name = "ui.data.column.mpAdjustStructureIn.adjustPriority")
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.adjustPriority", dictType = "adjust_priority")
     @ApiModelProperty(value = "调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑；", name = "adjustPriority")
     @TableField(value = "ADJUST_PRIORITY")
     private Integer adjustPriority;
