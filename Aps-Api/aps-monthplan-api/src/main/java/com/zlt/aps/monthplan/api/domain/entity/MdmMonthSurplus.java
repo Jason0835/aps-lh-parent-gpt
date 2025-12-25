@@ -110,7 +110,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 计划余量
      */
-    @ImportExcelValidated(required = true, digits = true)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999999)
     @Excel(name = "ui.data.column.mdmMonthSurplus.planSurplusQty")
     @ApiModelProperty(value = "计划余量", name = "planSurplusQty")
     @TableField(value = "PLAN_SURPLUS_QTY")
