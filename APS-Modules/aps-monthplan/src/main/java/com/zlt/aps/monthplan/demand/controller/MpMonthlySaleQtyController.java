@@ -14,6 +14,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
@@ -100,6 +101,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         List<AreaConvertVo> convertVoList = list.stream().map(MpMonthlySaleQty::getSaleArea)
                 .flatMap(item -> Arrays.stream(item.split(",")))
                 .distinct()
+                .filter(StringUtils::isNotBlank)
                 .map(item -> {
                     AreaConvertVo areaConvertVo = new AreaConvertVo();
                     areaConvertVo.setAreaCode(item);
