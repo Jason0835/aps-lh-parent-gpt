@@ -127,4 +127,12 @@ public interface IFactoryMonthPlanProdFinalService {
     FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
 
     List<MonthPlanRequireStock> getSaleMonthPlanRequireStock(String monthPlanVersion);
+
+    /**
+     * 下发月计划
+     *
+     * @param factoryMonthPlanProdFinal 参数
+     * @return 结果
+     */
+    AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal);
 }
