@@ -4,6 +4,7 @@ import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -108,10 +109,11 @@ public class ContinueProductInfo implements Serializable {
 
     /**
      * 提取续作Sku的续作排产模具数，并放入continueSkuMouldNumberMap集合中
+     * continueSkuMouldNumberMap : key=materialDesc : value=续作sku信息
      *
      * @param continueSkuMouldNumberMap 存储续作Sku的续作模具数
      */
-    public void extractSkuProductionMouldNumber(Map<String, Integer> continueSkuMouldNumberMap) {
+    public void extractSkuProductionMouldNumber(Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap) {
         if (null == continueSkuMouldNumberMap) {
             return;
         }
@@ -119,12 +121,28 @@ public class ContinueProductInfo implements Serializable {
         if (null == currentMouldNumber || currentMouldNumber <= BigDecimal.ZERO.intValue()) {
             currentMouldNumber = BigDecimal.ZERO.intValue();
         }
-        Integer sumNumber = continueSkuMouldNumberMap.get(materialDesc);
+        CxContinueSkuInfoHelper continueSkuInfo = continueSkuMouldNumberMap.get(materialDesc);
+        if (null == continueSkuInfo) {
+            continueSkuInfo = builderEmpty();
+            continueSkuMouldNumberMap.put(materialDesc, continueSkuInfo);
+        }
+        Integer sumNumber = continueSkuInfo.getMouldNumber();
         if (null == sumNumber) {
             sumNumber = BigDecimal.ZERO.intValue();
         }
         sumNumber = sumNumber + currentMouldNumber;
-        continueSkuMouldNumberMap.put(materialDesc, sumNumber);
+        continueSkuInfo.setMouldNumber(sumNumber);
     }
 
+    /**
+     * 创建带有基础信息-没有模具数的续作sku信息
+     *
+     * @return
+     */
+    private CxContinueSkuInfoHelper builderEmpty() {
+        CxContinueSkuInfoHelper continueSkuInfo = new CxContinueSkuInfoHelper();
+        BeanUtils.copyProperties(this, continueSkuInfo);
+        continueSkuInfo.setMouldNumber(BigDecimal.ZERO.intValue());
+        return continueSkuInfo;
+    }
 }

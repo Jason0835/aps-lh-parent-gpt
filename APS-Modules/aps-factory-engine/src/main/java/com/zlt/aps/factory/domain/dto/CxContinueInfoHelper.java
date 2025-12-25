@@ -32,8 +32,9 @@ public class CxContinueInfoHelper implements Serializable {
     private Set<String> cxMachineCodeSet;
     /**
      * 续作SKU及模具数
+     * key=materialDesc : value=续作sku信息(含使用的模具数)
      */
-    private Map<String, Integer> continueSkuMouldNumberMap;
+    private Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap;
     /**
      * 对应成型产能续作信息
      * 成型上在产的SKU和使用的模具数
@@ -95,7 +96,7 @@ public class CxContinueInfoHelper implements Serializable {
             return;
         }
         Set<String> cxMachineCodeSet = new HashSet<>();
-        Map<String, Integer> continueSkuMouldNumberMap = new HashMap<>();
+        Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = new HashMap<>();
         continueSkuList.forEach(continueProductInfo -> {
             continueProductInfo.extractEffectiveCxMachineCode(cxMachineCodeSet, allCxMachineGroup);
             continueProductInfo.extractSkuProductionMouldNumber(continueSkuMouldNumberMap);

@@ -390,6 +390,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(continueAllocationMap)) {
             return;
         }
+        //todo 降膜排产？
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = ((TbrProductionContext) context).getBaseDataContainer().getSkuMouldRelationMap();
         continueAllocationMap.forEach((cxMachineCode, productionGroupPlan) -> {
             String structureName = productionGroupPlan.getProductionPlanInfo().getGroupName();
