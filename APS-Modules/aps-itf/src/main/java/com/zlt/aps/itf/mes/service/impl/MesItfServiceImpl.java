@@ -6,6 +6,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
@@ -15,9 +16,9 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.core.dao.basedao.BaseDao;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -61,7 +62,7 @@ public class MesItfServiceImpl implements MesItfService {
         MdmSkuMouldRel mdmSkuMouldRel = new MdmSkuMouldRel();
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmSkuMouldRel> list = this.getMdmSkuMouldRelList(mdmSkuMouldRel);
-        // 型腔模号+NC物料编码作为匹配条件，如果存在，则更新，不存在则插入
+        // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 1000);
         for (List<MdmSkuMouldRel> skuMouldRelList : splitList) {
             List<MdmSkuMouldRel> existsList = productModelRelationEntityMapper.selectByUniqueKeyList(skuMouldRelList);
@@ -93,7 +94,7 @@ public class MesItfServiceImpl implements MesItfService {
         MdmModelInfo mdmSkuMouldRel = new MdmModelInfo();
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmModelInfo> list = getMdmModelInfoList(mdmSkuMouldRel);
-        // 型腔模号+NC物料编码作为匹配条件，如果存在，则更新，不存在则插入
+        // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         List<List<MdmModelInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
         for (List<MdmModelInfo> saveList : splitList) {
             List<MdmModelInfo> existsList = modelInfoEntityMapper.selectByUniqueKeyList(saveList);
@@ -146,7 +147,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @param time               时间
      * @param mpOverdueSkuList   要添加的列表
      */
-    private static List<MpOverdueSku> addOverdueSku(MdmProductStock productStock, int stockYear, int stockMonth, Date overdueRegularTime, Date overdueCycleTime, Date time, List<MpOverdueSku> mpOverdueSkuList) {
+    private static void addOverdueSku(MdmProductStock productStock, int stockYear, int stockMonth, Date overdueRegularTime, Date overdueCycleTime, Date time, List<MpOverdueSku> mpOverdueSkuList) {
         if (YesOrNoEnum.YES.getCode().equals(productStock.getIsExceedTire())) {
             MpOverdueSku mpOverdueSku = new MpOverdueSku();
             mpOverdueSku.setFactoryCode(productStock.getFactoryCode());
@@ -169,7 +170,6 @@ public class MesItfServiceImpl implements MesItfService {
             }
             mpOverdueSkuList.add(mpOverdueSku);
         }
-        return mpOverdueSkuList;
     }
 
     /**
@@ -187,6 +187,7 @@ public class MesItfServiceImpl implements MesItfService {
             stockDate = DateUtils.getNowDate("yyyy-MM-dd");
         }
         String factoryCode = mdmProductStock.getFactoryCode();
+        String productTypeCode = mdmProductStock.getProductTypeCode();
 
         Calendar stockDateCalendar = Calendar.getInstance();
         stockDateCalendar.setTime(stockDate);
@@ -215,6 +216,8 @@ public class MesItfServiceImpl implements MesItfService {
         Date subTime4 = stockDateCalendar.getTime();
 
         FactoryParam param = new FactoryParam();
+        param.setFactoryCode(factoryCode);
+        param.setProductTypeCode(productTypeCode);
         param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
         Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
 
@@ -253,7 +256,7 @@ public class MesItfServiceImpl implements MesItfService {
                 } else if (time.before(subTime1)) {
                     productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, false, false, false);
                 }
-                mpOverdueSkuList = addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
+                addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
             }
             baseDao.insertBatch(importList);
             baseDao.insertBatch(mpOverdueSkuList);
@@ -272,7 +275,9 @@ public class MesItfServiceImpl implements MesItfService {
     private Date getOverdueTime(FactoryParam param, Calendar stockDateCalendar, Date stockDate) {
         FactoryParam overdueParam = iFactoryParamService.getFacParamSingle(param);
         stockDateCalendar.setTime(stockDate);
-        stockDateCalendar.add(Calendar.MONTH, -Integer.parseInt(overdueParam.getParamValue()));
+        String defaultValue = overdueParam.getDefauleValue();
+        String paramValue = StringUtils.defaultIfBlank(overdueParam.getParamValue(), defaultValue);
+        stockDateCalendar.add(Calendar.MONTH, -Integer.parseInt(paramValue));
         return stockDateCalendar.getTime();
     }
 
@@ -466,10 +471,10 @@ public class MesItfServiceImpl implements MesItfService {
             List<MdmMouldShellInfo> existsList = mouldShellInfoEntityMapper.selectByUniqueKeyList(saveList);
             Map<String, MdmMouldShellInfo> existsMap = new HashMap<>(16);
             if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMoldModelCode()), Function.identity()));
+                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldSetCode()), Function.identity()));
             }
             for (MdmMouldShellInfo entity : saveList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMoldModelCode());
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldSetCode());
                 if (existsMap.containsKey(mapKey)) {
                     MdmMouldShellInfo existsData = existsMap.get(mapKey);
                     entity.setId(existsData.getId());

@@ -165,7 +165,7 @@ public class MpTrialPlanUIController extends BaseUIController<MpTrialPlan> {
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
         ExcelUtil<MpTrialPlan> util = new ExcelUtil<>(MpTrialPlan.class);
-        util.exportExcel(response, null, fileName, fileName);
+        util.importTemplateExcel(response, fileName);
         return AjaxResult.success();
     }
 

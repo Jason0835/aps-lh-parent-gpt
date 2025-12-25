@@ -1,21 +1,5 @@
 package com.zlt.aps.gsq.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog;
-import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
-import com.zlt.aps.gsq.mapper.GsqDispatcherLogMapper;
-import com.zlt.aps.gsq.service.GsqDispatcherLogService;
-import com.zlt.aps.gsq.service.GsqMachineInfoService;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,6 +8,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.gsq.api.domain.entity.GsqDispatcherLog;
+import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
+import com.zlt.aps.gsq.mapper.GsqDispatcherLogMapper;
+import com.zlt.aps.gsq.service.GsqDispatcherLogService;
+import com.zlt.aps.gsq.service.GsqMachineInfoService;
 
 /**
  * 钢丝圈调度员排程操作日志Service业务层处理

@@ -1,6 +1,39 @@
 package com.zlt.aps.tc.controller;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
@@ -14,41 +47,21 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.tc.api.domain.entity.TcDayFinishQty;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
 import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.common.handle.TcSyncDataHandle;
 import com.zlt.aps.tc.engine.service.TcEngineService;
 import com.zlt.aps.tc.service.TcMachineInfoService;
 import com.zlt.aps.tc.service.TcScheduleResultService;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
-import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.common.utils.StringUtil;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
+
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
 
 /**
  * 胎侧排程结果Controller
@@ -68,12 +81,10 @@ public class TcScheduleResultController extends AbstractBillBizController<TcSche
     private TcMachineInfoService tcMachineInfoService;
     @Resource
     private TcEngineService tcEngineService;
-    @Resource
-    private TcSyncDataHandle syncDataHandle;
     @Autowired
     private FactoryService factoryService;
 	@Resource
-	private SyncDataLogsService syncDataLogsService;
+	private ISyncDataLogsApiService syncDataLogsService;
 
     /**
      * 查询胎侧排程结果列表
@@ -429,24 +440,25 @@ public class TcScheduleResultController extends AbstractBillBizController<TcSche
         //排程发布
         long[] arr = list.stream().mapToLong(TcScheduleResult::getId).toArray();
         //获取数据版本号
-        String dataVersion = syncDataHandle.getDataVersion(ApsConstant.TC_DEPLOY_SYNC_KEY);
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.TC_DEPLOY_SYNC_KEY);
         // 厂别、分公司编号
         String factoryCode = factoryService.getFactoryCode();
         String companyCode = factoryService.getCompanyCode();
         AjaxResult ajaxResult = null;
         try {
             ajaxResult = tcScheduleResultService.publish(arr, tcScheduleResult.getScheduleDate(), dataVersion, factoryCode, companyCode);
-            SyncParamsVO syncParamsVO = new SyncParamsVO();
-            syncParamsVO.setSyncKey(ApsConstant.TC_DEPLOY_SYNC_KEY);
-            syncParamsVO.setDataVersion(dataVersion);
-            // 请求参数
-            JSONObject params = new JSONObject();
-            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, tcScheduleResult.getScheduleDate()));
-			params.put("rowCount", arr.length);
-            syncParamsVO.setParams(params);
-            syncParamsVO.setFactoryCode(factoryCode);
-            syncParamsVO.setCompanyCode(companyCode);
-            syncDataHandle.syncNotice(syncParamsVO);
+            // TODO 调整成itf接口
+//            SyncParamsVO syncParamsVO = new SyncParamsVO();
+//            syncParamsVO.setSyncKey(ApsConstant.TC_DEPLOY_SYNC_KEY);
+//            syncParamsVO.setDataVersion(dataVersion);
+//            // 请求参数
+//            JSONObject params = new JSONObject();
+//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, tcScheduleResult.getScheduleDate()));
+//			params.put("rowCount", arr.length);
+//            syncParamsVO.setParams(params);
+//            syncParamsVO.setFactoryCode(factoryCode);
+//            syncParamsVO.setCompanyCode(companyCode);
+//            syncDataHandle.syncNotice(syncParamsVO);
 
 			// 取回mes的反馈结果
 			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);

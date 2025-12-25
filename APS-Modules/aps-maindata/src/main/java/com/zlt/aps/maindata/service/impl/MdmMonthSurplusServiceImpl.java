@@ -68,7 +68,7 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "requireVersion", "materialCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "materialCode"));
     }
 
     @Override

@@ -309,12 +309,12 @@ public class ApsConstant {
      * 是否 为是
      */
     public static final Integer APS_YES_NO_1 = 1;
-    
+
     /**
      * sync服务同步状态：异常
      */
     public static final Integer SYNC_STATUS_3 = 3;
-    
+
     /**
      * sync服务同步状态：成功
      */
@@ -413,22 +413,22 @@ public class ApsConstant {
      *  销售优先级：5-暂缓订单
      */
     public static final String SAL_PRIORITY_POSTPONE = "5";
-    
+
     /**
      * 发货模式：02-整单发货
      */
     public static final String DELIVERY_MODE_ALL = "02";
-    
+
     /**
      * 发货模式：01-分批发货
      */
     public static final String DELIVERY_MODE_SPLIT = "01";
-    
+
     /**
      * SCM发货模式：10-整单发货
      */
     public static final String SCM_DELIVERY_MODE_ALL = "10";
-    
+
     /**
      * SCM发货模式：20-分批发货
      */

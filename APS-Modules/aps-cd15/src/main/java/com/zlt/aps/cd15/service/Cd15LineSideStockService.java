@@ -20,11 +20,4 @@ public interface Cd15LineSideStockService {
      * @return 15°裁断库存信息集合
      */
     List<Cd15LineSideStock> selectStockList(Cd15LineSideStock stock);
-
-    /**
-     * 到MES同步库存数据
-     *
-     * @return 
-     */
-    AjaxResult syncStock();
 }

@@ -1,23 +1,17 @@
 package com.zlt.aps.itf.mes.listener;
 
-import javax.annotation.Resource;
-
-import org.springframework.amqp.rabbit.annotation.EnableRabbit;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import com.ruoyi.common.core.utils.SpringUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
+import com.zlt.aps.itf.mes.enums.MesInterfaceCodeEnum;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.service.SyncDataMQService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.*;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import com.ruoyi.common.core.utils.SpringUtils;
-import com.ruoyi.common.core.utils.reflect.ReflectUtils;
-import com.zlt.aps.itf.mes.enums.MesInterfaceCodeEnum;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
-import com.zlt.sync.service.SyncDataMQService;
-
-import lombok.extern.slf4j.Slf4j;
+import javax.annotation.Resource;
 
 /**
  * @author Chen
@@ -29,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MesSyncListener {
     @Resource(name = "syncDataMQService")
     private SyncDataMQService syncDataMQService;
-    
+
     /**
      * 接收MES消息
      *

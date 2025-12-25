@@ -65,9 +65,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
      * @return
      */
     public static ProductGroupCxCapacityInfo buildContinueCxCapacityInfo(String structureName, String cxMachineCode, Map<String, CxContinueProductInfoHelper> continueSkuInfo, CxMachineBaseInfoVo baseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        ProductGroupCxCapacityInfo capacityInfo = new ProductGroupCxCapacityInfo();
-        capacityInfo.setGroupName(structureName);
-        capacityInfo.setCxMachineCode(cxMachineCode);
+        ProductGroupCxCapacityInfo capacityInfo = buildContinueCxCapacityInfo(structureName, cxMachineCode, baseInfo, structureLhRatioList);
         //实际硫化机台数
         List<CxContinueProductInfoHelper> realMouldCountList = new ArrayList<>(continueSkuInfo.values());
         if (CollectionUtils.isEmpty(realMouldCountList)) {
@@ -76,6 +74,22 @@ public class ProductGroupCxCapacityInfo implements Serializable {
             Integer lhMachineCount = realMouldCountList.stream().mapToInt(CxContinueProductInfoHelper::getMouldNumber).sum() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             capacityInfo.setRealMaxLhMachineCount(lhMachineCount);
         }
+        return capacityInfo;
+    }
+
+    /**
+     * 构建在机结构-在机机台的产能相关信息，结构成型硫化配比
+     *
+     * @param structureName        结构名
+     * @param cxMachineCode        成型机台编码
+     * @param baseInfo             机台基础信息
+     * @param structureLhRatioList 结构成型硫化配比集合
+     * @return
+     */
+    public static ProductGroupCxCapacityInfo buildContinueCxCapacityInfo(String structureName, String cxMachineCode, CxMachineBaseInfoVo baseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        ProductGroupCxCapacityInfo capacityInfo = new ProductGroupCxCapacityInfo();
+        capacityInfo.setGroupName(structureName);
+        capacityInfo.setCxMachineCode(cxMachineCode);
         //原始配置的胎胚种类数和硫化机台配比
         capacityInfo.setMaxEmbryoCodeCount(BigDecimal.ZERO.intValue());
         capacityInfo.setMaxLhMachineCount(BigDecimal.ZERO.intValue());

@@ -1,6 +1,39 @@
 package com.zlt.aps.gdyy.service.impl;
 
-import com.alibaba.fastjson.JSONObject;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -31,7 +64,6 @@ import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyDispatcherLog;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyMachineInfo;
-import com.zlt.aps.gdyy.common.handle.GdyySyncDataHandle;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineService;
 import com.zlt.aps.gdyy.engine.vo.GdyyBigRollVo;
 import com.zlt.aps.gdyy.entity.GdyyParams;
@@ -41,26 +73,6 @@ import com.zlt.aps.gdyy.mapper.GdyyParamsMapper;
 import com.zlt.aps.gdyy.mapper.GdyyScheduleResultMapper;
 import com.zlt.aps.gdyy.service.GdyyDispatcherLogService;
 import com.zlt.aps.gdyy.service.GdyyScheduleResultService;
-import com.zlt.sync.povo.SyncParamsVO;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 
 /**
@@ -94,9 +106,6 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
 
     @Autowired
     private FactoryService factoryService;
-
-    @Resource
-    private GdyySyncDataHandle gdyySyncDataHandle;
 
     /**
      * 大卷标准长度默认值：600
@@ -331,21 +340,22 @@ public class GdyyScheduleResultServiceImpl extends ServiceImpl<GdyyScheduleResul
      */
     @Override
     public void publishNoticeMes(Date scheduleDate, String dataVersion, int rowCount) {
-        // 厂别、分公司编号
-        String factoryCode = factoryService.getFactoryCode();
-        String companyCode = factoryService.getCompanyCode();
-        //数据同步到中间库后，往mq中发送消息通知MES去取数据
-        SyncParamsVO syncParamsVO = new SyncParamsVO();
-        syncParamsVO.setSyncKey(ApsConstant.GDYY_DEPLOY_SYNC_KEY);
-        syncParamsVO.setDataVersion(dataVersion);
-        // 请求参数
-        JSONObject params = new JSONObject();
-        params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-        params.put("rowCount", rowCount);
-        syncParamsVO.setParams(params);
-        syncParamsVO.setFactoryCode(factoryCode);
-        syncParamsVO.setCompanyCode(companyCode);
-        gdyySyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
+    	// 调整为itf接口
+//        // 厂别、分公司编号
+//        String factoryCode = factoryService.getFactoryCode();
+//        String companyCode = factoryService.getCompanyCode();
+//        //数据同步到中间库后，往mq中发送消息通知MES去取数据
+//        SyncParamsVO syncParamsVO = new SyncParamsVO();
+//        syncParamsVO.setSyncKey(ApsConstant.GDYY_DEPLOY_SYNC_KEY);
+//        syncParamsVO.setDataVersion(dataVersion);
+//        // 请求参数
+//        JSONObject params = new JSONObject();
+//        params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+//        params.put("rowCount", rowCount);
+//        syncParamsVO.setParams(params);
+//        syncParamsVO.setFactoryCode(factoryCode);
+//        syncParamsVO.setCompanyCode(companyCode);
+//        gdyySyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
     }
 
     /**

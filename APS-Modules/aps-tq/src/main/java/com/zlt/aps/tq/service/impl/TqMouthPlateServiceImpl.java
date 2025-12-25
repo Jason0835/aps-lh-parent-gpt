@@ -1,6 +1,20 @@
 package com.zlt.aps.tq.service.impl;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -17,16 +31,7 @@ import com.zlt.aps.tq.entity.TqMouthPlate;
 import com.zlt.aps.tq.mapper.TqMouthPlateMapper;
 import com.zlt.aps.tq.service.TqMachineInfoService;
 import com.zlt.aps.tq.service.TqMouthPlateService;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.zlt.common.utils.StringUtil;
 
 /**
  * <p>
@@ -151,7 +156,7 @@ public class TqMouthPlateServiceImpl extends ServiceImpl<TqMouthPlateMapper, TqM
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, mouthPlate);
             String machineName = mouthPlate.getMachineName();
             Long machineId = machineCodeMap.get(machineName);
-            if (machineId == null && StringUtil.isNotBlank(machineName)) {
+            if (machineId == null && !StringUtil.isEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }

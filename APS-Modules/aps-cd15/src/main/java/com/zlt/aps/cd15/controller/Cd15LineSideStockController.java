@@ -45,16 +45,6 @@ public class Cd15LineSideStockController extends BaseController {
     }
 
     /**
-     * 到MES同步15°裁断线边库存信息
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改15°裁断库存信息（id不为空）")
-    @PostMapping("/syncStock")
-    public AjaxResult syncStock() {
-        return stockService.syncStock();
-    }
-
-    /**
      * 查询15°裁断线边库存列表
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)

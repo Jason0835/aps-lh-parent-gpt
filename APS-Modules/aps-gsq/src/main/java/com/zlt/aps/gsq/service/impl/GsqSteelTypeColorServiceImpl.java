@@ -1,6 +1,20 @@
 package com.zlt.aps.gsq.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -17,14 +31,6 @@ import com.zlt.aps.gsq.api.domain.dto.GsqSteelTypeColorDto;
 import com.zlt.aps.gsq.entity.GsqSteelTypeColor;
 import com.zlt.aps.gsq.mapper.GsqSteelTypeColorMapper;
 import com.zlt.aps.gsq.service.GsqSteelTypeColorService;
-import org.apache.commons.lang.StringUtils;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 /**
  * @author Gim
  */

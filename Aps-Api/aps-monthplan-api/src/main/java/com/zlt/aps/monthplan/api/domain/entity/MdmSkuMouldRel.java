@@ -118,7 +118,7 @@ public class MdmSkuMouldRel extends BaseEntity {
      * 是否共用花纹/侧板块，字典：biz_yes_no，0否1是
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.relation.samePatternPanel", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.relation.isSamePatternPanel", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否共用花纹/侧板块，字典：biz_yes_no，0否1是", name = "isSamePatternPanel")
     @TableField(value = "IS_SAME_PATTER_PANEL")
     private String isSamePatternPanel;

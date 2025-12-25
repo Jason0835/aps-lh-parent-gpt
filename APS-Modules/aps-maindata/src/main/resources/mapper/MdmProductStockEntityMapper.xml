@@ -4,4 +4,38 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper">
 
+    <select id="list4Mes">
+        SELECT stock.STOCK_DATE,
+        stock.MATERIAL_CODE,
+        stock.MES_MATERIAL_CODE,
+        stock.STOCK_NUM,
+        stock.WEEK_YEAR,
+        stock.IS_UNIFORMITY,
+        stock.IS_DYNAMIC_BALANCE,
+        stock.STOCK_END_TIME,
+        stock.DATA_VERSION,
+        stock.COMPANY_CODE,
+        stock.FACTORY_CODE,
+        info.PRODUCT_TYPE_CODE,
+        info.BRAND,
+        info.STRUCTURE_NAME,
+        -- info.LOCATION_TYPE,
+        info.MATERIAL_DESC
+        FROM mes_product_stock stock
+        LEFT JOIN T_MDM_MATERIAL_INFO info ON stock.MATERIAL_CODE = info.MATERIAL_CODE
+        WHERE 1 = 1
+        <if test="stockDate != null">AND stock.STOCK_DATE = #{stockDate}</if>
+        <if test="materialCode != null and materialCode != ''">AND stock.MATERIAL_CODE like concat(concat('%',
+            #{materialCode}), '%')
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">AND stock.FACTORY_CODE = #{factoryCode}</if>
+        <if test="params != null">
+            <if test="params.materialCodeList != null and params.materialCodeList.size() > 0">
+                AND stock.MATERIAL_CODE IN
+                <foreach item="item" collection="params.materialCodeList" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </if>
+    </select>
 </mapper>

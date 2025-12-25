@@ -104,7 +104,7 @@
     </select>
 
     <!-- 插入数据 -->
-    <insert id="insert" parameterType="com.zlt.sync.domain.AuxReqSyncDataLogs">
+    <insert id="insert" parameterType="com.zlt.aps.itf.vo.AuxReqSyncDataLogs">
         INSERT INTO AUX_REQ_SYNC_DATA_LOGS
         (<include refid="fields"/>)
         VALUES(<include refid="values"/>)
@@ -223,7 +223,7 @@
     </sql>
 
     <!-- 插入数据 -->
-    <update id="update" parameterType="com.zlt.sync.domain.AuxReqSyncDataLogs">
+    <update id="update" parameterType="com.zlt.aps.itf.vo.AuxReqSyncDataLogs">
         UPDATE AUX_REQ_SYNC_DATA_LOGS
         <set>
             STATUS=#{auxReqSyncDataLogs.status},

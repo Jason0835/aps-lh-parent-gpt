@@ -1,6 +1,6 @@
 package com.zlt.sync.service;
 
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 
 /**
  * mq消息处理

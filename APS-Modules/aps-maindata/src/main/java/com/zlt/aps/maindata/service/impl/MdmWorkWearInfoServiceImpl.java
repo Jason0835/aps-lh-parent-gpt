@@ -57,6 +57,6 @@ public class MdmWorkWearInfoServiceImpl extends AbstractDocService<MdmWorkWearIn
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "workWearName", "specificationModel", "workWearType"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "workWearName", "specifications", "workWearType"));
     }
 }

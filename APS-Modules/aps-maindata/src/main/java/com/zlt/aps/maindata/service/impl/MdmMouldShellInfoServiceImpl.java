@@ -4,11 +4,14 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,10 @@ import java.util.List;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MdmMouldShellInfoServiceImpl extends AbstractDocService<MdmMouldShellInfo> implements IMdmMouldShellInfoService {
+
+    @Autowired
+    private IMesItfService mesItfService;
+
     @Override
     protected String getDocTypeCode() {
         return "MP0208";
@@ -68,7 +75,10 @@ public class MdmMouldShellInfoServiceImpl extends AbstractDocService<MdmMouldShe
      */
     @Override
     public AjaxResult mesCapture() {
-        // Steve's TODO 待模壳信息同步接口完善后补充
+        // Steve's TODO 待确认抓取模壳信息版本号取值
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+//        syncDataLogs.setDataVersion("");
+        mesItfService.syncMoldShell(syncDataLogs);
         return AjaxResult.success();
     }
 }

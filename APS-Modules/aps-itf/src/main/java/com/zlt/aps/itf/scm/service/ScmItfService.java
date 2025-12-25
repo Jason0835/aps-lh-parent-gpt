@@ -22,6 +22,13 @@ public interface ScmItfService {
 	AjaxResult syncPlanedNotShipList(SyncPlanedNotShipParamVo planedNotShipParamVo);
 
 	/**
+	 * 锁定订单池
+	 * @param planedNotShipParamVo
+	 * @return
+	 */
+	AjaxResult lockSalesOrderPool(SyncPlanedNotShipParamVo planedNotShipParamVo);
+
+	/**
 	 * 同步发货明细数据
 	 * 
 	 * @param syncOutShipDmdOrdVo
