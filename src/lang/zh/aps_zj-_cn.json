@@ -23,7 +23,7 @@
   "ui.data.column.monthplan.salNCode": "客户国别",
   "ui.data.column.monthplan.natCode": "目的国",
   "ui.data.column.monthplan.salCodePo": "PO号",
-  "ui.data.column.monthplan.oriMaterialCode": "NC物料编码",
+  "ui.data.column.monthplan.oriMaterialCode": "物料编码",
   "ui.data.column.monthplan.weekYear": "年周号",
   "ui.data.column.monthplan.dynamicBalance": "均匀性",
   "ui.data.column.monthplan.uniformity": "动平衡",

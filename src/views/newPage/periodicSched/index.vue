@@ -43,6 +43,7 @@
         >
         <el-button
           @click="handleExport"
+
           v-hasPermi="['monthplan:mdmCycleSchStruConf:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
@@ -78,7 +79,7 @@
         }}</el-button>
         <el-button
           type="primary"
-          :loading="btnLoading"
+          :loading="generateLoading"
           @click="handleConfirm"
           >{{ this.$t("common.button.confirm") }}</el-button
         >
@@ -118,6 +119,7 @@ export default {
   data() {
     return {
       loading: false,
+      generateLoading:false,
       data: [],
       selection: [],
       page: {
@@ -219,19 +221,23 @@ export default {
         this.$modal.msgWarning(this.$t('ui.data.column.construction.check.planMonth.isNull'));
         return;
       } else {
+
         let arr = this.yearMonth.split("-");
         let params = {
           year: arr[0],
           month: arr[1],
         };
         try {
+          this.generateLoading=true
           let res = await getCycleSchStruConf(params);
           this.$modal.msgSuccess(res.msg);
           this.$set(this.page, "current", 1);
           this.getList();
           this.hide();
+          this.generateLoading=false
         } catch (err) {
           console.log(err);
+          this.generateLoading=false
         }
       }
     },

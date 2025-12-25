@@ -136,11 +136,11 @@ export default {
           dictData: this.dict.type.material_type,
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(NC)',
+          label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(MES)',
+          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
            prop: "mesMaterialCode",
         },
         // {
@@ -204,14 +204,14 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(NC)',
+          label: this.$t("ui.data.colume.wms.unused.productCode"),
         },
         {
            prop: "mesMaterialCode",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(MES)',
+          label: this.$t("ui.data.defectiveStock.mesMaterialCode")
         },
         // {
         //   prop: "物料名称",

@@ -407,7 +407,7 @@ export default {
         );
         console.log(data);
         this.data = data.rows;
-        // this.page.total = data.total;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

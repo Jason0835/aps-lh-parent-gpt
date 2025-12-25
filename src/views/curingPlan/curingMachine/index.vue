@@ -151,7 +151,7 @@ export default {
         // { type: "index", fixed: "left" },
 
         {
-          label: this.$t("ui.data.column.machine.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           formatter: (row) => {
             return this.selectDictLabel(
@@ -381,6 +381,7 @@ export default {
       }
     },
     handleEdit(row) {
+
       if (this.$refs.infoDialogRef) {
         this.$refs.infoDialogRef.show(row);
       }

@@ -19,7 +19,7 @@
 
       <template v-if="device !== 'mobile'">
         <lang-select class="set-language" />
-        <el-button type="text" @click="goMonth">中控台</el-button>
+        <!-- <el-button type="text" @click="goMonth">中控台</el-button> -->
         <search id="header-search" class="right-menu-item" />
 
         <RefreshCache class="right-menu-item hover-effect"/>

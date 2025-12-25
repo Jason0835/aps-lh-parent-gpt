@@ -30,6 +30,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import { editMachine, checkMachineCodeUnique } from "@/api/lh/machine";
+import { status } from "nprogress";
 // import { editVulcanizingMachine } from "@/api/mdm/vulcanizingMachine";
 
 export default {
@@ -154,7 +155,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.machine.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -222,7 +223,7 @@ export default {
             "controls-position": "right",
             precision: 0,
             min: 0,
-            max: 10,
+            max: 999999,
           },
         },
         {
@@ -267,6 +268,7 @@ export default {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           type: "textarea",
+          maxlength:200
         },
       ];
     },
@@ -290,6 +292,7 @@ export default {
 
     //utils
     show(data) {
+
       this.visible = true;
       if (data) {
         this.isEdit = true;
@@ -304,8 +307,10 @@ export default {
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
             : [],
+            status:data.status=='1'?true:false
           // mouldType: data.mouldType ? data.mouldType.split(",") : [],
         };
+        console.log( this.form)
       } else {
         this.form = {
           classShift: "2",

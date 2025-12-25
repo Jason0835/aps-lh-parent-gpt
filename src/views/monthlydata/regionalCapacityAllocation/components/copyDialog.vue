@@ -27,7 +27,7 @@
         v-loading="loading"
       >
       </info-form>
-      <div style="width: 100px; text-align: center">ui.text.monthlyproductiontarget.copyto</div>
+      <div style="width: 100px; text-align: center">{{ this.$t('ui.text.monthlyproductiontarget.copyto') }}</div>
       <info-form
         class="form-item-height"
         ref="copyForm"

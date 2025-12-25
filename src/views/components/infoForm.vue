@@ -250,16 +250,15 @@ export default {
       );
     },
     renderSwitch(item) {
-      let activeValue = this.isEmpty(item.activeValue) ? "0" : item.activeValue;
+      let activeValue = this.isEmpty(item.activeValue) ? false : item.activeValue;
       let inactiveValue = this.isEmpty(item.inactiveValue)
-        ? "1"
+        ? true
         : item.inactiveValue;
       return (
         <el-switch
           v-model={this.form[item.prop]}
           disabled={item.disabled}
-          active-value={activeValue}
-          inactive-value={inactiveValue}
+
         />
       );
     },

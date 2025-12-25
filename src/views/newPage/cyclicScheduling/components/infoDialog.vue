@@ -39,6 +39,34 @@ export default {
   components: { infoForm ,materialCodeSelect},
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error(this.$t("common.rule.noPoint"))
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 99999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -74,18 +102,19 @@ export default {
             trigger: "change",
           },
         ],
-        lineType: [
+        locationType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        jobType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
+        qty: [
+        {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: false }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
       },
@@ -135,12 +164,20 @@ export default {
           },
         },
         {
+          prop: "locationType",
+          label: this.$t("ui.data.column.finishStock.wai"),
+          type: "select",
+          dictData: this.parentDict.type.biz_stor_type,
+
+        },
+        {
           prop: "qty",
           label: this.$t("ui.data.defectiveStock.qty"),
           type: "number",
           min: 0,
           max: 99999999,
         },
+
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
@@ -173,9 +210,21 @@ export default {
           type: "number",
         },
         {
+          prop: "structureFrequency",
+          label: this.$t("ui.data.defectiveStock.structureFrequency"),
+          disabled: true,
+          type: "number",
+        },
+        {
           prop: "saleArea",
           label: this.$t("ui.data.defectiveStock.saleArea"),
           disabled: true,
+        },
+        {
+          prop: "threeOverdueStockQty",
+          label: this.$t("ui.data.defectiveStock.threeOverdueStockQty"),
+           disabled: true,
+          type: "number"
         },
         {
           prop: "sixOverdueStockQty",
@@ -183,11 +232,17 @@ export default {
           disabled: true,
           type: "number",
         },
+        // {
+        //   prop: "nightOverdueStockQty",
+        //   label: this.$t("ui.data.defectiveStock.nightOverdueStockQty"),
+        //   disabled: true,
+        //   type: "number",
+        // },
         {
-          prop: "nightOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.nightOverdueStockQty"),
-          disabled: true,
-          type: "number",
+          prop: "twelveOverdueStockQty",
+          label: this.$t("ui.data.defectiveStock.twelveOverdueStockQty"),
+             disabled: true,
+          type: "number"
         },
         {
           prop: "stockLimit",
@@ -197,6 +252,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          maxlength:200
         },
       ];
     },
@@ -242,6 +298,7 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
+          locationType: '2'
         };
       }
     },

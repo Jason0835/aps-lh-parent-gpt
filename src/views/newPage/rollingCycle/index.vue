@@ -22,9 +22,7 @@
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
           <el-tab-pane label="结构内" name="first">
-            <el-button @click="handShowResult(true)">{{
-              $t("获取调整订单")
-            }}</el-button>
+            <el-button @click="adjustOrder">{{ $t("获取调整订单") }}</el-button>
             <el-button @click="handShowResult(true)">{{
               $t("自动调整")
             }}</el-button>
@@ -62,10 +60,11 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-// import {
-//   listProductMoldingLimit,
-//   removeProductMoldingLimit,
-// } from "@/api/mdm/productMoldingLimit";
+import {
+  listInternalStructure,
+  getAdjustDetailList,
+  listOutsideStructure,
+} from "@/api/monthplan/adjustStructure";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -74,6 +73,7 @@ import infoDialog from "./components/infoDialog.vue";
 import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
+import { aW } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "MoldingClosingStageProgress",
@@ -84,7 +84,7 @@ export default {
     special,
     addModal,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -113,7 +113,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
-      testCloumn: [],
+      isEdit: false,
     };
   },
   computed: {
@@ -121,62 +121,68 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     columns() {
-
-      if(!this.show){
-        return []
+      if (!this.show) {
+        return [];
       }
       if (this.activeName == "first") {
-       return [
+        return [
           {
-            prop: "productStructure",
+            prop: "structureName",
             label: this.$t("产品结构"),
           },
           {
-            prop: "schedulingMachine",
+            prop: "scheduledMachines",
             label: this.$t("排产机台"),
           },
           {
-            prop: "ncMaterialCode",
+            prop: "materialCode",
             label: this.$t("NC物料编码"),
           },
           {
-            prop: "materialDescription",
+            prop: "materialDesc",
             label: this.$t("物料描述"),
           },
           {
-            prop: "isContainMaterials",
+            prop: "hasSpecialMaterial",
             label: this.$t("是否含材料"),
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
           },
           {
-            prop: "lastWeekOriginalNetDemand",
+            prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
           },
           {
-            prop: "currentNetDemand",
+            prop: "currentNetQty",
             label: this.$t("当前净需求量"),
           },
           {
-            prop: "netDemandChange",
+            prop: "netQtyChange",
             label: this.$t("净需求变动"),
           },
           {
-            prop: "monthlyPlanProductionQuantity",
+            prop: "monthScheduledQty",
             label: this.$t("月计划已排产量"),
           },
           {
-            prop: "pendingAdjustmentAmount",
+            prop: "pendingQty",
             label: this.$t("待调整量（降序）"),
           },
           {
-            prop: "confirmAdjustmentAmount",
+            prop: "confirmAdjustQty",
             label: this.$t("确认调整量"),
             render: ({ row }) => {
               return (
-                <el-input
-                  v-model={row.确认调整量}
-                  placeholder="请输入内容"
-                  size="mini"
-                ></el-input>
+                <div>
+                  <el-input
+                    v-if={this.isEdit}
+                    v-model={row.confirmAdjustQty}
+                    placeholder="请输入内容"
+                    size="mini"
+                  ></el-input>
+                  <span v-else>{row.confirmAdjustQty}</span>
+                </div>
               );
             },
           },
@@ -185,11 +191,14 @@ export default {
             label: this.$t("调整优先级"),
             render: ({ row }) => {
               return (
-                <el-input
-                  v-model={row.调整优先级}
-                  placeholder="请输入内容"
-                  size="mini"
-                ></el-input>
+                <div>
+                  <el-select v-model={row.adjustPriorities} size="mini" v-if={this.isEdit}>
+                    <el-option label="1" value="1" key="1" />
+                    <el-option label="2" value="2" key="2" />
+                    <el-option label="3" value="3" key="3" />
+                  </el-select>
+                  <span v-else>{row.adjustPriorities}</span>
+                </div>
               );
             },
           },
@@ -224,6 +233,7 @@ export default {
       }
       if (this.activeName == "second") {
         return [
+          { type: "selection", fixed: "left" },
           {
             prop: "expand",
             type: "expand",
@@ -247,15 +257,15 @@ export default {
           },
 
           {
-            prop: "formingMachine",
+            prop: "cxMachineCode",
             label: this.$t("成型机台"),
           },
           {
-            prop: "productStructure",
+            prop: "structureName",
             label: this.$t("产品结构"),
           },
           {
-            prop: "planQuantity",
+            prop: "beforePlanQty",
             label: this.$t("计划量"),
           },
           {
@@ -267,15 +277,15 @@ export default {
             label: this.$t("结束日期"),
           },
           {
-            prop: "adjustPlanQuantity",
+            prop: "afterPlanQty",
             label: this.$t("调整后计划量"),
           },
           {
-            prop: "adjustStartDate",
+            prop: "beforeEndDate",
             label: this.$t("调整后开始日期"),
           },
           {
-            prop: "adjustEndDate",
+            prop: "afterStartDate",
             label: this.$t("调整后结束日期"),
           },
         ];
@@ -334,23 +344,23 @@ export default {
           clearable: false,
         },
         {
-          prop: "成型机台",
+          prop: "cxMachineCode",
           label: this.$t("成型机台"),
         },
         {
-          prop: "产品结构",
+          prop: "structureName",
           label: this.$t("产品结构"),
         },
         {
-          prop: "版本",
+          prop: "version",
           label: this.$t("版本"),
         },
         {
-          prop: "NC物料编码",
+          prop: "materialCode",
           label: this.$t("NC物料编码"),
         },
         {
-          prop: "物料描述",
+          prop: "materialDesc",
           label: this.$t("物料描述"),
         },
       ];
@@ -388,6 +398,29 @@ export default {
     },
   },
   methods: {
+    //获取调整订单
+    async adjustOrder() {
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        if (this.activeName == "first") {
+          params.adjustType = "01";
+        } else {
+          params.adjustType = "02";
+        }
+        this.isEdit = true;
+        let res = await getAdjustDetailList(params);
+        console.log(res);
+      } catch (err) {}
+    },
     handleExpandChange(row, expandedRows) {
       // console.log(row, expandedRows, this.expands);
       this.expands = [];
@@ -404,13 +437,15 @@ export default {
       }
     },
     handleClick(tab, event) {
-      this.loading=true
+      this.loading = true;
       this.show = false;
-      setTimeout(() => {
-        // this.$refs.tableRef.onReset()
-        this.show = true;
-        this.loading = false;
-      }, 300);
+      this.getList();
+
+      // setTimeout(() => {
+      //   // this.$refs.tableRef.onReset()
+      //   this.show = true;
+      //   this.loading = false;
+      // }, 300);
     },
     handShowResult() {
       this.show = false;
@@ -490,10 +525,10 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
       }
 
       return params;
@@ -501,101 +536,45 @@ export default {
     // api
     async getList() {
       try {
+        this.isEdit = false;
         this.loading = true;
-        const data = [
-          {
-            id: 1,
-            productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101H1102",
-            ncMaterialCode: "3302000915",
-            materialDescription: "315/80R22.5 156/153K 20PR JD755 BL0EJY",
-            isContainMaterials: "否",
-            lastWeekOriginalNetDemand: "100",
-            currentNetDemand: "0",
-            netDemandChange: "-100",
-            monthlyPlanProductionQuantity: "100",
-            pendingAdjustmentAmount: "-100",
-            confirmAdjustmentAmount: "-100",
-            adjustPriorities: "",
-            actualAdjustment: "",
-            adjustmentReason: "",
-            formingMachine: "H1101",
-            productStructure: "315/80R22.5-JD758零度",
-            planQuantity: "100",
-            startDate: "1",
-            endDate: "5",
-            adjustPlanQuantity: "100",
-            adjustStartDate: "1",
-            adjustEndDate: "10",
-          },
-          {
-            id: 2,
-            productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101H1102",
-            ncMaterialCode: "3302002306",
-            materialDescription: "315/80R22.5 156/150J 20PR JD755 BL0EJY DL",
-            isContainMaterials: "否",
-            lastWeekOriginalNetDemand: "200",
-            currentNetDemand: "150",
-            netDemandChange: "-50",
-            monthlyPlanProductionQuantity: "150",
-            pendingAdjustmentAmount: "0",
-            confirmAdjustmentAmount: "0",
-            adjustPriorities: "",
-            actualAdjustment: "",
-            adjustmentReason: "",
-            formingMachine: "H1101",
-            productStructure: "315/80R22.5-JD759零度",
-            planQuantity: "120",
-            startDate: "6",
-            endDate: "10",
-            adjustPlanQuantity: "100",
-            adjustStartDate: "1",
-            adjustEndDate: "10",
-          },
-          {
-            id: 3,
-            productStructure: "315/80R22.5-JD758零度",
-            schedulingMachine: "H1101H1102",
-            ncMaterialCode: "3302002356",
-            materialDescription: "315/80R22.5 156/150J 20PR BD290 BL0EBL DL",
-            isContainMaterials: "否",
-            lastWeekOriginalNetDemand: "250",
-            currentNetDemand: "330",
-            netDemandChange: "80",
-            monthlyPlanProductionQuantity: "200",
-            pendingAdjustmentAmount: "130",
-            confirmAdjustmentAmount: "130",
-            adjustPriorities: "1",
-            actualAdjustment: "",
-            adjustmentReason: "",
-            formingMachine: "H1102",
-            productStructure: "315/80R22.5-JD760零度",
-            planQuantity: "150",
-            startDate: "11",
-            endDate: "15",
-            adjustPlanQuantity: "100",
-            adjustStartDate: "1",
-            adjustEndDate: "10",
-          },
-        ];
-        this.data = data;
-        this.total = 3;
-        // const data = await listProductMoldingLimit(this.formatParams());
-        // this.data = data.rows;
-        // this.page.total = data.total;
+        let data;
+        if (this.activeName == "first") {
+          data = await listInternalStructure(this.formatParams());
+        }
+        if (this.activeName == "second") {
+          data = await listOutsideStructure(this.formatParams());
+        }
+
+        this.data = data.rows;
+        this.page.total = data.total;
+        this.show = true;
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
+        this.show = true;
       }
     },
   },
   mounted() {
-    console.log("mounted");
-    this.getList();
+    // console.log("mounted");
+    // this.getList();
   },
   created() {
+    // 获取当前ui.data.colume.year和月份
+    const now = new Date();
+    const year = now.getFullYear(); // 2024
+    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
+    let defaultParams = {
+      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
   activated() {

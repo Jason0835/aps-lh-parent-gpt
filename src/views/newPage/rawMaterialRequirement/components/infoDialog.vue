@@ -41,6 +41,34 @@ export default {
   components: { infoForm },
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error(this.$t("common.rule.noPoint"))
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 99999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -89,12 +117,24 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
         ],
         t1MonthQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
         t2MonthQty: [
@@ -103,12 +143,24 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
         ],
         curMonthRudrQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
         t1MonthEudrQty: [
@@ -117,12 +169,24 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
         ],
         t2MonthEudrQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
           },
         ],
       },
@@ -172,27 +236,39 @@ export default {
         {
           prop: "curMonthQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthQty"),
+          type:'number',
+          max:99999999
         },
         {
           prop: "t1MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthQty"),
+          type:'number',
+          max:99999999
         },
 
         {
           prop: "t2MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthQty"),
+          type:'number',
+          max:99999999
         },
         {
           prop: "curMonthRudrQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthRudrQty"),
+          type:'number',
+          max:99999999
         },
         {
           prop: "t1MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthEudrQty"),
+          type:'number',
+          max:99999999
         },
         {
           prop: "t2MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthEudrQty"),
+          type:'number',
+          max:99999999
         },
         {
           prop: "remark",

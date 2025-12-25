@@ -44,7 +44,7 @@ export default {
 
       // 转换为数字
       const numValue = Number(strValue);
-      if (numValue > 999999) {
+      if (numValue > 99999999) {
         return callback(new Error(this.$t("common.rule.inoutMax")));
       }
 
@@ -150,11 +150,13 @@ export default {
           prop: "lhMachineMaxQty",
           label: this.$t("ui.data.column.curingPlan.lhMachineMaxQty"),
           type: "number",
+          max:99999999
         },
         {
           prop: "maxEmbryoQty",
           label: this.$t("ui.data.column.curingPlan.maxEmbryoQty"),
           type: "number",
+          max:99999999
         },
         {
           prop: "remark",
