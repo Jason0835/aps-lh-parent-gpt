@@ -2,18 +2,24 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.SysUser;
+import com.ruoyi.api.gateway.system.service.ISysUserService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.http.client.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +49,12 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
 
     @Autowired
     private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+
+    @Autowired
+    private ISysUserService iSysUserService;
 
     @Override
     protected String getDocTypeCode() {
@@ -74,9 +86,9 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     @Override
     protected Map<Object, Object> getServiceCheckParams(List<MpTrialPlan> list, List<MpTrialPlan> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
-        // 查询SKU与施工关系，用于写入 制造示方、文字示方、硫化示方
         List<String> materialCodeList = list.stream().map(MpTrialPlan::getMaterialCode).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(materialCodeList)) {
+            // 查询SKU与施工关系，用于写入 制造示方、文字示方、硫化示方
             LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
             List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
@@ -85,7 +97,19 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
                 skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, Function.identity(), (old, now) -> old));
             }
             serviceCheckParams.put("skuConstructionRefMap", skuConstructionRefMap);
+
+            // 查询物料信息
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList);
+            List<MdmMaterialInfo> materialInfoList = materialInfoEntityMapper.selectList(wrapper);
+            Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(materialInfoList)) {
+                materialInfoMap = materialInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (old, now) -> old));
+            }
+            serviceCheckParams.put("materialInfoMap", materialInfoMap);
         }
+        SysUser sysUser = iSysUserService.selectUserByName(SecurityUtils.getUsername());
+        serviceCheckParams.put("user", sysUser);
         return serviceCheckParams;
     }
 
@@ -93,14 +117,28 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     protected Boolean serviceCheckAndDataHandle(MpTrialPlan importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         importDocEntity.setImportTime(new Date());
         importDocEntity.setIsImport(ApsConstant.TRUE);
+        if (serviceCheckParams.containsKey("user")) {
+            SysUser sysUser = (SysUser) serviceCheckParams.get("user");
+            importDocEntity.setDeptId(sysUser.getDeptId());
+        }
         String materialCode = importDocEntity.getMaterialCode();
         if (serviceCheckParams.containsKey("skuConstructionRefMap")) {
             Map<String, MdmSkuConstructionRef> skuConstructionRefMap = (Map<String, MdmSkuConstructionRef>) serviceCheckParams.get("skuConstructionRefMap");
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
-                importDocEntity.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
-                importDocEntity.setMoldingInfo(mdmSkuConstructionRef.getTextNo());
-                importDocEntity.setVulcanizationInfo(mdmSkuConstructionRef.getLhNo());
+                importDocEntity.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                importDocEntity.setMadeInfo(DateUtils.formatDate(mdmSkuConstructionRef.getEmbryoReleaseDate(), "yyyy-MM-dd"));
+                importDocEntity.setMoldingInfo(DateUtils.formatDate(mdmSkuConstructionRef.getTextReleaseDate(), "yyyy-MM-dd"));
+                importDocEntity.setVulcanizationInfo(DateUtils.formatDate(mdmSkuConstructionRef.getLhReleaseDate(), "yyyy-MM-dd"));
+            }
+        }
+        if (serviceCheckParams.containsKey("materialInfoMap")) {
+            Map<String, MdmMaterialInfo> materialInfoMap = (Map<String, MdmMaterialInfo>) serviceCheckParams.get("materialInfoMap");
+            if (materialInfoMap.containsKey(materialCode)) {
+                MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
+                importDocEntity.setMaterialDesc(materialInfo.getMaterialDesc());
+                importDocEntity.setPattern(materialInfo.getPattern());
+                importDocEntity.setSpecifications(materialInfo.getSpecifications());
             }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);

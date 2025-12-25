@@ -37,7 +37,7 @@ public class MpTrialPlan extends BaseEntity {
      * 工厂编号
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mpTrialPlan.factoryCode")
+    @Excel(name = "ui.data.column.mpTrialPlan.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -72,7 +72,7 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 物料描述
      */
-    @ImportExcelValidated(required = true, maxLength = 256)
+    @ImportExcelValidated(maxLength = 256)
     @Excel(name = "ui.data.column.mdmMaterialInfo.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
@@ -169,6 +169,15 @@ public class MpTrialPlan extends BaseEntity {
     private Date completeDate;
 
     /**
+     * 制造示方书号
+     */
+    @ImportExcelValidated(maxLength = 30)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
+
+    /**
      * 制造示方
      */
     @ImportExcelValidated(maxLength = 64)
@@ -207,11 +216,11 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 部门
      */
-    @ImportExcelValidated(maxLength = 64)
-    @Excel(name = "ui.data.column.mpTrialPlan.deptName")
-    @ApiModelProperty(value = "部门", name = "deptName")
-    @TableField(value = "DEPT_NAME")
-    private String deptName;
+//    @ImportExcelValidated(maxLength = 64)
+//    @Excel(name = "ui.data.column.mpTrialPlan.deptName")
+    @ApiModelProperty(value = "部门", name = "deptId")
+    @TableField(value = "DEPT_Id")
+    private Long deptId;
 
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
@@ -260,4 +269,13 @@ public class MpTrialPlan extends BaseEntity {
     @ApiModelProperty(value = "更新人名称", name = "updateByName")
     @TableField(exist = false)
     private String updateByName;
+
+    /**
+     * 部门
+     */
+    @ImportExcelValidated(maxLength = 64)
+    @Excel(name = "ui.data.column.mpTrialPlan.deptName", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "部门", name = "deptIdName")
+    @TableField(exist = false)
+    private String deptIdName;
 }

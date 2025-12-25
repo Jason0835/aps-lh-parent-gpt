@@ -114,7 +114,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /** 夏季液压硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime")
     @ApiModelProperty(value = "夏季液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
-    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME")
+    @TableField(value = "HY_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;
 
     /** 冬季机械硫化时间(秒) */
@@ -126,7 +126,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /** 冬季液压硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime2")
     @ApiModelProperty(value = "冬季液压硫化时间(秒)", name = "hydraulicPressureCuringTime2")
-    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME2")
+    @TableField(value = "HY_PRESSURE_CURING_TIME2")
     private Integer hydraulicPressureCuringTime2;
 
     /**

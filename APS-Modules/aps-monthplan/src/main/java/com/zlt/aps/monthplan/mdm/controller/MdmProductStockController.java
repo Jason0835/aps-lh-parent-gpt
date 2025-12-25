@@ -179,17 +179,4 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
         return "MDM0216";
     }
 
-
-    /**
-     * 查询MES实时成品库存列表
-     *
-     * @param queryVO 查询参数
-     * @return 结果
-     */
-    @ApiOperation("查询MES实时成品库存列表")
-    @PostMapping("/list4Mes")
-    public TableDataInfo list4Mes(@RequestBody MdmProductStock queryVO) {
-        return getDataTable(mdmProductStockService.list4Mes(queryVO));
-    }
-
 }
