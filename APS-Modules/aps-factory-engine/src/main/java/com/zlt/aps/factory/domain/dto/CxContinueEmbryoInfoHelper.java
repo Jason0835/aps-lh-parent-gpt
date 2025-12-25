@@ -5,6 +5,7 @@ import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 /**
  * 在机结构续作胎胚
@@ -38,6 +39,18 @@ public class CxContinueEmbryoInfoHelper implements Serializable {
      * 计划需求量--高优先级或是总排产量？
      */
     private Long planDemandQty;
+
+    /**
+     * 计划量/与模具数的比值
+     *
+     * @return
+     */
+    public Long getDemandMouldRatioInfo() {
+        if (mouldNumber <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.longValue();
+        }
+        return BigDecimal.valueOf(planDemandQty).divide(BigDecimal.valueOf(mouldNumber), 0, RoundingMode.UP).longValue();
+    }
 
     /**
      * 创建空的续作胎胚信息

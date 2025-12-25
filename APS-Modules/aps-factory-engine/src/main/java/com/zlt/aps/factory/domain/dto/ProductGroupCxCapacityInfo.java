@@ -65,9 +65,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
      * @return
      */
     public static ProductGroupCxCapacityInfo buildContinueCxCapacityInfo(String structureName, String cxMachineCode, Map<String, CxContinueProductInfoHelper> continueSkuInfo, CxMachineBaseInfoVo baseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        ProductGroupCxCapacityInfo capacityInfo = new ProductGroupCxCapacityInfo();
-        capacityInfo.setGroupName(structureName);
-        capacityInfo.setCxMachineCode(cxMachineCode);
+        ProductGroupCxCapacityInfo capacityInfo = buildContinueCxCapacityInfo(structureName, cxMachineCode, baseInfo, structureLhRatioList);
         //实际硫化机台数
         List<CxContinueProductInfoHelper> realMouldCountList = new ArrayList<>(continueSkuInfo.values());
         if (CollectionUtils.isEmpty(realMouldCountList)) {
@@ -76,22 +74,6 @@ public class ProductGroupCxCapacityInfo implements Serializable {
             Integer lhMachineCount = realMouldCountList.stream().mapToInt(CxContinueProductInfoHelper::getMouldNumber).sum() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             capacityInfo.setRealMaxLhMachineCount(lhMachineCount);
         }
-        //原始配置的胎胚种类数和硫化机台配比
-        capacityInfo.setMaxEmbryoCodeCount(BigDecimal.ZERO.intValue());
-        capacityInfo.setMaxLhMachineCount(BigDecimal.ZERO.intValue());
-        if (CollectionUtils.isEmpty(structureLhRatioList)) {
-            return capacityInfo;
-        }
-        if (null == baseInfo) {
-            return capacityInfo;
-        }
-        //得到结构成型类型的配比
-        MonthPlanStructureLhRatioVo lhRatio = structureLhRatioList.stream().filter(match -> match.isMatch(structureName, baseInfo.getCxMachineBrandCode())).findFirst().orElse(null);
-        if (null == lhRatio) {
-            return capacityInfo;
-        }
-        capacityInfo.setMaxEmbryoCodeCount(lhRatio.getMaxEmbryoQty());
-        capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
         return capacityInfo;
     }
 

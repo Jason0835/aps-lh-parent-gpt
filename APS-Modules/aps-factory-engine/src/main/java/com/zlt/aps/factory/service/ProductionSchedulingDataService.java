@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.service;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
@@ -115,6 +116,17 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+
+    /**
+     * 获取续作SKU信息，包含续作机台及使用的模具数
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
 
     /**
      * 获取工厂的成型基础配置信息
@@ -325,39 +337,11 @@ public interface ProductionSchedulingDataService {
     List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context);
 
     /**
-     * 保存明细
-     *
-     * @param detailList
-     */
-    void saveMouldProductionDetail(List<MonthPlanProductionResultDetail> detailList);
-
-    /**
      * 保存未排计划信息
      *
      * @param noProductionPlanList
      */
     void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList);
-
-    /**
-     * 保存排产汇总结果
-     *
-     * @param dayList 汇总结果列表
-     */
-    void saveMouldProductionSummary(List<MonthPlanMouldingDayResult> dayList);
-
-    /**
-     * 保存模具排产结果辅助记录
-     *
-     * @param mouldingProductionResultList
-     */
-    void saveMouldingProductionResult(List<MouldingProductionResultHelper> mouldingProductionResultList);
-
-    /**
-     * 排产排产分组结果辅助记录
-     *
-     * @param productionGroupResultList
-     */
-    void saveProductionGroupResult(List<ProductionGroupResultHelper> productionGroupResultList);
 
     /**
      * 保存模具排程排产流程日志
