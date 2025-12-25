@@ -62,7 +62,7 @@ public class MesItfServiceImpl implements MesItfService {
         MdmSkuMouldRel mdmSkuMouldRel = new MdmSkuMouldRel();
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmSkuMouldRel> list = this.getMdmSkuMouldRelList(mdmSkuMouldRel);
-        // 型腔模号+NC物料编码作为匹配条件，如果存在，则更新，不存在则插入
+        // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 1000);
         for (List<MdmSkuMouldRel> skuMouldRelList : splitList) {
             List<MdmSkuMouldRel> existsList = productModelRelationEntityMapper.selectByUniqueKeyList(skuMouldRelList);
@@ -94,7 +94,7 @@ public class MesItfServiceImpl implements MesItfService {
         MdmModelInfo mdmSkuMouldRel = new MdmModelInfo();
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmModelInfo> list = getMdmModelInfoList(mdmSkuMouldRel);
-        // 型腔模号+NC物料编码作为匹配条件，如果存在，则更新，不存在则插入
+        // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         List<List<MdmModelInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
         for (List<MdmModelInfo> saveList : splitList) {
             List<MdmModelInfo> existsList = modelInfoEntityMapper.selectByUniqueKeyList(saveList);

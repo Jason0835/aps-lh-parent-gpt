@@ -50,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
@@ -1170,4 +1169,20 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         queryWrapper.eq(PubUtil.isNotEmpty(brand), "BRAND", brand);
     }
 
+    /**
+     * 下发月计划
+     *
+     * @param param 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal param) {
+        // 保证填写完整：年月、分厂、需求计划版本、分厂月计划版本
+        if (param.getYear() == null || param.getMonth() == null || StringUtils.isBlank(param.getFactoryCode())
+                || StringUtils.isBlank(param.getMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
+        }
+
+        return AjaxResult.success();
+    }
 }

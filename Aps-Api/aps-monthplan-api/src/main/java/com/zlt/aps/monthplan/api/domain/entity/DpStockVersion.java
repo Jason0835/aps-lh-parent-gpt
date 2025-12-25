@@ -86,10 +86,10 @@ public class DpStockVersion extends BaseEntity {
     private String structureName;
 
     /**
-     * NC物料编码
+     * 物料编码
      */
     @Excel(name = "ui.data.column.mdmFinishStock.materialCode")
-    @ApiModelProperty(value = "NC物料编码", name = "materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
