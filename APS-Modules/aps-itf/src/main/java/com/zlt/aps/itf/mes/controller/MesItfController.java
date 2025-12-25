@@ -1,12 +1,10 @@
 package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -172,5 +170,20 @@ public class MesItfController {
     @PostMapping("/syncMoldShell")
     public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncMoldShell(syncDataLogs);
+    }
+
+    @Autowired
+    private IMonthPlanIssueService iMonthPlanIssueService;
+
+    /**
+     * 下发月计划
+     *
+     * @param finalResultList 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划")
+    @PostMapping("/issueMonthPlan")
+    public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList) {
+        return iMonthPlanIssueService.issueMonthPlan(finalResultList);
     }
 }

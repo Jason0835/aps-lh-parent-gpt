@@ -1,9 +1,9 @@
-package com.zlt.aps.common.engine.domain;
+package com.zlt.aps.itf.vo;
 
 import lombok.Data;
 
 /**
- * 
+ *
  * @Description 同步接口日志
  * @Author zlt
  * @Date 2022-3-9 10:27:31
