@@ -26,7 +26,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 @ApiModel(value = "SKU排产分类对象", description = "SKU排产分类对象 ")
 @Data
-@TableName(value = "T_MP_SKU_PRODUCTION_TYPE")
+@TableName(value = "t_mdm_sku_schedule_category")
 public class MpSkuProductionType extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
