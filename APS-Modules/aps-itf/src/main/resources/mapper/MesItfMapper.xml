@@ -15,7 +15,7 @@
         REMARK,
         DEL_FLAG,
         DATA_VERSION,
-        SAME_PATTER_PANEL,
+        IS_SAME_PATTER_PANEL,
         MOULD_TYPE
         FROM PRODUCT_MOD_RELATION
         WHERE DEL_FLAG = 0
@@ -26,7 +26,9 @@
         <if test="materialDesc != null and materialDesc != ''">AND SPEC_DESC = #{materialDesc}</if>
         <if test="pattern != null and pattern != ''">AND PATTERN = #{pattern}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
-        <if test="samePatternPanel != null and samePatternPanel != ''">AND SAME_PATTER_PANEL = #{samePatternPanel}</if>
+        <if test="isSamePatternPanel != null and isSamePatternPanel != ''">AND IS_SAME_PATTER_PANEL =
+            #{isSamePatternPanel}
+        </if>
         <if test="mouldType != null and mouldType != ''">AND MOULD_TYPE = #{mouldType}</if>
     </select>
 
