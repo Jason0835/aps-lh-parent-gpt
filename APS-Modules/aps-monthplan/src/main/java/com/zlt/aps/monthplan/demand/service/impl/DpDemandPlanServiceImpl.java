@@ -1,12 +1,10 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.datasource.service.BaseService;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
+import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -18,35 +16,62 @@ import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
-import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
-import com.zlt.aps.monthplan.demand.service.*;
+import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
+import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
+import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
+import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
+import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
+import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
-import com.zlt.aps.monthplan.factory.service.IMpMonthPlanProdFinalService;
-import com.zlt.common.enums.ImportErrorTypeEnums;
-import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import com.zlt.bill.common.service.AbstractDocService;
+import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：DpDemandPlanServiceImpl.java
  * 描    述：DpDemandPlanServiceImpl需求计划业务层处理
  *@author yelq
- *@date 2025-12-12
+ *@date 2025-12-25
  *@version 1.0
  *
  *  修改记录：
@@ -56,18 +81,17 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
-public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implements IDpDemandPlanService
-{
+public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  implements IDpDemandPlanService {
     private static final String PREFIX = "REQ";
-    private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
     private final IMdmProductStockService mdmProductStockService;
     // 定稿的月度排产计划
-    private final IMpMonthPlanProdFinalService mpMonthPlanProdFinalService;
+    private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
     // 订单分配表
     private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
@@ -87,216 +111,42 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
     // 月均销量
     private final IMpMonthlySaleQtyService monthlySaleQtyService;
 
-    /**
-     * 查询需求计划
-     *
-     * @param id 需求计划主键
-     * @return 需求计划
-     */
     @Override
-    public DpDemandPlan selectDpDemandPlanById(Long id)
-    {
-        return dpDemandPlanEntityMapper.selectDpDemandPlanById(id);
-    }
-
-    /**
-     * 查询需求计划列表
-     *
-     * @param dpDemandPlan 需求计划
-     * @return 需求计划
-     */
-    @Override
-    public List<DpDemandPlan> selectDpDemandPlanList(DpDemandPlan dpDemandPlan)
-    {
-        return dpDemandPlanEntityMapper.selectDpDemandPlanList(dpDemandPlan);
-    }
-
-    /**
-     * 批量查询需求计划列表
-     *
-     * @param ids 需要查询的数据主键集合
-     * @return 需求计划集合
-     */
-    @Override
-    public List<DpDemandPlan> selectDpDemandPlanByIds(List<Long> ids)
-    {
-        return super.executeSelectIn(
-            dpDemandPlanEntityMapper::selectDpDemandPlanByIds
-                    ,ids
-        );
-    }
-
-
-    /**
-     * 新增需求计划
-     *
-     * @param dpDemandPlan 需求计划
-     * @return 结果
-     */
-    @Override
-    public int insertDpDemandPlan(DpDemandPlan dpDemandPlan)
-    {
-        dpDemandPlan.setBaseVale(null);
-        return dpDemandPlanEntityMapper.insert(dpDemandPlan);
-    }
-
-    /**
-     * 修改需求计划
-     *
-     * @param dpDemandPlan 需求计划
-     * @return 结果
-     */
-    @Override
-    public int updateDpDemandPlan(DpDemandPlan dpDemandPlan)
-    {
-        dpDemandPlan.setBaseVale(dpDemandPlan.getId());
-        return dpDemandPlanEntityMapper.update(dpDemandPlan);
-    }
-
-    /**
-     * 批量删除需求计划
-     *
-     * @param ids 需要删除的需求计划主键
-     * @return 结果
-     */
-    @Override
-    public int deleteDpDemandPlanByIds(Long[] ids)
-    {
-        return dpDemandPlanEntityMapper.deleteDpDemandPlanByIds(ids);
-    }
-
-    /**
-     * 批量删除需求计划
-     *
-     * @param ids 需要删除的需求计划主键
-     * @return 结果
-     */
-    @Override
-    public int deleteDpDemandPlanByIds(List<Long> ids)
-    {
-        Long[] arrayids = ids.toArray(new Long[0]);
-
-        return this.deleteDpDemandPlanByIds(arrayids);
-    }
-
-    /**
-     * 删除需求计划信息
-     *
-     * @param id 需求计划主键
-     * @return 结果
-     */
-    @Override
-    public int deleteDpDemandPlanById(Long id)
-    {
-        return dpDemandPlanEntityMapper.deleteDpDemandPlanById(id);
+    protected String getDocTypeCode() {
+        return "2025122521";
     }
 
     @Override
-    public void insertBatchData(Collection<DpDemandPlan> dataList) {
-
-        this.insertBatchData(dataList, DpDemandPlanEntityMapper.class);
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("2025122521");
+        return sysDocType;
     }
 
     @Override
-    public void updateBatchData(Collection<DpDemandPlan> dataList) {
-
-        this.updateBatchData(dataList, DpDemandPlanEntityMapper.class);
-    }
-
-    @Override
-    public void mergerIntoBatchData(List<DpDemandPlan> list) {
-        this.mergerIntoBatchData(list, DpDemandPlanEntityMapper.class);
-    }
-
-    /**
-     * 校验需求计划唯一性
-     */
-    @Override
-    public String checkDpDemandPlanUnique(DpDemandPlan dpDemandPlan) {
-        if (dpDemandPlan == null) {
-            return UserConstants.NOT_UNIQUE;
+    public String checkUnique(DpDemandPlan docEntityVO) {
+        String unique = super.checkUnique(docEntityVO);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.dpDemandPlan.notUnique"));
         }
-        List<DpDemandPlan> list = dpDemandPlanEntityMapper.selectDpDemandPlanList(dpDemandPlan);
-        if (CollectionUtils.isNotEmpty(list)) {
-            long iCount = list.stream().filter(x->!x.getId().equals(dpDemandPlan.getId())).count();
-            return iCount == 0 ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
-        }
-        return UserConstants.UNIQUE;
+        return unique;
     }
-    /**
-     * 导入需求计划数据
-     *
-     * @param list          要导入的数据集合
-     * @param updateSupport 已存在记录是否更新
-     * @param importLogId   导入日志id
-     */
+
     @Override
-    public AjaxResult importData(List<DpDemandPlan> list, boolean updateSupport, Long importLogId) {
-        //初始化
-        int successNum = 0;
-        int failureNum = 0;
-        List<DpDemandPlan> importList = new ArrayList<>();
-        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-
-        //公共校验（非空校验、长度校验等）
-        for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 2;
-            DpDemandPlan dpDemandPlan = list.get(i);
-            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, dpDemandPlan);
-            ImportExcelValidatedUtils.validatedRepeat(list,dpDemandPlan,i,2,importLogId,validated);
-            if (CollectionUtils.isNotEmpty(validated)) {
-                dpDemandPlan.setId(-999L);
-                failureNum++;
-                importErrorLogs.addAll(validated);
-            } else{
-                dpDemandPlan.setBaseVale(null);
-                importList.add(dpDemandPlan);
-            }
-        }
-
-        try {
-            //勾选更新记录，调用mergeOrInsert
-            if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                successNum = importList.size();
-                dpDemandPlanEntityMapper.mergeSql(importList);
-            } else {
-                //唯一则新增
-                for (int i = 0; i < list.size(); i++) {
-                    DpDemandPlan dpDemandPlan = list.get(i);
-                    // 错误记录跳过
-                    if (dpDemandPlan.getId() != null && dpDemandPlan.getId().equals(-999L)) {
-                        continue;
-                    }
-                    String unique = this.checkDpDemandPlanUnique(dpDemandPlan);
-                    if (UserConstants.UNIQUE.equals(unique)) {
-                        successNum++;
-                        this.insertDpDemandPlan(dpDemandPlan);
-                    } else {
-                        failureNum++;
-                        //TODO:此处需手动填写唯一校验失败国际化信息
-                        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(),i + 2,
-                                String.format(uniqueMsg, i + 2), importErrorLogs);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            ImportExcelValidatedUtils.addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
-        }
-        //返回提示信息及错误集合
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
-        } else {
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
-        }
+    protected List<String> getCheckUniqueFields() {
+        // 唯一校验字段
+        return Collections.emptyList();
     }
 
     @Override
     public void createMonthRequire(DpDemandPlan createCondition) {
+        createCondition.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        // 获取操作日所在月份
+        YearMonth currentMonth = YearMonth.from(LocalDate.now());
+        // T月 = 当月 + 1个月
+        YearMonth tMonth = currentMonth.plusMonths(1);
+        createCondition.setYear(tMonth.getYear());
+        createCondition.setMonth(tMonth.getMonthValue());
         // 1. 前置校验
         validateProductionVersionFinalized(createCondition);
 
@@ -356,10 +206,10 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         // 合并需求计划
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
             demandPlans, minProductionQty, skuMap,
-            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap());
+            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
 
         if (CollectionUtils.isNotEmpty(mergedPlans)) {
-            insertBatchData(mergedPlans);
+            this.baseDao.insertBatch(mergedPlans);
         }
     }
 
@@ -397,11 +247,13 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         CompletableFuture<Map<String, Long>> monthSurplusFuture =
             CompletableFuture.supplyAsync(() -> this.fetchMonthSurplusMap(monthPlanVersion));
+        CompletableFuture<Map<String, Long>> monthlySaleQtyFuture =
+            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
 
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
-            supplyOrdersFuture, monthSurplusFuture
+            supplyOrdersFuture, monthSurplusFuture,monthlySaleQtyFuture
         ).join();
 
         try {
@@ -410,7 +262,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
-
+            Map<String, Long>  monthlySaleQty = monthlySaleQtyFuture.get();
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
@@ -430,7 +282,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
                 supplyOrderPools,
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
-                monthSurplusMap
+                monthSurplusMap,
+                monthlySaleQty
             );
 
         } catch (Exception e) {
@@ -650,7 +503,11 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
      * 计算月底计划余量 查询获取所有成品库存；同时计算月底计划余量：库存抓取日~（同月）月底的月度计划量汇总
      */
     private Map<String, Long> fetchMonthSurplusMap(String monthPlanVersion) {
-        return mpMonthPlanProdFinalService.calculateMonthSurplus(monthPlanVersion);
+        return factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion);
+    }
+
+    private Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+        return monthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
     }
 
     /**
@@ -670,7 +527,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap) {
+    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Long> monthlySaleQty) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -685,7 +542,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap))
+                productionTypeMap,monthlySaleQty))
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
     }
@@ -696,7 +553,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         Map<String, MdmMaterialInfo> skuMap,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Long> mdmMonthSurplusMap,
-        Map<String, String> productionTypeMap) {
+        Map<String, String> productionTypeMap,
+        Map<String, Long> monthlySaleQty) {
 
         // 验证分组数据有效性
         if (CollectionUtils.isEmpty(groupPlans)) {
@@ -715,8 +573,14 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         setProductionType(mergedPlan,productionTypeMap);
         // 计算并设置各类数量统计
         setQuantityStatistics(mergedPlan, groupPlans, minProductionQty);
+        // 设置月均销量
+        setAverageSaleQty(mergedPlan,monthlySaleQty);
 
         return mergedPlan;
+    }
+
+    private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Long> monthlySaleQty) {
+        mergedPlan.setAverageSaleQty(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0L));
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
@@ -1031,6 +895,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
         private final List<SalesOrderPool> allocationOrders;
         private final List<SalesOrderPool> postponeOrders;
         private final Map<String, Long> monthSurplusMap;
+        private final Map<String, Long>  monthlySaleQty;
 
         public DataCollection(
             List<SalesOrderPool> salesOrders,
@@ -1040,7 +905,8 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             List<SupplyOrderPool> supplyOrderPools,
             List<SalesOrderPool> allocationOrders,
             List<SalesOrderPool> postponeOrders,
-            Map<String, Long> monthSurplusMap) {
+            Map<String, Long> monthSurplusMap,
+            Map<String, Long>  monthlySaleQty) {
             this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
             this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
             this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
@@ -1049,6 +915,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
             this.allocationOrders = allocationOrders != null ? allocationOrders : Collections.emptyList();
             this.postponeOrders = postponeOrders != null ? postponeOrders : Collections.emptyList();
             this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
+            this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
         }
     }
 
@@ -1086,7 +953,7 @@ public class DpDemandPlanServiceImpl extends BaseService<DpDemandPlan>  implemen
 
         void accumulate(DpDemandPlan plan) {
             if (plan == null) {
-              return;
+                return;
             }
 
             totalOrderQty += plan.getOrderQty();

@@ -1,5 +1,40 @@
 package com.zlt.aps.cd15.controller;
 
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.alibaba.csp.sentinel.util.StringUtil;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
@@ -13,39 +48,18 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cd15.api.domain.entity.Cd15DayFinishQty;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
-import com.zlt.aps.cd15.common.handle.Cd15SyncDataHandle;
 import com.zlt.aps.cd15.engine.service.Cd15EngineService;
 import com.zlt.aps.cd15.service.Cd15MachineInfoService;
 import com.zlt.aps.cd15.service.Cd15ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
+
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
 
 /**
  * 15度裁断排程结果Controller
@@ -65,10 +79,8 @@ public class Cd15ScheduleResultController extends BaseController {
     private Cd15MachineInfoService machineInfoService;
     @Autowired
     private Cd15EngineService cd15EngineService;
-    @Autowired
-    private Cd15SyncDataHandle cd15SyncDataHandle;
 	@Resource
-	private SyncDataLogsService syncDataLogsService;
+	private ISyncDataLogsApiService syncDataLogsService;
     /**
      * 查询15度裁断排程结果列表
      */
@@ -464,7 +476,7 @@ public class Cd15ScheduleResultController extends BaseController {
         Date scheduleDate = list.get(0).getScheduleDate();
         AjaxResult ajaxResult = null;
         // 获取下发接口版本号
-        String dataVersion = cd15SyncDataHandle.getDataVersion(ApsConstant.CD15_DEPLOY_SYNC_KEY);
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.CD15_DEPLOY_SYNC_KEY);
         try {
 			cd15ScheduleResultService.batchUpdate(arr,scheduleDate, dataVersion);
 	        // 给mes发送排程下发通知

@@ -94,9 +94,11 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "BILL_DATE")
     private Date billDate;
 
-    /** NC物料编码 */
+    /**
+     * 物料编码
+     */
     @Excel(name = "ui.data.column.SalesOrderPool.oriMaterialCode")
-    @ApiModelProperty(value = "NC物料编码", name = "oriMaterialCode")
+    @ApiModelProperty(value = "物料编码", name = "oriMaterialCode")
     @TableField(value = "ORI_MATERIAL_CODE")
     private String oriMaterialCode;
 

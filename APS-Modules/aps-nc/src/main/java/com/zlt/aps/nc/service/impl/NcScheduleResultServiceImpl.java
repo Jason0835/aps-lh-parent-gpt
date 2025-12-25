@@ -1,6 +1,28 @@
 package com.zlt.aps.nc.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -19,7 +41,11 @@ import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
-import com.zlt.aps.nc.api.domain.entity.*;
+import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
+import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
+import com.zlt.aps.nc.api.domain.entity.NcDispatcherLog;
+import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
+import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.engine.service.NcEngineService;
 import com.zlt.aps.nc.engine.vo.NcScheduleResultVo;
 import com.zlt.aps.nc.entity.NcParams;
@@ -30,18 +56,6 @@ import com.zlt.aps.nc.service.NcDispatcherLogService;
 import com.zlt.aps.nc.service.NcMachineInfoService;
 import com.zlt.aps.nc.service.NcScheduleResultService;
 import com.zlt.bill.common.service.AbstractBillService;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 内衬胶排程结果Service业务层处理

@@ -1,6 +1,22 @@
 package com.zlt.aps.nc.service.impl;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -18,17 +34,7 @@ import com.zlt.aps.nc.entity.NcGlueOrder;
 import com.zlt.aps.nc.mapper.NcGlueOrderMapper;
 import com.zlt.aps.nc.service.NcGlueGroupOrderService;
 import com.zlt.aps.nc.service.NcGlueOrderService;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.zlt.common.utils.StringUtil;
 
 /**
  * <p>
@@ -144,7 +150,7 @@ public class NcGlueOrderServiceImpl extends ServiceImpl<NcGlueOrderMapper, NcGlu
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, glueOrder);
             String glueGroupCode = glueOrder.getGlueGroupCode();
             Long glueGroupOrderId = glueGroupOrderMap.get(glueGroupCode);
-            if (glueGroupOrderId == null && StringUtil.isNotBlank(glueGroupCode)) {
+            if (glueGroupOrderId == null && !StringUtil.isEmpty(glueGroupCode)) {
                 // 非法Code
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.glueGroupNotExist"), validated);

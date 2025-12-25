@@ -1,5 +1,40 @@
 package com.zlt.aps.tq.service.impl;
 
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -31,25 +66,6 @@ import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.service.TqDispatcherLogService;
 import com.zlt.aps.tq.service.TqMachineInfoService;
 import com.zlt.aps.tq.service.TqScheduleResultService;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 胎圈排程结果Service业务层处理
@@ -102,7 +118,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
         }
         List<TqMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new TqMachineInfo());
         Map<Long, TqMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
-        if (com.alibaba.nacos.common.utils.CollectionUtils.isNotEmpty(list)) {
+        if (CollectionUtils.isNotEmpty(list)) {
 
             List<String> codeList = list.stream().map(TqScheduleResultDto::getBeadCode).collect(Collectors.toList());
             scheduleResult.getParams().put("codeList", codeList);

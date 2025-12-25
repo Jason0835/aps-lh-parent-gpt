@@ -188,20 +188,22 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         List<SyncOutShipDmdOrdResultVo> outShipDmdOrdResultVos = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SyncOutShipDmdOrdResultVo.class);
 
         List<MpHistorySaleRecord> saveList = new ArrayList<>();
-        for (SyncOutShipDmdOrdResultVo outShipDmdOrdResultVo : outShipDmdOrdResultVos) {
-            MpHistorySaleRecord mpHistorySaleRecord = new MpHistorySaleRecord();
-            mpHistorySaleRecord.setBaseVale(null);
-            mpHistorySaleRecord.setFactoryCode(outShipDmdOrdResultVo.getFactory());
-            mpHistorySaleRecord.setYear(lastYear);
-            mpHistorySaleRecord.setMonth(Integer.parseInt(lastMonth));
-            mpHistorySaleRecord.setYearMonth(Integer.parseInt(lastYear + lastMonth));
-            mpHistorySaleRecord.setAreaCode(outShipDmdOrdResultVo.getEmployeeDept().toString());
-            mpHistorySaleRecord.setMaterialCode(outShipDmdOrdResultVo.getOriMaterialCode());
-            mpHistorySaleRecord.setSaleQty(outShipDmdOrdResultVo.getDnNum().intValue());
-            mpHistorySaleRecord.setGenrateDate(nowDate);
-            saveList.add(mpHistorySaleRecord);
+        if (CollectionUtils.isNotEmpty(outShipDmdOrdResultVos)) {
+            for (SyncOutShipDmdOrdResultVo outShipDmdOrdResultVo : outShipDmdOrdResultVos) {
+                MpHistorySaleRecord mpHistorySaleRecord = new MpHistorySaleRecord();
+                mpHistorySaleRecord.setBaseVale(null);
+                mpHistorySaleRecord.setFactoryCode(outShipDmdOrdResultVo.getFactory());
+                mpHistorySaleRecord.setYear(lastYear);
+                mpHistorySaleRecord.setMonth(Integer.parseInt(lastMonth));
+                mpHistorySaleRecord.setYearMonth(Integer.parseInt(lastYear + lastMonth));
+                mpHistorySaleRecord.setAreaCode(outShipDmdOrdResultVo.getEmployeeDept().toString());
+                mpHistorySaleRecord.setMaterialCode(outShipDmdOrdResultVo.getOriMaterialCode());
+                mpHistorySaleRecord.setSaleQty(outShipDmdOrdResultVo.getDnNum().intValue());
+                mpHistorySaleRecord.setGenrateDate(nowDate);
+                saveList.add(mpHistorySaleRecord);
+            }
+            baseDao.saveBatch(saveList);
         }
-        baseDao.saveBatch(saveList);
     }
 
     @Override
@@ -218,6 +220,18 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MpMonthlySaleQty> monthlySaleQties = entityMapper.selectList(wrapper);
         return CollectionUtils.isEmpty(monthlySaleQties) ? null : monthlySaleQties.get(0);
+    }
+
+    @Override
+    public Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+        List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQty();
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
+            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingLong(MpMonthlySaleQty::getAverageSaleQty)));
     }
 
     /**
@@ -268,11 +282,13 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 List<MpHistorySaleRecord> value = entry.getValue();
 
                 MpMonthlySaleQty monthlySaleQty = new MpMonthlySaleQty();
+                monthlySaleQty.setBaseVale(null);
+                monthlySaleQty.setFactoryCode(factoryCode);
                 monthlySaleQty.setMaterialCode(materialCode);
 
                 // 按SKU分组，销量降序，适销区域用逗号分隔
                 String area = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed())
-                        .map(MpHistorySaleRecord::getAreaCodeName).distinct().collect(Collectors.joining(","));
+                        .map(MpHistorySaleRecord::getAreaCodeName).distinct().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
                 monthlySaleQty.setSaleArea(area);
 
                 // 月均销量=销量汇总/6，近3个月销量=取月份最大三个月汇总/3，向上取整

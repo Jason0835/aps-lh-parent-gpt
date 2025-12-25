@@ -150,7 +150,7 @@ public class MdmWorkWearInfoController extends AbstractDocBizController<MdmWorkW
     protected void builderCondition(QueryWrapper<MdmWorkWearInfo> queryWrapper, MdmWorkWearInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("workWearName")), "WORK_WEAR_NAME", queryVO.getFieldValueByFieldName("workWearName"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specificationModel")), "SPECIFICATION_MODEL", queryVO.getFieldValueByFieldName("specificationModel"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("workWearType")), "WORK_WEAR_TYPE", queryVO.getFieldValueByFieldName("workWearType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("workWearStatus")), "WORK_WEAR_STATUS", queryVO.getFieldValueByFieldName("workWearStatus"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qty")), "QTY", queryVO.getFieldValueByFieldName("qty"));

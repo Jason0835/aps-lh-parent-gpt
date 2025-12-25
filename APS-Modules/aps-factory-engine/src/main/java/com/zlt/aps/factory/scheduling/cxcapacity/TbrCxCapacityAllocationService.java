@@ -82,7 +82,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //todo 记录日志 续作结构排产分配
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
-        //先对续作结构进行成型机台分配
+        //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
@@ -94,8 +94,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //todo 记录日志
 
         //todo 第二轮排产
-        //得到结构成型排程结果
+        //保存结构成型排程结果
         saveStructureInfo(productionContext);
+        //保存模具排产结果
+        saveMouldProductionInfo(productionContext);
     }
 
     /**
@@ -454,6 +456,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     /**
      * 根据成型信息，得到结构排产结果
+     * 即结构转产信息
      *
      * @param productionContext
      */
@@ -465,14 +468,43 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<CxMachineAllocationPlanHelper> allAllocationList = new ArrayList<>();
         cxMachineBaseInfo.forEach((cxMachineCode, cxMachineInfo) -> {
             List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-            if (CollectionUtils.isEmpty(allAllocationList)) {
+            if (CollectionUtils.isEmpty(allocationList)) {
                 return;
             }
-            allAllocationList.addAll(allAllocationList);
+            allAllocationList.addAll(allocationList);
         });
-        Map<String, ProductionMouldInfoVo> mouldProductionList = productionContext.getBaseDataContainer().getMouldInfoMap();
-        List<ProductionMouldInfoVo> allMouldProductionInfoList = new ArrayList<>();
+        if (CollectionUtils.isEmpty(allAllocationList)) {
+            return;
+        }
 
+    }
+
+    /**
+     * 根据模具信息，保存模具排产结果
+     *
+     * @param productionContext
+     */
+    private void saveMouldProductionInfo(TbrProductionContext productionContext) {
+        Map<String, ProductionMouldInfoVo> mouldProductionList = productionContext.getBaseDataContainer().getMouldInfoMap();
+        if (CollectionUtils.isEmpty(mouldProductionList)) {
+            return;
+        }
+        List<CxMouldDayProductionHelper> allMouldProductionInfoList = new ArrayList<>();
+        mouldProductionList.forEach((mouldCode, productionMouldInfo) -> {
+            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = productionMouldInfo.getDayProductionInfo();
+            if (CollectionUtils.isEmpty(dayProductionInfo)) {
+                return;
+            }
+            dayProductionInfo.forEach((day, dayProductionList) -> {
+                if (CollectionUtils.isEmpty(dayProductionList)) {
+                    return;
+                }
+                allMouldProductionInfoList.addAll(dayProductionList);
+            });
+        });
+        if (CollectionUtils.isEmpty(allMouldProductionInfoList)) {
+            return;
+        }
 
     }
 
@@ -640,9 +672,61 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //获取上个排产周期最后排产日的排产信息
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
-        //构建续作信息
+        //构建续作分组信息(TBR为结构，PCR为英寸)
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo();
+        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(factoryCode, year, month, lastDay);
+        setContinueGroupByProduct(continueProductionInfoList, continueGroupInfo);
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+    }
+
+    /**
+     * 获取工厂年份-月份的最后一天排产的分组信息
+     * TBR-结构
+     * PCR-英寸、寸别、寸口
+     *
+     * @param factoryCode 工厂
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    private Map<String, Set<String>> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+        List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+        if (!CollectionUtils.isEmpty(continueGroupInfoList)) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<ContinueGroupInfo>> continueGroupInfoMap = continueGroupInfoList.stream().collect(Collectors.groupingBy(ContinueGroupInfo::getGroupName));
+        Map<String, Set<String>> continueGroupInfo = new HashMap<>();
+        continueGroupInfoMap.forEach((groupName, continueCxMachineInfoList) -> {
+            if (CollectionUtils.isEmpty(continueCxMachineInfoList)) {
+                return;
+            }
+            Set<String> continueCxMachineSet = continueCxMachineInfoList.stream().map(ContinueGroupInfo::getCxMachineCode).collect(Collectors.toSet());
+            continueGroupInfo.put(groupName, continueCxMachineSet);
+        });
+        return continueGroupInfo;
+    }
+
+    /**
+     * 对续作的Sku设置分组信息
+     * 按分组名匹配
+     * TRB为结构
+     * PCR为英寸
+     *
+     * @param continueSkuInfo   续作的Sku规格
+     * @param continueGroupInfo 续作的分组信息-含机台
+     */
+    private void setContinueGroupByProduct(List<ContinueProductInfo> continueSkuInfo, Map<String, Set<String>> continueGroupInfo) {
+        if (CollectionUtils.isEmpty(continueGroupInfo) || CollectionUtils.isEmpty(continueGroupInfo)) {
+            return;
+        }
+        continueSkuInfo.forEach(continueSku -> {
+            String groupName = continueSku.getGroupName();
+            if (StringUtils.isBlank(groupName)) {
+                return;
+            }
+            continueSku.setContinueCxMachineCodeSet(continueGroupInfo.get(groupName));
+        });
     }
 
     /**

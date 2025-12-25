@@ -6,27 +6,25 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.service.IDpDemandPlanRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.ruoyi.common4ui.exception.base.BaseException;
+
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
+import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -39,7 +37,7 @@ import javax.servlet.http.HttpServletResponse;
  * 文件名称：DpDemandPlanUIController.java
  * 描    述：需求计划 UI控制层类：....
  *@author yelq
- *@date 2025-12-20
+ *@date 2025-12-25
  *@version 1.0
  *
  *  修改记录：
@@ -52,90 +50,55 @@ import javax.servlet.http.HttpServletResponse;
 @Controller
 @RequestMapping("/monthplan/demandPlan")
 public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
-
     @Autowired
     private IDpDemandPlanRemoteService iDpDemandPlanService;
 
-    private final String prefix = "monthplan/monthplan/demandPlan";
-
     /**
-     * 跳转至主页面
+     * 根据条件查询主表数据
      */
-    @RequiresPermissions("monthplan:demandPlan:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/demandPlan";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("dpDemandPlan", new DpDemandPlan());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("dpDemandPlan", iDpDemandPlanService.getInfo(id));
-        return prefix + "/edit";
-    }
-
-    /**
-     * 根据条件查询需求计划列表
-     */
-    @ApiOperation("根据条件查询需求计划列表")
+    @ApiOperation("根据条件查询主表数据")
     @RequiresPermissions("monthplan:demandPlan:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DpDemandPlan entity) {
-        return iDpDemandPlanService.list(entity);
+    public TableDataInfo list(DpDemandPlan dpDemandPlan) {
+        return iDpDemandPlanService.list(dpDemandPlan);
     }
 
     /**
-     * 修改或新增需求计划
+     * 修改或新增
      */
-    @ApiOperation("修改或新增需求计划")
+    @ApiOperation("修改或新增")
     @RequiresPermissions("monthplan:demandPlan:edit")
-    @PostMapping("/edit")
+    @PostMapping("/save")
     @ResponseBody
-    public AjaxResult editSave(DpDemandPlan dpDemandPlan) {
-        AjaxResult ajaxResult = null;
-        if (UserConstants.NOT_UNIQUE.equals(iDpDemandPlanService.checkDpDemandPlanUnique(dpDemandPlan))) {
-            return ajaxResult.error(I18nUtil.getMessage("ui.data.column.dpDemandPlan.checkUnique"));
+    public AjaxResult save(DpDemandPlan dpDemandPlan) {
+        if (UserConstants.NOT_UNIQUE.equals(iDpDemandPlanService.checkUnique(dpDemandPlan))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.dpDemandPlan.checkUnique"));
         }
-        if (dpDemandPlan.getId() != null){
-            ajaxResult = iDpDemandPlanService.edit(dpDemandPlan);
-        } else{
-            ajaxResult = iDpDemandPlanService.add(dpDemandPlan);
-        }
-        return ajaxResult;
+
+        return iDpDemandPlanService.save(dpDemandPlan);
     }
 
     /**
      * 删除需求计划
      */
-    @ApiOperation("删除需求计划（id不为空）")
+    @ApiOperation("删除,id不为空")
     @RequiresPermissions("monthplan:demandPlan:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iDpDemandPlanService.remove(arr);
+        return iDpDemandPlanService.removeByIds(Arrays.asList(arr));
     }
 
     /**
      * 校验需求计划唯一性
      */
-    @ApiOperation("校验需求计划唯一性")
-    @PostMapping("/checkDpDemandPlanUnique")
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkDpDemandPlanUnique(DpDemandPlan dpDemandPlan) {
-        return iDpDemandPlanService.checkDpDemandPlanUnique(dpDemandPlan);
+    public String checkUnique(DpDemandPlan dpDemandPlan) {
+        return iDpDemandPlanService.checkUnique(dpDemandPlan);
     }
 
     /**
@@ -145,15 +108,15 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getExportTemplateFileName(){
-        throw new BaseException("没有定义导出模板的文件名");
+        return this.getFunctionName();
     }
 
 
     /**
- * 继承时重写方法。
- *
- * @return
- */
+     * 继承时重写方法。
+     *
+     * @return
+     */
     @Override
     public String getProcedureCode() {
         return "0";
@@ -169,9 +132,20 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
         return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
+    /**
+     * 重写导入模板的生成逻辑
+     */
+    @ApiOperation("下载导入模板")
+    @Override
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        ExcelUtil<DpDemandPlan> util = new ExcelUtil<>(DpDemandPlan.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
-    @RequiresPermissions("monthplan:demandPlan:export")
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
@@ -186,7 +160,6 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
-    @RequiresPermissions("monthplan:demandPlan:import")
     @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
@@ -209,13 +182,6 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @RequiresPermissions("monthplan:demandPlan:createMonthRequire")
     @ResponseBody
     public AjaxResult createMonthRequire(DpDemandPlan createCondition) {
-        if (null == createCondition) {
-            return AjaxResult.error("条件不可为空");
-        }
-        if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
-            return AjaxResult.error("分厂、年份、月份不能为空");
-        }
         return iDpDemandPlanService.createMonthRequire(createCondition);
     }
-
 }

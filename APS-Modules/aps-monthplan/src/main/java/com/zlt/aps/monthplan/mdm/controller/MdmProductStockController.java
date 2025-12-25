@@ -7,7 +7,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
@@ -56,7 +55,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
     /**
      * 查询成品库存列表
      */
-    @RequiresPermissions("monthplan:mdmProductStock:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -73,7 +71,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
      * 保存
      */
     @Log(title = "ui.data.column.mdmProductStock.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mdmProductStock:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -85,7 +82,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
      * 删除
      */
     @Log(title = "ui.data.column.mdmProductStock.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:mdmProductStock:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -97,7 +93,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
     /**
      * 获取成品库存详细信息
      */
-    @RequiresPermissions("monthplan:mdmProductStock:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -113,7 +108,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:mdmProductStock:import")
     @Log(title = "ui.data.column.mdmProductStock.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -125,7 +119,6 @@ public class MdmProductStockController extends AbstractDocBizController<MdmProdu
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:mdmProductStock:export")
     @Log(title = "成品库存", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

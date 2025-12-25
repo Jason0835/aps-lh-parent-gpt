@@ -91,11 +91,11 @@ public class MdmMonthSurplus extends BaseEntity {
     private String structureName;
 
     /**
-     * NC物料编码
+     * 物料编码
      */
     @ImportExcelValidated(required = true, maxLength = 32)
     @Excel(name = "ui.data.column.mdmMonthSurplus.materialCode")
-    @ApiModelProperty(value = "NC物料编码", name = "materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
@@ -110,7 +110,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 计划余量
      */
-    @ImportExcelValidated(required = true, digits = true)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 99999999)
     @Excel(name = "ui.data.column.mdmMonthSurplus.planSurplusQty")
     @ApiModelProperty(value = "计划余量", name = "planSurplusQty")
     @TableField(value = "PLAN_SURPLUS_QTY")

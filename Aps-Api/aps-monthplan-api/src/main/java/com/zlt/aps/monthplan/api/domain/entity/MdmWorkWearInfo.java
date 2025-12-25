@@ -67,13 +67,13 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String workWearName;
 
     /**
-     * 规格型号，必填长度64
+     * 规格，必填长度64
      */
     @ImportExcelValidated(required = true, maxLength = 64)
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.specificationModel")
-    @ApiModelProperty(value = "规格型号", name = "specificationModel")
-    @TableField(value = "SPECIFICATION_MODEL")
-    private String specificationModel;
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.specifications")
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
 
     /**
      * 工装分类，必填 数据字典 biz_work_type 01 成型鼓 02 胎体鼓
