@@ -10,10 +10,12 @@ import lombok.Getter;
  */
 @Getter
 public enum ItfSyncKeyEnum {
+
     /**
-     * XXX接口
+     * 月计划下发接口
      */
-    SYNC_XXX("XXX", "MES", "APS", "XXX接口"),
+    SYNC_MONTH_PLAN("MONTH_PLAN_FBK", "APS", "MES", "月计划下发接口"),
+
     ;
 	/**
 	 * 接口码

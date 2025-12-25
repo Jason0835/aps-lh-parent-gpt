@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.vo.MonthPlanIssue;
 import com.zlt.aps.itf.vo.SyncDataLogs;
@@ -125,14 +126,14 @@ public class MonthPlanIssueServiceImpl extends AbstractDocService<MonthPlanIssue
         // 发送MQ
         AjaxResult ajaxResult = null;
         // 获取下发接口版本号
-        String dataVersion = syncDataHandle.getDataVersion(ApsConstant.MONTH_PLAN_FBK);
+        String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.SYNC_MONTH_PLAN.getCode());
         String factoryCode = monthPlanIssueList.get(0).getFactoryCode();
         String monthPlanVersion = monthPlanIssueList.get(0).getMonthPlanVersion();
         String productionVersion = monthPlanIssueList.get(0).getProductionVersion();
         try {
             // 数据同步到中间库后，往 mq中发送消息通知 MES去取数据
             SyncParamsVO syncParamsVO = new SyncParamsVO();
-            syncParamsVO.setSyncKey(ApsConstant.MONTH_PLAN_FBK);
+            syncParamsVO.setSyncKey(ItfSyncKeyEnum.SYNC_MONTH_PLAN.getCode());
             syncParamsVO.setDataVersion(dataVersion);
             // 请求参数
             JSONObject params = new JSONObject();

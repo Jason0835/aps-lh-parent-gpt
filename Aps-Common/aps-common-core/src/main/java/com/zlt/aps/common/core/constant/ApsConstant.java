@@ -237,11 +237,6 @@ public class ApsConstant {
     public static String MOULD_CHANGE_FBK = "MOULD_CHANGE_FBK";
 
     /**
-     * 下发月计划接口同步key
-     */
-    public static String MONTH_PLAN_FBK = "MONTH_PLAN_FBK";
-
-    /**
      * 请求MES系统模具变更计划同步KEY
      */
     public static String LH_MOLD_ADJUST_PLAN = "LH_MOLD_ADJUST_PLAN";
