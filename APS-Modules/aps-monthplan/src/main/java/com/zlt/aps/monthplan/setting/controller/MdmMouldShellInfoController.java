@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
@@ -68,7 +67,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * 保存
      */
     @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mpMouldShellInfo:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
