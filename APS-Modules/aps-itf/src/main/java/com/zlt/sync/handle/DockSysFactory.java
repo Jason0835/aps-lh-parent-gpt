@@ -49,7 +49,7 @@ public class DockSysFactory {
     }
 
     /**
-     * 处理类初始化
+     * 处理类初始化，添加同步类
      */
     private static void initHandles() {
         MesHandle mesHandle = SpringUtils.getBean(MesHandle.class);

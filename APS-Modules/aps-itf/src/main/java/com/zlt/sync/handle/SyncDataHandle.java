@@ -1,13 +1,26 @@
 package com.zlt.sync.handle;
 
+import java.security.NoSuchAlgorithmException;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.nacos.common.utils.MD5Utils;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.sync.constants.SyncConstants;
 import com.zlt.sync.domain.AuxDataVersions;
 import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
 import com.zlt.sync.domain.vo.AuxDataVersionsVO;
@@ -15,30 +28,20 @@ import com.zlt.sync.handle.dockSys.DockCommonHandle;
 import com.zlt.sync.mapper.AuxDataVersionsMapper;
 import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
 import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
-import com.zlt.sync.povo.SyncDataVO;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.utils.RedisLock;
 import com.zlt.sync.utils.SpringBeanUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
-
-import java.security.NoSuchAlgorithmException;
-import java.util.*;
 
 /**
  * 公共同步调用接口方法
  * 需要继承 且注解 @Component
  */
-public abstract class SyncDataHandle {
+@Service
+public class SyncDataHandle {
     private static final Logger logger = LoggerFactory.getLogger(SyncDataHandle.class);
 
     @Autowired
     private RedisLock redisLock;
-
-    @Autowired
-    private SyncConstants syncConstants;
 
     /**
      * 缓存前缀KEY
@@ -92,15 +95,6 @@ public abstract class SyncDataHandle {
         }
 
         logger.info("syncRequest-003 请求数据, 参数: " + paramsVO.toString());
-
-        SyncDataVO dataVO = syncConstants.getSyncDataByKey(paramsVO.getSyncKey());
-
-        if (dataVO == null) {
-            logger.error("syncRequest-004 无法获取同步服务信息: syncKey: " + paramsVO.getSyncKey());
-            return AjaxResult.error("无法获取同步服务信息: syncKey: " + paramsVO.getSyncKey());
-        }
-
-        SpringBeanUtils.copyPropertiesIgnoreNull(dataVO, paramsVO);
 
         /**
          * 主计划目前 params 为空，但目前主计划接口基本一个一个请求
@@ -190,20 +184,6 @@ public abstract class SyncDataHandle {
 
         logger.info("syncNotice-004 通知数据, 参数: " + paramsVO.toString());
 
-        SyncDataVO dataVO = syncConstants.getSyncDataByKey(paramsVO.getSyncKey());
-
-        if (dataVO == null) {
-            logger.error("syncNotice-005 无法获取同步服务信息: syncKey: " + paramsVO.getSyncKey());
-            return AjaxResult.error("无法获取同步服务信息: syncKey: " + paramsVO.getSyncKey());
-        }
-
-        if (!Integer.valueOf(1).equals(dataVO.getBackIssue())) {
-            logger.error("syncNotice-0051 该接口不是回传反馈接口(backIssue:1)，不可发送同步通知，请修改配置: syncKey: " + paramsVO.getSyncKey() + "; 回传反馈标志: " + dataVO.getBackIssue());
-            return AjaxResult.error("该接口不是回传反馈接口(backIssue:1)，不可发送同步通知，请修改配置: syncKey: " + paramsVO.getSyncKey() + "; 回传反馈标志: " + dataVO.getBackIssue());
-        }
-
-        SpringBeanUtils.copyPropertiesIgnoreNull(dataVO, paramsVO);
-
         JSONObject params = paramsVO.getParams();
 
         if (params == null) {
@@ -266,7 +246,9 @@ public abstract class SyncDataHandle {
      * 用于异步返回的统一通知方法
      * 业务模块自己实现
      */
-    public abstract void asyncResult(AjaxResult result);
+    public void asyncResult(AjaxResult result) {
+    	
+    }
 
     /**
      * 此方法用于获取 版本号
@@ -275,14 +257,12 @@ public abstract class SyncDataHandle {
      * @return
      */
     public String getDataVersion(String syncKey) {
-
-        SyncDataVO dataVO = syncConstants.getSyncDataByKey(syncKey);
-        if (dataVO == null) {
+    	ItfSyncKeyEnum itfSyncKey = ItfSyncKeyEnum.getByCode(syncKey);
+        if (itfSyncKey == null) {
             logger.error("getDataVersion-001 获取数据版本号: syncKey: " + syncKey + ", 获取对象为空;");
             throw new CustomException("同步数据标志不存在: " + syncKey + ", 请对照 sync-data-${spring.profiles.active}.yml 获取");
         }
-
-        return getDataVersion(dataVO);
+        return getDataVersion(itfSyncKey);
     }
 
     /**
@@ -291,53 +271,46 @@ public abstract class SyncDataHandle {
      * @param dataVO 用于返回数据所属对接系统
      * @return
      */
-    public String getDataVersion(SyncDataVO dataVO) {
-
-        if (dataVO == null) {
+    public String getDataVersion(ItfSyncKeyEnum itfSyncKey) {
+        if (itfSyncKey == null) {
             logger.error("getDataVersion-001 获取数据版本号: 传入对象为空");
             throw new CustomException("dataVo由 syncKey 在前置阶段获取");
         }
 
-        if (StringUtils.isEmpty(dataVO.getDataSys()) || StringUtils.isEmpty(dataVO.getDockSys())) {
-            logger.error("getDataVersion-002 获取数据版本号: 参数对接系统dockSys或需求数据系统dataSys为空 ");
-            throw new CustomException("获取版本号 dockSys, dataSys 不能为空");
-        }
+        logger.info("getDataVersion-003 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys());
 
-        logger.info("getDataVersion-003 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys());
-
-        String lockKey = SYNC_DATA_KEY + ":" + dataVO.getDataSys() + ":" + dataVO.getDockSys();
+        String lockKey = SYNC_DATA_KEY + ":" + itfSyncKey.getDataSys() + ":" + itfSyncKey.getDockSys();
         if (!redisLock.lock(lockKey, 3000, 2)) {
             logger.error("getDataVersion-0031 获取数据版本号: 没有获取版本锁，请重试 ");
             throw new CustomException("没有获取版本锁，请重试");
         }
 
         try {
-
-            logger.info("getDataVersion-005 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", 获取到REDIS 锁");
+            logger.info("getDataVersion-005 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 获取到REDIS 锁");
             //获取当前最新版本号
             Map<String, Object> params = new HashMap<>();
-            params.put("fromSys", dataVO.getDataSys());
-            params.put("toSys", dataVO.getDockSys());
+            params.put("fromSys", itfSyncKey.getDataSys());
+            params.put("toSys", itfSyncKey.getDockSys());
             List<AuxDataVersionsVO> versions = auxDataVersionsMapper.queryDataVersion(params);
 
             if (CollectionUtils.isEmpty(versions)) {
-                logger.error("getDataVersion-0051 获取版本数据为空异常，至少会有一条记录;FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys());
-                throw new CustomException("获取版本数据为空异常，至少会有一条记录;FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys());
+                logger.error("getDataVersion-0051 获取版本数据为空异常，至少会有一条记录;FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys());
+                throw new CustomException("获取版本数据为空异常，至少会有一条记录;FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys());
             }
 
             AuxDataVersionsVO version = versions.get(0);
 
             if (null == version || StringUtils.isEmpty(version.getYyyyMMdd())) {
-                logger.error("getDataVersion-0052 获取版本数据为空异常，数据异常日期为null;FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys());
-                throw new CustomException("获取版本数据为空异常，数据异常日期为null;FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys());
+                logger.error("getDataVersion-0052 获取版本数据为空异常，数据异常日期为null;FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys());
+                throw new CustomException("获取版本数据为空异常，数据异常日期为null;FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys());
             }
 
             //获取当前日期
             String nowDay = version.getYyyyMMdd(),
-                    prefix = dataVO.getDataSys() + "_" + dataVO.getDockSys() + "_" + nowDay;
+                    prefix = itfSyncKey.getDataSys() + "_" + itfSyncKey.getDockSys() + "_" + nowDay;
 
             String dataVersion = prefix + VERSION_FIRST_NUMBER;
-            logger.info("getDataVersion-004 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", 版本前缀: " + prefix);
+            logger.info("getDataVersion-004 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 版本前缀: " + prefix);
 
             if (!StringUtils.isEmpty(version.getVerId())) {
                 if (!StringUtils.isEmpty(version.getYmdVersion())) { //getDataVersion
@@ -363,7 +336,7 @@ public abstract class SyncDataHandle {
 
                 } else {
                     // 数据为空异常, 一般不会走到这
-                    logger.error("getDataVersion-007 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", 版本值 为空异常");
+                    logger.error("getDataVersion-007 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 版本值 为空异常");
                     version.setDataVersion(dataVersion);
                     version.setYmdVersion(nowDay);
                     version.setVerVersion(1);
@@ -371,14 +344,14 @@ public abstract class SyncDataHandle {
 
                 version.setUpdateDate(new Date());
 
-                logger.info("getDataVersion-008 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", 获取当前版本号: " + version.getDataVersion());
+                logger.info("getDataVersion-008 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 获取当前版本号: " + version.getDataVersion());
                 // 更新版本数据
                 auxDataVersionsMapper.update(version);
             } else {
                 // 没找到数据
                 AuxDataVersions newVersion = new AuxDataVersions();
-                newVersion.setFromSys(dataVO.getDataSys());
-                newVersion.setToSys(dataVO.getDockSys());
+                newVersion.setFromSys(itfSyncKey.getDataSys());
+                newVersion.setToSys(itfSyncKey.getDockSys());
                 newVersion.setVerId(UUID.randomUUID().toString());
                 newVersion.setCreateDate(new Date());
                 newVersion.setDataVersion(dataVersion);
@@ -386,7 +359,7 @@ public abstract class SyncDataHandle {
                 newVersion.setYmdVersion(nowDay);
                 newVersion.setVerVersion(1);
 
-                logger.info("getDataVersion-009 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", (new)获取当前版本号: " + newVersion.getDataVersion());
+                logger.info("getDataVersion-009 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", (new)获取当前版本号: " + newVersion.getDataVersion());
 
                 auxDataVersionsMapper.insert(newVersion);
             }
@@ -395,7 +368,7 @@ public abstract class SyncDataHandle {
 
         } finally {
             redisLock.unlock(lockKey);
-            logger.info("getDataVersion-010 获取数据版本号: FROM_SYS: " + dataVO.getDataSys() + "_TO_SYS: " + dataVO.getDockSys() + ", 释放 Redis 锁");
+            logger.info("getDataVersion-010 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 释放 Redis 锁");
         }
 
     }
