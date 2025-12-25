@@ -61,6 +61,24 @@ public class MpTrialPlan extends BaseEntity {
     private Integer month;
 
     /**
+     * 物料编号
+     */
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCode")
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /**
+     * 物料描述
+     */
+    @ImportExcelValidated(required = true, maxLength = 256)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /**
      * 分类 数据字典 biz_trial_type 01 新产品 02 产品改善
      */
     @Excel(name = "ui.data.column.mpTrialPlan.trialType", dictType = "biz_trial_type")

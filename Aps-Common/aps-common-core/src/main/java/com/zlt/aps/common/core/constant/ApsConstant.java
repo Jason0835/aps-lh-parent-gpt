@@ -237,6 +237,11 @@ public class ApsConstant {
     public static String MOULD_CHANGE_FBK = "MOULD_CHANGE_FBK";
 
     /**
+     * 下发月计划接口同步key
+     */
+    public static String MONTH_PLAN_FBK = "MONTH_PLAN_FBK";
+
+    /**
      * 请求MES系统模具变更计划同步KEY
      */
     public static String LH_MOLD_ADJUST_PLAN = "LH_MOLD_ADJUST_PLAN";
@@ -309,12 +314,12 @@ public class ApsConstant {
      * 是否 为是
      */
     public static final Integer APS_YES_NO_1 = 1;
-    
+
     /**
      * sync服务同步状态：异常
      */
     public static final Integer SYNC_STATUS_3 = 3;
-    
+
     /**
      * sync服务同步状态：成功
      */
@@ -413,22 +418,22 @@ public class ApsConstant {
      *  销售优先级：5-暂缓订单
      */
     public static final String SAL_PRIORITY_POSTPONE = "5";
-    
+
     /**
      * 发货模式：02-整单发货
      */
     public static final String DELIVERY_MODE_ALL = "02";
-    
+
     /**
      * 发货模式：01-分批发货
      */
     public static final String DELIVERY_MODE_SPLIT = "01";
-    
+
     /**
      * SCM发货模式：10-整单发货
      */
     public static final String SCM_DELIVERY_MODE_ALL = "10";
-    
+
     /**
      * SCM发货模式：20-分批发货
      */

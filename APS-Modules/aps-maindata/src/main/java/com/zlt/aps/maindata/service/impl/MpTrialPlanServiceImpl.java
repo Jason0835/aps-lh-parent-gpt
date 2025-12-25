@@ -1,22 +1,26 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -36,6 +40,10 @@ import java.util.Map;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> implements IMpTrialPlanService {
+
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MP0210";
@@ -64,9 +72,37 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     }
 
     @Override
+    protected Map<Object, Object> getServiceCheckParams(List<MpTrialPlan> list, List<MpTrialPlan> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        // 查询SKU与施工关系，用于写入 制造示方、文字示方、硫化示方
+        List<String> materialCodeList = list.stream().map(MpTrialPlan::getMaterialCode).distinct().collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(materialCodeList)) {
+            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
+            List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+            Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
+                skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, Function.identity(), (old, now) -> old));
+            }
+            serviceCheckParams.put("skuConstructionRefMap", skuConstructionRefMap);
+        }
+        return serviceCheckParams;
+    }
+
+    @Override
     protected Boolean serviceCheckAndDataHandle(MpTrialPlan importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         importDocEntity.setImportTime(new Date());
         importDocEntity.setIsImport(ApsConstant.TRUE);
+        String materialCode = importDocEntity.getMaterialCode();
+        if (serviceCheckParams.containsKey("skuConstructionRefMap")) {
+            Map<String, MdmSkuConstructionRef> skuConstructionRefMap = (Map<String, MdmSkuConstructionRef>) serviceCheckParams.get("skuConstructionRefMap");
+            if (skuConstructionRefMap.containsKey(materialCode)) {
+                MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
+                importDocEntity.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                importDocEntity.setMoldingInfo(mdmSkuConstructionRef.getTextNo());
+                importDocEntity.setVulcanizationInfo(mdmSkuConstructionRef.getLhNo());
+            }
+        }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }
