@@ -6,13 +6,17 @@ import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.*;
+import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultService;
+import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
+import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
+import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
@@ -81,17 +85,12 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
 
-    private final IFactoryProductionGroupResultService factoryProductionGroupResultService;
-
     private final IFactoryProductionMonthPlanInitService factoryProductionMonthPlanInitService;
 
     private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
 
     private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
 
-    private final IFactoryProductionMouldProductionResultService factoryProductionMouldProductionResultService;
-
-    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {
@@ -211,6 +210,14 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyList();
         }
         return factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDay);
+    }
+
+    @Override
+    public List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
+            return Collections.emptyList();
+        }
+        return factoryMonthPlanContinueProductInfoMapper.getContinueGroupInfo(factoryCode, year, month, lastDay);
     }
 
     @Override
@@ -485,14 +492,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public void saveMouldProductionDetail(List<MonthPlanProductionResultDetail> detailList) {
-        if (CollectionUtils.isEmpty(detailList)) {
-            return;
-        }
-        factoryProductionDayProductionResultDetailService.saveBatch(detailList);
-    }
-
-    @Override
     public void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList) {
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
@@ -504,36 +503,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             }
         });
         factoryProductionNoProductionPlanService.saveBatch(noProductionPlanList);
-    }
-
-    @Override
-    public void saveMouldProductionSummary(List<MonthPlanMouldingDayResult> dayList) {
-        if (CollectionUtils.isEmpty(dayList)) {
-            return;
-        }
-        dayList.stream().forEach(dayResult -> {
-//            String mergeInfo = dayResult.getMergeInfo();
-//            if (StringUtils.isNotBlank(mergeInfo)) {
-//                dayResult.setMergeInfo(String.format("[%s]", mergeInfo));
-//            }
-        });
-        factoryProductionDayProductionResultService.saveBatch(dayList);
-    }
-
-    @Override
-    public void saveMouldingProductionResult(List<MouldingProductionResultHelper> mouldingProductionResultList) {
-        if (CollectionUtils.isEmpty(mouldingProductionResultList)) {
-            return;
-        }
-        factoryProductionMouldProductionResultService.saveBatch(mouldingProductionResultList);
-    }
-
-    @Override
-    public void saveProductionGroupResult(List<ProductionGroupResultHelper> productionGroupResultList) {
-        if (CollectionUtils.isEmpty(productionGroupResultList)) {
-            return;
-        }
-        factoryProductionGroupResultService.saveBatch(productionGroupResultList);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -7,7 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MonthPlanMouldingDayResultMapper.java
- * 描    述：S2-0604.排产结果-生产计划排产结果对象-Mapper接口
+ * 描    述：S2-0602.排产结果-生产计划排产结果明细对象-Mapper接口
  *
  * @author zlt
  * @version 1.0
@@ -19,6 +20,6 @@ import org.apache.ibatis.annotations.Mapper;
  * @date 2025-12-25
  */
 @Mapper
-public interface FactoryMouldingDayResultMapper extends CommBaseMapper<FactoryMonthPlanMouldDayResult> {
+public interface FactoryMouldingDayResultDetailMapper extends CommBaseMapper<FactoryMonthPlanMouldDayDetail> {
 
 }

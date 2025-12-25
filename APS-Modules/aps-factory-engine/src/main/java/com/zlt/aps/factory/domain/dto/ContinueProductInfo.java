@@ -5,6 +5,7 @@ import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -69,6 +70,10 @@ public class ContinueProductInfo implements Serializable {
      * 模具使用数量变化信息
      */
     private String mouldChangeInfo;
+    /**
+     * 续作在机机台-从结构转产表中获取
+     */
+    private Set<String> continueCxMachineCodeSet;
 
     /**
      * 获取对应的硫化机台数
@@ -96,15 +101,20 @@ public class ContinueProductInfo implements Serializable {
         if (null == cxMachineCodeSet || null == allCxMachineMap) {
             return;
         }
-        if (StringUtils.isBlank(cxMachineCode)) {
+        if (CollectionUtils.isEmpty(continueCxMachineCodeSet)) {
             return;
         }
-        String[] cxMachineCodeArray = cxMachineCode.split(StringConstant.COMMA);
-        for (String singleCxMachineCode : cxMachineCodeArray) {
+        continueCxMachineCodeSet.forEach(singleCxMachineCode -> {
             if (allCxMachineMap.containsKey(singleCxMachineCode)) {
                 cxMachineCodeSet.add(singleCxMachineCode);
             }
-        }
+        });
+//        String[] cxMachineCodeArray = cxMachineCode.split(StringConstant.COMMA);
+//        for (String singleCxMachineCode : cxMachineCodeArray) {
+//            if (allCxMachineMap.containsKey(singleCxMachineCode)) {
+//                cxMachineCodeSet.add(singleCxMachineCode);
+//            }
+//        }
     }
 
     /**
