@@ -44,7 +44,7 @@ public class MpHistorySaleRecord extends BaseEntity{
      */
     @Excel(name = "ui.data.column.MpHistorySaleRecord.year")
     @ApiModelProperty(value = "年份", name = "year")
-    @TableField(value = "YEAR")
+    @TableField(value = "`YEAR`")
     private Integer year;
 
     /**
@@ -52,14 +52,14 @@ public class MpHistorySaleRecord extends BaseEntity{
      */
     @Excel(name = "ui.data.column.MpHistorySaleRecord.month")
     @ApiModelProperty(value = "月份", name = "month")
-    @TableField(value = "MONTH")
+    @TableField(value = "`MONTH`")
     private Integer month;
 
     /**
      * 年月
      */
     @ApiModelProperty(value = "年月", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /**
@@ -90,10 +90,10 @@ public class MpHistorySaleRecord extends BaseEntity{
      * 生成日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.MpHistorySaleRecord.generationDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "生成日期", name = "generationDate")
-    @TableField(value = "GENERATION_DATE")
-    private Date generationDate;
+    @Excel(name = "ui.data.column.MpHistorySaleRecord.genrateDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "生成日期", name = "genrateDate")
+    @TableField(value = "GENRATE_DATE")
+    private Date genrateDate;
 
     /**
      * 区域名称国际化字符串

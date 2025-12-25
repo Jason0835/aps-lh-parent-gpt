@@ -1,11 +1,15 @@
 package com.zlt.sync.service.impl;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
+import com.alibaba.fastjson.JSONObject;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.constants.SyncConstants;
+import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
+import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
+import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
+import com.zlt.sync.povo.SyncDataVO;
+import com.zlt.sync.service.SyncDataMQService;
+import com.zlt.sync.utils.SpringBeanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,16 +17,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import com.alibaba.fastjson.JSONObject;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.sync.constants.SyncConstants;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
-import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
-import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
-import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
-import com.zlt.sync.povo.SyncDataVO;
-import com.zlt.sync.service.SyncDataMQService;
-import com.zlt.sync.utils.SpringBeanUtils;
+import java.util.*;
 
 @Primary
 @Service("syncDataMQService")

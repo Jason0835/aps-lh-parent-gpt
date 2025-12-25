@@ -26,23 +26,27 @@ public class BaseDataContainer implements Serializable {
     ProductionCapacityParamConfiguration paramConfiguration;
     /**
      * 成型产能信息集合
-     * key cxMachineCode value 成型机信息
+     * key=cxMachineCode : value=成型机信息
      */
     Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
     /**
      * 模具信息
+     * key=型腔模号 : value=模具信息
      */
     Map<String, ProductionMouldInfoVo> mouldInfoMap;
     /**
      * Sku与模具关系
+     * key=materialDesc : value=关系列表
      */
     Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
     /**
      * 模壳总数信息
+     * key=模块标准 : value=模块标准数量
      */
     Map<String, MouldShellBaseInfoVo> mouldShellMap;
     /**
      * 生胎对应的特殊原材料配置信息
+     * key=胎胚号 : value={ key=特殊原材料编码 : value=比例}
      */
     Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
 }

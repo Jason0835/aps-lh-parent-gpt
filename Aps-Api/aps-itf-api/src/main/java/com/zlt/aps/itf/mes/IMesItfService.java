@@ -2,11 +2,14 @@ package com.zlt.aps.itf.mes;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
 
 /**
  * MES接口业务
@@ -40,12 +43,12 @@ public interface IMesItfService {
     /**
      * 同步成品库存
      *
-     * @param productStockMonth 参数
+     * @param productStock 参数
      * @return 结果
      */
     @ApiOperation("同步成品库存")
     @PostMapping("/mesItf/syncProductStock")
-    public AjaxResult syncProductStock(@RequestBody ProductStockMonth productStockMonth);
+    public AjaxResult syncProductStock(@RequestBody MdmProductStock productStock);
 
     /**
      * 同步不合格库存
@@ -77,4 +80,43 @@ public interface IMesItfService {
     @PostMapping("/mesItf/syncRawMaterialOutboundRecord")
     public AjaxResult syncRawMaterialOutboundRecord(@RequestBody RawMaterialOutboundRecord materialOutboundRecord);
 
+    /**
+     * 查询实时成品库存
+     *
+     * @param productStock 参数
+     * @return 结果
+     */
+    @ApiOperation("查询实时成品库存")
+    @PostMapping("/mesItf/getProductStock")
+    public List<MdmProductStock> getProductStock(@RequestBody MdmProductStock productStock);
+
+    /**
+     * 获取不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @return 结果
+     */
+    @ApiOperation("获取不合格库存")
+    @PostMapping("/mesItf/getUnqualifiedStock")
+    public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock);
+
+    /**
+     * 查询特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    @ApiOperation("同步特殊材料库存")
+    @PostMapping("/mesItf/getRawSpecialMaterialStock")
+    public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock);
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模壳台账信息")
+    @PostMapping("/mesItf/syncMoldShell")
+    public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

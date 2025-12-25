@@ -97,6 +97,18 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return salesOrderPoolService.editBySalCodePo(billVO);
     }
 
+	/**
+	 * 锁定订单池
+	 * @return
+	 */
+    @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @RequiresPermissions( "monthplan:SalesOrderPool:lock")
+    @ApiOperation("锁定订单池")
+    @PostMapping("/lockSalesOrderPool")
+    public AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool billVO){
+        return salesOrderPoolService.lockSalesOrderPool(billVO);
+    }
+
     /**
      * 删除
      */

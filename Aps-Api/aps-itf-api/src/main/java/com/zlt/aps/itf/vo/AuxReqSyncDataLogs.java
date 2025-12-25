@@ -1,4 +1,4 @@
-package com.zlt.sync.domain;
+package com.zlt.aps.itf.vo;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

@@ -1,7 +1,8 @@
-package com.zlt.aps.monthplan.demand.mapper;
+package com.zlt.aps.maindata.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -17,6 +18,7 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
  * 修改内容：...
  * @date 2025-12-12
  */
+@Mapper
 public interface MpOverdueSkuEntityMapper extends CommBaseMapper<MpOverdueSku> {
 
 }

@@ -1,9 +1,9 @@
-package com.zlt.aps.common.engine.service;
+package com.zlt.sync.service;
 
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
+import com.zlt.aps.itf.vo.SyncDataLogs;
 
 /**
- * 
+ *
  * @Description 同步日志服务接口
  * @Author zlt
  * @Date 2022-3-9 10:23:36
@@ -11,15 +11,15 @@ import com.zlt.aps.common.engine.domain.SyncDataLogs;
 public interface SyncDataLogsService {
 	/**
 	 * 获取同步日志的反馈状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @return
 	 */
 	SyncDataLogs getSyncDataResult(String dataVersion);
-	
+
 	/**
 	 * 获取请求日志的反馈状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @return
 	 */
@@ -27,7 +27,7 @@ public interface SyncDataLogsService {
 
 	/**
 	 * 检查待发布排程记录是否已被锁定
-	 * 
+	 *
 	 * @param lockKey    锁key
 	 * @param publishIds 待发布记录ID
 	 * @return

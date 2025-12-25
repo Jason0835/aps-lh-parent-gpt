@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.domain.CommonBusiEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -28,7 +29,7 @@ import java.math.BigDecimal;
 @Data
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "工厂月生产计划-最终排产计划定稿对象", description = "工厂月生产计划-最终排产计划定稿对象")
-public class FactoryMonthPlanProductionFinalResult extends CommonBusiEntity {
+public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -69,7 +70,7 @@ public class FactoryMonthPlanProductionFinalResult extends CommonBusiEntity {
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /**
@@ -241,6 +242,22 @@ public class FactoryMonthPlanProductionFinalResult extends CommonBusiEntity {
     private Integer dayVulcanizationQty;
 
     /**
+     * 成型机台信息 多个以，分隔
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.cxMachineCode")
+    @ApiModelProperty(value = "成型机台信息", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private Integer cxMachineCode;
+
+    /**
+     * 模具使用变化信息如2-4-2,或是2-4或是2
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mouldChangeInfo")
+    @ApiModelProperty(value = "模具使用变化信息", name = "mouldChangeInfo")
+    @TableField(value = "MOULD_CHANGE_INFO")
+    private Integer mouldChangeInfo;
+
+    /**
      * 动平衡数量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dynamicBalanceQty")
@@ -287,6 +304,14 @@ public class FactoryMonthPlanProductionFinalResult extends CommonBusiEntity {
     @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
+
+    /**
+     * 试制量试计划需求量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialQty")
+    @ApiModelProperty(value = "试制量试计划需求量", name = "trialQty")
+    @TableField(value = "TRIAL_QTY")
+    private Integer trialQty;
 
     /**
      * 高优先级排产数量
@@ -343,6 +368,14 @@ public class FactoryMonthPlanProductionFinalResult extends CommonBusiEntity {
     @ApiModelProperty(value = "暂缓订单排产数量", name = "postponeProductionQty")
     @TableField(value = "POSTPONE_PRODUCTION_QTY")
     private Integer postponeProductionQty;
+
+    /**
+     * 试制量试排产量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.trialProductionQty")
+    @ApiModelProperty(value = "试制量试排产量", name = "trialProductionQty")
+    @TableField(value = "TRIAL_PRODUCTION_QTY")
+    private Integer trialProductionQty;
 
     /**
      * 差异量(未排产数量)

@@ -154,7 +154,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleType")), "SCHEDULE_TYPE", queryVO.getFieldValueByFieldName("scheduleType"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("generateDate")), "GENERATE_DATE", queryVO.getFieldValueByFieldName("generateDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("genrateDate")), "GENRATE_DATE", queryVO.getFieldValueByFieldName("genrateDate"));
     }
 
     @Override

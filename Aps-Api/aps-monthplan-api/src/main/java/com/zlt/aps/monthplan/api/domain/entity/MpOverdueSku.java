@@ -1,16 +1,15 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
+import lombok.Data;
 
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -25,11 +24,10 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
  *     修 改 人：yelq
  *     修改内容：...
  */
-
-@ApiModel(value = "超期SKU对象", description = "超期SKU对象 ")
+@ApiModel(value = "超期SKU对象", description = "超期SKU对象")
 @Data
 @TableName(value = "t_mdm_overdue_sku")
-public class MpOverdueSku extends BaseEntity{
+public class MpOverdueSku extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

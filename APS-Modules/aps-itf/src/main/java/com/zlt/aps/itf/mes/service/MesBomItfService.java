@@ -1,11 +1,11 @@
 package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 
 /**
  * MES接口-Bom相关接口
- * 
+ *
  * @author zlt
  * @since 2025/12/19
  */

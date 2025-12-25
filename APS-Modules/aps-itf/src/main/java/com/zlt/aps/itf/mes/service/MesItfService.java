@@ -1,8 +1,8 @@
 package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 
 import java.text.ParseException;
 import java.util.List;
@@ -112,4 +112,12 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs);
 }

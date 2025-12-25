@@ -45,7 +45,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
      * @param factoryCode 工厂编码
      * @param year        年份
      * @param week        周次
-     * @param month
+     * @param month      月份
      * @return 预警结果
      */
     @Override

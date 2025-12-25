@@ -1,23 +1,22 @@
-package com.zlt.aps.common.engine.service.impl;
-
-import java.util.Date;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
+package com.zlt.sync.service.impl;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.RedisLock;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
-import com.zlt.aps.common.engine.mapper.SyncDataLogsMapper;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
-import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.sync.mapper.SyncDataLogsMapper;
+import com.zlt.sync.service.SyncDataLogsService;
+import com.zlt.sync.utils.DateUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
 
 /**
- * 
+ *
  * @Description 同步日志服务接口
  * @Author zlt
  * @Date 2022-3-9 10:23:36
@@ -41,7 +40,7 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 	 */
 	@Value("${syncdata.publish.lockTime:1000}")
 	private Integer publishLockTime;
-	
+
     /**
      * 检查开关
      */
@@ -50,7 +49,7 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 
 	/**
 	 * 获取同步日志的反馈状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @return
 	 */
@@ -67,7 +66,7 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 			SyncDataLogs logs = syncDataLogsMapper.getSyncDataLogs(dataVersion);
 			SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
 			if (resultLog != null) {
-				return resultLog; 
+				return resultLog;
 			}
 		}
 	}
@@ -109,11 +108,11 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 		}
 		return null;
 	}
-	
+
 
 	/**
 	 * 获取请求日志的反馈状态
-	 * 
+	 *
 	 * @param dataVersion 数据版本
 	 * @return
 	 */
@@ -125,14 +124,14 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 			SyncDataLogs logs = syncDataLogsMapper.getReqDataLogs(dataVersion);
 			SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
 			if (resultLog != null) {
-				return resultLog; 
+				return resultLog;
 			}
 		}
 	}
 
 	/**
 	 * 检查待发布排程记录是否已被锁定
-	 * 
+	 *
 	 * @param lockKey    锁key
 	 * @param publishIds 待发布记录ID
 	 * @return

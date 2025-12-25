@@ -153,6 +153,12 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "SCM_DETAIL_ID")
     private Long scmDetailId;
 
+    /** 订单状态，0-关单，1-正常 */
+    @Excel(name = "ui.data.column.SalesOrderPool.scmDetailId", dictType = "biz_product_type")
+    @ApiModelProperty(value = "订单状态，0-关单，1-正常", name = "orderStatus")
+    @TableField(value = "ORDER_STATUS")
+    private String orderStatus;
+
     /** 年份 */
     @TableField(exist = false)
     private Integer year;

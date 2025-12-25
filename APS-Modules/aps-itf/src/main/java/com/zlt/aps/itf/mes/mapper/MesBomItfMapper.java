@@ -1,13 +1,12 @@
 package com.zlt.aps.itf.mes.mapper;
 
-import java.util.List;
-
-import org.apache.ibatis.annotations.Mapper;
-
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 /**
  * MES接口Mapper-Bom相关

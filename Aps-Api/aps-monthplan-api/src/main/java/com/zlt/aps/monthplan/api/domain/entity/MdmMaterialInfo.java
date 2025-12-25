@@ -175,6 +175,30 @@ public class MdmMaterialInfo extends BaseEntity {
     private Integer cantProduce;
 
     /**
+     * 胎胚编码
+     */
+    @Excel(name = "ui.data.column.mdmMaterialInfo.embryoCode")
+    @ApiModelProperty(value = "胎胚编码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /**
+     * 胎胚描述
+     */
+    @Excel(name = "ui.data.column.mdmMaterialInfo.embryoDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "embryoDesc")
+    @TableField(value = "EMBRYO_DESC")
+    private String embryoDesc;
+
+    /**
+     * 断面宽
+     */
+    @Excel(name = "ui.data.column.mdmMaterialInfo.sectionWidth")
+    @ApiModelProperty(value = "断面宽", name = "sectionWidth")
+    @TableField(value = "SECTION_WIDTH")
+    private String sectionWidth;
+
+    /**
      * 品名编码
      */
 //    @Excel(name = "ui.data.column.mdmMaterialInfo.productTypeName", dictType = "biz_product_name", sort = 13)

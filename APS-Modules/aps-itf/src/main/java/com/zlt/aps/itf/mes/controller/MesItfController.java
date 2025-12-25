@@ -1,12 +1,10 @@
 package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.ParseException;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -78,6 +77,18 @@ public class MesItfController {
     }
 
     /**
+     * 获取实时成品库存
+     *
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @ApiOperation("获取实时成品库存")
+    @PostMapping("/getProductStock")
+    public List<MdmProductStock> getProductStock(@RequestBody MdmProductStock mdmProductStock) {
+        return mesItfService.getProductStock(mdmProductStock);
+    }
+
+    /**
      * 同步不合格库存
      *
      * @param mdmUnqualifiedStock 参数
@@ -90,6 +101,18 @@ public class MesItfController {
     }
 
     /**
+     * 获取不合格库存
+     *
+     * @param mdmUnqualifiedStock 参数
+     * @return 结果
+     */
+    @ApiOperation("获取不合格库存")
+    @PostMapping("/getUnqualifiedStock")
+    public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) {
+        return mesItfService.getUnqualifiedStock(mdmUnqualifiedStock);
+    }
+
+    /**
      * 同步特殊材料库存
      *
      * @param rawSpecialMaterialStock 参数
@@ -99,6 +122,18 @@ public class MesItfController {
     @PostMapping("/syncRawSpecialMaterialStock")
     public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
         return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
+    }
+
+    /**
+     * 查询特殊材料库存
+     *
+     * @param rawSpecialMaterialStock 参数
+     * @return 结果
+     */
+    @ApiOperation("同步特殊材料库存")
+    @PostMapping("/getRawSpecialMaterialStock")
+    public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) {
+        return mesItfService.getRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
     /**
@@ -123,5 +158,32 @@ public class MesItfController {
     @PostMapping("/syncMaterial")
     public AjaxResult syncMaterial(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncMaterial(syncDataLogs);
+    }
+
+    /**
+     * 同步模壳台账信息
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模壳台账信息")
+    @PostMapping("/syncMoldShell")
+    public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncMoldShell(syncDataLogs);
+    }
+
+    @Autowired
+    private IMonthPlanIssueService iMonthPlanIssueService;
+
+    /**
+     * 下发月计划
+     *
+     * @param finalResultList 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划")
+    @PostMapping("/issueMonthPlan")
+    public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList) {
+        return iMonthPlanIssueService.issueMonthPlan(finalResultList);
     }
 }

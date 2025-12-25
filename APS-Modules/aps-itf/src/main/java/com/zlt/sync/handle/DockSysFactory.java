@@ -1,15 +1,14 @@
 package com.zlt.sync.handle;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
+import com.ruoyi.common.core.utils.SpringUtils;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.handle.dockSys.MesHandle;
+import com.zlt.sync.povo.SyncParamsVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ruoyi.common.core.utils.SpringUtils;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
-import com.zlt.sync.handle.dockSys.MesHandle;
-import com.zlt.sync.povo.SyncParamsVO;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 对接系统处理转向
@@ -50,7 +49,7 @@ public class DockSysFactory {
     }
 
     /**
-     * 处理类初始化
+     * 处理类初始化，添加同步类
      */
     private static void initHandles() {
         MesHandle mesHandle = SpringUtils.getBean(MesHandle.class);

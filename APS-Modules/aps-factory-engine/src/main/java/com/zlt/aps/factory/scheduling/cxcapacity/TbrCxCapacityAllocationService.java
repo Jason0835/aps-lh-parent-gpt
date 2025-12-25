@@ -73,16 +73,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         initProductionBaseData(productionContext, requirePlanList);
         //获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
-
         //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         //todo 记录日志-粗算成型机台数
-        //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
-        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
         //按结构分组，汇总结构净需求量，粗算需要的机台数
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(context, requirePlanList, structureLhRatioList);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         //todo 记录日志 续作结构排产分配
+        //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
+        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
         //先对续作结构进行成型机台分配
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
@@ -142,6 +141,28 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        Set<String> isSetStructureNameSet = new HashSet<>();
+        //根据计划，补充模具关系中的物料结构名
+        requirePlanList.forEach(requirePlan -> {
+            String materialDesc = requirePlan.getMaterialDesc();
+            if (StringUtils.isBlank(materialDesc)) {
+                return;
+            }
+            if (isSetStructureNameSet.contains(materialDesc)) {
+                return;
+            }
+            isSetStructureNameSet.add(materialDesc);
+            List<MonthPlanProductMouldInfoVo> mouldRelationList = mouldRelationMap.get(requirePlan.getMaterialDesc());
+            if (CollectionUtils.isEmpty(mouldRelationList)) {
+                return;
+            }
+            mouldRelationList.forEach(mouldRelation -> {
+                mouldRelation.setStructureName(requirePlan.getStructureName());
+            });
+        });
     }
 
     /**
@@ -369,6 +390,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(continueAllocationMap)) {
             return;
         }
+        //todo 降膜排产？
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = ((TbrProductionContext) context).getBaseDataContainer().getSkuMouldRelationMap();
         continueAllocationMap.forEach((cxMachineCode, productionGroupPlan) -> {
             String structureName = productionGroupPlan.getProductionPlanInfo().getGroupName();
@@ -435,19 +457,23 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      *
      * @param productionContext
      */
-    private void saveStructureInfo(TbrProductionContext productionContext){
+    private void saveStructureInfo(TbrProductionContext productionContext) {
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        if(CollectionUtils.isEmpty(cxMachineBaseInfo)){
-            return ;
+        if (CollectionUtils.isEmpty(cxMachineBaseInfo)) {
+            return;
         }
         List<CxMachineAllocationPlanHelper> allAllocationList = new ArrayList<>();
-        cxMachineBaseInfo.forEach((cxMachineCode, cxMachineInfo) ->{
+        cxMachineBaseInfo.forEach((cxMachineCode, cxMachineInfo) -> {
             List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-            if(CollectionUtils.isEmpty(allAllocationList)){
-                return ;
+            if (CollectionUtils.isEmpty(allAllocationList)) {
+                return;
             }
-
+            allAllocationList.addAll(allAllocationList);
         });
+        Map<String, ProductionMouldInfoVo> mouldProductionList = productionContext.getBaseDataContainer().getMouldInfoMap();
+        List<ProductionMouldInfoVo> allMouldProductionInfoList = new ArrayList<>();
+
+
     }
 
     /**

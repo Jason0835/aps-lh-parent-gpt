@@ -98,6 +98,18 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	}
 
 	/**
+	 * 锁定订单池
+	 */
+	@Override
+	public AjaxResult lockSalesOrderPool(SalesOrderPool salesOrderPool) {
+		SyncPlanedNotShipParamVo planedNotShipParamVo = new SyncPlanedNotShipParamVo();
+		planedNotShipParamVo.setYear(salesOrderPool.getYear());
+		planedNotShipParamVo.setMonth(salesOrderPool.getMonth());
+		planedNotShipParamVo.setFactory(salesOrderPool.getFactoryCode());
+		return iScmItfService.lockSalesOrderPool(planedNotShipParamVo);
+	}
+
+	/**
 	 * 批量修改同PO号的销售优先级
 	 * 
 	 * @param salesOrderPool
@@ -202,8 +214,6 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		Integer month = salesOrderPool.getMonth();
 		String factoryCode = salesOrderPool.getFactoryCode();
 		LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
-		queryWrapper.eq(SalesOrderPool::getYear, year);
-		queryWrapper.eq(SalesOrderPool::getMonth, month);
 		queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
 		queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
 		List<SalesOrderPool> salesOrderPoolList = salesOrderPoolEntityMapper.selectList(queryWrapper);

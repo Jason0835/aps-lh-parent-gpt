@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -20,13 +21,12 @@ import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutShipDmdOrdResultVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
-import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +71,13 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     private MpHistorySaleRecordEntityMapper mpHistorySaleRecordEntityMapper;
 
     @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+
+    @Autowired
     private IScmItfService iScmItfService;
+
+    @Autowired
+    private ISysConfigService sysConfigService;
 
     @Override
     protected String getDocTypeCode() {
@@ -167,6 +173,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         param.setBillDateEndTime(nowDateStr);
         SyncPlanedNotShipParamVo paramVo = new SyncPlanedNotShipParamVo();
         paramVo.setFactory(factoryCode);
+        try {
+            String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
+            String[] split = config.split("-");
+            lastYear = Integer.parseInt(split[0]);
+            paramVo.setMonth(Integer.parseInt(split[1]));
+        } catch (NumberFormatException e) {
+            log.error("获取配置失败", e);
+        }
         paramVo.setYear(lastYear);
         paramVo.setMonth(Integer.parseInt(lastMonth));
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
@@ -180,10 +194,11 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             mpHistorySaleRecord.setFactoryCode(outShipDmdOrdResultVo.getFactory());
             mpHistorySaleRecord.setYear(lastYear);
             mpHistorySaleRecord.setMonth(Integer.parseInt(lastMonth));
+            mpHistorySaleRecord.setYearMonth(Integer.parseInt(lastYear + lastMonth));
             mpHistorySaleRecord.setAreaCode(outShipDmdOrdResultVo.getEmployeeDept().toString());
             mpHistorySaleRecord.setMaterialCode(outShipDmdOrdResultVo.getOriMaterialCode());
             mpHistorySaleRecord.setSaleQty(outShipDmdOrdResultVo.getDnNum().intValue());
-            mpHistorySaleRecord.setGenerationDate(nowDate);
+            mpHistorySaleRecord.setGenrateDate(nowDate);
             saveList.add(mpHistorySaleRecord);
         }
         baseDao.saveBatch(saveList);
@@ -228,6 +243,22 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 .ge(MpHistorySaleRecord::getYearMonth, last6YearMonth)
                 .le(MpHistorySaleRecord::getYearMonth, maxYearMonth);
         List<MpHistorySaleRecord> last6MonthHistorySaleList = mpHistorySaleRecordEntityMapper.selectList(wrapper);
+
+        List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
+        List<String> materialCodeList = last6MonthHistorySaleList.stream().map(MpHistorySaleRecord::getMaterialCode).collect(Collectors.toList());
+        List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000);
+        for (List<String> codeList : materialCodeSplitList) {
+            LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.in(MdmMaterialInfo::getMaterialCode, codeList);
+            List<MdmMaterialInfo> selectList = materialInfoEntityMapper.selectList(queryWrapper);
+            materialInfoList.addAll(selectList);
+        }
+
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(materialInfoList)) {
+            materialInfoMap = materialInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (v1, v2) -> v1));
+        }
+
         Map<String, List<MpHistorySaleRecord>> groupMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(last6MonthHistorySaleList)) {
             groupMap = last6MonthHistorySaleList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
@@ -270,6 +301,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 }
 
                 // 根据物料信息回写物料信息
+                if (materialInfoMap.containsKey(materialCode)) {
+                    MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
+                    monthlySaleQty.setProductTypeCode(materialInfo.getProductTypeCode());
+//                    monthlySaleQty.setLocationType(materialInfo.getLocationType());
+                    monthlySaleQty.setBrand(materialInfo.getBrand());
+                    monthlySaleQty.setMaterialDesc(materialInfo.getMaterialDesc());
+                }
+
                 monthlySaleQtyList.add(monthlySaleQty);
             }
         }
@@ -308,7 +347,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 MdmSkuScheduleCategory skuScheduleCategory = new MdmSkuScheduleCategory();
                 skuScheduleCategory.setFactoryCode(factoryCode);
                 skuScheduleCategory.setMaterialCode(materialCode);
-                skuScheduleCategory.setGenerateDate(new Date());
+                skuScheduleCategory.setGenrateDate(new Date());
                 // 12月平均销量
                 long sumSaleQty = value.stream().mapToLong(MpHistorySaleRecord::getSaleQty).sum();
                 BigDecimal averageSaleQty = BigDecimal.valueOf(sumSaleQty).divide(BigDecimal.valueOf(12), 0, RoundingMode.UP);
