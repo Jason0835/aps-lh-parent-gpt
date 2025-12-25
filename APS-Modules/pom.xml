@@ -215,6 +215,12 @@
                 <artifactId>tlog-all-spring-boot-starter</artifactId>
                 <version>1.5.2</version>
             </dependency>
+            <!-- Hutool工具库 -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>5.8.40</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>
