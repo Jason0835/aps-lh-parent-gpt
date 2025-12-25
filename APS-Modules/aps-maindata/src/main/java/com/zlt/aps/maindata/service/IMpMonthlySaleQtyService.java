@@ -6,6 +6,7 @@ import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -42,4 +43,9 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * @return
      */
     MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode);
+    /**
+     * 根据编码获取月均销量
+     * @return
+     */
+    Map<String,Long> findMonthlySaleQtyGroupByMaterialCode();
 }

@@ -26,7 +26,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
-import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
@@ -37,7 +36,7 @@ import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
-import com.zlt.aps.monthplan.factory.service.IMpMonthPlanProdFinalService;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -92,7 +91,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     // 成品库存
     private final IMdmProductStockService mdmProductStockService;
     // 定稿的月度排产计划
-    private final IMpMonthPlanProdFinalService mpMonthPlanProdFinalService;
+    private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
     // 订单分配表
     private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
@@ -207,7 +206,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 合并需求计划
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
             demandPlans, minProductionQty, skuMap,
-            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap());
+            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
 
         if (CollectionUtils.isNotEmpty(mergedPlans)) {
             this.baseDao.insertBatch(mergedPlans);
@@ -248,11 +247,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         CompletableFuture<Map<String, Long>> monthSurplusFuture =
             CompletableFuture.supplyAsync(() -> this.fetchMonthSurplusMap(monthPlanVersion));
+        CompletableFuture<Map<String, Long>> monthlySaleQtyFuture =
+            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
 
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
-            supplyOrdersFuture, monthSurplusFuture
+            supplyOrdersFuture, monthSurplusFuture,monthlySaleQtyFuture
         ).join();
 
         try {
@@ -261,7 +262,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
-
+            Map<String, Long>  monthlySaleQty = monthlySaleQtyFuture.get();
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
@@ -281,7 +282,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 supplyOrderPools,
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
-                monthSurplusMap
+                monthSurplusMap,
+                monthlySaleQty
             );
 
         } catch (Exception e) {
@@ -501,7 +503,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 计算月底计划余量 查询获取所有成品库存；同时计算月底计划余量：库存抓取日~（同月）月底的月度计划量汇总
      */
     private Map<String, Long> fetchMonthSurplusMap(String monthPlanVersion) {
-        return mpMonthPlanProdFinalService.calculateMonthSurplus(monthPlanVersion);
+        return factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion);
+    }
+
+    private Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+        return monthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
     }
 
     /**
@@ -521,7 +527,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap) {
+    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Long> monthlySaleQty) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -536,7 +542,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap))
+                productionTypeMap,monthlySaleQty))
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
     }
@@ -547,7 +553,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, MdmMaterialInfo> skuMap,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Long> mdmMonthSurplusMap,
-        Map<String, String> productionTypeMap) {
+        Map<String, String> productionTypeMap,
+        Map<String, Long> monthlySaleQty) {
 
         // 验证分组数据有效性
         if (CollectionUtils.isEmpty(groupPlans)) {
@@ -566,8 +573,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         setProductionType(mergedPlan,productionTypeMap);
         // 计算并设置各类数量统计
         setQuantityStatistics(mergedPlan, groupPlans, minProductionQty);
+        // 设置月均销量
+        setAverageSaleQty(mergedPlan,monthlySaleQty);
 
         return mergedPlan;
+    }
+
+    private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Long> monthlySaleQty) {
+        mergedPlan.setAverageSaleQty(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0L));
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
@@ -882,6 +895,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         private final List<SalesOrderPool> allocationOrders;
         private final List<SalesOrderPool> postponeOrders;
         private final Map<String, Long> monthSurplusMap;
+        private final Map<String, Long>  monthlySaleQty;
 
         public DataCollection(
             List<SalesOrderPool> salesOrders,
@@ -891,7 +905,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             List<SupplyOrderPool> supplyOrderPools,
             List<SalesOrderPool> allocationOrders,
             List<SalesOrderPool> postponeOrders,
-            Map<String, Long> monthSurplusMap) {
+            Map<String, Long> monthSurplusMap,
+            Map<String, Long>  monthlySaleQty) {
             this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
             this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
             this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
@@ -900,6 +915,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             this.allocationOrders = allocationOrders != null ? allocationOrders : Collections.emptyList();
             this.postponeOrders = postponeOrders != null ? postponeOrders : Collections.emptyList();
             this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
+            this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
         }
     }
 

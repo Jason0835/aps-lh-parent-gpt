@@ -222,6 +222,18 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         return CollectionUtils.isEmpty(monthlySaleQties) ? null : monthlySaleQties.get(0);
     }
 
+    @Override
+    public Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+        List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQty();
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
+            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingLong(MpMonthlySaleQty::getAverageSaleQty)));
+    }
+
     /**
      * 生成月均销量
      *
