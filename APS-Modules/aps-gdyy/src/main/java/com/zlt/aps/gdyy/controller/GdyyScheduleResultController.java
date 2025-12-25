@@ -1,5 +1,23 @@
 package com.zlt.aps.gdyy.controller;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -10,29 +28,19 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.gdyy.api.domain.dto.GdyyScheduleResultDto;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyDayFinishQty;
-import com.zlt.aps.gdyy.common.handle.GdyySyncDataHandle;
 import com.zlt.aps.gdyy.engine.service.GdyyEngineService;
 import com.zlt.aps.gdyy.entity.GdyyScheduleResult;
 import com.zlt.aps.gdyy.service.GdyyScheduleResultService;
+import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
+
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 钢带压延排程结果Controller
@@ -50,9 +58,7 @@ public class GdyyScheduleResultController extends BaseController {
     @Autowired
     private GdyyEngineService gdyyEngineService;
     @Resource
-    private GdyySyncDataHandle gdyySyncDataHandle;
-    @Resource
-    private SyncDataLogsService syncDataLogsService;
+    private ISyncDataLogsApiService syncDataLogsService;
 
     /**
      * 查询钢带压延排程结果列表
@@ -231,7 +237,7 @@ public class GdyyScheduleResultController extends BaseController {
         }
         long[] arr = list.stream().mapToLong(GdyyScheduleResultDto::getId).toArray();
         // 获取下发接口版本号
-        String dataVersion = gdyySyncDataHandle.getDataVersion(ApsConstant.GDYY_DEPLOY_SYNC_KEY);
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.GDYY_DEPLOY_SYNC_KEY);
         AjaxResult ajaxResult = null;
         try {
             // 发布排程记录

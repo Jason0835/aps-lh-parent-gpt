@@ -13,6 +13,13 @@ import org.springframework.web.bind.annotation.PostMapping;
  */
 @FeignClient(contextId = "ISyncDataLogsApiService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.itf:/itf}")
 public interface ISyncDataLogsApiService {
+	
+	/**
+	 * 获取数据版本
+	 * @param syncKey
+	 * @return
+	 */
+	String getDataVersion(@PathVariable("syncKey") String syncKey);
 
     /**
      * 获取同步日志的反馈状态

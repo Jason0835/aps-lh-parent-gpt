@@ -1,6 +1,17 @@
 package com.zlt.aps.tc.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -15,16 +26,6 @@ import com.zlt.aps.tc.entity.TcLossSetting;
 import com.zlt.aps.tc.mapper.TcLossSettingMapper;
 import com.zlt.aps.tc.service.TcLossSettingService;
 import com.zlt.aps.tc.service.TcMachineInfoService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 
 /**
