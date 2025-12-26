@@ -33,13 +33,41 @@ import { mapState } from "vuex";
 import {
   saveMpTrialPlan
 } from "@/api/monthplan/mpTrialPlan";
-
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm,materialCodeSelect },
   inject: ["parentDict"],
   data() {
+    const validatePositiveInteger = (rule, value, callback) => {
+      if (value === "" || value === null || value === undefined) {
+        if (rule.required) {
+          return callback(new Error(this.$t("common.rule.noData")));
+        }
+        return callback();
+      }
+      const strValue = String(value).trim();
+
+      // 检查是否只包含数字
+      if (!/^\d+$/.test(strValue)) {
+        return callback(
+          new Error(this.$t("common.rule.noPoint"))
+        );
+      }
+
+      // 转换为数字
+      const numValue = Number(strValue);
+      if (numValue > 99999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
+
+      if (!Number.isInteger(numValue)) {
+        return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      }
+
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -48,6 +76,13 @@ export default {
       form: {},
       rules: {
         factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        materialCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -95,6 +130,12 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
+          {
+            validator: (rule, value, callback) => {
+              validatePositiveInteger({ required: true }, value, callback);
+            },
+            trigger: ["change"],
+          },
         ],
       },
     };
@@ -126,11 +167,31 @@ export default {
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
+          maxlength:64
         },
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
+          maxlength:64
 
+        },
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
+          disabled:true
         },
         {
           prop: "planDate",
@@ -148,6 +209,8 @@ export default {
           prop: "trialQty",
           label: this.$t("common.num"),
           type: "number",
+          min:0,
+          max:99999999
         },
 
         {
@@ -213,6 +276,13 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
     },
   },
 };

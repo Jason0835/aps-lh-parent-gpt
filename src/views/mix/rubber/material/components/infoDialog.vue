@@ -102,7 +102,7 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
           prop: "structureName",
-          maxlength: "50",
+          maxlength: "20",
           required: true,
         },
         {

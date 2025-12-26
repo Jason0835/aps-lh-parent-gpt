@@ -142,6 +142,16 @@ export default {
           width: 120
         },
         {
+          prop: "materialCode",
+          width: 120,
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300,
+        },
+        {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           width: 120,

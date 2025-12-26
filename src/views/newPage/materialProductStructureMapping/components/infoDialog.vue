@@ -151,30 +151,37 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
+          maxlength:10
         },
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          maxlength:100
         },
         {
           prop: "standardLength",
           label: this.$t("ui.data.column.masterdata.standardLength"),
+          type: "number",
+          max: 99999999,
+          min:0
         },
         {
           prop: "ratio",
           label: this.$t("ui.data.column.capsuleChuck.ratio")+'%',
           type: "number",
-          max: 100,
+          max: 9999999.99,
           min:0
         },
 
         {
           prop: "unit",
           label: this.$t("common.unit"),
+          maxlength:10
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          maxlength:300
         },
       ];
     },
