@@ -66,7 +66,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 保存
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -77,7 +77,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 删除
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -104,7 +104,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
     @Override
