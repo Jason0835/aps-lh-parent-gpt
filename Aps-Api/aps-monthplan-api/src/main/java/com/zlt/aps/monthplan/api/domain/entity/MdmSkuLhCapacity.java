@@ -32,6 +32,7 @@ public class MdmSkuLhCapacity extends BaseEntity {
 
      /** 工厂编号 */
     @Excel(name = "ui.data.column.mdmSkuLhCapacity.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
