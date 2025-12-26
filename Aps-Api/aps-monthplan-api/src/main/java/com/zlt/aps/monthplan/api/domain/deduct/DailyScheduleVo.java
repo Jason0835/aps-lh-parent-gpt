@@ -15,7 +15,7 @@ public class DailyScheduleVo {
     /**
      * 排产日期
      */
-    private LocalDate scheduleDate;
+    private Integer scheduleDate;
 
     /**
      * 当日产量

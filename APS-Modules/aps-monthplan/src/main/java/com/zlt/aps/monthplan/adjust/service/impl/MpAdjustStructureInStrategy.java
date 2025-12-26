@@ -40,9 +40,12 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         // 1、构建结构内调整记录
         List<MpAdjustStructureInVo> adjustStructureInList = buildAdjustStructureInList(contextDTO);
         contextDTO.setMpAdjustStructureInList(adjustStructureInList);
-        if (PubUtil.isEmpty(adjustStructureInList)) {
-            return;
-        }
+        // 未获取到调整记录，抛出异常
+        Assert.isFalse(PubUtil.isEmpty(adjustStructureInList), () -> {
+            String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notAdjustStructure"),
+                    contextDTO.getYearMonth());
+            return new BusinessException(msg);
+        });
         // 2、设置净需求
         setCurrentNetQty(contextDTO);
         // 3、设置计划剩余排产量、计划已排产量
@@ -331,7 +334,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
 
     /**
-     * 设置其他值
+     * 设置其他字段
      * @param contextDTO
      */
     private void setOtherField(MpRollAdjustContextDTO contextDTO) {

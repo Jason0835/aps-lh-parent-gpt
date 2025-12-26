@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
@@ -52,7 +51,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     /**
      * 查询供应链订单池列表
      */
-    @RequiresPermissions( "monthplan:supplyOrderPool:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +67,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
      * 保存
      */
     @Log(title = "ui.data.column.supplyOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "monthplan:supplyOrderPool:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +78,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
      * 删除
      */
     @Log(title = "ui.data.column.supplyOrderPool.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:supplyOrderPool:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +89,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     /**
      * 获取供应链订单池详细信息
      */
-    @RequiresPermissions( "monthplan:supplyOrderPool:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -108,7 +103,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "monthplan:supplyOrderPool:import")
     @Log(title = "ui.data.column.supplyOrderPool.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -120,7 +114,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:supplyOrderPool:export")
     @Log(title = "供应链订单池", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

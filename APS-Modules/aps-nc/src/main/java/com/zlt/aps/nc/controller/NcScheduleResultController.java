@@ -1,7 +1,39 @@
 package com.zlt.aps.nc.controller;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
-import com.alibaba.fastjson.JSONObject;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -14,41 +46,21 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.common.engine.utils.DateUtil;
+import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
-import com.zlt.aps.nc.common.handle.NcSyncDataHandle;
 import com.zlt.aps.nc.engine.service.NcEngineService;
 import com.zlt.aps.nc.service.NcMachineInfoService;
 import com.zlt.aps.nc.service.NcScheduleResultService;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
-import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.common.utils.StringUtil;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
+
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
 
 /**
  * 内衬胶排程结果Controller
@@ -68,12 +80,10 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     private NcMachineInfoService ncMachineInfoService;
     @Resource
     private NcEngineService ncEngineService;
-    @Resource
-    private NcSyncDataHandle ncSyncDataHandle;
     @Autowired
     private FactoryService factoryService;
 	@Resource
-	private SyncDataLogsService syncDataLogsService;
+	private ISyncDataLogsApiService syncDataLogsService;
 
     /**
      * 查询内衬排程结果列表
@@ -425,25 +435,26 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
         long[] arr = list.stream().mapToLong(NcScheduleResult::getId).toArray();
         Date scheduleDate = list.get(0).getScheduleDate();
 
-        String dataVersion = ncSyncDataHandle.getDataVersion(ApsConstant.NC_DEPLOY_SYNC_KEY);  //下发接口版本号
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.NC_DEPLOY_SYNC_KEY);  //下发接口版本号
         // 厂别、分公司编号
         String factoryCode = factoryService.getFactoryCode();
         String companyCode = factoryService.getCompanyCode();
         AjaxResult ajaxResult = null;
         try {
             ncScheduleResultService.batchUpdate(arr, scheduleDate, dataVersion, factoryCode, companyCode);
-            //数据同步到中间库后，往mq中发送消息通知MES去取数据
-            SyncParamsVO syncParamsVO = new SyncParamsVO();
-            syncParamsVO.setSyncKey(ApsConstant.NC_DEPLOY_SYNC_KEY);
-            syncParamsVO.setDataVersion(dataVersion);
-            // 请求参数
-            JSONObject params = new JSONObject();
-            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-			params.put("rowCount", arr.length);
-            syncParamsVO.setParams(params);
-            syncParamsVO.setFactoryCode(factoryCode);
-            syncParamsVO.setCompanyCode(companyCode);
-            ncSyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
+            // 调整为itf接口
+//            //数据同步到中间库后，往mq中发送消息通知MES去取数据
+//            SyncParamsVO syncParamsVO = new SyncParamsVO();
+//            syncParamsVO.setSyncKey(ApsConstant.NC_DEPLOY_SYNC_KEY);
+//            syncParamsVO.setDataVersion(dataVersion);
+//            // 请求参数
+//            JSONObject params = new JSONObject();
+//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+//			params.put("rowCount", arr.length);
+//            syncParamsVO.setParams(params);
+//            syncParamsVO.setFactoryCode(factoryCode);
+//            syncParamsVO.setCompanyCode(companyCode);
+//            ncSyncDataHandle.syncNotice(syncParamsVO);  //往消息队列发送消息
 
 			// 取回mes的反馈结果
 			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);

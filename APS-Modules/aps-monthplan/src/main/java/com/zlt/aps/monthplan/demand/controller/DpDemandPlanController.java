@@ -1,43 +1,47 @@
 package com.zlt.aps.monthplan.demand.controller;
 
-
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.common.controller.BusiController;
+import com.zlt.common.utils.PubUtil;
+
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
+
 import com.ruoyi.common.core.web.page.TableDataInfo;
+
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
 * 文件名称：DpDemandPlanController.java
 * 描    述：需求计划 控制层类：....
 *@author yelq
-*@date 2025-12-12
+*@date 2025-12-25
 *@version 1.0
 *
  *  修改记录：
@@ -49,94 +53,62 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 @Api(tags = "需求计划")
 @RestController
 @RequestMapping("/demandPlan")
-public class DpDemandPlanController extends BusiController<DpDemandPlan>
-{
+public class DpDemandPlanController extends AbstractDocBizController<DpDemandPlan> {
+
     @Autowired
-    private IDpDemandPlanService DpDemandPlanService;
+    private IDpDemandPlanService dpDemandPlanService;
+
+    @Autowired
+    private DpDemandPlanEntityMapper entityMapper;
 
     /**
      * 查询需求计划列表
      */
-    @RequiresPermissions( "monthplan:demandPlan:list")
-    @ApiOperation("查询需求计划列表")
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody DpDemandPlan DpDemandPlan)
-    {
-        startPage("create_time desc");
-        List<DpDemandPlan> list = DpDemandPlanService.selectDpDemandPlanList(DpDemandPlan);
-        return getDataTable(list);
-    }
-
-
-    /**
-     * 导出需求计划列表
-     */
-    @RequiresPermissions( "monthplan:demandPlan:export")
-    @Log(title = "需求计划", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportData/{fileName}")
-    public byte[] exportData(@RequestBody DpDemandPlan DpDemandPlan,@PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
-        return commonExport(DpDemandPlan,fileName,response);
+    @Override
+    public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
+        return super.list(queryVO);
     }
 
     @Override
-    public List<DpDemandPlan> listExportData(DpDemandPlan DpDemandPlan) {
-        startPage("create_time desc");
-        return  DpDemandPlanService.selectDpDemandPlanList(DpDemandPlan);
+    protected String getOrderBy() {
+        return "create_time desc";
     }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody DpDemandPlan billVO){
+        return super.save(billVO);
+    }
+
+    /**
+     * 删除
+     */
+    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+        return super.removeByIds(ids);
+    }
+
 
     /**
      * 获取需求计划详细信息
      */
-    @RequiresPermissions( "monthplan:demandPlan:query")
-    @ApiOperation("获取需求计划详细信息")
-    @GetMapping(value = "/{id}")
-    public DpDemandPlan getInfo(@PathVariable("id") Long id)
-    {
-        return DpDemandPlanService.selectDpDemandPlanById(id);
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{billId}")
+    @Override
+    public DpDemandPlan getInfo(@PathVariable("billId") Long billId) {
+        return super.getInfo(billId);
     }
 
-    /**
-     * 新增需求计划
-     */
-    @Log(title = "ui.data.column.demandPlan.modelName", businessType = BusinessType.INSERT)
-    @RequiresPermissions( "monthplan:demandPlan:add")
-    @ApiOperation("新增需求计划")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody DpDemandPlan DpDemandPlan){
-        return toAjax(DpDemandPlanService.insertDpDemandPlan(DpDemandPlan));
-    }
-
-    /**
-     * 修改需求计划
-     */
-    @Log(title = "ui.data.column.demandPlan.modelName", businessType = BusinessType.UPDATE)
-    @RequiresPermissions( "monthplan:demandPlan:edit")
-    @ApiOperation("修改需求计划")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody DpDemandPlan DpDemandPlan){
-        return toAjax(DpDemandPlanService.updateDpDemandPlan(DpDemandPlan));
-    }
-
-    /**
-     * 删除需求计划
-     */
-    @Log(title = "ui.data.column.demandPlan.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:demandPlan:remove")
-    @ApiOperation("删除需求计划")
-	@DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids){
-        return toAjax(DpDemandPlanService.deleteDpDemandPlanByIds(ids));
-    }
-
-    /**
-     * 校验需求计划唯一性
-     */
-    @ApiOperation("校验需求计划唯一性")
-    @PostMapping("/checkDpDemandPlanUnique")
-    public String checkDpDemandPlanUnique(@RequestBody DpDemandPlan DpDemandPlan){
-        return DpDemandPlanService.checkDpDemandPlanUnique(DpDemandPlan);
-    }
 
     /**
      * 根据集合导入需求计划数据
@@ -144,19 +116,101 @@ public class DpDemandPlanController extends BusiController<DpDemandPlan>
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.demandPlan.modelName", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入需求计划数据")
-    @PostMapping("/importData/{updateSupport}")
-    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
-        return commonImport(importContext,updateSupport);
+    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext,updateSupport);
+    }
+
+    /**
+     * 导出列表
+     */
+    @RequiresPermissions( "monthplan:dpDemandPlan:export")
+    @Log(title = "需求计划", businessType = BusinessType.EXPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody DpDemandPlan queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    public AjaxResult doImportData(List<DpDemandPlan> list, boolean updateSupport, long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return DpDemandPlanService.importData(list, updateSupport, importLogId);
+    protected List<DpDemandPlan> listExportData(DpDemandPlan obj) {
+        QueryWrapper<DpDemandPlan> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return entityMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService(){
+        return dpDemandPlanService;
+    }
+
+    /**
+     * 条件拼接
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<DpDemandPlan> queryWrapper, DpDemandPlan queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isAlternateMaterial")), "IS_ALTERNATE_MATERIAL", queryVO.getFieldValueByFieldName("isAlternateMaterial"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("locationType")), "LOCATION_TYPE", queryVO.getFieldValueByFieldName("locationType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionType")), "PRODUCTION_TYPE", queryVO.getFieldValueByFieldName("productionType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("yearWeek")), "YEAR_WEEK", queryVO.getFieldValueByFieldName("yearWeek"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isUniformity")), "IS_UNIFORMITY", queryVO.getFieldValueByFieldName("isUniformity"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderQty")), "ORDER_QTY", queryVO.getFieldValueByFieldName("orderQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stockQty")), "STOCK_QTY", queryVO.getFieldValueByFieldName("stockQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("remainingQty")), "REMAINING_QTY", queryVO.getFieldValueByFieldName("remainingQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("averageSaleQty")), "AVERAGE_SALE_QTY", queryVO.getFieldValueByFieldName("averageSaleQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("plannedSurplus")), "PLANNED_SURPLUS", queryVO.getFieldValueByFieldName("plannedSurplus"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("netQty")), "NET_QTY", queryVO.getFieldValueByFieldName("netQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isProduction")), "IS_PRODUCTION", queryVO.getFieldValueByFieldName("isProduction"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("postponeNetQty")), "POSTPONE_NET_QTY", queryVO.getFieldValueByFieldName("postponeNetQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("unPostponeNetQty")), "UN_POSTPONE_NET_QTY", queryVO.getFieldValueByFieldName("unPostponeNetQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("midQty")), "MID_QTY", queryVO.getFieldValueByFieldName("midQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("postponeQty")), "POSTPONE_QTY", queryVO.getFieldValueByFieldName("postponeQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cycleReserveQty")), "CYCLE_RESERVE_QTY", queryVO.getFieldValueByFieldName("cycleReserveQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("conventionReserveQty")), "CONVENTION_RESERVE_QTY", queryVO.getFieldValueByFieldName("conventionReserveQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isReachMinProductionQty")), "IS_REACH_MIN_PRODUCTION_QTY", queryVO.getFieldValueByFieldName("isReachMinProductionQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("minProductionQty")), "MIN_PRODUCTION_QTY", queryVO.getFieldValueByFieldName("minProductionQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("channel")), "CHANNEL", queryVO.getFieldValueByFieldName("channel"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hierarchy")), "HIERARCHY", queryVO.getFieldValueByFieldName("hierarchy"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("speed")), "SPEED", queryVO.getFieldValueByFieldName("speed"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImportantCustom")), "IS_IMPORTANT_CUSTOM", queryVO.getFieldValueByFieldName("isImportantCustom"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isEnsurePlan")), "IS_ENSURE_PLAN", queryVO.getFieldValueByFieldName("isEnsurePlan"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isEmergency")), "IS_EMERGENCY", queryVO.getFieldValueByFieldName("isEmergency"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDebitPlan")), "IS_DEBIT_PLAN", queryVO.getFieldValueByFieldName("isDebitPlan"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliveryDateDue")), "DELIVERY_DATE_DUE", queryVO.getFieldValueByFieldName("deliveryDateDue"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImport")), "IS_IMPORT", queryVO.getFieldValueByFieldName("isImport"));
+    }
+
+
+    @Override
+    protected String getTypeCode(){
+        return "2025122521";
     }
 
     @ApiOperation("生成需求计划")
@@ -168,13 +222,8 @@ public class DpDemandPlanController extends BusiController<DpDemandPlan>
     )
     @PostMapping("/createMonthRequire")
     public AjaxResult createMonthRequire(@RequestBody DpDemandPlan createCondition){
-        if (null == createCondition) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
-        }
-        if (StringUtils.isBlank(createCondition.getFactoryCode()) || null == createCondition.getYear() || null == createCondition.getMonth()) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
-        }
-        DpDemandPlanService.createMonthRequire(createCondition);
+        dpDemandPlanService.createMonthRequire(createCondition);
         return AjaxResult.success();
     }
+
 }

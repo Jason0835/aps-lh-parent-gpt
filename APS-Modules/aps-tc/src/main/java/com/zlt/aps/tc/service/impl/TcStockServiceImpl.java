@@ -1,5 +1,20 @@
 package com.zlt.aps.tc.service.impl;
 
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -16,20 +31,6 @@ import com.zlt.aps.tc.mapper.TcCurlRollMapper;
 import com.zlt.aps.tc.mapper.TcParamsMapper;
 import com.zlt.aps.tc.mapper.TcStockMapper;
 import com.zlt.aps.tc.service.TcStockService;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 胎侧库存信息Service业务层处理
@@ -82,7 +83,7 @@ public class TcStockServiceImpl implements TcStockService {
         if (CollectionUtils.isNotEmpty(stockList)) {
             List<String> codeList = stockList.stream().map(TcStock::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, BigDecimal> lengthMap = new HashMap<>(16);
-            if (com.alibaba.nacos.common.utils.CollectionUtils.isNotEmpty(codeList)) {
+            if (CollectionUtils.isNotEmpty(codeList)) {
                 LambdaQueryWrapper<TcCurlRoll> wrapper = new LambdaQueryWrapper<>();
                 wrapper.in(TcCurlRoll::getSidewallCode, codeList);
                 wrapper.eq(TcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);

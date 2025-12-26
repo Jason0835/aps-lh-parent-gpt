@@ -1,5 +1,6 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
@@ -62,12 +63,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
 					List<MdmSkuConstructionRef> updateList = refMap.get(this.getMapKey(item));
 					for (MdmSkuConstructionRef updateItem : updateList) {
-						updateItem.setId(updateItem.getId());
-						updateItem.setBaseVale(updateItem.getId());
+						updateItem.setId(item.getId());
+						updateItem.setBaseVale(item.getId());
 					}
 				});
 			}
-			List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(apsDataList, 1000);
+			List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(syncList, 1000);
 			for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
 				baseDao.saveBatch(saveList);
 			}
@@ -84,6 +85,14 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	private String getMapKey(MdmSkuConstructionRef info) {
 		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getMesMaterialCode(),
 				info.getMaterialCode(), info.getBomVersion(), info.getEmbryoCode());
+	}
+
+	@DS("aps")
+	private void saveBatch(List<MdmSkuConstructionRef> apsDataList) {
+		List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(apsDataList, 1000);
+		for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
+			baseDao.saveBatch(saveList);
+		}
 	}
 
 	/**
@@ -106,12 +115,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
 					List<MdmConstructionInfo> updateList = refMap.get(this.getMapKey(item));
 					for (MdmConstructionInfo updateItem : updateList) {
-						updateItem.setId(updateItem.getId());
-						updateItem.setBaseVale(updateItem.getId());
+						updateItem.setId(item.getId());
+						updateItem.setBaseVale(item.getId());
 					}
 				});
 			}
-			List<List<MdmConstructionInfo>> splitList = ScmListUtils.getSplitList(apsDataList, 1000);
+			List<List<MdmConstructionInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
 			for (List<MdmConstructionInfo> saveList : splitList) { // 分批保存，防止长度超出限制
 				baseDao.saveBatch(saveList);
 			}
@@ -150,12 +159,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
 					List<MdmBomInfo> updateList = refMap.get(this.getMapKey(item));
 					for (MdmBomInfo updateItem : updateList) {
-						updateItem.setId(updateItem.getId());
-						updateItem.setBaseVale(updateItem.getId());
+						updateItem.setId(item.getId());
+						updateItem.setBaseVale(item.getId());
 					}
 				});
 			}
-			List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(apsDataList, 1000);
+			List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
 			for (List<MdmBomInfo> saveList : splitList) { // 分批保存，防止长度超出限制
 				baseDao.saveBatch(saveList);
 			}

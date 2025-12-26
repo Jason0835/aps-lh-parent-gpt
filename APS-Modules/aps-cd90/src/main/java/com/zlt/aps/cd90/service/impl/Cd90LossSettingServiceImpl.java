@@ -1,6 +1,17 @@
 package com.zlt.aps.cd90.service.impl;
 
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
@@ -15,16 +26,6 @@ import com.zlt.aps.cd90.mapper.Cd90LossSettingMapper;
 import com.zlt.aps.cd90.service.Cd90LossSettingService;
 import com.zlt.aps.cd90.service.Cd90MachineInfoService;
 import com.zlt.aps.common.core.utils.ImportUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 90度裁断损耗率设定Service业务层处理

@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
+import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.ThreadPoolUtil;
@@ -187,9 +188,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void initCommon(MpRollAdjustContextDTO contextDTO) {
-        // todo 暂时写死
-        contextDTO.setFactoryCode("116");
-        contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + contextDTO.getMpMonth()));
+        // 工厂编码
+        contextDTO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
+            // 年月
+            contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + contextDTO.getMpMonth()));
+        }
     }
 
     /**
@@ -398,6 +402,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void check(MpRollAdjustContextDTO contextDTO) {
+        // 初始化通用
+        initCommon(contextDTO);
+        // 校验年月是否为空
+        Assert.isFalse(contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null,I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.yearMonthEmpty"));
         // 获取定稿的排产版本
         FactoryProductionVersion factoryProductionVersion = getIsFinalVersion(contextDTO);
         // 月度生产计划还未定稿，抛出异常
@@ -414,11 +422,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @return
      */
     private FactoryProductionVersion getIsFinalVersion(MpRollAdjustContextDTO contextDTO) {
+        // 初始化排产版本
         initVersion(contextDTO);
+
         List<FactoryProductionVersion> sourceVersionList = contextDTO.getFactoryProductionVersionList();
         if (PubUtil.isEmpty(sourceVersionList)) {
             return null;
         }
+        // 筛选：定稿的排产版本
         FactoryProductionVersion factoryProductionVersion = sourceVersionList.stream()
                 .filter(item -> Constant.TRUE.equals(item.getIsFinal()))
                 .findFirst()

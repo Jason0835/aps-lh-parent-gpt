@@ -49,7 +49,7 @@ public class MpWeekRollAdjustController extends BaseController {
             key = "'ADJ:GET:' + #weekRollAdjustDTO.mpYear + #weekRollAdjustDTO.mpMonth",
             waitTime = 0,
             leaseTime = -1,
-            failMsg = "ui.data.alert.listAdjustOrder.run",
+            failMsg = "ui.data.alert.getAdjustDetail.run",
             args = {"#weekRollAdjustDTO.mpYear","#weekRollAdjustDTO.mpMonth"}
     )
     public TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) throws InterruptedException {
@@ -62,13 +62,13 @@ public class MpWeekRollAdjustController extends BaseController {
         // 构建上下文对象
         MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
 
-        log.info("获取调整订单 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+        log.info("获取调整明细 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
 
         // 执行周程滚动调整策略（生成调整明细）
         weekAdjustStrategy.generateAdjust(contextDTO);
 
-        log.info("获取调整订单 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+        log.info("获取调整明细 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
 
         // 返回结果处理

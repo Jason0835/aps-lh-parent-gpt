@@ -1,23 +1,21 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.util.Date;
-
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpSkuProductionType.java
  * 描    述：SKU排产分类对象 t_mp_sku_production_type
  *@author yelq
- *@date 2025-12-17
+ *@date 2025-12-26
  *@version 1.0
  *
  *  修改记录：
@@ -28,8 +26,8 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 
 @ApiModel(value = "SKU排产分类对象", description = "SKU排产分类对象 ")
 @Data
-@TableName(value = "t_mp_sku_production_type")
-public class MpSkuProductionType extends BaseEntity{
+@TableName(value = "t_mdm_sku_schedule_category")
+public class MpSkuProductionType extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -63,5 +61,6 @@ public class MpSkuProductionType extends BaseEntity{
     @ApiModelProperty(value = "排产类型", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
+
 
 }
