@@ -106,7 +106,7 @@ public class MdmStructureLhRatioUIController extends BaseUIController<MdmStructu
     @ResponseBody
     public AjaxResult save(MdmStructureLhRatio mdmStructureLhRatio) {
         if (UserConstants.NOT_UNIQUE.equals(iMdmStructureLhRatioService.checkUnique(mdmStructureLhRatio))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmStructureLhRatio.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmStructureLhRatio.notUnique"));
         }
 
         return iMdmStructureLhRatioService.save(mdmStructureLhRatio);
