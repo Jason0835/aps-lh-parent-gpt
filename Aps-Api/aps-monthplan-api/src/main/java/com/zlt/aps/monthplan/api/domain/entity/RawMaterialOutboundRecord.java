@@ -35,7 +35,7 @@ public class RawMaterialOutboundRecord extends BaseEntity {
 
      /** 工厂 */
     @Excel(name = "ui.data.column.rawMaterialOutboundRecord.factoryCode", dictType = "biz_factory_name")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(required = true, maxLength = 10, dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
