@@ -111,7 +111,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
     @Override
     protected Map<Object, Object> getServiceCheckParams(List<MdmDevicePlanShut> list, List<MdmDevicePlanShut> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
-        Map<String, List<MdmDevicePlanShut>> groupMap = list.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProcCode(), item.getMachineCode())));
+        Map<String, List<MdmDevicePlanShut>> groupMap = list.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getProcCode(), item.getMachineType(), item.getMachineCode())));
         serviceCheckParams.put("groupMap", groupMap);
         for (int i = 0; i < list.size(); i++) {
             MdmDevicePlanShut mdmDevicePlanShut = list.get(i);
@@ -124,7 +124,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
     protected Boolean serviceCheckAndDataHandle(MdmDevicePlanShut importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         if (serviceCheckParams.containsKey("groupMap")) {
             Map<String, List<MdmDevicePlanShut>> groupMap = (Map<String, List<MdmDevicePlanShut>>) serviceCheckParams.get("groupMap");
-            String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getProcCode(), importDocEntity.getMachineCode());
+            String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getProcCode(), importDocEntity.getMachineType(), importDocEntity.getMachineCode());
             // excel内校验
             if (groupMap.containsKey(mapKey)) {
                 List<MdmDevicePlanShut> mdmDevicePlanShutList = groupMap.get(mapKey);
