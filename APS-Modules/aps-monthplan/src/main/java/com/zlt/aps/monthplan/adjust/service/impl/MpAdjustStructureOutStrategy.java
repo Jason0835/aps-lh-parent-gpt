@@ -1,13 +1,20 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import cn.hutool.core.convert.Convert;
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
+import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 结构外调整策略
@@ -19,10 +26,68 @@ import java.util.Collections;
 public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService {
 
     @Override
-    public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) {
-        // todo 结构外调整逻辑
-        contextDTO.setMpAdjustStructureInList(Collections.emptyList());
+    public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        // 1、构建结构外调整明细
+        List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
+        // 2、通过排产机台、结构筛选结构外调整明细
+        List<MpAdjustDetailVo> matchAdjustList = filterAdjustDetailList(contextDTO,adjustDetailList);
+        contextDTO.setAdjustDetailList(matchAdjustList);
+        // 未获取到调整记录，抛出异常
+        Assert.isFalse(PubUtil.isEmpty(matchAdjustList), () -> {
+            String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
+                    contextDTO.getYearMonth());
+            return new BusinessException(msg);
+        });
+        // 3、设置净需求
+        setCurrentNetQty(contextDTO);
+        // 4、设置计划剩余排产量、计划已排产量
+        setMonthUnScheduledQty(contextDTO);
+        // 5、筛选：净需求 - 计划已排产量 > 0的数据
+        filterAdjustList(contextDTO.getAdjustDetailList());
+        // 筛选后数据为空，抛出异常
+        Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
+            String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
+            return new BusinessException(msg);
+        });
+        // 6、设置其他字段
+        setOtherField(contextDTO);
     }
+
+
+    /**
+     * 通过排产机台、结构筛选结构外调整明细
+     * @param contextDTO
+     * @param adjustDetailList
+     * @return
+     */
+    private List<MpAdjustDetailVo> filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
+                                                                     List<MpAdjustDetailVo> adjustDetailList) {
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return Collections.emptyList();
+        }
+        return adjustDetailList.stream()
+                .filter(vo -> vo.getStructureName().equals(contextDTO.getStructureName())
+                        && vo.getScheduledMachines().contains(contextDTO.getScheduledMachines()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 筛选：净需求 - 计划已排产量 > 0的数据
+     * @param adjustList
+     */
+    private void filterAdjustList(List<MpAdjustDetailVo> adjustList) {
+        if (PubUtil.isEmpty(adjustList)) {
+            return;
+        }
+        adjustList.removeIf(adjust -> {
+            Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
+            Integer monthScheduledQty = Convert.toInt(adjust.getMonthScheduledQty(),0);
+            return (currentNetQty - monthScheduledQty) <= 0;
+        });
+    }
+
+
+
 
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
