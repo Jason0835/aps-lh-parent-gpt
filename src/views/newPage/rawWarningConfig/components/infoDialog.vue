@@ -97,6 +97,20 @@ export default {
             trigger: "change",
           },
         ],
+        warningLevel: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        warningType: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -153,6 +167,13 @@ export default {
           label: this.$t("ui.data.column.rawMaterial.warningLevel"),
           type: "select",
           dictData: this.parentDict.type.warn_level,
+        },
+        {
+          prop: "warningType",
+          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          type: "select",
+          dictData: this.parentDict.type.warn_type,
+
         },
         {
           prop: "remark",

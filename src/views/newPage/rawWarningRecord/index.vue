@@ -22,12 +22,12 @@
         <el-button
           @click="handleAdd('month')"
              v-hasPermi="['maindata:rawWarningRecord:executeNewMaterialWarning']"
-          >{{ $t("执行新材料预警") }}</el-button
+          >{{ $t("ui.data.rawWarningRecord.executeNewMaterialWarning") }}</el-button
         >
         <el-button
           @click="handleAdd('week')"
              v-hasPermi="['maindata:rawWarningRecord:executeUsageWarning']"
-          >{{ $t("执行用量偏差预警") }}</el-button
+          >{{ $t("ui.data.rawWarningRecord.executeUsageWarning") }}</el-button
         >
         <!-- <el-button
           @click="handleExport"

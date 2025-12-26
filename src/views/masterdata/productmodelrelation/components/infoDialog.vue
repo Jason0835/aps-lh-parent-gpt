@@ -88,6 +88,13 @@ export default {
             trigger: "change",
           },
         ],
+        shareMouldCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -108,6 +115,10 @@ export default {
         {
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
           prop: "mouldCode",
+        },
+        {
+          label: this.$t("ui.data.rubberMaterial.shareMouldCode"),
+          prop: "shareMouldCode",
         },
         {
           prop: "materialCode",

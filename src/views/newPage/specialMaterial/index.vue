@@ -23,7 +23,7 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['maindata:rawSpecialMaterialRecord:add']"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:edit']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >

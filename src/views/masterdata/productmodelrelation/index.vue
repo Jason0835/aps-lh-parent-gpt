@@ -186,6 +186,10 @@ export default {
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
         },
         {
+          prop: "shareMouldCode",
+          label: this.$t("ui.data.rubberMaterial.shareMouldCode"),
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },

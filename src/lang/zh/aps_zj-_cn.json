@@ -237,7 +237,8 @@
 
   "ui.data.rubberMaterial.embryoCode": "胎胚编码",
   "ui.data.rubberMaterial.embryoDesc": "胎胚描述",
-  "ui.data.rubberMaterial.sectionWidth": "断面宽"
+  "ui.data.rubberMaterial.sectionWidth": "断面宽",
+  "ui.data.rubberMaterial.shareMouldCode": "共用模具号"
 
 
 

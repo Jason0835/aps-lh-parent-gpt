@@ -21,7 +21,7 @@
       <template slot="header">
         <el-button
           @click="handleAdd"
-           v-hasPermi="['maindata:rawWarningConfig:add']"
+           v-hasPermi="['maindata:rawWarningConfig:edit']"
           type="primary"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
@@ -71,7 +71,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'warn_level'],
+  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'warn_level','warn_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -140,6 +140,13 @@ export default {
           label: this.$t("ui.data.column.rawMaterial.warningLevel"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_level, value);
+          },
+        },
+        {
+          prop: "warningType",
+          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.warn_type, value);
           },
         },
         {
