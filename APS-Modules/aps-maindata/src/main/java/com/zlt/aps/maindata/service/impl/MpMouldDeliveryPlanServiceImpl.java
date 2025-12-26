@@ -16,6 +16,8 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpMouldDeliveryPlan;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -140,6 +142,10 @@ public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDe
             if (materialInfoMap.containsKey(materialCode)) {
                 MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
                 importDocEntity.setMaterialDesc(materialInfo.getMaterialDesc());
+            } else {
+                String message = I18nUtil.getMessage("ui.data.column.mdmMaterialInfo.dbNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
             }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
