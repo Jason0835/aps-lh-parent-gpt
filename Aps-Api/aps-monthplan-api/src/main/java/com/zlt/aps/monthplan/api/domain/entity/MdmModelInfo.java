@@ -167,9 +167,6 @@ public class MdmModelInfo extends BaseEntity {
     @TableField(value = "REMARK")
     private String remark;
 
-    @TableField(exist = false)
-    private Integer isDelete;
-
     /**
      * 寸口
      */
