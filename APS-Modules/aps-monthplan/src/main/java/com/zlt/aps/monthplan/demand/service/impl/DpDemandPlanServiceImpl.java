@@ -15,6 +15,7 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
+import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
@@ -30,7 +31,6 @@ import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
-import com.zlt.aps.monthplan.demand.service.IMpSkuProductionTypeService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
@@ -99,7 +99,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     // 区域产能分配
     private final IMdmAreaCapaAllocationService mdmAreaCapaAllocationService;
     // SKU排产分类
-    private final IMpSkuProductionTypeService mpSkuProductionTypeService;
+    private final IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
     // 供应链订单
     private final ISupplyOrderPoolService supplyOrderPoolService;
     // 订单快照
@@ -489,7 +489,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 获取排产类型
      */
     private Map<String, String> fetchProductionTypeMap() {
-        return mpSkuProductionTypeService.skuToProductionType();
+        return mdmSkuScheduleCategoryService.skuToProductionType();
     }
 
     /**
