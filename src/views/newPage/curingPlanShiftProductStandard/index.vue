@@ -125,10 +125,12 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:120
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300
         },
         {
           prop: "classCapacity",

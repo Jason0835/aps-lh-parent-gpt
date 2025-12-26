@@ -93,6 +93,13 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
+        ],
+        stockDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
         ]
       },
     };
@@ -133,6 +140,13 @@ export default {
           type: "number",
         },
         {
+          prop: "stockDate",
+          label: this.$t("库存日期"),
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+
+        },
+        {
           prop: "unit",
           label: this.$t("common.unit"),
         },
@@ -171,7 +185,7 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "",
+          factoryCode: "116",
         };
       }
     },

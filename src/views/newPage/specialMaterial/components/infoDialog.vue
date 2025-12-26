@@ -124,27 +124,33 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
+          maxlength:10
         },
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          maxlength:100
         },
         {
           prop: "rubberSpec",
           label: this.$t("ui.data.column.masterdata.rubberSpec"),
+          maxlength:100
         },
         {
           prop: "quota",
           label: this.$t("ui.data.column.quota.quota"),
           type: "number",
+          max:99999999
         },
         {
           prop: "unit",
           label: this.$t("common.unit"),
+          maxlength:10
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          maxlength:300
         },
       ];
     },

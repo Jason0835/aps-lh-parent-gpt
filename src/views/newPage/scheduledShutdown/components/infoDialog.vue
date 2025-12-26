@@ -36,11 +36,12 @@ import {
   listMdmDevicePlanShut,
   editMdmDevicePlanShu,
 } from "@/api/monthplan/scheduledShutdown";
+import machineSelect from "@/views/components/machineSelect.vue";
 
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm ,machineSelect},
   inject: ["parentDict"],
   data() {
     return {
@@ -132,12 +133,27 @@ export default {
           label: this.$t("ui.data.column.cx.machine.type"),
           type: "select",
           dictData: this.parentDict.type.device_shut_machine_type,
+          listeners: {
+            change: this.handleMachineTypeChange,
+          },
         },
 
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.dispatcherlog.machineId"),
-          maxlength:50
+
+          render: (form) => {
+            return (
+              <machineSelect
+                disabled={form.machineType?false:true}
+                factoryCode={form.factoryCode}
+                key={form.machineCode}
+                machineType={form.machineType}
+                v-model={form.machineCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
         },
         {
           prop: "machineStopType",
@@ -169,6 +185,9 @@ export default {
     },
   },
   methods: {
+    handleMachineTypeChange(){
+      this.$set(this.form,'machineCode','')
+    },
     // api
     async save(params) {
       try {
@@ -208,6 +227,9 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleMaterialCodeChange(){
+
     },
   },
 };

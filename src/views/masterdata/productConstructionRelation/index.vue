@@ -142,7 +142,7 @@ export default {
         {
           prop: "specifications",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 180,
+          width: 300,
         },
         {
           prop: "constructionCode",

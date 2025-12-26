@@ -217,8 +217,6 @@
   "ui.data.rawWarningRecord.executeNewMaterialWarning": "执行新材料预警",
   "ui.data.rawWarningRecord.executeUsageWarning": "执行用量偏差预警",
   "common.materialCodeSelect.title": "物料信息",
-
-
   "ui.data.DemandPlan.order": "优先级(订单类型)",
   "ui.data.DemandPlan.productionType": "排产分类",
   "ui.data.DemandPlan.orderQty": "订单量",
@@ -234,7 +232,12 @@
   "ui.data.DemandPlan.cycleReserveQty": "周期排产储备",
   "ui.data.DemandPlan.conventionReserveQty": "常规排产储备",
   "ui.data.DemandPlan.isReachMinProductionQty": "是否满足最小投产量",
-  "ui.data.DemandPlan.minProductionQty": "最小投产量值"
+  "ui.data.DemandPlan.minProductionQty": "最小投产量值",
+
+
+  "ui.data.rubberMaterial.embryoCode": "胎胚编码",
+  "ui.data.rubberMaterial.embryoDesc": "胎胚描述",
+  "ui.data.rubberMaterial.sectionWidth": "断面宽"
 
 
 

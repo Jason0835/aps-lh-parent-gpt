@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="800px"
+    width="900px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"

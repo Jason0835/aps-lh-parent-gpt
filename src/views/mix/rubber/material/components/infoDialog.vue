@@ -79,7 +79,6 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
-
       return [
         {
           label: this.$t("common.factory"),
@@ -93,7 +92,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
-           prop: "materialCategory",
+          prop: "materialCategory",
           maxlength: "50",
           required: true,
           type: "select", //ISORNOT
@@ -105,18 +104,17 @@ export default {
           prop: "structureName",
           maxlength: "50",
           required: true,
-          disabled: true,
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(NC)',
+          label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
           maxlength: "50",
           required: true,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode")+'(MES)',
-           prop: "mesMaterialCode",
+          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+          prop: "mesMaterialCode",
           maxlength: "50",
           required: true,
           disabled: true,
@@ -131,54 +129,73 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
-
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
-           prop: "specifications",
+          prop: "specifications",
           maxlength: "50",
           disabled: true,
-
         },
         {
           label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "pattern",
-          disabled: false,
+          disabled: true,
         },
         {
           label: this.$t("ui.data.colume.plan.first.draft.brand"),
           prop: "brand",
           type: "select", //ISORNOT
           dictData: this.parentDict.type.biz_brand_type,
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.seep"),
           prop: "speed",
 
+          disabled: true,
         },
 
         {
           label: this.$t("ui.data.column.scheduleAdjust.hierarchy"),
           prop: "hierarchy",
-
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.proSize"),
           prop: "proSize",
-
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.lean.productinfo.ability"),
           prop: "ability",
-
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.cantProduce"),
           prop: "cantProduce",
           type: "select", //ISORNOT
           dictData: this.parentDict.type.biz_yes_no,
+        },
+        {
+          prop: "embryoCode",
           disabled: true,
-
+          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+        },
+        {
+          prop: "embryoDesc",
+          disabled: true,
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+        },
+        {
+          prop: "sectionWidth",
+          disabled: true,
+          label: this.$t("ui.data.rubberMaterial.sectionWidth"),
+        },
+        {
+          prop: "remark",
+          disabled: true,
+          label: this.$t("common.remark"),
         },
       ];
     },
@@ -208,7 +225,7 @@ export default {
         this.form = {
           ...data,
         };
-        this.form.cantProduce=data.cantProduce+''
+        this.form.cantProduce = data.cantProduce + "";
       } else {
         this.form = {
           classShift: "2",

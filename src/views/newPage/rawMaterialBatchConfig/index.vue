@@ -47,8 +47,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/mainda/rawMaterialOutboundRecord/importTemplate"
-      uploadUrl="/mainda/rawMaterialOutboundRecord/importData"
+      downloadUrl="/maindata/rawMaterialOutboundRecord/importTemplate"
+      uploadUrl="/maindata/rawMaterialOutboundRecord/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -259,7 +259,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mainda/rawMaterialOutboundRecord/export", this.formatParams(false));
+      downloadLink("/maindata/rawMaterialOutboundRecord/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {

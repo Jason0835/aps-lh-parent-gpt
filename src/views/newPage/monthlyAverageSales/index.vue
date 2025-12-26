@@ -130,18 +130,20 @@ export default {
         {
           prop: "brand",
           label: this.$t("common.brand"),
+          width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
         },
         {
           prop: "materialCode",
+          width:120,
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:200
+          width:300
         },
         {
           prop: "rollTwelveMonthSaleQty",

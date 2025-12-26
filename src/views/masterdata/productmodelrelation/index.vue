@@ -192,6 +192,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300,
         },
         {
           prop: "mainPattern",
@@ -200,6 +201,7 @@ export default {
         {
           prop: "samePatternPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
+          width:80,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },

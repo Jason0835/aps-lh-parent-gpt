@@ -169,6 +169,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:400
         },
         {
           prop: "productCategory",

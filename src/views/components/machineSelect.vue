@@ -18,6 +18,7 @@
         :data="data"
         :toolbar="false"
         :page="page"
+         :search="search"
         :highlight-current-row="true"
         @current-change="handleCurrentChange"
         @row-dblclick="handleDbClick"
@@ -34,10 +35,10 @@
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
-import { listProductinfo } from "@/api/lean/productinfo";
+import { getMachineList } from "@/api/monthplan/scheduledShutdown";
 export default {
   components: { selectDialog },
-
+  inject: ["parentDict"],
   model: {
     prop: "value",
     event: "change",
@@ -46,6 +47,8 @@ export default {
     value: String | Number,
     title: String,
     disabled: Boolean,
+    factoryCode: String | Number,
+    machineType: String | Number,
     label: String,
     multiple: {
       type: Boolean,
@@ -55,83 +58,56 @@ export default {
   data() {
     return {
       searchKey: "",
-      searchColumns: [
-        {
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-          prop: "materialCode",
-        },
-      ],
+      // searchColumns: [
+      //   {
+      //     prop: "factoryCode",
+      //     label: this.$t("common.factory"),
+      //     type: "select", //GLUE_TYPE
+      //     dictData: this.parentDict.type.biz_factory_name,
+      //   },
+      // ],
       filterKey: "",
       page: {
         current: 1,
         pageSize: 10,
         total: 0,
+
       },
       query: {},
       showValue: "",
       loading: false,
-      valueProp: "materialCode",
-      labelProp: "materialCode",
+      valueProp: "machineCode",
+      labelProp: "machineCode",
       data: [],
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select", //GLUE_TYPE
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+      ]
+    },
     columns: function () {
       const list = [
         {
-          prop: "materialCode",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          label: this.$t("ui.data.column.machine.machineCode"),
+          prop: "machineCode",
+          minWidth: 100,
+          // width: 150,
+          // sortable: "custom",
         },
-        {
-          prop: "mesMaterialCode",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
-        },
-        {
-          prop: "materialDesc",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
-        {
-          prop: "specifications",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
-        },
-        {
-          prop: "pattern",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.confMinProd.pattern"),
-        },
-        {
-          prop: "speed",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.seep"),
-        },
-        {
-          prop: "hierarchy",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.hierarchy"),
-        },
-        {
-          prop: "proSize",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
-        },
-        {
-          prop: "ability",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.lean.productinfo.ability"),
-        },
+        // {
+        //   label: this.$t("ui.data.column.machine.machineName"),
+        //   prop: "machineName",
+        //   minWidth: 100,
+        //   width: 150,
+        //   // sortable: "custom",
+        // },
       ];
       if (this.multiple) {
         list.unshift({
@@ -163,7 +139,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listProductinfo(this.formatParams());
+        const data = await getMachineList(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -178,15 +154,14 @@ export default {
       return {
         pageSize: this.page.pageSize,
         pageNum: this.page.current,
+        machineType: this.machineType,
         ...this.query,
         // userName: this.filterKey,
         status: 0, //过滤，只显示启用的用户
       };
     },
     getTitle() {
-      return this.title
-        ? this.title
-        : this.$t("common.materialCodeSelect.title");
+      return this.title ? this.title : this.$t("common.button.select");
     },
 
     /**
@@ -215,11 +190,24 @@ export default {
     },
 
     handleShow() {
+      console.log('sss')
+      let defaultParams = {
+        factoryCode:this.factoryCode?this.factoryCode:'116',
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
+      console.log( this.query)
       this.getList();
     },
     handleCancel() {
       this.data = [];
-      this.query = {};
+      this.query = {
+        factoryCode:'116'
+      };
       this.searchKey = "";
       this.filterKey = "";
       this.page = {

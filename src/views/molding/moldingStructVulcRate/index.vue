@@ -77,7 +77,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["LINE_TYPE", "biz_machine_brand", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -117,6 +117,9 @@ export default {
         {
           prop: "cxMachineBrandCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
+          },
         },
         {
           prop: "structureName",
@@ -182,8 +185,8 @@ export default {
         {
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           prop: "cxMachineBrandCode",
-          // type: "select",
-          // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
+          type: "select",
+          dictData: this.dict.type.biz_machine_brand, // "JOB_TYPE",
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),

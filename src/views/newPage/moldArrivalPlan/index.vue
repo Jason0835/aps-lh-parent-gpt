@@ -132,6 +132,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:350
         },
         {
           prop: "shipmentDate",

@@ -60,6 +60,7 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
+            maxlength:40,
           },
         ],
         embryoCode: [

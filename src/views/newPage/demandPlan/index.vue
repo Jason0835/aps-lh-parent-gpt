@@ -1,7 +1,6 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="DemandPlanMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -267,6 +266,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300
         },
         {
           prop: "productionType",

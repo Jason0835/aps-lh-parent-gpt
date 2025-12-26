@@ -93,6 +93,7 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
+
           },
         ],
         dimension: [
@@ -169,6 +170,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
+          maxlength:20,
         },
         {
           label: this.$t("ui.data.column.machine.lhMachineType"),
@@ -223,7 +225,7 @@ export default {
             "controls-position": "right",
             precision: 0,
             min: 0,
-            max: 999999,
+            max: 255,
           },
         },
         {

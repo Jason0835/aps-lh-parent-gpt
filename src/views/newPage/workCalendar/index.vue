@@ -3,9 +3,9 @@
   <basic-container>
     <div class="form">
       <div class="itemForm">
-        {{$t('common.factory')}}：
+        {{ $t("common.factory") }}：
         <el-select
-         :placeholder="$t('common.rule.select')"
+          :placeholder="$t('common.rule.select')"
           v-model="search.factoryCode"
           @change="getList"
         >
@@ -19,13 +19,24 @@
         </el-select>
       </div>
       <div class="itemForm">
+        <el-select v-model="search.year" placeholder="请选择" @change="changeYear">
+          <el-option
+            v-for="item in yearRange"
+            :key="item"
+            :label="item"
+            :value="item"
+          >
+          </el-option>
+        </el-select>
+      </div>
+      <div class="itemForm">
         <el-button
           type="primary"
           v-hasPermi="['maindata:mdmWorkCalendar:genAnnualPlan']"
           @click="genYearlPlan"
           :disabled="genDisable"
           :loading="loading"
-          >{{$t('ui.data.workCalendar.genAnnualPlan')}}</el-button
+          >{{ $t("ui.data.workCalendar.genAnnualPlan") }}</el-button
         >
       </div>
     </div>
@@ -38,39 +49,48 @@
         ></el-tab-pane>
       </el-tabs>
       <div style="display: flex; flex: 1">
-        <FullCalendar :options="calendarOptions">
-          <template v-slot:eventContent="arg" >
-            <div class="cus-event" v-if="search.procCode == 1"   @click="changeDayFlag(arg.event.extendedProps)"   :style="{
-                  background:
-                    arg.event.extendedProps.dayFlag == 0 ? '#ffebee' : '#e3f2fd',
-                }">
-
-              <div
-
-                class="statusDiv"
-
-              ></div>
+        <FullCalendar :options="calendarOptions" ref="fullCalendar">
+          <template v-slot:eventContent="arg">
+            <div
+              class="cus-event"
+              v-if="search.procCode == 1"
+              @click="changeDayFlag(arg.event.extendedProps)"
+              :style="{
+                background:
+                  arg.event.extendedProps.dayFlag == 0 ? '#ffebee' : '#e3f2fd',
+              }"
+            >
+              <div class="statusDiv"></div>
               <el-button
-                v-if=" arg.event.extendedProps.rate!=100"
+                v-if="arg.event.extendedProps.rate != 100"
                 type="text"
                 @click.stop="showModal(arg.event.extendedProps)"
                 >{{ arg.event.extendedProps.rate + "%" }}</el-button
               >
               <!-- <div class="shift">{{arg.event.extendedProps.randomNum }}</div> -->
             </div>
-            <div class="cus-event" v-else  >
-              <div class="shift"    @click="changeShiftFlag(arg.event.extendedProps,'oneShiftFlag')"  :style="{
-                    background:
-                      arg.event.extendedProps.oneShiftFlag == 0
-                        ? '#ffebee'
-                        : '#e3f2fd',
-                  }">
-               <span :style="{
+            <div class="cus-event" v-else>
+              <div
+                class="shift"
+                @click="
+                  changeShiftFlag(arg.event.extendedProps, 'oneShiftFlag')
+                "
+                :style="{
+                  background:
+                    arg.event.extendedProps.oneShiftFlag == 0
+                      ? '#ffebee'
+                      : '#e3f2fd',
+                }"
+              >
+                <span
+                  :style="{
                     color:
                       arg.event.extendedProps.oneShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">{{$t('ui.data.workCalendar.night')}}</span>
+                  }"
+                  >{{ $t("ui.data.workCalendar.night") }}</span
+                >
 
                 <!-- <div
                   class="statusDiv"
@@ -78,18 +98,27 @@
 
                 ></div> -->
               </div>
-              <div class="shift marginDiv"   @click="changeShiftFlag(arg.event.extendedProps,'twoShiftFlag')" :style="{
-                    background:
-                      arg.event.extendedProps.twoShiftFlag == 0
-                        ? '#ffebee'
-                        : '#e3f2fd',
-                  }">
-                  <span :style="{
+              <div
+                class="shift marginDiv"
+                @click="
+                  changeShiftFlag(arg.event.extendedProps, 'twoShiftFlag')
+                "
+                :style="{
+                  background:
+                    arg.event.extendedProps.twoShiftFlag == 0
+                      ? '#ffebee'
+                      : '#e3f2fd',
+                }"
+              >
+                <span
+                  :style="{
                     color:
                       arg.event.extendedProps.twoShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">{{$t('ui.data.workCalendar.morning')}}</span>
+                  }"
+                  >{{ $t("ui.data.workCalendar.morning") }}</span
+                >
 
                 <!-- <div
                   class="statusDiv"
@@ -102,20 +131,29 @@
                   }"
                 ></div> -->
               </div>
-              <div class="shift"  @click="changeShiftFlag(arg.event.extendedProps,'threeShiftFlag')" :style="{
-                    background:
-                      arg.event.extendedProps.threeShiftFlag == 0
-                        ? '#ffebee'
-                        : '#e3f2fd',
-                  }">
-                   <span :style="{
+              <div
+                class="shift"
+                @click="
+                  changeShiftFlag(arg.event.extendedProps, 'threeShiftFlag')
+                "
+                :style="{
+                  background:
+                    arg.event.extendedProps.threeShiftFlag == 0
+                      ? '#ffebee'
+                      : '#e3f2fd',
+                }"
+              >
+                <span
+                  :style="{
                     color:
                       arg.event.extendedProps.threeShiftFlag == 0
                         ? '#c62828'
                         : '#1565c0',
-                  }">{{$t('ui.data.workCalendar.noon')}}</span>
+                  }"
+                  >{{ $t("ui.data.workCalendar.noon") }}</span
+                >
 
-<!--
+                <!--
                 <div
                   class="statusDiv"
 
@@ -183,7 +221,6 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
-import { color } from "echarts";
 
 export default {
   name: "PersonTrainSetting",
@@ -205,6 +242,7 @@ export default {
   },
   data() {
     return {
+      yearRange: [],
       visible: false,
       loading: false,
       genDisable: false,
@@ -221,15 +259,15 @@ export default {
       search: {
         factoryCode: "116",
         procCode: "01",
+        year:''
       },
       query: {},
       selectList: [],
 
       calendarOptions: {
-
         plugins: [dayGridPlugin, interactionPlugin],
         initialView: "dayGridMonth",
-        locale:this.$i18n.locale=='zh_CN'?'zh-cn': "vi",
+        locale: this.$i18n.locale == "zh_CN" ? "zh-cn" : "vi",
         contentHeight: "auto",
         // weekends: false,
         events: [],
@@ -246,47 +284,72 @@ export default {
           };
         },
         buttonText: {
-          today:this.$t("ui.data.workCalendar.today"),
+          today: this.$t("ui.data.workCalendar.today"),
           // month: "月",
           // week: "周",
           // day: "日",
         },
       },
-      dateList:[]
+      dateList: [],
     };
   },
   computed: {},
   methods: {
-    hasPermission(permission) {
-      const permissions = this.$store.state.user.permissions || []
-      if (Array.isArray(permission)) {
-        return permission.some(perm => permissions.includes(perm))
+    initYearRange() {
+      const currentYear = new Date().getFullYear();
+      for (let i = currentYear - 1; i <= currentYear + 1; i++) {
+        this.yearRange.push(i);
       }
-      return permissions.includes(permission)
+    },
+      // 跳转到特定年份
+    changeYear() {
+      this.getList()
+      const calendarApi = this.$refs.fullCalendar.getApi()
+      calendarApi.gotoDate(this.search.year + '-01-01')
+      this.calendarOptions.validRange = {
+        start: this.search.year + '-01-01',
+        end: (this.search.year + 1) + '-01-01'
+      }
+    },
+    hasPermission(permission) {
+      const permissions = this.$store.state.user.permissions || [];
+      if (Array.isArray(permission)) {
+        return permission.some((perm) => permissions.includes(perm));
+      }
+      return permissions.includes(permission);
     },
     handleClick(tab, event) {
       let obj = this.selectList.find((item) => item.dictLabel == tab.label);
       this.search.procCode = obj.dictValue;
       this.getList();
     },
-    changeShiftFlag(info,type) {
-      if (!this.hasPermission('maindata:mdmWorkCalendar:edit')) {
-        return // 直接返回，不执行后续逻辑
+    changeShiftFlag(info, type) {
+      if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
+        return; // 直接返回，不执行后续逻辑
       }
       let obj = JSON.parse(JSON.stringify(info));
       obj.id = obj.editId;
-      let title=''
-      if(type=='oneShiftFlag'){
-       title=obj.oneShiftFlag==0? this.$t("ui.data.workCalendar.isNightStart"):this.$t("ui.data.workCalendar.isNightStop")
-       obj.oneShiftFlag=obj.oneShiftFlag==0?1:0
+      let title = "";
+      if (type == "oneShiftFlag") {
+        title =
+          obj.oneShiftFlag == 0
+            ? this.$t("ui.data.workCalendar.isNightStart")
+            : this.$t("ui.data.workCalendar.isNightStop");
+        obj.oneShiftFlag = obj.oneShiftFlag == 0 ? 1 : 0;
       }
-      if(type=='twoShiftFlag'){
-       title=obj.twoShiftFlag==0?this.$t("ui.data.workCalendar.isMorningStart"):this.$t("ui.data.workCalendar.isMorningStop")
-       obj.twoShiftFlag=obj.twoShiftFlag==0?1:0
+      if (type == "twoShiftFlag") {
+        title =
+          obj.twoShiftFlag == 0
+            ? this.$t("ui.data.workCalendar.isMorningStart")
+            : this.$t("ui.data.workCalendar.isMorningStop");
+        obj.twoShiftFlag = obj.twoShiftFlag == 0 ? 1 : 0;
       }
-      if(type=='threeShiftFlag'){
-       title=obj.threeShiftFlag==0?this.$t("ui.data.workCalendar.isNoongStart"):this.$t("ui.data.workCalendar.isNoongStop")
-       obj.threeShiftFlag=obj.threeShiftFlag==0?1:0
+      if (type == "threeShiftFlag") {
+        title =
+          obj.threeShiftFlag == 0
+            ? this.$t("ui.data.workCalendar.isNoongStart")
+            : this.$t("ui.data.workCalendar.isNoongStop");
+        obj.threeShiftFlag = obj.threeShiftFlag == 0 ? 1 : 0;
       }
       this.$confirm(title, {
         type: "warning",
@@ -310,13 +373,15 @@ export default {
       this.visible = false;
     },
     changeDayFlag(info) {
-      if (!this.hasPermission('maindata:mdmWorkCalendar:edit')) {
-        return // 直接返回，不执行后续逻辑
+      if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
+        return; // 直接返回，不执行后续逻辑
       }
       let obj = JSON.parse(JSON.stringify(info));
       obj.id = obj.editId;
       this.$confirm(
-        obj.dayFlag == 1 ? this.$t("ui.data.workCalendar.isStop") : this.$t("ui.data.workCalendar.isStart"),
+        obj.dayFlag == 1
+          ? this.$t("ui.data.workCalendar.isStop")
+          : this.$t("ui.data.workCalendar.isStart"),
         {
           type: "warning",
         }
@@ -331,12 +396,11 @@ export default {
       });
     },
     showModal(info) {
-      if (!this.hasPermission('maindata:mdmWorkCalendar:edit')) {
-
-        return // 直接返回，不执行后续逻辑
+      if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
+        return; // 直接返回，不执行后续逻辑
       }
       this.actionData = info;
-      this.actionRate = info.rate+'';
+      this.actionRate = info.rate + "";
       this.visible = true;
     },
     handleEventClick(info) {
@@ -364,17 +428,17 @@ export default {
       }
     },
     handleDateClick(info) {
-      if(this.search.procCode != 1){
-        return
+      if (this.search.procCode != 1) {
+        return;
       }
-      const result = this.dateList.find(item => item.calendarTime == info.dateStr);
+      const result = this.dateList.find(
+        (item) => item.calendarTime == info.dateStr
+      );
 
-      this.showModal(result)
+      this.showModal(result);
       // if (moment().isAfter(info.dateStr)) {
       //   return;
       // }
-
-
     },
 
     handleExport() {
@@ -407,12 +471,6 @@ export default {
     // api
     async getList() {
       try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        this.search.year = year;
         let res = await mdmWorkCalendar(this.search);
         if (res.rows.length == 0) {
           this.genDisable = false;
@@ -426,7 +484,7 @@ export default {
           obj.editId = obj.id;
           items.push(obj);
         }
-        this.dateList=items
+        this.dateList = items;
         this.$set(this.calendarOptions, "events", items);
         // this.page.total = data.total;
       } catch (error) {
@@ -448,7 +506,6 @@ export default {
       try {
         this.loading = true;
         let res = await genAnnualPlan(this.search);
-        console.log(res);
         this.getList();
       } catch (err) {
       } finally {
@@ -457,9 +514,14 @@ export default {
     },
     async changeRateNumber() {
       try {
-        if(this.actionRate<1||this.actionRate>100 || this.actionRate.includes('.')||isNaN(this.actionRate)){
-          this.$modal.msgError(this.$t('ui.data.workCalendar.peleaseInteger'));
-          return
+        if (
+          this.actionRate < 1 ||
+          this.actionRate > 100 ||
+          this.actionRate.includes(".") ||
+          isNaN(this.actionRate)
+        ) {
+          this.$modal.msgError(this.$t("ui.data.workCalendar.peleaseInteger"));
+          return;
         }
         const processedData = JSON.parse(JSON.stringify(this.actionData));
         processedData.id = processedData.editId;
@@ -474,8 +536,12 @@ export default {
     },
   },
   created() {
-    console.log('$i18n:', this.$i18n) // 应该输出 i18n 实例
-    console.log('$t:', this.$t) // 应该输出函数
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    this.search.year = year;
+    this.initYearRange();
     this.getCodeList();
   },
   activated() {},
@@ -542,7 +608,7 @@ export default {
   justify-content: center;
   height: 60px;
 }
-.marginDiv{
+.marginDiv {
   margin: 0;
 }
 /* 鼠标悬停效果 */

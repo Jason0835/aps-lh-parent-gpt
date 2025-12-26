@@ -114,7 +114,7 @@ export default {
           },
         },
         {
-          prop: "moldModelCode",
+          prop: "mouldSetCode",
           label: this.$t("ui.data.column.monthplan.moldModelCode"),
         },
         {
@@ -194,7 +194,7 @@ export default {
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "moldModelCode",
+          prop: "mouldSetCode",
           label: this.$t("ui.data.column.monthplan.moldModelCode"),
         },
 

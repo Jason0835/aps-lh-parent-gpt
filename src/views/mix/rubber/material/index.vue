@@ -2,7 +2,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerMachineMainTable"
+
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -39,8 +39,9 @@
           @click="() => $refs.tltUploadForm.handleImport()"
           >{{ $t("ui.frame.btn.import") }}
         </el-button>
-        <el-button @click="handleExport"
-        v-hasPermi="['lean:productinfo:export']"
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['lean:productinfo:export']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
         <!--<el-button-->
@@ -79,7 +80,16 @@ import {
 export default {
   name: "RubberMaterial",
   components: { InfoDialog, tltUpload },
-  dicts: ["GLUE_TYPE", "MAJOR_TYPE", "biz_factory_name","material_type",'biz_brand_type','biz_yes_no','biz_product_type','product_category'],
+  dicts: [
+    "GLUE_TYPE",
+    "MAJOR_TYPE",
+    "biz_factory_name",
+    "material_type",
+    "biz_brand_type",
+    "biz_yes_no",
+    "biz_product_type",
+    "product_category",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -88,7 +98,6 @@ export default {
   data() {
     let tomorrow = moment().add(1, "days").format("YYYY-MM-DD");
     return {
-
       loading: false,
       data: [],
       page: {
@@ -131,8 +140,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
-           prop: "materialCategory",
-            type: "select", //GLUE_TYPE
+          prop: "materialCategory",
+          type: "select", //GLUE_TYPE
           dictData: this.dict.type.material_type,
         },
         {
@@ -141,7 +150,7 @@ export default {
         },
         {
           label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
-           prop: "mesMaterialCode",
+          prop: "mesMaterialCode",
         },
         // {
         //   label: this.$t("物料名称"),
@@ -149,7 +158,7 @@ export default {
         // },
         {
           label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
-           prop: "specifications",
+          prop: "specifications",
         },
         {
           label: this.$t("ui.data.column.confMinProd.pattern"),
@@ -162,9 +171,8 @@ export default {
       ];
     },
     columns() {
-
       return [
-      { type: "selection", fixed: "left" },
+        { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
           halign: "center",
@@ -183,7 +191,7 @@ export default {
           },
         },
         {
-           prop: "materialCategory",
+          prop: "materialCategory",
           halign: "center",
           align: "center",
           width: 120,
@@ -194,10 +202,8 @@ export default {
         },
         {
           prop: "structureName",
-          halign: "center",
-          align: "center",
-          width: 120,
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          width: 200,
         },
         {
           prop: "materialCode",
@@ -207,11 +213,9 @@ export default {
           label: this.$t("ui.data.colume.wms.unused.productCode"),
         },
         {
-           prop: "mesMaterialCode",
-          halign: "center",
-          align: "center",
+          prop: "mesMaterialCode",
           width: 120,
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode")
+          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
         },
         // {
         //   prop: "物料名称",
@@ -222,13 +226,11 @@ export default {
         // },
         {
           prop: "materialDesc",
-          halign: "center",
-          align: "center",
-          width: 120,
+          width: 300,
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
         {
-           prop: "specifications",
+          prop: "specifications",
           halign: "center",
           align: "center",
           width: 120,
@@ -288,7 +290,25 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
+        },
 
+        {
+          prop: "embryoCode",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+        },
+        {
+          prop: "embryoDesc",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+        },
+        {
+          prop: "sectionWidth",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.rubberMaterial.sectionWidth"),
         },
         {
           prop: "remark",
@@ -304,7 +324,7 @@ export default {
           width: 180,
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
         },
-           {
+        {
           align: "center",
           halign: "center",
           label: this.$t("common.option"),
@@ -450,8 +470,8 @@ export default {
       try {
         this.loading = true;
         const data = await listProductinfo(this.formatParams());
-        console.log(data)
-        this.data =  data.rows
+        console.log(data);
+        this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
         console.error(error);
@@ -460,8 +480,7 @@ export default {
       }
     },
   },
-  mounted() {
-  },
+  mounted() {},
   created() {
     let defaultParams = {
       factoryCode: "116",

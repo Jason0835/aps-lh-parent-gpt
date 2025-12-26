@@ -121,6 +121,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          width:200
         },
         {
           prop: "locationType",
@@ -136,6 +137,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300
         },
 
         {
@@ -236,6 +238,7 @@ export default {
     },
   },
   methods: {
+
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -351,6 +354,7 @@ export default {
   created() {
     let defaultParams = {
       factoryCode: "116",
+      isExceedMonth:false
     };
     this.search = {
       ...defaultParams,

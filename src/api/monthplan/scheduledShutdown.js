@@ -22,7 +22,13 @@ export function removeMdmDevicePlanShut(query) {
     data: query
   })
 }
-
+export function getMachineList(query) {
+  return request({
+    url: '/monthplan/mdmDevicePlanShut/getMachineList',
+    method: 'post',
+    data: query
+  })
+}
 export function exportData(query) {
   downloadLink('/maindata/mdmModelInfo/export', query)
 }

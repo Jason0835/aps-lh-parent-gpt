@@ -139,6 +139,7 @@ export default {
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
+          width: 120
         },
         {
           prop: "trialStatus",

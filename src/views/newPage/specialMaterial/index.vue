@@ -330,9 +330,10 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.getList();
   },
   activated() {
-    this.getList();
+
   },
 };
 </script>

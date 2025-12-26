@@ -145,6 +145,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:300
         },
         {
           prop: "planSurplusQty",

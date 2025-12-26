@@ -136,6 +136,10 @@ export default {
           label: this.$t("common.unit"),
         },
         {
+          prop: "stockDate",
+          label: this.$t("库存日期"),
+        },
+        {
           prop: "remark",
           label: this.$t("common.remark"),
         },
@@ -266,7 +270,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
+      downloadLink("/maindata/rawSpecialMaterialStock/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {

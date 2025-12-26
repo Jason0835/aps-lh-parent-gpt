@@ -44,7 +44,7 @@ export default {
 
       // 转换为数字
       const numValue = Number(strValue);
-      if (numValue > 99999999) {
+      if (numValue > 99) {
         return callback(new Error(this.$t("common.rule.inoutMax")));
       }
 
@@ -141,6 +141,9 @@ export default {
         {
           prop: "cxMachineBrandCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_machine_brand,
+
         },
         {
           prop: "structureName",
@@ -150,13 +153,13 @@ export default {
           prop: "lhMachineMaxQty",
           label: this.$t("ui.data.column.curingPlan.lhMachineMaxQty"),
           type: "number",
-          max:99999999
+          max:99
         },
         {
           prop: "maxEmbryoQty",
           label: this.$t("ui.data.column.curingPlan.maxEmbryoQty"),
           type: "number",
-          max:99999999
+          max:99
         },
         {
           prop: "remark",

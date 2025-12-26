@@ -174,7 +174,7 @@ export default {
             trigger: ["change"],
           },
         ],
-        moldModelCode: [
+        mouldSetCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -203,7 +203,7 @@ export default {
         },
 
         {
-          prop: "moldModelCode",
+          prop: "mouldSetCode",
           label: this.$t("ui.data.column.monthplan.moldModelCode"),
           maxlength:30,
         },
