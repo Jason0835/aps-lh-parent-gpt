@@ -55,7 +55,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
     /**
      * 查询特殊材料库存列表
      */
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -72,7 +71,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
      * 保存
      */
     @Log(title = "ui.data.column.rawSpecialMaterialStock.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -84,7 +82,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
      * 删除
      */
     @Log(title = "ui.data.column.rawSpecialMaterialStock.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -96,7 +93,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
     /**
      * 获取特殊材料库存详细信息
      */
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -111,7 +107,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:import")
     @Log(title = "ui.data.column.rawSpecialMaterialStock.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -123,7 +118,6 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
     /**
      * 导出列表
      */
-    @RequiresPermissions( "maindata:rawSpecialMaterialStock:export")
     @Log(title = "特殊材料库存", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

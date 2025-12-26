@@ -33,7 +33,7 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.factoryCode")
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.factoryCode", dictType = "biz_factory_name")
     @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -80,6 +80,9 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;
+
+    public RawSpecialMaterialRecord() {
+    }
 
     public RawSpecialMaterialRecord(String materialCode) {
         this.materialCode = materialCode;

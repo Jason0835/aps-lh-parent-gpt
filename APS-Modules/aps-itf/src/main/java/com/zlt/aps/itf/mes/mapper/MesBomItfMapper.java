@@ -1,13 +1,15 @@
 package com.zlt.aps.itf.mes.mapper;
 
+import java.util.List;
+
+import org.apache.ibatis.annotations.Mapper;
+
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
-import org.apache.ibatis.annotations.Mapper;
-
-import java.util.List;
 
 /**
  * MES接口Mapper-Bom相关
@@ -15,11 +17,12 @@ import java.util.List;
  * @author zlt
  * @since 2025/12/19
  */
+@DS(DataSource.MES)
 @Mapper
 public interface MesBomItfMapper {
 
 	/**
-	 * 查询SKU与模具关系列表
+	 * 查询SKU与施工关系列表
 	 *
 	 * @param syncDataLogs 查询参数
 	 * @return 结果
