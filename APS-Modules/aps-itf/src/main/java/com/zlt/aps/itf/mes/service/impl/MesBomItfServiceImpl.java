@@ -1,10 +1,20 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesBomItfMapper;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
@@ -16,13 +26,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.core.dao.basedao.BaseDao;
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * MES接口-Bom相关接口
@@ -56,21 +59,28 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 			LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(MdmSkuConstructionRef::getIsDelete, ApsConstant.APS_YES_NO_0);
 			queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, syncDataLogs.getFactoryCode());
-			List<MdmSkuConstructionRef> apsDataList = mdmSkuConstructionRefEntityMapper.selectList(queryWrapper); // 取出APS数据
-			if (CollectionUtils.isNotEmpty(apsDataList)) {
-				Map<String, List<MdmSkuConstructionRef>> refMap = syncList.stream()
-						.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
-				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
-					List<MdmSkuConstructionRef> updateList = refMap.get(this.getMapKey(item));
-					for (MdmSkuConstructionRef updateItem : updateList) {
-						updateItem.setId(item.getId());
-						updateItem.setBaseVale(item.getId());
-					}
-				});
-			}
-			List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-			for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
-				baseDao.saveBatch(saveList);
+			try {
+				/** 切换APS数据源 start **/
+				DynamicDataSourceContextHolder.push(DataSource.APS);
+				List<MdmSkuConstructionRef> apsDataList = mdmSkuConstructionRefEntityMapper.selectList(queryWrapper); // 取出APS数据
+				if (CollectionUtils.isNotEmpty(apsDataList)) {
+					Map<String, List<MdmSkuConstructionRef>> refMap = syncList.stream()
+							.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+					apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+						List<MdmSkuConstructionRef> updateList = refMap.get(this.getMapKey(item));
+						for (MdmSkuConstructionRef updateItem : updateList) {
+							updateItem.setId(item.getId());
+							updateItem.setBaseVale(item.getId());
+						}
+					});
+				}
+				List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+				for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
+					baseDao.saveBatch(saveList);
+				}
+			} finally {
+				DynamicDataSourceContextHolder.clear();
+				/** 切换APS数据源 end **/
 			}
 		}
 		return AjaxResult.success();
@@ -87,14 +97,6 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				info.getMaterialCode(), info.getBomVersion(), info.getEmbryoCode());
 	}
 
-	@DS("aps")
-	private void saveBatch(List<MdmSkuConstructionRef> apsDataList) {
-		List<List<MdmSkuConstructionRef>> splitList = ScmListUtils.getSplitList(apsDataList, 1000);
-		for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
-			baseDao.saveBatch(saveList);
-		}
-	}
-
 	/**
 	 * 半部件BOM接口
 	 *
@@ -108,21 +110,28 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 			LambdaQueryWrapper<MdmConstructionInfo> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(MdmConstructionInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
 			queryWrapper.eq(MdmConstructionInfo::getFactoryCode, syncDataLogs.getFactoryCode());
-			List<MdmConstructionInfo> apsDataList = mdmConstructionInfoEntityMapper.selectList(queryWrapper); // 取出APS数据
-			if (CollectionUtils.isNotEmpty(apsDataList)) {
-				Map<String, List<MdmConstructionInfo>> refMap = syncList.stream()
-						.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
-				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
-					List<MdmConstructionInfo> updateList = refMap.get(this.getMapKey(item));
-					for (MdmConstructionInfo updateItem : updateList) {
-						updateItem.setId(item.getId());
-						updateItem.setBaseVale(item.getId());
-					}
-				});
-			}
-			List<List<MdmConstructionInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-			for (List<MdmConstructionInfo> saveList : splitList) { // 分批保存，防止长度超出限制
-				baseDao.saveBatch(saveList);
+			try {
+				/** 切换APS数据源 start **/
+				DynamicDataSourceContextHolder.push(DataSource.APS);
+				List<MdmConstructionInfo> apsDataList = mdmConstructionInfoEntityMapper.selectList(queryWrapper); // 取出APS数据
+				if (CollectionUtils.isNotEmpty(apsDataList)) {
+					Map<String, List<MdmConstructionInfo>> refMap = syncList.stream()
+							.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+					apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+						List<MdmConstructionInfo> updateList = refMap.get(this.getMapKey(item));
+						for (MdmConstructionInfo updateItem : updateList) {
+							updateItem.setId(item.getId());
+							updateItem.setBaseVale(item.getId());
+						}
+					});
+				}
+				List<List<MdmConstructionInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+				for (List<MdmConstructionInfo> saveList : splitList) { // 分批保存，防止长度超出限制
+					baseDao.saveBatch(saveList);
+				}
+			} finally {
+				DynamicDataSourceContextHolder.clear();
+				/** 切换APS数据源 end **/
 			}
 		}
 		return AjaxResult.success();
@@ -152,21 +161,28 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 			LambdaQueryWrapper<MdmBomInfo> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(MdmBomInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
 			queryWrapper.eq(MdmBomInfo::getFactoryCode, syncDataLogs.getFactoryCode());
-			List<MdmBomInfo> apsDataList = mdmBomInfoEntityMapper.selectList(queryWrapper); // 取出APS数据
-			if (CollectionUtils.isNotEmpty(apsDataList)) {
-				Map<String, List<MdmBomInfo>> refMap = syncList.stream()
-						.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
-				apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
-					List<MdmBomInfo> updateList = refMap.get(this.getMapKey(item));
-					for (MdmBomInfo updateItem : updateList) {
-						updateItem.setId(item.getId());
-						updateItem.setBaseVale(item.getId());
-					}
-				});
-			}
-			List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-			for (List<MdmBomInfo> saveList : splitList) { // 分批保存，防止长度超出限制
-				baseDao.saveBatch(saveList);
+			try {
+				/** 切换APS数据源 start **/
+				DynamicDataSourceContextHolder.push(DataSource.APS);
+				List<MdmBomInfo> apsDataList = mdmBomInfoEntityMapper.selectList(queryWrapper); // 取出APS数据
+				if (CollectionUtils.isNotEmpty(apsDataList)) {
+					Map<String, List<MdmBomInfo>> refMap = syncList.stream()
+							.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+					apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+						List<MdmBomInfo> updateList = refMap.get(this.getMapKey(item));
+						for (MdmBomInfo updateItem : updateList) {
+							updateItem.setId(item.getId());
+							updateItem.setBaseVale(item.getId());
+						}
+					});
+				}
+				List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+				for (List<MdmBomInfo> saveList : splitList) { // 分批保存，防止长度超出限制
+					baseDao.saveBatch(saveList);
+				}
+			} finally {
+				DynamicDataSourceContextHolder.clear();
+				/** 切换APS数据源 end **/
 			}
 		}
 		return AjaxResult.success();
