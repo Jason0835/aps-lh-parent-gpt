@@ -19,6 +19,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
@@ -31,6 +32,7 @@ import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper;
 import com.zlt.aps.monthplan.demand.service.IOrderPlanAllocationService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
@@ -43,6 +45,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1163,6 +1166,12 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         queryWrapper.eq(PubUtil.isNotEmpty(brand), "BRAND", brand);
     }
 
+    @Autowired
+    private IMesItfService mesItfService;
+
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
+
     /**
      * 下发月计划
      *
@@ -1176,7 +1185,17 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
                 || StringUtils.isBlank(param.getMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
-
+        // steve's TODO 更新发布状态=发布中
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion());
+//        wrapper.eq(FactoryMonthPlanProductionFinalResult::getPublishStatus, PublishStatusEnum.PUBLISHING.getCode());
+        List<FactoryMonthPlanProductionFinalResult> monthPlanProdFinalList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(wrapper);
+        mesItfService.issueMonthPlan(monthPlanProdFinalList);
+        // 更新发布状态=发布成功
         return AjaxResult.success();
     }
 }
