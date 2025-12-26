@@ -206,7 +206,7 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
     protected String[] getQueryFormulas() {
         return new String[]{
                 "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
-                "showDeptName->getcolvalue(SYS_DEPT, nick_name, user_name, updateBy)",
+                "deptIdName->getcolvalue(SYS_DEPT, dept_name, dept_id, deptId)",
         };
     }
 }
