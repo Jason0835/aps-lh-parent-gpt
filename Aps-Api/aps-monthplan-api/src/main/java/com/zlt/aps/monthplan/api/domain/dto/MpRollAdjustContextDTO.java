@@ -2,10 +2,9 @@ package com.zlt.aps.monthplan.api.domain.dto;
 
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-import com.zlt.aps.monthplan.api.domain.vo.MpAdjustStructureInVo;
+import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import org.apache.poi.ss.formula.functions.T;
 
 import java.io.Serializable;
 import java.util.List;
@@ -45,8 +44,15 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "工厂编码")
     private String factoryCode;
 
+    @ApiModelProperty(value = "产品结构")
+    private String structureName;
+
+    /** 排产机台,多个机台用逗号分隔 */
+    @ApiModelProperty(value = "排产机台")
+    private String scheduledMachines;
+
     @ApiModelProperty(value = "结构内调整记录")
-    private List<MpAdjustStructureInVo> mpAdjustStructureInList;
+    private List<MpAdjustStructureIn> mpAdjustStructureInList;
 
     @ApiModelProperty(value = "月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList;
@@ -71,6 +77,9 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "排程过程日志")
     private StringBuilder logDetail;
+
+    @ApiModelProperty(value = "调整明细列表")
+    private List<MpAdjustDetailVo> adjustDetailList;
 
 
 }
