@@ -57,14 +57,14 @@ public class RawSpecialMaterialRatio extends BaseEntity {
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.standardLength")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 100)
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 99999999)
     @ApiModelProperty(value = "标准长", name = "standardLength")
     @TableField(value = "STANDARD_LENGTH")
     private Integer standardLength;
 
     /** 比例 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.ratio")
-    @ImportExcelValidated(required = true,  number = true, min = 0, max = 999999)
+    @ImportExcelValidated(required = true,  number = true, min = 0, max = 100)
     @ApiModelProperty(value = "比例", name = "ratio")
     @TableField(value = "RATIO")
     private BigDecimal ratio;
