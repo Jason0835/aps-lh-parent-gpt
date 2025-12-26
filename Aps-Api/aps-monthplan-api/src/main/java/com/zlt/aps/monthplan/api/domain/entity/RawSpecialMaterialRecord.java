@@ -87,6 +87,7 @@ public class RawSpecialMaterialRecord extends BaseEntity {
 
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.unit")
     @JsonSerialize(using = HtmlEscapeSerializer.class)
+    @ImportExcelValidated(maxLength = 300)
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;

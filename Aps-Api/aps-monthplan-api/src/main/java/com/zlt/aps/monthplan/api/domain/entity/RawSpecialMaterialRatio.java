@@ -2,7 +2,9 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.monthplan.api.annotation.HtmlEscapeSerializer;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -76,5 +78,10 @@ public class RawSpecialMaterialRatio extends BaseEntity {
     @TableField(value = "UNIT")
     private String unit;
 
-
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.unit")
+    @JsonSerialize(using = HtmlEscapeSerializer.class)
+    @ImportExcelValidated(maxLength = 300)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }
