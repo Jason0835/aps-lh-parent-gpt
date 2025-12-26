@@ -106,12 +106,12 @@ public class MpMonthlySaleQty extends BaseEntity {
     /**
      * 近6个月均销量
      */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.passSixMonthSaleQty")
+//    @Excel(name = "ui.data.column.mpMonthlySaleQty.passSixMonthSaleQty")
     @ApiModelProperty(value = "近6个月均销量", name = "passThreeMonthSaleQty")
     @TableField(value = "PASS_SIX_MONTH_SALE_QTY")
     private Long passSixMonthSaleQty;
     /** 近12个月的发货频次 */
-    @Excel(name = "ui.data.column.mpMonthlySaleQty.deliveryFrequency")
+//    @Excel(name = "ui.data.column.mpMonthlySaleQty.deliveryFrequency")
     @ApiModelProperty(value = "近12个月发货频次", name = "deliveryFrequency")
     @TableField(value = "DELIVERY_FREQUENCY")
     private Integer deliveryFrequency;
