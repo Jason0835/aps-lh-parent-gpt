@@ -21,6 +21,8 @@ import org.apache.commons.io.IOUtils;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 
 import com.zlt.aps.monthplan.api.service.IRawSpecialMaterialRecordRemoteService;
+
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -77,6 +79,10 @@ public class RawSpecialMaterialRecordUIController extends BaseUIController<RawSp
     public AjaxResult save(RawSpecialMaterialRecord rawSpecialMaterialRecord) {
         if (UserConstants.NOT_UNIQUE.equals(iRawSpecialMaterialRecordService.checkUnique(rawSpecialMaterialRecord))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawSpecialMaterialRecord.checkUnique"));
+        }
+
+        if (rawSpecialMaterialRecord.getQuota() != null && rawSpecialMaterialRecord.getQuota().compareTo(BigDecimal.valueOf(99999999.99)) > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.rawSpecialMaterialRecord.quota.max"));
         }
 
         return iRawSpecialMaterialRecordService.save(rawSpecialMaterialRecord);
