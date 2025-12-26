@@ -1,7 +1,20 @@
 package com.zlt.aps.tc.service.impl;
 
-import com.alibaba.csp.sentinel.util.StringUtil;
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -19,14 +32,7 @@ import com.zlt.aps.tc.entity.TcMouthPlate;
 import com.zlt.aps.tc.mapper.TcMouthPlateMapper;
 import com.zlt.aps.tc.service.TcMachineInfoService;
 import com.zlt.aps.tc.service.TcMouthPlateService;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.zlt.common.utils.StringUtil;
 
 /**
  * <p>
@@ -147,7 +153,7 @@ public class TcMouthPlateServiceImpl extends ServiceImpl<TcMouthPlateMapper, TcM
             String machineName = dto.getMachineName();
             Long machineId = machineCodeMap.get(machineName);
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, dto);
-            if (machineId == null && StringUtil.isNotBlank(machineName)) {
+            if (machineId == null && !StringUtil.isEmpty(machineName)) {
                 String errorMsg = I18nUtil.getMessage("ui.error.message.column.machineNotExist");
                 ImportUtil.addImportErrorLog(importLogId, i + 2, errorMsg, validated);
             }

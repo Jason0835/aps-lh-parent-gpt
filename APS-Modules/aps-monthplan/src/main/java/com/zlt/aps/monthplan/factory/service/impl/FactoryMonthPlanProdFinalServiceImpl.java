@@ -19,6 +19,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
@@ -31,9 +32,8 @@ import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper;
 import com.zlt.aps.monthplan.demand.service.IOrderPlanAllocationService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
-import com.zlt.aps.monthplan.factory.mapper.MonthPlanMouldingDayResultMapper;
-import com.zlt.aps.monthplan.factory.mapper.MonthPlanProdDetailFinalMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanNoProductionPlanService;
@@ -45,12 +45,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
@@ -87,13 +87,9 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
 
     private final MdmProductConstructionEntityMapper mdmProductConstructionMapper;
 
-    private final MonthPlanMouldingDayResultMapper monthPlanMouldingDayResultMapper;
-
     private final MdmModelInfoEntityMapper modelInfoEntityMapper;
 
     private final MdmProductModelRelationEntityMapper productModelRelationEntityMapper;
-
-    private final MonthPlanProdDetailFinalMapper monthPlanProdDetailFinalMapper;
 
     private final FactoryMonthPlanProdFinalMapper factoryMonthPlanProdFinalMapper;
 
@@ -248,16 +244,16 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         }
 
         // 查询对应年月、分厂的分厂月计划排产汇总结果
-        List<MonthPlanMouldingDayResult> resultList = monthPlanMouldingDayResultMapper.selectList(Wrappers.lambdaQuery(MonthPlanMouldingDayResult.class)
-                .eq(MonthPlanMouldingDayResult::getYear, param.getYear())
-                .eq(MonthPlanMouldingDayResult::getMonth, param.getMonth())
-                .eq(MonthPlanMouldingDayResult::getFactoryCode, param.getFactoryCode())
-                .eq(MonthPlanMouldingDayResult::getMonthPlanVersion, param.getMonthPlanVersion())
-                .eq(MonthPlanMouldingDayResult::getProductionVersion, param.getProductionVersion()));
-        if (CollectionUtils.isEmpty(resultList)) {
-            // 如果对应年月、分厂的分厂月计划排产结果不存在，提示错误信息
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.resultNotFound"));
-        }
+//        List<MonthPlanMouldingDayResult> resultList = monthPlanMouldingDayResultMapper.selectList(Wrappers.lambdaQuery(MonthPlanMouldingDayResult.class)
+//                .eq(MonthPlanMouldingDayResult::getYear, param.getYear())
+//                .eq(MonthPlanMouldingDayResult::getMonth, param.getMonth())
+//                .eq(MonthPlanMouldingDayResult::getFactoryCode, param.getFactoryCode())
+//                .eq(MonthPlanMouldingDayResult::getMonthPlanVersion, param.getMonthPlanVersion())
+//                .eq(MonthPlanMouldingDayResult::getProductionVersion, param.getProductionVersion()));
+//        if (CollectionUtils.isEmpty(resultList)) {
+//            // 如果对应年月、分厂的分厂月计划排产结果不存在，提示错误信息
+//            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.resultNotFound"));
+//        }
 
         // 更新版本表-是否定稿
         FactoryProductionVersion productionVersion = new FactoryProductionVersion();
@@ -273,28 +269,28 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
                 .getBillNoSequenceByExpire(IncrementConstant.MONTH_FINAL + DateUtils.dateTimeNow("yyyyMMdd"), 3, 60 * 24 * 7);
         int index = 1;
         // 构建对应计划排产汇总结果为最终排产表记录
-        List<FactoryMonthPlanProdFinal> finalList = new ArrayList<>(resultList.size());
+        List<FactoryMonthPlanProdFinal> finalList = new ArrayList<>();
         Map<String, String> locationTypeMap = Maps.newHashMap();
-        for (int i = 0; i < resultList.size(); i++) {
-            MonthPlanMouldingDayResult itemResult = resultList.get(i);
-            FactoryMonthPlanProdFinal itemFinal = new FactoryMonthPlanProdFinal();
-            BeanUtils.copyProperties(itemResult, itemFinal);
-            Integer year = itemResult.getYear();
-            Integer month = itemResult.getMonth();
-            // 年月拼接
-            if (null != year && null != month) {
-                String yearAndMonth = String.format("%s%02d", year, month);
-                itemFinal.setYearMonth(Integer.valueOf(yearAndMonth));
-            }
-            itemFinal.setIsImport(String.valueOf(Constant.FALSE));
-            // 排产单号
-            itemFinal.setProductionNo(monthPlanVersion + String.format("%06d", index));
-            index++;
-            itemFinal.setId(null);
-            itemFinal.setBaseVale(null);
-            finalList.add(itemFinal);
-            //            locationTypeMap.put(itemResult.getProductCode(), itemResult.getLocationType());
-        }
+//        for (int i = 0; i < resultList.size(); i++) {
+//            MonthPlanMouldingDayResult itemResult = resultList.get(i);
+//            FactoryMonthPlanProdFinal itemFinal = new FactoryMonthPlanProdFinal();
+//            BeanUtils.copyProperties(itemResult, itemFinal);
+//            Integer year = itemResult.getYear();
+//            Integer month = itemResult.getMonth();
+//            // 年月拼接
+//            if (null != year && null != month) {
+//                String yearAndMonth = String.format("%s%02d", year, month);
+//                itemFinal.setYearMonth(Integer.valueOf(yearAndMonth));
+//            }
+//            itemFinal.setIsImport(String.valueOf(Constant.FALSE));
+//            // 排产单号
+//            itemFinal.setProductionNo(monthPlanVersion + String.format("%06d", index));
+//            index++;
+//            itemFinal.setId(null);
+//            itemFinal.setBaseVale(null);
+//            finalList.add(itemFinal);
+//            //            locationTypeMap.put(itemResult.getProductCode(), itemResult.getLocationType());
+//        }
         // 插入最终排产表
         baseDao.insertBatch(finalList);
         //20250922 ZLT 按SKU一条记录的排产结果表
@@ -392,20 +388,20 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         FactoryMonthPlanProdFinal prodFinal = finalList.get(0);
 
         // 统计备货量
-        if (StringUtils.isNotBlank(prodFinal.getProductionVersion())) {
-            QueryWrapper<MonthPlanProdDetailFinal> detailWrapper = new QueryWrapper<>();
-            detailWrapper.select("sum(TOTAL_QTY) as stockNum");
-            builderCondition(detailWrapper, queryVO);
-            detailWrapper.eq("PRODUCTION_VERSION", prodFinal.getProductionVersion());
-            detailWrapper.eq("IS_STOCK_UP", Constant.TRUE);
-            List<Map<String, Object>> detailMapList = monthPlanProdDetailFinalMapper.selectMaps(detailWrapper);
-            if (CollectionUtils.isNotEmpty(detailMapList)) {
-                Map<String, Object> resultMap = detailMapList.get(0);
-                if (resultMap != null && resultMap.get("stockNum") != null) {
-                    statisticsVo.setStockNum(Long.parseLong(resultMap.get("stockNum").toString()));
-                }
-            }
-        }
+//        if (StringUtils.isNotBlank(prodFinal.getProductionVersion())) {
+//            QueryWrapper<MonthPlanProdDetailFinal> detailWrapper = new QueryWrapper<>();
+//            detailWrapper.select("sum(TOTAL_QTY) as stockNum");
+//            builderCondition(detailWrapper, queryVO);
+//            detailWrapper.eq("PRODUCTION_VERSION", prodFinal.getProductionVersion());
+//            detailWrapper.eq("IS_STOCK_UP", Constant.TRUE);
+//            List<Map<String, Object>> detailMapList = monthPlanProdDetailFinalMapper.selectMaps(detailWrapper);
+//            if (CollectionUtils.isNotEmpty(detailMapList)) {
+//                Map<String, Object> resultMap = detailMapList.get(0);
+//                if (resultMap != null && resultMap.get("stockNum") != null) {
+//                    statisticsVo.setStockNum(Long.parseLong(resultMap.get("stockNum").toString()));
+//                }
+//            }
+//        }
 
         // 查询未排的SAP总量
         MonthPlanNoProductionPlan noProductionPlan = new MonthPlanNoProductionPlan();
@@ -1170,4 +1166,36 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         queryWrapper.eq(PubUtil.isNotEmpty(brand), "BRAND", brand);
     }
 
+    @Autowired
+    private IMesItfService mesItfService;
+
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
+
+    /**
+     * 下发月计划
+     *
+     * @param param 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal param) {
+        // 保证填写完整：年月、分厂、需求计划版本、分厂月计划版本
+        if (param.getYear() == null || param.getMonth() == null || StringUtils.isBlank(param.getFactoryCode())
+                || StringUtils.isBlank(param.getMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
+        }
+        // steve's TODO 更新发布状态=发布中
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion());
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion());
+//        wrapper.eq(FactoryMonthPlanProductionFinalResult::getPublishStatus, PublishStatusEnum.PUBLISHING.getCode());
+        List<FactoryMonthPlanProductionFinalResult> monthPlanProdFinalList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(wrapper);
+        mesItfService.issueMonthPlan(monthPlanProdFinalList);
+        // 更新发布状态=发布成功
+        return AjaxResult.success();
+    }
 }

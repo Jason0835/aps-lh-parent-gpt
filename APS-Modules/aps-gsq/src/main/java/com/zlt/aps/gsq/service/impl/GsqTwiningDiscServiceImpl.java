@@ -1,8 +1,23 @@
 package com.zlt.aps.gsq.service.impl;
 
 
-import com.alibaba.csp.sentinel.util.StringUtil;
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -20,16 +35,7 @@ import com.zlt.aps.gsq.entity.GsqTwiningDisc;
 import com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
 import com.zlt.aps.gsq.service.GsqTwiningDiscService;
-import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.zlt.common.utils.StringUtil;
 
 /**
  * <p>
@@ -151,7 +157,7 @@ public class GsqTwiningDiscServiceImpl extends ServiceImpl<GsqTwiningDiscMapper,
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, twiningDiscDto);
             String machineName = twiningDiscDto.getMachineName();
             Long machineId = machineCodeMap.get(machineName);
-            if (machineId == null && StringUtil.isNotBlank(machineName)) {
+            if (machineId == null && !StringUtil.isEmpty(machineName)) {
                 // 未查询到对应机台信息
                 ImportUtil.addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);

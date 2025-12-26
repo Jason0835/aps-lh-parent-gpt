@@ -1,14 +1,13 @@
 package com.zlt.sync.handle.dockSys;
 
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.aspectj.AopSyncData;
+import com.zlt.sync.handle.DockSysHandle;
+import com.zlt.sync.povo.SyncParamsVO;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
-
-import com.zlt.sync.aspectj.AopSyncData;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
-import com.zlt.sync.handle.DockSysHandle;
-import com.zlt.sync.povo.SyncParamsVO;
 
 /**
  * Mes 处理类

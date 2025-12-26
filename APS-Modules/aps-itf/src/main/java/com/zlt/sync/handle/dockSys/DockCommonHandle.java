@@ -1,7 +1,7 @@
 package com.zlt.sync.handle.dockSys;
 
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.aspectj.AopSyncData;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
 import com.zlt.sync.handle.DockSysHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import org.springframework.aop.framework.AopContext;

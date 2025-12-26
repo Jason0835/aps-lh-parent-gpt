@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
@@ -68,7 +67,6 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * 保存
      */
     @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mpMouldShellInfo:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -147,8 +145,8 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     @Override
     protected void builderCondition(QueryWrapper<MdmMouldShellInfo> queryWrapper, MdmMouldShellInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldModelCode")), "MOLD_MODEL_CODE", queryVO.getFieldValueByFieldName("moldModelCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qty")), "QTY", queryVO.getFieldValueByFieldName("qty"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldSetCode")), "MOULD_SET_CODE", queryVO.getFieldValueByFieldName("mouldSetCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("totalQty")), "TOTAL_QTY", queryVO.getFieldValueByFieldName("totalQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineQty")), "MACHINE_QTY", queryVO.getFieldValueByFieldName("machineQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("onHandQty")), "ON_HAND_QTY", queryVO.getFieldValueByFieldName("onHandQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("outBoundQty")), "OUT_BOUND_QTY", queryVO.getFieldValueByFieldName("outBoundQty"));

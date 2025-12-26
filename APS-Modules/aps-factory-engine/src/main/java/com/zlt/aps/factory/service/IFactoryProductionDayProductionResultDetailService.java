@@ -1,14 +1,15 @@
 package com.zlt.aps.factory.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanProductionResultDetail;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 
 /**
- * 分厂月度计划日排产结果明细服务接口
+ * 工厂月度计划-模具排产结果明细记录数据
+ * <p>
  * 性能优化需要
  *
  * @author ZLT
- * 20250515
+ * 20251225
  */
-public interface IFactoryProductionDayProductionResultDetailService extends IService<MonthPlanProductionResultDetail> {
+public interface IFactoryProductionDayProductionResultDetailService extends IService<FactoryMonthPlanMouldDayDetail> {
 }

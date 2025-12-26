@@ -45,16 +45,6 @@ public class Cd90LineSideStockController extends BaseController {
     }
 
     /**
-     * 到MES同步90°裁断线边库存信息
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改90°裁断库存信息（id不为空）")
-    @PostMapping("/syncStock")
-    public AjaxResult syncStock() {
-        return stockService.syncStock();
-    }
-
-    /**
      * 查询90°裁断线边库存列表
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)

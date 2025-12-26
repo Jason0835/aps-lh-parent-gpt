@@ -3,6 +3,8 @@ package com.zlt.aps.maindata.service;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Map;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmSkuScheduleCategoryService.java
@@ -19,4 +21,9 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMdmSkuScheduleCategoryService extends IDocService<MdmSkuScheduleCategory> {
 
+  /**
+   *  获取SKU对应的排产分类
+   * @return SKU对应的排产分类
+   */
+  Map<String,String> skuToProductionType();
 }

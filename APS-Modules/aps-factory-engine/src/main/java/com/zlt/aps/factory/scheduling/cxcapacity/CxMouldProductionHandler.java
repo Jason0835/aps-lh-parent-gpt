@@ -60,6 +60,8 @@ public class CxMouldProductionHandler {
             return;
         }
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
+        //todo 搭配排产
+
     }
 
     /**
@@ -96,6 +98,8 @@ public class CxMouldProductionHandler {
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
         buildNewLhConclusionInfo(cxMachineInfo, cxLhRatio.getLhMachineMaxQty(), productionPlan);
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        //todo 搭配排产
+
     }
 
     /**

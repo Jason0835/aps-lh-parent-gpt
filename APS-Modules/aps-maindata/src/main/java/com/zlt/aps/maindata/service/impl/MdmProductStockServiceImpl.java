@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
@@ -40,6 +41,9 @@ public class MdmProductStockServiceImpl extends AbstractDocService<MdmProductSto
     @Autowired
     private MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
+    @Autowired
+    private IMesItfService mesItfService;
+
     @Override
     protected String getDocTypeCode() {
         return "MDM0216";
@@ -64,18 +68,6 @@ public class MdmProductStockServiceImpl extends AbstractDocService<MdmProductSto
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
-    }
-
-    /**
-     * 查询MES实时成品库存列表
-     *
-     * @param queryVO 查询参数
-     * @return 结果
-     */
-    @Override
-    public List<MdmProductStock> list4Mes(MdmProductStock queryVO) {
-        // steve's TODO 查询MES实时成品库存列表
         return Collections.emptyList();
     }
 

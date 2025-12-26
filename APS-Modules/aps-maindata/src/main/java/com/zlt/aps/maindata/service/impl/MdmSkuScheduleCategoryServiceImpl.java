@@ -1,18 +1,28 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmSkuScheduleCategoryEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -31,7 +41,9 @@ import java.util.List;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
+@RequiredArgsConstructor
 public class MdmSkuScheduleCategoryServiceImpl extends AbstractDocService<MdmSkuScheduleCategory> implements IMdmSkuScheduleCategoryService {
+    private final MdmSkuScheduleCategoryEntityMapper skuScheduleCategoryEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MDM0146";
@@ -57,5 +69,22 @@ public class MdmSkuScheduleCategoryServiceImpl extends AbstractDocService<MdmSku
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, String> skuToProductionType() {
+        LambdaQueryWrapper<MdmSkuScheduleCategory> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmSkuScheduleCategory::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmSkuScheduleCategory>  list =   skuScheduleCategoryEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .filter(skuScheduleCategory -> StringUtils.isNotBlank(skuScheduleCategory.getMaterialCode()))
+            .collect(Collectors.toMap(MdmSkuScheduleCategory::getMaterialCode,
+                MdmSkuScheduleCategory::getScheduleType,
+                (existing, replacement) -> existing
+            ));
     }
 }

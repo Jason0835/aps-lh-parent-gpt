@@ -1,7 +1,29 @@
 package com.zlt.aps.cd90.service.impl;
 
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -10,8 +32,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.cd90.api.domain.entity.*;
-import com.zlt.aps.cd90.common.handle.Cd90SyncDataHandle;
+import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DayFinishQty;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DispatcherLog;
+import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.engine.service.Cd90EngineProductOrderService;
 import com.zlt.aps.cd90.engine.service.Cd90EngineService;
 import com.zlt.aps.cd90.entity.Cd90Params;
@@ -30,19 +55,6 @@ import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
-import com.zlt.sync.povo.SyncParamsVO;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 
 /**
@@ -59,9 +71,6 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
 
     @Autowired
     private Cd90MachineInfoService machineInfoService;
-
-    @Autowired
-    private Cd90SyncDataHandle cd90SyncDataHandle;
 
     @Autowired
     private Cd90EngineService cd90EngineService;
@@ -384,22 +393,23 @@ public class Cd90ScheduleResultServiceImpl implements Cd90ScheduleResultService 
 	 */
     @Override
 	public void publishNoticeMes(Date scheduleDate, String dataVersion, int rowCount) {
-        // 厂别、分公司编号
-        String factoryCode = factoryService.getFactoryCode();
-        String companyCode = factoryService.getCompanyCode();
-		//数据同步到中间库后，往 mq中发送消息通知 MES去取数据
-        SyncParamsVO syncParamsVO = new SyncParamsVO();
-        syncParamsVO.setSyncKey(ApsConstant.CD90_DEPLOY_SYNC_KEY);
-        syncParamsVO.setDataVersion(dataVersion);
-        syncParamsVO.setFactoryCode(factoryCode);
-        syncParamsVO.setCompanyCode(companyCode);
-        // 请求参数
-        JSONObject params = new JSONObject();
-        params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-        params.put("rowCount", rowCount);
-        syncParamsVO.setParams(params);
-        //往消息队列发送消息
-        cd90SyncDataHandle.syncNotice(syncParamsVO);
+    	// TODO 改成itf接口
+//        // 厂别、分公司编号
+//        String factoryCode = factoryService.getFactoryCode();
+//        String companyCode = factoryService.getCompanyCode();
+//		//数据同步到中间库后，往 mq中发送消息通知 MES去取数据
+//        SyncParamsVO syncParamsVO = new SyncParamsVO();
+//        syncParamsVO.setSyncKey(ApsConstant.CD90_DEPLOY_SYNC_KEY);
+//        syncParamsVO.setDataVersion(dataVersion);
+//        syncParamsVO.setFactoryCode(factoryCode);
+//        syncParamsVO.setCompanyCode(companyCode);
+//        // 请求参数
+//        JSONObject params = new JSONObject();
+//        params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+//        params.put("rowCount", rowCount);
+//        syncParamsVO.setParams(params);
+//        //往消息队列发送消息
+//        cd90SyncDataHandle.syncNotice(syncParamsVO);
 	}
 
 	/**

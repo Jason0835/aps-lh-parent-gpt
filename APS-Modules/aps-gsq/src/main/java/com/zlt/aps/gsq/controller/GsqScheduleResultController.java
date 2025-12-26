@@ -1,6 +1,25 @@
 package com.zlt.aps.gsq.controller;
 
-import com.alibaba.fastjson.JSONObject;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -11,32 +30,19 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.domain.SyncDataLogs;
 import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.common.engine.service.SyncDataLogsService;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
 import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
-import com.zlt.aps.gsq.common.handle.GsqSyncDataHandle;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
 import com.zlt.aps.gsq.entity.GsqScheduleResult;
 import com.zlt.aps.gsq.service.GsqScheduleResultService;
-import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
+
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 钢丝圈排程结果Controller
@@ -53,11 +59,9 @@ public class GsqScheduleResultController extends BaseController {
     @Resource
     private GsqEngineService gsqEngineService;
     @Autowired
-    private GsqSyncDataHandle gsqSyncDataHandle;
-    @Autowired
     private FactoryService factoryService;
 	@Resource
-	private SyncDataLogsService syncDataLogsService;
+	private ISyncDataLogsApiService syncDataLogsService;
 
     /**
      * 查询钢丝圈排程结果列表
@@ -296,7 +300,7 @@ public class GsqScheduleResultController extends BaseController {
         }
         long[] arr = list.stream().mapToLong(GsqScheduleResultDto::getId).toArray();
         // 获取下发接口版本号
-        String dataVersion = gsqSyncDataHandle.getDataVersion(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
         // 厂别、分公司编号
         String factoryCode = factoryService.getFactoryCode();
         String companyCode = factoryService.getCompanyCode();
@@ -304,19 +308,20 @@ public class GsqScheduleResultController extends BaseController {
         try {
             //ids为空或数组大小为0，发布今日所有未发布的排程记录
             gsqScheduleResultService.publish(scheduleResult, arr, dataVersion, factoryCode, companyCode);
-            //数据同步到中间库后，往 mq中发送消息通知 MES去取数据
-            SyncParamsVO syncParamsVO = new SyncParamsVO();
-            syncParamsVO.setSyncKey(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
-            syncParamsVO.setDataVersion(dataVersion);
-            // 请求参数
-            JSONObject params = new JSONObject();
-            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-			params.put("rowCount", arr.length);
-            syncParamsVO.setParams(params);
-            syncParamsVO.setFactoryCode(factoryCode);
-            syncParamsVO.setCompanyCode(companyCode);
-            //往消息队列发送消息
-            gsqSyncDataHandle.syncNotice(syncParamsVO);
+            // TODO 调整为itf接口
+//            //数据同步到中间库后，往 mq中发送消息通知 MES去取数据
+//            SyncParamsVO syncParamsVO = new SyncParamsVO();
+//            syncParamsVO.setSyncKey(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
+//            syncParamsVO.setDataVersion(dataVersion);
+//            // 请求参数
+//            JSONObject params = new JSONObject();
+//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+//			params.put("rowCount", arr.length);
+//            syncParamsVO.setParams(params);
+//            syncParamsVO.setFactoryCode(factoryCode);
+//            syncParamsVO.setCompanyCode(companyCode);
+//            //往消息队列发送消息
+//            gsqSyncDataHandle.syncNotice(syncParamsVO);
 
 			// 取回mes的反馈结果
 			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);

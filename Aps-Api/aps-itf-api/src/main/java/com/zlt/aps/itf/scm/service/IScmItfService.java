@@ -30,6 +30,16 @@ public interface IScmItfService {
     AjaxResult syncPlanedNotShipList(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo);
 
     /**
+     * 锁定订单池
+     *
+     * @param planedNotShipParamVo 锁定参数
+     * @return 结果集合
+     */
+    @ApiOperation("月计划排程结果推送")
+    @PostMapping("/scm/lockSalesOrderPool")
+    AjaxResult lockSalesOrderPool(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo);
+
+    /**
      * 发货明细表同步接口
      *
      * @param syncOutShipDmdOrdVo 查询条件

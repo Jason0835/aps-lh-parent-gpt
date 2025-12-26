@@ -1,6 +1,7 @@
 package com.zlt.aps.controller.maindata;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -8,8 +9,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.common.core.enums.DeviceShutMachineTypeEnums;
+import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.monthplan.api.domain.vo.MdmDevicePlanShutQueryMachineParamVo;
 import com.zlt.aps.monthplan.api.service.IMdmDevicePlanShutRemoteService;
+import com.zlt.aps.monthplan.api.service.IMdmMoldingMachineRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -199,5 +206,36 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
         context.setFileBytes(data);
         AjaxResult ajaxResult = iMdmDevicePlanShutService.importData(context, false);
         return ajaxResult;
+    }
+
+    @Autowired
+    private IMdmMoldingMachineRemoteService iMdmMoldingMachineService;
+    @Autowired
+    private ILhMachineInfoRemoteService iLhMachineInfoService;
+
+    /**
+     * 获取机台列表
+     *
+     * @param mdmDevicePlanShutQueryMachineParamVo 参数
+     * @return 结果
+     */
+    @ApiOperation("获取机台列表")
+    @PostMapping("/getMachineList")
+    @ResponseBody
+    public TableDataInfo getMachineList(MdmDevicePlanShutQueryMachineParamVo mdmDevicePlanShutQueryMachineParamVo) {
+        String machineType = mdmDevicePlanShutQueryMachineParamVo.getMachineType();
+        DeviceShutMachineTypeEnums deviceShutMachineTypeEnums = DeviceShutMachineTypeEnums.getNameByCode(machineType);
+        switch (deviceShutMachineTypeEnums) {
+            case LH:
+                LhMachineInfo lhMachineInfo = new LhMachineInfo();
+                BeanUtils.copyProperties(mdmDevicePlanShutQueryMachineParamVo, lhMachineInfo);
+                return iLhMachineInfoService.list(lhMachineInfo);
+            case CX:
+                MdmMoldingMachine mdmMoldingMachine = new MdmMoldingMachine();
+                BeanUtils.copyProperties(mdmDevicePlanShutQueryMachineParamVo, mdmMoldingMachine);
+                return iMdmMoldingMachineService.list(mdmMoldingMachine);
+            default:
+                return null;
+        }
     }
 }

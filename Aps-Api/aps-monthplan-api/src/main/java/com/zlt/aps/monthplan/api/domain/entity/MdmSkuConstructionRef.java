@@ -1,14 +1,16 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.math.BigDecimal;
-
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -112,7 +114,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /** 夏季液压硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime")
     @ApiModelProperty(value = "夏季液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
-    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME")
+    @TableField(value = "HY_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;
 
     /** 冬季机械硫化时间(秒) */
@@ -124,8 +126,81 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /** 冬季液压硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime2")
     @ApiModelProperty(value = "冬季液压硫化时间(秒)", name = "hydraulicPressureCuringTime2")
-    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME2")
+    @TableField(value = "HY_PRESSURE_CURING_TIME2")
     private Integer hydraulicPressureCuringTime2;
 
+    /**
+     * 制造示方书号
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
 
+    /**
+     * 制造示方书类型
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoType")
+    @ApiModelProperty(value = "制造示方书类型", name = "embryoType")
+    @TableField(value = "EMBRYO_TYPE")
+    private String embryoType;
+
+    /**
+     * 制造示方书发行时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate")
+    @ApiModelProperty(value = "制造示方书发行时间", name = "embryoReleaseDate")
+    @TableField(value = "EMBRYO_RELEASE_DATE")
+    private Date embryoReleaseDate;
+
+    /**
+     * 文字示方书号
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textNo")
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(value = "TEXT_NO")
+    private String textNo;
+
+    /**
+     * 文字示方书类型
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textType")
+    @ApiModelProperty(value = "文字示方书类型", name = "textType")
+    @TableField(value = "TEXT_TYPE")
+    private String textType;
+
+    /**
+     * 文字示方书发行时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate")
+    @ApiModelProperty(value = "文字示方书发行时间", name = "textReleaseDate")
+    @TableField(value = "TEXT_RELEASE_DATE")
+    private Date textReleaseDate;
+
+    /**
+     * 硫化示方书号
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhNo")
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(value = "LH_NO")
+    private String lhNo;
+
+    /**
+     * 硫化示方书类型
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhType")
+    @ApiModelProperty(value = "硫化示方书类型", name = "lhType")
+    @TableField(value = "LH_TYPE")
+    private String lhType;
+
+    /**
+     * 硫化示方书发行时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate")
+    @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
+    @TableField(value = "LH_RELEASE_DATE")
+    private Date lhReleaseDate;
 }

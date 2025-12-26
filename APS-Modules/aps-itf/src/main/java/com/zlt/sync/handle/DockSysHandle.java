@@ -1,6 +1,6 @@
 package com.zlt.sync.handle;
 
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.povo.SyncParamsVO;
 
 public interface DockSysHandle {

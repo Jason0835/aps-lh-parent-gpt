@@ -48,9 +48,8 @@
         </dependency>
         <!-- 和客户做接口的jar -->
         <dependency>
-            <groupId>com.zlt</groupId>
-            <artifactId>zlt-sync-data</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
         </dependency>
         <!-- 操作日志jar -->
         <dependency>
@@ -61,6 +60,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-swagger</artifactId>
         </dependency>
     </dependencies>
 

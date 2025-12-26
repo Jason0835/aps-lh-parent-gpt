@@ -1,19 +1,18 @@
 package com.zlt.sync.worker.processor;
 
-import java.util.List;
-
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.constants.SyncConstants;
+import com.zlt.sync.povo.SyncDataVO;
+import com.zlt.sync.worker.IProcessor;
+import com.zlt.sync.worker.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.sync.constants.SyncConstants;
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
-import com.zlt.sync.povo.SyncDataVO;
-import com.zlt.sync.worker.IProcessor;
-import com.zlt.sync.worker.Task;
+import java.util.List;
 
 /**
  * 同步失败任务重试

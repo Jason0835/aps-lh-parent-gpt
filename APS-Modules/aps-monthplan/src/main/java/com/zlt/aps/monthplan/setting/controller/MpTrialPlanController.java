@@ -1,13 +1,19 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.SysUser;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.ISysUserService;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -15,12 +21,19 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.client.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -47,6 +60,11 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
 
     @Autowired
     private MpTrialPlanEntityMapper entityMapper;
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
+
+    @Autowired
+    private ISysUserService iSysUserService;
 
     /**
      * 查询试制量试计划列表
@@ -71,6 +89,26 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MpTrialPlan billVO) {
+        SysUser sysUser = iSysUserService.selectUserByName(SecurityUtils.getUsername());
+        billVO.setDeptId(sysUser.getDeptId());
+        // 查询SKU与施工关系，用于写入 制造示方、文字示方、硫化示方
+        String materialCode = billVO.getMaterialCode();
+        if (StringUtils.isNotBlank(materialCode)) {
+            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmSkuConstructionRef::getMaterialCode, materialCode);
+            List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+            Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
+                skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, Function.identity(), (old, now) -> old));
+            }
+            if (skuConstructionRefMap.containsKey(materialCode)) {
+                MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
+                billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                billVO.setMadeInfo(DateUtils.formatDate(mdmSkuConstructionRef.getEmbryoReleaseDate(), "yyyy-MM-dd"));
+                billVO.setMoldingInfo(DateUtils.formatDate(mdmSkuConstructionRef.getTextReleaseDate(), "yyyy-MM-dd"));
+                billVO.setVulcanizationInfo(DateUtils.formatDate(mdmSkuConstructionRef.getLhReleaseDate(), "yyyy-MM-dd"));
+            }
+        }
         return super.save(billVO);
     }
 
@@ -168,6 +206,7 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
     protected String[] getQueryFormulas() {
         return new String[]{
                 "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
+                "deptIdName->getcolvalue(SYS_DEPT, dept_name, dept_id, deptId)",
         };
     }
 }

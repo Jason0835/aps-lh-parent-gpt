@@ -44,18 +44,18 @@ public class MdmMouldShellInfo extends BaseEntity {
      */
     @ImportExcelValidated(required = true, maxLength = 30)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.moldModelCode")
-    @ApiModelProperty(value = "模套型号", name = "moldModelCode")
-    @TableField(value = "MOLD_MODEL_CODE")
-    private String moldModelCode;
+    @ApiModelProperty(value = "模套型号", name = "mouldSetCode")
+    @TableField(value = "MOULD_SET_CODE")
+    private String mouldSetCode;
 
     /**
      * 总数量
      */
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmMouldShellInfo.qty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "总数量", name = "qty")
-    @TableField(value = "QTY")
-    private Integer qty;
+    @ApiModelProperty(value = "总数量", name = "totalQty")
+    @TableField(value = "TOTAL_QTY")
+    private Integer totalQty;
 
     /**
      * 机台数量

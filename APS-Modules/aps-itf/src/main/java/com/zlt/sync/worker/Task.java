@@ -1,6 +1,6 @@
 package com.zlt.sync.worker;
 
-import com.zlt.sync.domain.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import lombok.Data;
 
 import java.util.List;

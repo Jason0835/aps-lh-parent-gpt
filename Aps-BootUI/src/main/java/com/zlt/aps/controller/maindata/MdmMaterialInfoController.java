@@ -12,7 +12,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
-import com.zlt.aps.monthplan.api.service.IMdmMaterialInfoService;
+import com.zlt.aps.monthplan.api.service.IMdmMaterialInfoRemoteService;
 import com.zlt.aps.monthplan.api.service.IMdmProductModelRelationRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -41,7 +41,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo> {
 
-    private final IMdmMaterialInfoService iMaterialInfoService;
+    private final IMdmMaterialInfoRemoteService iMaterialInfoService;
 
     private final IMdmProductModelRelationRemoteService productModelRelationRemoteService;
 
@@ -299,6 +299,7 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
 
     /**
      * 施工配置-新
+     *
      * @param configConstructionVo 配置数据
      * @return 结果
      */

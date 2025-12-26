@@ -58,9 +58,11 @@ public class CxCapacityAllocationHandler {
             BigDecimal integerPart = machineCount.setScale(0, RoundingMode.DOWN);
             //向上取整，看续作机台是否需要空出机台
             Integer wholeMachineCount = machineCount.setScale(0, RoundingMode.UP).intValue();
+            //todo 计算在机结构续作SKU的使用硫化机台数--在机结构机台数减量时，需要空出对应配比的硫化模具数
+            CxContinueSkuAllocationMouldHandler.allocationContinueSkuMouldNumber(groupPlanInfo, cxContinueInfo, wholeMachineCount);
             List<ProductGroupCxCapacityInfo> cxCapacityInfoList = cxContinueInfo.getCxCapacityInfoList();
             //按对应的硫化机台数少优先，成型机编号小的优先排序
-            cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getRealMaxLhMachineCount, Comparator.reverseOrder()).thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.reverseOrder()));
+            cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.reverseOrder()).thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.reverseOrder()));
             //先分整台
             Integer wholeMachine = integerPart.intValue();
             for (int allocationIndex = BigDecimal.ZERO.intValue(); allocationIndex < wholeMachine; allocationIndex++) {
@@ -79,6 +81,7 @@ public class CxCapacityAllocationHandler {
             CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
             //续作Sku信息
             Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
+            //小数部分的天数
             BigDecimal decimalPart = machineCount.subtract(integerPart);
             Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
             CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
