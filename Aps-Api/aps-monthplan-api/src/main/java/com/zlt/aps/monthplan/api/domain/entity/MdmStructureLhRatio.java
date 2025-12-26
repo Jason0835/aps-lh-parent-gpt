@@ -37,12 +37,14 @@ public class MdmStructureLhRatio extends BaseEntity {
     private String factoryCode;
 
     /** 成型机类型 */
+    @ImportExcelValidated(required = true, maxLength = 20)
     @Excel(name = "ui.data.column.mdmStructureLhRatio.cxMachineBrandCode", dictType = "biz_machine_brand")
     @ApiModelProperty(value = "成型机类型", name = "cxMachineBrandCode")
     @TableField(value = "CX_MACHINE_BRAND_CODE")
     private String cxMachineBrandCode;
 
     /** 结构 */
+    @ImportExcelValidated(required = true, maxLength = 64)
     @Excel(name = "ui.data.column.mdmStructureLhRatio.structureName")
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")

@@ -213,7 +213,6 @@ public class MdmConstructionInfoUIController extends BaseUIController<MdmConstru
     /**
      * 抓取MES数据
      */
-    @RequiresPermissions("monthplan:mdmConstructionInfo:mesCapture")
     @ApiOperation("抓取MES数据")
     @PostMapping("/mesCapture")
     @ResponseBody
