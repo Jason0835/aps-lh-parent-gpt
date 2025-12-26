@@ -145,7 +145,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     @Override
     protected void builderCondition(QueryWrapper<MdmMouldShellInfo> queryWrapper, MdmMouldShellInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldModelCode")), "MOLD_MODEL_CODE", queryVO.getFieldValueByFieldName("moldModelCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldSetCode")), "MOULD_SET_CODE", queryVO.getFieldValueByFieldName("mouldSetCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qty")), "QTY", queryVO.getFieldValueByFieldName("qty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineQty")), "MACHINE_QTY", queryVO.getFieldValueByFieldName("machineQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("onHandQty")), "ON_HAND_QTY", queryVO.getFieldValueByFieldName("onHandQty"));
