@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.maindata;
 
+import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -33,6 +34,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -233,7 +235,14 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
             case CX:
                 MdmMoldingMachine mdmMoldingMachine = new MdmMoldingMachine();
                 BeanUtils.copyProperties(mdmDevicePlanShutQueryMachineParamVo, mdmMoldingMachine);
-                return iMdmMoldingMachineService.list(mdmMoldingMachine);
+                TableDataInfo tableDataInfo = iMdmMoldingMachineService.list(mdmMoldingMachine);
+                List<MdmMoldingMachine> list = JSON.parseArray(JSON.toJSONString(tableDataInfo.getRows()), MdmMoldingMachine.class);
+                for (MdmMoldingMachine moldingMachine : list) {
+                    moldingMachine.setMachineCode(moldingMachine.getCxMachineCode());
+                    moldingMachine.setMachineName(moldingMachine.getCxMachineCode());
+                }
+                tableDataInfo.setRows(list);
+                return tableDataInfo;
             default:
                 return null;
         }

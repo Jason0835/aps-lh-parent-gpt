@@ -34,11 +34,11 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 工厂编号
+     * 工厂
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mpMouldDeliveryPlan.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 

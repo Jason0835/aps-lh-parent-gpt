@@ -196,7 +196,7 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpMouldDeliveryPlanService.importData(context, false);
+        AjaxResult ajaxResult = iMpMouldDeliveryPlanService.importData(context, true);
         return ajaxResult;
     }
 
