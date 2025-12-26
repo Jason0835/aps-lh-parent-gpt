@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -48,12 +49,14 @@ public class MdmStructureLhRatio extends BaseEntity {
     private String structureName;
 
     /** 最大硫化机台数 */
+    @ImportExcelValidated(digits = true, min = 0, max = 99)
     @Excel(name = "ui.data.column.mdmStructureLhRatio.lhMachineMaxQty")
     @ApiModelProperty(value = "最大硫化机台数", name = "lhMachineMaxQty")
     @TableField(value = "LH_MACHINE_MAX_QTY")
     private Integer lhMachineMaxQty;
 
     /** 最大胎胚数 */
+    @ImportExcelValidated(digits = true, min = 0, max = 99)
     @Excel(name = "ui.data.column.mdmStructureLhRatio.maxEmbryoQty")
     @ApiModelProperty(value = "最大胎胚数", name = "maxEmbryoQty")
     @TableField(value = "MAX_EMBRYO_QTY")
