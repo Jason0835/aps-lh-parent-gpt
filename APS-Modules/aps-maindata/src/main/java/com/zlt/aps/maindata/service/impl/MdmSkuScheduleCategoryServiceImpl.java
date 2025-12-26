@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class MdmSkuScheduleCategoryServiceImpl extends AbstractDocService<MdmSkuScheduleCategory> implements IMdmSkuScheduleCategoryService {
-    private MdmSkuScheduleCategoryEntityMapper skuScheduleCategoryEntityMapper;
+    private final MdmSkuScheduleCategoryEntityMapper skuScheduleCategoryEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MDM0146";
