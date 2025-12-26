@@ -580,7 +580,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Long> monthlySaleQty) {
-        mergedPlan.setAverageSaleQty(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0L));
+        mergedPlan.setAverageSaleQty(BigDecimal.valueOf(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0L)));
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
@@ -628,12 +628,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String factoryMaterialKey = demandPlan.getGroupFactoryAndMaterialKey();
 
         // 计算库存数量（优化getStockQty方法）
-        demandPlan.setStockQty(calculateStockQty(finishedProductStockMap, factoryMaterialKey));
+        demandPlan.setStockQty(BigDecimal.valueOf(calculateStockQty(finishedProductStockMap, factoryMaterialKey)));
         // 结余库存
-        demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
+        demandPlan.setRemainingQty(BigDecimal.valueOf(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey)));
 
         // 计算月底计划余量
-        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
+        demandPlan.setPlannedSurplus(BigDecimal.valueOf(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey)));
     }
 
     private Long calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
@@ -658,15 +658,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
 
         // 设置基本数量
-        demandPlan.setOrderQty(statistics.totalOrderQty);
-        demandPlan.setNetQty(statistics.totalNetQty);
+        demandPlan.setOrderQty(BigDecimal.valueOf(statistics.totalOrderQty));
+        demandPlan.setNetQty(BigDecimal.valueOf(statistics.totalNetQty));
 
         // 设置优先级相关数量
-        demandPlan.setHeightQty(statistics.heightQty);
-        demandPlan.setMidQty(statistics.midQty);
-        demandPlan.setPostponeQty(statistics.postponeQty);
-        demandPlan.setCycleReserveQty(statistics.cycleReserveQty);
-        demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
+        demandPlan.setHeightQty(BigDecimal.valueOf(statistics.heightQty));
+        demandPlan.setMidQty(BigDecimal.valueOf(statistics.midQty));
+        demandPlan.setPostponeQty(BigDecimal.valueOf(statistics.postponeQty));
+        demandPlan.setCycleReserveQty(BigDecimal.valueOf(statistics.cycleReserveQty));
+        demandPlan.setConventionReserveQty(BigDecimal.valueOf(statistics.conventionReserveQty));
 
         // 计算派生数量
         calculateDerivedQuantities(demandPlan, statistics);
@@ -699,7 +699,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
-        demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.longValue() : supplyOrder.getQty());
+        demandPlan.setOrderQty(BigDecimal.valueOf(supplyOrder.getQty()==null? BigDecimal.ZERO.longValue() : supplyOrder.getQty()));
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
@@ -715,7 +715,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setYearWeek(postponeOrder.getWeekYear());
         demandPlan.setIsDynamicBalance(postponeOrder.getIsDynamicBalance());
         demandPlan.setIsUniformity(postponeOrder.getIsUniformity());
-        demandPlan.setOrderQty(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.longValue() : postponeOrder.getOrdQty().longValue());
+        demandPlan.setOrderQty(BigDecimal.valueOf(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.longValue() : postponeOrder.getOrdQty().longValue()));
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
@@ -859,7 +859,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private DpDemandPlan buildDemandPlanFromAllocation(DpOrderOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
-        demandPlan.setNetQty(netDemand.getProducionQty());
+        demandPlan.setNetQty(BigDecimal.valueOf(netDemand.getProducionQty()));
         demandPlan.setYearWeek(netDemand.getWeekYear());
         return demandPlan;
     }
@@ -956,12 +956,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 return;
             }
 
-            totalOrderQty += plan.getOrderQty();
-            totalNetQty += plan.getNetQty();
+            totalOrderQty += plan.getOrderQty().longValue();
+            totalNetQty += plan.getNetQty().longValue();
 
             // 根据订单优先级累加对应数量
             String priority = plan.getOrderPriority();
-            long netQty = plan.getNetQty();
+            long netQty = plan.getNetQty().longValue();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {
                 heightQty += netQty;
@@ -992,10 +992,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private void calculateDerivedQuantities(DpDemandPlan demandPlan, QuantityStatistics statistics) {
         // (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
-        demandPlan.setPostponeNetQty(statistics.heightQty + statistics.midQty + statistics.postponeQty);
+        demandPlan.setPostponeNetQty(BigDecimal.valueOf(statistics.heightQty + statistics.midQty + statistics.postponeQty));
 
         // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
-        demandPlan.setUnPostponeNetQty(statistics.heightQty + statistics.midQty);
+        demandPlan.setUnPostponeNetQty(BigDecimal.valueOf(statistics.heightQty + statistics.midQty));
     }
 
     /**

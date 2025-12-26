@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -143,37 +144,37 @@ public class DpDemandPlan extends BaseEntity {
     @Excel(name = "ui.data.column.dpDemandPlan.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
-    private Long orderQty;
+    private BigDecimal orderQty;
 
     /** 库存 */
     @Excel(name = "ui.data.column.demandPlan.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Long stockQty;
+    private BigDecimal stockQty;
 
     /** 月结库存余量 */
     @Excel(name = "ui.data.column.demandPlan.remainingQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月结库存余量", name = "remainingQty")
     @TableField(value = "REMAINING_QTY")
-    private Long remainingQty;
+    private BigDecimal remainingQty;
 
     /** 月均销量 */
     @Excel(name = "ui.data.column.dpDemandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
-    private Long averageSaleQty;
+    private BigDecimal averageSaleQty;
 
     /** 月底余量 */
     @Excel(name = "ui.data.column.demandPlan.plannedSurplus", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月底余量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
-    private Long plannedSurplus;
+    private BigDecimal plannedSurplus;
 
     /** 排产净需求 */
     @Excel(name = "ui.data.column.demandPlan.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求", name = "netQty")
     @TableField(value = "NET_QTY")
-    private Long netQty;
+    private BigDecimal netQty;
 
     /** 是否排产 */
     @Excel(name = "ui.data.column.demandPlan.isProduction", dictType = "biz_yes_no")
@@ -185,43 +186,43 @@ public class DpDemandPlan extends BaseEntity {
     @Excel(name = "ui.data.column.demandPlan.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
     @TableField(value = "POSTPONE_NET_QTY")
-    private Long postponeNetQty;
+    private BigDecimal postponeNetQty;
 
     /** 净需求(不含暂缓) */
     @Excel(name = "ui.data.column.dpDemandPlan.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
-    private Long unPostponeNetQty;
+    private BigDecimal unPostponeNetQty;
 
     /** 高优先级 */
     @Excel(name = "ui.data.column.demandPlan.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
-    private Long heightQty;
+    private BigDecimal heightQty;
 
     /** 中优先级 */
     @Excel(name = "ui.data.column.demandPlandemandPlan.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
-    private Long midQty;
+    private BigDecimal midQty;
 
     /** 暂缓订单 */
     @Excel(name = "ui.data.column.demandPlan.postponeQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
     @TableField(value = "POSTPONE_QTY")
-    private Long postponeQty;
+    private BigDecimal postponeQty;
 
     /** 周期排产储备 */
     @Excel(name = "ui.data.column.demandPlan.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
     @TableField(value = "CYCLE_RESERVE_QTY")
-    private Long cycleReserveQty;
+    private BigDecimal cycleReserveQty;
 
     /** 常规储备 */
     @Excel(name = "ui.data.column.demandPlan.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
-    private Long conventionReserveQty;
+    private BigDecimal conventionReserveQty;
 
     /** 是否满足最小投产量 */
     @Excel(name = "ui.data.column.demandPlan.isReachMinProductionQty", dictType = "biz_yes_no")
