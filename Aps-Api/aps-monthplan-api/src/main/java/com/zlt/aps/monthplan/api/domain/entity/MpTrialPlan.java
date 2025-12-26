@@ -124,7 +124,7 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 数量
      */
-    @ImportExcelValidated(digits = true, max = 99999999)
+    @ImportExcelValidated(digits = true, min = 0, max = 99999999)
     @Excel(name = "ui.data.column.mpTrialPlan.trialQty")
     @ApiModelProperty(value = "数量", name = "trialQty")
     @TableField(value = "TRIAL_QTY")
