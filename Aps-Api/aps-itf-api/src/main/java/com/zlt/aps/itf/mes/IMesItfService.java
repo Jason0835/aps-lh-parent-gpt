@@ -119,4 +119,14 @@ public interface IMesItfService {
     @ApiOperation("同步模壳台账信息")
     @PostMapping("/mesItf/syncMoldShell")
     public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 下发月计划
+     *
+     * @param finalResultList 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划")
+    @PostMapping("/mesItf/issueMonthPlan")
+    public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList);
 }
