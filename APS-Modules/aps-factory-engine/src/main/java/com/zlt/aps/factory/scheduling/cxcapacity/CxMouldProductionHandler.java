@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public class CxMouldProductionHandler {
 
     /**
-     * 在机结构，进行模具排产
+     * 在机结构，进行模具排产--按机台
      * 1、先排续作规格
      * 1.1、续作SKU
      * 1.2、同规格同花纹
@@ -49,7 +49,8 @@ public class CxMouldProductionHandler {
             return;
         }
         //先续作排产： 续作SKU ->同规格同花纹 -> 换活字块共生胎同模具
-        Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
+        Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
+//                cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
         if (!CollectionUtils.isEmpty(continueSkuMap)) {
             CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, continueSkuMap, productionPlan, mouldInfoMap, mouldShellMap);
         }
@@ -61,6 +62,10 @@ public class CxMouldProductionHandler {
         }
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
         //todo 搭配排产
+
+    }
+
+    public static void continueGroupPlanMouldProduction(Context context){
 
     }
 
