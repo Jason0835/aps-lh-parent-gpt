@@ -2,7 +2,9 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.monthplan.api.annotation.HtmlEscapeSerializer;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -35,7 +37,7 @@ public class RawSpecialMaterialRatio extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.rawSpecialMaterialRatio.factoryCode")
+    @Excel(name = "ui.data.column.rawSpecialMaterialRatio.factoryCode", dictType = "biz_factory_name")
     @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -57,14 +59,14 @@ public class RawSpecialMaterialRatio extends BaseEntity {
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.standardLength")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 100)
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 99999999)
     @ApiModelProperty(value = "标准长", name = "standardLength")
     @TableField(value = "STANDARD_LENGTH")
     private Integer standardLength;
 
     /** 比例 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRatio.ratio")
-    @ImportExcelValidated(required = true,  number = true, min = 0, max = 999999)
+    @ImportExcelValidated(required = true,  number = true, min = 0, max = 100)
     @ApiModelProperty(value = "比例", name = "ratio")
     @TableField(value = "RATIO")
     private BigDecimal ratio;
@@ -76,5 +78,10 @@ public class RawSpecialMaterialRatio extends BaseEntity {
     @TableField(value = "UNIT")
     private String unit;
 
-
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.unit")
+    @JsonSerialize(using = HtmlEscapeSerializer.class)
+    @ImportExcelValidated(maxLength = 300)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

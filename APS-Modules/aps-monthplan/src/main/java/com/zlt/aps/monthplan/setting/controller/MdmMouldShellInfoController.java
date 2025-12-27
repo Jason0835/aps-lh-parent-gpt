@@ -66,7 +66,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 保存
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -77,7 +77,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     /**
      * 删除
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -104,7 +104,7 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.mpMouldShellInfo.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.mdmMouldShellInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
     @Override
@@ -145,8 +145,8 @@ public class MdmMouldShellInfoController extends AbstractDocBizController<MdmMou
     @Override
     protected void builderCondition(QueryWrapper<MdmMouldShellInfo> queryWrapper, MdmMouldShellInfo queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldModelCode")), "MOLD_MODEL_CODE", queryVO.getFieldValueByFieldName("moldModelCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qty")), "QTY", queryVO.getFieldValueByFieldName("qty"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldSetCode")), "MOULD_SET_CODE", queryVO.getFieldValueByFieldName("mouldSetCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("totalQty")), "TOTAL_QTY", queryVO.getFieldValueByFieldName("totalQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineQty")), "MACHINE_QTY", queryVO.getFieldValueByFieldName("machineQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("onHandQty")), "ON_HAND_QTY", queryVO.getFieldValueByFieldName("onHandQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("outBoundQty")), "OUT_BOUND_QTY", queryVO.getFieldValueByFieldName("outBoundQty"));

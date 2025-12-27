@@ -151,7 +151,7 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
     protected void builderCondition(QueryWrapper<MdmCapsuleChuck> queryWrapper, MdmCapsuleChuck queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("internalQty")), "INTERNAL_QTY", queryVO.getFieldValueByFieldName("internalQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("newChuckQty")), "NEW_CHUCK_QTY", queryVO.getFieldValueByFieldName("newChuckQty"));
     }

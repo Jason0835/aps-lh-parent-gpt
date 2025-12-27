@@ -153,9 +153,6 @@ public class MdmSkuMouldRel extends BaseEntity {
     private String remark;
 
     @TableField(exist = false)
-    private Integer isDelete;
-
-    @TableField(exist = false)
     private Integer index;
 
     @TableField(exist = false)

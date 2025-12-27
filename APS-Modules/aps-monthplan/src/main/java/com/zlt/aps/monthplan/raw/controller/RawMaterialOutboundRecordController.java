@@ -157,7 +157,7 @@ public class RawMaterialOutboundRecordController extends AbstractDocBizControlle
     protected void builderCondition(QueryWrapper<RawMaterialOutboundRecord> queryWrapper, RawMaterialOutboundRecord queryVO) {
         // 精确查询的字段
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialType")), "MATERIAL_TYPE", queryVO.getFieldValueByFieldName("materialType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("outboundDate")), "OUTBOUND_DATE", queryVO.getFieldValueByFieldName("outboundDate"));

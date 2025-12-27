@@ -177,6 +177,7 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 胎胚编码
      */
+    @ImportExcelValidated(maxLength = 20)
     @Excel(name = "ui.data.column.mdmMaterialInfo.embryoCode")
     @ApiModelProperty(value = "胎胚编码", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
@@ -185,6 +186,7 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 胎胚描述
      */
+    @ImportExcelValidated(maxLength = 600)
     @Excel(name = "ui.data.column.mdmMaterialInfo.embryoDesc")
     @ApiModelProperty(value = "胎胚描述", name = "embryoDesc")
     @TableField(value = "EMBRYO_DESC")
@@ -193,6 +195,7 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 断面宽
      */
+    @ImportExcelValidated(maxLength = 20)
     @Excel(name = "ui.data.column.mdmMaterialInfo.sectionWidth")
     @ApiModelProperty(value = "断面宽", name = "sectionWidth")
     @TableField(value = "SECTION_WIDTH")

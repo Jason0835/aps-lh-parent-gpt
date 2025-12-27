@@ -34,8 +34,8 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.rawMaterialOutboundRecord.factoryCode")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @Excel(name = "ui.data.column.rawMaterialOutboundRecord.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, maxLength = 10, dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -57,7 +57,7 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     /**
      * 物料类型，数据字典 biz_rawMaterial_type 01 常规产品 02 特殊材料，匹配特殊原材料，则 类型 = 02
      */
-    @Excel(name = "ui.data.column.rawMaterialOutboundRecord.materialType")
+    @Excel(name = "ui.data.column.rawMaterialOutboundRecord.materialType", dictType = "biz_rawMaterial_type")
     @ImportExcelValidated(required = true, dictType = "biz_rawMaterial_type")
     @ApiModelProperty(value = "物料类型  biz_rawMaterial_type")
     @TableField(value = "MATERIAL_TYPE")

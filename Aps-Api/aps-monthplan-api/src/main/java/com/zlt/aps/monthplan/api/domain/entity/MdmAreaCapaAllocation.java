@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -32,7 +33,8 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 工厂编号，字典：biz_factory_name
      */
-    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.factoryCode")
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号，字典：biz_factory_name", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -40,7 +42,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 产品品类，字典：biz_product_type
      */
-    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.productTypeCode")
+    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类，字典：biz_product_type", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -48,6 +50,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 年份
      */
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
     @Excel(name = "ui.data.column.mdmAreaCapaAllocation.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
@@ -56,6 +59,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 月份
      */
+    @ImportExcelValidated(required = true, digits = true, min = 1, max = 12)
     @Excel(name = "ui.data.column.mdmAreaCapaAllocation.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
@@ -64,6 +68,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 区域
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode")
     @ApiModelProperty(value = "区域", name = "areaCode")
     @TableField(value = "AREA_CODE")
@@ -72,6 +77,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 产能分配
      */
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmAreaCapaAllocation.capacityAllocation")
     @ApiModelProperty(value = "产能分配", name = "capacityAllocation")
     @TableField(value = "CAPACITY_ALLOCATION")

@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.api.domain.dto;
 
-import com.zlt.aps.monthplan.api.domain.vo.MpAdjustStructureInVo;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import java.io.Serializable;
@@ -25,13 +27,21 @@ public class MpWeekRollAdjustDTO implements Serializable {
     @ApiModelProperty(value = "月度计划年月")
     private Integer yearMonth;
 
+    @ApiModelProperty(value = "产品结构")
+    private String structureName;
+
+    /** 排产机台,多个机台用逗号分隔 */
+    @ApiModelProperty(value = "排产机台")
+    private String scheduledMachines;
+
+
     /**
-     * 调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构
+     * 调整类型 01-结构内，02-结构外
      */
     @ApiModelProperty(value = "调整类型")
     private String adjustType;
 
-    @ApiModelProperty(value = "结构内调整记录")
-    private List<MpAdjustStructureInVo> mpAdjustStructureInList;
+    @ApiModelProperty(value = "调整明细列表")
+    private List<MpAdjustDetailVo> mpAdjustStructureInList;
 
 }

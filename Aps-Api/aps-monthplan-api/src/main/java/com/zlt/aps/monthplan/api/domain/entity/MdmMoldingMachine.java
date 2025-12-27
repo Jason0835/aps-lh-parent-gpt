@@ -1,13 +1,12 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.zlt.common.domain.CommonBusiEntity;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -78,5 +77,17 @@ public class MdmMoldingMachine extends BaseEntity {
     @TableField(value = "MAX_DAY_CAPACITY")
     private Integer maxDayCapacity;
 
+    /**
+     * 展示机台编号
+     */
+    @ApiModelProperty(value = "展示机台编号", name = "machineCode")
+    @TableField(exist = false)
+    private String machineCode;
 
+    /**
+     * 展示机台名称
+     */
+    @ApiModelProperty(value = "展示机台名称", name = "machineCode")
+    @TableField(exist = false)
+    private String machineName;
 }

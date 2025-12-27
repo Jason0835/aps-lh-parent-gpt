@@ -34,7 +34,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.rawSpecialMaterialStock.factoryCode")
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.factoryCode", dictType = "biz_factory_name")
     @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")

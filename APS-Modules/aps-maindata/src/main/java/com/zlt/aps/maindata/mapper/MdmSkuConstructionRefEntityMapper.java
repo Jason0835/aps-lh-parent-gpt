@@ -1,6 +1,5 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -18,7 +17,6 @@ import org.apache.ibatis.annotations.Mapper;
  *     修 改 人：zlt
  *     修改内容：...
  */
-@DS("aps")
 @Mapper
 public interface MdmSkuConstructionRefEntityMapper extends CommBaseMapper<MdmSkuConstructionRef> {
 

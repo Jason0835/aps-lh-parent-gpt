@@ -59,7 +59,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     /**
      * 查询原材料预警记录列表
      */
-    @RequiresPermissions( "maindata:rawWarningRecord:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -75,7 +74,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     /**
      * 获取原材料预警记录详细信息
      */
-    @RequiresPermissions( "maindata:rawWarningRecord:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -87,7 +85,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     /**
      * 导出列表
      */
-    @RequiresPermissions( "maindata:rawWarningRecord:export")
     @Log(title = "原材料预警记录", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
@@ -119,7 +116,7 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     protected void builderCondition(QueryWrapper<RawWarningRecord> queryWrapper, RawWarningRecord queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningType")), "WARNING_TYPE", queryVO.getFieldValueByFieldName("warningType"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningLevel")), "WARNING_LEVEL", queryVO.getFieldValueByFieldName("warningLevel"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningTitle")), "WARNING_TITLE", queryVO.getFieldValueByFieldName("warningTitle"));
@@ -141,7 +138,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         return "S3521";
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:executeUsageWarning")
     @PostMapping("/execute-usage-warning")
     @ApiOperation("执行用量偏差预警")
     public AjaxResult executeUsageWarning(@RequestParam("factoryCode") String factoryCode,
@@ -151,7 +147,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         return rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:executeNewMaterialWarning")
     @PostMapping("/execute-new-material-warning")
     @ApiOperation("执行新材料预警")
     public AjaxResult executeNewMaterialWarning(@RequestParam("factoryCode") String factoryCode,
@@ -160,7 +155,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         return rawWarningService.executeNewMaterialWarning(factoryCode, year, month);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:syncActualUsage")
     @PostMapping("/sync-actual-usage")
     @ApiOperation("同步周维度原材料实际用量数据")
     public AjaxResult syncActualUsage(@RequestParam("factoryCode") String factoryCode,
@@ -170,7 +164,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         return rawWarningService.syncWeekActualUsage(factoryCode, year, week, month);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:handleWarning")
     @PostMapping("/handle-warning")
     @ApiOperation("处理预警记录")
     public AjaxResult handleWarning(@RequestParam("id") Long id,
@@ -179,7 +172,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         return rawWarningService.handleWarning(id, handler, opinion);
     }
 
-    @RequiresPermissions( "maindata:rawWarningRecord:handleWarning")
     @GetMapping("/statistics")
     @ApiOperation("获取预警统计")
     public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,

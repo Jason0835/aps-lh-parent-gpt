@@ -72,7 +72,7 @@ public class MpWeekRollAdjustController extends BaseController {
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
 
         // 返回结果处理
-        return getDataTable(weekRollAdjustDTO.getMpAdjustStructureInList());
+        return getDataTable(contextDTO.getAdjustDetailList());
     }
 
 

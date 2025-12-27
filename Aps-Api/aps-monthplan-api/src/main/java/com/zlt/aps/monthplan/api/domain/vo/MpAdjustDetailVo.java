@@ -7,11 +7,11 @@ import lombok.Data;
 
 
 /**
- * 调整-结构内调整记录实体VO类
+ * 调整-调整明细实体VO类
  * @author wengpc
  */
 @Data
-public class MpAdjustStructureInVo extends MpAdjustStructureIn {
+public class MpAdjustDetailVo extends MpAdjustStructureIn {
 
     @ApiModelProperty(value = "计划剩余排产量", name = "monthUnScheduledQty")
     @TableField(exist = false)
