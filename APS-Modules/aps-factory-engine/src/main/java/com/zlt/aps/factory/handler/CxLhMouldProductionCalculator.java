@@ -1,6 +1,7 @@
-package com.zlt.aps.factory.utils;
+package com.zlt.aps.factory.handler;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
@@ -13,13 +14,13 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 成型硫化模具排产工具类
+ * 成型硫化模具排产计算器
  *
  * @author ZLT
  * @date 20251221
  */
 @Slf4j
-public class CxLhMouldProductionUtils {
+public class CxLhMouldProductionCalculator {
 
     /**
      * 采用双模，在startDay~endDay进行排产
@@ -70,7 +71,11 @@ public class CxLhMouldProductionUtils {
         lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
     }
 
-    private CxLhMouldProductionUtils(){
+    public static void continueSkuLhProductionHandler(Context context, CxContinueSkuInfoHelper continueSkuInfo,Integer productionDay, CxLhProductionHelper lhGroupInfo, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList){
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+    }
+
+    private CxLhMouldProductionCalculator() {
 
     }
 }

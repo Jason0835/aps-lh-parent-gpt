@@ -1,23 +1,21 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.util.Date;
-
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：DpOrderPoolSnapshot.java
  * 描    述：S1-0206.订单池快照对象 t_dp_order_pool_snapshot
  *@author yelq
- *@date 2025-12-18
+ *@date 2025-12-26
  *@version 1.0
  *
  *  修改记录：
@@ -29,7 +27,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 @ApiModel(value = "S1-0206.订单池快照对象", description = "S1-0206.订单池快照对象 ")
 @Data
 @TableName(value = "T_DP_ORDER_POOL_SNAPSHOT")
-public class DpOrderPoolSnapshot extends BaseEntity{
+public class DpOrderPoolSnapshot extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -81,9 +79,9 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     @TableField(value = "BRAND")
     private String brand;
 
-    /** 数据字典：biz_order_type            1 高优先级 2 周期排产储备 3 中优先级            4 常规储备 5 暂缓订单 */
+    /** 订单类型 */
     @Excel(name = "ui.data.column.orderPoolSnapshot.orderPriority")
-    @ApiModelProperty(value = "订单优先级：1 高优先级 2 周期排产储备 3 中优先级 4 常规储备 5 暂缓订单", name = "orderPriority")
+    @ApiModelProperty(value = "订单类型", name = "orderPriority")
     @TableField(value = "ORDER_PRIORITY")
     private String orderPriority;
 
@@ -148,13 +146,13 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
-    /** 均匀性 */
+    /** 动平衡 */
     @Excel(name = "ui.data.column.orderPoolSnapshot.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
 
-    /** 动平衡 */
+    /** 均匀性 */
     @Excel(name = "ui.data.column.orderPoolSnapshot.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
@@ -177,5 +175,7 @@ public class DpOrderPoolSnapshot extends BaseEntity{
     @ApiModelProperty(value = "预测版本号", name = "predictionVersion")
     @TableField(value = "PREDICTION_VERSION")
     private String predictionVersion;
+
+
 
 }

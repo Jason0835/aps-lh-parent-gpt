@@ -195,7 +195,7 @@ public class MpMonthlySaleQtyUIController extends BaseUIController<MpMonthlySale
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpMonthlySaleQtyService.importData(context, false);
+        AjaxResult ajaxResult = iMpMonthlySaleQtyService.importData(context, updateSupport);
         return ajaxResult;
     }
 

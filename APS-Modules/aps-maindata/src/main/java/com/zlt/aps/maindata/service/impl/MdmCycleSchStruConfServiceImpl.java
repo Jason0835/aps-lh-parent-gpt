@@ -1,6 +1,8 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -8,18 +10,20 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.text.Convert;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
+import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,13 +48,11 @@ import java.util.List;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
+@RequiredArgsConstructor
 public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleSchStruConf> implements IMdmCycleSchStruConfService {
-
-    @Autowired
-    private RedisService redisService;
-
-    @Autowired
-    private MdmMonCycleSchStruConfEntityMapper monCycleSchStruConfEntityMapper;
+    private final RedisService redisService;
+    private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
+    private final MdmMonCycleSchStruConfEntityMapper monCycleSchStruConfEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -119,5 +121,12 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
             return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.mdmCycleSchStruConf.generateDataNull"));
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.mdmCycleSchStruConf.generateSuccess"));
+    }
+
+    @Override
+    public List<MdmCycleSchStruConf> findCycleSchStruConf() {
+        LambdaQueryWrapper<MdmCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
+        return mdmCycleSchStruConfEntityMapper.selectList(wrapper);
     }
 }

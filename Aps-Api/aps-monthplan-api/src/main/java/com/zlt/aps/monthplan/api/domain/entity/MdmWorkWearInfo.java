@@ -40,6 +40,33 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String factoryCode;
 
     /**
+     * 工装分类，必填 数据字典 biz_work_type 01 成型鼓 02 胎体鼓
+     */
+//    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearType", dictType = "biz_work_type")
+    @ApiModelProperty(value = "工装分类 数据字典 biz_work_type 01 成型鼓 02 胎体鼓", name = "workWearType")
+    @TableField(value = "WORK_WEAR_TYPE")
+    private String workWearType;
+
+    /**
+     * 工装状态，必填 数据字典 biz_available_status 1 可用 0 禁用
+     */
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearStatus", dictType = "biz_available_status")
+    @ApiModelProperty(value = "工装状态 biz_available_status 1 可用 0 禁用", name = "workWearStatus")
+    @TableField(value = "WORK_WEAR_STATUS")
+    private String workWearStatus;
+
+    /**
+     * 工装名称，必填长度64
+     */
+    @ImportExcelValidated(maxLength = 64)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearName")
+    @ApiModelProperty(value = "工装名称", name = "workWearName")
+    @TableField(value = "WORK_WEAR_NAME")
+    private String workWearName;
+
+    /**
      * 成型机类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆
      */
     @ImportExcelValidated(required = true)
@@ -58,39 +85,13 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String cxMachineTypeCode;
 
     /**
-     * 工装名称，必填长度64
+     * 成型鼓周长上限
      */
-    @ImportExcelValidated(required = true, maxLength = 64)
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearName")
-    @ApiModelProperty(value = "工装名称", name = "workWearName")
-    @TableField(value = "WORK_WEAR_NAME")
-    private String workWearName;
-
-    /**
-     * 规格，必填长度64
-     */
-    @ImportExcelValidated(required = true, maxLength = 64)
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.specifications")
-    @ApiModelProperty(value = "规格", name = "specifications")
-    @TableField(value = "SPECIFICATIONS")
-    private String specifications;
-
-    /**
-     * 工装分类，必填 数据字典 biz_work_type 01 成型鼓 02 胎体鼓
-     */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearType", dictType = "biz_work_type")
-    @ApiModelProperty(value = "工装分类 数据字典 biz_work_type 01 成型鼓 02 胎体鼓", name = "workWearType")
-    @TableField(value = "WORK_WEAR_TYPE")
-    private String workWearType;
-
-    /**
-     * 工装状态，必填 数据字典 biz_available_status 1 可用 0 禁用
-     */
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearStatus", dictType = "biz_available_status")
-    @ApiModelProperty(value = "工装状态 biz_available_status 1 可用 0 禁用", name = "workWearStatus")
-    @TableField(value = "WORK_WEAR_STATUS")
-    private String workWearStatus;
+    @ImportExcelValidated(digits = true, min = 1, max = 999999)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMax")
+    @ApiModelProperty(value = "成型鼓周长上限", name = "perimeterMax")
+    @TableField(value = "PERIMETER_MAX")
+    private Integer perimeterMax;
 
     /**
      * 成型鼓周长下限
@@ -102,18 +103,18 @@ public class MdmWorkWearInfo extends BaseEntity {
     private Integer perimeterMin;
 
     /**
-     * 成型鼓周长上限
+     * 规格，必填长度64
      */
-    @ImportExcelValidated(digits = true, min = 1, max = 999999)
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMax")
-    @ApiModelProperty(value = "成型鼓周长上限", name = "perimeterMax")
-    @TableField(value = "PERIMETER_MAX")
-    private Integer perimeterMax;
+    @ImportExcelValidated(required = true, maxLength = 64)
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.specifications")
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
 
     /**
      * 数量，必填，整数，最大9999
      */
-    @ImportExcelValidated(required = true, digits = true, max = 9999)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.qty")
     @ApiModelProperty(value = "数量", name = "qty")
     @TableField(value = "QTY")
@@ -137,5 +138,13 @@ public class MdmWorkWearInfo extends BaseEntity {
     @TableField(value = "USED_TYPE")
     private String usedType;
 
+    /**
+     * 备注
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 
 }

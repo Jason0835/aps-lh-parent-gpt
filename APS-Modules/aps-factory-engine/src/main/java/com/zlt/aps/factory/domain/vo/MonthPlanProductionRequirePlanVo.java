@@ -1,11 +1,9 @@
 package com.zlt.aps.factory.domain.vo;
 
-import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
-import com.tlt.aps.enums.ProductTypeEnum;
-import com.tlt.aps.enums.ProductionPlanType;
-import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.enums.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
@@ -122,14 +120,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
 
     /**
      * 是否有供应链优先排产量
+     *
      * @return
      */
-    public boolean hasPrioritizeQty(){
-        if( !YesOrNoEnum.YES.getCode().equals(getIsPrioritize())){
+    public boolean hasPrioritizeQty() {
+        if (!YesOrNoEnum.YES.getCode().equals(getIsPrioritize())) {
             return false;
         }
         return hasProduction();
     }
+
     /**
      * 是否小于minQty
      * 如果有高优先级排产量则使用高优先级排产量比较，否则使用排产量比较
@@ -211,13 +211,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return;
         }
         //施工配置
-        MonthPlanProductConstructionInfoVo constructionInfo;
-        if (ProductTypeEnum.SEMI_STEEL.getValue().equalsIgnoreCase(getProductTypeCode())) {
-            //优先一次法 按成型法排序 1-1次法 2-2次法
-            constructionConfigurationList.sort(Comparator.comparing(MonthPlanProductConstructionInfoVo::getMouldMethod));
-        }
-        constructionInfo = constructionConfigurationList.get(0);
-        setConstructionStage(constructionInfo.getConstructionCode());
+        MonthPlanProductConstructionInfoVo constructionInfo = setConstructionStage(constructionConfigurationList, getProductTypeCode());
         setEmbryoCode(constructionInfo.getEmbryoCode());
         setMouldMethod(constructionInfo.getMouldMethod());
         setSpecCode(constructionInfo.getSpecCode());
@@ -309,7 +303,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param continueProductInfo
      * @return
      */
-    public boolean hasContinueProduction(CxContinueProductInfoHelper continueProductInfo) {
+    public boolean hasContinueProduction(CxContinueSkuInfoHelper continueProductInfo) {
         boolean isSameSpecificationsAndPattern = isSameSpecificationsAndPattern(continueProductInfo);
         if (!isSameSpecificationsAndPattern) {
             return false;
@@ -324,7 +318,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param continueProductInfo 续作Sku信息
      * @return
      */
-    public boolean isSameSpecificationsAndPattern(CxContinueProductInfoHelper continueProductInfo) {
+    public boolean isSameSpecificationsAndPattern(CxContinueSkuInfoHelper continueProductInfo) {
         if (null == continueProductInfo) {
             return false;
         }
@@ -349,7 +343,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param continueProductInfo 续作Sku信息
      * @return
      */
-    public boolean isSameEmbryoCode(CxContinueProductInfoHelper continueProductInfo) {
+    public boolean isSameEmbryoCode(CxContinueSkuInfoHelper continueProductInfo) {
         if (null == continueProductInfo) {
             return false;
         }
@@ -453,6 +447,34 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             addNoProductionReason(noStructureNameReason);
         }
         return isProduction;
+    }
+
+    /**
+     * 根据产品品类，设置施工阶段及施工配置信息
+     *
+     * @param constructionConfigurationList 施工配置信息
+     * @param productTypeCode               产品品类
+     * @return
+     */
+    private MonthPlanProductConstructionInfoVo setConstructionStage(List<MonthPlanProductConstructionInfoVo> constructionConfigurationList, String productTypeCode) {
+        boolean isPCR = ProductTypeEnum.SEMI_STEEL.getValue().equalsIgnoreCase(getProductTypeCode());
+        if (isPCR) {
+            //优先一次法 按成型法排序 1-1次法 2-2次法
+            constructionConfigurationList.sort(Comparator.comparing(MonthPlanProductConstructionInfoVo::getMouldMethod));
+        }
+        MonthPlanProductConstructionInfoVo constructionInfo = constructionConfigurationList.get(0);
+        String constructionCode = constructionInfo.getConstructionCode();
+        if (isPCR) {
+            setConstructionStage(ConstructionStageEnum.matchByConstructionCode(constructionCode).getStage());
+            return constructionInfo;
+        }
+        //全钢TBR -施工阶段-正式
+        if (StringUtils.isBlank(constructionCode)) {
+            setConstructionStage(ConstructionStageEnum.NO_CONSTRUCTION.getStage());
+        } else {
+            setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
+        }
+        return constructionInfo;
     }
 
     /**

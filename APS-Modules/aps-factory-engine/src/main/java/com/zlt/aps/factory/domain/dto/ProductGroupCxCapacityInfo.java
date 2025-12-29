@@ -4,6 +4,7 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -69,11 +70,10 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         //实际硫化机台数
         List<CxContinueProductInfoHelper> realMouldCountList = new ArrayList<>(continueSkuInfo.values());
         if (CollectionUtils.isEmpty(realMouldCountList)) {
-            capacityInfo.setRealMaxLhMachineCount(BigDecimal.ZERO.intValue());
-        } else {
-            Integer lhMachineCount = realMouldCountList.stream().mapToInt(CxContinueProductInfoHelper::getMouldNumber).sum() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            capacityInfo.setRealMaxLhMachineCount(lhMachineCount);
+            return capacityInfo;
         }
+        Integer lhMachineCount = realMouldCountList.stream().mapToInt(CxContinueProductInfoHelper::getMouldNumber).sum() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        capacityInfo.setRealMaxLhMachineCount(lhMachineCount);
         return capacityInfo;
     }
 
@@ -87,16 +87,9 @@ public class ProductGroupCxCapacityInfo implements Serializable {
      * @return
      */
     public static ProductGroupCxCapacityInfo buildContinueCxCapacityInfo(String structureName, String cxMachineCode, CxMachineBaseInfoVo baseInfo, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        ProductGroupCxCapacityInfo capacityInfo = new ProductGroupCxCapacityInfo();
-        capacityInfo.setGroupName(structureName);
-        capacityInfo.setCxMachineCode(cxMachineCode);
-        //原始配置的胎胚种类数和硫化机台配比
-        capacityInfo.setMaxEmbryoCodeCount(BigDecimal.ZERO.intValue());
-        capacityInfo.setMaxLhMachineCount(BigDecimal.ZERO.intValue());
-        if (CollectionUtils.isEmpty(structureLhRatioList)) {
-            return capacityInfo;
-        }
-        if (null == baseInfo) {
+        ProductGroupCxCapacityInfo capacityInfo = createEmptyGroupCxCapacityInfo(structureName, cxMachineCode);
+        //没有结构成型硫化配比信息及机台信息，则返回空实例
+        if (CollectionUtils.isEmpty(structureLhRatioList) || null == baseInfo) {
             return capacityInfo;
         }
         //得到结构成型类型的配比
@@ -104,8 +97,40 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         if (null == lhRatio) {
             return capacityInfo;
         }
+        //设置对应的最大胎胚数和最大硫化机台数、最低硫化机台数
         capacityInfo.setMaxEmbryoCodeCount(lhRatio.getMaxEmbryoQty());
         capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
+        capacityInfo.setMinLhMachineCount(lhRatio.getLhMachineMinQty());
         return capacityInfo;
+    }
+
+    /**
+     * 构建空的成型产能对象实例
+     * 只有分组名、成型机台编号
+     *
+     * @param groupName     分组名
+     * @param cxMachineCode 成型机台编号
+     * @return
+     */
+    public static ProductGroupCxCapacityInfo createEmptyGroupCxCapacityInfo(String groupName, String cxMachineCode) {
+        if (StringUtils.isBlank(groupName) || StringUtils.isBlank(cxMachineCode)) {
+            return null;
+        }
+        return new ProductGroupCxCapacityInfo(groupName, cxMachineCode);
+    }
+
+    /**
+     * 构建初始带有分组、成型机台的实例对象
+     *
+     * @param groupName     分组名
+     * @param cxMachineCode 成型机台编号
+     */
+    private ProductGroupCxCapacityInfo(String groupName, String cxMachineCode) {
+        this.groupName = groupName;
+        this.cxMachineCode = cxMachineCode;
+        this.maxEmbryoCodeCount = BigDecimal.ZERO.intValue();
+        this.realMaxLhMachineCount = BigDecimal.ZERO.intValue();
+        this.maxLhMachineCount = BigDecimal.ZERO.intValue();
+        this.minLhMachineCount = BigDecimal.ZERO.intValue();
     }
 }

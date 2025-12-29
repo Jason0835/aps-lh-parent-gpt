@@ -206,7 +206,7 @@ public class MdmDevicePlanShutUIController extends BaseUIController<MdmDevicePla
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmDevicePlanShutService.importData(context, false);
+        AjaxResult ajaxResult = iMdmDevicePlanShutService.importData(context, updateSupport);
         return ajaxResult;
     }
 

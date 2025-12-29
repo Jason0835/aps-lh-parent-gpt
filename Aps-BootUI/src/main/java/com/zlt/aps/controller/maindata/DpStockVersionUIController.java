@@ -197,7 +197,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmFinishStockService.importData(context, false);
+        AjaxResult ajaxResult = iMdmFinishStockService.importData(context, updateSupport);
         return ajaxResult;
     }
 

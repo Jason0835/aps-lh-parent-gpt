@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.api.domain.deduct;
+package com.zlt.aps.factory.deduct;
 
 import lombok.Data;
 

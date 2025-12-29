@@ -139,7 +139,7 @@ public class SaleMonthPlanRequireUIController extends BaseUIController<SaleMonth
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iSaleMonthPlanRequireService.importData(context, false);
+        AjaxResult ajaxResult = iSaleMonthPlanRequireService.importData(context, updateSupport);
         return ajaxResult;
     }
 

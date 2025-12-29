@@ -196,7 +196,7 @@ public class MdmAreaCapaAllocationUIController extends BaseUIController<MdmAreaC
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmAreaCapaAllocationService.importData(context, false);
+        AjaxResult ajaxResult = iMdmAreaCapaAllocationService.importData(context, updateSupport);
         return ajaxResult;
     }
 

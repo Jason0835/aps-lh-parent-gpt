@@ -27,7 +27,7 @@
                       GROUP BY a.FACTORY_CODE, a.STRUCTURE_NAME
                       HAVING a.FACTORY_CODE = cssc.FACTORY_CODE
                          AND a.STRUCTURE_NAME = cssc.STRUCTURE_NAME
-                         AND MAX(a.`YEAR_MONTH`) &lt; DATE_FORMAT(
+                         AND MAX(a.`YEAR_MONTH`) &lt;= DATE_FORMAT(
                               DATE_SUB(CONCAT(@genYear, '-', @genMonth, '-01'), INTERVAL cssc.TURNOVER_MONTH MONTH),
                               '%Y%m'))
     </select>

@@ -1,22 +1,5 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
-import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -34,22 +17,32 @@ import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.mapper.MdmAreaEntityMapper;
+import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmArea;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。 文件名称：SalesOrderPoolServiceImpl.java
  * 描 述：SalesOrderPoolServiceImpl销售订单池业务层处理
- * 
+ *
  * @author zlt
  * @date 2025-12-04
  * @version 1.0
@@ -68,7 +61,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
-	private MdmAreaEntityMapper mdmAreaEntityMapper;
+	private DpAreaEntityMapper mdmAreaEntityMapper;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -111,7 +104,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 批量修改同PO号的销售优先级
-	 * 
+	 *
 	 * @param salesOrderPool
 	 * @return
 	 */
@@ -126,7 +119,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 校验SCM已计划未发货数据
-	 * 
+	 *
 	 * @param salesOrderPool
 	 * @return
 	 */
@@ -145,13 +138,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 
 		// 加载区域
-		LambdaQueryWrapper<MdmArea> areaQueryWrapper = new LambdaQueryWrapper<>();
-		areaQueryWrapper.eq(MdmArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-		Map<String, MdmArea> areaMap = mdmAreaEntityMapper.selectList(areaQueryWrapper).stream()
-				.collect(Collectors.toMap(MdmArea::getAreaCode, Function.identity()));
+		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
+		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+		Map<String, DpArea> areaMap = mdmAreaEntityMapper.selectList(areaQueryWrapper).stream()
+				.collect(Collectors.toMap(DpArea::getAreaCode, Function.identity()));
 
 		// 校验是否有没有录入优先级的数据
-		MdmArea defaultArea = new MdmArea();
+		DpArea defaultArea = new DpArea();
 		List<String> notPriorityAreaList = syncResultList.stream().filter(s -> StringUtils.isEmpty(s.getSalPriority()))
 				.map(s -> areaMap.getOrDefault(s.getEmployeeDept(), defaultArea).getRemark()) // 先从备注获取名称
 				.filter(Objects::nonNull).distinct().collect(Collectors.toList());
@@ -174,7 +167,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 抓取SCM已计划未发货数据
-	 * 
+	 *
 	 * @param salesOrderPool
 	 * @return
 	 */
@@ -203,7 +196,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 保存接口数据
-	 * 
+	 *
 	 * @param salesOrderPool 同步数据参数
 	 * @param syncResultList 同步数据返回结果
 	 * @return
@@ -340,8 +333,6 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 		// 删除旧数据
 		LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
-		updateWrapper.eq(SalesOrderPool::getYear, year);
-		updateWrapper.eq(SalesOrderPool::getMonth, month);
 		updateWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
 		updateWrapper.set(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_1);
 		updateWrapper.set(SalesOrderPool::getUpdateTime, new Date());
@@ -355,7 +346,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 获取同步接口数据
-	 * 
+	 *
 	 * @param salesOrderPool
 	 * @return
 	 */
@@ -375,7 +366,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 获取配置信息
-	 * 
+	 *
 	 * @param paramCode
 	 * @return
 	 */

@@ -189,7 +189,7 @@ public class ProductVulcanizingLimitUIController extends BaseUIController<Produc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductVulcanizingLimitService.importData(context, false);
+        AjaxResult ajaxResult = iProductVulcanizingLimitService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

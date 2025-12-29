@@ -197,7 +197,7 @@ public class MdmStockFactorUIController extends BaseUIController<MdmStockFactor>
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmStockFactorService.importData(context, false);
+        AjaxResult ajaxResult = iMdmStockFactorService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
