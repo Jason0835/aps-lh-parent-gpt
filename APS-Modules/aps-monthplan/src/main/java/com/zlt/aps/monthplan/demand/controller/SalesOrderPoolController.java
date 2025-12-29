@@ -2,6 +2,8 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -22,6 +25,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -57,6 +63,9 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 
     @Autowired
     private SalesOrderPoolEntityMapper entityMapper;
+    
+	@Autowired
+	private DpAreaEntityMapper dpAreaEntityMapper;
 
     /**
      * 查询销售订单池列表
@@ -66,7 +75,9 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody SalesOrderPool queryVO) {
-        return super.list(queryVO);
+    	TableDataInfo tableResult = super.list(queryVO);
+		this.translationList((List<SalesOrderPool>)tableResult.getRows());
+        return tableResult;
     }
 
     @Override
@@ -166,7 +177,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     protected List<SalesOrderPool> listExportData(SalesOrderPool obj) {
         QueryWrapper<SalesOrderPool> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        return translationList(entityMapper.selectList(wrapper));
     }
     
     /**
@@ -206,14 +217,14 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productType")), "PRODUCT_TYPE", queryVO.getFieldValueByFieldName("productType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("area")), "AREA", queryVO.getFieldValueByFieldName("area"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCode")), "SAL_CODE", queryVO.getFieldValueByFieldName("salCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCode")), "SAL_CODE", queryVO.getFieldValueByFieldName("salCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salNCode")), "SAL_N_CODE", queryVO.getFieldValueByFieldName("salNCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("natCode")), "NAT_CODE", queryVO.getFieldValueByFieldName("natCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCodePo")), "SAL_CODE_PO", queryVO.getFieldValueByFieldName("salCodePo"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCodePo")), "SAL_CODE_PO", queryVO.getFieldValueByFieldName("salCodePo"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDate")), "BILL_DATE", queryVO.getFieldValueByFieldName("billDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("oriMaterialCode")), "ORI_MATERIAL_CODE", queryVO.getFieldValueByFieldName("oriMaterialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("oriMaterialCode")), "ORI_MATERIAL_CODE", queryVO.getFieldValueByFieldName("oriMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ordQty")), "ORD_QTY", queryVO.getFieldValueByFieldName("ordQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("weekYear")), "WEEK_YEAR", queryVO.getFieldValueByFieldName("weekYear"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));
@@ -230,5 +241,24 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return "DP0202";
     }
 
-
+    /**
+     * 翻译列表
+     * @param resultList
+     */
+	private List<SalesOrderPool> translationList(List<SalesOrderPool> resultList) {
+		// 加载区域
+		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
+		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+		Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
+				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+		for (SalesOrderPool item: resultList) {
+			String salNCode = item.getSalNCode();
+			String natCode = item.getNatCode();
+			String area = item.getArea();
+			item.setSalNCode(areaMap.getOrDefault(salNCode, salNCode));
+			item.setNatCode(areaMap.getOrDefault(natCode, natCode));
+			item.setArea(areaMap.getOrDefault(area, area));
+		}
+		return resultList;
+	}
 }

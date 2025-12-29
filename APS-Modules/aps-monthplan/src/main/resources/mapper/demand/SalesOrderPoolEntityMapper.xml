@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper">
-	<update id="batchInsert">
+	<insert id="batchInsert">
 		INSERT INTO T_DP_SALES_ORDER_POOL (
 			FACTORY_CODE,
 			PRODUCT_TYPE,
@@ -19,9 +19,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			MATERIAL_DESC,
 			ORD_QTY,
 			WEEK_YEAR,
-			DYNAMIC_BALANCE,
-			UNIFORMITY,
-			EUDR,
+			IS_DYNAMIC_BALANCE,
+			IS_UNIFORMITY,
+			IS_EUDR,
 			DELIVER_GOODS_TYPE,
 			SCM_PRIORITY,
 			SCM_DETAIL_ID,
@@ -48,12 +48,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{saleOrderPool.materialDesc,jdbcType=VARCHAR},
             #{saleOrderPool.ordQty,jdbcType=NUMERIC},
             #{saleOrderPool.weekYear,jdbcType=VARCHAR},
-            #{saleOrderPool.dynamicBalance,jdbcType=VARCHAR},
-            #{saleOrderPool.uniformity,jdbcType=VARCHAR},
-            #{saleOrderPool.eudr,jdbcType=VARCHAR},
+            #{saleOrderPool.isDynamicBalance,jdbcType=VARCHAR},
+            #{saleOrderPool.isUniformity,jdbcType=VARCHAR},
+            #{saleOrderPool.isEudr,jdbcType=VARCHAR},
             #{saleOrderPool.deliverGoodsType,jdbcType=VARCHAR},
             #{saleOrderPool.scmPriority,jdbcType=VARCHAR},
-            #{saleOrderPool.scmDetailId,jdbcType=LONG},
+            #{saleOrderPool.scmDetailId,jdbcType=BIGINT},
             #{saleOrderPool.remark,jdbcType=VARCHAR},
             0,
             #{saleOrderPool.createBy,jdbcType=DATE},
@@ -62,5 +62,5 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{saleOrderPool.updateTime,jdbcType=VARCHAR}
             )
         </foreach>
-    </update>
+    </insert>
 </mapper>
