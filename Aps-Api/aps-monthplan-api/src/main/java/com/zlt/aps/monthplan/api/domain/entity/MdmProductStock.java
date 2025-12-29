@@ -45,7 +45,7 @@ public class MdmProductStock extends BaseEntity {
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+//    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "库存日期", name = "stockDate")
     @TableField(value = "STOCK_DATE")
     private Date stockDate;
@@ -77,7 +77,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 库位类别
      */
-    @Excel(name = "ui.data.column.productStock.locationType")
+    @Excel(name = "ui.data.column.productStock.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -85,7 +85,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * MES物料编码
      */
-    @Excel(name = "ui.data.column.productStock.mesMaterialCode")
+//    @Excel(name = "ui.data.column.productStock.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -157,7 +157,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 是否超9个月胎
      */
-    @Excel(name = "ui.data.column.productStock.isExceedNineMonth", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.productStock.isExceedNineMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超9个月胎", name = "isExceedNineMonth")
     @TableField(value = "IS_EXCEED_NINE_MONTH")
     private String isExceedNineMonth;
