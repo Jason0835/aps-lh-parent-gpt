@@ -38,7 +38,7 @@ public class MdmSkuLhCapacity extends BaseEntity {
     private String factoryCode;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.mdmSkuLhCapacity.mesMaterialCode")
+//    @Excel(name = "ui.data.column.mdmSkuLhCapacity.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
