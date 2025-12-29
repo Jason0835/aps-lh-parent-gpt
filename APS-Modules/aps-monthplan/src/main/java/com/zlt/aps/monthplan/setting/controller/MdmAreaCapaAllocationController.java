@@ -4,14 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -55,7 +60,10 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmAreaCapaAllocation queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        List<MdmAreaCapaAllocation> list = (List<MdmAreaCapaAllocation>) tableDataInfo.getRows();
+        JsonI18nConvertUtils.conventJsonI18n(list, MdmAreaCapaAllocation.class);
+        return tableDataInfo;
     }
 
     @Override
@@ -93,7 +101,16 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     @GetMapping(value = "/{billId}")
     @Override
     public MdmAreaCapaAllocation getInfo(@PathVariable("billId") Long billId) {
-        return super.getInfo(billId);
+        MdmAreaCapaAllocation areaCapaAllocation = super.getInfo(billId);
+        List<MdmAreaCapaAllocation> list = Collections.singletonList(areaCapaAllocation);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(list, MdmAreaCapaAllocation.class);
+        return areaCapaAllocation;
     }
 
 
@@ -154,6 +171,15 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     @Override
     protected String getTypeCode() {
         return "MDM0141";
+    }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "createByName->getcolvalue(SYS_USER, nick_name, user_name, createBy)",
+                "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
+                "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+        };
     }
 
     /**
