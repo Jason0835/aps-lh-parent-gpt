@@ -5,7 +5,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
-import com.zlt.aps.factory.utils.CxLhMouldProductionUtils;
+import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -130,7 +130,7 @@ public class CxContinueSkuProductionHandler {
             }
             //逐日进行排产
             LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, cxLhProductionHelper, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
-            CxLhMouldProductionUtils.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedDouble, continueSkuPlanList);
+            CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedDouble, continueSkuPlanList);
             sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
             realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
         }
@@ -190,7 +190,7 @@ public class CxContinueSkuProductionHandler {
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
-        CxLhMouldProductionUtils.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
         productionSameSpecificationsAndPattern(productionContext, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
     }
@@ -248,7 +248,7 @@ public class CxContinueSkuProductionHandler {
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
-        CxLhMouldProductionUtils.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
         productionSameEmbryoCodeAndMould(productionContext, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
     }

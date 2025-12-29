@@ -69,6 +69,10 @@ public class CxContinueSkuInfoHelper implements Serializable {
      * 计划需求量--高优先级或是总排产量？
      */
     private Long planDemandQty;
+    /**
+     * 日硫化量(单模)
+     */
+    private Long dayVulcanizationQty;
 
     /**
      * 先从排产计划中获取materialDesc,如果没有匹配到，从续作中获取
@@ -93,6 +97,7 @@ public class CxContinueSkuInfoHelper implements Serializable {
         continueSkuInfo.setMainPattern(plan.getMainPattern());
         continueSkuInfo.setProSize(plan.getProSize());
         continueSkuInfo.setGroupName(plan.getStructureName());
+        continueSkuInfo.setDayVulcanizationQty(plan.getDayVulcanizationQty());
         return continueSkuInfo;
     }
 }

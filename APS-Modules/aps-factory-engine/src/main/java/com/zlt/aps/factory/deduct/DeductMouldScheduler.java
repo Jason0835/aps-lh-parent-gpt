@@ -1,17 +1,11 @@
 package com.zlt.aps.factory.deduct;
 
-import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
-import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldContext;
-import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import com.zlt.common.utils.PubUtil;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * 轮胎APS降模排产系统
@@ -19,26 +13,30 @@ import java.util.Set;
  * 1. 所有排产量必须在结构收尾日前全部排完
  * 2. 第1天，延续上个月不变
  * 3. 按机台数量和收尾临近天数动态降模
+ *
+ * @author Sandy
+ * @date 2025/12/24
  */
 public class DeductMouldScheduler {
 
     /**
      * 执行降模排产计划
+     *
      * @return 每日排产计划列表
      */
-    public List<DailyScheduleVo> scheduleProduction(DeductMouldVo deductMouldVo) {
+    public static List<DailyScheduleVo> scheduleProduction(DeductMouldVo deductMouldVo) {
 
         DeductMouldContext context = new DeductMouldContext();
         List<DailyScheduleVo> schedules = new ArrayList<>();
-        context.setCurrentDate(getValidDate(deductMouldVo.getStartDate(),deductMouldVo,schedules));
+        context.setCurrentDate(getValidDate(deductMouldVo.getStartDate(), deductMouldVo, schedules));
 
         //收尾日
         context.setDeadLineDate(deductMouldVo.getDeadline());
         // 1、第1天：延续上个月不变
-        DailyScheduleVo firstDayVo = createFirstDaySchedule(deductMouldVo,context.getCurrentDate());
+        DailyScheduleVo firstDayVo = createFirstDaySchedule(deductMouldVo, context.getCurrentDate());
         schedules.add(firstDayVo);
-        updateRemainingQuantities(deductMouldVo,firstDayVo);
-        context.setCurrentDate(getValidDate(context.getCurrentDate()+1,deductMouldVo,schedules));
+        updateRemainingQuantities(deductMouldVo, firstDayVo);
+        context.setCurrentDate(getValidDate(context.getCurrentDate() + 1, deductMouldVo, schedules));
 
         // 初始化：第1天延续上月配置
         context.setPreDayMachines(deductMouldVo.getMachinesAssigned());
@@ -52,7 +50,7 @@ public class DeductMouldScheduler {
         while (hasRemainingProduction(deductMouldVo)
                 && context.getCurrentDate() <= context.getDeadLineDate()) {
             // 创建每日计划
-            DailyScheduleVo dailyScheduleVo = createDailySchedule(deductMouldVo,context);
+            DailyScheduleVo dailyScheduleVo = createDailySchedule(deductMouldVo, context);
             schedules.add(dailyScheduleVo);
             // 更新前一天机台配置
             context.setPreDayMachines(dailyScheduleVo.getSkuMachines());
@@ -61,8 +59,8 @@ public class DeductMouldScheduler {
             context.setPreDayQty(dailyScheduleVo.getSkuQuantity());
             // 预计收尾天数 = 前日剩余量/前日计划
             context.setExpectedDays((int) Math.ceil((double) context.getPreRemainQty() / context.getPreDayQty()));
-            updateRemainingQuantities(deductMouldVo,dailyScheduleVo);
-            context.setCurrentDate(getValidDate(context.getCurrentDate()+1,deductMouldVo,schedules));
+            updateRemainingQuantities(deductMouldVo, dailyScheduleVo);
+            context.setCurrentDate(getValidDate(context.getCurrentDate() + 1, deductMouldVo, schedules));
 
             // 检查是否所有任务都已完成
             if (!hasRemainingProduction(deductMouldVo)) {
@@ -75,40 +73,42 @@ public class DeductMouldScheduler {
 
     /**
      * 获取有效日期
-     * @param currentDate 当前日期
+     *
+     * @param currentDate   当前日期
      * @param deductMouldVo 当前降模Vo
-     * @param schedules 排程列表
+     * @param schedules     排程列表
      * @return 有效日期
      */
-    private int getValidDate(int currentDate,DeductMouldVo deductMouldVo,List<DailyScheduleVo> schedules){
-       if (PubUtil.isEmpty(deductMouldVo.getShutDownDaySet())){
-           return currentDate;
-       }
-       while (deductMouldVo.getShutDownDaySet().contains(currentDate)){
-           if (schedules != null){
-               DailyScheduleVo dailyScheduleVo = new DailyScheduleVo();
-               dailyScheduleVo.setMaterialCode(deductMouldVo.getMaterialCode());
-               dailyScheduleVo.setScheduleDate(currentDate);
-               dailyScheduleVo.setSkuMachines(0);
-               dailyScheduleVo.setSkuQuantity(0);
-               dailyScheduleVo.setSkuPreQty(0);
-               schedules.add(dailyScheduleVo);
-           }
-           currentDate += 1;
-           if (!deductMouldVo.getShutDownDaySet().contains(currentDate)){
-               break;
-           }
-       }
-       return currentDate;
+    private static int getValidDate(int currentDate, DeductMouldVo deductMouldVo, List<DailyScheduleVo> schedules) {
+        if (PubUtil.isEmpty(deductMouldVo.getShutDownDaySet())) {
+            return currentDate;
+        }
+        while (deductMouldVo.getShutDownDaySet().contains(currentDate)) {
+            if (schedules != null) {
+                DailyScheduleVo dailyScheduleVo = new DailyScheduleVo();
+                dailyScheduleVo.setMaterialCode(deductMouldVo.getMaterialCode());
+                dailyScheduleVo.setScheduleDate(currentDate);
+                dailyScheduleVo.setSkuMachines(0);
+                dailyScheduleVo.setSkuQuantity(0);
+                dailyScheduleVo.setSkuPreQty(0);
+                schedules.add(dailyScheduleVo);
+            }
+            currentDate += 1;
+            if (!deductMouldVo.getShutDownDaySet().contains(currentDate)) {
+                break;
+            }
+        }
+        return currentDate;
     }
 
     /**
      * 根据规则确定当前激活机台数
+     *
      * @param deductMouldVo 降模Vo
-     * @param expectedDays 预计收尾天数
+     * @param expectedDays  预计收尾天数
      * @return 应该激活的机台数
      */
-    private int getActiveMachinesByRule(DeductMouldVo deductMouldVo,int expectedDays) {
+    private static int getActiveMachinesByRule(DeductMouldVo deductMouldVo, int expectedDays) {
         // 第1天延续上月配置（调用处处理）
         if (deductMouldVo.getMachinesAssigned() <= 0) {
             return 0;
@@ -152,11 +152,11 @@ public class DeductMouldScheduler {
     /**
      * 创建第1天降模排产计划（延续上个月不变）
      */
-    private DailyScheduleVo createFirstDaySchedule(DeductMouldVo deductMouldVo,int currentDate) {
+    private static DailyScheduleVo createFirstDaySchedule(DeductMouldVo deductMouldVo, int currentDate) {
         DailyScheduleVo dailyScheduleVo = new DailyScheduleVo();
         dailyScheduleVo.setMaterialCode(deductMouldVo.getMaterialCode());
         dailyScheduleVo.setScheduleDate(currentDate);
-        if (deductMouldVo.getRemainingQty() <=0 ){
+        if (deductMouldVo.getRemainingQty() <= 0) {
             return dailyScheduleVo;
         }
         // 第1天延续上月机台配置
@@ -168,7 +168,7 @@ public class DeductMouldScheduler {
         // 日计划量 = 激活台数 * 每日硫化量
         int dailyCapacity = activeMachines * deductMouldVo.getDailyOutputPerMachine();
         // 处理开产首日计划量
-        dailyCapacity = doProductionStartDayRatio(dailyScheduleVo.getScheduleDate(),dailyCapacity,deductMouldVo);
+        dailyCapacity = doProductionStartDayRatio(dailyScheduleVo.getScheduleDate(), dailyCapacity, deductMouldVo);
         int todayOutput = Math.min(deductMouldVo.getRemainingQty(), dailyCapacity);
         dailyScheduleVo.setSkuQuantity(todayOutput);
         dailyScheduleVo.setSkuPreQty(dailyCapacity);
@@ -177,18 +177,19 @@ public class DeductMouldScheduler {
 
     /**
      * 处理开产首日计划量
-     * @param scheduleDate 排产日
+     *
+     * @param scheduleDate  排产日
      * @param dailyCapacity 排产量
      * @param deductMouldVo 降模Vo
      * @return 开产首日计划量
      */
-    private int doProductionStartDayRatio(int scheduleDate,int dailyCapacity,DeductMouldVo deductMouldVo){
-        if (PubUtil.isEmpty(deductMouldVo.getProductionStartDaySet())){
+    private static int doProductionStartDayRatio(int scheduleDate, int dailyCapacity, DeductMouldVo deductMouldVo) {
+        if (PubUtil.isEmpty(deductMouldVo.getProductionStartDaySet())) {
             return dailyCapacity;
         }
 
         //若排产日 = 开产日，则日计划量 = 日计划量*开产比例
-        if (deductMouldVo.getProductionStartDaySet().contains(scheduleDate)){
+        if (deductMouldVo.getProductionStartDaySet().contains(scheduleDate)) {
             dailyCapacity = (int) Math.ceil((double) dailyCapacity * deductMouldVo.getParamStartDayRatio());
             // 判断奇数,奇数加1
             if (dailyCapacity % 2 == 1) {
@@ -197,11 +198,12 @@ public class DeductMouldScheduler {
         }
         return dailyCapacity;
     }
+
     /**
      * 创建每日排产计划（第2天及以后）
      */
-    private DailyScheduleVo createDailySchedule(DeductMouldVo deductMouldVo,
-                                                DeductMouldContext context) {
+    private static DailyScheduleVo createDailySchedule(DeductMouldVo deductMouldVo,
+                                                       DeductMouldContext context) {
         DailyScheduleVo dailyScheduleVo = new DailyScheduleVo();
         dailyScheduleVo.setScheduleDate(context.getCurrentDate());
         if (deductMouldVo.getRemainingQty() <= 0) {
@@ -210,27 +212,27 @@ public class DeductMouldScheduler {
 
         int activeMachines;
         //1、模拟计算，判断在收尾日前是否可以正常排产完
-        boolean isRemain = isRemainBySimulationCalc(deductMouldVo,context);
-        if (isRemain){
+        boolean isRemain = isRemainBySimulationCalc(deductMouldVo, context);
+        if (isRemain) {
             //1.1 在收尾日不能排产完，激活机台数延续前日的机台数
             activeMachines = context.getPreDayMachines();
             //1.2 若在收尾日，激活机台数不能大于需要的机台数；
-            if (context.getCurrentDate().equals(context.getDeadLineDate())){
+            if (context.getCurrentDate().equals(context.getDeadLineDate())) {
                 int needMachines = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / deductMouldVo.getDailyOutputPerMachine());
                 activeMachines = Math.min(activeMachines, needMachines);
             }
-        }else{
+        } else {
             //1.3 在收尾日通排产完，则根据规则确定激活机台数
-            activeMachines = getActiveMachinesByRule(deductMouldVo,context.getExpectedDays());
+            activeMachines = getActiveMachinesByRule(deductMouldVo, context.getExpectedDays());
         }
 
         //2、在收尾日倒数第2天 且前日机台数大于3台，优化激活台数
-        if (context.getPreDayMachines()>=3
-                && (context.getCurrentDate()+1)==context.getDeadLineDate()){
+        if (context.getPreDayMachines() >= 3
+                && (context.getCurrentDate() + 1) == context.getDeadLineDate()) {
             //在保障全部收尾的情况下，采取均分策略
             int avgMachines = (int) Math.ceil((double) context.getPreDayMachines() / 2);
-            int dailyCapacity = 2* avgMachines * deductMouldVo.getDailyOutputPerMachine();
-            if (deductMouldVo.getRemainingQty() <= dailyCapacity){
+            int dailyCapacity = 2 * avgMachines * deductMouldVo.getDailyOutputPerMachine();
+            if (deductMouldVo.getRemainingQty() <= dailyCapacity) {
                 activeMachines = avgMachines;
             }
         }
@@ -241,7 +243,7 @@ public class DeductMouldScheduler {
         // 3、计算当日产量，并组装日计划实体
         int dailyCapacity = activeMachines * deductMouldVo.getDailyOutputPerMachine();
         // 处理开产首日计划量
-        dailyCapacity = doProductionStartDayRatio(dailyScheduleVo.getScheduleDate(),dailyCapacity,deductMouldVo);
+        dailyCapacity = doProductionStartDayRatio(dailyScheduleVo.getScheduleDate(), dailyCapacity, deductMouldVo);
         int todayOutput = Math.min(deductMouldVo.getRemainingQty(), dailyCapacity);
 
         if (todayOutput > 0) {
@@ -256,11 +258,12 @@ public class DeductMouldScheduler {
 
     /**
      * 模拟计算，判断在收尾日前是否可以正常排产完
+     *
      * @param deductMouldVo 降模Vo
-     * @param context 降模上下文
+     * @param context       降模上下文
      * @return false-有剩余不能排产完；true-可以排产完
      */
-    private boolean isRemainBySimulationCalc(DeductMouldVo deductMouldVo,DeductMouldContext context){
+    private static boolean isRemainBySimulationCalc(DeductMouldVo deductMouldVo, DeductMouldContext context) {
         // 当前计算日期
         int currentDate = context.getCurrentDate();
         // 收尾日
@@ -274,17 +277,17 @@ public class DeductMouldScheduler {
         // 目前剩余量
         int remainQty = deductMouldVo.getRemainingQty();
 
-        int activeMachines,dailyCapacity,todayOutput,preDayMachines;
-        while (remainQty > 0  && currentDate <= deadLineDate) {
+        int activeMachines, dailyCapacity, todayOutput, preDayMachines;
+        while (remainQty > 0 && currentDate <= deadLineDate) {
             // 根据规则确定激活机台数
-            activeMachines = getActiveMachinesByRule(deductMouldVo,expectedDays);
+            activeMachines = getActiveMachinesByRule(deductMouldVo, expectedDays);
             // 保证激活机台数不超过总分配数
             activeMachines = Math.min(activeMachines, deductMouldVo.getMachinesAssigned());
 
             // 计算当日产量
             dailyCapacity = activeMachines * deductMouldVo.getDailyOutputPerMachine();
             // 处理开产首日计划量
-            dailyCapacity = doProductionStartDayRatio(currentDate,dailyCapacity,deductMouldVo);
+            dailyCapacity = doProductionStartDayRatio(currentDate, dailyCapacity, deductMouldVo);
 
             todayOutput = Math.min(remainQty, dailyCapacity);
 
@@ -297,22 +300,23 @@ public class DeductMouldScheduler {
             expectedDays = (int) Math.ceil((double) preRemainQty / preDayQty);
 
             remainQty = remainQty - todayOutput;
-            currentDate = getValidDate(currentDate + 1,deductMouldVo,null);
+            currentDate = getValidDate(currentDate + 1, deductMouldVo, null);
             // 检查是否所有任务都已完成
             if (remainQty <= 0) {
                 break;
             }
         }
 
-        if (remainQty >0 ){
+        if (remainQty > 0) {
             return true;
         }
         return false;
     }
+
     /**
      * 更新剩余产量
      */
-    private void updateRemainingQuantities(DeductMouldVo deductMouldVo,DailyScheduleVo dailyScheduleVo) {
+    private static void updateRemainingQuantities(DeductMouldVo deductMouldVo, DailyScheduleVo dailyScheduleVo) {
         int remainingQty = deductMouldVo.getRemainingQty() - dailyScheduleVo.getSkuQuantity();
         deductMouldVo.setRemainingQty(remainingQty);
     }
@@ -320,18 +324,19 @@ public class DeductMouldScheduler {
     /**
      * 检查是否还有剩余产量
      */
-    private boolean hasRemainingProduction(DeductMouldVo deductMouldVo) {
+    private static boolean hasRemainingProduction(DeductMouldVo deductMouldVo) {
         return deductMouldVo.getRemainingQty() > 0;
     }
 
     /**
      * 当前日期到收尾日的天数
-     * @param currentDate 当前日期
+     *
+     * @param currentDate  当前日期
      * @param deadLineDate 收尾日
      * @return 间隔天数
      */
-    private long getDaysToDeadLine(LocalDate currentDate, LocalDate deadLineDate){
-        return ChronoUnit.DAYS.between(currentDate,deadLineDate) + 1;
+    private static long getDaysToDeadLine(LocalDate currentDate, LocalDate deadLineDate) {
+        return ChronoUnit.DAYS.between(currentDate, deadLineDate) + 1;
     }
 }
 
