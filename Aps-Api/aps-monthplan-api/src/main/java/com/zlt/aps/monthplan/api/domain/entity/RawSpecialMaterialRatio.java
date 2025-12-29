@@ -78,7 +78,7 @@ public class RawSpecialMaterialRatio extends BaseEntity {
     @TableField(value = "UNIT")
     private String unit;
 
-    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.unit")
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
     @JsonSerialize(using = HtmlEscapeSerializer.class)
     @ImportExcelValidated(maxLength = 300)
     @ApiModelProperty("备注")
