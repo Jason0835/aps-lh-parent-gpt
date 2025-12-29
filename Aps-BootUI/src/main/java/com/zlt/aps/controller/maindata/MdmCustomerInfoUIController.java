@@ -198,7 +198,7 @@ public class MdmCustomerInfoUIController extends BaseUIController<MdmCustomerInf
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmCustomerInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmCustomerInfoService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

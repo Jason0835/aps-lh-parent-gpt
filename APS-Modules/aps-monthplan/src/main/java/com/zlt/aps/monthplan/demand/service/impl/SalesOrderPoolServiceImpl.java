@@ -340,8 +340,6 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 		// 删除旧数据
 		LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
-		updateWrapper.eq(SalesOrderPool::getYear, year);
-		updateWrapper.eq(SalesOrderPool::getMonth, month);
 		updateWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
 		updateWrapper.set(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_1);
 		updateWrapper.set(SalesOrderPool::getUpdateTime, new Date());

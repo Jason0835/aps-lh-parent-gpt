@@ -206,6 +206,6 @@ public class MdmMonthSurplusUIController extends BaseUIController<MdmMonthSurplu
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return iMdmMonthSurplusService.importData(context, false);
+        return iMdmMonthSurplusService.importData(context, updateSupport);
     }
 }

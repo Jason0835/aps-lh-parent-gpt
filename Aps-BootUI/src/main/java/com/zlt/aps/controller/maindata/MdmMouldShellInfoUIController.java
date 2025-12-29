@@ -196,7 +196,7 @@ public class MdmMouldShellInfoUIController extends BaseUIController<MdmMouldShel
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMouldShellInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmMouldShellInfoService.importData(context, updateSupport);
         return ajaxResult;
     }
 

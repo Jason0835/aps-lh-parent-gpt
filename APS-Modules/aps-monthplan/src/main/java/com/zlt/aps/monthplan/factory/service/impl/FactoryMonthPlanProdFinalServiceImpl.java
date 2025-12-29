@@ -806,7 +806,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
     private boolean checkDataMouldInfoAndFullMouldNo(FactoryMonthPlanProdFinal item, Long importLogId, Integer errorNum, List<ImportErrorLog> importErrorLogs, Map<String, List<MdmSkuMouldRel>> mouldBaseInfoMap) {
         String mouldErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNoErrorInfo");
         String mouldNumberErrorInfo = I18nUtil.getMessage("ui.data.column.monthPlanMouldingDayResult.specCodeMouldNumberErrorInfo");
-        Integer constructionStage = Integer.valueOf(item.getConstructionStage());
+        String constructionStage = item.getConstructionStage();
         ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
         if (null == stage) {
             return true;
@@ -901,7 +901,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         //自动生成productCode的流水号--没有物料编码时
         int index = 0;
         for (FactoryMonthPlanProdFinal finalPlan : importList) {
-            Integer constructionStage = Integer.valueOf(finalPlan.getConstructionStage());
+            String constructionStage = finalPlan.getConstructionStage();
             ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
             if (null == stage) {
                 continue;
@@ -929,7 +929,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      * @return
      */
     private int addProductConstructionConfiguration(String batchNo, int index, FactoryMonthPlanProdFinal importFinalPlan, List<FactoryMonthPlanProdFinal> informalConstructionStageList) {
-        Integer constructionStage = Integer.valueOf(importFinalPlan.getConstructionStage());
+        String constructionStage = importFinalPlan.getConstructionStage();
         ConstructionStageEnum stage = ConstructionStageEnum.getInstance(constructionStage);
         if (null == stage) {
             return index;

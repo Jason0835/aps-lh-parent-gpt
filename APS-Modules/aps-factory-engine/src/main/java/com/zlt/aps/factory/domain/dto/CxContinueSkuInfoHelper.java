@@ -1,8 +1,14 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 在机结构-续作Sku信息
@@ -63,4 +69,30 @@ public class CxContinueSkuInfoHelper implements Serializable {
      * 计划需求量--高优先级或是总排产量？
      */
     private Long planDemandQty;
+
+    /**
+     * 先从排产计划中获取materialDesc,如果没有匹配到，从续作中获取
+     *
+     * @param productionPlanList 分组排产计划
+     * @param continueSkuMap     成型初始的续作Sku信息
+     * @return
+     */
+    public static CxContinueSkuInfoHelper buildContinueProductInfo(String materialDesc, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
+        if (CollectionUtils.isEmpty(productionPlanList)) {
+            return continueSkuMap.get(materialDesc);
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanList = productionPlanList.stream().filter(groupPlan -> materialDesc.equals(groupPlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(groupPlanList)) {
+            return continueSkuMap.get(materialDesc);
+        }
+        MonthPlanProductionRequirePlanVo plan = groupPlanList.get(BigDecimal.ZERO.intValue());
+        CxContinueSkuInfoHelper continueSkuInfo = new CxContinueSkuInfoHelper();
+        continueSkuInfo.setEmbryoCode(plan.getEmbryoCode());
+        continueSkuInfo.setSpecifications(plan.getSpecifications());
+        continueSkuInfo.setPattern(plan.getPattern());
+        continueSkuInfo.setMainPattern(plan.getMainPattern());
+        continueSkuInfo.setProSize(plan.getProSize());
+        continueSkuInfo.setGroupName(plan.getStructureName());
+        return continueSkuInfo;
+    }
 }

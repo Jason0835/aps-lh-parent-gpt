@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
+import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
@@ -82,6 +83,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //todo 记录日志 续作结构排产分配
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
+        //汇总续作Sku信息
+        statisticsGroupContinueInfo(estimateGroupCxAllocationMap, cxContinueInfoMap);
+
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
@@ -616,6 +620,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(structureLhRatioList)) {
             return Collections.emptyList();
         }
+        //周期结构硫化配比
         List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
         Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
         if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
@@ -628,6 +633,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         structureLhRatioList.forEach(structureLhRatio -> {
             String structureName = structureLhRatio.getStructureName();
             structureLhRatio.setLhMachineMinQty(defaultMinLhRatio);
+            //如果是周期，则换成周期
             if (cycleStructureMinLhRatioMap.containsKey(structureName)) {
                 structureLhRatio.setLhMachineMinQty(cycleStructureMinLhRatioMap.get(structureName));
                 return;
@@ -672,11 +678,32 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //获取上个排产周期最后排产日的排产信息
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        //获取续作结构--结构转产表
+        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(factoryCode, year, month, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo();
-        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(factoryCode, year, month, lastDay);
         setContinueGroupByProduct(continueProductionInfoList, continueGroupInfo);
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+    }
+
+    /**
+     * 汇总续作信息
+     * 在机结构-续作Sku有排产量的胎胚和使用模具数
+     *
+     * @param allGroupPlanMap      分组计划信息
+     * @param allCxContinueInfoMap 续作分组信息
+     */
+    private void statisticsGroupContinueInfo(Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allCxContinueInfoMap) {
+        if (CollectionUtils.isEmpty(allGroupPlanMap) || CollectionUtils.isEmpty(allGroupPlanMap)) {
+            return;
+        }
+        allGroupPlanMap.forEach((structureName, groupPlanInfo) -> {
+            CxContinueInfoHelper cxContinueInfoHelper = allCxContinueInfoMap.get(structureName);
+            if (null == cxContinueInfoHelper) {
+                return;
+            }
+            ContinueSkuCalculator.setContinueSkuPlanDemandQty(groupPlanInfo, cxContinueInfoHelper);
+        });
     }
 
     /**

@@ -11,7 +11,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MouldProductionLog.java
- * 描    述：分厂月度排产流程日志对象 t_mp_mould_production_log
+ * 描    述：S2-0410.排产过程_排产日志对象 t_mp_mould_production_log
  *
  * @author zlt
  * @version 1.0
@@ -25,7 +25,7 @@ import lombok.Data;
 
 @Data
 @TableName(value = "T_MP_MOULD_PRODUCTION_LOG")
-@ApiModel(value = "分厂月度排产流程日志对象", description = "分厂月度排产流程日志对象")
+@ApiModel(value = "工厂月度排产流程日志对象", description = "工厂月度排产流程日志对象")
 public class MouldProductionLog extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -101,19 +101,5 @@ public class MouldProductionLog extends BaseEntity {
     @ApiModelProperty(value = "日志内容", name = "logContent")
     @TableField(value = "LOG_CONTENT")
     private String logContent;
-
-    /**
-     * 需求计划
-     */
-    @ApiModelProperty(value = "需求计划", name = "monthPlanId")
-    @TableField(exist = false)
-    private Long monthPlanId;
-
-    /**
-     * 物料编号
-     */
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(exist = false)
-    private String productCode;
 
 }

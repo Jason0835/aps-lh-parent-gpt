@@ -253,7 +253,7 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMaterialInfoService.importGrossRate(context, false);
+        AjaxResult ajaxResult = iMaterialInfoService.importGrossRate(context, updateSupport);
         return ajaxResult;
     }
 

@@ -199,7 +199,7 @@ public class ProductMoldingLimitUIController extends BaseUIController<ProductMol
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductMoldingLimitService.importData(context, false);
+        AjaxResult ajaxResult = iProductMoldingLimitService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.maindata;
+package com.zlt.aps.controller.monthplan;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineClsB;
-import com.zlt.aps.monthplan.api.service.IMdmMoldingMachineClsBRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.service.IDpAreaRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +29,8 @@ import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmMoldingMachineClsBUIController.java
- * 描    述：成型机单机班产 UI控制层类：....
+ * 文件名称：DpAreaUIController.java
+ * 描    述：区域 UI控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -39,26 +39,25 @@ import java.util.Arrays;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-02-27
+ * @date 2025-12-29
  */
 @Slf4j
-@Api(tags = "成型机单机班产子表")
+@Api(tags = "区域")
 @Controller
-@RequestMapping("/monthplan/mdmMoldingMachineClsB")
-public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldingMachineClsB> {
+@RequestMapping("/monthplan/dpArea")
+public class DpAreaUIController extends BaseUIController<DpArea> {
 
+    private final String prefix = "aps/monthplan/dpArea";
     @Autowired
-    private IMdmMoldingMachineClsBRemoteService iMdmMoldingMachineClsBService;
-
-    private final String prefix = "aps/monthplan/mdmMoldingMachineClsB";
+    private IDpAreaRemoteService iDpAreaService;
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmMoldingMachineClsB:view")
+    @RequiresPermissions("monthplan:dpArea:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmMoldingMachineClsB";
+        return prefix + "/dpArea";
     }
 
     /**
@@ -66,7 +65,7 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmMoldingMachineClsB", new MdmMoldingMachineClsB());
+        mmap.put("dpArea", new DpArea());
         return prefix + "/add";
     }
 
@@ -75,7 +74,7 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmMoldingMachineClsB", iMdmMoldingMachineClsBService.getInfo(id));
+        mmap.put("dpArea", iDpAreaService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -83,49 +82,47 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmMoldingMachineClsB:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmMoldingMachineClsB mdmMoldingMachineClsB) {
-        return iMdmMoldingMachineClsBService.list(mdmMoldingMachineClsB);
+    public TableDataInfo list(DpArea dpArea) {
+        return iDpAreaService.list(dpArea);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmMoldingMachineClsB:edit")
+    @RequiresPermissions("monthplan:dpArea:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmMoldingMachineClsB mdmMoldingMachineClsB) {
-        AjaxResult ajaxResult = null;
-        if (UserConstants.NOT_UNIQUE.equals(iMdmMoldingMachineClsBService.checkUnique(mdmMoldingMachineClsB))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmMoldingMachineClsB.notUnique"));
+    public AjaxResult save(DpArea dpArea) {
+        if (UserConstants.NOT_UNIQUE.equals(iDpAreaService.checkUnique(dpArea))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.dpArea.checkUnique"));
         }
 
-        return iMdmMoldingMachineClsBService.save(mdmMoldingMachineClsB);
+        return iDpAreaService.save(dpArea);
     }
 
     /**
-     * 删除成型机单机班产
+     * 删除区域
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmMoldingMachineClsB:remove")
+    @RequiresPermissions("monthplan:dpArea:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmMoldingMachineClsBService.removeByIds(Arrays.asList(arr));
+        return iDpAreaService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验成型机单机班产唯一性
+     * 校验区域唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmMoldingMachineClsB mdmMoldingMachineClsB) {
-        return iMdmMoldingMachineClsBService.checkUnique(mdmMoldingMachineClsB);
+    public String checkUnique(DpArea dpArea) {
+        return iDpAreaService.checkUnique(dpArea);
     }
 
     /**
@@ -157,7 +154,7 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mdmMoldingMachineClsB.modelName");
+        return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
     /**
@@ -167,7 +164,7 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmMoldingMachineClsB> util = new ExcelUtil<>(MdmMoldingMachineClsB.class);
+        ExcelUtil<DpArea> util = new ExcelUtil<>(DpArea.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -176,9 +173,9 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmMoldingMachineClsB entity) throws IOException {
+    public void export(HttpServletResponse response, DpArea entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmMoldingMachineClsBService.exportData(entity, fileName);
+        byte[] excelBytes = iDpAreaService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -198,7 +195,7 @@ public class MdmMoldingMachineClsBUIController extends BaseUIController<MdmMoldi
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMoldingMachineClsBService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iDpAreaService.importData(context, false);
         return ajaxResult;
     }
 }

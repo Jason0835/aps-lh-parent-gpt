@@ -195,7 +195,7 @@ public class MdmCxMachineFixedUIController extends BaseUIController<MdmCxMachine
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmCxMachineFixedService.importData(context, false);
+        AjaxResult ajaxResult = iMdmCxMachineFixedService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
