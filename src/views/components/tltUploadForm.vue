@@ -26,6 +26,7 @@
         ref="upload"
         :limit="1"
         accept=".xlsx, .xls"
+         :before-upload="beforeUpload"
         :headers="upload.headers"
         :action="
           upload.url + uploadUrl
@@ -116,6 +117,19 @@ export default {
   },
 
   methods: {
+     //上传前校验
+     beforeUpload(file) {
+      // 或者通过文件后缀名校验（更可靠）
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+      const isExcelByExtension = ["xlsx", "xls"].includes(fileExtension);
+
+      if (!isExcelByExtension) {
+        this.$message.error(this.$t("common.upload.onlyXlsXlsx"));
+        this.upload.isUploading = false;
+        this.upload.submitLoading = false;
+        return false; // 阻止上传
+      }
+    },
     handleTemplateDownload() {
       let downloadDom = document.createElement("a");
       if (this.downloadUrlFormatter) {
@@ -174,16 +188,19 @@ export default {
     },
 
     handleImport(data) {
+      this.updateSupport=false
       if (data) {
         this.defaultValue = {
           ...data,
+
         };
         // console.log(this.defaultValue);
       }
       this.upload.open = true;
     },
     handleClose() {
-      this.$refs.form.triggerResetForm();
+      // this.$refs.form.triggerResetForm();
+
       this.upload.submitLoading = false;
     },
     handleChange(file, fileList) {

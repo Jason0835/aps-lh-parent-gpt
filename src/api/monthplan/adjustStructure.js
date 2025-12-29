@@ -18,7 +18,24 @@ export function getAdjustDetailList(query) {
 //结构外记录
 export function listOutsideStructure(query) {
   return request({
-    url: '/monthplan/mpAdjustStructureOut/list',
+    url: '/monthplan/mpStructureAllocation/list',
+    method: 'post',
+    data: query
+  })
+}
+//确认调整结果
+export function confirmAdjust(query) {
+  return request({
+    url: '/monthplan/mpWeekRollAdjust/confirmAdjust',
+    method: 'post',
+    data: query
+  })
+}
+
+//新增结构
+export function addAdjust(query) {
+  return request({
+    url: '/monthplan/mpStructureAllocation/save',
     method: 'post',
     data: query
   })

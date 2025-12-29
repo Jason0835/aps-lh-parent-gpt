@@ -418,6 +418,7 @@ export default {
         >
           {this.renderColumns(this.columns)}
         </t-table>
+        {this.$slots.footer ? this.$slots.footer : null}
         {this.page ? (
           <div ref="pageRef" class="page-table-page">
             <el-pagination

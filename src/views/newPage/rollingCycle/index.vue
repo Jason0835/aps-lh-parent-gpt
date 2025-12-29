@@ -15,6 +15,7 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
+      @selection-change="handleSelectionChange"
       row-key="id"
       :expand-row-keys="expands"
       @expand-change="handleExpandChange"
@@ -28,7 +29,9 @@
             }}</el-button>
           </el-tab-pane>
           <el-tab-pane label="结构调整" name="second">
-            <el-button @click="handleAdd">{{ $t("单选结构调整") }}</el-button>
+            <el-button @click="handleAdd" :disabled="selection.length != 1">{{
+              $t("单选结构调整")
+            }}</el-button>
             <el-button @click="handleShowSpecial">{{
               $t("特殊材料生产情况")
             }}</el-button>
@@ -36,8 +39,30 @@
               $t("新增结构")
             }}</el-button>
           </el-tab-pane>
-          <el-tab-pane label="调整结果" name="three"> </el-tab-pane>
+          <el-tab-pane label="调整结果" disabled name="three"> </el-tab-pane>
         </el-tabs>
+      </template>
+      <template slot="footer" v-if="activeName == 'three'">
+        <div
+          style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-end;
+          "
+        >
+          <el-button @click="backPlan">
+            {{ this.$t("common.button.cancel") }}</el-button
+          >
+          <el-button
+            type="primary"
+            @click="confirmResult"
+            :loading="loading"
+            :disabled="data.length == 0"
+          >
+            {{ this.$t("common.button.confirm") }}</el-button
+          >
+        </div>
       </template>
     </page-table>
 
@@ -51,7 +76,7 @@
     <infoDialog ref="infoRef" @success="getList" />
 
     <special ref="specialRef"></special>
-    <addModal ref="addModalRef" />
+    <addModal ref="addModalRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -64,6 +89,7 @@ import {
   listInternalStructure,
   getAdjustDetailList,
   listOutsideStructure,
+  confirmAdjust,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -73,7 +99,6 @@ import infoDialog from "./components/infoDialog.vue";
 import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
-import { aW } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "MoldingClosingStageProgress",
@@ -84,7 +109,12 @@ export default {
     special,
     addModal,
   },
-  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name"],
+  dicts: [
+    "biz_yes_no",
+    "biz_factory_name",
+    "biz_machine_brand",
+    "biz_class_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -92,6 +122,7 @@ export default {
   },
   data() {
     return {
+      adjustType: "01",
       show: true,
       subLoading: false,
       activeName: "first",
@@ -192,7 +223,11 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  <el-select v-model={row.adjustPriorities} size="mini" v-if={this.isEdit}>
+                  <el-select
+                    v-model={row.adjustPriorities}
+                    size="mini"
+                    v-if={this.isEdit}
+                  >
                     <el-option label="1" value="1" key="1" />
                     <el-option label="2" value="2" key="2" />
                     <el-option label="3" value="3" key="3" />
@@ -264,30 +299,31 @@ export default {
             prop: "structureName",
             label: this.$t("产品结构"),
           },
+
           {
-            prop: "beforePlanQty",
-            label: this.$t("计划量"),
-          },
-          {
-            prop: "startDate",
+            prop: "beginDay",
             label: this.$t("开始日期"),
           },
           {
-            prop: "endDate",
+            prop: "endDay",
             label: this.$t("结束日期"),
           },
-          {
-            prop: "afterPlanQty",
-            label: this.$t("调整后计划量"),
-          },
-          {
-            prop: "beforeEndDate",
-            label: this.$t("调整后开始日期"),
-          },
-          {
-            prop: "afterStartDate",
-            label: this.$t("调整后结束日期"),
-          },
+          // {
+          //   prop: "beforePlanQty",
+          //   label: this.$t("计划量"),
+          // },
+          // {
+          //   prop: "afterPlanQty",
+          //   label: this.$t("调整后计划量"),
+          // },
+          // {
+          //   prop: "beforeEndDate",
+          //   label: this.$t("调整后开始日期"),
+          // },
+          // {
+          //   prop: "afterStartDate",
+          //   label: this.$t("调整后结束日期"),
+          // },
         ];
       }
       if (this.activeName == "three") {
@@ -335,6 +371,12 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           prop: "yearMonth",
           label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
@@ -398,6 +440,23 @@ export default {
     },
   },
   methods: {
+    backPlan() {
+      if (this.adjustType == "01") {
+        this.activeName = "first";
+      } else {
+        this.activeName = "second";
+      }
+    },
+    //确认调整结果
+    async confirmResult() {
+      try {
+        let res = await confirmAdjust({
+          adjustResultList: JSON.stringify(this.data),
+          adjustType: this.adjustType,
+        });
+        console.log(res);
+      } catch (err) {}
+    },
     //获取调整订单
     async adjustOrder() {
       try {
@@ -411,11 +470,12 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        if (this.activeName == "first") {
-          params.adjustType = "01";
-        } else {
-          params.adjustType = "02";
-        }
+        // if (this.activeName == "first") {
+        //   params.adjustType = "01";
+        // } else {
+        //   params.adjustType = "02";
+        // }
+        params.adjustType = this.adjustType;
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         console.log(res);
@@ -440,6 +500,11 @@ export default {
       this.loading = true;
       this.show = false;
       this.getList();
+      if (this.activeName == "first") {
+        this.adjustType = "01";
+      } else {
+        this.adjustType = "02";
+      }
 
       // setTimeout(() => {
       //   // this.$refs.tableRef.onReset()
@@ -463,10 +528,31 @@ export default {
         this.$refs.specialRef.show();
       }
     },
-    handleAdd() {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+   async handleAdd() {
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        params.scheduledMachines=this.selection[0].cxMachineCode
+        params.structureName=this.selection[0].structureName
+
+        params.adjustType = this.adjustType;
+        this.isEdit = true;
+        let res = await getAdjustDetailList(params);
+        console.log(res);
+        if (this.$refs.infoRef) {
+        this.$refs.infoRef.show(res);
       }
+      } catch (err) {}
+
+
     },
 
     handleDelete(row) {
@@ -508,6 +594,7 @@ export default {
       this.getList();
     },
     handleSelectionChange(rows) {
+      console.log(rows);
       this.selection = rows;
     },
     handleExport() {
@@ -535,6 +622,7 @@ export default {
     },
     // api
     async getList() {
+      console.log(this.adjustType);
       try {
         this.isEdit = false;
         this.loading = true;
@@ -568,6 +656,7 @@ export default {
     const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
     let defaultParams = {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+      factoryCode: "116",
     };
     this.search = {
       ...defaultParams,

@@ -208,7 +208,7 @@ export default {
           maxlength:30,
         },
         {
-          prop: "qty",
+          prop: "totalQty",
           label: this.$t("ui.data.column.docInventoryBoiA.fullQty"),
           type: "number",
           max:999999

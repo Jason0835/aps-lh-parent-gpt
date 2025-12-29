@@ -145,19 +145,19 @@ export default {
           label: this.$t("ui.data.column.skuConstruction.mouldCavity"),
           width: 180,
         },
-        {
-          prop: "mouldClampingPressure",
-          label: this.$t("ui.data.column.lhTireConstructionInfo.clampingPressure"),
-          width: 180,
-        },
-        {
-          prop: "mouldMethod",
-          label: this.$t("ui.data.column.sizeCapacity.mouldMethod"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.molding_method, value);
-          },
-          width: 180,
-        },
+        // {
+        //   prop: "mouldClampingPressure",
+        //   label: this.$t("ui.data.column.lhTireConstructionInfo.clampingPressure"),
+        //   width: 180,
+        // },
+        // {
+        //   prop: "mouldMethod",
+        //   label: this.$t("ui.data.column.sizeCapacity.mouldMethod"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.molding_method, value);
+        //   },
+        //   width: 180,
+        // },
         {
           prop: "isZeroRack",
           label: this.$t("ui.data.column.mpMonthlySaleQty.isZeroRack"),
@@ -215,12 +215,12 @@ export default {
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           prop: "materialCode",
         },
-        {
-          label: this.$t("ui.data.column.sizeCapacity.mouldMethod"),
-          prop: "mouldMethod",
-          type:'select',
-          dictData: this.dict.type.molding_method,
-        },
+        // {
+        //   label: this.$t("ui.data.column.sizeCapacity.mouldMethod"),
+        //   prop: "mouldMethod",
+        //   type:'select',
+        //   dictData: this.dict.type.molding_method,
+        // },
         {
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),
           prop: "embryoCode",

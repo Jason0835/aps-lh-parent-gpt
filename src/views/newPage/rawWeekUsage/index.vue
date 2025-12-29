@@ -170,7 +170,7 @@ export default {
           label: this.$t("ui.data.column.rawMaterial.materialCode"),
         },
         {
-          prop: "materialName",
+          prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
         },
 

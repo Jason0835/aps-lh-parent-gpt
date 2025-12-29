@@ -167,12 +167,15 @@ export default {
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
-          maxlength:64
+          maxlength:64,
+          disabled:true
+
         },
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
-          maxlength:64
+          maxlength:64,
+          disabled:true
 
         },
         {
@@ -224,6 +227,57 @@ export default {
           label: this.$t("ui.data.column.trialPlan.trialType"),
           type: "select",
           dictData: this.parentDict.type.biz_trial_type,
+        },
+
+        {
+          prop: "destination",
+          label: this.$t("ui.data.column.trialPlan.destination"),
+          maxlength:200
+        },
+        {
+          prop: "embryoNo",
+          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          disabled:true,
+        },
+        {
+          prop: "embryoType",
+          label: this.$t("ui.data.column.trialPlan.embryoType"),
+          disabled:true,
+        },
+        {
+          prop: "embryoReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.embryoReleaseDate"),
+          disabled:true,
+        },
+        {
+          prop: "textNo",
+          label: this.$t("ui.data.column.trialPlan.textNo"),
+          disabled:true,
+        },
+        {
+          prop: "textType",
+          label: this.$t("ui.data.column.trialPlan.textType"),
+          disabled:true,
+        },
+        {
+          prop: "textReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.textReleaseDate"),
+          disabled:true,
+        },
+        {
+          prop: "lhNo",
+          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          disabled:true,
+        },
+        {
+          prop: "lhType",
+          label: this.$t("ui.data.column.trialPlan.lhType"),
+          disabled:true,
+        },
+        {
+          prop: "lhReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.lhReleaseDate"),
+          disabled:true,
         },
         {
           prop: "remark",
@@ -281,8 +335,12 @@ export default {
     handleMaterialCodeChange(val, row) {
       if (val) {
         this.$set(this.form, "materialDesc", row.materialDesc);
+        this.$set(this.form, "specifications", row.specifications);
+        this.$set(this.form, "pattern", row.pattern);
       } else {
         this.$set(this.form, "materialDesc", "");
+        this.$set(this.form, "specifications", '');
+        this.$set(this.form, "pattern", '');
       }
     },
   },

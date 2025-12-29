@@ -145,7 +145,7 @@ export default {
           label: this.$t("ui.data.column.monthplan.moldModelCode"),
         },
         {
-          prop: "qty",
+          prop: "totalQty",
           label: this.$t("ui.data.column.docInventoryBoiA.fullQty"),
         },
         {

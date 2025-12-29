@@ -30,14 +30,20 @@
 
 <script>
 import { mapState } from "vuex";
+import {
+  listInternalStructure,
+  getAdjustDetailList,
+  listOutsideStructure,
+  confirmAdjust,
+  addAdjust,
+} from "@/api/monthplan/adjustStructure";
 
-// import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
-import { editProductMoldingLimit } from "@/api/mdm/productMoldingLimit";
+import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, formingCapacitySelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -45,16 +51,19 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
-      form: {},
+      form: {
+        beginDay:'',
+        endDay:''
+      },
       rules: {
-        机台: [
+        cxMachineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        sapCode: [
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -103,46 +112,90 @@ export default {
     },
     columns() {
       return [
-      {
-          prop: "机台",
-          label: this.$t("机台"),
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
           type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "cxMachineCode",
+          label: this.$t("机台"),
+          render: (form) => {
+            return (
+              <formingCapacitySelect
+                factoryCode={form.cxMachineCode}
+                key={form.cxMachineCode}
+                v-model={form.cxMachineCode}
+              />
+            );
+          },
         },
 
         {
-          prop: "产品结构",
+          prop: "structureName",
           label: this.$t("产品结构"),
         },
         {
-          prop: "开始日期",
-          label: this.$t("开始日期"),
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
           type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
         },
         {
-          prop: "结束日期",
-          label: this.$t("结束日期"),
-          type: "date",
-        },
+          prop: "beginDay",
+          label: this.$t("开始日期"),
+          render: (form) => {
 
+            const days = Array.from({ length: 31 }, (_, i) => i + 1);
+            return (
+              <el-select v-model={form.beginDay}>
+                {days.map((item) => (
+                  <el-option key={item} label={item} value={item}></el-option>
+                ))}
+              </el-select>
+            );
+          },
+        },
+        {
+          prop: "endDay",
+          label: this.$t("结束日期"),
+          render: (form) => {
+            const days = Array.from({ length: 31 }, (_, i) => i + 1);
+            return (
+              <el-select v-model={form.endDay}>
+                {days.map((item) => (
+                  <el-option key={item} label={item} value={item}></el-option>
+                ))}
+              </el-select>
+            );
+          },
+        },
       ];
     },
   },
   methods: {
     // api
     async save(params) {
-      // try {
-      //   this.loading = true;
-
-      //   const res = await editProductMoldingLimit(params);
-      //   this.$modal.msgSuccess(res.msg);
-      //   this.$emit("success");
-      //   this.hide();
-
-      //   this.loading = false;
-      // } catch (error) {
-      //   console.log(error);
-      //   this.loading = false;
-      // }
+      try {
+        this.loading = true;
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+          params.yearMonth = "";
+        }
+        const res = await addAdjust(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+        this.loading = false;
+      } catch (error) {
+        console.log(error);
+        this.loading = false;
+      }
     },
 
     //utils
@@ -155,7 +208,7 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "AH01",
+          factoryCode: "116",
         };
       }
     },

@@ -228,51 +228,60 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          maxlength:300
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          maxlength:10
         },
         {
           prop: "curMonthQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
         {
           prop: "t1MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
 
         {
           prop: "t2MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
         {
           prop: "curMonthRudrQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthRudrQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
         {
           prop: "t1MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthEudrQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
         {
           prop: "t2MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthEudrQty"),
           type:'number',
-          max:99999999
+          max:99999999.99,
+          min:0
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          maxlength:100
         },
       ];
     },

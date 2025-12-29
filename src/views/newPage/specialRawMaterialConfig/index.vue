@@ -137,7 +137,7 @@ export default {
         },
         {
           prop: "stockDate",
-          label: this.$t("库存日期"),
+          label: this.$t("ui.data.defectiveStock.stockDate"),
         },
         {
           prop: "remark",

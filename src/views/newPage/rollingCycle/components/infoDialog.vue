@@ -106,6 +106,7 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      selection:{},
       tableData: [
         {
           productStructure: "315/80R22.5-JD758零度",
@@ -294,7 +295,7 @@ export default {
     show(data) {
       this.visible = true;
       if (data) {
-        this.isEdit = true;
+        this.selection = data;
         this.form = {
           ...data,
         };

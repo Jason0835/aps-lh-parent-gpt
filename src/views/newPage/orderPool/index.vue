@@ -327,7 +327,7 @@ export default {
           label: this.$t("schedule.glueDecomposePlan.submissionDate"),
           prop: "billDate",
           type: "date",
-          dateType: "date",
+          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
         },
         {
@@ -467,10 +467,10 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
+      if (params.billDate && params.billDate[0]) {
+        params.billDateStartTime = params.billDate[0];
+        params.billDateEndTime = params.billDate[1];
+        params.billDate = undefined;
       }
 
       return params;
