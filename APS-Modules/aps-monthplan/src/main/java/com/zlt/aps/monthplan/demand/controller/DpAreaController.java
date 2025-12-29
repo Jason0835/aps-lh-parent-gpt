@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.demand.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpAreaService;
@@ -52,7 +51,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
     /**
      * 查询区域列表
      */
-    @RequiresPermissions("monthplan:dpArea:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +67,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
      * 保存
      */
     @Log(title = "ui.data.column.dpArea.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:dpArea:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +78,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
      * 删除
      */
     @Log(title = "ui.data.column.dpArea.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:dpArea:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +89,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
     /**
      * 获取区域详细信息
      */
-    @RequiresPermissions("monthplan:dpArea:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +104,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:dpArea:import")
     @Log(title = "ui.data.column.dpArea.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +115,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:dpArea:export")
     @Log(title = "区域", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
@@ -159,7 +152,6 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isEudr")), "IS_EUDR", queryVO.getFieldValueByFieldName("isEudr"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ncCode")), "NC_CODE", queryVO.getFieldValueByFieldName("ncCode"));
     }
-
 
     @Override
     protected String getTypeCode() {
