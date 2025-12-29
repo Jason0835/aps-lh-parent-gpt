@@ -138,5 +138,13 @@ public class MdmWorkWearInfo extends BaseEntity {
     @TableField(value = "USED_TYPE")
     private String usedType;
 
+    /**
+     * 备注
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 
 }
