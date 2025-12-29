@@ -173,6 +173,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         param.setBillDateEndTime(nowDateStr);
         SyncPlanedNotShipParamVo paramVo = new SyncPlanedNotShipParamVo();
         paramVo.setFactory(factoryCode);
+        paramVo.setYear(lastYear);
+        paramVo.setMonth(Integer.parseInt(lastMonth));
         try {
             String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
             String[] split = config.split("-");
@@ -181,8 +183,6 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         } catch (NumberFormatException e) {
             log.error("获取配置失败", e);
         }
-        paramVo.setYear(lastYear);
-        paramVo.setMonth(Integer.parseInt(lastMonth));
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
         AjaxResultUtils.getList(ajaxResult, SyncOutShipDmdOrdResultVo.class);
         List<SyncOutShipDmdOrdResultVo> outShipDmdOrdResultVos = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SyncOutShipDmdOrdResultVo.class);
