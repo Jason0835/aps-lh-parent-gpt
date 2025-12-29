@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper">
 	<update id="batchInsert">
-		INSERT INTO T_MP_SALES_ORDER_POOL (
+		INSERT INTO T_DP_SALES_ORDER_POOL (
 			FACTORY_CODE,
 			PRODUCT_TYPE,
 			ORDER_PRIORITY,
@@ -25,8 +25,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			DELIVER_GOODS_TYPE,
 			SCM_PRIORITY,
 			SCM_DETAIL_ID,
-			YEAR,
-			MONTH,
 			REMARK,
 			IS_DELETE,
 			CREATE_BY,
@@ -56,8 +54,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{saleOrderPool.deliverGoodsType,jdbcType=VARCHAR},
             #{saleOrderPool.scmPriority,jdbcType=VARCHAR},
             #{saleOrderPool.scmDetailId,jdbcType=LONG},
-            #{saleOrderPool.year,jdbcType=INTEGER},
-            #{saleOrderPool.month,jdbcType=INTEGER},
             #{saleOrderPool.remark,jdbcType=VARCHAR},
             0,
             #{saleOrderPool.createBy,jdbcType=DATE},
