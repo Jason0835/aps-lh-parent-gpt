@@ -1,189 +1,193 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import lombok.Data;
+import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MpOrderPrediction.java
- * 描    述：订单预测对象 T_MP_ORDER_PREDICTION
+ * 文件名称：MpProductionPrediction.java
+ * 描    述：S2-1002.未来产量预测对象 t_mp_production_prediction
+ *@author yelq
+ *@date 2025-12-28
+ *@version 1.0
  *
- * @author zlt
- * @version 1.0
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：yelq
+ *     修改内容：...
  */
-@ApiModel(value = "订单预测对象", description = "订单预测表")
+
+@ApiModel(value = "S2-1002.未来产量预测对象", description = "S2-1002.未来产量预测对象 ")
 @Data
-@EqualsAndHashCode(callSuper = true)
 @TableName(value = "T_MP_PRODUCTION_PREDICTION")
 public class MpProductionPrediction extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    /** 工厂编号 */
-    @Excel(name = "ui.data.column.prediction.factoryCode")
+     /** 工厂编号 */
+    @Excel(name = "ui.data.column.productionPrediction.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.prediction.year")
+    @Excel(name = "ui.data.column.productionPrediction.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.prediction.month")
+    @Excel(name = "ui.data.column.productionPrediction.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
 
-    /** 产品品类 数据字典：biz_product_type  全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.prediction.productTypeCode")
-    @ApiModelProperty(value = "产品品类 数据字典：biz_product_type  全钢 PCR 半钢", name = "productTypeCode")
+    /** 产品品类 */
+    @Excel(name = "ui.data.column.productionPrediction.productTypeCode")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
-    /** 库位类别 1 内销 2 外销 3 OE */
-    @Excel(name = "ui.data.column.prediction.locationType")
-    @ApiModelProperty(value = "库位类别 1 内销 2 外销 3 OE", name = "locationType")
+    /** 库位类别 */
+    @Excel(name = "ui.data.column.productionPrediction.locationType")
+    @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.prediction.brand")
+    @Excel(name = "ui.data.column.productionPrediction.brand")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.prediction.mesMaterialCode")
+    @Excel(name = "ui.data.column.productionPrediction.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     /** 物料编码 */
-    @Excel(name = "ui.data.column.prediction.materialCode")
+    @Excel(name = "ui.data.column.productionPrediction.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.prediction.materialDesc")
+    @Excel(name = "ui.data.column.productionPrediction.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
     /** 第1个月排产量 */
-    @Excel(name = "ui.data.column.prediction.month1")
+    @Excel(name = "ui.data.column.productionPrediction.month1")
     @ApiModelProperty(value = "第1个月排产量", name = "month1")
     @TableField(value = "MONTH_1")
     private Integer month1;
 
     /** 第2个月排产量 */
-    @Excel(name = "ui.data.column.prediction.month2")
+    @Excel(name = "ui.data.column.productionPrediction.month2")
     @ApiModelProperty(value = "第2个月排产量", name = "month2")
     @TableField(value = "MONTH_2")
     private Integer month2;
 
     /** 第3个月排产量 */
-    @Excel(name = "ui.data.column.prediction.month3")
+    @Excel(name = "ui.data.column.productionPrediction.month3")
     @ApiModelProperty(value = "第3个月排产量", name = "month3")
     @TableField(value = "MONTH_3")
     private Integer month3;
 
     /** 预测版本号 */
-    @Excel(name = "ui.data.column.prediction.predictionVersion")
+    @Excel(name = "ui.data.column.productionPrediction.predictionVersion")
     @ApiModelProperty(value = "预测版本号", name = "predictionVersion")
     @TableField(value = "PREDICTION_VERSION")
     private String predictionVersion;
 
     /** 预测需求版本号 */
-    @Excel(name = "ui.data.column.prediction.monthPlanVersion")
+    @Excel(name = "ui.data.column.productionPrediction.monthPlanVersion")
     @ApiModelProperty(value = "预测需求版本号", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
     /** 预测排产计划版本 */
-    @Excel(name = "ui.data.column.prediction.productionVersion")
+    @Excel(name = "ui.data.column.productionPrediction.productionVersion")
     @ApiModelProperty(value = "预测排产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
     /** 产品结构 */
-    @Excel(name = "ui.data.column.prediction.structureName")
+    @Excel(name = "ui.data.column.productionPrediction.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
     /** 英寸 */
-    @Excel(name = "ui.data.column.prediction.proSize")
+    @Excel(name = "ui.data.column.productionPrediction.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
     /** 规格 */
-    @Excel(name = "ui.data.column.prediction.specifications")
+    @Excel(name = "ui.data.column.productionPrediction.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
 
     /** 花纹 */
-    @Excel(name = "ui.data.column.prediction.pattern")
+    @Excel(name = "ui.data.column.productionPrediction.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;
 
     /** 主花纹 */
-    @Excel(name = "ui.data.column.prediction.mainPattern")
+    @Excel(name = "ui.data.column.productionPrediction.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
 
     /** 主物料 */
-    @Excel(name = "ui.data.column.prediction.mainMaterialDesc")
+    @Excel(name = "ui.data.column.productionPrediction.mainMaterialDesc")
     @ApiModelProperty(value = "主物料", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 
     /** 模具数量(同主花纹的模具数量) */
-    @Excel(name = "ui.data.column.prediction.mouldQty")
+    @Excel(name = "ui.data.column.productionPrediction.mouldQty")
     @ApiModelProperty(value = "模具数量(同主花纹的模具数量)", name = "mouldQty")
     @TableField(value = "MOULD_QTY")
     private Integer mouldQty;
 
     /** 活块数量(同主花纹的物料模具数量) */
-    @Excel(name = "ui.data.column.prediction.typeBlockQty")
+    @Excel(name = "ui.data.column.productionPrediction.typeBlockQty")
     @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
     @TableField(value = "TYPE_BLOCK_QTY")
     private Integer typeBlockQty;
 
     /** 净需求 */
-    @Excel(name = "ui.data.column.prediction.netQty")
+    @Excel(name = "ui.data.column.productionPrediction.netQty")
     @ApiModelProperty(value = "净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Integer netQty;
 
     /** 高优先级数量 */
-    @Excel(name = "ui.data.column.prediction.heightQty")
+    @Excel(name = "ui.data.column.productionPrediction.heightQty")
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
 
     /** 排产总量 */
-    @Excel(name = "ui.data.column.prediction.productionQty")
+    @Excel(name = "ui.data.column.productionPrediction.productionQty")
     @ApiModelProperty(value = "排产总量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
 
-    /** 计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟 */
-    @Excel(name = "ui.data.column.prediction.planType")
-    @ApiModelProperty(value = "计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟", name = "planType")
+    /** 计划类型 */
+    @Excel(name = "ui.data.column.productionPrediction.planType")
+    @ApiModelProperty(value = "计划类型", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;
 
@@ -219,9 +223,9 @@ public class MpProductionPrediction extends BaseEntity {
      */
     public boolean hasProduction() {
         return (this.month1 != null && this.month1 > 0)
-                || (this.month2 != null && this.month2 > 0)
-                || (this.month3 != null && this.month3 > 0)
-                || (this.productionQty != null && this.productionQty > 0);
+            || (this.month2 != null && this.month2 > 0)
+            || (this.month3 != null && this.month3 > 0)
+            || (this.productionQty != null && this.productionQty > 0);
     }
 
     /**
@@ -230,9 +234,16 @@ public class MpProductionPrediction extends BaseEntity {
      */
     public Integer getTotalProduction() {
         int total = 0;
-        if (this.month1 != null) total += this.month1;
-        if (this.month2 != null) total += this.month2;
-        if (this.month3 != null) total += this.month3;
+        if (this.month1 != null) {
+          total += this.month1;
+        }
+        if (this.month2 != null) {
+          total += this.month2;
+        }
+        if (this.month3 != null) {
+          total += this.month3;
+        }
         return total;
     }
+
 }

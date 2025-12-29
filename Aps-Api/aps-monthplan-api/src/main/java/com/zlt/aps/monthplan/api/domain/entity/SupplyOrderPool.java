@@ -21,7 +21,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
  *     修 改 人：yelq
  *     修改内容：...
  */
-
 @ApiModel(value = "供应链订单池对象", description = "供应链订单池对象 ")
 @Data
 @TableName(value = "T_DP_SUPPLY_ORDER_POOL")
@@ -161,6 +160,18 @@ public class SupplyOrderPool extends BaseEntity {
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(exist = false)
     private Long averageSaleQty;
+    /**
+     * 无订单库存
+     */
+    @ApiModelProperty(value = "无订单库存", name = "notOrderStockQty")
+    @TableField(exist = false)
+    private long notOrderStockQty;
+    /**
+     * 结构
+     */
+    @ApiModelProperty(value = "结构", name = "structureName")
+    @TableField(exist = false)
+    private String structureName;
 
     /**
      * 以分厂+物料为维度，转换销售订单

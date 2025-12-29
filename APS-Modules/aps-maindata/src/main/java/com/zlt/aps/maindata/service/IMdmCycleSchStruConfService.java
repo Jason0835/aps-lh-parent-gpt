@@ -4,6 +4,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMdmCycleSchStruConfService.java
@@ -27,4 +29,9 @@ public interface IMdmCycleSchStruConfService extends IDocService<MdmCycleSchStru
      * @return 结果
      */
     AjaxResult genMonthCycleSchStruConf(MdmCycleSchStruConf mdmCycleSchStruConf);
+    /**
+     *  查询当前周期性排产结构配置
+     * @return 周期性排产结构配置
+     */
+    List<MdmCycleSchStruConf> findCycleSchStruConf();
 }

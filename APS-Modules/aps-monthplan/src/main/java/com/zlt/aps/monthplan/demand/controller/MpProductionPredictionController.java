@@ -1,28 +1,27 @@
 package com.zlt.aps.monthplan.demand.controller;
 
-
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
-import com.zlt.common.controller.BusiController;
+import com.zlt.common.utils.PubUtil;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
@@ -32,12 +31,15 @@ import java.util.List;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService ;
+
 /**
 * Copyright (c) 2022, All rights reserved。
 * 文件名称：MpProductionPredictionController.java
 * 描    述：S2-1002.未来产量预测 控制层类：....
 *@author yelq
-*@date 2025-12-21
+*@date 2025-12-28
 *@version 1.0
 *
  *  修改记录：
@@ -49,94 +51,62 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 @Api(tags = "S2-1002.未来产量预测")
 @RestController
 @RequestMapping("/productionPrediction")
-public class MpProductionPredictionController extends BusiController<MpProductionPrediction>
-{
+public class MpProductionPredictionController extends AbstractDocBizController<MpProductionPrediction> {
+
     @Autowired
     private IMpProductionPredictionService mpProductionPredictionService;
+
+    @Autowired
+    private MpProductionPredictionEntityMapper entityMapper;
 
     /**
      * 查询S2-1002.未来产量预测列表
      */
-    @RequiresPermissions( "monthplan:productionPrediction:list")
-    @ApiOperation("查询S2-1002.未来产量预测列表")
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody MpProductionPrediction mpProductionPrediction)
-    {
-        startPage("create_time desc");
-        List<MpProductionPrediction> list = mpProductionPredictionService.selectMpProductionPredictionList(mpProductionPrediction);
-        return getDataTable(list);
-    }
-
-
-    /**
-     * 导出S2-1002.未来产量预测列表
-     */
-    @RequiresPermissions( "monthplan:productionPrediction:export")
-    @Log(title = "S2-1002.未来产量预测", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportData/{fileName}")
-    public byte[] exportData(@RequestBody MpProductionPrediction mpProductionPrediction,@PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
-        return commonExport(mpProductionPrediction,fileName,response);
+    @Override
+    public TableDataInfo list(@RequestBody MpProductionPrediction queryVO) {
+        return super.list(queryVO);
     }
 
     @Override
-    public List<MpProductionPrediction> listExportData(MpProductionPrediction mpProductionPrediction) {
-        startPage("create_time desc");
-        return  mpProductionPredictionService.selectMpProductionPredictionList(mpProductionPrediction);
+    protected String getOrderBy() {
+        return "create_time desc";
     }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody MpProductionPrediction billVO){
+        return super.save(billVO);
+    }
+
+    /**
+     * 删除
+     */
+    @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+        return super.removeByIds(ids);
+    }
+
 
     /**
      * 获取S2-1002.未来产量预测详细信息
      */
-    @RequiresPermissions( "monthplan:productionPrediction:query")
-    @ApiOperation("获取S2-1002.未来产量预测详细信息")
-    @GetMapping(value = "/{id}")
-    public MpProductionPrediction getInfo(@PathVariable("id") Long id)
-    {
-        return mpProductionPredictionService.selectMpProductionPredictionById(id);
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{billId}")
+    @Override
+    public MpProductionPrediction getInfo(@PathVariable("billId") Long billId) {
+        return super.getInfo(billId);
     }
 
-    /**
-     * 新增S2-1002.未来产量预测
-     */
-    @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.INSERT)
-    @RequiresPermissions( "monthplan:productionPrediction:add")
-    @ApiOperation("新增S2-1002.未来产量预测")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody MpProductionPrediction mpProductionPrediction){
-        return toAjax(mpProductionPredictionService.insertMpProductionPrediction(mpProductionPrediction));
-    }
-
-    /**
-     * 修改S2-1002.未来产量预测
-     */
-    @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.UPDATE)
-    @RequiresPermissions( "monthplan:productionPrediction:edit")
-    @ApiOperation("修改S2-1002.未来产量预测")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody MpProductionPrediction mpProductionPrediction){
-        return toAjax(mpProductionPredictionService.updateMpProductionPrediction(mpProductionPrediction));
-    }
-
-    /**
-     * 删除S2-1002.未来产量预测
-     */
-    @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:productionPrediction:remove")
-    @ApiOperation("删除S2-1002.未来产量预测")
-	@DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids){
-        return toAjax(mpProductionPredictionService.deleteMpProductionPredictionByIds(ids));
-    }
-
-    /**
-     * 校验S2-1002.未来产量预测唯一性
-     */
-    @ApiOperation("校验S2-1002.未来产量预测唯一性")
-    @PostMapping("/checkMpProductionPredictionUnique")
-    public String checkMpProductionPredictionUnique(@RequestBody MpProductionPrediction mpProductionPrediction){
-        return mpProductionPredictionService.checkMpProductionPredictionUnique(mpProductionPrediction);
-    }
 
     /**
      * 根据集合导入S2-1002.未来产量预测数据
@@ -145,18 +115,72 @@ public class MpProductionPredictionController extends BusiController<MpProductio
      * @return 结果
      */
     @Log(title = "ui.data.column.productionPrediction.modelName", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入S2-1002.未来产量预测数据")
-    @PostMapping("/importData/{updateSupport}")
-    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
-        return commonImport(importContext,updateSupport);
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext,updateSupport);
+    }
+
+    /**
+     * 导出列表
+     */
+    @Log(title = "S2-1002.未来产量预测", businessType = BusinessType.EXPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody MpProductionPrediction queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    public AjaxResult doImportData(List<MpProductionPrediction> list, boolean updateSupport, long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return mpProductionPredictionService.importData(list, updateSupport, importLogId);
+    protected List<MpProductionPrediction> listExportData(MpProductionPrediction obj) {
+        QueryWrapper<MpProductionPrediction> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return entityMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService(){
+        return mpProductionPredictionService;
+    }
+
+    /**
+     * 条件拼接
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<MpProductionPrediction> queryWrapper, MpProductionPrediction queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("locationType")), "LOCATION_TYPE", queryVO.getFieldValueByFieldName("locationType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month1")), "MONTH_1", queryVO.getFieldValueByFieldName("month1"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month2")), "MONTH_2", queryVO.getFieldValueByFieldName("month2"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month3")), "MONTH_3", queryVO.getFieldValueByFieldName("month3"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion")), "PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainMaterialDesc")), "MAIN_MATERIAL_DESC", queryVO.getFieldValueByFieldName("mainMaterialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldQty")), "MOULD_QTY", queryVO.getFieldValueByFieldName("mouldQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("typeBlockQty")), "TYPE_BLOCK_QTY", queryVO.getFieldValueByFieldName("typeBlockQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("netQty")), "NET_QTY", queryVO.getFieldValueByFieldName("netQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionQty")), "PRODUCTION_QTY", queryVO.getFieldValueByFieldName("productionQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
     }
 
     @ApiOperation("生成订单预测")
@@ -170,4 +194,11 @@ public class MpProductionPredictionController extends BusiController<MpProductio
     public AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition){
         return mpProductionPredictionService.createMonthPrediction(createCondition);
     }
+
+    @Override
+    protected String getTypeCode(){
+        return "2025122822";
+    }
+
+
 }
