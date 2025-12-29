@@ -84,7 +84,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
         //汇总续作Sku信息
-        statisticsGroupContinueInfo(estimateGroupCxAllocationMap, cxContinueInfoMap);
+        statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
 
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
@@ -689,11 +689,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     /**
      * 汇总续作信息
      * 在机结构-续作Sku有排产量的胎胚和使用模具数
+     * 机构计划-在产成型机信息初始化
      *
      * @param allGroupPlanMap      分组计划信息
      * @param allCxContinueInfoMap 续作分组信息
      */
-    private void statisticsGroupContinueInfo(Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allCxContinueInfoMap) {
+    private void statisticsGroupContinueInfo(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allCxContinueInfoMap) {
         if (CollectionUtils.isEmpty(allGroupPlanMap) || CollectionUtils.isEmpty(allGroupPlanMap)) {
             return;
         }
@@ -703,6 +704,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 return;
             }
             ContinueSkuCalculator.setContinueSkuPlanDemandQty(groupPlanInfo, cxContinueInfoHelper);
+            ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
         });
     }
 

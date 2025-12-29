@@ -12,7 +12,7 @@ import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
-import com.zlt.aps.factory.utils.CxLhMouldProductionUtils;
+import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -76,7 +76,7 @@ public class CxAddSkuProductionHandler {
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
-        CxLhMouldProductionUtils.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
     }

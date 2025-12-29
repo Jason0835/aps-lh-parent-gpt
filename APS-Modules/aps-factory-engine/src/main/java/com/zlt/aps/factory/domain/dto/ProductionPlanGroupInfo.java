@@ -81,6 +81,20 @@ public class ProductionPlanGroupInfo {
     private Integer productionCount;
 
     /**
+     * 排产-成型硫化产能限制
+     * 包含 最大胎胚数
+     * 最大硫化机台数
+     * 实单最低硫化机台数
+     * key=day : value=日成型硫化产能限制实例
+     */
+    private Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo;
+    /**
+     * 确定结构机台分配后，成型硫化配比最后一天排产分组信息
+     * 在机结构-需要考虑后续新增机台场景
+     */
+    private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
+
+    /**
      * 粗步计算 结构需求量需要的成型产能分配
      * 结构有效总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
      * 保留1位小数

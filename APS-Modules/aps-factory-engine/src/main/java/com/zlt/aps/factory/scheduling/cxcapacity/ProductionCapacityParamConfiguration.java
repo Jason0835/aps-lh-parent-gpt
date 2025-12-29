@@ -87,4 +87,41 @@ public class ProductionCapacityParamConfiguration {
      * 最小批量值
      */
     private Integer minQty;
+
+    /**
+     * 进行降膜排产的条件，使用机台数超过该值
+     * 默认为3台
+     */
+    private Integer deductMouldMinLhMachineCount;
+    /**
+     * 第一次 临近收尾天数判断
+     * 默认为 7天
+     */
+    private Integer firstNearDeadLineDay;
+    /**
+     * 第一次 临近收尾天数，不能超过的机台数
+     * 默认为 3台
+     */
+    private Integer firstNearDeadLineMaxLhMachineCount;
+    /**
+     * 第二次 临近收尾天数判断
+     * 默认为 5天
+     */
+    private Integer secondNearDeadLineDay;
+    /**
+     * 第二次 临近收尾天数判断
+     * 默认为 2台
+     */
+    private Integer secondNearDeadLineMaxLhMachineCount;
+    /**
+     * 最后一次 临近收尾天数判断
+     * 默认为 2天
+     */
+    private Integer lastNearDeadLineDay;
+    /**
+     * 最后一次 临近收尾天数判断
+     * 默认为 1台
+     */
+    private Integer lastNearDeadLineMaxLhMachineCount;
+
 }
