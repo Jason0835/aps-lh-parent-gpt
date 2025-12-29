@@ -94,11 +94,9 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "BILL_DATE")
     private Date billDate;
 
-    /**
-     * 物料编码
-     */
+    /** NC物料编码 */
     @Excel(name = "ui.data.column.SalesOrderPool.oriMaterialCode")
-    @ApiModelProperty(value = "物料编码", name = "oriMaterialCode")
+    @ApiModelProperty(value = "NC物料编码", name = "oriMaterialCode")
     @TableField(value = "ORI_MATERIAL_CODE")
     private String oriMaterialCode;
 
@@ -120,17 +118,17 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
-    /** 动平衡，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
-    @TableField(value = "IS_DYNAMIC_BALANCE")
-    private String isDynamicBalance;
-
     /** 均匀性，1 是 0 否 */
     @Excel(name = "ui.data.column.SalesOrderPool.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性，1 是 0 否", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
+
+    /** 动平衡，1 是 0 否 */
+    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
 
     /** EUDR，1 是 0 否 */
     @Excel(name = "ui.data.column.SalesOrderPool.isEudr", dictType = "biz_yes_no")
@@ -154,6 +152,11 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "SCM行ID", name = "scmDetailId")
     @TableField(value = "SCM_DETAIL_ID")
     private Long scmDetailId;
+
+    /** 更新时间，用于导出展示 */
+    @Excel(name = "ui.data.column.SalesOrderPool.updateTime")
+    @TableField(exist = false)
+    private String updateTimeExport;
 
     /** 订单状态，0-关单，1-正常 */
     @ApiModelProperty(value = "订单状态，0-关单，1-正常", name = "orderStatus")
@@ -189,9 +192,4 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
     @TableField(exist = false)
     private String billDateEndTime;
-
-    /** 更新时间，用于导出展示 */
-    @Excel(name = "ui.data.column.SalesOrderPool.updateTime")
-    @TableField(exist = false)
-    private String updateTimeExport;
 }
