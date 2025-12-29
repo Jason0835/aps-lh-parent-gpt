@@ -179,7 +179,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
             String[] split = config.split("-");
             lastYear = Integer.parseInt(split[0]);
-            paramVo.setMonth(Integer.parseInt(split[1]));
+            lastMonth = split[1];
+            paramVo.setMonth(lastYear);
+            paramVo.setMonth(Integer.parseInt(lastMonth));
         } catch (NumberFormatException e) {
             log.error("获取配置失败", e);
         }

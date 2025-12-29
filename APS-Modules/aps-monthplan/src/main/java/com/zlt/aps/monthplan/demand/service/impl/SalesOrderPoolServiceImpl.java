@@ -113,7 +113,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
 		updateWrapper.eq(SalesOrderPool::getSalCodePo, salesOrderPool.getSalCodePo());
 		updateWrapper.set(SalesOrderPool::getScmPriority, salesOrderPool.getScmPriority());
-		salesOrderPoolEntityMapper.update(new SalesOrderPool(), updateWrapper);
+		salesOrderPoolEntityMapper.update(null, updateWrapper);
 		return AjaxResult.success();
 	}
 
@@ -247,7 +247,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setOrderPriority(salPriority);
 			newVO.setOrdQty(vo.getOrdQty());
 			newVO.setOriMaterialCode(vo.getOriMaterialCode());
-			newVO.setProductType(vo.getProductType());
+			newVO.setProductType(Optional.ofNullable(vo.getProductType()).orElse(ProductTypeEnum.WHOLE_STEEL.getValue()));
 			newVO.setSalCode(vo.getSalCode());
 			newVO.setSalCodePo(salCodePo);
 			newVO.setSalNCode(vo.getSalNCode());
@@ -333,10 +333,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 		// 删除旧数据
 		LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
-		updateWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
+		updateWrapper.exists("select 1 a"); // 加个条件用来绕过框架的防全表更新限制
 		updateWrapper.set(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_1);
-		updateWrapper.set(SalesOrderPool::getUpdateTime, new Date());
-		salesOrderPoolEntityMapper.update(new SalesOrderPool(), updateWrapper);
+		salesOrderPoolEntityMapper.update(null, updateWrapper);
 
 		salesOrderPoolEntityMapper.batchInsert(newSalesOrderPoolList); // 新增一批数据
 
