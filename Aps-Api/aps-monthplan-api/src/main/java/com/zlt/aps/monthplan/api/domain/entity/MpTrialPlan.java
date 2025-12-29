@@ -153,7 +153,7 @@ public class MpTrialPlan extends BaseEntity {
      */
     @ImportExcelValidated(date = true)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpTrialPlan.productionDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.mpTrialPlan.productionDate", width = 30, dateFormat = "yyyy-MM-dd", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "系统排产日期", name = "productionDate")
     @TableField(value = "PRODUCTION_DATE")
     private Date productionDate;
@@ -163,7 +163,7 @@ public class MpTrialPlan extends BaseEntity {
      */
     @ImportExcelValidated(date = true)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpTrialPlan.completeDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.mpTrialPlan.completeDate", width = 30, dateFormat = "yyyy-MM-dd", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "完成时间", name = "completeDate")
     @TableField(value = "COMPLETE_DATE")
     private Date completeDate;
@@ -172,7 +172,7 @@ public class MpTrialPlan extends BaseEntity {
      * 制造示方书号
      */
     @ImportExcelValidated(maxLength = 30)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
     @TableField(value = "EMBRYO_NO")
     private String embryoNo;
@@ -181,7 +181,7 @@ public class MpTrialPlan extends BaseEntity {
      * 制造示方
      */
     @ImportExcelValidated(maxLength = 64)
-    @Excel(name = "ui.data.column.mpTrialPlan.madeInfo")
+    @Excel(name = "ui.data.column.mpTrialPlan.madeInfo", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "制造示方", name = "madeInfo")
     @TableField(value = "MADE_INFO")
     private String madeInfo;
@@ -190,7 +190,7 @@ public class MpTrialPlan extends BaseEntity {
      * 文字示方
      */
     @ImportExcelValidated(maxLength = 64)
-    @Excel(name = "ui.data.column.mpTrialPlan.moldingInfo")
+    @Excel(name = "ui.data.column.mpTrialPlan.moldingInfo", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "文字示方", name = "moldingInfo")
     @TableField(value = "MOLDING_INFO")
     private String moldingInfo;
@@ -199,7 +199,7 @@ public class MpTrialPlan extends BaseEntity {
      * 硫化示方
      */
     @ImportExcelValidated(maxLength = 64)
-    @Excel(name = "ui.data.column.mpTrialPlan.vulcanizationInfo")
+    @Excel(name = "ui.data.column.mpTrialPlan.vulcanizationInfo", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "硫化示方", name = "vulcanizationInfo")
     @TableField(value = "VULCANIZATION_INFO")
     private String vulcanizationInfo;
