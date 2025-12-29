@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
@@ -11,60 +12,31 @@ import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
-import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmProductStockService;
-import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
-import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.maindata.service.*;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
-import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
-import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
-import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
-import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
+import com.zlt.aps.monthplan.demand.service.*;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-
-import org.springframework.transaction.annotation.Transactional;
-
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -450,7 +422,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
             // 计算总产能和总需求
             long totalCapacity = areaCapacities.stream()
-                .mapToLong(MdmAreaCapaAllocation::getCapacityAllocation)
+                    .mapToLong(item -> item.getCapacityAllocation().longValue())
                 .sum();
 
             long totalDemand = sortedOrders.stream()
