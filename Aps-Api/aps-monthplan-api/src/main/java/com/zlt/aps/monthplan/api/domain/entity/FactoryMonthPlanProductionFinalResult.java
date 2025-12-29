@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.domain.CommonBusiEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -247,7 +246,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.cxMachineCode")
     @ApiModelProperty(value = "成型机台信息", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
-    private Integer cxMachineCode;
+    private String cxMachineCode;
 
     /**
      * 模具使用变化信息如2-4-2,或是2-4或是2
