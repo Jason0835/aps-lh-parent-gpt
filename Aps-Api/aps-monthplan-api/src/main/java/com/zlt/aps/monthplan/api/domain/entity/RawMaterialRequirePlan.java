@@ -86,13 +86,13 @@ public class RawMaterialRequirePlan extends BaseEntity {
     private BigDecimal curMonthRudrQty;
 
     /** 次月需求量(T月) */
-    @Excel(name = "ui.data.column.rawMaterialRequirePlan.tMonthQty")
+    //@Excel(name = "ui.data.column.rawMaterialRequirePlan.tMonthQty")
     @ApiModelProperty(value = "次月需求量(T月)", name = "tMonthQty")
     @TableField(value = "T_MONTH_QTY")
     private BigDecimal tMonthQty;
 
     /** 次月EUDR(T月) */
-    @Excel(name = "ui.data.column.rawMaterialRequirePlan.tMonthEudrQty")
+    //@Excel(name = "ui.data.column.rawMaterialRequirePlan.tMonthEudrQty")
     @ApiModelProperty(value = "次月EUDR(T月)", name = "tMonthEudrQty")
     @TableField(value = "T_MONTH_EUDR_QTY")
     private BigDecimal tMonthEudrQty;
