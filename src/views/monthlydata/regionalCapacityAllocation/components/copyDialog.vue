@@ -199,8 +199,8 @@ export default {
           params.sourceYear = array[0];
           params.sourceMonth = array[1];
           let arrayCopy = copyParams.targeYearMonth.split("-");
-          params.targetYear = array[0];
-          params.targetMonth = array[1];
+          params.targetYear = arrayCopy[0];
+          params.targetMonth = arrayCopy[1];
           let obj = {
             ...params,
             ...copyParams,

@@ -228,6 +228,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          maxlength:500
         },
       ];
     },

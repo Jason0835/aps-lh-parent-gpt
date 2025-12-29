@@ -22,10 +22,13 @@
           type="primary"
           plain
           @click="handleAdd"
-           v-hasPermi="['monthplan:mdmAreaCapaAllocation:edit']"
+          v-hasPermi="['monthplan:mdmAreaCapaAllocation:edit']"
           >{{ $t("ui.frame.btn.add") }}
         </el-button>
-        <el-button type="primary" plain @click="handleBuild"
+        <el-button
+          type="primary"
+          plain
+          @click="handleBuild"
           v-hasPermi="['monthplan:mdmAreaCapaAllocation:copy']"
           >{{ $t("ui.params.copy") }}
         </el-button>
@@ -51,11 +54,23 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmAreaCapaAllocation/importTemplate"
       uploadUrl="/monthplan/mdmAreaCapaAllocation/importData"
       @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      downloadUrl="/monthplan/mdmAreaCapaAllocation/importTemplate"
+      uploadUrl="/monthplan/mdmAreaCapaAllocation/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
     <copyDialog ref="copyRef" @success="getList" />
@@ -63,9 +78,12 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import {listAreaCapaInfo,removeAreaCapaInfo} from "@/api/monthplan/mdmAreaCapaAllocation";
+import {
+  listAreaCapaInfo,
+  removeAreaCapaInfo,
+} from "@/api/monthplan/mdmAreaCapaAllocation";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 import copyDialog from "./components/copyDialog.vue";
 import cos from "highlight.js/lib/languages/cos";
@@ -75,7 +93,8 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    copyDialog
+    copyDialog,
+    TltUploadForm,
   },
   dicts: ["biz_factory_name", "biz_product_type"],
   provide() {
@@ -85,6 +104,24 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            console.log(form);
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
+      importRules: {},
       loading: false,
       data: [],
       selection: [],
@@ -137,7 +174,9 @@ export default {
         },
         {
           prop: "capacityAllocation",
-          label: this.$t("ui.data.column.regionalCapacityAllocation.capacityAllocation"),
+          label: this.$t(
+            "ui.data.column.regionalCapacityAllocation.capacityAllocation"
+          ),
         },
         {
           prop: "updateTime",
@@ -207,7 +246,6 @@ export default {
           label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
-
         },
         {
           prop: "areaCode",
@@ -223,7 +261,7 @@ export default {
         this.$refs.infoRef.show();
       }
     },
-    handleBuild(){
+    handleBuild() {
       if (this.$refs.copyRef) {
         this.$refs.copyRef.show();
       }
@@ -239,7 +277,7 @@ export default {
         if (i == this.selection.length - 1) {
           ids = ids + this.selection[i].id;
         } else {
-          ids = ids +  this.selection[i].id + ",";
+          ids = ids + this.selection[i].id + ",";
         }
       }
       this.$confirm(this.$t("common.confirm.delete"), {
@@ -301,8 +339,6 @@ export default {
       this.selection = rows;
     },
 
-
-
     // utils
     formatParams(hasPage = true) {
       const params = {
@@ -316,9 +352,9 @@ export default {
       }
 
       if (params.yearMonth) {
-        let array = params.yearMonth.split("-")
-        params.year = array[0]
-        params.month = array[1]
+        let array = params.yearMonth.split("-");
+        params.year = array[0];
+        params.month = array[1];
       }
 
       return params;
@@ -328,9 +364,7 @@ export default {
       try {
         this.loading = true;
 
-        const data = await listAreaCapaInfo(
-          this.formatParams()
-        );
+        const data = await listAreaCapaInfo(this.formatParams());
         console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
@@ -353,9 +387,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

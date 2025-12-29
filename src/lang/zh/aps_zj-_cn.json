@@ -233,12 +233,11 @@
   "ui.data.DemandPlan.conventionReserveQty": "常规排产储备",
   "ui.data.DemandPlan.isReachMinProductionQty": "是否满足最小投产量",
   "ui.data.DemandPlan.minProductionQty": "最小投产量值",
-
-
   "ui.data.rubberMaterial.embryoCode": "胎胚编码",
   "ui.data.rubberMaterial.embryoDesc": "胎胚描述",
   "ui.data.rubberMaterial.sectionWidth": "断面宽",
-  "ui.data.rubberMaterial.shareMouldCode": "共用模具号"
+  "ui.data.rubberMaterial.shareMouldCode": "共用模具号",
+  "common.rule.updateSupport": "是否更新已经存在的数据"
 
 
 

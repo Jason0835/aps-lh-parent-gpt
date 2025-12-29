@@ -32,6 +32,7 @@
 import { mapState } from "vuex";
 
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
+import structureSelect from "@/views/components/structureSelect.vue";
 import {
   editCxMachineFixed
 } from "@/api/monthplan/mdmCxMachineFixed";
@@ -41,7 +42,7 @@ import infoForm from "@/views/components/infoForm.vue";
 
 
 export default {
-  components: { infoForm,materialCodeSelect },
+  components: { infoForm,materialCodeSelect,structureSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -58,7 +59,7 @@ export default {
             trigger: "change",
           },
         ],
-        sapCode: [
+        cxMachineCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -122,17 +123,41 @@ export default {
         {
           prop: "fixedStructure1",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.fixedStructure1}
+                v-model={form.fixedStructure1}
+              />
+            );
+          },
           maxlength: 500,
         },
         {
           prop: "fixedStructure2",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.fixedStructure2}
+                v-model={form.fixedStructure2}
+              />
+            );
+          },
           maxlength: 500,
         },
         {
           prop: "fixedStructure3",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
           maxlength: 500,
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.fixedStructure3}
+                v-model={form.fixedStructure3}
+              />
+            );
+          },
         },
         {
           prop: "fixedMaterialCode",
@@ -152,6 +177,14 @@ export default {
           prop: "disableStructure",
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
           maxlength: 500,
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.disableStructure}
+                v-model={form.disableStructure}
+              />
+            );
+          },
         },
         {
           prop: "disableMaterialCode",
@@ -198,7 +231,7 @@ export default {
         };
       } else {
         this.form = {
-          factoryCode: "",
+          factoryCode: "116",
         };
       }
     },

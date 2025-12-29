@@ -54,7 +54,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入机台信息数据"
+      title=""
       downloadUrl="/lh/info/importTemplate"
       uploadUrl="/lh/info/importData"
       @uploadSuccess="getList"
@@ -119,12 +119,12 @@ export default {
             console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
+                label= {this.$t('common.rule.updateSupport')}
                 true-label={true}
                 false-label={false}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t('common.rule.updateSupport')}
               </el-checkbox>
             );
           },

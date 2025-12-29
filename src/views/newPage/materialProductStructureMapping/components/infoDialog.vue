@@ -169,7 +169,7 @@ export default {
           prop: "ratio",
           label: this.$t("ui.data.column.capsuleChuck.ratio")+'%',
           type: "number",
-          max: 9999999.99,
+          max: 100,
           min:0
         },
 
