@@ -1,18 +1,25 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.PubUtil;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 /**
@@ -26,27 +33,35 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
-        // 1、构建结构内调整明细
+        // 1、设置版本号
+        setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
+        // 2、构建结构内调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
-        contextDTO.setAdjustDetailList(adjustDetailList);
+        // 3、构建结构内调整明细（试制量试计划）
+        List<MpAdjustDetailVo> adjustDetailByTrialList = buildAdjustDetailByTrialList(contextDTO);
+        // 结构内调整明细结果列表
+        List<MpAdjustDetailVo> resultList = new ArrayList<>();
+        resultList.addAll(adjustDetailByTrialList);
+        resultList.addAll(adjustDetailList);
         // 未获取到调整记录，抛出异常
-        Assert.isFalse(PubUtil.isEmpty(adjustDetailList), () -> {
+        Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 2、设置净需求
+        contextDTO.setAdjustDetailList(resultList);
+        // 4、设置净需求
         setCurrentNetQty(contextDTO);
-        // 3、设置计划剩余排产量、计划已排产量
+        // 5、设置计划剩余排产量、计划已排产量
         setMonthUnScheduledQty(contextDTO);
-        // 4、筛选：净需求 - 计划剩余排产量 > 0的数据
+        // 6、筛选：净需求 - 计划剩余排产量 > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 5、设置其他字段
+        // 7、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -60,9 +75,41 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
     }
 
+    @Override
+    public void specialCheck(MpRollAdjustContextDTO contextDTO) {
 
+    }
 
-
+    /**
+     * 构建结构内调整明细（试制量试计划）
+     * @param contextDTO
+     * @return
+     */
+    private List<MpAdjustDetailVo> buildAdjustDetailByTrialList(MpRollAdjustContextDTO contextDTO) {
+        // 试制量试计划列表
+        List<MpTrialPlan> trialPlanList = contextDTO.getMpTrialPlanList();
+        // 月度生产计划列表
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 结果集初始化
+        List<MpAdjustDetailVo> resultList = new ArrayList<>();
+        // 任一列表为空则直接返回空结果
+        if (PubUtil.isEmpty(trialPlanList) || PubUtil.isEmpty(monthPlanProdList)) {
+            return resultList;
+        }
+        // 生产计划列表按照物料编码进行分组
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap = monthPlanProdList.stream()
+                .collect(Collectors.groupingBy(FactoryMonthPlanFinalAdjustVo::getMaterialCode));
+        // 遍历试制量试计划列表，匹配生产计划
+        for (MpTrialPlan trialPlan : trialPlanList) {
+            String materialCode = trialPlan.getMaterialCode();
+            // 物料编码为空则跳过
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            matchMonthPlanList(contextDTO,resultList,materialCode,monthPlanMap);
+        }
+        return resultList;
+    }
 
     /**
      * 筛选：净需求 - 计划剩余排产量 > 0的数据

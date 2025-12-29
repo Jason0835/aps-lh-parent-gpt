@@ -4,7 +4,9 @@ import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
@@ -27,9 +29,11 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
-        // 1、构建结构外调整明细
+        // 1、设置版本号
+        setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
+        // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
-        // 2、通过排产机台、结构筛选结构外调整明细
+        // 3、通过排产机台、结构筛选结构外调整明细
         List<MpAdjustDetailVo> matchAdjustList = filterAdjustDetailList(contextDTO,adjustDetailList);
         contextDTO.setAdjustDetailList(matchAdjustList);
         // 未获取到调整记录，抛出异常
@@ -38,18 +42,18 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 3、设置净需求
+        // 4、设置净需求
         setCurrentNetQty(contextDTO);
-        // 4、设置计划剩余排产量、计划已排产量
+        // 5、设置计划剩余排产量、计划已排产量
         setMonthUnScheduledQty(contextDTO);
-        // 5、筛选：净需求 - 计划已排产量 > 0的数据
+        // 6、筛选：净需求 - 计划已排产量 > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 6、设置其他字段
+        // 7、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -97,6 +101,14 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     @Override
     public void doConfirmAdjust(MpRollAdjustContextDTO contextDTO) {
 
+    }
+
+    @Override
+    public void specialCheck(MpRollAdjustContextDTO contextDTO) {
+        // 判断机台是否为空
+        Assert.isFalse(StringUtils.isEmpty(contextDTO.getScheduledMachines()), I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.scheduledMachinesEmpty"));
+        // 判断结构是否为空
+        Assert.isFalse(StringUtils.isEmpty(contextDTO.getStructureName()), I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structureNameEmpty"));
     }
 
 }
