@@ -1,5 +1,7 @@
 package com.zlt.aps.itf.mes.mapper;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
@@ -12,6 +14,7 @@ import java.util.List;
  * @author Chen
  * @since 2025/12/16
  */
+@DS(DataSource.MES)
 @Mapper
 public interface MesItfMapper {
 
