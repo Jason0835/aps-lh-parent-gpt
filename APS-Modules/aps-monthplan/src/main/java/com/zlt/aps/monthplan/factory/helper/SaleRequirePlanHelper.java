@@ -611,8 +611,8 @@ public class SaleRequirePlanHelper {
       }
 
       // 计算总产能和总需求
-      long totalCapacity = areaCapacities.stream()
-          .mapToLong(MdmAreaCapaAllocation::getCapacityAllocation)
+      long totalCapacity = areaCapacities.stream().filter(item -> null != item.getCapacityAllocation())
+          .mapToLong(item -> item.getCapacityAllocation().longValue())
           .sum();
 
       long totalDemand = sortedOrders.stream()
