@@ -297,6 +297,7 @@ public class RawWeekUsageGenerateServiceImpl {
             weekUsage.setPlanQty(planQty);
             // 初始化为0，后续从MES同步
             weekUsage.setActualQty(BigDecimal.ZERO);
+            weekUsage.setRemark("当前出库量默认为0, 执行预警时会依据最新原材料出库量自动计算！");
             weekUsage.setHasWarning(0);
             weekUsage.setStartDate(java.sql.Date.valueOf(weekStartDate));
             weekUsage.setEndDate(java.sql.Date.valueOf(weekEndDate));
