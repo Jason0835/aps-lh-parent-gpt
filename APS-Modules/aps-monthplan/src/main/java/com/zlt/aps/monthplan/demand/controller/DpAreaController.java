@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.demand.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpAreaService;
@@ -55,7 +56,10 @@ public class DpAreaController extends AbstractDocBizController<DpArea> {
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody DpArea queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        List<DpArea> list = (List<DpArea>) tableDataInfo.getRows();
+        JsonI18nConvertUtils.conventJsonI18n(list, DpArea.class);
+        return tableDataInfo;
     }
 
     @Override

@@ -85,5 +85,11 @@ public class DpArea extends BaseEntity {
     @TableField(value = "NC_CODE")
     private String ncCode;
 
+    /**
+     * 区域名称国际化
+     */
+    @ApiModelProperty(value = "区域名称国际化", name = "areaNameI18n")
+    @TableField(exist = false)
+    private String areaNameI18n;
 
 }
