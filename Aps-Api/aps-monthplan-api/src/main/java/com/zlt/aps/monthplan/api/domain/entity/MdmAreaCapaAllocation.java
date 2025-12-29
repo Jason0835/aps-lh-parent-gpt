@@ -27,7 +27,7 @@ import java.math.BigDecimal;
  */
 @ApiModel(value = "区域产能分配对象", description = "区域产能分配对象")
 @Data
-@TableName(value = "T_MDM_AREA_CAPA_ALLOCATION")
+@TableName(value = "T_DP_AREA_CAPACITY_CONFIG")
 public class MdmAreaCapaAllocation extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
