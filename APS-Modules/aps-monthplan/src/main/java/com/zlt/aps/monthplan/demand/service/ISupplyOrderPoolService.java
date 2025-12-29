@@ -45,4 +45,12 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    * @return 当前年月供应链订单
    */
   List<SupplyOrderPool> findCurrentSupplyOrderPool();
+  /**
+   * 生成周期排产储备
+   */
+  List<SupplyOrderPool> createCycleStockUp();
+  /**
+   * 生成周期排产储备
+   */
+  List<SupplyOrderPool> createPrecedentStockUp();
 }

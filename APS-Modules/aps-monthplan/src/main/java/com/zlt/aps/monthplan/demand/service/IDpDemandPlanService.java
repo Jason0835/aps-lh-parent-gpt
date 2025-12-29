@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.bill.common.service.IDocService;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IDpDemandPlanService.java
@@ -22,4 +23,5 @@ public interface IDpDemandPlanService  extends IDocService<DpDemandPlan>{
    * @param createCondition 参数
    */
   void createMonthRequire(DpDemandPlan createCondition);
+
 }
