@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.api.domain.dto;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -43,5 +44,8 @@ public class MpWeekRollAdjustDTO implements Serializable {
 
     @ApiModelProperty(value = "调整明细列表")
     private List<MpAdjustDetailVo> mpAdjustStructureInList;
+
+    @ApiModelProperty(value = "调整结果列表")
+    private List<MpAdjustResult> adjustResultList;
 
 }
