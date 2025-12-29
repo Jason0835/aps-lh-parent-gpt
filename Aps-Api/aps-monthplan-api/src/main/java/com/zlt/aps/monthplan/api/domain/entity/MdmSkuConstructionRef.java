@@ -149,7 +149,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
      * 制造示方书发行时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "制造示方书发行时间", name = "embryoReleaseDate")
     @TableField(value = "EMBRYO_RELEASE_DATE")
     private Date embryoReleaseDate;
@@ -174,7 +174,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
      * 文字示方书发行时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "文字示方书发行时间", name = "textReleaseDate")
     @TableField(value = "TEXT_RELEASE_DATE")
     private Date textReleaseDate;
@@ -199,7 +199,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
      * 硫化示方书发行时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
     @TableField(value = "LH_RELEASE_DATE")
     private Date lhReleaseDate;
