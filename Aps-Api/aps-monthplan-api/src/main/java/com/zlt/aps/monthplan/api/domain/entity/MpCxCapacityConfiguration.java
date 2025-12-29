@@ -11,7 +11,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：SizeCapacityConfiguration.java
- * 描    述：成型产能分配(结构) t_mp_structure_allocation
+ * 描    述：S2-0408.排产过程_结构排产表 t_mp_structure_allocation
  *
  * @author zlt
  * @version 1.0
@@ -26,7 +26,7 @@ import lombok.Data;
 @Data
 @TableName(value = "T_MP_STRUCTURE_ALLOCATION")
 @ApiModel(value = "成型产能分配配置(结构)对象", description = "成型产能分配配置(结构)对象")
-public class CxCapacityConfiguration extends BaseEntity {
+public class MpCxCapacityConfiguration extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

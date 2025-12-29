@@ -1,8 +1,11 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.enums.CxMachineLimitTypeEnum;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -36,11 +39,20 @@ public class CxContinueInfoHelper implements Serializable {
      */
     private Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap;
     /**
+     * 续作Sku有排产量的对应胎胚信息
+     */
+    private Set<String> continueEffectiveEmbryoSet;
+    /**
+     * 续作Sku有排产量的模具数
+     */
+    private Integer continueEffectiveMouldNumber;
+    /**
      * 对应成型产能续作信息
      * 成型上在产的SKU和使用的模具数
      * key=cxMachineCode : value = { key = 物料描述 : value = cxContinueProductInfoHelper}
      * cxContinueProductInfoHelper = { 规格 主花纹 花纹 英寸 胎胚号 模具数}
      */
+    @Deprecated
     private Map<String, Map<String, CxContinueProductInfoHelper>> cxMachineGroup;
 
     /**
@@ -49,10 +61,59 @@ public class CxContinueInfoHelper implements Serializable {
     private List<ProductGroupCxCapacityInfo> cxCapacityInfoList;
 
     /**
+     * 创建空的在机结构信息
+     *
+     * @param groupName 结构名
+     * @return
+     */
+    public static CxContinueInfoHelper createEmptyContinueInfo(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return null;
+        }
+        return new CxContinueInfoHelper(groupName);
+    }
+
+    /**
+     * 扣除最大配比的机台数后的最大胎胚种类数
+     *
+     * @param deductionCount 扣减的数量
+     * @param type           类型
+     * @return
+     */
+    public Integer getDeductionCountLimitValue(int deductionCount, CxMachineLimitTypeEnum type) {
+        if (CollectionUtils.isEmpty(cxCapacityInfoList) || CollectionUtils.isEmpty(cxMachineCodeSet)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<ProductGroupCxCapacityInfo> leftOver;
+        if (deductionCount <= BigDecimal.ZERO.intValue()) {
+            leftOver = cxCapacityInfoList;
+        } else if (deductionCount >= cxCapacityInfoList.size()) {
+            leftOver = Collections.emptyList();
+        } else {
+            //按硫化配比最大优先->机台编号大优先
+            cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.reverseOrder())
+                    .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.reverseOrder()));
+            leftOver = cxCapacityInfoList.subList(deductionCount, cxCapacityInfoList.size() - BigDecimal.ONE.intValue());
+        }
+        //最大胎胚种类数
+        if (CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE == type) {
+            return getMaxEmbryoSize(leftOver);
+        }
+        //最大硫化机台数-模具数
+        if (CxMachineLimitTypeEnum.MAX_LH_COUNT == type) {
+            return getMaxMouldNumber(leftOver);
+        }
+        //最低硫化机台数-模具数
+        if (CxMachineLimitTypeEnum.MIN_LH_COUNT == type) {
+            return getMinMouldNumber(leftOver);
+        }
+        return BigDecimal.ZERO.intValue();
+    }
+
+    /**
      * 根据续作信息集合，构建以
      * 分组名(TBR-structureName)为key的续作成型信息
      * key = structureName(TBR) : value = 结构在产成型机及在产SKU、硫化机台数信息(模具数)
-     * CxContinueInfoHelper.cxMachineGroup = { key = cxMachineCode : value = {key = materialDesc : value = 硫化机台数(模具数)}}
      *
      * @param continueProductionInfoList 排产续作信息
      * @param allCxMachineInfo           成型基础信息
@@ -71,8 +132,7 @@ public class CxContinueInfoHelper implements Serializable {
             if (CollectionUtils.isEmpty(productionSkuList)) {
                 return;
             }
-            CxContinueInfoHelper helper = new CxContinueInfoHelper();
-            helper.setGroupName(structureName);
+            CxContinueInfoHelper helper = createEmptyContinueInfo(structureName);
             setContinueInfo(helper, allCxMachineInfo, productionSkuList);
             //在机结构的硫化配比(多机台情形下-用于续作判断优先下机的机台)
             helper.setCxCapacityInfoList(createGroupCxCapacityInfo(structureName, helper.getCxMachineCodeSet(), allCxMachineInfo, structureLhRatioList));
@@ -82,7 +142,7 @@ public class CxContinueInfoHelper implements Serializable {
     }
 
     /**
-     * 根据续作排产信息，提取续作成型机台
+     * 根据续作排产信息，提取续作成型机台及续作Sku使用的模具数
      *
      * @param cxContinueInfoHelper 续作信息对象
      * @param allCxMachineGroup    所有成型机信息
@@ -95,6 +155,7 @@ public class CxContinueInfoHelper implements Serializable {
             cxContinueInfoHelper.setContinueSkuMouldNumberMap(new HashMap<>());
             return;
         }
+        //在机结构的成型机台信息
         Set<String> cxMachineCodeSet = new HashSet<>();
         Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = new HashMap<>();
         continueSkuList.forEach(continueProductInfo -> {
@@ -113,6 +174,7 @@ public class CxContinueInfoHelper implements Serializable {
      * @param cxContinueGroup 结构分组成型续作信息
      * @return
      */
+    @Deprecated
     private static Map<String, Map<String, CxContinueProductInfoHelper>> getCxMachineGroup(Map<String, List<ContinueProductInfo>> cxContinueGroup) {
         Map<String, Map<String, CxContinueProductInfoHelper>> cxMachineGroup = new HashMap<>();
         if (CollectionUtils.isEmpty(cxContinueGroup)) {
@@ -169,6 +231,71 @@ public class CxContinueInfoHelper implements Serializable {
             cxCapacityList.add(capacityInfo);
         });
         return cxCapacityList;
+    }
+
+    /**
+     * 获取成型机台硫化配比中的最大胎胚种类数
+     *
+     * @param cxCapacityInfoList 成型硫化配比信息
+     * @return
+     */
+    private Integer getMaxEmbryoSize(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
+        if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer max = BigDecimal.ZERO.intValue();
+        for (ProductGroupCxCapacityInfo cxCapacityInfo : cxCapacityInfoList) {
+            max = max + cxCapacityInfo.getMaxEmbryoCodeCount();
+        }
+        return max;
+    }
+
+    /**
+     * 获取成型机台硫化配比中的最大模具数
+     *
+     * @param cxCapacityInfoList 成型硫化配比信息
+     * @return
+     */
+    private Integer getMaxMouldNumber(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
+        if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer max = BigDecimal.ZERO.intValue();
+        for (ProductGroupCxCapacityInfo cxCapacityInfo : cxCapacityInfoList) {
+            max = max + cxCapacityInfo.getMaxLhMachineCount();
+        }
+        return max * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 获取成型机台硫化配比中的实单最小使用模具数
+     *
+     * @param cxCapacityInfoList 成型硫化配比信息
+     * @return
+     */
+    private Integer getMinMouldNumber(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
+        if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer min = BigDecimal.ZERO.intValue();
+        for (ProductGroupCxCapacityInfo cxCapacityInfo : cxCapacityInfoList) {
+            min = min + cxCapacityInfo.getMinLhMachineCount();
+        }
+        return min * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 构建空的续作信息对象实例
+     * 只有分组名
+     *
+     * @param groupName
+     */
+    private CxContinueInfoHelper(String groupName) {
+        this.groupName = groupName;
+        this.cxMachineCodeSet = new HashSet<>();
+        this.continueSkuMouldNumberMap = new HashMap<>();
+        this.continueEffectiveEmbryoSet = new HashSet<>();
+        this.continueEffectiveMouldNumber = BigDecimal.ZERO.intValue();
     }
 
 }

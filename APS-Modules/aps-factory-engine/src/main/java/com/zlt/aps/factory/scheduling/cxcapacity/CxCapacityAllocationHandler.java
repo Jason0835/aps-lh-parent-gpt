@@ -34,6 +34,7 @@ public class CxCapacityAllocationHandler {
      * @param estimateGroupCxAllocationMap 分组计划预估分配信息
      * @param cxContinueInfoMap            续作信息
      */
+    @Deprecated
     public static Map<String, CxMachineAllocationPlanHelper> continueGroupPlanAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
         //续作分组 --TBR按结构
         if (CollectionUtils.isEmpty(cxContinueInfoMap)) {
@@ -69,7 +70,8 @@ public class CxCapacityAllocationHandler {
                 ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(allocationIndex);
                 CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
                 //续作Sku信息
-                Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
+                Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
+//                        cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
                 Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
                 cxMachineBaseInfo.setRemainingDays(BigDecimal.ZERO.intValue());
                 CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
@@ -80,7 +82,8 @@ public class CxCapacityAllocationHandler {
             ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(wholeMachineCount - BigDecimal.ONE.intValue());
             CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
             //续作Sku信息
-            Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
+            Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
+//            cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
             //小数部分的天数
             BigDecimal decimalPart = machineCount.subtract(integerPart);
             Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
@@ -109,7 +112,7 @@ public class CxCapacityAllocationHandler {
      * @param monthDays         月份最大天数
      * @return
      */
-    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer maxLhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueProductInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
+    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer maxLhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
         Integer startAllocationDay = BigDecimal.ZERO.intValue();
         Integer endAllocationDay = BigDecimal.ZERO.intValue();
         Set<Integer> stopDayInfo = cxMachineBaseInfo.getStopDayInfo();

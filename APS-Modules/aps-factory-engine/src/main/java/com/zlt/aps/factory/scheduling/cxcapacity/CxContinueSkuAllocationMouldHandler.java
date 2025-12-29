@@ -2,7 +2,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -50,12 +50,13 @@ public class CxContinueSkuAllocationMouldHandler {
      * @param groupContinueInfo      在机结构续作信息
      * @param realWholeMachineNumber 需要的机台数
      */
+    @Deprecated
     public static void allocationContinueSkuMouldNumber(ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Integer realWholeMachineNumber) {
         if (null == groupContinueInfo || CollectionUtils.isEmpty(groupContinueInfo.getCxMachineCodeSet())) {
             return;
         }
         //设置续作Sku的计划排产量：先暂时取高优先级量
-        setContinueSkuPlanDemandQty(groupPlanInfo, groupContinueInfo);
+        ContinueSkuCalculator.setContinueSkuPlanDemandQty(groupPlanInfo, groupContinueInfo);
         Set<String> cxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (isBuilderFullLhMachine(cxMachineCodeSet, realWholeMachineNumber)) {
             //todo 构建续作？
@@ -65,44 +66,6 @@ public class CxContinueSkuAllocationMouldHandler {
         //构建配比大，机台编号大的需要释放的成型机台数，按sku续作模具数多的优先减，其次排产需求量少的优先减模具数，直到减到满足硫化配比机台数为止
         Integer releaseCount = cxMachineCodeSet.size() - realWholeMachineNumber;
         releaseContinueSkuMouldNumber(groupContinueInfo, releaseCount);
-    }
-
-    /**
-     * 设置续作sku的计划量
-     * 取高优先级量还是总净需求量？
-     *
-     * @param groupPlanInfo     分组计划-TBR为结构
-     * @param groupContinueInfo 结构对应的续作信息
-     */
-    private static void setContinueSkuPlanDemandQty(ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
-        List<MonthPlanProductionRequirePlanVo> groupPlanList = groupPlanInfo.getGroupPlanData();
-        if (CollectionUtils.isEmpty(groupPlanList)) {
-            //todo 记录日志
-            return;
-        }
-        Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = groupContinueInfo.getContinueSkuMouldNumberMap();
-        if (CollectionUtils.isEmpty(continueSkuMouldNumberMap)) {
-            //todo 记录日志
-            return;
-        }
-        //提取续作Sku计划
-        Set<String> skuMaterialDescSet = continueSkuMouldNumberMap.keySet();
-        List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(continueSkuPlanList)) {
-            //todo 记录日志
-            return;
-        }
-        //分组合计续作Sku的计划量-高优先级
-        Map<String, List<MonthPlanProductionRequirePlanVo>> continueSkuGroupMap = continueSkuPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-        Map<String, Long> continueSkuProductionQtyMap = new HashMap<>();
-        continueSkuGroupMap.forEach((materialDesc, planList) -> continueSkuProductionQtyMap.put(materialDesc, planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum()));
-        continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            Long planDemandQty = continueSkuProductionQtyMap.get(materialDesc);
-            if (null == planDemandQty) {
-                planDemandQty = BigDecimal.ZERO.longValue();
-            }
-            cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
-        });
     }
 
     /**

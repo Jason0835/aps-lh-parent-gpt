@@ -12,19 +12,19 @@ public enum ConstructionStageEnum {
     /**
      * 0 无施工
      */
-    NO_CONSTRUCTION(0, "无施工"),
+    NO_CONSTRUCTION("0", "无施工"),
     /**
      * 1 试制
      */
-    MEASUREMENT(1, "试制"),
+    MEASUREMENT("1", "试制"),
     /**
      * 2 量试
      */
-    TRIAL_PRODUCTION(2, "量试"),
+    TRIAL_PRODUCTION("2", "量试"),
     /**
      * 3 正式
      */
-    FORMAL_PRODUCTION(3, "正式");
+    FORMAL_PRODUCTION("3", "正式");
     /**
      * T 量试标记
      */
@@ -38,11 +38,11 @@ public enum ConstructionStageEnum {
      */
     private static final String FORMAL_FLAG = "S";
 
-    private Integer stage;
+    private String stage;
 
     private String desc;
 
-    ConstructionStageEnum(Integer stage, String desc) {
+    ConstructionStageEnum(String stage, String desc) {
         this.stage = stage;
         this.desc = desc;
     }
@@ -79,7 +79,7 @@ public enum ConstructionStageEnum {
      * @param stage
      * @return
      */
-    public static ConstructionStageEnum getInstance(Integer stage) {
+    public static ConstructionStageEnum getInstance(String stage) {
         if (null == stage) {
             return ConstructionStageEnum.NO_CONSTRUCTION;
         }
@@ -91,7 +91,7 @@ public enum ConstructionStageEnum {
         return ConstructionStageEnum.NO_CONSTRUCTION;
     }
 
-    public Integer getStage() {
+    public String getStage() {
         return stage;
     }
 
