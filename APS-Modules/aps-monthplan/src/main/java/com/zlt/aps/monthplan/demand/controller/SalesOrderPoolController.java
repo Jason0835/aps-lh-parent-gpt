@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -222,7 +223,8 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("natCode")), "NAT_CODE", queryVO.getFieldValueByFieldName("natCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCodePo")), "SAL_CODE_PO", queryVO.getFieldValueByFieldName("salCodePo"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDate")), "BILL_DATE", queryVO.getFieldValueByFieldName("billDate"));
+        queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDateStartTime")), "BILL_DATE", queryVO.getBillDateStartTime());
+        queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDateEndTime")), "BILL_DATE", queryVO.getBillDateEndTime());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("oriMaterialCode")), "ORI_MATERIAL_CODE", queryVO.getFieldValueByFieldName("oriMaterialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ordQty")), "ORD_QTY", queryVO.getFieldValueByFieldName("ordQty"));
@@ -258,6 +260,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 			item.setSalNCode(areaMap.getOrDefault(salNCode, salNCode));
 			item.setNatCode(areaMap.getOrDefault(natCode, natCode));
 			item.setArea(areaMap.getOrDefault(area, area));
+			item.setUpdateTimeExport(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
 		}
 		return resultList;
 	}
