@@ -200,7 +200,7 @@ public class VulcanizingMachineUIController extends BaseUIController<Vulcanizing
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iVulcanizingMachineService.importData(context, false);
+        AjaxResult ajaxResult = iVulcanizingMachineService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

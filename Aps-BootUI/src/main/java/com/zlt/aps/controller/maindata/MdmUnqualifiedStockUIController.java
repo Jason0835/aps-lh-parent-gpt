@@ -194,7 +194,7 @@ public class MdmUnqualifiedStockUIController extends BaseUIController<MdmUnquali
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmUnqualifiedStockService.importData(context, false);
+        AjaxResult ajaxResult = iMdmUnqualifiedStockService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

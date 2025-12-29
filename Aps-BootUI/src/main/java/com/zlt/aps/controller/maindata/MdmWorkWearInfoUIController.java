@@ -196,7 +196,7 @@ public class MdmWorkWearInfoUIController extends BaseUIController<MdmWorkWearInf
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmWorkWearInfoService.importData(context, false);
+        AjaxResult ajaxResult = iMdmWorkWearInfoService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

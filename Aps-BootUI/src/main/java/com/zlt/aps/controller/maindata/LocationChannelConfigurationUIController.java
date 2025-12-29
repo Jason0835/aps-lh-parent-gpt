@@ -197,7 +197,7 @@ public class LocationChannelConfigurationUIController extends BaseUIController<L
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLocationChannelConfigurationService.importData(context, false);
+        AjaxResult ajaxResult = iLocationChannelConfigurationService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

@@ -195,7 +195,7 @@ public class MpTrialPlanUIController extends BaseUIController<MpTrialPlan> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpTrialPlanService.importData(context, false);
+        AjaxResult ajaxResult = iMpTrialPlanService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

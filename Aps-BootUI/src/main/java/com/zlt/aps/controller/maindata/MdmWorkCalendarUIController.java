@@ -197,7 +197,7 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmWorkCalendarService.importData(context, false);
+        AjaxResult ajaxResult = iMdmWorkCalendarService.importData(context, updateSupport);
         return ajaxResult;
     }
 

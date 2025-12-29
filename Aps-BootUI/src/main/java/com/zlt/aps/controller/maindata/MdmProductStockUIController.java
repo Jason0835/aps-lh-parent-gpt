@@ -197,7 +197,7 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProductStockService.importData(context, false);
+        AjaxResult ajaxResult = iMdmProductStockService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

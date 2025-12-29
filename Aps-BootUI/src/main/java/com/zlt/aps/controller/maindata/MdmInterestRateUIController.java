@@ -197,7 +197,7 @@ public class MdmInterestRateUIController extends BaseUIController<MdmInterestRat
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmInterestRateService.importData(context, false);
+        AjaxResult ajaxResult = iMdmInterestRateService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

@@ -196,7 +196,7 @@ public class MdmMonCycleSchStruConfUIController extends BaseUIController<MdmMonC
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMonCycleSchStruConfService.importData(context, false);
+        AjaxResult ajaxResult = iMdmMonCycleSchStruConfService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

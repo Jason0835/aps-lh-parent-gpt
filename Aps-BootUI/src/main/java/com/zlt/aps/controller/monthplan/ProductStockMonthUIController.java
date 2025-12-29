@@ -178,7 +178,7 @@ public class ProductStockMonthUIController extends BaseUIController<ProductStock
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductStockMonthService.importData(context, false);
+        AjaxResult ajaxResult = iProductStockMonthService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
