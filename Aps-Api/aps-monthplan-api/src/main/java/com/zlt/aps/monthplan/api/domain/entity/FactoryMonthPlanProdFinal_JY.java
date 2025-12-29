@@ -278,6 +278,28 @@ public class FactoryMonthPlanProdFinal_JY extends BaseEntity {
     @TableField(value = "DIFFERENCE_QTY")
     private Integer differenceQty;
 
+
+    /** 第1周调整量 */
+    @ApiModelProperty(value = "第1周调整量", name = "adjustQty1")
+    @TableField(value = "ADJUST_QTY1")
+    private Integer adjustQty1;
+
+    /** 第2周调整量 */
+    @ApiModelProperty(value = "第2周调整量", name = "adjustQty2")
+    @TableField(value = "ADJUST_QTY2")
+    private Integer adjustQty2;
+
+    /** 第3周调整量 */
+    @ApiModelProperty(value = "第3周调整量", name = "adjustQty3")
+    @TableField(value = "ADJUST_QTY3")
+    private Integer adjustQty3;
+
+    /** 第4周调整量 */
+    @ApiModelProperty(value = "第4周调整量", name = "adjustQty4")
+    @TableField(value = "ADJUST_QTY4")
+    private Integer adjustQty4;
+
+
     /** 未排产原因 */
     @Excel(name = "ui.data.column.final.reason")
     @ApiModelProperty(value = "未排产原因", name = "reason")

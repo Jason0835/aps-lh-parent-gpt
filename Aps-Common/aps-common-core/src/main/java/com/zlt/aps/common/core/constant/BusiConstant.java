@@ -18,6 +18,22 @@ public interface BusiConstant {
          * 锁定天数
          */
         int LOCK_DAYS = 3;
+        /**
+         * 日期格式
+         */
+        String DATE_FORMAT_YYYYMMDD = "yyyyMMdd";
+        /**
+         * 天字段前缀
+         */
+        String FIELD_PREFIX_DAY = "day";
+        /**
+         * 调整量字段前缀
+         */
+        String FIELD_PREFIX_ADJUST_QTY = "adjustQty";
+        /**
+         * 月最大天数
+         */
+        int MAX_DAY_OF_MONTH = 31;
     }
 
 

@@ -44,5 +44,15 @@ public class MpWeekRollAdjustUIController extends BaseController {
         return mpWeekRollAdjustRemoteService.getAdjustDetailList(weekRollAdjustDTO);
     }
 
+    /**
+     * 确认调整结果
+     */
+    @ApiOperation("确认调整结果")
+    @PostMapping("/confirmAdjust")
+    @ResponseBody
+    public AjaxResult confirmAdjust(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        return mpWeekRollAdjustRemoteService.confirmAdjust(weekRollAdjustDTO);
+    }
+
 
 }
