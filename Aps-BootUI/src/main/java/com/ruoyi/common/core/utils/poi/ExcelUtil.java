@@ -461,7 +461,7 @@ public class ExcelUtil<T> {
 
         ExcelUtil.setResponseHeader(response, fileName, XLSX_FILE);
 
-        this.init(list, sheetName, Type.EXPORT);
+        this.init(list, sheetName, Type.IMPORT);
         exportExcel(response.getOutputStream());
     }
 

@@ -30,7 +30,7 @@ import java.util.Arrays;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmFinishStockUIController.java
- * 描    述：成品库存 UI控制层类：....
+ * 描    述：版本库存 UI控制层类：....
  *
  * @author zlt
  * @version 1.0
@@ -105,7 +105,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
     }
 
     /**
-     * 删除成品库存
+     * 删除版本库存
      */
     @ApiOperation("删除,id不为空")
     @RequiresPermissions("monthplan:mdmFinishStock:remove")
@@ -117,7 +117,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
     }
 
     /**
-     * 校验成品库存唯一性
+     * 校验版本库存唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
