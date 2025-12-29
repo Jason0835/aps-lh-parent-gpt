@@ -9,6 +9,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmAreaCapaAllocation.java
@@ -81,7 +83,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     @Excel(name = "ui.data.column.mdmAreaCapaAllocation.capacityAllocation")
     @ApiModelProperty(value = "产能分配", name = "capacityAllocation")
     @TableField(value = "CAPACITY_ALLOCATION")
-    private Long capacityAllocation;
+    private BigDecimal capacityAllocation;
 
     /**
      * 复制时源工厂编号，字典：biz_factory_name
