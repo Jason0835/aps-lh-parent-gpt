@@ -53,12 +53,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/maindata/mdmModelInfo/importTemplate"
       uploadUrl="/maindata/mdmModelInfo/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+     downloadUrl="/maindata/mdmModelInfo/importTemplate"
+      uploadUrl="/maindata/mdmModelInfo/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -76,12 +85,14 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
   name: "moldingRestrictions",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["logistics_status", "biz_mould_Type", "biz_factory_name",'biz_available_status','logistics_status'],
   provide() {
@@ -91,6 +102,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],

@@ -32,11 +32,11 @@
 <script>
 import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
-
+import areaSelect from '@/views/components/areaSelect.vue'
 import {saveAreaCapaInfo} from "@/api/monthplan/mdmAreaCapaAllocation";
 
 export default {
-  components: {infoForm},
+  components: {infoForm,areaSelect},
   inject: ["parentDict"],
   data() {
     const validatePositiveInteger = (rule, value, callback) => {
@@ -193,6 +193,15 @@ export default {
         {
           prop: "areaCode",
           label: this.$t("common.area"),
+          render: (form) => {
+            return (
+              <areaSelect
+                key={form.areaCode}
+                multiple={true}
+                v-model={form.areaCode}
+              />
+            );
+          },
         },
         // {
         //   prop: "mouldCode",

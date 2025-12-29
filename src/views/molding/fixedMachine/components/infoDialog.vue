@@ -127,6 +127,7 @@ export default {
             return (
               <structureSelect
                 key={form.fixedStructure1}
+                multiple={true}
                 v-model={form.fixedStructure1}
               />
             );
@@ -140,6 +141,7 @@ export default {
             return (
               <structureSelect
                 key={form.fixedStructure2}
+                multiple={true}
                 v-model={form.fixedStructure2}
               />
             );
@@ -154,6 +156,7 @@ export default {
             return (
               <structureSelect
                 key={form.fixedStructure3}
+                multiple={true}
                 v-model={form.fixedStructure3}
               />
             );
@@ -181,6 +184,7 @@ export default {
             return (
               <structureSelect
                 key={form.disableStructure}
+                multiple={true}
                 v-model={form.disableStructure}
               />
             );

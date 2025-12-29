@@ -35,3 +35,10 @@ export function copyCheckAreaCapaInfo(query) {
     data: query
   })
 }
+export function areaList(query) {
+  return request({
+    url: '/monthplan/dpArea/list',
+    method: 'post',
+    data: query
+  })
+}

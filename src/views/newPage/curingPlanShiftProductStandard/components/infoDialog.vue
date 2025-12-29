@@ -15,7 +15,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="160px"
+      label-width="140px"
       v-loading="loading"
     >
     </info-form>

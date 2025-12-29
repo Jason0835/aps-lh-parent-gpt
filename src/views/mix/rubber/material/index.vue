@@ -2,7 +2,6 @@
 <template>
   <basic-container>
     <page-table
-
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -53,13 +52,22 @@
         <!--&gt;-->
       </template>
     </page-table>
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUploadForm"
       :updateSupport="true"
       downloadUrl="/lean/productinfo/importTemplate"
       uploadUrl="/lean/productinfo/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUploadForm"
+      :updateSupport="true"
+      downloadUrl="/lean/productinfo/importTemplate"
+      uploadUrl="/lean/productinfo/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <InfoDialog ref="infoDialogRef" @success="handelSuccess" />
   </basic-container>
 </template>
@@ -69,6 +77,7 @@ import moment from "moment";
 import { listMaterial, removeMaterial } from "@/api/setting/material";
 import InfoDialog from "./components/infoDialog.vue";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import { downloadLink } from "@/utils/request";
 import {
   tableListProductinfo,
@@ -79,7 +88,7 @@ import {
 } from "@/api/lean/productinfo";
 export default {
   name: "RubberMaterial",
-  components: { InfoDialog, tltUpload },
+  components: { InfoDialog, tltUpload, TltUploadForm },
   dicts: [
     "GLUE_TYPE",
     "MAJOR_TYPE",
@@ -98,6 +107,23 @@ export default {
   data() {
     let tomorrow = moment().add(1, "days").format("YYYY-MM-DD");
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            console.log(form);
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       page: {

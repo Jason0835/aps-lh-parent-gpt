@@ -46,12 +46,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mpMouldShellInfo/importTemplate"
       uploadUrl="/monthplan/mpMouldShellInfo/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mpMouldShellInfo/importTemplate"
+      uploadUrl="/monthplan/mpMouldShellInfo/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -62,19 +71,21 @@ import { mapState } from "vuex";
 import { downloadLink } from "@/utils/request";
 
 import {
-  listMpMouldShellInfo,removeMpMouldShellInfo,
+  listMpMouldShellInfo,
+  removeMpMouldShellInfo,
 } from "@/api/monthplan/mpMouldShellInfo";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
   name: "MoldShellRegister",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm,
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
   provide() {
@@ -84,6 +95,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -157,7 +184,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
-          width:200,
+          width: 200,
           render: ({ row }) => {
             return (
               <div>
@@ -197,7 +224,6 @@ export default {
           prop: "mouldSetCode",
           label: this.$t("ui.data.column.monthplan.moldModelCode"),
         },
-
       ];
     },
   },
@@ -212,16 +238,15 @@ export default {
         this.$refs.infoRef.show(row);
       }
     },
-    handleDeleteAll(){
-      console.log(this.selection)
-      let ids=''
+    handleDeleteAll() {
+      console.log(this.selection);
+      let ids = "";
       for (let i = 0; i < this.selection.length; i++) {
-        if(i==this.selection.length-1){
-          ids=ids+this.selection[i].id
-        }else{
-          ids=ids+this.selection[i].id+','
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
         }
-
       }
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
@@ -275,7 +300,10 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/monthplan/mpMouldShellInfo/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/mpMouldShellInfo/export",
+        this.formatParams(false)
+      );
     },
 
     formatParams(hasPage = true) {
