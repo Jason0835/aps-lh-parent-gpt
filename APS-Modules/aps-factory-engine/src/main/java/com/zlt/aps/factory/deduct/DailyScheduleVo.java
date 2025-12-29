@@ -1,9 +1,14 @@
-package com.zlt.aps.monthplan.api.domain.deduct;
+package com.zlt.aps.factory.deduct;
 
 import lombok.Data;
 
-import java.time.LocalDate;
-
+/**
+ * 降模排产结果对象
+ * 到日
+ *
+ * @author Sandy
+ * @date 2025/12/24
+ */
 @Data
 public class DailyScheduleVo {
 
