@@ -1,11 +1,13 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.maindata.service.IMdmWorkWearInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -58,5 +61,17 @@ public class MdmWorkWearInfoServiceImpl extends AbstractDocService<MdmWorkWearIn
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "workWearName", "specifications", "workWearType"));
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmWorkWearInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        Integer perimeterMin = importDocEntity.getPerimeterMin();
+        Integer perimeterMax = importDocEntity.getPerimeterMax();
+        if (perimeterMin != null && perimeterMax != null && perimeterMin > perimeterMax) {
+            String message = I18nUtil.getMessage("ui.data.alert.mdmWorkWearInfo.perimeterCheck");
+            com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }

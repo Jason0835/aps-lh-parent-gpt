@@ -1,8 +1,10 @@
 package com.zlt.aps.job.task;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.service.IMpMonthlySaleQtyRemoteService;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
  * @since 2025/12/23
  */
 @Component("dpTask")
+@Slf4j
 public class DpTask {
 
     @Autowired
@@ -25,7 +28,8 @@ public class DpTask {
     public void genMonthlySaleQty() {
         MpMonthlySaleQty mpMonthlySaleQty = new MpMonthlySaleQty();
         mpMonthlySaleQty.setFactoryCode("116");
-        iMpMonthlySaleQtyRemoteService.genMonthlySaleQty(mpMonthlySaleQty);
+        AjaxResult ajaxResult = iMpMonthlySaleQtyRemoteService.genMonthlySaleQty(mpMonthlySaleQty);
+        log.info(ajaxResult.toString());
     }
 
 }

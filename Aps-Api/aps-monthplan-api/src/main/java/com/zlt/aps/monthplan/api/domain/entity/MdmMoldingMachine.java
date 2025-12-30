@@ -54,7 +54,7 @@ public class MdmMoldingMachine extends BaseEntity {
     private String cxMachineTypeCode;
 
     /** 反包方式 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.rollOverType")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.rollOverType", dictType = "ROLL_OVER_TYPE")
     @ApiModelProperty(value = "反包方式", name = "rollOverType")
     @TableField(value = "ROLL_OVER_TYPE")
     private String rollOverType;
