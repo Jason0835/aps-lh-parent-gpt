@@ -15,6 +15,10 @@ import java.io.Serializable;
 @Data
 public class LhProductionQtyHelper implements Serializable {
     /**
+     * 分组计划信息对象
+     */
+    private ProductionPlanGroupInfo productionPlanInfo;
+    /**
      * 成型机台
      */
     private CxMachineBaseInfoVo cxMachineInfo;
@@ -38,13 +42,15 @@ public class LhProductionQtyHelper implements Serializable {
     /**
      * 构建对象实例
      *
-     * @param cxMachineInfo        成型机台
+     * @param productionPlanInfo   分组计划信息对象
+     * @param cxMachineInfo        成型机台，可以为空
      * @param cxLhGroup            成型硫化组
      * @param sumProductionQty     需要排产的总量
      * @param realSumProductionQty 实际排产总量
      * @param dayMaxProductionQty  日双模最大硫化量
      */
-    public LhProductionQtyHelper(CxMachineBaseInfoVo cxMachineInfo, CxLhProductionHelper cxLhGroup, Long sumProductionQty, Long realSumProductionQty, Long dayMaxProductionQty) {
+    public LhProductionQtyHelper(ProductionPlanGroupInfo productionPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxLhProductionHelper cxLhGroup, Long sumProductionQty, Long realSumProductionQty, Long dayMaxProductionQty) {
+        this.productionPlanInfo = productionPlanInfo;
         this.cxMachineInfo = cxMachineInfo;
         this.cxLhGroup = cxLhGroup;
         this.sumProductionQty = sumProductionQty;

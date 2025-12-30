@@ -1,11 +1,18 @@
 package com.zlt.aps.factory.deduct;
 
+import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
+import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldContext;
+import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import com.zlt.common.utils.PubUtil;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 轮胎APS降模排产系统
@@ -18,6 +25,46 @@ import java.util.List;
  * @date 2025/12/24
  */
 public class DeductMouldScheduler {
+
+    /**
+     * 构建降膜排产参数对象
+     *
+     * @param deadLineDay        收尾日
+     * @param stopDays           停工日集合
+     * @param openDays           开产日集合
+     * @param paramConfiguration 排产参数对象
+     * @param continueSkuInfo    续作Sku信息
+     * @return
+     */
+    public static DeductMouldVo createDeductMouldBySku(Integer deadLineDay, Set<Integer> stopDays, Set<Integer> openDays, ProductionCapacityParamConfiguration paramConfiguration, CxContinueSkuInfoHelper
+            continueSkuInfo) {
+        DeductMouldVo deductMould = new DeductMouldVo();
+        //参数设置
+        deductMould.setShutDownDaySet(stopDays);
+        deductMould.setProductionStartDaySet(openDays);
+        //降膜排产-相关的参数 当前的硫化机台数超过该值 默认为3
+        deductMould.setParamAssignedMachines(paramConfiguration.getDeductMouldMinLhMachineCount());
+        //降膜排产-相关的参数 7天时降到3台
+        deductMould.setParamNearDeadline7(paramConfiguration.getFirstNearDeadLineDay());
+        deductMould.setParamReduceMachines3(paramConfiguration.getFirstNearDeadLineMaxLhMachineCount());
+        //降膜排产-相关的参数 5天时降到2台
+        deductMould.setParamNearDeadline5(paramConfiguration.getSecondNearDeadLineDay());
+        deductMould.setParamReduceMachines2(paramConfiguration.getSecondNearDeadLineMaxLhMachineCount());
+        //降膜排产-相关的参数 2天时降到1台
+        deductMould.setParamNearDeadline2(paramConfiguration.getLastNearDeadLineDay());
+        deductMould.setParamReduceMachines1(paramConfiguration.getLastNearDeadLineMaxLhMachineCount());
+
+        //续作Sku信息 -
+        deductMould.setMaterialCode(continueSkuInfo.getMaterialDesc());
+        deductMould.setStartDate(ProductionConstant.MONTH_START_DAY);
+        deductMould.setDeadline(deadLineDay);
+        deductMould.setTotalQty(continueSkuInfo.getPlanDemandQty().intValue());
+        Integer startLhMachineCount = continueSkuInfo.getMouldNumber() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        deductMould.setMachinesAssigned(startLhMachineCount);
+        Integer dayLhCapacityQty = continueSkuInfo.getMaxDaySingleLhMachineQty().intValue();
+        deductMould.setDailyOutputPerMachine(dayLhCapacityQty);
+        return deductMould;
+    }
 
     /**
      * 执行降模排产计划

@@ -74,7 +74,7 @@ public class CxAddSkuProductionHandler {
         Long dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfo, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
         CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组

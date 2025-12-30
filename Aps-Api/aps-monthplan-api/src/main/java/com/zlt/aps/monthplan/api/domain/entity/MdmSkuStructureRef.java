@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -32,22 +33,26 @@ public class MdmSkuStructureRef extends BaseEntity {
      /** 工厂编号 */
     @Excel(name = "ui.data.column.mdmSkuStructureRef.factoryCode", dictType = "biz_factory_name", sort = 1)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 物料编码 */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmSkuStructureRef.materialCode", sort = 3)
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** MES物料编号 */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmSkuStructureRef.mesMaterialCode", sort = 2)
     @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     /** 结构 */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmSkuStructureRef.structureName", sort = 5)
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")

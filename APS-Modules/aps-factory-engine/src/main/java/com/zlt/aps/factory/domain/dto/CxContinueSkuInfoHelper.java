@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
@@ -8,6 +9,7 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +75,15 @@ public class CxContinueSkuInfoHelper implements Serializable {
      * 日硫化量(单模)
      */
     private Long dayVulcanizationQty;
+    /**
+     * 在机结构构建续作信息时赋值
+     * 续作sku的排产计划集合
+     */
+    private List<MonthPlanProductionRequirePlanVo> continueSkuPlanList;
+    /**
+     * 续作Sku-开始在机成型机台
+     */
+    private Set<String> onLineCxMachineSet;
 
     /**
      * 先从排产计划中获取materialDesc,如果没有匹配到，从续作中获取
@@ -99,5 +110,34 @@ public class CxContinueSkuInfoHelper implements Serializable {
         continueSkuInfo.setGroupName(plan.getStructureName());
         continueSkuInfo.setDayVulcanizationQty(plan.getDayVulcanizationQty());
         return continueSkuInfo;
+    }
+
+    /**
+     * 获取天单硫化机台产能
+     * 单硫化机台天产能 = 双模产能 = 单模天产能 * 2
+     *
+     * @return
+     */
+    public Long getMaxDaySingleLhMachineQty() {
+        return dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 根据模具数，得到使用的硫化机台数
+     *
+     * @return
+     */
+    public Integer getUsedLhMachineCountByMouldNumber() {
+        return mouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 根据使用的硫化机台组信息，获取使用模具集合所处下标
+     *
+     * @param assignedCount 当前使用的硫化机台组
+     * @return
+     */
+    public Integer getUsedMouldIndex(int assignedCount) {
+        return assignedCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 }

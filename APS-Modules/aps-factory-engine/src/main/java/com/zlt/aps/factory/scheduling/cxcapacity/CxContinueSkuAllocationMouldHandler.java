@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
  * @date 20251223
  */
 @Slf4j
+@Deprecated
 public class CxContinueSkuAllocationMouldHandler {
     /**
      * 如果结构在机成型机台数 <= 估算需要的成型机台数，则续作Sku不用处理

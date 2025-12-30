@@ -52,7 +52,7 @@ public class CxMouldProductionHandler {
         Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
 //                cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
         if (!CollectionUtils.isEmpty(continueSkuMap)) {
-            CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, continueSkuMap, productionPlan, mouldInfoMap, mouldShellMap);
+            CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, productionPlan, mouldInfoMap, mouldShellMap);
         }
         //排产收尾新增规格-重新获取需求需排产计划信息
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = hasProductionPlanList.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
@@ -62,10 +62,6 @@ public class CxMouldProductionHandler {
         }
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
         //todo 搭配排产
-
-    }
-
-    public static void continueGroupPlanMouldProduction(Context context){
 
     }
 
@@ -121,7 +117,7 @@ public class CxMouldProductionHandler {
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
         for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
             newCxLhGroupNo.add(cxLhGroupNo);
-            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), startDay);
+            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), cxMachineInfo.getCxMachineCode(), startDay);
         }
         Set<Integer> needDeletedGroupNo = new HashSet<>();
         cxLhRatioMap.forEach((cxLhGroupNo, helper) -> {
@@ -139,15 +135,18 @@ public class CxMouldProductionHandler {
      * @param cxLhRatioMap
      * @param cxLhGroupNo
      * @param groupName
+     * @param cxMachineCode
      * @param startDay
      */
-    private static void updateProductionInfo(Map<Integer, CxLhProductionHelper> cxLhRatioMap, Integer cxLhGroupNo, String groupName, Integer startDay) {
+    private static void updateProductionInfo(Map<Integer, CxLhProductionHelper> cxLhRatioMap, Integer cxLhGroupNo, String groupName, String cxMachineCode, Integer startDay) {
         if (cxLhRatioMap.containsKey(cxLhGroupNo)) {
             CxLhProductionHelper helper = cxLhRatioMap.get(cxLhGroupNo);
             helper.resetProductionInfoByNewGroupName(groupName, startDay);
             return;
         }
-        CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo);
+        Set<String> cxMachineInfo = new HashSet<>();
+        cxMachineInfo.add(cxMachineCode);
+        CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, cxMachineInfo);
         newHelper.setProductionDay(startDay);
         newHelper.setProductionQty(BigDecimal.ZERO.longValue());
         cxLhRatioMap.put(cxLhGroupNo, newHelper);

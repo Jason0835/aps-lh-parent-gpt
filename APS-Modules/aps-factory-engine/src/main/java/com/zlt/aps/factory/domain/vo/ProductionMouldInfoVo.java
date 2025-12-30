@@ -4,6 +4,8 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
+import com.zlt.aps.factory.domain.dto.GroupPlanDayProductionInfoHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.utils.DateUtils;
 import lombok.Data;
@@ -84,6 +86,7 @@ public class ProductionMouldInfoVo implements Serializable {
      * 模具增加排产信息
      *
      * @param day                  排产日
+     * @param productionPlanInfo   分组计划信息对象
      * @param cxLhProductionHelper 硫化分组
      * @param isFinishDay          天是否排产完毕(包含正常排产完成，因换模或是换活字块导致的完成)
      * @param realDayProductionQty 双模实际排产量
@@ -91,7 +94,7 @@ public class ProductionMouldInfoVo implements Serializable {
      * @param cxMachineCode        成型机台
      * @param continueSkuPlanList  排产计划集合
      */
-    public void addProductionInfo(Integer day, CxLhProductionHelper cxLhProductionHelper, boolean isFinishDay, Long realDayProductionQty, Long dayLhQty, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
+    public void addProductionInfo(Integer day, ProductionPlanGroupInfo productionPlanInfo, CxLhProductionHelper cxLhProductionHelper, boolean isFinishDay, Long realDayProductionQty, Long dayLhQty, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
         //加入已经排产完毕
         if (isFinishDay) {
             finishDaySet.add(day);
@@ -116,6 +119,9 @@ public class ProductionMouldInfoVo implements Serializable {
                 CxMouldDayProductionHelper mouldProductionHelper = CxMouldDayProductionHelper.createCxMouldDayProductionInfo(groupPlan, cxMachineCode, day, productionQty, cxLhProductionHelper);
                 mouldProductionHelper.setMouldCode(mouldCode);
                 addDayProductionInfo(day, mouldProductionHelper);
+                //日排产信息
+                GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, cxLhProductionHelper, productionQty, BigDecimal.ZERO.longValue(), null);
+                productionPlanInfo.addDayProductionInfo(helper);
             });
             return;
         }
@@ -128,6 +134,12 @@ public class ProductionMouldInfoVo implements Serializable {
             CxMouldDayProductionHelper mouldProductionHelper = CxMouldDayProductionHelper.createCxMouldDayProductionInfo(groupPlan, cxMachineCode, day, productionQty, cxLhProductionHelper);
             mouldProductionHelper.setMouldCode(mouldCode);
             addDayProductionInfo(day, mouldProductionHelper);
+        });
+        //增加日排产信息
+        realDeductionMap.forEach((monthPlanId, productionQty) -> {
+            MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
+            GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, cxLhProductionHelper, productionQty, BigDecimal.ZERO.longValue(), null);
+            productionPlanInfo.addDayProductionInfo(helper);
         });
     }
 
