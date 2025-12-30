@@ -676,8 +676,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
         return factoryMonthPlanProdFinals.stream()
             .filter(Objects::nonNull)
-            .filter(item -> item.getMaterialCode() != null)
-            .filter(item -> item.getYearMonth() != null)
+            .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()) && item.getYearMonth() != null)
             .collect(Collectors.groupingBy(
                 FactoryMonthPlanProductionFinalResult::getMaterialCode,
                 Collectors.mapping(
@@ -698,7 +697,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
         return salesOrderPools.stream()
             .filter(Objects::nonNull)
-            .filter(salesOrder -> salesOrder.getOriMaterialCode() != null && salesOrder.getWeekYear() != null)
+            .filter(salesOrder -> StringUtils.isNotBlank(salesOrder.getOriMaterialCode()) && salesOrder.getOrdQty() != null)
             .collect(Collectors.groupingBy(
                 salesOrder -> createCompositeKey(
                     salesOrder.getOriMaterialCode(),
@@ -733,7 +732,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
         return finishedProductStocks.stream()
             .filter(Objects::nonNull)
-            .filter(stock -> stock.getMaterialCode() != null && stock.getWeekYear() != null)
+            .filter(stock -> StringUtils.isNotBlank(stock.getMaterialCode())  && stock.getStockQty() != null)
             .collect(Collectors.groupingBy(
                 stock -> createCompositeKey(
                     stock.getMaterialCode(),
