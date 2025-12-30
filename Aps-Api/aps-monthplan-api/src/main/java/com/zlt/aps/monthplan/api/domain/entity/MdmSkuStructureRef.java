@@ -30,31 +30,31 @@ public class MdmSkuStructureRef extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.factoryCode", dictType = "biz_factory_name")
+//    @Excel(name = "ui.data.column.mdmSkuStructureRef.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 物料编码 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialCode")
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialCode", sort = 1)
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     /** MES物料编号 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.mesMaterialCode")
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.mesMaterialCode", sort = 2)
     @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     /** 结构 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.structureName")
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.structureName", sort = 4)
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialDesc")
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialDesc", sort = 3)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(exist = false)
     private String materialDesc;
