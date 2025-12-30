@@ -108,7 +108,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getExportTemplateFileName(){
-        return this.getFunctionName();
+        return I18nUtil.getMessage("ui.data.column.demandPlan.modelName");
     }
 
 
@@ -119,7 +119,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getProcedureCode() {
-        return "0";
+         return I18nUtil.getMessage("ui.data.column.demandPlan.modelName");
     }
 
     /**
@@ -129,7 +129,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.demandPlan.modelName");
     }
 
     /**
@@ -146,6 +146,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
 
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
+    @RequiresPermissions("monthplan:demandPlan:export")
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
@@ -159,6 +160,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
 
     @PostMapping({"/importData"})
     @ResponseBody
+    @RequiresPermissions("monthplan:demandPlan:import")
     @ApiOperation("数据导入")
     @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
@@ -170,8 +172,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iDpDemandPlanService.importData(context,false);
-        return ajaxResult;
+      return iDpDemandPlanService.importData(context,false);
     }
 
     /**
