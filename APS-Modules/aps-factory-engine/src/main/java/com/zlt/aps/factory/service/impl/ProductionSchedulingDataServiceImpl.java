@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
@@ -18,6 +19,7 @@ import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
 import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -29,6 +31,7 @@ import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +79,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final FactoryMonthPlanSpecialMaterialInfoMapper factoryMonthPlanSpecialMaterialInfoMapper;
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
+    
+    private final MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
     private final BaseDao baseDao;
 
@@ -325,6 +330,18 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyList();
         }
         return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode());
+    }
+    
+    /**
+     * 获取成品库存
+     * @param context 排产上下文
+     * @return
+     */
+    @Override
+    public List<MdmProductStock> getMdmProductStock(Context context) {
+    	LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
+    	queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
+    	return mdmProductStockEntityMapper.selectList(queryWrapper);
     }
 
     @Override

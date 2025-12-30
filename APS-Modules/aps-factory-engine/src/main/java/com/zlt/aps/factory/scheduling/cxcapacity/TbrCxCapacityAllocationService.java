@@ -132,6 +132,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
         //特殊材料的胎胚配置信息
         specialMaterialInfoHandler(productionContext);
+		// 超6个成品库存信息
+		overSixMonthStockHandler(productionContext);
         //初始化库销比、标记是否按总需求排产
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
@@ -170,6 +172,21 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             });
         });
     }
+
+    /**
+     * 加载超6个月的库存信息
+     * @param productionContext
+     */
+	private void overSixMonthStockHandler(TbrProductionContext productionContext) {
+		List<MdmProductStock> stockList = getDataService().getMdmProductStock(productionContext);
+		Map<String, Integer> overSixMonthStockMap = stockList.stream()
+				.filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()))
+				.collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc,
+						Collectors.collectingAndThen(Collectors.toList(),
+								list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth()))
+										.collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
+		productionContext.setOverSixMonthStockMap(overSixMonthStockMap);
+	}
 
     /**
      * 获取初始化业务的参数设定
