@@ -180,7 +180,7 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 制造示方
      */
-    @ImportExcelValidated(maxLength = 64)
+    @ImportExcelValidated(maxLength = 30)
     @Excel(name = "ui.data.column.mpTrialPlan.madeInfo", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "制造示方", name = "madeInfo")
     @TableField(value = "MADE_INFO")
@@ -189,20 +189,20 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 文字示方
      */
-    @ImportExcelValidated(maxLength = 64)
+    @ImportExcelValidated(maxLength = 30)
     @Excel(name = "ui.data.column.mpTrialPlan.moldingInfo", type = Excel.Type.EXPORT)
-    @ApiModelProperty(value = "文字示方", name = "moldingInfo")
-    @TableField(value = "MOLDING_INFO")
-    private String moldingInfo;
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(value = "TEXT_NO")
+    private String textNo;
 
     /**
      * 硫化示方
      */
-    @ImportExcelValidated(maxLength = 64)
+    @ImportExcelValidated(maxLength = 30)
     @Excel(name = "ui.data.column.mpTrialPlan.vulcanizationInfo", type = Excel.Type.EXPORT)
-    @ApiModelProperty(value = "硫化示方", name = "vulcanizationInfo")
-    @TableField(value = "VULCANIZATION_INFO")
-    private String vulcanizationInfo;
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(value = "LH_NO")
+    private String lhNo;
 
     /**
      * 导入时间
