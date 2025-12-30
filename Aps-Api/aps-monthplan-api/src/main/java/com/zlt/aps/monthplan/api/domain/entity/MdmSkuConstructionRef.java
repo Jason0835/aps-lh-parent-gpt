@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -36,10 +37,12 @@ public class MdmSkuConstructionRef extends BaseEntity {
      /** 工厂编号 */
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 物料编码 */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
@@ -106,24 +109,28 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private String isZeroRack;
 
     /** 夏季机械硫化时间(秒) */
+    @ImportExcelValidated(digits = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime")
     @ApiModelProperty(value = "夏季机械硫化时间(秒)", name = "curingTime")
     @TableField(value = "CURING_TIME")
     private Integer curingTime;
 
     /** 夏季液压硫化时间(秒) */
+    @ImportExcelValidated(digits = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime")
     @ApiModelProperty(value = "夏季液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
     @TableField(value = "HY_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;
 
     /** 冬季机械硫化时间(秒) */
+    @ImportExcelValidated(digits = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime2")
     @ApiModelProperty(value = "冬季机械硫化时间(秒)", name = "curingTime2")
     @TableField(value = "CURING_TIME2")
     private Integer curingTime2;
 
     /** 冬季液压硫化时间(秒) */
+    @ImportExcelValidated(digits = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime2")
     @ApiModelProperty(value = "冬季液压硫化时间(秒)", name = "hydraulicPressureCuringTime2")
     @TableField(value = "HY_PRESSURE_CURING_TIME2")
@@ -148,6 +155,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 制造示方书发行时间
      */
+    @ImportExcelValidated(date = true)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "制造示方书发行时间", name = "embryoReleaseDate")
@@ -173,6 +181,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 文字示方书发行时间
      */
+    @ImportExcelValidated(date = true)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "文字示方书发行时间", name = "textReleaseDate")
@@ -198,6 +207,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 硫化示方书发行时间
      */
+    @ImportExcelValidated(date = true)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
