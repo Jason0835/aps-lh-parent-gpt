@@ -18,7 +18,8 @@
                UPDATE_TIME,
                UPDATE_BY
         from T_DP_AREA_CAPACITY_CONFIG
-        where FACTORY_CODE = #{sourceFactoryCode}
+        where IS_DELETE = 0
+          AND FACTORY_CODE = #{sourceFactoryCode}
           and `YEAR` = #{sourceYear}
           and `MONTH` = #{sourceMonth}
     </insert>
