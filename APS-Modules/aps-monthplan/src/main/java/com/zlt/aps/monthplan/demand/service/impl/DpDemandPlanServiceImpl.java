@@ -179,9 +179,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(String monthPlanVersion) {
+    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(FactoryProductionVersion finalVersion) {
         LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
+        wrapper.eq(DpDemandPlan::getFactoryCode, finalVersion.getFactoryCode());
+        wrapper.eq(DpDemandPlan::getYear, finalVersion.getYear());
+        wrapper.eq(DpDemandPlan::getMonth, finalVersion.getMonth());
+        wrapper.eq(DpDemandPlan::getMonthPlanVersion, finalVersion.getMonthPlanVersion());
         wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.demandPlanEntityMapper.selectList(wrapper);
     }
