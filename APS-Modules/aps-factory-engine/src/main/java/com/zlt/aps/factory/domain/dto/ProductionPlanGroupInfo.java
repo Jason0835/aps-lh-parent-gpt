@@ -8,6 +8,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
@@ -93,6 +94,11 @@ public class ProductionPlanGroupInfo {
      * 在机结构-需要考虑后续新增机台场景
      */
     private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
+    /**
+     * 日排产信息
+     * 数据存储
+     */
+    private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
 
     /**
      * 粗步计算 结构需求量需要的成型产能分配
@@ -127,6 +133,28 @@ public class ProductionPlanGroupInfo {
             groupInfo.calculateNeedCxCapacityMachineCount(context.getMaxProductionDays());
         });
         return groupInfoMap;
+    }
+
+    /**
+     * 获取结构下，最早收尾的硫化机台组
+     *
+     * @return
+     */
+    public CxLhProductionHelper getEarliestConclusionLhGroup() {
+        //获取成型硫化组
+        if (CollectionUtils.isEmpty(cxLhRatioMap)) {
+            return null;
+        }
+        List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
+        //剔除一开始没有排产的？
+        List<CxLhProductionHelper> hasProductionList = cxLhGroupList.stream().filter(cxLhGroup -> null != cxLhGroup.getProductionDay()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return null;
+        }
+        //按最后排产日，进行升序排序
+        hasProductionList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
+        //取得第一条：即最早收尾的硫化组
+        return hasProductionList.get(BigDecimal.ZERO.intValue());
     }
 
     /**
@@ -223,6 +251,91 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.longValue();
         }
         return hasProductionList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
+     * 根据续作类型，获取续作可排产信息
+     * 1、同规格同花纹
+     * 2、同生胎同模具
+     *
+     * @param continueType              续作类型
+     * @param materialDesc              续作Sku
+     * @param shareMouldMaterialDescSet 共用模具的物料集合
+     * @param continueProductInfoHelper 续作Sku详细信息
+     * @return
+     */
+    public List<MonthPlanProductionRequirePlanVo> getContinueListByType(ContinueTypeEnum continueType, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
+            return getSameSpecificationsAndPatternPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
+        }
+        if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
+            return getSameEmbryoCodeAndMouldPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * 获取分组下同规格同花纹的Sku计划
+     *
+     * @param materialDesc              前规格
+     * @param shareMouldMaterialDescSet 共用模具的sku集合
+     * @param continueProductInfoHelper 前规格详情信息
+     * @return
+     */
+    public List<MonthPlanProductionRequirePlanVo> getSameSpecificationsAndPatternPlan(String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return Collections.emptyList();
+        }
+        List<MonthPlanProductionRequirePlanVo> sameSpecificationsAndPatternList = new ArrayList<>();
+        groupPlanData.stream().forEach(groupPlan -> {
+            if (!groupPlan.hasProduction()) {
+                return;
+            }
+            if (materialDesc.equals(groupPlan.getMaterialDesc())) {
+                return;
+            }
+            //不共用模具
+            if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
+                return;
+            }
+            if (groupPlan.isSameSpecificationsAndPattern(continueProductInfoHelper)) {
+                sameSpecificationsAndPatternList.add(groupPlan);
+            }
+        });
+        return sameSpecificationsAndPatternList;
+    }
+
+    /**
+     * 获取分组下同生胎同模具下的Sku计划
+     *
+     * @param materialDesc              前规格
+     * @param shareMouldMaterialDescSet 共用模具的sku集合
+     * @param continueProductInfoHelper 前规格详情信息
+     */
+    public List<MonthPlanProductionRequirePlanVo> getSameEmbryoCodeAndMouldPlan(String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            Collections.emptyList();
+        }
+        List<MonthPlanProductionRequirePlanVo> sameEmbryoCodeAndMouldList = new ArrayList<>();
+        groupPlanData.stream().forEach(groupPlan -> {
+            //剔除不排产
+            if (!groupPlan.hasProduction()) {
+                return;
+            }
+            //排除自己
+            if (materialDesc.equals(groupPlan.getMaterialDesc())) {
+                return;
+            }
+            //剔除不共用模具
+            if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
+                return;
+            }
+            //同生胎
+            if (groupPlan.isSameEmbryoCode(continueProductInfoHelper)) {
+                sameEmbryoCodeAndMouldList.add(groupPlan);
+            }
+        });
+        return sameEmbryoCodeAndMouldList;
     }
 
     /**
@@ -370,6 +483,68 @@ public class ProductionPlanGroupInfo {
             }
         }
         return false;
+    }
+
+    /**
+     * 增加日排产信息
+     *
+     * @param singleDayProductionInfo
+     */
+    public void addDayProductionInfo(GroupPlanDayProductionInfoHelper singleDayProductionInfo) {
+        if (null == dayProductionInfo) {
+            dayProductionInfo = new HashMap<>();
+        }
+        if (null == singleDayProductionInfo || !singleDayProductionInfo.isEffective()) {
+            return;
+        }
+        Integer productionDay = singleDayProductionInfo.getProductionDay();
+        if (null == productionDay) {
+            return;
+        }
+        List<GroupPlanDayProductionInfoHelper> plannedProductionList = dayProductionInfo.get(productionDay);
+        if (null == plannedProductionList) {
+            plannedProductionList = new ArrayList<>();
+            dayProductionInfo.put(productionDay, plannedProductionList);
+        }
+        if (CollectionUtils.isEmpty(plannedProductionList)) {
+            plannedProductionList.add(singleDayProductionInfo);
+            return;
+        }
+        String key = singleDayProductionInfo.getDuplicateKey();
+        GroupPlanDayProductionInfoHelper find = plannedProductionList.stream().filter(plannedProduction -> key.equals(plannedProduction.getDuplicateKey())).findFirst().orElse(null);
+        if (null == find) {
+            plannedProductionList.add(singleDayProductionInfo);
+            return;
+        }
+    }
+
+    /**
+     * 获取分组的日排产汇总信息集合
+     * 当前为胎胚种类信息和硫化组信息
+     *
+     * @return
+     */
+    public List<GroupDayProductionSummaryHelper> getGroupProductionSummary() {
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return Collections.emptyList();
+        }
+        List<GroupDayProductionSummaryHelper> summaryList = new ArrayList<>(dayProductionInfo.size());
+        dayProductionInfo.forEach((productionDay, productionList) -> {
+            GroupDayProductionSummaryHelper daySummary = GroupDayProductionSummaryHelper.buildEmpty(groupName, productionDay);
+            summaryList.add(daySummary);
+            if (CollectionUtils.isEmpty(productionList)) {
+                return;
+            }
+            //胎胚种类数信息
+            Set<String> embryoCodeSet = productionList.stream().map(GroupPlanDayProductionInfoHelper::getEmbryoCode).collect(Collectors.toSet());
+            daySummary.setEmbryoCodeSet(embryoCodeSet);
+            daySummary.setEmbryoCount(embryoCodeSet.size());
+            //硫化分组信息
+            Set<Integer> lhGroupNoSet = productionList.stream().map(GroupPlanDayProductionInfoHelper::getLhGroupNo).collect(Collectors.toSet());
+            daySummary.setLhGroupCount(lhGroupNoSet.size());
+            daySummary.setLhGroupNoSet(lhGroupNoSet);
+        });
+        return summaryList;
     }
 
     /**

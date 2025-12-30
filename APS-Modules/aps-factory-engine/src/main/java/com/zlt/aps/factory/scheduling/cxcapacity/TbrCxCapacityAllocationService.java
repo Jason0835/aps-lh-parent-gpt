@@ -85,9 +85,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
+        //todo 采用新的逻辑进行分配在机结构的在产机台
         Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
         mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());

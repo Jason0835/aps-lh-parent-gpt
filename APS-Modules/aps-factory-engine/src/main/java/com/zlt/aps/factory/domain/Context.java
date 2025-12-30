@@ -94,6 +94,33 @@ public class Context {
     private Map<Integer, Integer> capacityRatioMap;
 
     /**
+     * 判断排产日是否为排产周期的第一天
+     *
+     * @param productionDay
+     * @return
+     */
+    public boolean isCycleFirstProductionDay(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
+        Integer monthDays = getMonthDays();
+        if (productionDay < ProductionConstant.MONTH_START_DAY || productionDay > monthDays) {
+            return false;
+        }
+        if (stopDays.contains(productionDay)) {
+            return false;
+        }
+        Set<Integer> productionDaySet = getProductionDay();
+        if (CollectionUtils.isEmpty(productionDaySet)) {
+            return false;
+        }
+        List<Integer> productionDayList = new ArrayList<>(productionDaySet);
+        productionDayList.sort(Comparator.comparing(Integer::intValue));
+        Integer firstProductionDay = productionDayList.get(BigDecimal.ZERO.intValue());
+        return firstProductionDay.equals(productionDay);
+    }
+
+    /**
      * 是否采用自然月进行排产
      *
      * @return

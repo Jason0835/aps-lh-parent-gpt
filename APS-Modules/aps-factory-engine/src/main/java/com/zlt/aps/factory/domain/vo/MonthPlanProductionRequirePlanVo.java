@@ -1,8 +1,8 @@
 package com.zlt.aps.factory.domain.vo;
 
 import com.tlt.aps.enums.*;
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueProductInfoHelper;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
@@ -309,6 +309,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return isSameEmbryoCode(continueProductInfo);
+    }
+
+    /**
+     * 获取天单硫化机台产能
+     * 单硫化机台天产能 = 双模产能 = 单模天产能 * 2
+     *
+     * @return
+     */
+    public Long getMaxDaySingleLhMachineQty() {
+        return getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 
     /**

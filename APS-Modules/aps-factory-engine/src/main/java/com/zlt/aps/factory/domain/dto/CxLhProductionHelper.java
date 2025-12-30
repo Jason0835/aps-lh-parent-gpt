@@ -1,9 +1,11 @@
 package com.zlt.aps.factory.domain.dto;
 
 import lombok.Data;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -53,6 +55,11 @@ public class CxLhProductionHelper implements Serializable {
      * 天日硫化量--满产
      */
     private Long dayMaxProductionQty;
+    /**
+     * 成型机台编码信息
+     * 有可能一个，也有可能多个
+     */
+    private Set<String> cxMachineInfo;
 
     /**
      * 构建空的成型下硫化分组信息
@@ -61,10 +68,14 @@ public class CxLhProductionHelper implements Serializable {
      * @param lhGroupNo 虚拟的硫化分组
      * @return
      */
-    public static CxLhProductionHelper createEmptyLhGroup(String groupName, Integer lhGroupNo) {
+    public static CxLhProductionHelper createEmptyLhGroup(String groupName, Integer lhGroupNo, Set<String> cxMachineInfo) {
         CxLhProductionHelper cxLh = new CxLhProductionHelper();
         cxLh.setGroupName(groupName);
         cxLh.setLhGroupNo(lhGroupNo);
+        if (CollectionUtils.isEmpty(cxMachineInfo)) {
+            cxMachineInfo = new HashSet<>();
+        }
+        cxLh.setCxMachineInfo(cxMachineInfo);
         return cxLh;
     }
 
