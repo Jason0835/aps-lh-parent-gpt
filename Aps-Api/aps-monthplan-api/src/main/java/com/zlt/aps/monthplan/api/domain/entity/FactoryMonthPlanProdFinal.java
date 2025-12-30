@@ -35,10 +35,9 @@ import java.util.List;
 @Data
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "分厂月生产计划排产结果-生产计划排产结果对象", description = "分厂月生产计划排产结果-生产计划排产结果对象 ")
-public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
+public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProductionFinalResult {
 
     private static final long serialVersionUID = 1L;
-
 
 
     /**
@@ -57,7 +56,7 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     @ApiModelProperty(value = "生产规格描述", name = "productDesc")
     private String productDesc;
 
-   
+
 
     /**
      * 成型法
@@ -93,7 +92,7 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     private String channel;
 
 
-    
+
 
     /**
      * 层级
@@ -188,7 +187,7 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     private Integer isDeliveryDate;
 
 
-    
+
     /**
      * 开始日期
      */
@@ -197,7 +196,7 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     @ApiModelProperty(value = "开始日期", name = "beginDate")
      @TableField(exist = false)
     private Integer beginDate;
-    
+
 
 
 
@@ -283,5 +282,5 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProdFinal_JY {
     @ApiModelProperty(value = "未排产原因国际化", name = "reasonI18n")
     @TableField(exist = false)
     private String reasonI18n;
-    
+
 }

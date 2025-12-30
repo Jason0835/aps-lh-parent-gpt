@@ -63,9 +63,9 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "SAL_CODE")
     private String salCode;
 
-    /** 国别 */
+    /** 客户国别 */
     @Excel(name = "ui.data.column.SalesOrderPool.salNCode")
-    @ApiModelProperty(value = "国别", name = "salNCode")
+    @ApiModelProperty(value = "客户国别", name = "salNCode")
     @TableField(value = "SAL_N_CODE")
     private String salNCode;
 
@@ -94,11 +94,9 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "BILL_DATE")
     private Date billDate;
 
-    /**
-     * 物料编码
-     */
+    /** NC物料编码 */
     @Excel(name = "ui.data.column.SalesOrderPool.oriMaterialCode")
-    @ApiModelProperty(value = "物料编码", name = "oriMaterialCode")
+    @ApiModelProperty(value = "NC物料编码", name = "oriMaterialCode")
     @TableField(value = "ORI_MATERIAL_CODE")
     private String oriMaterialCode;
 
@@ -120,20 +118,20 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
-    /** 动平衡，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance")
-    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
-    @TableField(value = "IS_DYNAMIC_BALANCE")
-    private String isDynamicBalance;
-
     /** 均匀性，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity")
+    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性，1 是 0 否", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
+    /** 动平衡，1 是 0 否 */
+    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
+
     /** EUDR，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isEudr")
+    @Excel(name = "ui.data.column.SalesOrderPool.isEudr", dictType = "biz_yes_no")
     @ApiModelProperty(value = "EUDR，1 是 0 否", name = "isEudr")
     @TableField(value = "IS_EUDR")
     private String isEudr;
@@ -145,7 +143,7 @@ public class SalesOrderPool extends BaseEntity{
     private String deliverGoodsType;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority", dictType = "biz_product_type")
+    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority", dictType = "biz_order_type")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
@@ -155,8 +153,12 @@ public class SalesOrderPool extends BaseEntity{
     @TableField(value = "SCM_DETAIL_ID")
     private Long scmDetailId;
 
+    /** 更新时间，用于导出展示 */
+    @Excel(name = "ui.data.column.SalesOrderPool.updateTime")
+    @TableField(exist = false)
+    private String updateTimeExport;
+
     /** 订单状态，0-关单，1-正常 */
-    @Excel(name = "ui.data.column.SalesOrderPool.scmDetailId", dictType = "biz_product_type")
     @ApiModelProperty(value = "订单状态，0-关单，1-正常", name = "orderStatus")
     @TableField(value = "ORDER_STATUS")
     private String orderStatus;

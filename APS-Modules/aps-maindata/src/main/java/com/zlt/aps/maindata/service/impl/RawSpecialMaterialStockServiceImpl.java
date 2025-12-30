@@ -52,6 +52,11 @@ public class RawSpecialMaterialStockServiceImpl extends AbstractDocService<RawSp
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawSpecialMaterialStock.notUnique"));
         }
+
+        //materialCode 不能含有空格
+        if (docEntityVO.getMaterialCode().contains(" ")) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawWarningConfig.notUnique1"));
+        }
         return unique;
     }
 

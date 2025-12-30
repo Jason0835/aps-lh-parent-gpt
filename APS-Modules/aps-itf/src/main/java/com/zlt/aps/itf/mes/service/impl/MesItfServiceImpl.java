@@ -1,9 +1,12 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
@@ -63,21 +66,28 @@ public class MesItfServiceImpl implements MesItfService {
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmSkuMouldRel> list = this.getMdmSkuMouldRelList(mdmSkuMouldRel);
         // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
-        List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 1000);
-        for (List<MdmSkuMouldRel> skuMouldRelList : splitList) {
-            List<MdmSkuMouldRel> existsList = productModelRelationEntityMapper.selectByUniqueKeyList(skuMouldRelList);
-            Map<String, MdmSkuMouldRel> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode(), item.getMaterialCode()), Function.identity()));
-            }
-            for (MdmSkuMouldRel skuMouldRel : skuMouldRelList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(skuMouldRel.getFactoryCode(), skuMouldRel.getMouldCode(), skuMouldRel.getMaterialCode());
-                if (existsMap.containsKey(mapKey)) {
-                    MdmSkuMouldRel existsData = existsMap.get(mapKey);
-                    skuMouldRel.setId(existsData.getId());
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 1000);
+            for (List<MdmSkuMouldRel> skuMouldRelList : splitList) {
+                List<MdmSkuMouldRel> existsList = productModelRelationEntityMapper.selectByUniqueKeyList(skuMouldRelList);
+                Map<String, MdmSkuMouldRel> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode(), item.getMaterialCode()), Function.identity()));
                 }
+                for (MdmSkuMouldRel skuMouldRel : skuMouldRelList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(skuMouldRel.getFactoryCode(), skuMouldRel.getMouldCode(), skuMouldRel.getMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmSkuMouldRel existsData = existsMap.get(mapKey);
+                        skuMouldRel.setId(existsData.getId());
+                    }
+                }
+                baseDao.saveBatch(skuMouldRelList);
             }
-            baseDao.saveBatch(skuMouldRelList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -95,21 +105,28 @@ public class MesItfServiceImpl implements MesItfService {
         mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
         List<MdmModelInfo> list = getMdmModelInfoList(mdmSkuMouldRel);
         // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
-        List<List<MdmModelInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
-        for (List<MdmModelInfo> saveList : splitList) {
-            List<MdmModelInfo> existsList = modelInfoEntityMapper.selectByUniqueKeyList(saveList);
-            Map<String, MdmModelInfo> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode()), Function.identity()));
-            }
-            for (MdmModelInfo entity : saveList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldCode());
-                if (existsMap.containsKey(mapKey)) {
-                    MdmModelInfo existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            List<List<MdmModelInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+            for (List<MdmModelInfo> saveList : splitList) {
+                List<MdmModelInfo> existsList = modelInfoEntityMapper.selectByUniqueKeyList(saveList);
+                Map<String, MdmModelInfo> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode()), Function.identity()));
                 }
+                for (MdmModelInfo entity : saveList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmModelInfo existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+                baseDao.saveBatch(saveList);
             }
-            baseDao.saveBatch(saveList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -181,85 +198,104 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncProductStock(MdmProductStock mdmProductStock) throws ParseException {
         List<MdmProductStock> productStockList = this.getProductStock(mdmProductStock);
-        // 先删后增，日期
-        Date stockDate = mdmProductStock.getStockDate();
-        if (stockDate == null) {
-            stockDate = DateUtils.getNowDate("yyyy-MM-dd");
-        }
-        String factoryCode = mdmProductStock.getFactoryCode();
-        String productTypeCode = mdmProductStock.getProductTypeCode();
-
-        Calendar stockDateCalendar = Calendar.getInstance();
-        stockDateCalendar.setTime(stockDate);
-        int stockYear = stockDateCalendar.get(Calendar.YEAR);
-        int stockMonth = stockDateCalendar.get(Calendar.MONTH) + 1;
-
-        this.deleteMdmProductStock(factoryCode, stockDate);
-
-        this.deleteOverDueSku(factoryCode, stockYear, stockMonth);
-
-        int subMonthParam1 = 3, subMonthParam2 = 6, subMonthParam3 = 9, subMonthParam4 = 12;
-
-        stockDateCalendar.add(Calendar.MONTH, -subMonthParam1);
-        Date subTime1 = stockDateCalendar.getTime();
-
-        stockDateCalendar.setTime(stockDate);
-        stockDateCalendar.add(Calendar.MONTH, -subMonthParam2);
-        Date subTime2 = stockDateCalendar.getTime();
-
-        stockDateCalendar.setTime(stockDate);
-        stockDateCalendar.add(Calendar.MONTH, -subMonthParam3);
-        Date subTime3 = stockDateCalendar.getTime();
-
-        stockDateCalendar.setTime(stockDate);
-        stockDateCalendar.add(Calendar.MONTH, -subMonthParam4);
-        Date subTime4 = stockDateCalendar.getTime();
-
-        FactoryParam param = new FactoryParam();
-        param.setFactoryCode(factoryCode);
-        param.setProductTypeCode(productTypeCode);
-        param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
-        Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
-
-        param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
-        Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
-
-        List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
-        for (List<MdmProductStock> importList : splitList) {
-            List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
-            for (MdmProductStock productStock : importList) {
-                String weekYear = productStock.getWeekYear();
-                if (weekYear.length() != 4) {
-                    continue;
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            List<String> materialCodeList = productStockList.stream().map(MdmProductStock::getMaterialCode).distinct().collect(Collectors.toList());
+            Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
+            for (MdmProductStock stock : productStockList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
+                if (materialInfoMap.containsKey(mapKey)) {
+                    MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
+                    stock.setMaterialDesc(materialInfo.getMaterialDesc());
+                    stock.setStructureName(materialInfo.getStructureName());
+                    stock.setBrand(materialInfo.getBrand());
+                    stock.setProductTypeCode(materialInfo.getProductTypeCode());
                 }
-                int week, year;
-                try {
-                    week = Integer.parseInt(weekYear.substring(2));
-                    year = Integer.parseInt("20" + weekYear.substring(2, 4));
-                } catch (NumberFormatException e) {
-                    log.error("解析年周号失败：{}", weekYear);
-                    continue;
-                }
-                Calendar instance = Calendar.getInstance();
-                instance.set(Calendar.YEAR, year);
-                instance.set(Calendar.WEEK_OF_YEAR, week);
-                // 根据年周号对应月份判断超期时间
-                Date time = instance.getTime();
-                // 赋值是否超期胎
-                productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
-                if (time.before(subTime4)) {
-                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, true);
-                } else if (time.before(subTime3)) {
-                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, false);
-                } else if (time.before(subTime2)) {
-                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, false, false);
-                } else if (time.before(subTime1)) {
-                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, false, false, false);
-                }
-                addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
             }
-            baseDao.insertBatch(importList);
-            baseDao.insertBatch(mpOverdueSkuList);
+            // 先删后增，日期
+            Date stockDate = mdmProductStock.getStockDate();
+            if (stockDate == null) {
+                stockDate = DateUtils.getNowDate("yyyy-MM-dd");
+            }
+            String factoryCode = mdmProductStock.getFactoryCode();
+            String productTypeCode = mdmProductStock.getProductTypeCode();
+
+            Calendar stockDateCalendar = Calendar.getInstance();
+            stockDateCalendar.setTime(stockDate);
+            int stockYear = stockDateCalendar.get(Calendar.YEAR);
+            int stockMonth = stockDateCalendar.get(Calendar.MONTH) + 1;
+
+            this.deleteMdmProductStock(factoryCode, stockDate);
+
+            this.deleteOverDueSku(factoryCode, stockYear, stockMonth);
+
+            int subMonthParam1 = 3, subMonthParam2 = 6, subMonthParam3 = 9, subMonthParam4 = 12;
+
+            stockDateCalendar.add(Calendar.MONTH, -subMonthParam1);
+            Date subTime1 = stockDateCalendar.getTime();
+
+            stockDateCalendar.setTime(stockDate);
+            stockDateCalendar.add(Calendar.MONTH, -subMonthParam2);
+            Date subTime2 = stockDateCalendar.getTime();
+
+            stockDateCalendar.setTime(stockDate);
+            stockDateCalendar.add(Calendar.MONTH, -subMonthParam3);
+            Date subTime3 = stockDateCalendar.getTime();
+
+            stockDateCalendar.setTime(stockDate);
+            stockDateCalendar.add(Calendar.MONTH, -subMonthParam4);
+            Date subTime4 = stockDateCalendar.getTime();
+
+            FactoryParam param = new FactoryParam();
+            param.setFactoryCode(factoryCode);
+            param.setProductTypeCode(productTypeCode);
+            param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
+            Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+            param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
+            Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+            List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
+            for (List<MdmProductStock> importList : splitList) {
+                List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
+                for (MdmProductStock productStock : importList) {
+                    String weekYear = productStock.getWeekYear();
+                    if (weekYear.length() != 4) {
+                        continue;
+                    }
+                    int week, year;
+                    try {
+                        week = Integer.parseInt(weekYear.substring(2));
+                        year = Integer.parseInt("20" + weekYear.substring(2, 4));
+                    } catch (NumberFormatException e) {
+                        log.error("解析年周号失败：{}", weekYear);
+                        continue;
+                    }
+                    Calendar instance = Calendar.getInstance();
+                    instance.set(Calendar.YEAR, year);
+                    instance.set(Calendar.WEEK_OF_YEAR, week);
+                    // 根据年周号对应月份判断超期时间
+                    Date time = instance.getTime();
+                    // 赋值是否超期胎
+                    productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
+                    if (time.before(subTime4)) {
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, true);
+                    } else if (time.before(subTime3)) {
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, false);
+                    } else if (time.before(subTime2)) {
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, false, false);
+                    } else if (time.before(subTime1)) {
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, false, false, false);
+                    }
+                    addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
+                }
+                baseDao.insertBatch(importList);
+                baseDao.insertBatch(mpOverdueSkuList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -329,18 +365,35 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException {
-        List<MdmUnqualifiedStock> productStockList = this.getUnqualifiedStock(mdmUnqualifiedStock);
+        List<MdmUnqualifiedStock> unqualifiedStock = this.getUnqualifiedStock(mdmUnqualifiedStock);
         // 先删后增，日期
-        Date stockDate = mdmUnqualifiedStock.getStockDate();
-        if (stockDate == null) {
-            stockDate = DateUtils.getNowDate("yyyy-MM-dd");
-        }
-        Map<String, Object> map = new HashMap<>();
-        map.put("STOCK_DATE", stockDate);
-        baseDao.deleteByMap(ProductStockMonth.class, map);
-        List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
-        for (List<MdmUnqualifiedStock> importList : splitList) {
-            baseDao.insertBatch(importList);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<String> materialCodeList = unqualifiedStock.stream().map(MdmUnqualifiedStock::getMaterialCode).distinct().collect(Collectors.toList());
+            Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
+            for (MdmUnqualifiedStock stock : unqualifiedStock) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
+                if (materialInfoMap.containsKey(mapKey)) {
+                    MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
+                    stock.setMaterialDesc(materialInfo.getMaterialDesc());
+                }
+            }
+            Date stockDate = mdmUnqualifiedStock.getStockDate();
+            if (stockDate == null) {
+                stockDate = DateUtils.getNowDate("yyyy-MM-dd");
+            }
+            Map<String, Object> map = new HashMap<>();
+            map.put("STOCK_DATE", stockDate);
+            baseDao.deleteByMap(ProductStockMonth.class, map);
+            List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(unqualifiedStock, 1000);
+            for (List<MdmUnqualifiedStock> importList : splitList) {
+                baseDao.insertBatch(importList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -367,16 +420,24 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
         List<RawSpecialMaterialStock> productStockList = this.getRawSpecialMaterialStock(rawSpecialMaterialStock);
         // 先删后增，日期
-        Date stockDate = rawSpecialMaterialStock.getStockDate();
-        if (stockDate == null) {
-            stockDate = DateUtils.getNowDate("yyyy-MM-dd");
-        }
-        Map<String, Object> map = new HashMap<>();
-        map.put("STOCK_DATE", stockDate);
-        baseDao.deleteByMap(RawSpecialMaterialStock.class, map);
-        List<List<RawSpecialMaterialStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
-        for (List<RawSpecialMaterialStock> importList : splitList) {
-            baseDao.insertBatch(importList);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            Date stockDate = rawSpecialMaterialStock.getStockDate();
+            if (stockDate == null) {
+                stockDate = DateUtils.getNowDate("yyyy-MM-dd");
+            }
+            Map<String, Object> map = new HashMap<>();
+            map.put("STOCK_DATE", stockDate);
+            baseDao.deleteByMap(RawSpecialMaterialStock.class, map);
+            List<List<RawSpecialMaterialStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
+            for (List<RawSpecialMaterialStock> importList : splitList) {
+                baseDao.insertBatch(importList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -406,11 +467,51 @@ public class MesItfServiceImpl implements MesItfService {
             outboundDate = DateUtils.getNowDate("yyyy-MM-dd");
         }
         List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesItfMapper.syncRawMaterialOutboundRecord(materialOutboundRecord);
-        Map<String, Object> map = new HashMap<>(16);
-        map.put("OUTBOUND_DATE", outboundDate);
-        baseDao.deleteByMap(RawMaterialOutboundRecord.class, map);
-        baseDao.insertBatch(rawMaterialOutboundRecords);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            // 获取物料信息回写物料描述
+            List<String> materialCodeList = rawMaterialOutboundRecords.stream().map(RawMaterialOutboundRecord::getMaterialCode).distinct().collect(Collectors.toList());
+            Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
+            for (RawMaterialOutboundRecord record : rawMaterialOutboundRecords) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(record.getFactoryCode(), record.getMaterialCode());
+                if (materialInfoMap.containsKey(mapKey)) {
+                    MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
+                    record.setMaterialDesc(materialInfo.getMaterialDesc());
+                }
+            }
+            Map<String, Object> map = new HashMap<>(16);
+            map.put("OUTBOUND_DATE", outboundDate);
+            baseDao.deleteByMap(RawMaterialOutboundRecord.class, map);
+            baseDao.insertBatch(rawMaterialOutboundRecords);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
         return AjaxResult.success();
+    }
+
+    /**
+     * 获取物料信息
+     *
+     * @param materialCodeList 物料信息
+     * @return 结果
+     */
+    private Map<String, MdmMaterialInfo> getMaterialInfoMap(List<String> materialCodeList) {
+        List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
+        List<List<String>> splitList = ScmListUtils.getSplitList(materialCodeList, 1000);
+        for (List<String> codeList : splitList) {
+            LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.in(MdmMaterialInfo::getMaterialCode, codeList);
+            materialInfoList.addAll(materialInfoEntityMapper.selectList(queryWrapper));
+        }
+        Function<MdmMaterialInfo, String> keyMapper = item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode());
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(materialInfoList)) {
+            materialInfoMap = materialInfoList.stream().collect(Collectors.toMap(keyMapper, Function.identity(), (v1, v2) -> v1));
+        }
+        return materialInfoMap;
     }
 
     /**
@@ -424,23 +525,31 @@ public class MesItfServiceImpl implements MesItfService {
         // 查询中间表
         List<MdmMaterialInfo> list = getMaterialInfoList(syncDataLogs);
         // 工厂+物料编码作为匹配条件，如果存在，则更新，不存在则插入
-        List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
-        for (List<MdmMaterialInfo> saveList : splitList) {
-            List<String> uniqueKeyList = saveList.stream().map(productInfo ->
-                    String.join("|", productInfo.getFactoryCode(), productInfo.getMaterialCode())).collect(Collectors.toList());
-            List<MdmMaterialInfo> existsList = materialInfoEntityMapper.selectByUniqueKeyList(uniqueKeyList);
-            Map<String, MdmMaterialInfo> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity()));
-            }
-            for (MdmMaterialInfo entity : saveList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
-                if (existsMap.containsKey(mapKey)) {
-                    MdmMaterialInfo existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+            for (List<MdmMaterialInfo> saveList : splitList) {
+                List<String> uniqueKeyList = saveList.stream().map(productInfo ->
+                        String.join("|", productInfo.getFactoryCode(), productInfo.getMaterialCode())).collect(Collectors.toList());
+                List<MdmMaterialInfo> existsList = materialInfoEntityMapper.selectByUniqueKeyList(uniqueKeyList);
+                Map<String, MdmMaterialInfo> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity()));
                 }
+                for (MdmMaterialInfo entity : saveList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmMaterialInfo existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+                baseDao.saveBatch(saveList);
             }
-            baseDao.saveBatch(saveList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -464,23 +573,31 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
-        List<MdmMouldShellInfo> list = getMoldShellList(syncDataLogs);
+        List<MdmMouldShellInfo> list = this.getMoldShellList(syncDataLogs);
         // 工厂+模套型号作为匹配条件，如果存在，则更新，不存在则插入
-        List<List<MdmMouldShellInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
-        for (List<MdmMouldShellInfo> saveList : splitList) {
-            List<MdmMouldShellInfo> existsList = mouldShellInfoEntityMapper.selectByUniqueKeyList(saveList);
-            Map<String, MdmMouldShellInfo> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldSetCode()), Function.identity()));
-            }
-            for (MdmMouldShellInfo entity : saveList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldSetCode());
-                if (existsMap.containsKey(mapKey)) {
-                    MdmMouldShellInfo existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmMouldShellInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+            for (List<MdmMouldShellInfo> saveList : splitList) {
+                List<MdmMouldShellInfo> existsList = mouldShellInfoEntityMapper.selectByUniqueKeyList(saveList);
+                Map<String, MdmMouldShellInfo> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldSetCode()), Function.identity()));
                 }
+                for (MdmMouldShellInfo entity : saveList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldSetCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmMouldShellInfo existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+                baseDao.saveBatch(saveList);
             }
-            baseDao.saveBatch(saveList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }

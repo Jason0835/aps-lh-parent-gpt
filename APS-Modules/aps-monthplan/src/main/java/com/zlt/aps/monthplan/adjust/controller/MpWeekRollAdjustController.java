@@ -46,33 +46,50 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("获取调整明细列表")
     @PostMapping("/getAdjustDetailList")
     @DistributedLock(
-            key = "'ADJ:GET:' + #weekRollAdjustDTO.mpYear + #weekRollAdjustDTO.mpMonth",
+            key = "'ADJ:GET:' #weekRollAdjustDTO.adjustType + #weekRollAdjustDTO.mpYear + #weekRollAdjustDTO.mpMonth",
             waitTime = 0,
             leaseTime = -1,
             failMsg = "ui.data.alert.getAdjustDetail.run",
             args = {"#weekRollAdjustDTO.mpYear","#weekRollAdjustDTO.mpMonth"}
     )
-    public TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) throws InterruptedException {
+    public TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
         }
-
         // 构建上下文对象
         MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
-
         log.info("获取调整明细 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
-
         // 执行周程滚动调整策略（生成调整明细）
         weekAdjustStrategy.generateAdjust(contextDTO);
-
         log.info("获取调整明细 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
-
         // 返回结果处理
         return getDataTable(contextDTO.getAdjustDetailList());
+    }
+
+    /**
+     * 确认调整结果
+     */
+    @ApiOperation("确认调整结果")
+    @PostMapping("/confirmAdjust")
+    public AjaxResult confirmAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        // 获取周程滚动调整策略
+        IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
+        if (weekAdjustStrategy == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
+        }
+        // 构建上下文对象
+        MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
+        log.info("确认调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+        // 执行周程滚动调整策略（确认调整）
+        weekAdjustStrategy.confirmAdjust(contextDTO);
+        log.info("确认调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+        return AjaxResult.success();
     }
 
 

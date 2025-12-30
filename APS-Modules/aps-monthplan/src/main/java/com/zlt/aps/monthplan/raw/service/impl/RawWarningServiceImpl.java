@@ -417,6 +417,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                     usage.setActualQty(actualQty);
                     // 重新计算偏差
                     usage.calculateDeviation();
+                    usage.setRemark("已更新最新实际用量" + usage.getActualQty());
                     rawWeekUsageEntityMapper.updateById(usage);
                 }
             }
