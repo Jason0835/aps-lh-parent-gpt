@@ -23,7 +23,6 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -104,9 +103,9 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
                 billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                billVO.setMadeInfo(DateUtils.formatDate(mdmSkuConstructionRef.getEmbryoReleaseDate(), "yyyy-MM-dd"));
-                billVO.setMoldingInfo(DateUtils.formatDate(mdmSkuConstructionRef.getTextReleaseDate(), "yyyy-MM-dd"));
-                billVO.setVulcanizationInfo(DateUtils.formatDate(mdmSkuConstructionRef.getLhReleaseDate(), "yyyy-MM-dd"));
+                billVO.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+                billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
             }
         }
         return super.save(billVO);

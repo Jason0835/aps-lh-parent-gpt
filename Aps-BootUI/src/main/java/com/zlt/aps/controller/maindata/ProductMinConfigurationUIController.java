@@ -197,7 +197,7 @@ public class ProductMinConfigurationUIController extends BaseUIController<Produc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductMinConfigurationService.importData(context, true);
+        AjaxResult ajaxResult = iProductMinConfigurationService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

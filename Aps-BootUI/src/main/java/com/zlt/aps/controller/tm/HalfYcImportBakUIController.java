@@ -205,7 +205,7 @@ public class HalfYcImportBakUIController extends BaseUIController<HalfYcImportBa
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iHalfYcImportBakService.importData(context, true);
+        AjaxResult ajaxResult = iHalfYcImportBakService.importData(context, updateSupport);
         return ajaxResult;
     }
 

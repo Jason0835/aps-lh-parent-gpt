@@ -205,7 +205,7 @@ public class ProductALevelUIController extends BaseUIController<ProductALevel> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iProductALevelService.importData(context, true);
+        AjaxResult ajaxResult = iProductALevelService.importData(context, updateSupport);
         return ajaxResult;
     }
 

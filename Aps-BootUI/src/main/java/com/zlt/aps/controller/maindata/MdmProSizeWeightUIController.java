@@ -196,7 +196,7 @@ public class MdmProSizeWeightUIController extends BaseUIController<MdmProSizeWei
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProSizeWeightService.importData(context, true);
+        AjaxResult ajaxResult = iMdmProSizeWeightService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
