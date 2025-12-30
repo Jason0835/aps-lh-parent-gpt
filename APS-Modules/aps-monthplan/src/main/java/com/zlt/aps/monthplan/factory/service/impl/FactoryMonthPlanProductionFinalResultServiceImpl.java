@@ -146,7 +146,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
           if (null == value) {
             dayValue = BigDecimal.ZERO.longValue();
           } else {
-            dayValue = (Long) value;
+            dayValue = (Integer) value;
           }
           totalMonthSuplus = totalMonthSuplus + dayValue;
         }
