@@ -14,6 +14,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
@@ -28,6 +29,8 @@ import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.exception.QueryExprException;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -38,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.ParseException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -121,6 +125,16 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         String factoryCode = mpMonthlySaleQty.getFactoryCode();
         Calendar instance = Calendar.getInstance();
         Date nowDate = new Date();
+        try {
+            String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
+            if (StringUtils.isNotBlank(config)) {
+                nowDate = DateUtils.parseDate(config, "yyyy-MM");
+            }
+        } catch (NumberFormatException e) {
+            log.error("获取配置失败", e);
+        } catch (ParseException e) {
+            log.error("日期转换失败", e);
+        }
         instance.setTime(nowDate);
         int year = instance.get(Calendar.YEAR);
         String month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
@@ -138,13 +152,13 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         int passThreeMonth = 3;
         int passSixMonth = 6;
         int passTwelveMonth = 12;
-        instance.setTime(new Date());
+        instance.setTime(nowDate);
         instance.add(Calendar.MONTH, -passSixMonth);
         int last6Year = instance.get(Calendar.YEAR);
         String last6Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
         String last6YearMonth = last6Year + last6Month;
 
-        instance.setTime(new Date());
+        instance.setTime(nowDate);
         instance.add(Calendar.MONTH, -passTwelveMonth);
         int last12Year = instance.get(Calendar.YEAR);
         String last12Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
@@ -175,16 +189,6 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         paramVo.setFactory(factoryCode);
         paramVo.setYear(lastYear);
         paramVo.setMonth(Integer.parseInt(lastMonth));
-        try {
-            String config = sysConfigService.selectConfigByKey("mp.avgSaleQty.gen.date");
-            String[] split = config.split("-");
-            lastYear = Integer.parseInt(split[0]);
-            lastMonth = split[1];
-            paramVo.setYear(lastYear);
-            paramVo.setMonth(Integer.parseInt(lastMonth));
-        } catch (NumberFormatException e) {
-            log.error("获取配置失败", e);
-        }
         AjaxResult ajaxResult = iScmItfService.syncOutShipDmdOrdList(paramVo);
         AjaxResultUtils.getList(ajaxResult, SyncOutShipDmdOrdResultVo.class);
         List<SyncOutShipDmdOrdResultVo> outShipDmdOrdResultVos = JSON.parseArray(JSON.toJSONString(ajaxResult.get(AjaxResult.DATA_TAG)), SyncOutShipDmdOrdResultVo.class);
@@ -260,6 +264,17 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 .le(MpHistorySaleRecord::getYearMonth, maxYearMonth);
         List<MpHistorySaleRecord> last6MonthHistorySaleList = mpHistorySaleRecordEntityMapper.selectList(wrapper);
 
+        // 执行表达式，转义区域
+        try {
+            QueryFormulaUtil.execFormula(last6MonthHistorySaleList, new String[]{
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+            });
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("转换区域，执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(last6MonthHistorySaleList, MpHistorySaleRecord.class);
+
         List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
         List<String> materialCodeList = last6MonthHistorySaleList.stream().map(MpHistorySaleRecord::getMaterialCode).collect(Collectors.toList());
         List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000);
@@ -290,7 +305,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
                 // 按SKU分组，销量降序，适销区域用逗号分隔
                 String area = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed())
-                        .map(MpHistorySaleRecord::getAreaCodeName).distinct().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
+                        .map(MpHistorySaleRecord::getAreaCode).distinct().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
                 monthlySaleQty.setSaleArea(area);
 
                 // 月均销量=销量汇总/6，近3个月销量=取月份最大三个月汇总/3，向上取整
