@@ -197,8 +197,9 @@ export default {
             return (
               <areaSelect
                 key={form.areaCode}
-                multiple={true}
-                v-model={form.areaCode}
+                multiple={false}
+                v-model={form.areaCodeNameI18n}
+                onChange={this.handAreaCode}
               />
             );
           },
@@ -282,6 +283,16 @@ export default {
           this.loading = false;
         }
       });
+    },
+    handAreaCode(val,row){
+      if (val) {
+        this.$set(this.form, "areaCodeNameI18n", row.areaNameI18n);
+        this.$set(this.form, "areaCode",val);
+      } else {
+        this.$set(this.form, "areaCodeNameI18n", "");
+        this.$set(this.form, "areaCode",'');
+
+      }
     },
   },
 };

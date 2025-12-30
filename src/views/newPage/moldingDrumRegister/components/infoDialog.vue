@@ -36,11 +36,11 @@ import {
   saveMdmWorkWearInfo
 } from "@/api/monthplan/mdmWorkWearInfo";
 
-
+import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm ,formingCapacitySelect},
   inject: ["parentDict"],
   data() {
     const validatePositiveInteger = (rule, value, callback) => {
@@ -113,6 +113,13 @@ export default {
             trigger: "change",
           },
         ],
+        workWearName: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
         qty: [
           {
             required: true,
@@ -133,7 +140,7 @@ export default {
             trigger: "change",
           },
         ],
-        jobType: [
+        workWearType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -142,26 +149,26 @@ export default {
         ],
         perimeterMin: [
           {
-            required: true,
+            required: false,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
           {
             validator: (rule, value, callback) => {
-              validatePositiveInteger({ required: true }, value, callback);
+              validatePositiveInteger({ required: false }, value, callback);
             },
             trigger: ["change"],
           },
         ],
         perimeterMax: [
           {
-            required: true,
+            required: false,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
           {
             validator: (rule, value, callback) => {
-              validatePositiveInteger({ required: true }, value, callback);
+              validatePositiveInteger({ required: false }, value, callback);
             },
             trigger: ["change"],
           },
@@ -252,7 +259,15 @@ export default {
         {
           prop: "usedType",
           label: this.$t("ui.data.column.WorkWearInfo.usedType"),
-          maxlength:20
+          render: (form) => {
+            return (
+              <formingCapacitySelect
+                factoryCode={form.usedType}
+                key={form.usedType}
+                v-model={form.usedType}
+              />
+            );
+          },
         },
         {
           prop: "remark",

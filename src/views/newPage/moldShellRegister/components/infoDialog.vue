@@ -83,7 +83,7 @@ export default {
             trigger: "change",
           },
         ],
-        qty: [
+        totalQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),

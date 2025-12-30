@@ -24,6 +24,7 @@
       <el-upload
         class="form-uploader"
         ref="upload"
+          :on-exceed="handleExceed"
         :limit="1"
         accept=".xlsx, .xls"
          :before-upload="beforeUpload"
@@ -130,6 +131,25 @@ export default {
         return false; // 阻止上传
       }
     },
+       // 超过限制时的处理
+       handleExceed(files, fileList) {
+      // this.$message.warning('正在替换文件...')
+
+      // 清空当前文件
+      this.fileList = [];
+
+      // 使用 $nextTick 确保UI更新
+      this.$nextTick(() => {
+        const uploadRef = this.$refs.upload;
+        if (uploadRef) {
+          // 清空组件内部状态
+          uploadRef.clearFiles();
+
+          // 触发新文件上传
+          uploadRef.handleStart(files[0]);
+        }
+      });
+    },
     handleTemplateDownload() {
       let downloadDom = document.createElement("a");
       if (this.downloadUrlFormatter) {
@@ -188,7 +208,6 @@ export default {
     },
 
     handleImport(data) {
-      this.updateSupport=false
       if (data) {
         this.defaultValue = {
           ...data,
@@ -199,9 +218,14 @@ export default {
       this.upload.open = true;
     },
     handleClose() {
-      // this.$refs.form.triggerResetForm();
-
+      this.$refs.form.triggerResetForm();
+      this.defaultValue={
+        updateSupport:false
+      }
+      this.upload.data={}
+      this.upload.fileList = [];
       this.upload.submitLoading = false;
+      this.$refs.upload.clearFiles();
     },
     handleChange(file, fileList) {
       this.upload.fileList = fileList;

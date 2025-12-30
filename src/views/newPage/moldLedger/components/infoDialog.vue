@@ -60,7 +60,7 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
-            maxlength:40,
+
           },
         ],
         embryoCode: [
@@ -115,7 +115,7 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
-          maxlength:40
+          maxlength:32
         },
         {
           prop: "specifications",
@@ -158,7 +158,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.remark"),
-          maxlength:500
+          maxlength:100
         },
       ];
     },

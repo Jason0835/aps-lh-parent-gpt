@@ -47,3 +47,11 @@ export function savePoData(query) {
 
   })
 }
+export function lockPool(query) {
+  return request({
+    url: '/monthplan/SalesOrderPool/lockSalesOrderPool',
+    method: 'post',
+    data: query,
+
+  })
+}

@@ -86,8 +86,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 import copyDialog from "./components/copyDialog.vue";
-import cos from "highlight.js/lib/languages/cos";
-
+import { areaList } from "@/api/monthplan/mdmAreaCapaAllocation";
 export default {
   name: "RegionalCapacityAllocation",
   components: {
@@ -104,6 +103,7 @@ export default {
   },
   data() {
     return {
+      areaDist:[],
       importColumns: [
         {
           label: "",
@@ -169,7 +169,7 @@ export default {
           },
         },
         {
-          prop: "areaCode",
+          prop: "areaCodeNameI18n",
           label: this.$t("common.area"),
         },
         {
@@ -251,6 +251,7 @@ export default {
           prop: "areaCode",
           label: this.$t("common.area"),
           type: "select",
+          dictData:this.areaDist
         },
       ];
     },
@@ -365,7 +366,6 @@ export default {
         this.loading = true;
 
         const data = await listAreaCapaInfo(this.formatParams());
-        console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -374,8 +374,33 @@ export default {
         this.loading = false;
       }
     },
+    async getAreaList() {
+      try {
+        let res = await areaList({
+          pageSize: 1000,
+          pageNum: 1,
+          factoryCode: 116,
+          status: 0,
+        });
+        let list=[]
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj={
+            label:res.rows[i].areaNameI18n,
+            value:res.rows[i].areaCode
+          }
+          list.push(obj)
+
+        }
+        this.areaDist=list
+      } catch (error) {
+        console.error(error);
+      } finally {
+      }
+    },
   },
+
   created() {
+    this.getAreaList();
     let defaultParams = {
       factoryCode: "116",
     };

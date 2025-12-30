@@ -187,7 +187,9 @@ export default {
     },
     hide() {
       this.form = {};
+      this.copyForm={}
       this.$refs.form.triggerResetForm();
+      this.$refs.copyForm.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },

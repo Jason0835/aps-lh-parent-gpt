@@ -59,6 +59,7 @@ export default {
   },
   data() {
     return {
+      search:{},
       searchKey: "",
       // searchColumns: [
       //   {

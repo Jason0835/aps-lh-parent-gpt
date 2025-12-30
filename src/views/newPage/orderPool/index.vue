@@ -57,6 +57,13 @@
           v-hasPermi="['monthplan:SalesOrderPool:export']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          v-hasPermi="['monthplan:SalesOrderPool:getSCMData']"
+          @click="lockBtn"
+          >{{ $t("ui.data.column.oderPool.lock") }}
+        </el-button>
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -388,6 +395,11 @@ export default {
       // } catch (err) {
       //   console.log(err);
       // }
+    },
+    async lockBtn(){
+      if (this.$refs.scmRef) {
+        this.$refs.scmRef.show('lock');
+      }
     },
     handleAdd() {
       if (this.$refs.infoRef) {

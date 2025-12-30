@@ -238,8 +238,6 @@
   "ui.data.rubberMaterial.sectionWidth": "断面宽",
   "ui.data.rubberMaterial.shareMouldCode": "共用模具号",
   "common.rule.updateSupport": "是否更新已经存在的数据",
-
-
   "ui.data.column.trialPlan.embryoNo": "制造示方书号",
   "ui.data.column.trialPlan.embryoType": "制造示方书类型",
   "ui.data.column.trialPlan.embryoReleaseDate": "制造示方书发行时间",
@@ -249,6 +247,10 @@
  "ui.data.column.trialPlan.lhNo": "硫化示方书号",
   "ui.data.column.trialPlan.lhType": "硫化示方书类型",
   "ui.data.column.trialPlan.lhReleaseDate": "硫化示方书发行时间",
-  "ui.data.column.trialPlan.destination": "目的"
+  "ui.data.column.trialPlan.destination": "目的",
+
+
+
+  "ui.data.column.oderPool.lock": "锁定"
 
 }

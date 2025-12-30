@@ -31,7 +31,12 @@
 <script>
 import { mapState } from "vuex";
 
-import { getSCMDataCheck,getSCMData, savePoData } from "@/api/newPage/salesOrderPool";
+import {
+  getSCMDataCheck,
+  getSCMData,
+  savePoData,
+  lockPool,
+} from "@/api/newPage/salesOrderPool";
 
 import infoForm from "@/views/components/infoForm.vue";
 import Year from "@/components/Crontab/year.vue";
@@ -41,6 +46,7 @@ export default {
   inject: ["parentDict"],
   data() {
     return {
+      isLock: false,
       loading: false,
       visible: false,
       isEdit: false,
@@ -121,34 +127,41 @@ export default {
   methods: {
     async SCMBtn(params) {
       try {
-        this.loading=true
-        let arr=params.yearMonth.split("-");
+        this.loading = true;
+        let arr = params.yearMonth.split("-");
         let obj = {
           factoryCode: params.factoryCode,
           Year: arr[0],
           month: arr[1],
         };
-        let res = await getSCMDataCheck(obj);
-        console.log(res);
-        if (res.data == 1) {
-          this.$confirm(res.msg, {
-            type: "warning",
-          }).then(() => {
-            getSCMData(obj).then((data) => {
-              this.loading=false
-              this.$modal.msgSuccess(data.msg);
-              this.$emit("success");
-              this.hide();
-            });
-          });
-        } else {
+        if (this.isLock) {
+          let res = await lockPool(obj);
+          this.loading = false;
           this.$modal.msgSuccess(res.msg);
-          this.$set(this.page, "current", 1);
-          this.getList();
+          this.$emit("success");
+          this.hide();
+        } else {
+          let res = await getSCMDataCheck(obj);
+          if (res.data == 1) {
+            this.$confirm(res.msg, {
+              type: "warning",
+            }).then(() => {
+              getSCMData(obj).then((data) => {
+                this.loading = false;
+                this.$modal.msgSuccess(data.msg);
+                this.$emit("success");
+                this.hide();
+              });
+            });
+          } else {
+            this.$modal.msgSuccess(res.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          }
         }
       } catch (err) {
         console.log(err);
-        this.loading=false
+        this.loading = false;
       }
     },
     // api
@@ -172,9 +185,14 @@ export default {
     },
 
     //utils
-    show() {
+    show(data) {
+      if (data) {
+        this.isLock = true;
+      } else {
+        this.isLock = false;
+      }
       this.visible = true;
-      this.loading=false
+      this.loading = false;
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
