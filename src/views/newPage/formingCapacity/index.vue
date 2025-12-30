@@ -88,7 +88,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type'],
+  dicts: ["roll_over_type", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -162,6 +162,9 @@ export default {
         {
           prop: "rollOverType",
           label: this.$t("ui.data.column.capsuleChuck.rollOverType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.roll_over_type, value);
+          },
         },
         {
           prop: "isZeroRack",

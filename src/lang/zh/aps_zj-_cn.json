@@ -253,6 +253,8 @@
 
   "ui.data.column.oderPool.lock": "锁定",
   "ui.data.column.boom.parentVersion": "父物料版本",
-  "ui.data.column.boom.childMaterialVersion": "子物料版本"
+  "ui.data.column.boom.childMaterialVersion": "子物料版本",
+  "ui.data.column.capsuleChuck.proSize": "TBR卡盘英寸",
+  "common.rule.lengMax": "成型鼓周长下限不能大于成型鼓周长上限"
 
 }

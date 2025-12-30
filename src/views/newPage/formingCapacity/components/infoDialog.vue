@@ -169,6 +169,8 @@ export default {
           prop: "rollOverType",
           label: this.$t("ui.data.column.capsuleChuck.rollOverType"),
           maxlength:64,
+          type: "select",
+          dictData: this.parentDict.type.roll_over_type,
         },
         {
           prop: "isZeroRack",

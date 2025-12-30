@@ -166,6 +166,7 @@ export default {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
           disabled: this.isEdit,
+          maxlength:30,
         },
         {
           label: this.$t("ui.data.column.machine.machineName"),
@@ -270,7 +271,7 @@ export default {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           type: "textarea",
-          maxlength:200
+          maxlength:100
         },
       ];
     },
@@ -317,6 +318,7 @@ export default {
         this.form = {
           classShift: "2",
           openMachineClass: [],
+          factoryCode:'116'
         };
       }
     },

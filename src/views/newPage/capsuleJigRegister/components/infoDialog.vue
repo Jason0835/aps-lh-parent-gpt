@@ -124,10 +124,10 @@ export default {
             trigger: "change",
           },
         ],
-        jobType: [
+        proSize: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
@@ -156,7 +156,11 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.specifications"),
           maxlength: 64,
         },
-
+        {
+          prop: "proSize",
+          label: this.$t("ui.data.column.capsuleChuck.proSize"),
+          maxlength: 64,
+        },
         {
           prop: "internalQty",
           label: this.$t("ui.data.column.capsuleChuck.internalQty"),

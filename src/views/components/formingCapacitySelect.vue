@@ -70,6 +70,7 @@ export default {
       //     dictData: this.parentDict.type.biz_factory_name,
       //   },
       // ],
+      search:{},
       filterKey: "",
       page: {
         current: 1,

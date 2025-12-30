@@ -33,6 +33,7 @@ import { mapState } from "vuex";
 
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import structureSelect from "@/views/components/structureSelect.vue";
+import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 import {
   editCxMachineFixed
 } from "@/api/monthplan/mdmCxMachineFixed";
@@ -42,7 +43,7 @@ import infoForm from "@/views/components/infoForm.vue";
 
 
 export default {
-  components: { infoForm,materialCodeSelect,structureSelect },
+  components: { infoForm,materialCodeSelect,structureSelect ,formingCapacitySelect},
   inject: ["parentDict"],
   data() {
     return {
@@ -119,6 +120,15 @@ export default {
         {
           prop: "cxMachineCode",
           label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
+          render: (form) => {
+            return (
+              <formingCapacitySelect
+                key={form.cxMachineCode}
+                multiple={false}
+                v-model={form.cxMachineCode}
+              />
+            );
+          },
         },
         {
           prop: "fixedStructure1",

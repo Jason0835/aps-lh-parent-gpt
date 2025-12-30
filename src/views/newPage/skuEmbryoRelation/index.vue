@@ -140,6 +140,13 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
         },

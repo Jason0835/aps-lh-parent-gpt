@@ -191,9 +191,9 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
         },
         {
-          prop: "specificationModel",
+          prop: "specifications",
           label: this.$t("ui.data.column.specColor.specDesc"),
-          width:120
+          width:180
         },
         {
           prop: "qty",
@@ -281,7 +281,7 @@ export default {
           maxlength: 64,
         },
         {
-          prop: "specificationModel",
+          prop: "specifications",
           label: this.$t("ui.data.column.specColor.specDesc"),
           maxlength: 64,
         },

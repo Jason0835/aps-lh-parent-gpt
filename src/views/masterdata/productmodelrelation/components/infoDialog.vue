@@ -90,7 +90,7 @@ export default {
         ],
         shareMouldCode: [
           {
-            required: true,
+            required: false,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
@@ -143,7 +143,7 @@ export default {
           prop: "mainPattern",
         },
         {
-          prop: "samePatternPanel",
+          prop: "isSamePatternPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,

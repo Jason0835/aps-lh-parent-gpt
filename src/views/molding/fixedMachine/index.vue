@@ -87,7 +87,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_class_type','biz_machine_brand'],
   provide() {
     return {
       parentDict: this.dict,

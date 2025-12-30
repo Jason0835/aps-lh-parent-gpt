@@ -229,7 +229,7 @@ export default {
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
         },
         {
-          prop: "samePatternPanel",
+          prop: "isSamePatternPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
           width:80,
           formatter: (row, column, value) => {

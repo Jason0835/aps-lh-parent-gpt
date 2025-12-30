@@ -71,6 +71,7 @@ export default {
 
       callback();
     };
+
     return {
       loading: false,
       visible: false,
@@ -106,7 +107,7 @@ export default {
             trigger: "change",
           },
         ],
-        specificationModel: [
+        specifications: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -239,7 +240,7 @@ export default {
           min:1
         },
         {
-          prop: "specificationModel",
+          prop: "specifications",
           label: this.$t("ui.data.column.specColor.specDesc"),
           maxlength:64
         },
@@ -280,6 +281,10 @@ export default {
   methods: {
     // api
     async save(params) {
+      if(params.perimeterMax<params.perimeterMin){
+        this.$modal.msgError(this.$t('common.rule.lengMax'));
+        return
+      }
       try {
         this.loading = true;
 

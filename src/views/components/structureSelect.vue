@@ -62,6 +62,7 @@ export default {
   data() {
     return {
       searchKey: "",
+      search:{},
       // searchColumns: [
       //   {
       //     prop: "factoryCode",

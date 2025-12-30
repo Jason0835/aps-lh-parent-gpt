@@ -99,7 +99,7 @@ export default {
     // infoDialog,
     // addDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["LINE_TYPE", "production_stage", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -151,7 +151,7 @@ export default {
         },
 
         {
-          prop: "parentCode",
+          prop: "parentMaterialCode",
           label: this.$t("ui.data.column.boom.fatherCode"),
           width: 280,
         },
@@ -169,15 +169,18 @@ export default {
           label: this.$t("ui.data.column.boom.boomVersion"),
         },
         {
-          prop: "productionStageCode",
+          prop: "productionStage",
           label: this.$t("ui.data.column.cx.bom.productionStage"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.production_stage, value);
+          },
         },
         // {
         //   prop: "parentMaterialCode",
         //   label: "父物料版本信息",
         // },
         {
-          prop: "childCode",
+          prop: "childMaterialCode",
           label: this.$t("ui.data.column.boom.chirenCode"),
           width: 180,
         },
@@ -187,7 +190,7 @@ export default {
           width: 180,
         },
         {
-          prop: "childMaterialCode",
+          prop: "childCode",
           label: this.$t("ui.data.column.boom.chirenType"),
         },
         {
@@ -229,7 +232,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.boom.fatherCode"),
-          prop: "parentCode",
+          prop: "parentMaterialCode",
         },
         {
           label: this.$t("ui.data.column.boom.fatherName"),

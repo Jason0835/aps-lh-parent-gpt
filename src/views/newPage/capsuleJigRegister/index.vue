@@ -145,6 +145,10 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.specifications"),
         },
         {
+          prop: "proSize",
+          label: this.$t("ui.data.column.capsuleChuck.proSize"),
+        },
+        {
           prop: "internalQty",
           label: this.$t("ui.data.column.capsuleChuck.internalQty"),
         },
