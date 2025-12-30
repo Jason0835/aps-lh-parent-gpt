@@ -250,7 +250,7 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static DpOrderOffsetDetail allocateStockForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    long stockQty = context.getStockInfos().stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
+    long stockQty = context.getStockInfos().stream().filter(item -> null != item.getStockQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
     // 库存分配量
