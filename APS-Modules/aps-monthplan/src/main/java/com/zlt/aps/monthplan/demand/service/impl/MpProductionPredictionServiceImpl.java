@@ -71,8 +71,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final IMdmProductStockService mdmProductStockService;
     // 月底计划余量
     private final IMonthPlanSurplusService monthPlanSurplusService;
-    // 订单分配表
-    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
     private final IDpStockVersionService dpStockVersionService;
     // 定稿的月度排产计划
@@ -470,7 +468,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             monthPlanVersion,yearMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
         // 过滤净需求
         List<DpOrderOffsetDetail> netDemands = allocations.stream()
-            .filter(allocation -> allocation.getProducionQty() > 0)
+            .filter(allocation -> allocation.getProduceQtyDue() > 0)
             .collect(Collectors.toList());
         return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
     }
@@ -484,7 +482,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         OrderAllocationResult allocationResult) {
         // 批量插入分配结果
         if (CollectionUtils.isNotEmpty(allocationResult.getAllocations())) {
-            this.dpOrderOffsetDetailService.insertBatchData(allocationResult.getAllocations());
+            this.baseDao.insertBatch(allocationResult.getAllocations());
         }
         // 批量插入库存版本
         dpStockVersionService.insertBatchData(predictionVersion,yearMonth,allocationResult.getStockMap());

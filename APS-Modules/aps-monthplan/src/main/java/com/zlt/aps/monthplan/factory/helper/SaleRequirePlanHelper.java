@@ -616,7 +616,7 @@ public class SaleRequirePlanHelper {
           .sum();
 
       long totalDemand = sortedOrders.stream()
-          .mapToLong(DpOrderOffsetDetail::getProducionQty)
+          .mapToLong(DpOrderOffsetDetail::getProduceQtyDue)
           .sum();
 
       // 调整优先级
@@ -652,12 +652,12 @@ public class SaleRequirePlanHelper {
     for (int i = sortedOrders.size() - 1; i >= 0; i--) {
       DpOrderOffsetDetail order = sortedOrders.get(i);
       // 跳过已处理或无效的订单
-      if (order == null || order.getProducionQty() == null || order.getProducionQty() <= 0) {
+      if (order == null || order.getProduceQtyDue() == null || order.getProduceQtyDue() <= 0) {
         continue;
       }
       // 检查当前累加值是否已经达到或超过阈值
       // 注意：先检查，再累加
-      long currentOrderQty = order.getProducionQty();
+      long currentOrderQty = order.getProduceQtyDue();
       if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
         break;
       } else {
@@ -741,8 +741,8 @@ public class SaleRequirePlanHelper {
     }
 
     private int compareOrdQty(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
-      Long q1 = o1.getProducionQty();
-      Long q2 = o2.getProducionQty();
+      Long q1 = o1.getProduceQtyDue();
+      Long q2 = o2.getProduceQtyDue();
 
       if (q1 == null && q2 == null) {
         return 0;
@@ -783,7 +783,7 @@ public class SaleRequirePlanHelper {
   private static DpDemandPlan buildDemandPlanFromAllocation(DpOrderOffsetDetail netDemand) {
     DpDemandPlan demandPlan = new DpDemandPlan();
     BeanUtils.copyProperties(netDemand, demandPlan);
-    demandPlan.setNetQty(BigDecimal.valueOf(netDemand.getProducionQty()));
+    demandPlan.setNetQty(BigDecimal.valueOf(netDemand.getProduceQtyDue()));
     demandPlan.setYearWeek(netDemand.getWeekYear());
     return demandPlan;
   }
