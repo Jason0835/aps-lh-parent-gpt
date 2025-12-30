@@ -1,22 +1,21 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.util.Date;
-
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：DpOrderOffsetDetail.java
  * 描    述：S1-0604订单冲减分配对象 t_dp_order_offset_detail
  *@author yelq
- *@date 2025-12-21
+ *@date 2025-12-30
  *@version 1.0
  *
  *  修改记录：
@@ -28,23 +27,24 @@ import java.util.Date;
 @ApiModel(value = "S1-0604订单冲减分配对象", description = "S1-0604订单冲减分配对象 ")
 @Data
 @TableName(value = "T_DP_ORDER_OFFSET_DETAIL")
-public class DpOrderOffsetDetail extends BaseEntity{
+public class DpOrderOffsetDetail extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.factoryCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.year")
+    @Excel(name = "ui.data.column.orderOffsetDetail.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.month")
+    @Excel(name = "ui.data.column.orderOffsetDetail.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -56,13 +56,13 @@ public class DpOrderOffsetDetail extends BaseEntity{
     private String monthPlanVersion;
 
     /** 产品品类 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.productTypeCode")
+    @Excel(name = "ui.data.column.orderOffsetDetail.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 库位类别 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.locationType")
+    @Excel(name = "ui.data.column.orderOffsetDetail.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -104,7 +104,7 @@ public class DpOrderOffsetDetail extends BaseEntity{
     private String poNumber;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.brand")
+    @Excel(name = "ui.data.column.orderOffsetDetail.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -128,34 +128,40 @@ public class DpOrderOffsetDetail extends BaseEntity{
     private String materialDesc;
 
     /** 订单数量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.orderQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单数量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Long orderQty;
 
     /** 库存总数 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.stockQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存总数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Long stockQty;
 
     /** 库存分配量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.allocationQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.allocationQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存分配量", name = "allocationQty")
     @TableField(value = "ALLOCATION_QTY")
     private Long allocationQty;
 
     /** 月底计划余量分配量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.plannedSurplus")
+    @Excel(name = "ui.data.column.orderOffsetDetail.plannedSurplus", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月底计划余量分配量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
     private Long plannedSurplus;
 
+    /** 预计需要生产量 */
+    @Excel(name = "ui.data.column.orderOffsetDetail.produceQtyDue", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
+    @TableField(value = "PRODUCE_QTY_DUE")
+    private Long produceQtyDue;
+
     /** 计划排产量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.productionQty")
+    @Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "计划排产量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
-    private Long producionQty;
+    private Long productionQty;
 
     /** 供应链优先级 */
     @Excel(name = "ui.data.column.orderOffsetDetail.scmPriority")
@@ -169,20 +175,20 @@ public class DpOrderOffsetDetail extends BaseEntity{
     @TableField(value = "WEEK_YEAR")
     private String weekYear;
 
-    /** 均匀性 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.isDynamicBalance")
+    /** 动平衡 */
+    @Excel(name = "ui.data.column.orderOffsetDetail.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
 
-    /** 动平衡 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.uniformity")
-    @ApiModelProperty(value = "均匀性", name = "uniformity")
+    /** 均匀性 */
+    @Excel(name = "ui.data.column.orderOffsetDetail.isUniformity", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
     /** 发货模式 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.deliverGoodsType")
+    @Excel(name = "ui.data.column.orderOffsetDetail.deliverGoodsType", dictType = "biz_deliver_goods_type")
     @ApiModelProperty(value = "发货模式", name = "deliverGoodsType")
     @TableField(value = "DELIVER_GOODS_TYPE")
     private String deliverGoodsType;
@@ -202,5 +208,6 @@ public class DpOrderOffsetDetail extends BaseEntity{
     @ApiModelProperty(value = "提报日期", name = "billDate")
     @TableField(exist = false)
     private Date billDate;
+
 
 }

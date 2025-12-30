@@ -31,7 +31,6 @@ import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -95,8 +94,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IMdmProductStockService mdmProductStockService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-    // 订单分配表
-    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
     private final IDpStockVersionService dpStockVersionService;
     // 区域产能分配
@@ -333,7 +330,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 过滤净需求
         List<DpOrderOffsetDetail> netDemands = allocations.stream()
-            .filter(allocation -> allocation.getProducionQty() > 0)
+            .filter(allocation -> allocation.getProduceQtyDue() > 0)
             .collect(Collectors.toList());
 
         return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
@@ -349,7 +346,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 批量插入分配结果
         if (CollectionUtils.isNotEmpty(allocationResult.getAllocations())) {
-            this.dpOrderOffsetDetailService.insertBatchData(allocationResult.getAllocations());
+            this.baseDao.insertBatch(allocationResult.getAllocations());
         }
 
         // 批量插入库存版本

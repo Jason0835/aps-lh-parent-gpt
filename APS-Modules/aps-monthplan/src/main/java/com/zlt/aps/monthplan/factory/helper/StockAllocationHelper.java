@@ -513,7 +513,7 @@ public class StockAllocationHelper {
     allocation.setOrderQty(order.getOrdQty().longValue());
     allocation.setStockQty(stockQty);
     allocation.setAllocationQty(allocationQty);
-    allocation.setProducionQty(produceQtyDue);
+    allocation.setProduceQtyDue(produceQtyDue);
     return allocation;
   }
 
