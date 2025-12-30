@@ -149,7 +149,7 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     @Override
     protected void builderCondition(QueryWrapper<MdmMoldingMachine> queryWrapper, MdmMoldingMachine queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", queryVO.getFieldValueByFieldName("cxMachineCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", queryVO.getFieldValueByFieldName("cxMachineCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineTypeCode")), "CX_MACHINE_TYPE_CODE", queryVO.getFieldValueByFieldName("cxMachineTypeCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("rollOverType")), "ROLL_OVER_TYPE", queryVO.getFieldValueByFieldName("rollOverType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isZeroRack")), "IS_ZERO_RACK", queryVO.getFieldValueByFieldName("isZeroRack"));
