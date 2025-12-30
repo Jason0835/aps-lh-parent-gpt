@@ -2,17 +2,23 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -23,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -45,6 +53,9 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
 
     @Autowired
     private MdmAreaCapaAllocationEntityMapper mdmAreaCapaAllocationEntityMapper;
+
+    @Autowired
+    private DpAreaEntityMapper dpAreaEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -71,6 +82,38 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "areaCode"));
+    }
+
+    @Override
+    protected Map<Object, Object> getServiceCheckParams(List<MdmAreaCapaAllocation> list, List<MdmAreaCapaAllocation> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        // 查询区域数据，转义区域
+        List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
+        Map<String, String> areaMap;
+        if (CollectionUtils.isNotEmpty(dpAreaList)) {
+            JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
+            areaMap = dpAreaList.stream().collect(Collectors.toMap(DpArea::getAreaNameI18n, DpArea::getAreaCode, (old, newValue) -> newValue));
+            serviceCheckParams.put("areaMap", areaMap);
+        }
+        return serviceCheckParams;
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmAreaCapaAllocation importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (serviceCheckParams.containsKey("areaMap")) {
+            Map<String, String> areaMap = (Map<String, String>) serviceCheckParams.get("areaMap");
+            String areaCodeNameI18n = importDocEntity.getAreaCodeNameI18n();
+            if (areaMap.containsKey(areaCodeNameI18n)) {
+                String areaCode = areaMap.get(areaCodeNameI18n);
+                importDocEntity.setAreaCode(areaCode);
+            } else {
+                String message = I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.areaCodeNotExists");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
+            }
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
     /**
