@@ -3,10 +3,7 @@ package com.zlt.aps.factory.handler;
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
-import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
@@ -18,6 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 成型硫化模具排产计算器
@@ -116,6 +115,37 @@ public class CxLhMouldProductionCalculator {
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
         lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
+    }
+
+
+    /**
+     * 续作Sku使用续作模具进行排产
+     *
+     * @param context         排产上下文
+     * @param groupPlanInfo   分组排产计划
+     * @param continueSkuInfo 续作Sku信息
+     * @param productionDay   排产日
+     * @param productionQty   日排产量
+     * @param doubleMouldList 模具信息
+     */
+    public static void continueSkuLhProductionHandler(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueSkuInfoHelper continueSkuInfo, Integer productionDay, Integer productionQty, List<ProductionMouldInfoVo> doubleMouldList) {
+        Set<Integer> stopDay = context.getStopDays();
+        if (stopDay.contains(productionDay)) {
+            return;
+        }
+        Long dayMaxProductionQty = continueSkuInfo.getMaxDaySingleLhMachineQty();
+        boolean isDayFinish = productionQty >= dayMaxProductionQty ? true : false;
+        Set<String> cxMachineCodeInfo = continueSkuInfo.getOnLineCxMachineSet();
+        List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = continueSkuInfo.getContinueSkuPlanList();
+        Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = continueSkuPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
+        Map<Long, Long> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(Long.valueOf(productionQty), continueSkuPlanList);
+        productionPlanMap.forEach((monthPlanId, planProductionQty) -> {
+            MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
+            doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineCodeInfo));
+            //日排产信息
+            GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, productionDay, cxMachineCodeInfo, doubleMouldList, planProductionQty, BigDecimal.ZERO.longValue(), null);
+            groupPlanInfo.addDayProductionInfo(helper);
+        });
     }
 
     /**

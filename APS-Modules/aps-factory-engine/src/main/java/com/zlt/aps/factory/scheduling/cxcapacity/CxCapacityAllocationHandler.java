@@ -141,7 +141,7 @@ public class CxCapacityAllocationHandler {
         if (null == continueSkuMap) {
             continueSkuMap = new HashMap<>();
         }
-        return new CxMachineAllocationPlanHelper(groupPlanInfo, maxLhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
+        return new CxMachineAllocationPlanHelper(cxMachineBaseInfo.getCxMachineCode(), groupPlanInfo, maxLhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
     }
 
     /**

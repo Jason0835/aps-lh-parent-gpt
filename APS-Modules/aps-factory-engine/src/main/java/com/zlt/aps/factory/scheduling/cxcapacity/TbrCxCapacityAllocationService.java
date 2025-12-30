@@ -91,9 +91,11 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
         //todo 采用新的逻辑进行分配在机结构的在产机台
-        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+//        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
-        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
+//        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
+        mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //对收尾成型机台，反向匹配待排结构
         CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
         //对还需排产结构，获取优先级最高的结构--结构新增
@@ -402,6 +404,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             mouldShellMap.put(mouldShell.getMoldModelCode(), mouldShell);
         }
         return mouldShellMap;
+    }
+    /**
+     * 对在机结构进行新增Sku的模具排产
+     *
+     * @param context                排产上下文
+     * @param allGroupPlanMap        所有分组排产计划
+     * @param continueAllocationList 在机机台产能分配
+     * @param allContinueMap         续作信息
+     */
+    private void mouldProductionByContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        if (CollectionUtils.isEmpty(allContinueMap)) {
+            return;
+        }
+        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
+        //在机结构-在产机台限制
+        allContinueMap.forEach((structureName, cxContinueInfo) -> {
+            ProductionPlanGroupInfo groupPlan = allGroupPlanMap.get(structureName);
+            List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlan);
+            if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+                return;
+            }
+            groupPlan.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
+        });
+        //todo 在机结构-新增Sku模拟排产
     }
 
     /**
