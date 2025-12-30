@@ -180,6 +180,9 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     private List<MpHistorySaleRecord> getAreaGroupHistorySaleRecordList(String factoryCode, String last12YearMonth, String maxYearMonth, List<String> codeList) {
         List<MpHistorySaleRecord> sumQtyGroupByAreaList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByArea(factoryCode, last12YearMonth, maxYearMonth, codeList);
 
+        for (MpHistorySaleRecord record : sumQtyGroupByAreaList) {
+//            record.setColorFlag()
+        }
         // 执行表达式，转义区域
         try {
             QueryFormulaUtil.execFormula(sumQtyGroupByAreaList, new String[]{
@@ -204,7 +207,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
             throw new ServiceException("转换区域，执行查询公式时发生错误.");
         }
         JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
-        return convertVoList.stream().collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n));
+        return convertVoList.stream().collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n, (k1, k2) -> k1));
     }
 
     @Override
