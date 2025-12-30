@@ -253,15 +253,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
             CompletableFuture.supplyAsync(this::fetchSupplyOrderPool);
 
-        CompletableFuture<Map<String, Long>> monthSurplusFuture =
-            CompletableFuture.supplyAsync(() -> this.fetchMonthSurplusMap(monthPlanVersion));
         CompletableFuture<Map<String, Long>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
 
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
-            supplyOrdersFuture, monthSurplusFuture,monthlySaleQtyFuture
+            supplyOrdersFuture, monthlySaleQtyFuture
         ).join();
 
         try {
@@ -269,7 +267,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
-            Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
+
             Map<String, Long>  monthlySaleQty = monthlySaleQtyFuture.get();
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
@@ -277,7 +275,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-
+            Map<String, Long> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion,finishedProductStocks);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
@@ -438,12 +436,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return this.supplyOrderPoolService.findCurrentSupplyOrderPool();
     }
 
-    /**
-     * 计算月底计划余量 查询获取所有成品库存；同时计算月底计划余量：库存抓取日~（同月）月底的月度计划量汇总
-     */
-    private Map<String, Long> fetchMonthSurplusMap(String monthPlanVersion) {
-        return factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion);
-    }
 
     private Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
         return monthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
@@ -752,12 +744,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 return;
             }
 
-            totalOrderQty += plan.getOrderQty().longValue();
-            totalNetQty += plan.getNetQty().longValue();
+            totalOrderQty += plan.getOrderQty() == null? 0: plan.getOrderQty().longValue();
+            totalNetQty += plan.getNetQty()== null? 0: plan.getNetQty().longValue();
 
             // 根据订单优先级累加对应数量
             String priority = plan.getOrderPriority();
-            long netQty = plan.getNetQty().longValue();
+            long netQty = plan.getNetQty() == null? 0: plan.getNetQty().longValue();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {
                 heightQty += netQty;

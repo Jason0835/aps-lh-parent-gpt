@@ -25,7 +25,6 @@ import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
-import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
@@ -69,8 +68,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
     private final IMdmProductStockService mdmProductStockService;
-    // 月底计划余量
-    private final IMonthPlanSurplusService monthPlanSurplusService;
     // 版本库存
     private final IDpStockVersionService dpStockVersionService;
     // 定稿的月度排产计划
@@ -132,28 +129,37 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
         FactoryProductionVersion finalVersion =  finalVersions.get(0);
+        Map<String,Long> tPlus1MonthDemandQty = this.calculateTPlus1MonthDemandQty(monthRangeResult.getTPlus1Month(),finalVersion);
+        // TODO 12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
+
+
+
+
+        return null;
+    }
+
+    private Map<String, Long> calculateTPlus1MonthDemandQty(YearMonth yearMonth, FactoryProductionVersion finalVersion) {
         // 4、生成预测版本号(PRE+yyyymmdd+3位流水号)
         String predictionVersion = requirementVersionService.generateVersion(PREFIX);
-        createCondition.setPredictionVersion(predictionVersion);
         // 5. 并行获取数据
-        DataCollection data = fetchRequiredDataInParallel();
+        DataCollection data = fetchRequiredDataInParallel(predictionVersion);
         // 6. 处理销售订单分配
         OrderAllocationResult allocationResult = processSalesOrderAllocation(
-            predictionVersion, monthRangeResult.getTPlus1Month(),data.getSalesOrders(), data.getFinishedProductStockMap(),
+            predictionVersion,yearMonth,data.getSalesOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
         //  (1) 得到对冲后的销售订单净需求数据(包含暂缓订单+高优先级+中优先级的净需求)
         // 7. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
-            monthRangeResult.getTPlus1Month(),allocationResult.getNetDemands());
+            yearMonth,allocationResult.getNetDemands());
         // 8. 合并并保存需求计划
-        List<DpDemandPlan> tPlus1MonthDemandPlans =  saveDemandPlans(predictionVersion,monthRangeResult.getTPlus1Month(), demandPlans, data);
+        List<DpDemandPlan> tPlus1MonthDemandPlans =  saveDemandPlans(predictionVersion,yearMonth, demandPlans, data);
         //  (2) 同时，保存预测版本号T月的订单分配结果
-        saveAllocationResults(predictionVersion,monthRangeResult.getTPlus1Month(),allocationResult);
+        saveAllocationResults(predictionVersion,yearMonth,allocationResult);
         // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
         // 生成周期排产
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(monthRangeResult.getTPlus1Month());
+        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(yearMonth);
         // 生成储备排产
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(monthRangeResult.getTPlus1Month());
+        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(yearMonth);
 
         List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
         if(CollectionUtils.isNotEmpty(cycleStockUpOrders)){
@@ -164,20 +170,14 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         }
         // (1) 生成的T+1月的周期排产储备和常规储备数据，保存录入(预测版本号)订单池快照表
         // 8. 保存订单池快照
-        saveOrderPoolSnapshot(predictionVersion,monthRangeResult.getTPlus1Month(),allStockUpOrders);
+        saveOrderPoolSnapshot(predictionVersion,yearMonth,allStockUpOrders);
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
         List<DpDemandPlan> tMonthDemandPlans = dpDemandPlanService.findDemandPlanByMonthPlanVersion(finalVersion.getMonthPlanVersion());
         //  T月实单未排产量：	300	(高优先级净需求+中优先级净需求+暂缓订单净需求-T月实单排产量+T月实单已完成量)
         Map<String,Long> unProductionQty = this.getUnProductionQtyMap(tPlus1MonthDemandPlans,productionFinalResults);
         Map<String,Long> unProductionQtyByCycleStockUp = this.getUnProductionQtyByCycleStockUp(tMonthDemandPlans,productionFinalResults);
         Map<String,Long> stockUpOrderQty = this.getStockUpOrderQtyMap(allStockUpOrders);
-        Map<String,Long> tPlus1MonthDemandQty =  calculateTPlus1MonthDemandQty(unProductionQty,unProductionQtyByCycleStockUp,stockUpOrderQty);
-        // TODO 12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-
-
-
-
-        return null;
+        return  calculateTPlus1MonthDemandQty(unProductionQty,unProductionQtyByCycleStockUp,stockUpOrderQty);
     }
 
     private Map<String, Long> getStockUpOrderQtyMap(List<SupplyOrderPool> allStockUpOrders) {
@@ -491,13 +491,11 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     /**
      * 并行获取所有必要数
      */
-    private DataCollection fetchRequiredDataInParallel() {
+    private DataCollection fetchRequiredDataInParallel(String predictionVersion) {
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
             CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
-        CompletableFuture<Map<String, Long>> monthSurplusFuture =
-            CompletableFuture.supplyAsync(this::fetchMonthSurplusMap);
         CompletableFuture<Map<String, String>> productionTypeFuture =
             CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
         CompletableFuture<Map<String, Long>> monthlySaleQtyFuture =
@@ -509,13 +507,13 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
         // 等待所有任务完成
         CompletableFuture.allOf(
-            salesOrdersFuture, stocksFuture, monthSurplusFuture,productionTypeFuture,monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture
+            salesOrdersFuture, stocksFuture,productionTypeFuture,monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture
         ).join();
 
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
-            Map<String, Long> monthSurplusMap = monthSurplusFuture.get();
+
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             Map<String, Long>  monthlySaleQty = monthlySaleQtyFuture.get();
             long minProductionQty = minProductionQtyFuture.get();
@@ -526,8 +524,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-
-
+            Map<String, Long> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,finishedProductStocks);
             return new DataCollection(
                 salesOrders,
                 finishedProductStocks,
@@ -559,24 +556,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private Map<String, String> fetchProductionTypeMap() {
         return mdmSkuScheduleCategoryService.skuToProductionType();
     }
-
-    /**
-     *  获取T-1月新的月底计划余量(如果库存日期 > T-1月，则月底计划余量 = 0)；
-     * @return
-     */
-    private Map<String, Long> fetchMonthSurplusMap() {
-        List<MdmMonthSurplus> mdmMonthSurpluses = monthPlanSurplusService.findCurrentMonthPlanSurplus();
-        if(CollectionUtils.isEmpty(mdmMonthSurpluses)){
-            return Collections.emptyMap();
-        }
-        return mdmMonthSurpluses.stream()
-            .filter(Objects::nonNull)
-            .collect(Collectors.groupingBy(
-                MdmMonthSurplus::getGroupKey,
-                Collectors.summingLong(MdmMonthSurplus::getPlanSurplusQty)
-            ));
-    }
-
     /**
      *  从成品库存表中获取库存
      * @return 成品库存

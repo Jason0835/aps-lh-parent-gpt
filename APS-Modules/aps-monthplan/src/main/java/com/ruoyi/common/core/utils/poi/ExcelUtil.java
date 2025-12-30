@@ -1556,7 +1556,7 @@ public class ExcelUtil<T> {
                 } else if (cell.getCellType() == CellType.BOOLEAN) {
                     val = cell.getBooleanCellValue();
                 } else if (cell.getCellType() == CellType.ERROR) {
-                    val = cell.getErrorCellValue();
+                    val = cell.getStringCellValue();
                 }
 
             }
