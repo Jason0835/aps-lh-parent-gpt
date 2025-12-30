@@ -7,14 +7,14 @@ import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
-import com.zlt.aps.monthplan.demand.mapper.DpOrderPoolSnapshotEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-import java.util.ArrayList;
+
+import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 
@@ -81,6 +81,39 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         }
     }
 
+    @Override
+    public void saveOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, List<SupplyOrderPool> allStockUpOrders) {
+        List<DpOrderPoolSnapshot> orderPoolSnapshots = Lists.newArrayList();
+        if(CollectionUtils.isNotEmpty(allStockUpOrders)){
+            allStockUpOrders.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(predictionVersion,yearMonth,supplyOrder)));
+        }
+        if(CollectionUtils.isNotEmpty(orderPoolSnapshots)){
+            this.baseDao.insertBatch(orderPoolSnapshots);
+        }
+    }
+
+    private DpOrderPoolSnapshot buildOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, SupplyOrderPool supplyOrder) {
+        DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
+        BeanUtils.copyProperties(supplyOrder, entity);
+        entity.setId(null);
+        entity.setBaseVale(null);
+        entity.setYear(yearMonth.getYear());
+        entity.setMonth(yearMonth.getMonthValue());
+        entity.setMonthPlanVersion(predictionVersion);
+        entity.setOrderPriority(supplyOrder.getOrderType());
+        // entity.setAreaCode();
+        // entity.setCustomCode();
+        // entity.setCustomName();
+        // entity.setCustomNationCode();
+        entity.setDemandQty(supplyOrder.getQty());
+        // entity.setDestinationNationCode();
+        // entity.setIsDynamicBalance();
+        // entity.setIsUniformity();
+        // entity.setPoNumber();
+        // entity.setSubmitDate();
+        // entity.setScmId();
+        return entity;
+    }
 
 
     private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SalesOrderPool saleOrder) {

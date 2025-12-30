@@ -5,9 +5,9 @@ package com.zlt.aps.monthplan.demand.service;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.bill.common.service.IDocService;
 
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
@@ -33,9 +33,11 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    */
   void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
   /**
-   * 将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
-   * @param createCondition 需求参数
-   * @param finishedProductStockMap 成品库存记录
+   *  将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
+   * @param predictionVersion 预测版本号
+   * @param yearMonth 年月
+   * @param finishedProductStockMap 库存
    */
-  void insertBatchData(MpProductionPrediction createCondition, Map<String, List<MdmProductStock>> finishedProductStockMap);
+  void insertBatchData(String predictionVersion,
+                       YearMonth yearMonth, Map<String, List<MdmProductStock>> finishedProductStockMap);
 }
