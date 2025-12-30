@@ -60,7 +60,7 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:SalesOrderPool:getSCMData']"
+          v-hasPermi="['monthplan:SalesOrderPool:lock']"
           @click="lockBtn"
           >{{ $t("ui.data.column.oderPool.lock") }}
         </el-button>

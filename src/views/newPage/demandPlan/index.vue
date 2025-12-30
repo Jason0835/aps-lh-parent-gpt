@@ -232,21 +232,30 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-                <el-select
-                  v-if={this.hasPermission("monthplan:demandPlan:edit")}
-                  placeholder="请选择"
-                  v-model={row.scmPriority}
-                  onChange={(val) => this.handlePriorityChange(row, val)}
-                >
-                  {this.dict.type.biz_order_type.map((item) => (
-                    <el-option
-                      key={item.value}
-                      label={item.label}
-                      value={item.value}
-                    ></el-option>
-                  ))}
-                </el-select>
-                <span v-else>{this.selectDictLabel(this.dict.type.biz_order_type, row.scmPriority)}</span>
+                {this.hasPermission("monthplan:demandPlan:edit") && (
+                  <el-select
+                    v-if={this.hasPermission("monthplan:demandPlan:edit")}
+                    placeholder="请选择"
+                    v-model={row.scmPriority}
+                    onChange={(val) => this.handlePriorityChange(row, val)}
+                  >
+                    {this.dict.type.biz_order_type.map((item) => (
+                      <el-option
+                        key={item.value}
+                        label={item.label}
+                        value={item.value}
+                      ></el-option>
+                    ))}
+                  </el-select>
+                )}
+                {!this.hasPermission("monthplan:demandPlan:edit") && (
+                  <span>
+                    {this.selectDictLabel(
+                      this.dict.type.biz_order_type,
+                      row.scmPriority
+                    )}
+                  </span>
+                )}
               </div>
             );
           },
@@ -266,7 +275,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300
+          width: 300,
         },
         {
           prop: "productionType",

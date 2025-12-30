@@ -10,7 +10,7 @@ export function listDemandPlan(query) {
 }
 export function saveDemandPlan(query) {
   return request({
-    url: '/monthplan/demandPlan/edit',
+    url: '/monthplan/demandPlan/save',
     method: 'post',
     data: query
   })
