@@ -8,6 +8,7 @@ import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -56,6 +57,6 @@ public class MdmSkuConstructionRefServiceImpl extends AbstractDocService<MdmSkuC
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "constructionCode"));
     }
 }

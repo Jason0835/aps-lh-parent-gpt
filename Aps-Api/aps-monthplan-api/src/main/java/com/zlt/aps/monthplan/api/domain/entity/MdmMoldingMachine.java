@@ -30,49 +30,49 @@ public class MdmMoldingMachine extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode", dictType = "biz_factory_name", sort = 1)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 成型机编码 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineCode")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineCode", sort = 2)
     @ApiModelProperty(value = "成型机编码", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
 
     /** 成型机类型 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineBrandCode",dictType = "biz_machine_brand")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineBrandCode",dictType = "biz_machine_brand", sort = 4)
     @ApiModelProperty(value = "成型机类型", name = "cxMachineBrandCode")
     @TableField(value = "CX_MACHINE_BRAND_CODE")
     private String cxMachineBrandCode;
 
     /** 类型 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineTypeCode", dictType = "biz_class_type")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineTypeCode", dictType = "biz_class_type", sort = 3)
     @ApiModelProperty(value = "类型", name = "cxMachineTypeCode")
     @TableField(value = "CX_MACHINE_TYPE_CODE")
     private String cxMachineTypeCode;
 
     /** 反包方式 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.rollOverType", dictType = "ROLL_OVER_TYPE")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.rollOverType", dictType = "ROLL_OVER_TYPE", sort = 5)
     @ApiModelProperty(value = "反包方式", name = "rollOverType")
     @TableField(value = "ROLL_OVER_TYPE")
     private String rollOverType;
 
     /** 是否有零度供料架 数据字典 biz_yes_no 1 是 0 否 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.isZeroRack", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.isZeroRack", dictType = "biz_yes_no", sort = 6)
     @ApiModelProperty(value = "是否有零度供料架 数据字典 biz_yes_no 1 是 0 否", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
 
     /** 硫化机上限 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.lhMachineMaxQty")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.lhMachineMaxQty", sort = 7)
     @ApiModelProperty(value = "硫化机上限", name = "lhMachineMaxQty")
     @TableField(value = "LH_MACHINE_MAX_QTY")
     private Integer lhMachineMaxQty;
 
     /** 设备最大日产量 */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.maxDayCapacity")
+    @Excel(name = "ui.data.column.mdmMoldingMachine.maxDayCapacity", sort = 8)
     @ApiModelProperty(value = "设备最大日产量", name = "maxDayCapacity")
     @TableField(value = "MAX_DAY_CAPACITY")
     private Integer maxDayCapacity;

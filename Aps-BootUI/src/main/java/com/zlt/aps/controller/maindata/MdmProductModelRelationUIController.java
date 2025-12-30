@@ -214,7 +214,7 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProductModelRelationService.importData(context, true);
+        AjaxResult ajaxResult = iMdmProductModelRelationService.importData(context, updateSupport);
         return ajaxResult;
     }
 

@@ -4,8 +4,8 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -32,29 +32,29 @@ public class CxContinueSkuProductionHandler {
      * @param context            排产上下文
      * @param cxMachineCode      成型机台
      * @param productionPlanList 分组排产计划
-     * @param continueSkuMap     续作SKU信息
      * @param productionPlan     排产信息，包含起始及收尾日期
      * @param mouldInfoMap       模具关系信息
      * @param mouldShellMap      模壳信息
      */
-    public static void productionContinue(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueSkuInfoHelper> continueSkuMap, CxMachineAllocationPlanHelper productionPlan, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    public static void productionContinue(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxMachineAllocationPlanHelper productionPlan, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         //构建成型机台对应的空硫化分组
         createCxLhRatioMapByContinue(context, cxMachineCode, productionPlan.getMaxRatio(), productionPlan.getProductionPlanInfo().getGroupName());
         //成型分配的排产日
         Integer startDay = productionPlan.getStartDay();
         Integer endDay = productionPlan.getEndDay();
         Integer cxLhGroupNo = BigDecimal.ONE.intValue();
+        Map<String, CxContinueSkuInfoHelper> continueSkuMap = productionPlan.getContinueSkuMap();
         //1、优先排产续作SKU
         for (Map.Entry<String, CxContinueSkuInfoHelper> entry : continueSkuMap.entrySet()) {
             CxContinueSkuInfoHelper continueSkuInfo = entry.getValue();
             String materialDesc = entry.getKey();
             ProductionSkuParamHelper paramHelper = new ProductionSkuParamHelper(startDay, endDay, cxMachineCode, cxLhGroupNo, materialDesc);
-            cxLhGroupNo = productionSingleContinueSku(context, paramHelper, productionPlanList, continueSkuInfo, mouldInfoMap);
+            cxLhGroupNo = productionSingleContinueSku(context, productionPlan, paramHelper, productionPlanList, continueSkuInfo, mouldInfoMap);
         }
         //2、再排产同规格同花纹，获取先收尾的硫化组信息
-        productionSameSpecificationsAndPattern(context, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
+        productionSameSpecificationsAndPattern(context, productionPlan, cxMachineCode, endDay, productionPlanList, mouldInfoMap, mouldShellMap);
         //3、最后排产共生胎同模具
-        productionSameEmbryoCodeAndMould(context, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
+        productionSameEmbryoCodeAndMould(context, productionPlan, cxMachineCode, endDay, productionPlanList, mouldInfoMap, mouldShellMap);
     }
 
     /**
@@ -75,10 +75,12 @@ public class CxContinueSkuProductionHandler {
         if (!CollectionUtils.isEmpty(cxLhRatioMap)) {
             return;
         }
+        Set<String> lhCxMachineInfo = new HashSet<>();
+        lhCxMachineInfo.add(cxMachineCode);
         cxLhRatioMap = new HashMap<>(ratio);
         //初始化成型下配比的硫化分组
         for (int cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= ratio; cxLhGroupNo++) {
-            CxLhProductionHelper cxLhHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo);
+            CxLhProductionHelper cxLhHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, lhCxMachineInfo);
             cxLhRatioMap.put(cxLhGroupNo, cxLhHelper);
         }
         cxMachineInfo.setCxLhRatioMap(cxLhRatioMap);
@@ -96,7 +98,7 @@ public class CxContinueSkuProductionHandler {
      * @param mouldInfoMap       模具信息
      * @return
      */
-    private static Integer productionSingleContinueSku(Context context, ProductionSkuParamHelper paramHelper, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxContinueSkuInfoHelper continueSkuInfo, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap) {
+    private static Integer productionSingleContinueSku(Context context, CxMachineAllocationPlanHelper productionPlan, ProductionSkuParamHelper paramHelper, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxContinueSkuInfoHelper continueSkuInfo, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap) {
         Integer startDay = paramHelper.getStartDay();
         Integer endDay = paramHelper.getEndDay();
         String cxMachineCode = paramHelper.getCxMachineCode();
@@ -129,7 +131,7 @@ public class CxContinueSkuProductionHandler {
                 continue;
             }
             //逐日进行排产
-            LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, cxLhProductionHelper, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+            LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfo, cxLhProductionHelper, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
             CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedDouble, continueSkuPlanList);
             sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
             realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
@@ -141,15 +143,17 @@ public class CxContinueSkuProductionHandler {
      * 排产续作排产-同规格同花纹
      *
      * @param context            排产上下文
+     * @param productionPlan     排产分组计划信息对象
      * @param cxMachineCode      成型机台
      * @param endDay             分组计划收尾日
      * @param productionPlanList 排产计划
      * @param mouldInfoMap       模具信息
      * @param mouldShellMap      模壳信息
      */
-    private static void productionSameSpecificationsAndPattern(Context context, String cxMachineCode, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private static void productionSameSpecificationsAndPattern(Context context, CxMachineAllocationPlanHelper productionPlan, String cxMachineCode, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
+        Map<String, CxContinueSkuInfoHelper> continueSkuMap = productionPlan.getContinueSkuMap();
         //取得最早收尾的硫化组
         CxLhProductionHelper earliestConclusionLhGroup = getEarliestConclusionLhGroup(context, cxMachineCode);
         if (null == earliestConclusionLhGroup) {
@@ -168,7 +172,7 @@ public class CxContinueSkuProductionHandler {
         //获取规格、花纹等信息
         CxContinueSkuInfoHelper continueProductInfoHelper = CxContinueSkuInfoHelper.buildContinueProductInfo(materialDesc, productionPlanList, continueSkuMap);
         //获取同规格同花纹的其它sku排产计划
-        List<MonthPlanProductionRequirePlanVo> sameSpecificationsAndPatternList = getSameSpecificationsAndPatternPlan(productionPlanList, materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
+        List<MonthPlanProductionRequirePlanVo> sameSpecificationsAndPatternList = productionPlan.getProductionPlanInfo().getSameSpecificationsAndPatternPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
         //挑选下一个同规格同花纹的sku进行排产
         String selectedMaterialDesc = getSelectedSuitableSku(sameSpecificationsAndPatternList);
         if (StringUtils.isBlank(selectedMaterialDesc)) {
@@ -188,24 +192,25 @@ public class CxContinueSkuProductionHandler {
         Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //实际排产量
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
         CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
-        productionSameSpecificationsAndPattern(productionContext, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
+        productionSameSpecificationsAndPattern(productionContext, productionPlan, cxMachineCode, endDay, productionPlanList, mouldInfoMap, mouldShellMap);
     }
 
     /**
      * 排产续作排产-同生胎共用模具
      *
      * @param context            排产上下文
+     * @param productionPlan     分组排产计划信息对象
      * @param cxMachineCode      成型机台
      * @param endDay             分组计划收尾日
      * @param productionPlanList 排产计划
      * @param mouldInfoMap       模具信息
      * @param mouldShellMap      模壳信息
      */
-    private static void productionSameEmbryoCodeAndMould(Context context, String cxMachineCode, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private static void productionSameEmbryoCodeAndMould(Context context, CxMachineAllocationPlanHelper productionPlan, String cxMachineCode, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         //取得最早收尾的硫化组
@@ -219,6 +224,7 @@ public class CxContinueSkuProductionHandler {
             //todo 记录日志
             return;
         }
+        Map<String, CxContinueSkuInfoHelper> continueSkuMap = productionPlan.getContinueSkuMap();
         //共用模具的sku
         Set<String> shareMouldMaterialDescSet = getShareMouldSkuByLhGroup(mouldInfoMap, earliestConclusionLhGroup);
         //续作收尾的sku
@@ -226,7 +232,7 @@ public class CxContinueSkuProductionHandler {
         //获取规格、花纹等信息
         CxContinueSkuInfoHelper continueProductInfoHelper = CxContinueSkuInfoHelper.buildContinueProductInfo(materialDesc, productionPlanList, continueSkuMap);
         //获取同生胎共用模具的其它sku排产计划
-        List<MonthPlanProductionRequirePlanVo> sameEmbryoCodeAndMouldList = getSameEmbryoCodeAndMouldPlan(productionPlanList, materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
+        List<MonthPlanProductionRequirePlanVo> sameEmbryoCodeAndMouldList = productionPlan.getProductionPlanInfo().getSameEmbryoCodeAndMouldPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
         //挑选下一个同生胎的sku进行排产
         String selectedMaterialDesc = getSelectedSuitableSku(sameEmbryoCodeAndMouldList);
         if (StringUtils.isBlank(selectedMaterialDesc)) {
@@ -246,11 +252,11 @@ public class CxContinueSkuProductionHandler {
         Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //实际排产量
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfo, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
         CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
-        productionSameEmbryoCodeAndMould(productionContext, cxMachineCode, endDay, productionPlanList, continueSkuMap, mouldInfoMap, mouldShellMap);
+        productionSameEmbryoCodeAndMould(productionContext, productionPlan, cxMachineCode, endDay, productionPlanList, mouldInfoMap, mouldShellMap);
     }
 
 
@@ -380,66 +386,6 @@ public class CxContinueSkuProductionHandler {
             }
         });
         return shareMouldMaterialDescSet;
-    }
-
-    /**
-     * 获取分组下同规格同花纹的Sku计划
-     *
-     * @param productionPlanList        分组下所有计划
-     * @param materialDesc              前规格
-     * @param shareMouldMaterialDescSet 共用模具的sku集合
-     * @param continueProductInfoHelper 前规格详情信息
-     * @return
-     */
-    private static List<MonthPlanProductionRequirePlanVo> getSameSpecificationsAndPatternPlan(List<MonthPlanProductionRequirePlanVo> productionPlanList, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
-        List<MonthPlanProductionRequirePlanVo> sameSpecificationsAndPatternList = new ArrayList<>();
-        productionPlanList.stream().forEach(groupPlan -> {
-            if (!groupPlan.hasProduction()) {
-                return;
-            }
-            if (materialDesc.equals(groupPlan.getMaterialDesc())) {
-                return;
-            }
-            //不共用模具
-            if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
-                return;
-            }
-            if (groupPlan.isSameSpecificationsAndPattern(continueProductInfoHelper)) {
-                sameSpecificationsAndPatternList.add(groupPlan);
-            }
-        });
-        return sameSpecificationsAndPatternList;
-    }
-
-    /**
-     * 获取分组下同生胎同模具下的Sku计划
-     *
-     * @param productionPlanList        分组下所有计划
-     * @param materialDesc              前规格
-     * @param shareMouldMaterialDescSet 共用模具的sku集合
-     * @param continueProductInfoHelper 前规格详情信息
-     */
-    private static List<MonthPlanProductionRequirePlanVo> getSameEmbryoCodeAndMouldPlan(List<MonthPlanProductionRequirePlanVo> productionPlanList, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
-        List<MonthPlanProductionRequirePlanVo> sameEmbryoCodeAndMouldList = new ArrayList<>();
-        productionPlanList.stream().forEach(groupPlan -> {
-            //剔除不排产
-            if (!groupPlan.hasProduction()) {
-                return;
-            }
-            //排除自己
-            if (materialDesc.equals(groupPlan.getMaterialDesc())) {
-                return;
-            }
-            //剔除不共用模具
-            if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
-                return;
-            }
-            //同生胎
-            if (groupPlan.isSameEmbryoCode(continueProductInfoHelper)) {
-                sameEmbryoCodeAndMouldList.add(groupPlan);
-            }
-        });
-        return sameEmbryoCodeAndMouldList;
     }
 
     /**

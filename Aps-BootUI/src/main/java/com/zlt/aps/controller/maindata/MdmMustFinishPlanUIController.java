@@ -173,6 +173,6 @@ public class MdmMustFinishPlanUIController extends BaseUIController<MdmMustFinis
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return iMdmMustFinishPlanService.importData(context, true);
+        return iMdmMustFinishPlanService.importData(context, updateSupport);
     }
 }

@@ -2,6 +2,7 @@ package com.zlt.aps.factory.handler;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
@@ -11,10 +12,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 规格-模具选择器
@@ -26,7 +25,33 @@ import java.util.List;
 public class SkuMouldSelector {
 
     /**
-     * 获取续作sku对应的模具信息，并按共用性差的在前，模具编号大的在前
+     * 获取选中模具信息
+     *
+     * @param context                   排产上下文
+     * @param selectedMaterialDesc      选中的sku
+     * @param earliestConclusionLhGroup 收尾硫化组
+     * @param startDay                  排产开始日
+     * @param endDay                    排产结束日
+     * @return
+     */
+    public static List<ProductionMouldInfoVo> getSelectedMouldList(Context context, String selectedMaterialDesc, CxLhProductionHelper earliestConclusionLhGroup, Integer startDay, Integer endDay) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, List<MonthPlanProductMouldInfoVo>> allMouldInfo = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
+        List<MonthPlanProductMouldInfoVo> allMouldList = allMouldInfo.get(selectedMaterialDesc);
+        Set<String> productionMouldSet = earliestConclusionLhGroup.getProductionMouldSet();
+        List<MonthPlanProductMouldInfoVo> selectedMouldRelationList = new ArrayList<>();
+        allMouldList.forEach(mouldRelationInfo -> {
+            if (productionMouldSet.contains(mouldRelationInfo.getMouldCode())) {
+                selectedMouldRelationList.add(mouldRelationInfo);
+            }
+        });
+        //选中的续作模具
+        return selectedEnableMouldByNumber(context, ProductionConstant.DOUBLE_MOULD_PRODUCTION, selectedMouldRelationList, startDay, endDay);
+    }
+
+    /**
+     * 获取续作sku对应的模具信息，
+     * 并按共用性差的在前，模具编号大的在前排序
      *
      * @param context      排产上下文
      * @param materialDesc 物料描述
@@ -126,5 +151,68 @@ public class SkuMouldSelector {
             effectiveList.add(mouldInfo);
         });
         return effectiveList;
+    }
+
+    /**
+     * 从mouldList关系中获取能在startDay~endDay范围内可排产模具集合
+     * 并符合mouldNumber数量
+     *
+     * @param context     排产上下文
+     * @param mouldNumber 模具数量
+     * @param mouldList   sku配置的模具
+     * @param startDay    开始排产日
+     * @param endDay      结束排产日
+     * @return
+     */
+    private static List<ProductionMouldInfoVo> selectedEnableMouldByNumber(Context context, Integer mouldNumber, List<MonthPlanProductMouldInfoVo> mouldList, Integer startDay, Integer endDay) {
+        //没有模具关系，续作模具数，结构排产计划则直接返回
+        if (CollectionUtils.isEmpty(mouldList) || mouldNumber <= BigDecimal.ZERO.intValue()) {
+            return Collections.emptyList();
+        }
+        List<ProductionMouldInfoVo> enableSelectedList = selectedEnableProductionMould(context, mouldList, startDay, endDay);
+        if (CollectionUtils.isEmpty(enableSelectedList)) {
+            return Collections.emptyList();
+        }
+        enableSelectedList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue));
+        List<ProductionMouldInfoVo> maxSelectedMouldList;
+        if (enableSelectedList.size() > mouldNumber) {
+            maxSelectedMouldList = enableSelectedList.subList(BigDecimal.ZERO.intValue(), mouldNumber);
+        } else {
+            maxSelectedMouldList = enableSelectedList;
+        }
+        return maxSelectedMouldList;
+    }
+
+    /**
+     * 从mouldList的模具关系中，挑选符合startDay~endDay可进行排产的模具
+     *
+     * @param context   排产上下文
+     * @param mouldList SKU配置的所有模具关系
+     * @param startDay  开始排产日--一般为前一个SKU的收尾日
+     * @param endDay    结束排产日
+     * @return
+     */
+    private static List<ProductionMouldInfoVo> selectedEnableProductionMould(Context context, List<MonthPlanProductMouldInfoVo> mouldList, Integer startDay, Integer endDay) {
+        if (CollectionUtils.isEmpty(mouldList)) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
+        if (CollectionUtils.isEmpty(mouldInfoMap)) {
+            return Collections.emptyList();
+        }
+        List<ProductionMouldInfoVo> enableSelectedList = new ArrayList<>();
+        Set<String> mouldSet = mouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        mouldSet.forEach(mouldCode -> {
+            ProductionMouldInfoVo mouldInfo = mouldInfoMap.get(mouldCode);
+            if (null == mouldInfo) {
+                return;
+            }
+            if (!mouldInfo.isProduction(startDay, endDay)) {
+                return;
+            }
+            enableSelectedList.add(mouldInfo);
+        });
+        return enableSelectedList;
     }
 }

@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.handler;
 
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
@@ -52,18 +53,29 @@ public class ContinueSkuCalculator {
         }
         //分组合计续作Sku的计划量-高优先级
         Map<String, List<MonthPlanProductionRequirePlanVo>> continueSkuGroupMap = continueSkuPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-        Map<String, Long> continueSkuProductionQtyMap = new HashMap<>();
-        continueSkuGroupMap.forEach((materialDesc, planList) -> continueSkuProductionQtyMap.put(materialDesc, planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum()));
         //设置续作Sku的高优级量及单模日硫化量
         continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            Long planDemandQty = continueSkuProductionQtyMap.get(materialDesc);
+            List<MonthPlanProductionRequirePlanVo> planList = continueSkuGroupMap.get(materialDesc);
+            if (CollectionUtils.isEmpty(planList)) {
+                return;
+            }
+            Long planDemandQty;
+            Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
+            if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
+                //总净需求量
+                planDemandQty = planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+            } else {
+                //高优先级排产量
+                planDemandQty = planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+            }
             if (null == planDemandQty) {
                 planDemandQty = BigDecimal.ZERO.longValue();
             }
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
-            MonthPlanProductionRequirePlanVo plan = continueSkuGroupMap.get(materialDesc).get(BigDecimal.ZERO.intValue());
+            cxContinueSkuInfo.setContinueSkuPlanList(planList);
+            cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet());
+            MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());
             cxContinueSkuInfo.setDayVulcanizationQty(plan.getDayVulcanizationQty());
-
         });
         //提取对应续作Sku有高优先级量的胎胚信息
         List<CxContinueSkuInfoHelper> continueSkuInfoList = continueSkuMouldNumberMap.values().stream().collect(Collectors.toList());
@@ -95,6 +107,7 @@ public class ContinueSkuCalculator {
             //todo 记录日志
             return;
         }
+        Set<String> cxMachineInfo = groupContinueInfo.getCxMachineCodeSet();
         String groupName = groupPlanInfo.getGroupName();
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> limitMap = new HashMap<>();
         Integer maxEmbryoCodeCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMaxEmbryoCodeCount).sum();
@@ -111,7 +124,7 @@ public class ContinueSkuCalculator {
         }
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = new HashMap<>(maxLhMachineCount);
         for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhMachineCount; lhGroupNo++) {
-            CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupName, lhGroupNo);
+            CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupName, lhGroupNo, cxMachineInfo);
             cxLhRatioMap.put(lhGroupNo, cxLhGroup);
         }
         groupPlanInfo.setCxLhRatioMap(cxLhRatioMap);
@@ -130,7 +143,7 @@ public class ContinueSkuCalculator {
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = groupPlanInfo.getCxLhRatioMap();
         Integer maxLhGroupNo = cxLhRatioMap.size();
         Integer mouldNumber = continueSkuInfo.getMouldNumber();
-        Integer continueSkuMaxLhGroup = mouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer continueSkuMaxLhGroup = continueSkuInfo.getUsedLhMachineCountByMouldNumber();
         List<ProductionMouldInfoVo> mouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, continueSkuInfo.getMaterialDesc(), mouldNumber);
         List<CxLhProductionHelper> allocationGroupList = new ArrayList<>();
         int assignedCount = BigDecimal.ONE.intValue();
@@ -143,8 +156,8 @@ public class ContinueSkuCalculator {
             }
             assignedLhGroupNo.add(lhGroupNo);
             CxLhProductionHelper allocationGroup = cxLhRatioMap.get(lhGroupNo);
-            Integer startMouldNumber = (assignedCount - BigDecimal.ONE.intValue()) * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            Integer endMouldNumber = assignedCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            Integer startMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount - BigDecimal.ONE.intValue());
+            Integer endMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount);
             List<ProductionMouldInfoVo> selectedDoubleMouldList = mouldList.subList(startMouldNumber, endMouldNumber);
             allocationGroupList.add(allocationGroup);
             fullContinueMaterialAndMould(allocationGroup, continueSkuInfo, selectedDoubleMouldList);

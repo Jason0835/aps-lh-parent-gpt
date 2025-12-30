@@ -19,7 +19,6 @@ import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.http.client.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,9 +126,9 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
                 importDocEntity.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                importDocEntity.setMadeInfo(DateUtils.formatDate(mdmSkuConstructionRef.getEmbryoReleaseDate(), "yyyy-MM-dd"));
-                importDocEntity.setMoldingInfo(DateUtils.formatDate(mdmSkuConstructionRef.getTextReleaseDate(), "yyyy-MM-dd"));
-                importDocEntity.setVulcanizationInfo(DateUtils.formatDate(mdmSkuConstructionRef.getLhReleaseDate(), "yyyy-MM-dd"));
+                importDocEntity.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                importDocEntity.setTextNo(mdmSkuConstructionRef.getTextNo());
+                importDocEntity.setLhNo(mdmSkuConstructionRef.getLhNo());
             }
         }
         if (serviceCheckParams.containsKey("materialInfoMap")) {
