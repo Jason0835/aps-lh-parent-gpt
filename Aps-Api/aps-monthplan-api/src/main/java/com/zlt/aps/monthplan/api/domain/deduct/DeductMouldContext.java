@@ -1,8 +1,6 @@
-package com.zlt.aps.factory.deduct;
+package com.zlt.aps.monthplan.api.domain.deduct;
 
 import lombok.Data;
-
-import java.time.LocalDate;
 
 /**
  * 降模排产参数传递上下文

@@ -1,5 +1,8 @@
 package com.zlt.aps.factory.deduct;
 
+import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
+import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
+
 import java.time.LocalDate;
 import java.util.List;
 
