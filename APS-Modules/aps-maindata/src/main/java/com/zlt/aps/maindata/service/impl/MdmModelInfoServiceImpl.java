@@ -83,7 +83,7 @@ public class MdmModelInfoServiceImpl extends AbstractDocService<MdmModelInfo> im
         }*/
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.productmodelrelation.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.modelinfo.notUnique"));
         }
         // 赋值模具
         if (mouldCode.contains(MOULD_CODE_SPLIT)) {

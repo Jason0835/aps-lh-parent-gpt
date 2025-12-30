@@ -212,7 +212,7 @@ public class MdmProductConstructionUIController extends BaseUIController<MdmProd
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProductConstructionService.importData(context, true);
+        AjaxResult ajaxResult = iMdmProductConstructionService.importData(context, updateSupport);
         return ajaxResult;
     }
 

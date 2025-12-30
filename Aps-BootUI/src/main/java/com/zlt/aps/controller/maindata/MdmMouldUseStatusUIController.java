@@ -207,7 +207,7 @@ public class MdmMouldUseStatusUIController extends BaseUIController<MdmMouldUseS
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return iMdmMouldUseStatusRemoteService.importData(context, true);
+        return iMdmMouldUseStatusRemoteService.importData(context, updateSupport);
     }
 
 
