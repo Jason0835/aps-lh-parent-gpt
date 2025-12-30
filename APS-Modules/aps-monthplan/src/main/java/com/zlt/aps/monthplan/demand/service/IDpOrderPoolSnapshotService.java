@@ -6,6 +6,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
+import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -29,4 +30,11 @@ public interface IDpOrderPoolSnapshotService  extends IDocService<DpOrderPoolSna
    * @param supplyOrderPools
    */
   void saveOrderPoolSnapshot(DpDemandPlan createCondition, List<SalesOrderPool> salesOrders, List<SupplyOrderPool> supplyOrderPools);
+  /**
+   * 保存订单池快照数据
+   * @param predictionVersion
+   * @param yearMonth
+   * @param allStockUpOrders
+   */
+  void saveOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth,  List<SupplyOrderPool> allStockUpOrders);
 }
