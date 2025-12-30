@@ -133,7 +133,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      */
     @Override
     public String getExportTemplateFileName(){
-        return this.getFunctionName();
+        return I18nUtil.getMessage("ui.data.column.supplyOrderPool.modelName");
     }
 
 
@@ -144,7 +144,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      */
     @Override
     public String getProcedureCode() {
-        return "0";
+        return I18nUtil.getMessage("ui.data.column.supplyOrderPool.modelName");
     }
 
     /**
@@ -154,7 +154,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.supplyOrderPool.modelName");
     }
 
     /**
