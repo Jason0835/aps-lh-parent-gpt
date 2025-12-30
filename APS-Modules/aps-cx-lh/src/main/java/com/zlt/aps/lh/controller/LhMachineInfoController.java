@@ -157,7 +157,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
      */
     @Override
     protected void builderCondition(QueryWrapper<LhMachineInfo> queryWrapper, LhMachineInfo queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineName")), "MACHINE_NAME", queryVO.getFieldValueByFieldName("machineName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dimension")), "DIMENSION", queryVO.getFieldValueByFieldName("dimension"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("centripetalMechanism")), "CENTRIPETAL_MECHANISM", queryVO.getFieldValueByFieldName("centripetalMechanism"));
