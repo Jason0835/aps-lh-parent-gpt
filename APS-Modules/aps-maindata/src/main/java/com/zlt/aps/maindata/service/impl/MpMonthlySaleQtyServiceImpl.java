@@ -180,7 +180,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             String[] split = config.split("-");
             lastYear = Integer.parseInt(split[0]);
             lastMonth = split[1];
-            paramVo.setMonth(lastYear);
+            paramVo.setYear(lastYear);
             paramVo.setMonth(Integer.parseInt(lastMonth));
         } catch (NumberFormatException e) {
             log.error("获取配置失败", e);
