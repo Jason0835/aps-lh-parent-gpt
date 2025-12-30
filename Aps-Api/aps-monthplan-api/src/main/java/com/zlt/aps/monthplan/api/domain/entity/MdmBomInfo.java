@@ -101,18 +101,19 @@ public class MdmBomInfo extends BaseEntity {
     private String parentCode;
 
     /** 父物料版本 */
+    @Excel(name = "ui.data.column.mdmBomInfo.parentVersion")
     @ApiModelProperty(value = "父物料版本", name = "parentVersion")
     @TableField(value = "PARENT_VERSION")
     private String parentVersion;
 
     /** 生产阶段 */
-    @Excel(name = "ui.data.column.mdmBomInfo.productionStage")
+    @Excel(name = "ui.data.column.mdmBomInfo.productionStage", dictType = "PRODUCTION_STAGE")
     @ApiModelProperty(value = "生产阶段", name = "productionStage")
     @TableField(value = "PRODUCTION_STAGE")
     private String productionStage;
 
     /** 生产阶段中文映射（0：投产阶段；1试做阶段） */
-    @Excel(name = "ui.data.column.mdmBomInfo.productionStageCode", readConverterExp = "0=：投产阶段；1试做阶段")
+//    @Excel(name = "ui.data.column.mdmBomInfo.productionStageCode", readConverterExp = "0=：投产阶段；1：试做阶段")
     @ApiModelProperty(value = "生产阶段中文映射", name = "productionStageCode")
     @TableField(value = "PRODUCTION_STAGE_CODE")
     private String productionStageCode;
@@ -136,7 +137,7 @@ public class MdmBomInfo extends BaseEntity {
     private String bomType;
 
     /** 状态(1正常3废止) */
-    @Excel(name = "ui.data.column.mdmBomInfo.status")
+    @Excel(name = "ui.data.column.mdmBomInfo.status", dictType = "BOM_STATUS")
     @ApiModelProperty(value = "状态(1正常3废止)", name = "status")
     @TableField(value = "STATUS")
     private String status;
