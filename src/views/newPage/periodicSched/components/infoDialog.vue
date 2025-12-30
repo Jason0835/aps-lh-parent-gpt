@@ -154,18 +154,21 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          maxlength:100
         },
         {
           prop: "turnoverMonth",
           label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
           type:"number",
-          max:99999999
+          max:999999,
+          min:0
         },
         {
           prop: "minVulcanizingMachine",
           label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
           type: "number",
-          max:99999999
+          max:999999,
+          min:0
         },
 
       ];

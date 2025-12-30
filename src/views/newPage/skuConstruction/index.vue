@@ -223,6 +223,42 @@ export default {
           label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime2"),
           width: 180,
         },
+        {
+          prop: "embryoNo",
+          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+        },
+        {
+          prop: "embryoType",
+          label: this.$t("ui.data.column.trialPlan.embryoType"),
+        },
+        {
+          prop: "embryoReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.embryoReleaseDate"),
+        },
+        {
+          prop: "textNo",
+          label: this.$t("ui.data.column.trialPlan.textNo"),
+        },
+        {
+          prop: "textType",
+          label: this.$t("ui.data.column.trialPlan.textType"),
+        },
+        {
+          prop: "textReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.textReleaseDate"),
+        },
+        {
+          prop: "lhNo",
+          label: this.$t("ui.data.column.trialPlan.lhNo"),
+        },
+        {
+          prop: "lhType",
+          label: this.$t("ui.data.column.trialPlan.lhType"),
+        },
+        {
+          prop: "lhReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.lhReleaseDate"),
+        },
 
       ];
 

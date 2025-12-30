@@ -195,6 +195,12 @@ export default {
     },
     searchColumns() {
       return [
+      {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select", //GLUE_TYPE
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
@@ -323,10 +329,19 @@ export default {
     },
   },
   created() {
-
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+    this.getList();
   },
   activated() {
-    this.getList();
+
   },
 };
 </script>

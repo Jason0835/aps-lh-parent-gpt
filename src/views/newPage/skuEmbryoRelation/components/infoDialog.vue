@@ -74,7 +74,7 @@ export default {
             trigger: "change",
           },
         ],
-        lineType: [
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -102,6 +102,12 @@ export default {
     },
     columns() {
       return [
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
@@ -160,7 +166,9 @@ export default {
         };
         this.$set(this.form, "mesMaterialCode", data.mesMaterialCode);
       } else {
-        this.form = {};
+        this.form = {
+          factoryCode:'116'
+        };
       }
     },
     hide() {

@@ -32,7 +32,7 @@
 </template>
 
 <script>
-  //机台选择管理
+  //各个机台选择管理
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";

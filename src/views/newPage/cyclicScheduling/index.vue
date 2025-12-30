@@ -147,6 +147,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.supply_order_type, value);
           },
+          width:160
         },
         {
           prop: "locationType",
@@ -154,6 +155,8 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
+
+
         },
         {
           prop: "brand",

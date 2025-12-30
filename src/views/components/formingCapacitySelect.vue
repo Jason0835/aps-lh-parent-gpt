@@ -95,6 +95,10 @@ export default {
           type: "select", //GLUE_TYPE
           dictData: this.parentDict.type.biz_factory_name,
         },
+        {
+          prop: "cxMachineCode",
+          label: this.$t("setting.machine.machineCode"),
+        },
       ];
     },
     columns: function () {

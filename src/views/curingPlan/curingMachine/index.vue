@@ -163,7 +163,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
-          minWidth: 100,
+          minWidth: 150,
           // width: 150,
           // sortable: "custom",
         },
@@ -171,7 +171,7 @@ export default {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
           minWidth: 100,
-          width: 150,
+          width: 180,
           // sortable: "custom",
         },
         {
