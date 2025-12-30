@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -10,6 +11,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.DemandPlanTypeEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
@@ -27,8 +29,8 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
+import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -83,6 +85,8 @@ import com.ruoyi.common.exception.ServiceException;
 @RequiredArgsConstructor
 public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  implements IDpDemandPlanService {
     private static final String PREFIX = "REQ";
+
+    private final DpDemandPlanEntityMapper demandPlanEntityMapper;
     private final FactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
@@ -90,8 +94,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IMdmProductStockService mdmProductStockService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-    // 订单分配表
-    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
     // 版本库存
     private final IDpStockVersionService dpStockVersionService;
     // 区域产能分配
@@ -174,6 +176,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
+    }
+
+    @Override
+    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(String monthPlanVersion) {
+        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
+        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
+        return this.demandPlanEntityMapper.selectList(wrapper);
     }
 
     /**
@@ -310,14 +320,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 分组销售订单
         Map<String, List<SalesOrderPool>> saleOrderGroupMap =
             SaleRequirePlanHelper.getGroupSalesOrder(allocationOrders);
-
+        // 获取操作日所在月份
+        YearMonth currentMonth = YearMonth.from(LocalDate.now());
+        // T月 = 当月 + 1个月
+        YearMonth tMonth = currentMonth.plusMonths(1);
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
-            monthPlanVersion, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
+            monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
 
         // 过滤净需求
         List<DpOrderOffsetDetail> netDemands = allocations.stream()
-            .filter(allocation -> allocation.getProducionQty() > 0)
+            .filter(allocation -> allocation.getProduceQtyDue() > 0)
             .collect(Collectors.toList());
 
         return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
@@ -333,7 +346,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 批量插入分配结果
         if (CollectionUtils.isNotEmpty(allocationResult.getAllocations())) {
-            this.dpOrderOffsetDetailService.insertBatchData(allocationResult.getAllocations());
+            this.baseDao.insertBatch(allocationResult.getAllocations());
         }
 
         // 批量插入库存版本
@@ -804,7 +817,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         // 设置其他固定值
         demandPlan.setMinProductionQty(minProductionQty);
-        demandPlan.setPlanType(ApsConstant.APS_ZERO_1);
+        demandPlan.setPlanType(DemandPlanTypeEnum.MONTH_DEMAND.getCode());
         demandPlan.setIsImport(YesOrNoEnum.NO.getCode());
     }
 

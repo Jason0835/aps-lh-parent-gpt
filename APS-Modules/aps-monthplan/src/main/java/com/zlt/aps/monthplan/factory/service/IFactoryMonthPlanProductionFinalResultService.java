@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.factory.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 
 import java.util.List;
 import java.util.Map;
@@ -40,4 +41,10 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
    * @return 月底的月度计划量汇总
    */
   Map<String,Long> calculateMonthSurplus(String requireVersionNumber);
+  /**
+   *  获取最终排产结果
+   * @param finalVersion
+   * @return
+   */
+  List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(FactoryProductionVersion finalVersion);
 }

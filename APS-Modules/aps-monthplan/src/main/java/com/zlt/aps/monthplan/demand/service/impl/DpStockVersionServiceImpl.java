@@ -7,13 +7,13 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -84,29 +84,31 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
     }
 
     @Override
-    public void insertBatchData(MpProductionPrediction createCondition, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+    public void insertBatchData(String predictionVersion,
+                                YearMonth yearMonth, Map<String, List<MdmProductStock>> finishedProductStockMap) {
         if (org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
             return;
         }
         List<DpStockVersion> list = Lists.newArrayList();
         List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
         finishedProductStocks.forEach(finishedProductStock -> {
-            DpStockVersion requireStock = this.buildRequireStock(createCondition,finishedProductStock);
+            DpStockVersion requireStock = this.buildRequireStock(predictionVersion,yearMonth,finishedProductStock);
             list.add(requireStock);
         });
         this.baseDao.insertBatch(list);
     }
 
-    private DpStockVersion buildRequireStock(MpProductionPrediction createCondition, MdmProductStock finishedProductStock) {
+    private DpStockVersion buildRequireStock(String predictionVersion,
+                                             YearMonth yearMonth, MdmProductStock finishedProductStock) {
         DpStockVersion requireStock = new DpStockVersion();
         BeanUtils.copyProperties(finishedProductStock, requireStock);
         requireStock.setId(null);
-        requireStock.setRequireVersion(createCondition.getPredictionVersion());
+        requireStock.setRequireVersion(predictionVersion);
         requireStock.setIsDelete(YesOrNoEnum.NO.getValue());
         requireStock.setRemainingQty(finishedProductStock.getLeftOverQty());
         requireStock.setBaseVale(null);
-        requireStock.setYear(createCondition.getYear());
-        requireStock.setMonth(createCondition.getMonth());
+        requireStock.setYear(yearMonth.getYear());
+        requireStock.setMonth(yearMonth.getMonthValue());
         return requireStock;
     }
 

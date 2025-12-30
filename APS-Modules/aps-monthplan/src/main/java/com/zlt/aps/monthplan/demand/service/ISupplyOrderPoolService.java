@@ -6,6 +6,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -48,9 +49,9 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createCycleStockUp();
+  List<SupplyOrderPool> createCycleStockUp(YearMonth yearMonth);
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createPrecedentStockUp();
+  List<SupplyOrderPool> createPrecedentStockUp(YearMonth yearMonth);
 }

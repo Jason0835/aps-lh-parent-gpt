@@ -2,12 +2,14 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -48,14 +50,19 @@ public class MdmMouldAllocationServiceImpl extends AbstractDocService<MdmMouldAl
     public String checkUnique(MdmMouldAllocation docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmMouldAllocation.notUnique"));
+            String message = StringUtils.format(I18nUtil.getMessage("ui.data.alert.mdmMouldAllocation.notUnique"),
+                    docEntityVO.getStructureName(), docEntityVO.getFactoryCode(), docEntityVO.getYear(), docEntityVO.getMonth());
+            throw new ServiceException(message);
         }
         return unique;
     }
 
+
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "structureName"));
     }
+
+
 }

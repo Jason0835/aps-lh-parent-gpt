@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
@@ -102,6 +103,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
       result.add(entity);
     });
     return calculateMonthSurplus(result);
+  }
+
+  @Override
+  public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(FactoryProductionVersion finalVersion) {
+    LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+        .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
+        .ge(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion())
+        .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+    return this.list(queryWrapper);
   }
 
   private Map<String, Long> calculateMonthSurplus(List<MdmMonthSurplus> monthSurpluses) {
