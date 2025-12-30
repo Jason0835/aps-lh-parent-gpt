@@ -125,20 +125,24 @@ export default {
         {
           prop: "requireVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
+          width:120
         },
 
         {
           prop: "brand",
           label: this.$t("common.brand"),
+          width:120
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:180
         },
 
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:320
         },
         {
           prop: "stockQty",

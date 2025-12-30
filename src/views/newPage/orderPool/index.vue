@@ -197,6 +197,7 @@ export default {
         {
           prop: "area",
           label: this.$t("common.area"),
+          width:120
         },
         {
           prop: "salCode",
@@ -206,18 +207,22 @@ export default {
         {
           prop: "salNCode",
           label: this.$t("ui.data.column.monthplan.salNCode"),
+          width:120
         },
         {
           prop: "natCode",
           label: this.$t("ui.data.column.monthplan.natCode"),
+          width:120
         },
         {
           prop: "brand",
           label: this.$t("common.brand"),
+          width:120
         },
         {
           prop: "salCodePo",
           label: this.$t("ui.data.column.monthplan.salCodePo"),
+          width:150
         },
         {
           prop: "billDate",
@@ -227,6 +232,7 @@ export default {
         {
           prop: "oriMaterialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:120
         },
         {
           prop: "materialDesc",
@@ -236,10 +242,12 @@ export default {
         {
           prop: "ordQty",
           label: this.$t("common.num"),
+          width:120
         },
         {
           prop: "weekYear",
           label: this.$t("ui.data.column.monthplan.weekYear"),
+          width:120
         },
         {
           prop: "isDynamicBalance",

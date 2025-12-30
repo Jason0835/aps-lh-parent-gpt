@@ -113,20 +113,23 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
-          width: 200,
+          width: 300,
         },
         {
           prop: "relatedMonth",
           label: this.$t("ui.data.colume.month"),
+          width: 120,
         },
 
         {
           prop: "relatedWeek",
           label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
+          width: 180,
         },
         {
           prop: "warningContent",
           label: this.$t("ui.data.column.rawMaterial.warningContent"),
+          width: 300,
         },
         // {
         //   prop: "warningData",
@@ -142,6 +145,7 @@ export default {
         {
           prop: "warningTitle",
           label: this.$t("ui.data.column.rawMaterial.warningTitle"),
+          width: 280,
         },
         {
           prop: "warningType",
@@ -149,12 +153,14 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_type, value);
           },
+          width: 160,
 
         },
 
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          width: 180,
         },
         {
           prop: "updateTime",

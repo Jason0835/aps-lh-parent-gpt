@@ -148,7 +148,7 @@ export default {
           prop: "orderType",
           label: this.$t("ui.data.defectiveStock.orderType"),
           type: "select",
-          dictData: this.parentDict.type.biz_order_type,
+          dictData: this.parentDict.type.supply_order_type,
         },
         {
           prop: "materialCode",

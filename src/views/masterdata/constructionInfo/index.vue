@@ -111,178 +111,7 @@ export default {
           prop: "proSize",
           label: this.$t("ui.data.column.constructionInfo.proSize"),
         },
-        // {
-        //   label: "胎胚SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎胚代码",
-        //   prop: ""
-        // },
-        // {
-        //   label: "施工版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "生产阶段",
-        //   prop: ""
-        // },
-        // {
-        //   label: "施工类型",
-        //   prop: ""
-        // },
-        // {
-        //   label: "寸口信息",
-        //   prop: ""
-        // },
-        // {
-        //   label: "规格描述",
-        //   prop: ""
-        // },
-        // {
-        //   label: "机头宽度",
-        //   prop: ""
-        // },
-        // {
-        //   label: "扣圈盘直径",
-        //   prop: ""
-        // },
-        // {
-        //   label: "断面宽",
-        //   prop: ""
-        // },
-        // {
-        //   label: "贴合鼓周长",
-        //   prop: ""
-        // },
-        // {
-        //   label: "卡盘直径",
-        //   prop: ""
-        // },
-        // {
-        //   label: "拉伸宽度",
-        //   prop: ""
-        // },
-        // {
-        //   label: "定性宽度",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎胚周长",
-        //   prop: ""
-        // },
-        // {
-        //   label: "1#胎体布代号",
-        //   prop: ""
-        // },
-        // {
-        //   label: "1#胎体布SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "1#胎体布BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "1#胎体布工艺",
-        //   prop: ""
-        // },
-        // {
-        //   label: "2#胎体布代号",
-        //   prop: ""
-        // },
-        // {
-        //   label: "2#胎体布SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "2#胎体布BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "2#胎体布工艺",
-        //   prop: ""
-        // },
-        // {
-        //   label: "3#胎体布代号",
-        //   prop: ""
-        // },
-        // {
-        //   label: "3#胎体布SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "3#胎体布BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "3#胎体布工艺",
-        //   prop: ""
-        // },
-        // {
-        //   label: "原线代码",
-        //   prop: ""
-        // },
-        // {
-        //   label: "帘线规格",
-        //   prop: ""
-        // },
-        // {
-        //   label: "帘布大卷SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "帘布大卷BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "补强/封口胶",
-        //   prop: ""
-        // },
-        // {
-        //   label: "内衬胶料",
-        //   prop: ""
-        // },
-        // {
-        //   label: "内衬代号",
-        //   prop: ""
-        // },
-        // {
-        //   label: "内衬SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "内衬BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "内衬工艺",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧代号",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧SAP",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧BOM版本",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧工艺",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧口型",
-        //   prop: ""
-        // },
-        // {
-        //   label: "胎侧居中",
-        //   prop: ""
-        // },
+
 
         {
           prop: "constructionCode",
@@ -518,9 +347,11 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
+  created() {
     this.getList();
+  },
+  activated() {
+
   },
 };
 </script>

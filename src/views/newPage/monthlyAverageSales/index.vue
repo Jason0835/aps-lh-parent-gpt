@@ -156,6 +156,7 @@ export default {
         {
           prop: "saleAreaName",
           label: this.$t("ui.data.column.mpMonthlySaleQty.saleArea"),
+          width:180
         },
         {
           prop: "areaAll",
@@ -170,7 +171,7 @@ export default {
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          width:200
+          width:180
         },
       ];
       for (let i = 0; i < this.areaList.length; i++) {

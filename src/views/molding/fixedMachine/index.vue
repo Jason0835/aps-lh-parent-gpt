@@ -46,12 +46,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmCxMachineFixed/importTemplate"
       uploadUrl="/monthplan/mdmCxMachineFixed/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mdmCxMachineFixed/importTemplate"
+      uploadUrl="/monthplan/mdmCxMachineFixed/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -68,7 +77,7 @@ import {
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -76,6 +85,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
   provide() {
@@ -85,6 +95,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -113,39 +139,47 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
+          width:120,
         },
         {
           prop: "cxMachineCode",
           label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
+          width:120,
         },
         {
           prop: "fixedStructure1",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+          width:300
         },
         {
           prop: "fixedStructure2",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+          width:300
         },
         {
           prop: "fixedStructure3",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
+          width:300
         },
         {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
+          width:300
         },
         {
           prop: "disableStructure",
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
+          width:300
         },
       {
           prop: "disableMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
+          width:300
         },
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
-
+          width:200,
           render: ({ row }) => {
             return (
               <div>

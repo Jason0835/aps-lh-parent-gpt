@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="productionMouldConfigurationMainTable"
+
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -94,7 +94,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["product_category", "biz_product_type", "biz_factory_name",'biz_order_type','biz_stor_type','biz_brand_type'],
+  dicts: ["product_category", "biz_product_type", "biz_factory_name",'supply_order_type','biz_stor_type','biz_brand_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -145,7 +145,7 @@ export default {
           prop: "orderType",
           label: this.$t("ui.data.defectiveStock.orderType"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_order_type, value);
+            return this.selectDictLabel(this.dict.type.supply_order_type, value);
           },
         },
         {
@@ -161,10 +161,12 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
+          width:120
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:120
         },
         {
           prop: "materialDesc",
@@ -222,6 +224,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          width:120
         },
         {
           prop: "updateTime",
@@ -250,7 +253,7 @@ export default {
           prop: "orderType",
           label: this.$t("ui.data.defectiveStock.orderType"),
           type: "select",
-          dictData: this.dict.type.biz_order_type,
+          dictData: this.dict.type.supply_order_type,
         },
         {
           prop: "materialCode",

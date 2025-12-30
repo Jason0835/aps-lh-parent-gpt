@@ -141,14 +141,17 @@ export default {
               value
             );
           },
+          width:120
         },
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          width:200
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:180
         },
         // {
         //   prop: "物料代码",
@@ -186,6 +189,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          width:180
         },
         {
           prop: "updateTime",

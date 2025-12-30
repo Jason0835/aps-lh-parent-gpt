@@ -150,6 +150,7 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          width:180
         },
         {
           prop: "mouldType",
@@ -175,6 +176,7 @@ export default {
         {
           prop: "specifications",
           label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          width:180
         },
         {
           prop: "mainPattern",
@@ -183,6 +185,7 @@ export default {
         {
           prop: "pattern",
           label: this.$t("ui.data.column.moldLedger.pattern"),
+          width:180
         },
         {
           prop: "shellStandard",

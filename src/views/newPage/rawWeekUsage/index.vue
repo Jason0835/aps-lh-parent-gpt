@@ -122,7 +122,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
-          width: 200,
+          width: 300,
         },
         {
           prop: "year",

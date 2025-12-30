@@ -19,7 +19,9 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain @click="mesCap">{{ $t("ui.data.column.moldLedger.mes") }}</el-button>
+        <el-button type="primary" plain @click="mesCap">{{
+          $t("ui.data.column.moldLedger.mes")
+        }}</el-button>
         <el-button
           v-hasPermi="['monthplan:mdmBomInfo:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -27,7 +29,7 @@
         >
         <el-button
           @click="handleExport"
-         v-hasPermi="['monthplan:mdmBomInfo:export']"
+          v-hasPermi="['monthplan:mdmBomInfo:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
         <!-- <el-button
@@ -56,12 +58,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/maindata/mdmBomInfo/importTemplate"
       uploadUrl="/maindata/mdmBomInfo/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/maindata/mdmBomInfo/importTemplate"
+      uploadUrl="/maindata/mdmBomInfo/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <!-- <infoDialog ref="infoRef" @success="getList" />
     <addDialog ref="addRef" @success="getList" /> -->
   </basic-container>
@@ -72,9 +83,10 @@
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listConstructionInfo,mesCapture } from "@/api/cx/constructionInfo.js";
+import { listConstructionInfo, mesCapture } from "@/api/cx/constructionInfo.js";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 // import infoDialog from "./components/infoDialog.vue";
 // import addDialog from "./components/addDialog.vue";
@@ -83,6 +95,7 @@ export default {
   name: "Machine",
   components: {
     tltUpload,
+    TltUploadForm,
     // infoDialog,
     // addDialog,
   },
@@ -94,6 +107,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -124,11 +153,16 @@ export default {
         {
           prop: "parentCode",
           label: this.$t("ui.data.column.boom.fatherCode"),
+          width: 280,
         },
 
         {
           prop: "parentMaterialName",
           label: this.$t("ui.data.column.boom.fatherName"),
+        },
+        {
+          prop: "parentVersion",
+          label: this.$t("ui.data.column.boom.parentVersion"),
         },
         {
           prop: "bomVersion",
@@ -145,14 +179,20 @@ export default {
         {
           prop: "childCode",
           label: this.$t("ui.data.column.boom.chirenCode"),
+          width: 180,
         },
         {
           prop: "childMaterialName",
           label: this.$t("ui.data.column.boom.chirenName"),
+          width: 180,
         },
         {
           prop: "childMaterialCode",
           label: this.$t("ui.data.column.boom.chirenType"),
+        },
+        {
+          prop: "childMaterialVersion",
+          label: this.$t("ui.data.column.boom.childMaterialVersion"),
         },
         {
           prop: "unit",
@@ -165,6 +205,7 @@ export default {
         {
           prop: "dosageForm",
           label: this.$t("ui.data.column.boom.dosageForm"),
+          width: 180,
         },
         {
           prop: "status",
@@ -211,17 +252,20 @@ export default {
     },
   },
   methods: {
-    mesCap(){
+    mesCap() {
       this.loading = true;
-      mesCapture().then((response)=>{
-        this.$message.success(response.msg);
-        this.$set(this.page, "current", 1);
-        this.getList();
-      }).catch((error)=>{
-        console.log(error);
-      }).finally(()=>{
-        this.loading = false;
-      });
+      mesCapture()
+        .then((response) => {
+          this.$message.success(response.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        })
+        .catch((error) => {
+          console.log(error);
+        })
+        .finally(() => {
+          this.loading = false;
+        });
     },
     handleAdd() {
       // if (this.$refs.addRef) {
@@ -328,10 +372,9 @@ export default {
     this.query = {
       ...defaultParams,
     };
-  },
-  activated() {
     this.getList();
   },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

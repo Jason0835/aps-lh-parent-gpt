@@ -50,12 +50,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmCycleSchStruConf/importTemplate"
       uploadUrl="/monthplan/mdmCycleSchStruConf/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mdmCycleSchStruConf/importTemplate"
+      uploadUrl="/monthplan/mdmCycleSchStruConf/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
     <el-dialog
       :title=" $t('ui.data.column.curingPlan.dateSelect')"
@@ -101,7 +110,7 @@ import {
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -109,6 +118,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
   provide() {
@@ -118,6 +128,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       generateLoading:false,
       data: [],
@@ -154,6 +180,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          width:300
         },
         {
           prop: "turnoverMonth",

@@ -46,12 +46,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmMouldAllocation/importTemplate"
       uploadUrl="/monthplan/mdmMouldAllocation/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mdmMouldAllocation/importTemplate"
+      uploadUrl="/monthplan/mdmMouldAllocation/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -60,7 +69,7 @@
 import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import {
   listMdmMouldAllocation,
   removeMdmMouldAllocation,
@@ -76,6 +85,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name", "biz_product_type"],
   provide() {
@@ -85,6 +95,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -132,10 +158,12 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          width:200
         },
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
+          width:200
         },
         {
           prop: "mainPattern",

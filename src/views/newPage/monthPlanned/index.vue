@@ -47,12 +47,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmMonthSurplus/importTemplate"
       uploadUrl="/monthplan/mdmMonthSurplus/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mdmMonthSurplus/importTemplate"
+      uploadUrl="/monthplan/mdmMonthSurplus/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <!-- <infoDialog ref="infoRef" @success="getList" /> -->
   </basic-container>
 </template>
@@ -62,13 +71,14 @@ import {
   getMonthSurplusList
 } from "@/api/monthplan/mdmMonthSurplus";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "monthPlanned",
   components: {
     tltUpload,
+    TltUploadForm
     // infoDialog,
   },
   dicts: ['biz_product_type', 'biz_factory_name', 'biz_yes_no'],
@@ -79,6 +89,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],

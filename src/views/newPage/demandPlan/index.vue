@@ -225,6 +225,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
+          width:120
         },
         {
           prop: "scmPriority",
@@ -263,14 +264,17 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          width:180
         },
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          width:120
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:120
         },
         {
           prop: "materialDesc",

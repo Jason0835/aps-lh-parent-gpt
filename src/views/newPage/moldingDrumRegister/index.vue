@@ -46,12 +46,21 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <!-- <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mdmWorkWearInfo/importTemplate"
       uploadUrl="/monthplan/mdmWorkWearInfo/importData"
       @uploadSuccess="getList"
-    />
+    /> -->
+    <tlt-upload-form
+      ref="tltUpload"
+      :updateSupport="true"
+      downloadUrl="/monthplan/mdmWorkWearInfo/importTemplate"
+      uploadUrl="/monthplan/mdmWorkWearInfo/importData"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -68,7 +77,7 @@ import {
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 import { di } from "@fullcalendar/core/internal-common";
 
@@ -77,6 +86,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["biz_work_unit", "biz_work_type", "biz_factory_name",'biz_available_status','biz_machine_brand','biz_class_type'],
   provide() {
@@ -86,6 +96,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -123,6 +149,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_type, value);
           },
+          width:120
         },
         {
           prop: "workWearStatus",
@@ -135,6 +162,7 @@ export default {
         {
           prop: "workWearName",
           label: this.$t("common.name"),
+          width:180
         },
         {
           prop: "cxMachineBrandCode",
@@ -143,6 +171,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
           },
+          width:120
         },
         {
           prop: "cxMachineTypeCode",
@@ -151,6 +180,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_class_type, value);
           },
+          width:120
         },
         {
           prop: "perimeterMax",
@@ -163,10 +193,12 @@ export default {
         {
           prop: "specificationModel",
           label: this.$t("ui.data.column.specColor.specDesc"),
+          width:120
         },
         {
           prop: "qty",
           label: this.$t("common.num"),
+          width:120
         },
         {
           prop: "unit",
@@ -174,14 +206,17 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_unit, value);
           },
+          width:120
         },
         {
           prop: "usedType",
           label: this.$t("ui.data.column.WorkWearInfo.usedType"),
+          width:180
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          width:120
         },
         {
           prop: "updateTime",
