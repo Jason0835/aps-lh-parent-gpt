@@ -64,9 +64,9 @@ public class SupplyOrderPool extends BaseEntity {
     @TableField(value = "PRODUCT_CATEGORY")
     private String productCategory;
 
-    /** 订单类型:数据字典：biz_order_type */
-    @Excel(name = "ui.data.column.supplyOrderPool.orderType", dictType = "biz_order_type")
-    @ApiModelProperty(value = "订单类型:数据字典：biz_order_type", name = "orderType")
+    /** 订单类型:数据字典：supply_order_type */
+    @Excel(name = "ui.data.column.supplyOrderPool.orderType", dictType = "supply_order_type")
+    @ApiModelProperty(value = "订单类型:数据字典：supply_order_type", name = "orderType")
     @TableField(value = "ORDER_TYPE")
     private String orderType;
 
