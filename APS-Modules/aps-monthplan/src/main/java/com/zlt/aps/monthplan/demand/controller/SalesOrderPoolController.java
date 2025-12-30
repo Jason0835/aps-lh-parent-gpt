@@ -71,7 +71,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     /**
      * 查询销售订单池列表
      */
-//    @RequiresPermissions( "monthplan:SalesOrderPool:list")
+    @RequiresPermissions( "monthplan:SalesOrderPool:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
