@@ -31,11 +31,11 @@
 <script>
 import { mapState } from "vuex";
 import { saveMdmMouldAllocation } from  "@/api/monthplan/mdmMouldAllocation";
-
+import structureSelect from "@/views/components/structureSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm,structureSelect },
   inject: ["parentDict"],
   data() {
     const validatePositiveInteger = (rule, value, callback) => {
@@ -166,6 +166,15 @@ export default {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
           maxlength: 64,
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.structureName}
+                multiple={false}
+                v-model={form.structureName}
+              />
+            );
+          },
 
         },
         {

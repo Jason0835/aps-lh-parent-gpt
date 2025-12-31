@@ -77,10 +77,7 @@ export default {
   computed: {
     columns() {
       let columns = [
-        // {
-        //   prop: "yearMonth",
-        //   label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
-        // },
+
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -91,17 +88,17 @@ export default {
         },
         {
           prop: "year",
-          label: this.$t("年份"),
+          label: this.$t("ui.data.colume.year"),
           width:120
         },
         {
           prop: "month",
-          label: this.$t("月份"),
+          label: this.$t("ui.data.colume.month"),
           width:120
         },
         {
           prop: "productTypeCode",
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -113,7 +110,7 @@ export default {
         // },
         {
           prop: "brand",
-          label: this.$t("品牌"),
+          label: this.$t("common.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -121,12 +118,12 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width:180
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width:300
         },
         {
@@ -139,14 +136,7 @@ export default {
           prop: "month2",
           label: this.$t("T+1月"),
           width:120
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+
         },
         {
           prop: "month3",
@@ -155,16 +145,9 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           width:120
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+
         },
         {
           prop: "updateTime",
@@ -197,18 +180,18 @@ export default {
 
 
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
 
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
       ];

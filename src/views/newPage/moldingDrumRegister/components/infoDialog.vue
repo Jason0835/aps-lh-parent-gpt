@@ -226,19 +226,20 @@ export default {
           dictData: this.parentDict.type.biz_class_type,
         },
         {
-          prop: "perimeterMax",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
-          type:'number',
-          max:999999,
-          min:1
-        },
-        {
           prop: "perimeterMin",
           label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
           type:'number',
           max:999999,
           min:1
         },
+        {
+          prop: "perimeterMax",
+          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
+          type:'number',
+          max:999999,
+          min:1
+        },
+
         {
           prop: "specifications",
           label: this.$t("ui.data.column.specColor.specDesc"),

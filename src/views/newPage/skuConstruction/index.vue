@@ -150,7 +150,7 @@ export default {
          {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          width: 180,
+          width: 120,
 
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -159,7 +159,7 @@ export default {
          {
           prop: "bomVersion",
           label: this.$t("ui.data.column.boom.boomVersion"),
-          width: 180,
+          width: 120,
         },
         {
           prop: "materialCode",
@@ -190,22 +190,11 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-          width: 180,
+          width: 120,
         },
         {
           prop: "constructionCode",
           label: this.$t("ui.data.column.skuConstruction.constructionCode"),
-          width: 180,
-        },
-
-        {
-          prop: "curingTime",
-          label: this.$t("ui.data.column.skuConstruction.curingTime"),
-          width: 180,
-        },
-        {
-          prop: "curingTime2",
-          label: this.$t("ui.data.column.skuConstruction.curingTime2"),
           width: 180,
         },
         {
@@ -214,50 +203,73 @@ export default {
           width: 180,
         },
         {
+          prop: "curingTime",
+          label: this.$t("ui.data.column.skuConstruction.curingTime"),
+          align:'left',
+          width: 160,
+        },
+        {
+          prop: "curingTime2",
+          label: this.$t("ui.data.column.skuConstruction.curingTime2"),
+          align:'left',
+          width: 160,
+        },
+
+        {
           prop: "hydraulicPressureCuringTime",
           label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime"),
-          width: 180,
+          align:'left',
+          width: 160,
         },
         {
           prop: "hydraulicPressureCuringTime2",
           label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime2"),
-          width: 180,
+          width: 160,
         },
         {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          width: 180,
         },
         {
           prop: "embryoType",
           label: this.$t("ui.data.column.trialPlan.embryoType"),
+          width: 180,
         },
         {
           prop: "embryoReleaseDate",
           label: this.$t("ui.data.column.trialPlan.embryoReleaseDate"),
+          width: 180,
         },
         {
           prop: "textNo",
           label: this.$t("ui.data.column.trialPlan.textNo"),
+          width: 180,
         },
         {
           prop: "textType",
           label: this.$t("ui.data.column.trialPlan.textType"),
+          width: 180,
         },
         {
           prop: "textReleaseDate",
           label: this.$t("ui.data.column.trialPlan.textReleaseDate"),
+          width: 180,
         },
         {
           prop: "lhNo",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
+          width: 180,
         },
         {
           prop: "lhType",
           label: this.$t("ui.data.column.trialPlan.lhType"),
+          width: 180,
         },
         {
           prop: "lhReleaseDate",
           label: this.$t("ui.data.column.trialPlan.lhReleaseDate"),
+          width: 180,
         },
 
       ];

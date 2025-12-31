@@ -161,16 +161,16 @@ export default {
           label: this.$t("ui.data.column.construction.specCode"),
           width: 180,
         },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width: 180,
-        },
-        {
-          prop: "specifications",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 300,
-        },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        //   width: 180,
+        // },
+        // {
+        //   prop: "specifications",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        //   width: 300,
+        // },
         {
           prop: "constructionCode",
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),

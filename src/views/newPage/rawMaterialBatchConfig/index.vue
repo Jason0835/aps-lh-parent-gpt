@@ -29,7 +29,9 @@
           <el-button
           type="primary"
           plain
+            :loading="createLoading"
           v-hasPermi="['maindata:rawMaterialOutboundRecord:catch']"
+          @click="mesBtn"
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
         >
         <el-button
@@ -69,7 +71,7 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-import {listRawMaterialInfo} from "@/api/maindata/rawMateria";
+import {listRawMaterialInfo,mesCatch} from "@/api/maindata/rawMateria";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -90,6 +92,7 @@ export default {
   },
   data() {
     return {
+      createLoading:false,
       importColumns: [
         {
           label: "",
@@ -234,6 +237,18 @@ export default {
     },
   },
   methods: {
+    async mesBtn(){
+      try {
+        this.createLoading=true
+        let res = await mesCatch(this.formatParams());
+        this.$modal.msgSuccess(res.msg);
+        this.getList();
+        this.createLoading=false
+      } catch (err) {
+        this.createLoading=false
+      }
+
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();

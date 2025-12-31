@@ -153,20 +153,23 @@ export default {
         {
           prop: "parentMaterialCode",
           label: this.$t("ui.data.column.boom.fatherCode"),
-          width: 280,
+          width: 180,
         },
 
         {
           prop: "parentMaterialName",
           label: this.$t("ui.data.column.boom.fatherName"),
+          width: 180,
         },
         {
           prop: "parentVersion",
           label: this.$t("ui.data.column.boom.parentVersion"),
+          width: 180,
         },
         {
           prop: "bomVersion",
           label: this.$t("ui.data.column.boom.boomVersion"),
+          width: 180,
         },
         {
           prop: "productionStage",
@@ -174,6 +177,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.production_stage, value);
           },
+          width: 180,
         },
         // {
         //   prop: "parentMaterialCode",
@@ -192,18 +196,22 @@ export default {
         {
           prop: "childCode",
           label: this.$t("ui.data.column.boom.chirenType"),
+          width: 180,
         },
         {
           prop: "childMaterialVersion",
           label: this.$t("ui.data.column.boom.childMaterialVersion"),
+          width: 180,
         },
         {
           prop: "unit",
           label: this.$t("ui.data.column.boom.unit"),
+          width: 180,
         },
         {
           prop: "dosage",
           label: this.$t("ui.data.column.boom.dosage"),
+          width: 180,
         },
         {
           prop: "dosageForm",
@@ -213,6 +221,16 @@ export default {
         {
           prop: "status",
           label: this.$t("common.status"),
+          render: ({ row }) => {
+            return (
+              <div>
+                {row.status == 1
+                  ? this.$t("common.job.column.normal")
+                  : this.$t("financialManagement.exportSalesInvoice.button.repeal")}
+              </div>
+            );
+          },
+          minWidth:100
         },
         {
           prop: "updateTime",

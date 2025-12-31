@@ -248,16 +248,18 @@
   "ui.data.column.trialPlan.lhType": "硫化示方书类型",
   "ui.data.column.trialPlan.lhReleaseDate": "硫化示方书发行时间",
   "ui.data.column.trialPlan.destination": "目的",
-
-
-
   "ui.data.column.oderPool.lock": "锁定",
   "ui.data.column.boom.parentVersion": "父物料版本",
   "ui.data.column.boom.childMaterialVersion": "子物料版本",
   "ui.data.column.capsuleChuck.proSize": "TBR卡盘英寸",
   "common.rule.lengMax": "成型鼓周长下限不能大于成型鼓周长上限",
+  "ui.data.DemandPlan.createMonthRequire": "生成需求计划",
 
 
-  "ui.data.DemandPlan.createMonthRequire": "生成需求计划"
+
+  "ui.data.orderForecast.month1": "T月",
+  "ui.data.orderForecast.month2": "T+1月",
+  "ui.data.orderForecast.month3": "T+2月",
+  "ui.data.orderForecast.updateTime": "生成时间"
 
 }

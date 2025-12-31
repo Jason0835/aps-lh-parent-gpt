@@ -183,13 +183,14 @@ export default {
           width:120
         },
         {
-          prop: "perimeterMax",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
-        },
-        {
           prop: "perimeterMin",
           label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
         },
+        {
+          prop: "perimeterMax",
+          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
+        },
+
         {
           prop: "specifications",
           label: this.$t("ui.data.column.specColor.specDesc"),

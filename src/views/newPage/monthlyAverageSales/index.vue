@@ -60,8 +60,7 @@
 import { downloadLink } from "@/utils/request";
 import {
   listMpMonthlySaleQty,
-  tabletMpMonthlySaleQty
-
+  tabletMpMonthlySaleQty,
 } from "@/api/monthplan/mpMonthlySaleQty";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -73,7 +72,12 @@ export default {
     tltUpload,
     // infoDialog,
   },
-  dicts: ['biz_product_type','biz_factory_name','biz_brand_type','biz_stor_type'],
+  dicts: [
+    "biz_product_type",
+    "biz_factory_name",
+    "biz_brand_type",
+    "biz_stor_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -105,7 +109,6 @@ export default {
   computed: {
     columns() {
       let columns = [
-
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -130,24 +133,26 @@ export default {
         {
           prop: "brand",
           label: this.$t("common.brand"),
-          width:120,
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
         },
         {
           prop: "materialCode",
-          width:120,
+          width: 120,
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300
+          width: 300,
         },
         {
           prop: "rollTwelveMonthSaleQty",
-          label: this.$t("ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty"),
+          label: this.$t(
+            "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty"
+          ),
         },
         {
           prop: "averageSaleQty",
@@ -156,7 +161,7 @@ export default {
         {
           prop: "saleAreaName",
           label: this.$t("ui.data.column.mpMonthlySaleQty.saleArea"),
-          width:180
+          width: 180,
         },
         {
           prop: "areaAll",
@@ -171,26 +176,49 @@ export default {
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          width:180
+          width: 180,
         },
       ];
       for (let i = 0; i < this.areaList.length; i++) {
         columns[columns.length - 3].children.push({
           prop: this.areaList[i].areaCodeShow,
           label: this.areaList[i].areaCodeNameI18n,
+          render: ({ row }) => {
+            return (
+              <div
+                style={{
+                  width: "100%", // 缺少引号
+                  height: "100%", // 缺少引号
+                }}
+              >
+                {row[this.areaList[i].areaCodeShow+'isYell'] == 1 && (
+                  <div
+                    style={{
+                      width: "100%", // 缺少引号
+                      height: "100%", // 缺少引号
+                      background: "yellow",
+                    }}
+                  >
+                    {row[this.areaList[i].areaCodeShow]}
+                  </div>
+                )}
+                {row[this.areaList[i].areaCodeShow+'isYell'] != 1 && <div style={{}}>  {row[this.areaList[i].areaCodeShow]}</div>}
+              </div>
+            );
+          },
         });
       }
       for (let i = 0; i < this.monthList.length; i++) {
         columns[columns.length - 2].children.push({
           prop: this.monthList[i].monthShow,
-          label: this.monthList[i].month+this.$t('common.month'),
+          label: this.monthList[i].month + this.$t("common.month"),
         });
       }
       return columns;
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
@@ -311,35 +339,33 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        let res=await tabletMpMonthlySaleQty(this.formatParams())
-        this.areaList=res.areaTableTitle
-        this.monthList=res.monthTableTitle
-        let listdata = await listMpMonthlySaleQty(
-          this.formatParams()
-        );
-        let data=listdata.rows
+        let res = await tabletMpMonthlySaleQty(this.formatParams());
+        this.areaList = res.areaTableTitle;
+        this.monthList = res.monthTableTitle;
+        let listdata = await listMpMonthlySaleQty(this.formatParams());
+        let data = listdata.rows;
 
         for (let i = 0; i < data.length; i++) {
-
-          if(!data[i].areaGroupList){
-            data[i].areaGroupList=[]
+          if (!data[i].areaGroupList) {
+            data[i].areaGroupList = [];
           }
-          if(!data[i].monthGroupList){
-            data[i].monthGroupList=[]
+          if (!data[i].monthGroupList) {
+            data[i].monthGroupList = [];
           }
-          console.log(data[i].areaGroupList.length)
+          console.log(data[i].areaGroupList.length);
           for (let j = 0; j < data[i].areaGroupList.length; j++) {
             data[i][data[i].areaGroupList[j].areaCodeShow] =
               data[i].areaGroupList[j].saleQty;
-
+            data[i][data[i].areaGroupList[j].areaCodeShow+'isYell'] =
+              data[i].areaGroupList[j].yellowColorFlag;
           }
           for (let k = 0; k < data[i].monthGroupList.length; k++) {
             data[i][data[i].monthGroupList[k].areaCodeShow] =
               data[i].monthGroupList[k].saleQty;
-
           }
         }
         this.data = data;
+        console.log(data);
         this.page.total = listdata.total;
       } catch (error) {
         console.error(error);
@@ -360,8 +386,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

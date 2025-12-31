@@ -6,3 +6,10 @@ export function listRawMaterialInfo(query) {
     data: query
   })
 }
+export function mesCatch(query) {
+  return request({
+    url: '/maindata/rawMaterialOutboundRecord/mesCatch',
+    method: 'post',
+    data: query
+  })
+}

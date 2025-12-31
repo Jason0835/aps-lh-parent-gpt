@@ -135,6 +135,16 @@ export default {
           },
         },
         {
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          width:120
+        },
+        {
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          width:120
+        },
+        {
           prop: "productTypeCode",
           label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {

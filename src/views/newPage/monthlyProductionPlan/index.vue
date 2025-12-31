@@ -20,17 +20,10 @@
       :summary-method="getSummaryMethod"
     >
       <template slot="header">
-        <el-button
-          type="primary"
-            :loading="createLoading"
-          plain
-          @click="generPlan"
-          v-hasPermi="['monthplan:productionPrediction:createMonthPrediction']"
-          >{{ $t("生成") }}
-        </el-button>
+
         <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:productionPrediction:export']"
+          v-hasPermi="['monthplan:factoryMonthPlanMouldDayResult:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
@@ -46,9 +39,8 @@ import Big from "big.js";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
-  listOrderForecast,
-  createOrderForecast,
-} from "@/api/monthplan/orderForecast";
+  listProductionPlan
+} from "@/api/monthplan/monthlyProductionPlan";
 //components
 
 export default {
@@ -56,10 +48,10 @@ export default {
   components: {
     // tltUpload,
   },
-  dicts: ["biz_factory_name",'biz_product_type','biz_brand_type'],
+  dicts: ["biz_factory_name", "biz_product_type", "biz_brand_type",'biz_plan_type','biz_construction_stage'],
   data() {
     return {
-      createLoading:false,
+      createLoading: false,
       loading: false,
       data: [],
       selection: [],
@@ -78,138 +70,143 @@ export default {
     columns() {
       let columns = [
         // {
-        //   prop: "yearMonth",
-        //   label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+        //   prop: "productStatus",
+        //   label: this.$t("产品状态"),
+        //   width: 120,
         // },
         {
-          prop: "factoryCode",
-          label: this.$t("common.factory"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
-          },
-          width:120
+          prop: "structureName",
+          label: this.$t("产品结构"),
+          width: 120,
         },
         {
-          prop: "year",
-          label: this.$t("年份"),
-          width:120
-        },
-        {
-          prop: "month",
-          label: this.$t("月份"),
-          width:120
-        },
-        {
-          prop: "productTypeCode",
           label: this.$t("产品品类"),
+          prop: "productTypeCode",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
-          width:120
+          width: 120,
         },
-        // {
-        //   prop: "类型",
-        //   label: this.$t("类型"),
-        // },
         {
-          prop: "brand",
-          label: this.$t("品牌"),
+          label: this.$t("计划类型"),
+          prop: "planType",
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+            return this.selectDictLabel(this.dict.type.biz_plan_type, value);
           },
-          width:120
+          width: 120,
         },
         {
-          prop: "materialCode",
-          label: this.$t("物料编码"),
-          width:180
+          label: this.$t("施工阶段"),
+          prop: "constructionStage",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+          },
+          width: 120,
+        },
+
+        {
+          prop: "mainMaterialDesc",
+          label: this.$t("主物料"),
+          width: 180,
         },
         {
           prop: "materialDesc",
           label: this.$t("物料描述"),
-          width:300
+          width: 300,
         },
         {
-          prop: "month1",
-          label: this.$t("T月"),
-          width:120
+          prop: "mainPattern",
+          label: this.$t("花纹"),
+          width: 120,
         },
 
         {
-          prop: "month2",
-          label: this.$t("T+1月"),
-          width:120
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+          prop: "mouldCavityQty",
+          label: this.$t("型腔"),
         },
         {
-          prop: "month3",
-          label: this.$t("T+2月"),
-          width:120
+          prop: "typeBlockQty",
+          label: this.$t("活块"),
+          width: 120,
         },
         {
-          prop: "remark",
-          label: this.$t("备注"),
-          width:120
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+          prop: "prodReqPlan",
+          label: this.$t("净需求"),
+          width: 120,
         },
         {
-          prop: "updateTime",
-          label: this.$t("生成时间"),
-          width:180
+          prop: "heightQty",
+          label: this.$t("高优先级"),
+          width: 120,
         },
-
-
+        {
+          prop: "averageQty",
+          label: this.$t("月均销量"),
+          width: 120,
+        },
+        {
+          prop: "inventorySalesRatio",
+          label: this.$t("库销比"),
+          width: 120,
+        },
+        {
+          prop: "dayVulcanizationQty",
+          label: this.$t("日硫化量"),
+          width: 120,
+        },
       ];
+      const days = 31;
 
+      for (let i = 0; i < days; i++) {
+        columns.push({
+          label: `${i + 1}号`,
+          // label: this.$t("ui.data.column.mouldingDayResult.day", {
+          //   day: i + 1,
+          // }),
+          prop: `day${i + 1}`,
+          minWidth: "80px",
+          type: "number",
+        });
+      }
       return columns;
     },
     searchColumns() {
       return [
-      {
-          prop: "factoryCode",
-          label: this.$t("common.factory"),
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          clearable: false,
+        {
+          label: this.$t("产品结构"),
+          prop: "structureName",
         },
         {
-          prop: "yearMonth",
-          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
-          type: "date",
-          dateType: "month",
-          valueFormat: "yyyy-MM",
-          clearable: false,
+          label: this.$t("主物料"),
+          prop: "mainMaterialDesc",
         },
-
-
+        {
+          label: this.$t("物料描述"),
+          prop: "materialDesc",
+        },
+        {
+          label: this.$t("花纹"),
+          prop: "mainPattern",
+        },
+        // {
+        //   label: this.$t("产品状态"),
+        //   prop: "productStatus",
+        //   type: "select",
+        //   dictData: this.dict.type.biz_product_type,
+        // },
+        // {
+        //   label: this.$t("规格"),
+        //   prop: "materialDesc",
+        // },
+        {
+          label: this.$t("物料编码"),
+          prop: "materialCode",
+        },
         {
           label: this.$t("产品品类"),
           prop: "productTypeCode",
           type: "select",
           dictData: this.dict.type.biz_product_type,
-        },
-
-        {
-          label: this.$t("物料编码"),
-          prop: "materialCode",
-        },
-        {
-          label: this.$t("物料描述"),
-          prop: "materialDesc",
         },
       ];
     },
@@ -217,13 +214,13 @@ export default {
   methods: {
     async generPlan() {
       try {
-        this.createLoading=true
+        this.createLoading = true;
         let res = await createOrderForecast(this.formatParams());
         this.$modal.msgSuccess(res.msg);
         this.getList();
-        this.createLoading=false
+        this.createLoading = false;
       } catch (err) {
-        this.createLoading=false
+        this.createLoading = false;
       }
     },
     handleSearch(data) {
@@ -249,7 +246,10 @@ export default {
       this.getList();
     },
     handleExport() {
-      downloadLink("/monthplan/productionPrediction/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/factoryMonthPlanMouldDayResult/export",
+        this.formatParams(false)
+      );
     },
 
     // utils
@@ -352,14 +352,9 @@ export default {
     async getList() {
       try {
         this.loading = true;
-
-        const res = await listOrderForecast(this.formatParams());
-        // console.log()
-
+        const res = await listProductionPlan(this.formatParams());
         this.data = res.rows;
-
-
-        this.page.total = data.total;
+        this.page.total = res.total;
       } catch (error) {
         console.error(error);
       } finally {
@@ -383,8 +378,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>
