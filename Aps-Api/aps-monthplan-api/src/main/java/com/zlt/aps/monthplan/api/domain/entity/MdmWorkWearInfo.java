@@ -42,7 +42,7 @@ public class MdmWorkWearInfo extends BaseEntity {
     /**
      * 工装分类，必填 数据字典 biz_work_type 01 成型鼓 02 胎体鼓
      */
-//    @ImportExcelValidated(required = true)
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearType", dictType = "biz_work_type")
     @ApiModelProperty(value = "工装分类 数据字典 biz_work_type 01 成型鼓 02 胎体鼓", name = "workWearType")
     @TableField(value = "WORK_WEAR_TYPE")
@@ -60,7 +60,7 @@ public class MdmWorkWearInfo extends BaseEntity {
     /**
      * 工装名称，必填长度64
      */
-    @ImportExcelValidated(maxLength = 64)
+    @ImportExcelValidated(required = true, maxLength = 64)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.workWearName")
     @ApiModelProperty(value = "工装名称", name = "workWearName")
     @TableField(value = "WORK_WEAR_NAME")
@@ -87,7 +87,7 @@ public class MdmWorkWearInfo extends BaseEntity {
     /**
      * 成型鼓周长上限
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(digits = true, min = 1, max = 999999)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMax")
     @ApiModelProperty(value = "成型鼓周长上限", name = "perimeterMax")
     @TableField(value = "PERIMETER_MAX")
@@ -96,7 +96,7 @@ public class MdmWorkWearInfo extends BaseEntity {
     /**
      * 成型鼓周长下限
      */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 999999)
+    @ImportExcelValidated(digits = true, min = 1, max = 999999)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.perimeterMin")
     @ApiModelProperty(value = "成型鼓周长下限", name = "perimeterMin")
     @TableField(value = "PERIMETER_MIN")
@@ -132,7 +132,6 @@ public class MdmWorkWearInfo extends BaseEntity {
     /**
      * 使用机型，长度20
      */
-    @ImportExcelValidated(maxLength = 20)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.usedType")
     @ApiModelProperty(value = "使用机型", name = "usedType")
     @TableField(value = "USED_TYPE")
