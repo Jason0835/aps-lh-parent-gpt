@@ -204,7 +204,7 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 品名编码
      */
-//    @Excel(name = "ui.data.column.mdmMaterialInfo.productTypeName", dictType = "biz_product_name", sort = 13)
+//    @Excel(name = "ui.data.column.mdmMaterialInfo.productTypeName", dictType = "biz_product_type", sort = 13)
     @ApiModelProperty(value = "品名编码", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;

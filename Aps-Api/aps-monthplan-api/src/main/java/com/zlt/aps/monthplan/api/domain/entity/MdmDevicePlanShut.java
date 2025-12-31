@@ -98,5 +98,9 @@ public class MdmDevicePlanShut extends BaseEntity {
     @TableField(value = "END_DATE")
     private Date endDate;
 
-
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

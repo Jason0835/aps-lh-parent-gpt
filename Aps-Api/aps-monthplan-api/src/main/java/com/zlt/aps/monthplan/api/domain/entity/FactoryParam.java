@@ -40,7 +40,7 @@ public class FactoryParam extends BaseEntity {
     /**
      * 产品品类
      */
-    @Excel(name = "ui.data.column.factoryParam.productTypeCode", dictType = "biz_product_name")
+    @Excel(name = "ui.data.column.factoryParam.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;

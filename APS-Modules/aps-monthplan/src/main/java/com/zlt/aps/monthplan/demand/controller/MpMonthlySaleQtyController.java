@@ -280,12 +280,16 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         }
 
         int areaMergeEndCellNum = cellNum + areaTitleSize - 1;
-        CellRangeAddress areaMergeRegion = new CellRangeAddress(0, 0, cellNum, areaMergeEndCellNum);
-        sheet.addMergedRegion(areaMergeRegion);
+        if (cellNum != areaMergeEndCellNum) {
+            CellRangeAddress areaMergeRegion = new CellRangeAddress(0, 0, cellNum, areaMergeEndCellNum);
+            sheet.addMergedRegion(areaMergeRegion);
+        }
         int monthMergeStartCellNum = areaMergeEndCellNum + 1;
         int monthMergeEndCellNum = monthMergeStartCellNum + monthTableTitleList.size() - 1;
-        CellRangeAddress monthMergeRegion = new CellRangeAddress(0, 0, monthMergeStartCellNum, monthMergeEndCellNum);
-        sheet.addMergedRegion(monthMergeRegion);
+        if (monthMergeStartCellNum != monthMergeEndCellNum) {
+            CellRangeAddress monthMergeRegion = new CellRangeAddress(0, 0, monthMergeStartCellNum, monthMergeEndCellNum);
+            sheet.addMergedRegion(monthMergeRegion);
+        }
     }
 
     /**
