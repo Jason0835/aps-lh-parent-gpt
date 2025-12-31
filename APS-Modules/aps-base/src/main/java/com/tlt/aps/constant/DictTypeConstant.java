@@ -12,11 +12,11 @@ public class DictTypeConstant {
      */
     public static final String FACTORY_NAME = "biz_factory_name";
     /**
-     * 品名数据字典类型 biz_product_name
+     * 品名数据字典类型 biz_product_type
      */
-    public static final String PRODUCT_NAME = "biz_product_name";
+    public static final String PRODUCT_NAME = "biz_product_type";
     /**
-     * 公司数据字典类型 biz_product_name
+     * 公司数据字典类型 biz_product_type
      */
     public static final String COMPANY_NAME = "biz_company_name";
 
