@@ -84,11 +84,11 @@ public class MdmWorkWearInfoServiceImpl extends AbstractDocService<MdmWorkWearIn
         // 查询成型机列表，如果校验使用机型字段是否为编号
         List<String> machineCodeList = list.stream().map(MdmWorkWearInfo::getUsedType).collect(Collectors.toList());
         List<List<String>> splitList = ScmListUtils.getSplitList(machineCodeList, 1000);
-        List<Object> moldingMachineList = new ArrayList<>();
+        List<MdmMoldingMachine> moldingMachineList = new ArrayList<>();
         for (List<String> codeList : splitList) {
             LambdaQueryWrapper<MdmMoldingMachine> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_NORMAL);
-            queryWrapper.in(MdmMoldingMachine::getMachineCode, machineCodeList);
+            queryWrapper.in(MdmMoldingMachine::getMachineCode, codeList);
             moldingMachineList.addAll(moldingMachineEntityMapper.selectList(queryWrapper));
         }
         Map<String, MdmMoldingMachine> moldingMachineMap;
