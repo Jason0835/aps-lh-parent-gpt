@@ -85,6 +85,8 @@ public abstract class AbstractDailyCapacityLimit {
         int changeMouldCount = 0;
         int dayPlanQty,dailyLhQty;
         String dayField = FactoryConstant.DAY_FIELD + iDay;
+        // 次日字段
+        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1);
         String embryoFieldValue;
         for (BaseEntity mpFinalVo: mpProdFinalList){
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null) {
@@ -94,10 +96,18 @@ public abstract class AbstractDailyCapacityLimit {
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             // 日硫化量 = 单模硫化量 * 2；
             dailyLhQty = getDayVulcanizationQty(mpFinalVo);
-            // 取整(日计划量/日单台硫化量)
-            intPart += dayPlanQty / dailyLhQty;
-            // 统计有余数的SKU个数
-            remainderCount += dayPlanQty % dailyLhQty > 0 ? 1:0;
+
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) != null &&
+                    (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) >= dayPlanQty) {
+                // 若次日计划量 比 当日计划量 大，说明在增模
+                // 日计划量 / 日单台硫化量 向上取整
+                intPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+            }else {
+                // 取整(日计划量/日单台硫化量)
+                intPart += dayPlanQty / dailyLhQty;
+                // 统计有余数的SKU个数
+                remainderCount += dayPlanQty % dailyLhQty > 0 ? 1:0;
+            }
             // 统计换模的SKU个数
             changeMouldCount += dayPlanQty > 0 && dayPlanQty < dailyLhQty ? 1:0;
 
