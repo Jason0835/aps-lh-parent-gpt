@@ -19,10 +19,11 @@
       <template slot="header">
         <el-button
           type="primary"
+          :loading="createLoading"
           plain
           @click="generPlan"
           v-hasPermi="['monthplan:demandPlan:createMonthRequire']"
-          >{{ $t("生成需求计划") }}
+          >{{ $t("ui.data.DemandPlan.createMonthRequire  ") }}
         </el-button>
         <!-- <el-button
           type="primary"
@@ -141,6 +142,7 @@ export default {
   data() {
     return {
       title: "优先级调整",
+      createLoading:false,
       loading: false,
       visible: false,
       data: [],
@@ -451,10 +453,14 @@ export default {
     },
     async generPlan() {
       try {
+        this.createLoading=true
         let res = await genenrDemandPlan(this.formatParams());
-        console.log(res);
+        this.$modal.msgSuccess(res.msg);
         this.getList();
-      } catch (err) {}
+        this.createLoading=false
+      } catch (err) {
+        this.createLoading=false
+      }
     },
     save() {},
     hide() {
@@ -592,6 +598,7 @@ export default {
   },
   created() {
     const now = new Date();
+    now.setMonth(now.getMonth() + 1);
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
     let defaultParams = {

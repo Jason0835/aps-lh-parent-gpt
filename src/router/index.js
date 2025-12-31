@@ -382,12 +382,12 @@ constantRoutes.push(
   //     //   name: "monthPlanned",
   //     //   meta: { title: "月底计划余量" },
   //     // },
-  //     {
-  //       path: "orderForecast",
-  //       component: () => import("@/views/newPage/orderForecast/index"),
-  //       name: "orderForecast",
-  //       meta: { title: "排产预测" },
-  //     },
+  //     // {
+  //     //   path: "orderForecast",
+  //     //   component: () => import("@/views/newPage/orderForecast/index"),
+  //     //   name: "orderForecast",
+  //     //   meta: { title: "排产预测" },
+  //     // },
   //     // {
   //     //   path: "moldLedger",
   //     //   component: () => import("@/views/newPage/moldLedger/index"),
