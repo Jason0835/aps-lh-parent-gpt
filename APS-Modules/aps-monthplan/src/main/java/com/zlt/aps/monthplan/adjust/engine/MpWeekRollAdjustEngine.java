@@ -1,19 +1,22 @@
 package com.zlt.aps.monthplan.adjust.engine;
 
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
-import springfox.documentation.schema.Entry;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -87,8 +90,8 @@ public class MpWeekRollAdjustEngine {
         //2.减量调整
         structureInAdjustWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
         //3.在机SKU增量
-        onIncrementAdjustList = onIncrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
-        structureInAdjustWithOnIncrement(onIncrementAdjustList,mpProdFinalList);
+        //onIncrementAdjustList = onIncrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+        structureInAdjustWithOnIncrement(onIncrementAdjustList,mpProdFinalList,null);
         //4.新增SKU
         incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         structureInAdjustWithIncrement(incrementAdjustList,mpProdFinalList);
@@ -222,11 +225,19 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustWithOnIncrement(List<MpAdjustStructureIn> onIncrementAdjustList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void structureInAdjustWithOnIncrement(List<MpAdjustStructureIn> onIncrementAdjustList,
+                                                  List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                  List<MpStructureAllocation> mpStructAllocList) throws BusinessException {
         if(PubUtil.isEmpty(onIncrementAdjustList)){
             return;
         }
 
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimit = new MpAdjustDailyCapacityLimit();
+        //1、初始日产能限制
+        //TODO startDay换成锁定日+1
+        adjustDailyCapacityLimit.getDailyCapacityLimitMap(1,mpProdFinalList,mpStructAllocList);
+
+        //2、
         Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = mpProdFinalList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                  Collectors.collectingAndThen(Collectors.toList(),m-> {
                      return m.get(0);
@@ -238,10 +249,9 @@ public class MpWeekRollAdjustEngine {
             if (mpFinalVo == null) {
                 continue;
             }
-            
-
         }
     }
+
 
     /**
      * 结构内调整：新增SKU
