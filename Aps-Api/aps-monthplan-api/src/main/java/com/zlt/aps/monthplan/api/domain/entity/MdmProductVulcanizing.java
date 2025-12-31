@@ -79,7 +79,7 @@ public class MdmProductVulcanizing extends BaseEntity implements Serializable {
      * 品名
      */
     @ImportExcelValidated(required = true, isCode = true, maxLength = 64)
-        @Excel(name = "ui.data.column.docVulcanizingMachine.productTypeCode",dictType = "biz_product_name")
+    @Excel(name = "ui.data.column.docVulcanizingMachine.productTypeCode", dictType = "biz_product_type")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 

@@ -9,6 +9,6 @@ import lombok.Setter;
 @Setter
 public class MdmProductionMoldingVo extends MdmProductionMolding {
     // 品名
-    @Excel(name = "ui.data.column.docFactoryNotProduction.productName", type = Excel.Type.EXPORT, dictType = "biz_product_name", sort = 70)
+    @Excel(name = "ui.data.column.docFactoryNotProduction.productName", type = Excel.Type.EXPORT, dictType = "biz_product_type", sort = 70)
     private String productName;
 }

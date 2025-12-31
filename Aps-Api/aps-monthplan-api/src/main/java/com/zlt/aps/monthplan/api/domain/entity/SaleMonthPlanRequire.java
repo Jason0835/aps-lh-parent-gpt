@@ -110,7 +110,7 @@ public class SaleMonthPlanRequire extends BaseEntity {
     /**
      * 品名编码
      */
-    @Excel(name = "ui.data.column.require.productTypeCode", dictType = "biz_product_name")
+    @Excel(name = "ui.data.column.require.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "品名编码", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;

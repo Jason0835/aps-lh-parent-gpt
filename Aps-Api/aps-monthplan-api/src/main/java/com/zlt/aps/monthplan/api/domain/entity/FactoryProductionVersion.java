@@ -44,7 +44,7 @@ public class FactoryProductionVersion extends BaseEntity {
     /**
      * 产品分类
      */
-    @Excel(name = "ui.data.column.factoryProductionVersion.productTypeCode", dictType = "biz_product_name")
+    @Excel(name = "ui.data.column.factoryProductionVersion.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品分类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;

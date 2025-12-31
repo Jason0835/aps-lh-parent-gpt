@@ -138,8 +138,11 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @RequiresPermissions( "monthplan:SalesOrderPool:lock")
     @PostMapping("/lockSalesOrderPool")
     @ResponseBody
-    public AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool billVO){
-        return iSalesOrderPoolService.lockSalesOrderPool(billVO);
+    public AjaxResult lockSalesOrderPool(SalesOrderPool salesOrderPool){
+    	if (salesOrderPool.getYear() == null || salesOrderPool.getMonth() == null) {
+            return AjaxResult.error("请输入正确的年月！");	
+    	}
+        return iSalesOrderPoolService.lockSalesOrderPool(salesOrderPool);
     }
 
     /**

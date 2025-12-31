@@ -4,4 +4,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper">
 
+    <select id="getStructureSelectList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef">
+        SELECT DISTINCT
+        STRUCTURE_NAME
+        FROM
+        T_MDM_SKU_STRUCTURE_REF
+        WHERE
+        IS_DELETE = 0 AND STRUCTURE_NAME IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
+        <if test="mesMaterialCode != null and mesMaterialCode != ''">AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
+        <if test="structureName != null and structureName != ''">AND STRUCTURE_NAME = #{structureName}</if>
+        GROUP BY STRUCTURE_NAME
+    </select>
 </mapper>
