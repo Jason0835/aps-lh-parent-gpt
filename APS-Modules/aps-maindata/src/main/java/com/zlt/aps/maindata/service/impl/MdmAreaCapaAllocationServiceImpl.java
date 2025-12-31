@@ -87,6 +87,8 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     @Override
     protected Map<Object, Object> getServiceCheckParams(List<MdmAreaCapaAllocation> list, List<MdmAreaCapaAllocation> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        String areaCodeNotExistsMessage = I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.areaCodeNotExists");
+        serviceCheckParams.put("areaCodeNotExistsMessage", areaCodeNotExistsMessage);
         // 查询区域数据，转义区域
         List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, String> areaMap;
@@ -107,9 +109,9 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
                 String areaCode = areaMap.get(areaCodeNameI18n);
                 importDocEntity.setAreaCode(areaCode);
             } else {
-                String message = I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.areaCodeNotExists");
+                String areaCodeNotExistsMessage = serviceCheckParams.get("areaCodeNotExistsMessage").toString();
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorRowNum, message, importErrorLogs);
+                        errorRowNum, areaCodeNotExistsMessage, importErrorLogs);
                 return Boolean.FALSE;
             }
         }
