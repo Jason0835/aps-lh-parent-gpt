@@ -100,18 +100,21 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     }
 
     /**
-     * 修改或新增
+     * 修改，仅能更新供应链优先级
      */
-    @ApiOperation("修改或新增")
+    @ApiOperation("修改")
     @RequiresPermissions("monthplan:SalesOrderPool:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(SalesOrderPool salesOrderPool) {
-        if (UserConstants.NOT_UNIQUE.equals(iSalesOrderPoolService.checkUnique(salesOrderPool))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.salesOrderPool.checkUnique"));
-        }
-
-        return iSalesOrderPoolService.save(salesOrderPool);
+    	if (salesOrderPool.getId() == null) { // 新增直接返回
+    		return AjaxResult.success();
+    	}
+    	// 重新赋值对象，仅能更新供应链优先级
+    	SalesOrderPool updateInfo = new SalesOrderPool();
+    	updateInfo.setId(salesOrderPool.getId());
+    	updateInfo.setScmPriority(salesOrderPool.getScmPriority());
+        return iSalesOrderPoolService.save(updateInfo);
     }
     
 
