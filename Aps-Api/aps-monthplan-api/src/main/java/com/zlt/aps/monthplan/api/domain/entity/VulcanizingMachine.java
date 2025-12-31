@@ -65,8 +65,8 @@ public class VulcanizingMachine extends BaseEntity {
     /**
      * 胎别，按胎别决定排产策略，全钢，半钢
      */
-    @Excel(name = "ui.data.column.VulcanizingMachine.productTypeCode", dictType = "biz_product_name")
-    @ApiModelProperty(value = "胎别，按胎别决定排产策略，全钢，半钢，字典：biz_product_name", name = "productTypeCode")
+    @Excel(name = "ui.data.column.VulcanizingMachine.productTypeCode", dictType = "biz_product_type")
+    @ApiModelProperty(value = "胎别，按胎别决定排产策略，全钢，半钢，字典：biz_product_type", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 

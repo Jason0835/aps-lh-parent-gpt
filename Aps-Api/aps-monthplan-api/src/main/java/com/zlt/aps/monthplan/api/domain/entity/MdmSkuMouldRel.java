@@ -147,9 +147,10 @@ public class MdmSkuMouldRel extends BaseEntity {
     @TableField(value = "MOULD_CATEGORY")
     private String mouldCategory;
 
-    //    @Excel(name = "ui.data.column.docProductALevel.remark")
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.remark")
     @ApiModelProperty("备注")
-    @TableField(value = "REMARK")
+    @TableField("REMARK")
     private String remark;
 
     @TableField(exist = false)

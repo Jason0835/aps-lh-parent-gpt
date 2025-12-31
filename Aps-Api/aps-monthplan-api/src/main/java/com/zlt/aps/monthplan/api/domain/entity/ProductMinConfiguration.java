@@ -57,7 +57,7 @@ public class ProductMinConfiguration extends BaseEntity {
     /**
      * 胎别
      */
-    @Excel(name = "ui.data.column.productMinConfiguration.productType", dictType = "biz_product_name")
+    @Excel(name = "ui.data.column.productMinConfiguration.productType", dictType = "biz_product_type")
     @ApiModelProperty(value = "胎别", name = "productType")
     @TableField(value = "PRODUCT_TYPE")
     private String productType;
