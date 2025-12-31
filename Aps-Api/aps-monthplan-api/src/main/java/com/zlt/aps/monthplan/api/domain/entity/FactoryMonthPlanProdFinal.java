@@ -39,7 +39,6 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProductionFinalRe
 
     private static final long serialVersionUID = 1L;
 
-
     /**
      * 生产物料编号
      */

@@ -4,4 +4,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper">
 
+    <update id="updateBatchProductionQty">
+        UPDATE T_DP_ORDER_OFFSET_DETAIL
+        SET PRODUCTION_QTY = CASE
+        <foreach collection="list" item="item">
+            WHEN ID = #{item.id} THEN #{item.productionQty}
+        </foreach>
+        END
+        WHERE ID IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            #{item.id}
+        </foreach>
+    </update>
+
 </mapper>
