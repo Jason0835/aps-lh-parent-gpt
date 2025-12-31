@@ -87,19 +87,19 @@ public class MpProductionPrediction extends BaseEntity {
     @Excel(name = "ui.data.column.productionPrediction.month1")
     @ApiModelProperty(value = "第1个月排产量", name = "month1")
     @TableField(value = "MONTH_1")
-    private Integer month1;
+    private Long month1;
 
     /** 第2个月排产量 */
     @Excel(name = "ui.data.column.productionPrediction.month2")
     @ApiModelProperty(value = "第2个月排产量", name = "month2")
     @TableField(value = "MONTH_2")
-    private Integer month2;
+    private Long month2;
 
     /** 第3个月排产量 */
     @Excel(name = "ui.data.column.productionPrediction.month3")
     @ApiModelProperty(value = "第3个月排产量", name = "month3")
     @TableField(value = "MONTH_3")
-    private Integer month3;
+    private Long month3;
 
     /** 预测版本号 */
     @Excel(name = "ui.data.column.productionPrediction.predictionVersion")
@@ -196,7 +196,7 @@ public class MpProductionPrediction extends BaseEntity {
      * @param monthIndex 月份索引：1, 2, 3
      * @return 生产量
      */
-    public Integer getProductionQtyByMonthIndex(int monthIndex) {
+    public Long getProductionQtyByMonthIndex(int monthIndex) {
         switch (monthIndex) {
             case 1:
                 return this.month1;
@@ -205,7 +205,7 @@ public class MpProductionPrediction extends BaseEntity {
             case 3:
                 return this.month3;
             default:
-                return 0;
+                return 0L;
         }
     }
 

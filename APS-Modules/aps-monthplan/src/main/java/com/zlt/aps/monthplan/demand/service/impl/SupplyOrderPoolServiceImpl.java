@@ -111,35 +111,33 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     public void createCycleStockUp(SupplyOrderPool supplyOrderPool) {
         // 1. 验证前置条件
         validatePrerequisites();
-
         // 2. 获取需要处理的SKU集合
         Set<String> eligibleSkus = getEligibleSkus();
         if (CollectionUtils.isEmpty(eligibleSkus)) {
             throw new BusinessException(I18nUtil.getMessage(
                 "ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
         }
-
+        YearMonth nextMonth = YearMonth.now().plusMonths(1);
         // 3. 清理旧数据并批量创建新数据
-        recreateSupplyOrderPools(eligibleSkus);
+        recreateSupplyOrderPools(nextMonth,eligibleSkus);
     }
 
     /**
      * 重新创建供应链订单池
      */
-    private void recreateSupplyOrderPools(Set<String> skus) {
-        YearMonth nextMonth = YearMonth.now().plusMonths(1);
+    private List<SupplyOrderPool> recreateSupplyOrderPools(YearMonth yearMonth,Set<String> skus) {
         // 3.1 清理旧数据
-        deleteSupplyOrderPool(nextMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
-
+        deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         // 3.2 准备计算所需数据
         CalculationData calculationData = prepareCalculationData();
 
         // 3.3 批量构建并插入订单池数据
-        List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPoolsInParallel(nextMonth,
+        List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPoolsInParallel(yearMonth,
             skus, calculationData);
         if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
             this.baseDao.insertBatch(supplyOrderPools);
         }
+        return supplyOrderPools;
     }
 
     /**
@@ -314,18 +312,24 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                 log.warn("No eligible SKUs found for precedent stock up");
                 throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
             }
-            List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(nextMonth,eligibleSkus, context);
-            // 3.1 清理旧数据
-            deleteSupplyOrderPool(nextMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
-            if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
-                this.baseDao.insertBatch(supplyOrderPools);
-            }
-            log.info("Successfully created {} precedent stock up orders", supplyOrderPools.size());
+            // 3. 清理旧数据并批量创建新数据
+            recreateSupplyOrderPools(nextMonth,eligibleSkus, context);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to create precedent stock up,errorMsg:{}", e.getMessage());
         }
+    }
+
+    private List<SupplyOrderPool> recreateSupplyOrderPools(YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) {
+        List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(yearMonth,eligibleSkus, context);
+        // 3.1 清理旧数据
+        deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
+        if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
+            this.baseDao.insertBatch(supplyOrderPools);
+        }
+        log.info("Successfully created {} precedent stock up orders", supplyOrderPools.size());
+        return supplyOrderPools;
     }
 
     private List<SupplyOrderPool> calculateAndBuildOrders(YearMonth yearMonth,
@@ -618,11 +622,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
         // 2. 获取需要处理的SKU集合
         Set<String> eligibleSkus = getEligibleSkus();
-        // 3.2 准备计算所需数据
-        CalculationData calculationData = prepareCalculationData();
-        // 3.3 批量构建
-        return buildSupplyOrderPoolsInParallel(yearMonth,
-            eligibleSkus, calculationData);
+        // 3. 清理旧数据并批量创建新数据
+        return  recreateSupplyOrderPools(yearMonth,eligibleSkus);
     }
 
     @Override
@@ -632,7 +633,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         if (eligibleSkus.isEmpty()) {
             return Collections.emptyList();
         }
-        return calculateAndBuildOrders(yearMonth,eligibleSkus, context);
+        return recreateSupplyOrderPools(yearMonth,  eligibleSkus,context);
     }
 
     /**

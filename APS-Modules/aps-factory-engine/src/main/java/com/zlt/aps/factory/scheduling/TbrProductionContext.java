@@ -7,6 +7,8 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -53,6 +55,11 @@ public class TbrProductionContext extends Context {
      * 反向匹配成型机台
      */
     Set<String> reverseFindSet;
+    
+    /**
+     * 超6个月库存量
+     */
+    Map<String, Integer> overSixMonthStockMap; 
 
     /**
      * 加入收尾，方向匹配结构集合

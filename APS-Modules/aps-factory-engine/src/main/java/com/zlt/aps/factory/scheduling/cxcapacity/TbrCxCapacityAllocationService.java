@@ -4,6 +4,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
@@ -18,6 +19,8 @@ import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -88,9 +91,11 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
         productionContext.setReverseFindSet(new HashSet<>());
         //todo 采用新的逻辑进行分配在机结构的在产机台
-        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+//        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //对成型机台进行模拟模具排产
-        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
+//        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
+        mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //对收尾成型机台，反向匹配待排结构
         CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
         //对还需排产结构，获取优先级最高的结构--结构新增
@@ -132,6 +137,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
         //特殊材料的胎胚配置信息
         specialMaterialInfoHandler(productionContext);
+		// 超6个成品库存信息
+		overSixMonthStockHandler(productionContext);
         //初始化库销比、标记是否按总需求排产
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
@@ -170,6 +177,21 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             });
         });
     }
+
+    /**
+     * 加载超6个月的库存信息
+     * @param productionContext
+     */
+	private void overSixMonthStockHandler(TbrProductionContext productionContext) {
+		List<MdmProductStock> stockList = getDataService().getMdmProductStock(productionContext);
+		Map<String, Integer> overSixMonthStockMap = stockList.stream()
+				.filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()))
+				.collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc,
+						Collectors.collectingAndThen(Collectors.toList(),
+								list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth()))
+										.collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
+		productionContext.setOverSixMonthStockMap(overSixMonthStockMap);
+	}
 
     /**
      * 获取初始化业务的参数设定
@@ -382,6 +404,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             mouldShellMap.put(mouldShell.getMoldModelCode(), mouldShell);
         }
         return mouldShellMap;
+    }
+    /**
+     * 对在机结构进行新增Sku的模具排产
+     *
+     * @param context                排产上下文
+     * @param allGroupPlanMap        所有分组排产计划
+     * @param continueAllocationList 在机机台产能分配
+     * @param allContinueMap         续作信息
+     */
+    private void mouldProductionByContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        if (CollectionUtils.isEmpty(allContinueMap)) {
+            return;
+        }
+        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
+        //在机结构-在产机台限制
+        allContinueMap.forEach((structureName, cxContinueInfo) -> {
+            ProductionPlanGroupInfo groupPlan = allGroupPlanMap.get(structureName);
+            List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlan);
+            if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+                return;
+            }
+            groupPlan.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
+        });
+        //todo 在机结构-新增Sku模拟排产
     }
 
     /**

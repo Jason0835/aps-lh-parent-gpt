@@ -146,7 +146,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
           if (null == value) {
             dayValue = BigDecimal.ZERO.longValue();
           } else {
-            dayValue = (Long) value;
+            dayValue = (Integer) value;
           }
           totalMonthSuplus = totalMonthSuplus + dayValue;
         }
@@ -158,8 +158,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
   @Override
   public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(FactoryProductionVersion finalVersion) {
     LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+        .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, finalVersion.getFactoryCode())
+        .eq(FactoryMonthPlanProductionFinalResult::getYear, finalVersion.getYear())
+        .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalVersion.getMonth())
         .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
-        .ge(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion())
         .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
     return this.list(queryWrapper);
   }

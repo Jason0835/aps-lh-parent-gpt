@@ -66,6 +66,7 @@ public class ProductionPlanGroupInfo {
     private Integer theoryDays;
     /**
      * 成型-硫化配比信息
+     * key=机型brandCode ： value=排比信息
      */
     private Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap;
     /**
@@ -483,6 +484,41 @@ public class ProductionPlanGroupInfo {
             }
         }
         return false;
+    }
+
+    /**
+     * 在机结构根据在产机台分配转化成排产限制
+     * 对在机结构来说，该部分为初始化
+     *
+     * @param continueCxMachineAllocation
+     */
+    public void buildDayProductionLimitInfoByContinue(Context context, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+            return;
+        }
+        Integer monthDays = context.getMonthDays();
+        Set<Integer> stopDays = context.getStopDays();
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(monthDays);
+        for (Integer productionDay = ProductionConstant.MONTH_START_DAY; productionDay <= monthDays; productionDay++) {
+            if (stopDays.contains(productionDay)) {
+                continue;
+            }
+            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByContinueCxMachineAllocation(context, productionDay, continueCxMachineAllocation);
+            dayLimitInfo.put(productionDay, dayLimit);
+        }
+        //如果没有
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            dayProductionLimitInfo = dayLimitInfo;
+            return;
+        }
+        dayLimitInfo.forEach((productionDay, dayLimit) -> {
+            GroupPlanCxLhCapacityLimitHelper old = dayProductionLimitInfo.get(productionDay);
+            if (null == old) {
+                dayProductionLimitInfo.put(productionDay, dayLimit);
+                return;
+            }
+            old.updateInfo(dayLimit);
+        });
     }
 
     /**

@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.demand.service;
 
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -27,8 +28,8 @@ public interface IDpDemandPlanService  extends IDocService<DpDemandPlan>{
   void createMonthRequire(DpDemandPlan createCondition);
   /**
    * 根据需求版本号获取需求计划
-   * @param monthPlanVersion 需求版本号
+   * @param finalVersion 最终排产版本
    * @return 需求计划
    */
-  List<DpDemandPlan> findDemandPlanByMonthPlanVersion(String monthPlanVersion);
+  List<DpDemandPlan> findDemandPlanByMonthPlanVersion(FactoryProductionVersion finalVersion);
 }
