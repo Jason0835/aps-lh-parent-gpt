@@ -112,14 +112,15 @@ public class ContinueSkuCalculator {
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> limitMap = new HashMap<>();
         Integer maxEmbryoCodeCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMaxEmbryoCodeCount).sum();
         Integer maxLhMachineCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMaxLhMachineCount).sum();
-        Integer minLhMachineCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMinLhMachineCount).sum();
+        Map<String, Integer> minLhMachineInfo = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, ProductGroupCxCapacityInfo::getMinLhMachineCount));
         Integer maxDays = context.getMonthDays();
         Set<Integer> stopDays = context.getStopDays();
         for (int day = ProductionConstant.MONTH_START_DAY; day <= maxDays; day++) {
             if (stopDays.contains(day)) {
                 continue;
             }
-            GroupPlanCxLhCapacityLimitHelper limitHelper = GroupPlanCxLhCapacityLimitHelper.buildEmptyData(day, maxEmbryoCodeCount, maxLhMachineCount, minLhMachineCount);
+            GroupPlanCxLhCapacityLimitHelper limitHelper = GroupPlanCxLhCapacityLimitHelper.buildEmptyData(day, maxEmbryoCodeCount, maxLhMachineCount);
+            limitHelper.getMinLhMachineInfo().putAll(minLhMachineInfo);
             limitMap.put(day, limitHelper);
         }
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = new HashMap<>(maxLhMachineCount);

@@ -187,6 +187,13 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(Context context);
+    
+    /**
+     * 获取成品库存
+     * @param context 排产上下文
+     * @return
+     */
+    List<MdmProductStock> getMdmProductStock(Context context);
 
     /**
      * 根据查询条件，获取工厂的排产计划信息

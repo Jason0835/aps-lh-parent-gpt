@@ -2,11 +2,14 @@ package com.zlt.aps.factory.domain.dto;
 
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 分组计划 - TBR为结构，PCR为英寸(寸口、寸别)
@@ -90,6 +93,39 @@ public class GroupPlanDayProductionInfoHelper implements Serializable {
         //模具、成型信息
         productionInfo.setCxMachineInfoSet(cxLhProductionHelper.getCxMachineInfo());
         productionInfo.setMouldCodeInfoSet(cxLhProductionHelper.getProductionMouldSet());
+        if (YesOrNoEnum.YES.getCode().equals(isVirtual)) {
+            productionInfo.setIsVirtual(YesOrNoEnum.YES.getCode());
+        } else {
+            productionInfo.setIsVirtual(YesOrNoEnum.NO.getCode());
+        }
+        return productionInfo;
+    }
+
+    /**
+     * 构建日排产信息
+     *
+     * @param groupPlan         排产计划
+     * @param productionDay     排产日
+     * @param cxMachineCodeInfo 成型机信息
+     * @param doubleMouldList   模具信息
+     * @param productionQty     排产量
+     * @param lossQty           sku日损耗量
+     * @param isVirtual         是否虚单 1 是 0 否
+     * @return
+     */
+    public static GroupPlanDayProductionInfoHelper buildDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Integer productionDay, Set<String> cxMachineCodeInfo, List<ProductionMouldInfoVo> doubleMouldList, Long productionQty, Long lossQty, String isVirtual) {
+        GroupPlanDayProductionInfoHelper productionInfo = new GroupPlanDayProductionInfoHelper(groupPlan.getMonthPlanId(), productionDay, null, groupPlan.getStructureName());
+        //排产量
+        productionInfo.setProductionQty(productionQty);
+        productionInfo.setLossQty(lossQty);
+        //物料信息、生胎信息
+        productionInfo.setEmbryoCode(groupPlan.getEmbryoCode());
+        productionInfo.setMaterialCode(groupPlan.getMaterialCode());
+        productionInfo.setMaterialDesc(groupPlan.getMaterialDesc());
+        //模具、成型信息
+        Set<String> mouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        productionInfo.setCxMachineInfoSet(cxMachineCodeInfo);
+        productionInfo.setMouldCodeInfoSet(mouldSet);
         if (YesOrNoEnum.YES.getCode().equals(isVirtual)) {
             productionInfo.setIsVirtual(YesOrNoEnum.YES.getCode());
         } else {
