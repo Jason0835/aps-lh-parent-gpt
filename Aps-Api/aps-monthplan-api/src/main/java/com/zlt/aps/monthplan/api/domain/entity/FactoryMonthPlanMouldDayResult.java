@@ -69,13 +69,13 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String productionVersion;
 
     /** 计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟 */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.planType")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.planType", dictType = "biz_plan_type")
     @ApiModelProperty(value = "计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;
 
     /** 产品品类 数据字典：biz_product_type  全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productTypeCode")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type  全钢 PCR 半钢", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -129,7 +129,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private Integer uniformityQty;
 
     /** 施工阶段 0 无工艺 1 试制 2 量试 3 正式 */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.constructionStage")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.constructionStage", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
