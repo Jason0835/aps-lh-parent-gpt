@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -15,6 +16,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
@@ -91,79 +93,64 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     }
 
     /**
-     * 转换区域名称、赋值区域分组、月份分组汇总集合
+     * 填充表体数据
      *
-     * @param queryVO 查询条件
-     * @param list    要转换的列表
+     * @param list                待填充的数据
+     * @param dataOffset          数据行偏移量
+     * @param sheet               工作簿
+     * @param cellNum             列号
+     * @param areaTableTitleList  区域表头
+     * @param monthTableTitleList 月份表头
      */
-    private void convertAndSetAreaMonthGroupList(MpMonthlySaleQty queryVO, List<MpMonthlySaleQty> list) {
-        // 把区域都转成名称
-        List<AreaConvertVo> convertVoList = list.stream().map(MpMonthlySaleQty::getSaleArea)
-                .flatMap(item -> Arrays.stream(item.split(",")))
-                .distinct()
-                .filter(StringUtils::isNotBlank)
-                .map(item -> {
-                    AreaConvertVo areaConvertVo = new AreaConvertVo();
-                    areaConvertVo.setAreaCode(item);
-                    return areaConvertVo;
-                })
-                .sorted(Comparator.comparing(AreaConvertVo::getAreaCode))
-                .collect(Collectors.toList());
-        Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
+    private static void fillTableData(List<MpMonthlySaleQty> list, int dataOffset, Sheet sheet, int cellNum,
+                                      List<MpHistorySaleRecord> areaTableTitleList,
+                                      List<MpHistorySaleRecord> monthTableTitleList,
+                                      CellStyle yellowCellStyle) {
+        for (int i = 0; i < list.size(); i++) {
+            int rowNum = i + dataOffset;
+            MpMonthlySaleQty mpMonthlySaleQty = list.get(i);
 
-        List<String> codeList = new ArrayList<>();
-        // 查询历史销售记录
-        int passTwelveMonth = 12;
-        Calendar instance = Calendar.getInstance();
-        instance.setTime(new Date());
-        int year = instance.get(Calendar.YEAR);
-        String month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
-        String maxYearMonth = year + month;
+            Row dataRow = sheet.getRow(rowNum);
+            CellStyle dataCellStyle = dataRow.getCell(cellNum - 2).getCellStyle();
+            BeanUtil.copyProperties(dataCellStyle, yellowCellStyle);
+            yellowCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            yellowCellStyle.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
 
-        instance.add(Calendar.MONTH, -passTwelveMonth);
-        int last12Year = instance.get(Calendar.YEAR);
-        String last12Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
-        String last12YearMonth = last12Year + last12Month;
+            int areaDataSize = areaTableTitleList.size();
 
-        String factoryCode = queryVO.getFactoryCode();
-        List<MpHistorySaleRecord> sumQtyGroupByAreaList = getAreaGroupHistorySaleRecordList(factoryCode, last12YearMonth, maxYearMonth, codeList);
+            List<MpHistorySaleRecord> areaGroupList = mpMonthlySaleQty.getAreaGroupList();
+            Map<String, MpHistorySaleRecord> areaGroupMap = areaGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getAreaCode, Function.identity()));
 
-        Map<String, List<MpHistorySaleRecord>> sumQtyGroupByAreaMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(sumQtyGroupByAreaList)) {
-            sumQtyGroupByAreaMap = sumQtyGroupByAreaList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
-        }
-
-        List<MpHistorySaleRecord> sumQtyGroupByMonthList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByMonth(factoryCode, last12YearMonth, maxYearMonth, codeList);
-        Map<String, List<MpHistorySaleRecord>> sumQtyGroupByMonthMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(sumQtyGroupByMonthList)) {
-            sumQtyGroupByMonthMap = sumQtyGroupByMonthList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
-        }
-
-        List<List<MpMonthlySaleQty>> splitList = ScmListUtils.getSplitList(list, 1000);
-
-        for (List<MpMonthlySaleQty> monthlySaleQtyList : splitList) {
-//            List<String> codeList = monthlySaleQtyList.stream().map(MpMonthlySaleQty::getMaterialCode).collect(Collectors.toList());
-
-            for (MpMonthlySaleQty monthlySaleQty : monthlySaleQtyList) {
-                String saleArea = monthlySaleQty.getSaleArea();
-                String[] areaSplitArr = saleArea.split(",");
-                List<String> areaNameList = new ArrayList<>();
-                for (String areaCode : areaSplitArr) {
-                    if (areaNameMap.containsKey(areaCode)) {
-                        String name = areaNameMap.get(areaCode);
-                        areaNameList.add(name);
+            for (int j = 0; j < areaDataSize; j++) {
+                MpHistorySaleRecord mpHistorySaleRecord = areaTableTitleList.get(j);
+                String areaCode = mpHistorySaleRecord.getAreaCode();
+                Cell cell = dataRow.createCell(cellNum + j);
+                cell.setCellStyle(dataCellStyle);
+                if (areaGroupMap.containsKey(areaCode)) {
+                    MpHistorySaleRecord areaRecord = areaGroupMap.get(areaCode);
+                    if (YesOrNoEnum.YES.getCode().equals(areaRecord.getYellowColorFlag())) {
+                        // 标黄
+                        cell.setCellStyle(yellowCellStyle);
                     }
+                    cell.setCellValue(areaRecord.getSaleQty());
+                } else {
+                    cell.setCellValue("");
                 }
-                monthlySaleQty.setSaleAreaName(String.join(",", areaNameList));
-                String materialCode = monthlySaleQty.getMaterialCode();
-                if (sumQtyGroupByAreaMap.containsKey(materialCode)) {
-                    List<MpHistorySaleRecord> areaGroupList = sumQtyGroupByAreaMap.get(materialCode);
-                    monthlySaleQty.setAreaGroupList(areaGroupList);
+            }
+
+            List<MpHistorySaleRecord> monthGroupList = mpMonthlySaleQty.getMonthGroupList();
+            Map<Integer, Integer> monthGroupMap = monthGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getMonth, MpHistorySaleRecord::getSaleQty));
+
+            for (int j = 0; j < monthTableTitleList.size(); j++) {
+                MpHistorySaleRecord mpHistorySaleRecord = monthTableTitleList.get(j);
+                Integer month = mpHistorySaleRecord.getMonth();
+                Cell cell = dataRow.createCell(cellNum + areaDataSize + j);
+                if (monthGroupMap.containsKey(month)) {
+                    cell.setCellValue(monthGroupMap.get(month));
+                } else {
+                    cell.setCellValue("");
                 }
-                if (sumQtyGroupByMonthMap.containsKey(materialCode)) {
-                    List<MpHistorySaleRecord> monthGroupList = sumQtyGroupByMonthMap.get(materialCode);
-                    monthlySaleQty.setMonthGroupList(monthGroupList);
-                }
+                cell.setCellStyle(dataCellStyle);
             }
         }
     }
@@ -293,53 +280,87 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     }
 
     /**
-     * 填充表体数据
+     * 转换区域名称、赋值区域分组、月份分组汇总集合
      *
-     * @param list                待填充的数据
-     * @param dataOffset          数据行偏移量
-     * @param sheet               工作簿
-     * @param cellNum             列号
-     * @param areaTableTitleList  区域表头
-     * @param monthTableTitleList 月份表头
+     * @param queryVO 查询条件
+     * @param list    要转换的列表
      */
-    private static void fillTableData(List<MpMonthlySaleQty> list, int dataOffset, Sheet sheet, int cellNum, List<MpHistorySaleRecord> areaTableTitleList, List<MpHistorySaleRecord> monthTableTitleList) {
-        for (int i = 0; i < list.size(); i++) {
-            int rowNum = i + dataOffset;
-            MpMonthlySaleQty mpMonthlySaleQty = list.get(i);
+    private void convertAndSetAreaMonthGroupList(MpMonthlySaleQty queryVO, List<MpMonthlySaleQty> list) {
+        // 把区域都转成名称
+        List<AreaConvertVo> convertVoList = list.stream().map(MpMonthlySaleQty::getSaleArea)
+                .flatMap(item -> Arrays.stream(item.split(",")))
+                .distinct()
+                .filter(StringUtils::isNotBlank)
+                .map(item -> {
+                    AreaConvertVo areaConvertVo = new AreaConvertVo();
+                    areaConvertVo.setAreaCode(item);
+                    return areaConvertVo;
+                })
+                .sorted(Comparator.comparing(AreaConvertVo::getAreaCode))
+                .collect(Collectors.toList());
+        Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
 
-            Row dataRow = sheet.getRow(rowNum);
-            CellStyle dataCellStyle = dataRow.getCell(cellNum - 2).getCellStyle();
+        List<String> codeList = new ArrayList<>();
+        // 查询历史销售记录
+        int passTwelveMonth = 12;
+        Calendar instance = Calendar.getInstance();
+        instance.setTime(new Date());
+        int year = instance.get(Calendar.YEAR);
+        String month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
+        String maxYearMonth = year + month;
 
-            int areaDataSize = areaTableTitleList.size();
+        instance.add(Calendar.MONTH, -passTwelveMonth);
+        int last12Year = instance.get(Calendar.YEAR);
+        String last12Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
+        String last12YearMonth = last12Year + last12Month;
 
-            List<MpHistorySaleRecord> areaGroupList = mpMonthlySaleQty.getAreaGroupList();
-            Map<String, Integer> areaGroupMap = areaGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getAreaCode, MpHistorySaleRecord::getSaleQty));
+        String factoryCode = queryVO.getFactoryCode();
+        List<MpHistorySaleRecord> sumQtyGroupByAreaList = getAreaGroupHistorySaleRecordList(factoryCode, last12YearMonth, maxYearMonth, codeList);
 
-            for (int j = 0; j < areaDataSize; j++) {
-                MpHistorySaleRecord mpHistorySaleRecord = areaTableTitleList.get(j);
-                String areaCode = mpHistorySaleRecord.getAreaCode();
-                Cell cell = dataRow.createCell(cellNum + j);
-                if (areaGroupMap.containsKey(areaCode)) {
-                    cell.setCellValue(areaGroupMap.get(areaCode));
-                } else {
-                    cell.setCellValue("");
+        Map<String, List<MpHistorySaleRecord>> sumQtyGroupByAreaMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(sumQtyGroupByAreaList)) {
+            sumQtyGroupByAreaMap = sumQtyGroupByAreaList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
+        }
+
+        List<MpHistorySaleRecord> sumQtyGroupByMonthList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByMonth(factoryCode, last12YearMonth, maxYearMonth, codeList);
+        Map<String, List<MpHistorySaleRecord>> sumQtyGroupByMonthMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(sumQtyGroupByMonthList)) {
+            sumQtyGroupByMonthMap = sumQtyGroupByMonthList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
+        }
+
+        List<List<MpMonthlySaleQty>> splitList = ScmListUtils.getSplitList(list, 1000);
+
+        for (List<MpMonthlySaleQty> monthlySaleQtyList : splitList) {
+//            List<String> codeList = monthlySaleQtyList.stream().map(MpMonthlySaleQty::getMaterialCode).collect(Collectors.toList());
+
+            for (MpMonthlySaleQty monthlySaleQty : monthlySaleQtyList) {
+                String saleArea = monthlySaleQty.getSaleArea();
+                String[] areaSplitArr = saleArea.split(",");
+                List<String> areaNameList = new ArrayList<>();
+                for (String areaCode : areaSplitArr) {
+                    if (areaNameMap.containsKey(areaCode)) {
+                        String name = areaNameMap.get(areaCode);
+                        areaNameList.add(name);
+                    }
                 }
-                cell.setCellStyle(dataCellStyle);
-            }
-
-            List<MpHistorySaleRecord> monthGroupList = mpMonthlySaleQty.getMonthGroupList();
-            Map<Integer, Integer> monthGroupMap = monthGroupList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getMonth, MpHistorySaleRecord::getSaleQty));
-
-            for (int j = 0; j < monthTableTitleList.size(); j++) {
-                MpHistorySaleRecord mpHistorySaleRecord = monthTableTitleList.get(j);
-                Integer month = mpHistorySaleRecord.getMonth();
-                Cell cell = dataRow.createCell(cellNum + areaDataSize + j);
-                if (monthGroupMap.containsKey(month)) {
-                    cell.setCellValue(monthGroupMap.get(month));
-                } else {
-                    cell.setCellValue("");
+                monthlySaleQty.setSaleAreaName(String.join(",", areaNameList));
+                String materialCode = monthlySaleQty.getMaterialCode();
+                if (sumQtyGroupByAreaMap.containsKey(materialCode)) {
+                    List<MpHistorySaleRecord> areaGroupList = sumQtyGroupByAreaMap.get(materialCode);
+                    for (int i = 0; i < areaGroupList.size(); i++) {
+                        MpHistorySaleRecord record = areaGroupList.get(i);
+                        if (i > 2) {
+                            record.setYellowColorFlag(YesOrNoEnum.NO.getCode());
+                        } else {
+                            record.setYellowColorFlag(YesOrNoEnum.YES.getCode());
+                        }
+                    }
+                    monthlySaleQty.setAreaGroupList(areaGroupList);
                 }
-                cell.setCellStyle(dataCellStyle);
+                if (sumQtyGroupByMonthMap.containsKey(materialCode)) {
+                    List<MpHistorySaleRecord> monthGroupList = sumQtyGroupByMonthMap.get(materialCode);
+                    monthlySaleQty.setMonthGroupList(monthGroupList);
+                }
             }
         }
     }
@@ -357,6 +378,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         List<MpMonthlySaleQty> list = this.listExportData(queryVO);
         ExcelUtil<MpMonthlySaleQty> util = new ExcelUtil<>(this.getTClass());
         Workbook workbook = util.exportExcel2(response, list, fileName, 2);
+        CellStyle yellowCellStyle = workbook.createCellStyle();
         Sheet sheet = workbook.getSheetAt(0);
         // 获取表头
         int headRowIndex = 0;
@@ -395,7 +417,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
 
         int dataOffset = insertRowIndex + 1;
         // 填充表体对应数据
-        fillTableData(list, dataOffset, sheet, cellNum, areaTableTitleList, monthTableTitleList);
+        fillTableData(list, dataOffset, sheet, cellNum, areaTableTitleList, monthTableTitleList, yellowCellStyle);
         byte[] resultBytes = ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
