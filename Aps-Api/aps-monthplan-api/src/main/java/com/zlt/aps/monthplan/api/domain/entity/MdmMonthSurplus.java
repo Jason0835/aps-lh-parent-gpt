@@ -9,6 +9,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmMonthSurplus.java
@@ -77,7 +79,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 品牌(物料信息.品牌)
      */
-    @Excel(name = "ui.data.column.mdmMonthSurplus.brand")
+    @Excel(name = "ui.data.column.mdmMonthSurplus.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌(物料信息.品牌)", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -85,6 +87,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 产品结构(物料信息.结构)
      */
+    @ImportExcelValidated(maxLength = 64)
     @Excel(name = "ui.data.column.mdmMonthSurplus.structureName")
     @ApiModelProperty(value = "产品结构(物料信息.结构)", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
@@ -93,7 +96,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 物料编码
      */
-    @ImportExcelValidated(required = true, maxLength = 32)
+    @ImportExcelValidated(required = true, maxLength = 30)
     @Excel(name = "ui.data.column.mdmMonthSurplus.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
@@ -102,6 +105,7 @@ public class MdmMonthSurplus extends BaseEntity {
     /**
      * 物料描述
      */
+    @ImportExcelValidated(maxLength = 256)
     @Excel(name = "ui.data.column.mdmMonthSurplus.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
@@ -114,7 +118,7 @@ public class MdmMonthSurplus extends BaseEntity {
     @Excel(name = "ui.data.column.mdmMonthSurplus.planSurplusQty")
     @ApiModelProperty(value = "计划余量", name = "planSurplusQty")
     @TableField(value = "PLAN_SURPLUS_QTY")
-    private Long planSurplusQty;
+    private BigDecimal planSurplusQty;
 
     /**
      * 以分厂+物料为维度，转换月底计划余量

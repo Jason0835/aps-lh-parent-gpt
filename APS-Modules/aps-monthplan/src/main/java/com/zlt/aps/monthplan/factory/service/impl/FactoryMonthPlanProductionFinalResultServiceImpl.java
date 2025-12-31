@@ -24,12 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -110,7 +105,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
       MdmMonthSurplus entity = new MdmMonthSurplus();
       entity.setBaseVale(null);
       entity.setIsDelete(ApsConstant.APS_YES_NO_0);
-      entity.setPlanSurplusQty(planSurplusQty);
+      entity.setPlanSurplusQty(BigDecimal.valueOf(planSurplusQty));
       entity.setFactoryCode(value.get(0).getFactoryCode());
       entity.setYear(value.get(0).getYear());
       entity.setMonth(value.get(0).getMonth());
