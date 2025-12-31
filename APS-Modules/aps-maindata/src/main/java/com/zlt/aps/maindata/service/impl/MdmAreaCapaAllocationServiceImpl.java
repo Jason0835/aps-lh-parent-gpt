@@ -135,6 +135,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
                 .eq(MdmAreaCapaAllocation::getMonth, targetMonth)
                 .set(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_DEL);
         mdmAreaCapaAllocationEntityMapper.update(null, updateWrapper);
+        entity.setBaseVale(null);
         mdmAreaCapaAllocationEntityMapper.copy(entity);
         return AjaxResult.success();
     }
