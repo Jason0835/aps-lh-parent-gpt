@@ -57,6 +57,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 模具类型，字典：biz_mould_Type
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmModelInfo.mouldType", dictType = "biz_mould_Type")
     @ApiModelProperty(value = "模具类型", name = "mouldType")
     @TableField(value = "MOULD_TYPE")
@@ -65,6 +66,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 模具状态，字典：biz_available_status
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmModelInfo.mouldStatus", dictType = "biz_available_status")
     @ApiModelProperty(value = "模具状态", name = "mouldStatus")
     @TableField(value = "MOULD_STATUS")
@@ -73,6 +75,7 @@ public class MdmModelInfo extends BaseEntity {
     /**
      * 物流状态,字典：	logistics_status
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmModelInfo.logisticsStatus", dictType = "logistics_status")
     @ApiModelProperty(value = "物流状态,字典：	logistics_status", name = "logisticsStatus")
     @TableField(value = "LOGISTICS_STATUS")

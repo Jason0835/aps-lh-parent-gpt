@@ -1,15 +1,12 @@
 package com.zlt.sync.service.impl;
 
-import com.alibaba.fastjson.JSONObject;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.sync.constants.SyncConstants;
-import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
-import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
-import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
-import com.zlt.sync.povo.SyncDataVO;
-import com.zlt.sync.service.SyncDataMQService;
-import com.zlt.sync.utils.SpringBeanUtils;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +14,17 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.*;
+import com.alibaba.fastjson.JSONObject;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.SysCode;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.sync.constants.SyncConstants;
+import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
+import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
+import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
+import com.zlt.sync.service.SyncDataMQService;
+import com.zlt.sync.utils.SpringBeanUtils;
 
 @Primary
 @Service("syncDataMQService")
@@ -66,9 +73,14 @@ public class SyncDataMQServiceImpl implements SyncDataMQService {
                 return dataLogs;
             }
 
-            Map<String, Object> params = new HashMap<>();
-            params.put("msgId", dataLogs.getMsgId());
-            List<AuxReqSyncDataLogs> dataLogsDbs = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
+            List<AuxReqSyncDataLogs> dataLogsDbs;
+            if (StringUtils.isNotEmpty(dataLogs.getMsgId())) {
+            	Map<String, Object> params = new HashMap<>();
+            	params.put("msgId", dataLogs.getMsgId());
+            	dataLogsDbs = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
+            } else {
+            	dataLogsDbs = new ArrayList<>();
+            }
 
             AuxReqSyncDataLogs dataLogsDb = new AuxReqSyncDataLogs();
 
@@ -80,15 +92,9 @@ public class SyncDataMQServiceImpl implements SyncDataMQService {
                     return dataLogs;
                 }
 
-                SyncDataVO dataVO = syncConstants.getSyncDataByKey(dataLogs.getSyncKey());
-                if (dataVO == null) {
-                    logger.error("defaultMQProcess-00511 接收同步反馈消息: SyncKey 对应的 接口配置不存在; " + dataLogs.getSyncKey());
-                    return dataLogs;
-                }
-
-                dataLogs.setDataSys(dataVO.getDataSys());
-                dataLogs.setDockSys(dataVO.getDockSys());
-                dataLogs.setBackIssue(dataVO.getBackIssue());
+                dataLogs.setDataSys(SysCode.MES);
+                dataLogs.setDockSys(SysCode.APS);
+                dataLogs.setBackIssue(ApsConstant.APS_YES_NO_0);
 
                 SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, dataLogsDb);
                 dataLogsDb.setCreateDate(new Date());

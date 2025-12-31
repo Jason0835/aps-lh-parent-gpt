@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -13,6 +14,7 @@ import com.tlt.aps.utils.AppUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
@@ -21,6 +23,7 @@ import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -57,7 +60,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private IScmItfService iScmItfService;
 	@Autowired
 	private IFactoryParamService iFactoryParamService;
-
+	@Autowired
+	private IMesItfService iMesItfService;
+	
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
@@ -249,7 +254,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setMaterialDesc(vo.getSpecDesc());
 			newVO.setNatCode(vo.getNatCode());
 			newVO.setOrderPriority(salPriority);
-			newVO.setOrdQty(vo.getOrdQty());
+			newVO.setOrdQty(vo.getPlanedNotShipQty()); // 数量为已计划未发货量
 			newVO.setOriMaterialCode(vo.getOriMaterialCode());
 			newVO.setProductType(Optional.ofNullable(vo.getProductType()).orElse(ProductTypeEnum.WHOLE_STEEL.getValue()));
 			newVO.setSalCode(vo.getSalCode());
@@ -343,7 +348,15 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 		salesOrderPoolEntityMapper.batchInsert(newSalesOrderPoolList); // 新增一批数据
 
-		// TODO 调用MES接口获取成品库存
+		try {
+			// 触发调用itf接口同步成品库存
+			MdmProductStock productStock = new MdmProductStock();
+			productStock.setFactoryCode(factoryCode);
+			productStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+			iMesItfService.syncProductStock(productStock);
+		} catch (Exception e) { // 同步失败也不影响订单同步
+			log.error(e.getMessage(), e);
+		}
 		return AjaxResult.success();
 	}
 
