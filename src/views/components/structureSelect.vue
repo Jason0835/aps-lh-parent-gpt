@@ -37,7 +37,7 @@ import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
 import {
-  listSkuStructure,
+  selectSkuStructure,
 
 } from "@/api/monthplan/skuStructure";
 export default {
@@ -88,15 +88,15 @@ export default {
   computed: {
     searchColumns() {
       return [
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-        },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        // },
 
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        // },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
@@ -105,22 +105,22 @@ export default {
     },
     columns: function () {
       const list = [
-      {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-        },
+      // {
+      //     prop: "materialCode",
+      //     label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+      //   },
         // {
         //   prop: "mesMaterialCode",
         //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        // // },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         // },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
-          width:150
+
         },
       ];
       if (this.multiple) {
@@ -153,7 +153,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listSkuStructure(this.formatParams());
+        const data = await selectSkuStructure(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

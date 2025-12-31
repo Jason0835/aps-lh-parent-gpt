@@ -145,14 +145,17 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
+          width:120,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          width:180,
         },
         {
           prop: "mesMaterialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:180,
         },
         {
           prop: "materialDesc",
@@ -166,6 +169,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
+          width:200,
           render: ({ row }) => {
             return (
               <div>

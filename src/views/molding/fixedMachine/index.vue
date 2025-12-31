@@ -222,10 +222,19 @@ export default {
 
         },
         {
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure"),
           prop: "fixedStructure1",
-          // type: "select",
-          // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+
+        },
+        {
+          prop: "fixedStructure2",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+
+        },
+        {
+          prop: "fixedStructure3",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
+
         },
         {
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),

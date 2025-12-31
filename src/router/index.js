@@ -134,6 +134,12 @@ constantRoutes.push(
   //       meta: { title: "周程滚动调整" },
   //     },
   //     {
+  //       path: "monthlyProductionPlan",
+  //       component: () => import("@/views/newPage/monthlyProductionPlan/index"),
+  //       name: "monthlyProductionPlan",
+  //       meta: { title: "月度生产计划" },
+  //     },
+  //     {
   //       path: "rollingCycleResult",
   //       component: () => import("@/views/newPage/rollingCycle/components/result.vue"),
   //       hidden: true,

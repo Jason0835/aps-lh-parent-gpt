@@ -20,3 +20,10 @@ export function removeSkuStructure(query) {
     data: query
   })
 }
+export function selectSkuStructure(query) {
+  return request({
+    url: '/monthplan/mdmSkuStructureRef/getStructureSelectList',
+    method: 'post',
+    data: query
+  })
+}

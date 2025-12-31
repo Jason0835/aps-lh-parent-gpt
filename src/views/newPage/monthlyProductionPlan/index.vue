@@ -52,7 +52,7 @@ import {
 //components
 
 export default {
-  name: "orderForecast",
+  name: "monthlyProductionPlan",
   components: {
     // tltUpload,
   },
@@ -330,8 +330,8 @@ export default {
       };
 
       if (hasPage) {
-        params.pageSize = this.page.pageSize;
-        params.pageNum = this.page.current;
+        // params.pageSize = this.page.pageSize;
+        // params.pageNum = this.page.current;
       }
       if (params.yearMonth) {
         let arr = params.yearMonth.split("-");
@@ -359,7 +359,7 @@ export default {
         this.data = res.rows;
 
 
-        this.page.total = res.total;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

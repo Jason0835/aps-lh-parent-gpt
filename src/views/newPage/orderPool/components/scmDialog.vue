@@ -142,7 +142,9 @@ export default {
           this.hide();
         } else {
           let res = await getSCMDataCheck(obj);
+
           if (res.data == 1) {
+
             this.$confirm(res.msg, {
               type: "warning",
             }).then(() => {
@@ -150,7 +152,7 @@ export default {
                 this.loading = false;
                 this.$modal.msgSuccess(data.msg);
                 this.$emit("success");
-                this.hide();
+
               });
             });
           } else {
@@ -158,6 +160,7 @@ export default {
             this.$set(this.page, "current", 1);
             this.getList();
           }
+          this.hide();
         }
       } catch (err) {
         console.log(err);

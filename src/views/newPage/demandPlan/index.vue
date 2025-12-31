@@ -23,7 +23,7 @@
           plain
           @click="generPlan"
           v-hasPermi="['monthplan:demandPlan:createMonthRequire']"
-          >{{ $t("ui.data.DemandPlan.createMonthRequire  ") }}
+          >{{ $t("ui.data.DemandPlan.createMonthRequire") }}
         </el-button>
         <!-- <el-button
           type="primary"
@@ -130,7 +130,7 @@ export default {
     "biz_product_type",
     "biz_order_type",
     "biz_yes_no",
-    "biz_sale_type",
+    "biz_stor_type",
     "biz_brand_type",
     "biz_product_characteristics",
   ],
@@ -218,7 +218,7 @@ export default {
           prop: "locationType",
           label: this.$t("common.type"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_sale_type, value);
+            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
         },
         {
