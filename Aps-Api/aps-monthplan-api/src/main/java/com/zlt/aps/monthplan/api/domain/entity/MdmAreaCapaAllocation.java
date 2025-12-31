@@ -130,8 +130,6 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 区域名称
      */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode")
     @ApiModelProperty(value = "区域名称", name = "areaCodeName")
     @TableField(exist = false)
     private String areaCodeName;
