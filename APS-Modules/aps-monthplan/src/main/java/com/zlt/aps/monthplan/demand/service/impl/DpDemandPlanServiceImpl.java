@@ -575,7 +575,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             return BigDecimal.ZERO.longValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
+        return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
     }
 
     /**

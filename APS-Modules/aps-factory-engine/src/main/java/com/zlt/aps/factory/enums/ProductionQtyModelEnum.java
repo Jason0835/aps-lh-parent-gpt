@@ -6,6 +6,7 @@ import lombok.Getter;
  * 排产量模式
  * 0 高优先级量
  * 1 净需求量
+ * 2 常规储备
  *
  * @author ZLT
  * @date 20250221
@@ -19,7 +20,11 @@ public enum ProductionQtyModelEnum {
     /**
      * 1 总净需求量
      */
-    NET_QTY(1, "总净需求量");
+    NET_QTY(1, "常规储备量"),
+    /**
+     * 2 总净需求量
+     */
+    RESERVE_QTY(2, "常规储备量");
 
     private Integer modelCode;
 

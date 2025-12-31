@@ -1,8 +1,10 @@
 package com.zlt.aps.monthplan.factory.helper;
 
 
+import cn.hutool.core.io.unit.DataUnit;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.utils.ApsCommonUtil;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 
@@ -250,7 +252,7 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static DpOrderOffsetDetail allocateStockForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    long stockQty = context.getStockInfos().stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
+    long stockQty = context.getStockInfos().stream().filter(item -> null != item.getLeftOverQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
     // 库存分配量
@@ -289,7 +291,7 @@ public class StockAllocationHelper {
   private static long calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
     List<MdmProductStock> stockInfos = context.getStockInfos();
     // 订单有年周号要求
-    if(StringUtils.isNotBlank(order.getWeekYear())) {
+    if(StringUtils.isNotBlank(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
         return reduceInventoryByWeekYear(
             order,
             stockInfos);
@@ -469,7 +471,7 @@ public class StockAllocationHelper {
     List<MdmProductStock> result =  stockInfos.stream()
         // 过滤：库存年周号晚于订单年周号
         .filter(stock -> {
-          if (StringUtils.isBlank(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
+          if (StringUtils.isBlank(stock.getWeekYear()) || !ApsCommonUtil.isNumber(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
             return false;
           }
           int stockWeekYear = Integer.parseInt(stock.getWeekYear());

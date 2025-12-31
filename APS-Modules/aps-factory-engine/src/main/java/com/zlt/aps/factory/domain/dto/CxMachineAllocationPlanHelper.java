@@ -17,7 +17,10 @@ import java.util.Map;
  */
 @Getter
 public class CxMachineAllocationPlanHelper implements Serializable {
-
+    /**
+     * 成型机台编号
+     */
+    private String cxMachineCode;
     /**
      * 分组计划信息
      */
@@ -58,6 +61,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     /**
      * 构造函数
      *
+     * @param cxMachineCode      成型机台
      * @param productionPlanInfo 分配的分组计划信息
      * @param maxRatio           最高硫化配比
      * @param continueSkuMap     续作规格信息
@@ -65,7 +69,8 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * @param startDay           起始天数
      * @param endDay             结束天数
      */
-    public CxMachineAllocationPlanHelper(ProductionPlanGroupInfo productionPlanInfo, Integer maxRatio, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
+    public CxMachineAllocationPlanHelper(String cxMachineCode, ProductionPlanGroupInfo productionPlanInfo, Integer maxRatio, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
+        this.cxMachineCode = cxMachineCode;
         this.productionPlanInfo = productionPlanInfo;
         this.maxRatio = maxRatio;
         this.minRatio = productionPlanInfo.getClosureMinLhRatio();

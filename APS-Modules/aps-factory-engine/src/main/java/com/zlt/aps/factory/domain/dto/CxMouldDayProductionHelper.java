@@ -1,11 +1,13 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
+import java.util.Set;
 
 /**
  * 成型模具日排产信息对象
@@ -102,6 +104,25 @@ public class CxMouldDayProductionHelper implements Serializable {
         mouldProductionHelper.setProductionDate(day);
         mouldProductionHelper.setProductionQty(productionQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
         mouldProductionHelper.setLhGroupNo(String.valueOf(cxLhProductionHelper.getLhGroupNo()));
+        return mouldProductionHelper;
+    }
+
+    /**
+     * 构建成型硫化组模具日排产信息
+     *
+     * @param groupPlan         排产计划
+     * @param cxMachineCodeInfo 成型机台
+     * @param day               排产日
+     * @param productionQty     双模排产量
+     * @return
+     */
+    public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Set<String> cxMachineCodeInfo, Integer day, Long productionQty) {
+        CxMouldDayProductionHelper mouldProductionHelper = new CxMouldDayProductionHelper();
+        BeanUtils.copyProperties(groupPlan, mouldProductionHelper);
+        mouldProductionHelper.setMonthPlanId(groupPlan.getMonthPlanId());
+        mouldProductionHelper.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeInfo));
+        mouldProductionHelper.setProductionDate(day);
+        mouldProductionHelper.setProductionQty(productionQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
         return mouldProductionHelper;
     }
 }

@@ -61,7 +61,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
-	private DpAreaEntityMapper mdmAreaEntityMapper;
+	private DpAreaEntityMapper dpAreaEntityMapper;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -140,14 +140,17 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		// 加载区域
 		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
 		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-		Map<String, DpArea> areaMap = mdmAreaEntityMapper.selectList(areaQueryWrapper).stream()
-				.collect(Collectors.toMap(DpArea::getAreaCode, Function.identity()));
-
+		Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
+				.filter(s -> StringUtils.isNotEmpty(s.getRemark()))
+				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
 		// 校验是否有没有录入优先级的数据
-		DpArea defaultArea = new DpArea();
-		List<String> notPriorityAreaList = syncResultList.stream().filter(s -> StringUtils.isEmpty(s.getSalPriority()))
-				.map(s -> areaMap.getOrDefault(s.getEmployeeDept(), defaultArea).getRemark()) // 先从备注获取名称
-				.filter(Objects::nonNull).distinct().collect(Collectors.toList());
+		List<String> notPriorityAreaList = syncResultList.stream()
+				.filter(s -> StringUtils.isEmpty(s.getSalPriority()) && s.getEmployeeDept() != null)
+				.map(s -> {
+					String areaCode = String.valueOf(s.getEmployeeDept());
+					return areaMap.getOrDefault(areaCode, areaCode);
+				}) // 先从备注获取名称
+				.distinct().collect(Collectors.toList());
 
 		// 拼接警告信息
 		StringBuilder warnMsg = new StringBuilder();
@@ -157,6 +160,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					.append(splitFlag);
 		}
 		if (warnMsg.length() > 0) {
+			warnMsg.setLength(warnMsg.length() - 1);
 			warnMsg.append(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.isContinue"));
 			return AjaxResult.success(warnMsg.toString(), ApsConstant.APS_YES_NO_1);
 		}

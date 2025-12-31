@@ -94,6 +94,7 @@ public class ProductionMouldInfoVo implements Serializable {
      * @param cxMachineCode        成型机台
      * @param continueSkuPlanList  排产计划集合
      */
+    @Deprecated
     public void addProductionInfo(Integer day, ProductionPlanGroupInfo productionPlanInfo, CxLhProductionHelper cxLhProductionHelper, boolean isFinishDay, Long realDayProductionQty, Long dayLhQty, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
         //加入已经排产完毕
         if (isFinishDay) {
@@ -141,6 +142,25 @@ public class ProductionMouldInfoVo implements Serializable {
             GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, cxLhProductionHelper, productionQty, BigDecimal.ZERO.longValue(), null);
             productionPlanInfo.addDayProductionInfo(helper);
         });
+    }
+
+    /**
+     * 模具增加排产信息
+     *
+     * @param day                排产日
+     * @param productionPlanInfo 排产计划
+     * @param isFinishDay        天是否排产完毕(包含正常排产完成，因换模或是换活字块导致的完成)
+     * @param productionQty      双模实际排产量
+     * @param cxMachineCodeInfo  成型机台
+     */
+    public void addProductionInfo(Integer day, MonthPlanProductionRequirePlanVo productionPlanInfo, boolean isFinishDay, Long productionQty, Set<String> cxMachineCodeInfo) {
+        //加入已经排产完毕
+        if (isFinishDay) {
+            finishDaySet.add(day);
+        }
+        CxMouldDayProductionHelper mouldProductionHelper = CxMouldDayProductionHelper.createCxMouldDayProductionInfo(productionPlanInfo, cxMachineCodeInfo, day, productionQty);
+        mouldProductionHelper.setMouldCode(mouldCode);
+        addDayProductionInfo(day, mouldProductionHelper);
     }
 
     /**

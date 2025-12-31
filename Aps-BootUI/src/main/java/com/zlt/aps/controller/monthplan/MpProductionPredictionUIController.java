@@ -1,6 +1,5 @@
-package com.zlt.aps.controller.maindata;
+package com.zlt.aps.controller.monthplan;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -8,56 +7,64 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
-import com.zlt.aps.monthplan.api.service.IMdmSkuStructureRefRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
+import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
+import com.zlt.aps.monthplan.api.service.IMpProductionPredictionRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.util.Arrays;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmSkuStructureRefUIController.java
- * 描    述：SKU与结构关系 UI控制层类：....
- *@author zlt
- *@date 2025-12-06
+ * 文件名称：MpProductionPredictionUIController.java
+ * 描    述：S2-1002.未来产量预测 UI控制层类：....
+ *@author yelq
+ *@date 2025-12-28
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：zlt
+ *     修 改 人：yelq
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "SKU与结构关系")
+@Api(tags = "S2-1002.未来产量预测")
 @Controller
-@RequestMapping("/monthplan/mdmSkuStructureRef")
-public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStructureRef> {
+@RequestMapping("/monthplan/productionPrediction")
+public class MpProductionPredictionUIController extends BaseUIController<MpProductionPrediction> {
 
     @Autowired
-    private IMdmSkuStructureRefRemoteService iMdmSkuStructureRefService;
+    private IMpProductionPredictionRemoteService iMpProductionPredictionService;
 
-    private final String prefix = "aps/monthplan/mdmSkuStructureRef";
+    private final String prefix = "monthplan/monthplan/productionPrediction";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:view")
+    @RequiresPermissions("monthplan:productionPrediction:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmSkuStructureRef";
+        return prefix + "/productionPrediction";
     }
 
     /**
@@ -65,7 +72,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmSkuStructureRef", new MdmSkuStructureRef());
+        mmap.put("mpProductionPrediction", new MpProductionPrediction());
         return prefix + "/add";
     }
 
@@ -74,7 +81,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmSkuStructureRef", iMdmSkuStructureRefService.getInfo(id));
+        mmap.put("mpProductionPrediction", iMpProductionPredictionService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -82,48 +89,48 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:list")
+    @RequiresPermissions("monthplan:productionPrediction:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmSkuStructureRef mdmSkuStructureRef) {
-        return iMdmSkuStructureRefService.list(mdmSkuStructureRef);
+    public TableDataInfo list(MpProductionPrediction mpProductionPrediction) {
+        return iMpProductionPredictionService.list(mpProductionPrediction);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:edit")
+    @RequiresPermissions("monthplan:productionPrediction:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmSkuStructureRef mdmSkuStructureRef) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmSkuStructureRefService.checkUnique(mdmSkuStructureRef))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmSkuStructureRef.checkUnique"));
+    public AjaxResult save(MpProductionPrediction mpProductionPrediction) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpProductionPredictionService.checkUnique(mpProductionPrediction))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpProductionPrediction.checkUnique"));
         }
 
-        return iMdmSkuStructureRefService.save(mdmSkuStructureRef);
+        return iMpProductionPredictionService.save(mpProductionPrediction);
     }
 
     /**
-     * 删除SKU与结构关系
+     * 删除S2-1002.未来产量预测
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:remove")
+    @RequiresPermissions("monthplan:productionPrediction:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmSkuStructureRefService.removeByIds(Arrays.asList(arr));
+        return iMpProductionPredictionService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验SKU与结构关系唯一性
+     * 校验S2-1002.未来产量预测唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmSkuStructureRef mdmSkuStructureRef) {
-        return iMdmSkuStructureRefService.checkUnique(mdmSkuStructureRef);
+    public String checkUnique(MpProductionPrediction mpProductionPrediction) {
+        return iMpProductionPredictionService.checkUnique(mpProductionPrediction);
     }
 
     /**
@@ -144,7 +151,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      */
     @Override
     public String getProcedureCode() {
-        return "0";
+        return I18nUtil.getMessage("ui.data.column.productionPrediction.modelName");
     }
 
     /**
@@ -154,7 +161,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mdmSkuStructureRef.modelName");
+        return I18nUtil.getMessage("ui.data.column.productionPrediction.modelName");
     }
 
     /**
@@ -164,18 +171,19 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmSkuStructureRef> util = new ExcelUtil<>(MdmSkuStructureRef.class);
+        ExcelUtil<MpProductionPrediction> util = new ExcelUtil<>(MpProductionPrediction.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
+    @RequiresPermissions("monthplan:productionPrediction:export")
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmSkuStructureRef entity) throws IOException {
+    public void export(HttpServletResponse response, MpProductionPrediction entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmSkuStructureRefService.exportData(entity,fileName);
+        byte[] excelBytes = iMpProductionPredictionService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -185,6 +193,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
+    @RequiresPermissions("monthplan:productionPrediction:import")
     @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
@@ -195,28 +204,15 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmSkuStructureRefService.importData(context,false);
+        AjaxResult ajaxResult = iMpProductionPredictionService.importData(context,false);
         return ajaxResult;
     }
 
-    /**
-     * 抓取MES数据
-     */
-    @RequiresPermissions("monthplan:mdmSkuStructureRef:mesCapture")
-    @ApiOperation("抓取MES数据")
-    @PostMapping("/mesCapture")
+    @ApiOperation("生成订单预测")
     @ResponseBody
-    public AjaxResult mesCapture() {
-        return AjaxResult.success();
-    }
-
-    /**
-     * 查询结构选择列表
-     */
-    @ApiOperation("查询结构选择列表")
-    @PostMapping("/getStructureSelectList")
-    @ResponseBody
-    public TableDataInfo getStructureSelectList(MdmSkuStructureRef queryVO) {
-        return iMdmSkuStructureRefService.getStructureSelectList(queryVO);
+    @RequiresPermissions("monthplan:productionPrediction:createMonthPrediction")
+    @PostMapping("/createMonthPrediction")
+    public AjaxResult createMonthPrediction(MpProductionPrediction createCondition){
+        return iMpProductionPredictionService.createMonthPrediction(createCondition);
     }
 }

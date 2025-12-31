@@ -438,7 +438,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             return BigDecimal.ZERO.longValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().mapToLong(MdmProductStock::getLeftOverQty).sum();
+        return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
     }
 
     private Long calculatePlannedSurplus(Map<String, Long> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
