@@ -172,21 +172,6 @@
            AND tmmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
 
-    <select id="getFactoryAverageSaleProduct" resultType="com.zlt.aps.factory.domain.vo.ProductAverageSaleVo">
-        SELECT PRODUCT_CODE,
-               AVERAGE_VALUE
-          FROM (SELECT DISTINCT PRODUCT_CODE,
-                       SUM(AVERAGE_VALUE) AS AVERAGE_VALUE
-                  FROM t_mdm_stock_up_plan
-                 WHERE IFNULL(IS_DELETE, 0) = 0
-                   AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                   AND YEAR = #{year,jdbcType=DECIMAL}
-                   AND MONTH = #{month,jdbcType=DECIMAL}
-                 GROUP BY PRODUCT_CODE
-               ) A
-         WHERE A.AVERAGE_VALUE >= #{averageValue,jdbcType=DECIMAL}
-    </select>
-
     <select id="getRequireMinConfiguration" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration">
         SELECT DISTINCT mprp.PRODUCT_CODE,
                tmmp.MIN_QTY

@@ -131,20 +131,6 @@ public interface FactoryProductionSchedulingMapper {
     Integer getFormingMachineCount(@Param("factoryCode") String factoryCode);
 
     /**
-     * 获取分厂在年月上月均销量大于等于averageValue的物料集合
-     *
-     * @param factoryCode  分厂编码
-     * @param year         年份
-     * @param month        月份
-     * @param averageValue 月均销量
-     * @return
-     */
-    List<ProductAverageSaleVo> getFactoryAverageSaleProduct(@Param("factoryCode") String factoryCode,
-                                                            @Param("year") Integer year,
-                                                            @Param("month") Integer month,
-                                                            @Param("averageValue") Integer averageValue);
-
-    /**
      * 根据需求，获取其最小批量配置
      *
      * @param factoryCode      分厂编码

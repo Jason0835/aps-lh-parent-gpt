@@ -1,16 +1,13 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
-import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.SkuMouldSelector;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
@@ -49,12 +46,13 @@ public class CxContinueProductionHandler {
     public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //取得最早收尾的硫化组
-        CxLhProductionHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhGroup();
+        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context);
+//        CxLhProductionHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhGroup();
         if (null == earliestConclusionLhGroup) {
             //todo 记录日志
             return;
         }
-        Integer startDay = earliestConclusionLhGroup.getProductionDay();
+        Integer startDay = earliestConclusionLhGroup.getClosingDay();
         if (startDay >= endDay) {
             //todo 记录日志
             return;
@@ -65,7 +63,7 @@ public class CxContinueProductionHandler {
             return;
         }
         //获取 续作收尾的sku 规格、花纹等信息
-        String materialDesc = earliestConclusionLhGroup.getMaterialDesc();
+        String materialDesc = earliestConclusionLhGroup.getBeforeMaterialDesc();
         CxContinueSkuInfoHelper continueProductInfoHelper = CxContinueSkuInfoHelper.buildContinueProductInfo(materialDesc, productionPlanList, continueSkuMap);
         //共用模具的sku
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
@@ -89,22 +87,16 @@ public class CxContinueProductionHandler {
             return;
         }
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        Long sumProductionQty;
-        Integer isProductionBySum = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
-        if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
-            //总净需求量
-            sumProductionQty = selectedProductionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-        } else {
-            //高优先级排产量
-            sumProductionQty = selectedProductionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
-        }
+        //总排产量
+        Long sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(selectedProductionPlanList);
         //日硫化量
         Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
         //实际排产量
         Long realSumProductionQty = BigDecimal.ZERO.longValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
-        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+//        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, earliestConclusionLhGroup, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
         productionContinueByType(productionContext, productionPlanInfo, continueType, endDay, continueSkuMap, mouldShellMap);
     }
@@ -239,6 +231,7 @@ public class CxContinueProductionHandler {
      * @param mouldInfoMap sku与模具关系
      * @param cxLhGroup    硫化组信息-排产模具
      */
+    @Deprecated
     private static Set<String> getShareMouldSkuByLhGroup(Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, CxLhProductionHelper cxLhGroup) {
         Set<String> shareMouldMaterialDescSet = new HashSet<>();
         mouldInfoMap.forEach((shareMouldMaterialDesc, mouldRelationList) -> {
@@ -248,6 +241,27 @@ public class CxContinueProductionHandler {
             }
             //模具关系中全包含
             if (mouldCodeSet.containsAll(cxLhGroup.getProductionMouldSet())) {
+                shareMouldMaterialDescSet.add(shareMouldMaterialDesc);
+            }
+        });
+        return shareMouldMaterialDescSet;
+    }
+
+    /**
+     * 从模具关系中和硫化组排产模具，挑选共用模具的物料集合
+     *
+     * @param mouldInfoMap              sku与模具关系
+     * @param earliestConclusionLhGroup 收尾信息
+     */
+    private static Set<String> getShareMouldSkuByLhGroup(Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, EarliestConclusionLhGroupHelper earliestConclusionLhGroup) {
+        Set<String> shareMouldMaterialDescSet = new HashSet<>();
+        mouldInfoMap.forEach((shareMouldMaterialDesc, mouldRelationList) -> {
+            Set<String> mouldCodeSet = mouldRelationList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+            if (CollectionUtils.isEmpty(mouldCodeSet)) {
+                return;
+            }
+            //模具关系中全包含
+            if (mouldCodeSet.containsAll(earliestConclusionLhGroup.getUsedMouldSet())) {
                 shareMouldMaterialDescSet.add(shareMouldMaterialDesc);
             }
         });
@@ -271,9 +285,9 @@ public class CxContinueProductionHandler {
         Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = sameMultipleSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         Map<String, Long> productionSkuMap = new HashMap<>();
         skuGroupMap.forEach((skuMaterialDesc, groupPlanList) -> {
-            Long sumHeightProductionQty = groupPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
-            if (sumHeightProductionQty > BigDecimal.ZERO.longValue()) {
-                productionSkuMap.put(skuMaterialDesc, sumHeightProductionQty);
+            Long sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(groupPlanList);
+            if (sumProductionQty > BigDecimal.ZERO.longValue()) {
+                productionSkuMap.put(skuMaterialDesc, sumProductionQty);
             }
         });
         if (CollectionUtils.isEmpty(productionSkuMap)) {

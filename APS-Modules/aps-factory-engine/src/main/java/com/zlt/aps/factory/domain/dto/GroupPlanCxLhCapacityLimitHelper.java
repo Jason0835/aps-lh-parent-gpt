@@ -8,7 +8,9 @@ import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 分组计划 - TBR为结构，PCR为英寸(寸口、寸别)
@@ -133,6 +135,82 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     *
+     *
+     * @param previousLimit
+     * @param releaseLhMachineCount
+     * @return
+     */
+    public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
+        Map<String, Integer> previousSkuUsedMachine = previousLimit.getSkuTheoryUsedMachine();
+        Map<String, Integer> currentSkuUsedMachine = getSkuUsedMachineRejectLeftOver();
+        List<String> reductionSkuList = new ArrayList<>();
+        previousSkuUsedMachine.forEach((materialDesc, usedMachineCount) -> {
+            Integer leaveCount = currentSkuUsedMachine.get(materialDesc);
+            if (null == leaveCount) {
+                leaveCount = BigDecimal.ZERO.intValue();
+            }
+            Integer reductionCount = usedMachineCount - leaveCount;
+            if (reductionCount <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            for (int index = BigDecimal.ONE.intValue(); index <= reductionCount; index++) {
+                reductionSkuList.add(materialDesc);
+            }
+        });
+        reductionSkuList.sort(Comparator.naturalOrder());
+        String selected = reductionSkuList.get(releaseLhMachineCount - BigDecimal.ONE.intValue());
+        return previousLimit.getProductionSkuQtyInfo().get(selected);
+    }
+
+    /**
+     * 判断能否加一台硫化
+     * 如果改日已经
+     *
+     * @return
+     */
+    public boolean isAddOneLhMachine(String embryoCode) {
+        Integer currentLhMachineCount = getProductionLhMachineCount();
+        Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        if (!productionMouldSet.contains(embryoCode) && currentEmbryoCodeCount >= maxEmbryoCodeCount) {
+            return false;
+        }
+
+        if (currentLhMachineCount >= maxLhMachineCount) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 判断是否达到限制条件
+     * 胎胚种类数没有超
+     * 硫化机台数没有超
+     *
+     * @return
+     */
+    public boolean isReachLimit() {
+        Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        Integer currentLhMachineCount = getProductionLhMachineCount();
+        if (currentEmbryoCodeCount >= maxEmbryoCodeCount) {
+            return true;
+        }
+        if (currentLhMachineCount >= maxLhMachineCount) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 获取当前使用的硫化机台数
+     *
+     * @return
+     */
+    public Integer getUsedLhMachineCount() {
+        return getProductionLhMachineCount();
+    }
+
+    /**
      * 构建空数据对象实例
      *
      * @param day                排产日
@@ -165,4 +243,85 @@ public class GroupPlanCxLhCapacityLimitHelper {
         this.cxMachineCodeSet = new HashSet<>();
         this.productionSkuQtyInfo = new HashMap<>();
     }
+
+    /**
+     * 获取Sku占用的硫化机台数，忽略余量
+     *
+     * @return
+     */
+    private Map<String, Integer> getSkuUsedMachineRejectLeftOver() {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> skuUsedLhMachine = new HashMap<>();
+        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
+            Integer productionQty = skuProductionInfo.getSumProductionQty();
+            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+            //表示换模或是换活字块
+            if (productionQty < lhMachineQty) {
+                return;
+            }
+            int wholeNumber = productionQty / lhMachineQty;
+            if (wholeNumber >= BigDecimal.ONE.intValue()) {
+                skuUsedLhMachine.put(materialDesc, wholeNumber);
+            }
+        });
+        return skuUsedLhMachine;
+    }
+
+    /**
+     * 获取Sku理论占用的硫化机台数，不忽略余量
+     *
+     * @return
+     */
+    private Map<String, Integer> getSkuTheoryUsedMachine() {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> skuUsedLhMachine = new HashMap<>();
+        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
+            Integer productionQty = skuProductionInfo.getSumProductionQty();
+            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
+            skuUsedLhMachine.put(materialDesc, upMachineCount);
+        });
+        return skuUsedLhMachine;
+    }
+
+    /**
+     * 获取使用的硫化机台数
+     *
+     * @return
+     */
+    private Integer getProductionLhMachineCount() {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Map<String, Integer> wholeLhMap = new HashMap<>();
+        Set<String> passLeftOverSet = new HashSet<>();
+        Set<String> noWholeSet = new HashSet<>();
+        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
+            Integer productionQty = skuProductionInfo.getSumProductionQty();
+            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+            //表示换模或是换活字块
+            if (productionQty < lhMachineQty) {
+                noWholeSet.add(materialDesc);
+                return;
+            }
+            //表示自己整台或是有余量
+            int remainder = productionQty % lhMachineQty;
+            int wholeNumber = productionQty / lhMachineQty;
+            if (remainder > BigDecimal.ZERO.intValue()) {
+                passLeftOverSet.add(materialDesc);
+            }
+            wholeLhMap.put(materialDesc, wholeNumber);
+        });
+        Integer sumCount = BigDecimal.ZERO.intValue();
+        if (!CollectionUtils.isEmpty(wholeLhMap)) {
+            sumCount = sumCount + wholeLhMap.values().stream().mapToInt(Integer::intValue).sum();
+        }
+        Integer leftOver = Math.max(passLeftOverSet.size(), noWholeSet.size());
+        return sumCount + leftOver;
+    }
+
 }

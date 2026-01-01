@@ -139,6 +139,23 @@ public class Context {
     }
 
     /**
+     * 获取前一天
+     *
+     * @param currentDay
+     * @return
+     */
+    public Integer getPreviousDay(Integer currentDay) {
+        if (ProductionConstant.MONTH_START_DAY.equals(currentDay)) {
+            return null;
+        }
+        Integer previousDay = currentDay - BigDecimal.ONE.intValue();
+        if (stopDays.contains(previousDay)) {
+            return getPreviousDay(previousDay);
+        }
+        return previousDay;
+    }
+
+    /**
      * 创建新的版本号，如果排产版本号已经有值，则不进行创建
      * 否则创建新的排产版本号：规则 前缀 + yyyyMMddHHMMSS
      *

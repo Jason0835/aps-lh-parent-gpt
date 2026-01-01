@@ -37,7 +37,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 有模具基础信息的模具数量(模具台账或是新模具到货计划)
      */
     private Integer baseMouldQty;
-
+    /**
+     * 产品状态？
+     */
+    private String productStatus;
     /**
      * 不可生产标志
      */
@@ -82,6 +85,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 是否按总需求量排产 1 是 0 否
      */
     private Integer isProductionBySum;
+    /**
+     * 本轮次是否参与排产 1 是 0 否
+     */
+    private Integer isThisRound;
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)
@@ -272,6 +279,19 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return hasProduction();
+    }
+
+    /**
+     * 如果不排产，则不排
+     * 否则判断本轮次排产标记
+     *
+     * @return
+     */
+    public boolean hasProductionThisRound() {
+        if (hasProduction()) {
+            return YesOrNoEnum.YES.getValue().equals(isThisRound);
+        }
+        return YesOrNoEnum.YES.getValue().equals(isThisRound);
     }
 
     /**

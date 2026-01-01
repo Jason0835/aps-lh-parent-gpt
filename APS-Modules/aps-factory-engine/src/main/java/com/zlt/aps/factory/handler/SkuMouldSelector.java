@@ -3,6 +3,7 @@ package com.zlt.aps.factory.handler;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
+import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
@@ -34,6 +35,32 @@ public class SkuMouldSelector {
      * @param endDay                    排产结束日
      * @return
      */
+    public static List<ProductionMouldInfoVo> getSelectedMouldList(Context context, String selectedMaterialDesc, EarliestConclusionLhGroupHelper earliestConclusionLhGroup, Integer startDay, Integer endDay) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, List<MonthPlanProductMouldInfoVo>> allMouldInfo = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
+        List<MonthPlanProductMouldInfoVo> allMouldList = allMouldInfo.get(selectedMaterialDesc);
+        Set<String> productionMouldSet = earliestConclusionLhGroup.getUsedMouldSet();
+        List<MonthPlanProductMouldInfoVo> selectedMouldRelationList = new ArrayList<>();
+        allMouldList.forEach(mouldRelationInfo -> {
+            if (productionMouldSet.contains(mouldRelationInfo.getMouldCode())) {
+                selectedMouldRelationList.add(mouldRelationInfo);
+            }
+        });
+        //选中的续作模具
+        return selectedEnableMouldByNumber(context, ProductionConstant.DOUBLE_MOULD_PRODUCTION, selectedMouldRelationList, startDay, endDay);
+    }
+
+    /**
+     * 获取选中模具信息
+     *
+     * @param context                   排产上下文
+     * @param selectedMaterialDesc      选中的sku
+     * @param earliestConclusionLhGroup 收尾硫化组
+     * @param startDay                  排产开始日
+     * @param endDay                    排产结束日
+     * @return
+     */
+    @Deprecated
     public static List<ProductionMouldInfoVo> getSelectedMouldList(Context context, String selectedMaterialDesc, CxLhProductionHelper earliestConclusionLhGroup, Integer startDay, Integer endDay) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, List<MonthPlanProductMouldInfoVo>> allMouldInfo = productionContext.getBaseDataContainer().getSkuMouldRelationMap();

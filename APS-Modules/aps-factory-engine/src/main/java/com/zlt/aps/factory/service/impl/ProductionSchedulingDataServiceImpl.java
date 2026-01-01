@@ -14,10 +14,7 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultService;
-import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
-import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
@@ -31,7 +28,6 @@ import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +75,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final FactoryMonthPlanSpecialMaterialInfoMapper factoryMonthPlanSpecialMaterialInfoMapper;
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
-    
+
     private final MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
     private final BaseDao baseDao;
@@ -95,6 +91,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
 
     private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
+
+    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
 
 
     @Override
@@ -331,17 +329,18 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode());
     }
-    
+
     /**
      * 获取成品库存
+     *
      * @param context 排产上下文
      * @return
      */
     @Override
     public List<MdmProductStock> getMdmProductStock(Context context) {
-    	LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
-    	queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
-    	return mdmProductStockEntityMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
+        return mdmProductStockEntityMapper.selectList(queryWrapper);
     }
 
     @Override
@@ -523,12 +522,37 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
+    public void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList) {
+        if (CollectionUtils.isEmpty(detailLogList)) {
+            return;
+        }
+        factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
+    }
+
+    @Override
+    public void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList) {
+        if (CollectionUtils.isEmpty(dayResultList)) {
+            return;
+        }
+        factoryProductionDayProductionResultService.saveBatch(dayResultList);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveMouldProductionLog(MouldProductionLog productionLog) {
         if (null == productionLog) {
             return;
         }
         baseDao.insert(productionLog);
+    }
+
+    @Override
+    public void saveGroupConversionResult(List<MpStructureAllocation> allocationResult) {
+        if (CollectionUtils.isEmpty(allocationResult)) {
+            return;
+        }
+        //数据不会太多
+        baseDao.insertBatch(allocationResult);
     }
 
     @Override
@@ -545,23 +569,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             vulcanizationMachineCount = BigDecimal.ZERO.intValue();
         }
         return new MachineCountDto(formingMachineCount, vulcanizationMachineCount);
-    }
-
-    @Override
-    public Set<String> getExportOemBrand(String factoryCode) {
-        return factoryParamService.getNoStockUpPlanBrand(factoryCode);
-    }
-
-    @Override
-    public Set<String> getGreaterAverageValueProductInfo(String factoryCode, Integer year, Integer month, Integer averageValue) {
-        if (StringUtils.isBlank(factoryCode) || null == averageValue) {
-            return Collections.emptySet();
-        }
-        List<ProductAverageSaleVo> averageSaleList = factoryProductionSchedulingMapper.getFactoryAverageSaleProduct(factoryCode, year, month, averageValue);
-        if (CollectionUtils.isEmpty(averageSaleList)) {
-            return Collections.emptySet();
-        }
-        return averageSaleList.stream().map(ProductAverageSaleVo::getProductCode).collect(Collectors.toSet());
     }
 
     /**

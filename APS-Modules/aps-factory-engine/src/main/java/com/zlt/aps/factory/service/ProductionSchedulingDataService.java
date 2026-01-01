@@ -11,7 +11,6 @@ import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 月份排产计算，需要获取数据的接口信息
@@ -187,9 +186,10 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(Context context);
-    
+
     /**
      * 获取成品库存
+     *
      * @param context 排产上下文
      * @return
      */
@@ -351,11 +351,34 @@ public interface ProductionSchedulingDataService {
     void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList);
 
     /**
+     * 保存模具排产明细日志
+     *
+     * @param detailLogList
+     */
+    void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList);
+
+    /**
+     * 保存模具排产结果信息
+     *
+     * @param dayResultList
+     */
+    void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList);
+
+    /**
      * 保存模具排程排产流程日志
      *
      * @param productionLog 日志信息
      */
     void saveMouldProductionLog(MouldProductionLog productionLog);
+
+    /**
+     * 保存分组计划的成型转产结果
+     * TBR-为结构
+     * PCR-英寸
+     *
+     * @param allocationResult
+     */
+    void saveGroupConversionResult(List<MpStructureAllocation> allocationResult);
 
     /**
      * 获取分厂成型机、硫化机 机台数
@@ -365,24 +388,4 @@ public interface ProductionSchedulingDataService {
      */
     MachineCountDto getMachineNumberInfo(String factoryCode);
 
-    /**
-     * 获取分厂外贸贴牌品牌耗损
-     *
-     * @param factoryCode 分厂
-     * @return
-     */
-    @Deprecated
-    Set<String> getExportOemBrand(String factoryCode);
-
-    /**
-     * 获取月平均销量大于averageValue值的物料集合
-     *
-     * @param factoryCode  分厂
-     * @param year         年份
-     * @param month        月份
-     * @param averageValue 月均销量
-     * @return
-     */
-    @Deprecated
-    Set<String> getGreaterAverageValueProductInfo(String factoryCode, Integer year, Integer month, Integer averageValue);
 }
