@@ -272,11 +272,11 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context) {
+    public List<DpDemandPlan> getFactoryMonthPlan(Context context) {
         if (isEmptyFactoryAndRequireVersion(context)) {
             return Collections.emptyList();
         }
-        QueryWrapper<SaleMonthPlanRequire> queryWrapper = new QueryWrapper();
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());

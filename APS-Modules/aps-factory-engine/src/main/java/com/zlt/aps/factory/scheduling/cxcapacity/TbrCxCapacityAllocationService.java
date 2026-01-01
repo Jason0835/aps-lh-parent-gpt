@@ -71,9 +71,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //todo 记录日志-开始进行成型产能分配-结构排产
-
         //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            //todo 记录日志
+            return;
+        }
+        //设置初始的排产量数据信息
+        requirePlanList.forEach(singlePlan -> singlePlan.initProductionDataInfo());
         //初始排产需要的基础数据，成型、模具关系、计划初始库销比
         initProductionBaseData(productionContext, requirePlanList);
         //获取结构的硫化配比
@@ -103,9 +108,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
         //todo 记录日志
         //保存结构成型排程结果
-        saveStructureInfo(productionContext);
+        List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
+        //第二轮排产
+        resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
+        FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        //todo 最后搭配排产 20260101
 
-        //todo 第二轮排产
         //保存模具排产结果
         saveMouldProductionInfo(productionContext);
     }
@@ -534,12 +542,48 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      *
      * @param productionContext
      */
-    private void saveStructureInfo(TbrProductionContext productionContext) {
+    private List<MpStructureAllocation> saveStructureInfo(TbrProductionContext productionContext) {
         List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
         if (CollectionUtils.isEmpty(allAllocationList)) {
-            return;
+            return Collections.emptyList();
         }
         getDataService().saveGroupConversionResult(allAllocationList);
+        return allAllocationList;
+    }
+
+    /**
+     * 在正式排产前进行重置数据处理
+     *
+     * @param context            排产上下文
+     * @param allGroupPlanInfo   所有分组计划对象
+     * @param allContinueSkuInfo 所有续作计划信息
+     * @param allAllocationList  分组转产配置
+     */
+    private void resetBeforeFormalProduction(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueSkuInfo, List<MpStructureAllocation> allAllocationList) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        //根据分组转产配置，重新构建分组的限制信息
+        allGroupPlanInfo.forEach((groupName, groupProductionInfo) -> {
+            List<MpStructureAllocation> groupAllocationList;
+            if (CollectionUtils.isEmpty(allAllocationList)) {
+                groupAllocationList = new ArrayList<>();
+            } else {
+                groupAllocationList = allAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
+            }
+            groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
+        });
+        //处理计划的待排产量及排产标记重置
+        Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
+        if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
+            allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
+        }
+        //重新构建模具排产信息，全部清空
+        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
+        if (!CollectionUtils.isEmpty(allMouldInfoMap)) {
+            allMouldInfoMap.forEach((mouldCode, singleMouldInfo) -> {
+                singleMouldInfo.setFinishDaySet(new HashSet<>());
+                singleMouldInfo.setDayProductionInfo(new HashMap<>());
+            });
+        }
     }
 
     /**
@@ -575,11 +619,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return;
         }
+        //按计划Id分组，全局存储
         productionContext.setAllProductionPlan(requirePlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity())));
-        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
+        //按物料描述分组，全局存储
         Map<String, List<MonthPlanProductionRequirePlanVo>> skuRequirePlanMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         productionContext.setAllSkuProductionPlan(skuRequirePlanMap);
         //已排产量和损耗量为零
+        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
         skuRequirePlanMap.forEach((materialDesc, productionPlanList) -> {
             productionContext.getSkuPlannedQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
             productionContext.getSkuWastageQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
@@ -598,10 +644,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             if (CollectionUtils.isEmpty(effectiveList)) {
                 return;
             }
+            //总需求量小于一定值
             Long sumProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
             if (sumProductionQty <= param.getSumProductionQty()) {
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
             }
+            //总需求量与高优先级量差值小于一定值
             Long sumHeightProductionQty = effectiveList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
             if (sumProductionQty - sumHeightProductionQty <= param.getHeightDiffQty()) {
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));

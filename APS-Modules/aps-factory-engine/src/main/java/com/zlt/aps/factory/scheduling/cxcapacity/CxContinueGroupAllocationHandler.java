@@ -253,7 +253,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupPlanInfo      分组计划信息对象
      * @param continueSkuInfoMap 续作Sku信息
      */
-    private static void productionContinueSku(TbrProductionContext context, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
+    static void productionContinueSku(TbrProductionContext context, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
         Set<Integer> stopDays = context.getStopDays();
         Integer monthDays = context.getMonthDays();
         ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();

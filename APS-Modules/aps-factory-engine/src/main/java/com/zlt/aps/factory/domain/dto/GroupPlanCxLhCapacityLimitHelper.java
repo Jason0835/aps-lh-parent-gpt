@@ -4,13 +4,13 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 分组计划 - TBR为结构，PCR为英寸(寸口、寸别)
@@ -79,41 +79,45 @@ public class GroupPlanCxLhCapacityLimitHelper {
             return null;
         }
         Integer minLimit = BigDecimal.ZERO.intValue();
-        GroupPlanCxLhCapacityLimitHelper minLimitHelper = buildEmptyData(productionDay, minLimit, minLimit);
+        GroupPlanCxLhCapacityLimitHelper initLimitHelper = buildEmptyData(productionDay, minLimit, minLimit);
         if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-            return minLimitHelper;
+            return initLimitHelper;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         continueCxMachineAllocation.forEach(singleCxMachineAllocation -> {
             String cxMachineCode = singleCxMachineAllocation.getCxMachineCode();
             CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
-            if (null == cxMachineInfo) {
-                return;
-            }
-            if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
-                return;
-            }
-            if (minLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
-                return;
-            }
-            MonthPlanStructureLhRatioVo lhRatio = singleCxMachineAllocation.getProductionPlanInfo().getCxMachineLhRationMap().get(cxMachineInfo.getCxMachineBrandCode());
-            if (null == lhRatio) {
-                return;
-            }
-            minLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
-            //最大硫化配比
-            Integer maxLhMachineCount = minLimitHelper.getMaxLhMachineCount();
-            maxLhMachineCount = maxLhMachineCount + lhRatio.getLhMachineMaxQty();
-            minLimitHelper.maxLhMachineCount = maxLhMachineCount;
-            //最低硫化配比
-            minLimitHelper.getMinLhMachineInfo().put(cxMachineCode, lhRatio.getLhMachineMinQty());
-            //最大胎胚种类数
-            Integer maxEmbryoCodeCount = minLimitHelper.getMaxEmbryoCodeCount();
-            maxEmbryoCodeCount = maxLhMachineCount + lhRatio.getMaxEmbryoQty();
-            minLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
+            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
         });
-        return minLimitHelper;
+        return initLimitHelper;
+    }
+
+    /**
+     * 根据结构转产配置，构建分组某日的限制对象信息
+     *
+     * @param context             排产上下文
+     * @param productionDay       排产日
+     * @param groupAllocationList 分组产能配置
+     * @return
+     */
+    public static GroupPlanCxLhCapacityLimitHelper buildByStructureAllocation(Context context, Integer productionDay, List<MpStructureAllocation> groupAllocationList) {
+        if (context.getStopDays().contains(productionDay)) {
+            return null;
+        }
+        Integer minLimit = BigDecimal.ZERO.intValue();
+        GroupPlanCxLhCapacityLimitHelper initLimitHelper = buildEmptyData(productionDay, minLimit, minLimit);
+        if (CollectionUtils.isEmpty(groupAllocationList)) {
+            return initLimitHelper;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        groupAllocationList.forEach(singleCxMachineAllocation -> {
+            String cxMachineCode = singleCxMachineAllocation.getCxMachineCode();
+            CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
+            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
+        });
+        return initLimitHelper;
     }
 
     /**
@@ -135,8 +139,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
-     *
-     *
      * @param previousLimit
      * @param releaseLhMachineCount
      * @return
@@ -324,4 +326,81 @@ public class GroupPlanCxLhCapacityLimitHelper {
         return sumCount + leftOver;
     }
 
+    /**
+     * 根据结构转产配置，更新基础的限制信息
+     * 胎胚种类数
+     * 最大硫化配比
+     * 实单最低硫化配比
+     *
+     * @param initLimitHelper           初始的限制信息
+     * @param cxMachineInfo             成型机台信息
+     * @param singleCxMachineAllocation 某条转产配置
+     */
+    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper singleCxMachineAllocation) {
+        Integer productionDay = initLimitHelper.getDay();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (null == cxMachineInfo) {
+            return;
+        }
+        if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+            return;
+        }
+        if (initLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
+            return;
+        }
+        MonthPlanStructureLhRatioVo lhRatio = singleCxMachineAllocation.getProductionPlanInfo().getCxMachineLhRationMap().get(cxMachineInfo.getCxMachineBrandCode());
+        if (null == lhRatio) {
+            return;
+        }
+        initLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
+        //最大硫化配比
+        Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
+        maxLhMachineCount = maxLhMachineCount + lhRatio.getLhMachineMaxQty();
+        initLimitHelper.maxLhMachineCount = maxLhMachineCount;
+        //最低硫化配比
+        initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, lhRatio.getLhMachineMinQty());
+        //最大胎胚种类数
+        Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
+        maxEmbryoCodeCount = maxLhMachineCount + lhRatio.getMaxEmbryoQty();
+        initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
+    }
+
+    /**
+     * 根据结构转产配置，更新基础的限制信息
+     * 胎胚种类数
+     * 最大硫化配比
+     * 实单最低硫化配比
+     *
+     * @param initLimitHelper           初始的限制信息
+     * @param cxMachineInfo             成型机台信息
+     * @param singleCxMachineAllocation 某条转产配置
+     */
+    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
+        Integer productionDay = initLimitHelper.getDay();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (null == cxMachineInfo) {
+            return;
+        }
+        if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+            return;
+        }
+        //理论不可重复
+        if (initLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
+            return;
+        }
+        if (!singleCxMachineAllocation.hasRange(productionDay)) {
+            return;
+        }
+        initLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
+        //最大硫化配比
+        Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
+        maxLhMachineCount = maxLhMachineCount + singleCxMachineAllocation.getMaxLhMachineCount();
+        initLimitHelper.maxLhMachineCount = maxLhMachineCount;
+        //最低硫化配比
+        initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
+        //最大胎胚种类数
+        Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
+        maxEmbryoCodeCount = maxLhMachineCount + singleCxMachineAllocation.getMaxEmbryoCodeCount();
+        initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
+    }
 }

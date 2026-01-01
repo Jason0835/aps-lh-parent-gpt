@@ -153,7 +153,7 @@ public interface ProductionSchedulingDataService {
      * @param context 排产上下文
      * @return
      */
-    List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context);
+    List<DpDemandPlan> getFactoryMonthPlan(Context context);
 
     /**
      * 获取需求计划对应的物料基础信息

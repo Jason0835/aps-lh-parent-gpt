@@ -12,6 +12,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -116,7 +117,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private List<MonthPlanProductionRequirePlanVo> getMonthPlanRequirePlan(TbrProductionContext productionContext) {
         //得到制造需求计划
-        List<SaleMonthPlanRequire> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
+        List<DpDemandPlan> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
         if (CollectionUtils.isEmpty(monthPlanRequireList)) {
             String planListIsNull = I18nUtil.getMessage("alg.data.alter.message.planListIsNull");
             throw new BusinessException(String.format(planListIsNull, productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion()));

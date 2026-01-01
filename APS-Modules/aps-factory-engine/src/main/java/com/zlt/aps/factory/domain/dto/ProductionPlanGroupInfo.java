@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -629,6 +630,37 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 根据结构转产配置表，重新构建真个分组几乎的日产能限制信息
+     *
+     * @param context             排产上下文
+     * @param groupAllocationList 结构转产配置集合
+     */
+    public void buildDayProductionLimitInfoByStructureAllocation(Context context, List<MpStructureAllocation> groupAllocationList) {
+        if (CollectionUtils.isEmpty(groupAllocationList)) {
+            dayProductionLimitInfo = new HashMap<>();
+            return;
+        }
+        List<MpStructureAllocation> effectiveList = groupAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            dayProductionLimitInfo = new HashMap<>();
+            return;
+        }
+        Integer monthDays = context.getMonthDays();
+        Set<Integer> stopDays = context.getStopDays();
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(monthDays);
+        Integer minDay = effectiveList.stream().mapToInt(MpStructureAllocation::getBeginDay).min().getAsInt();
+        Integer maxDay = effectiveList.stream().mapToInt(MpStructureAllocation::getEndDay).max().getAsInt();
+        for (Integer productionDay = minDay; productionDay <= maxDay; productionDay++) {
+            if (stopDays.contains(productionDay)) {
+                continue;
+            }
+            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByStructureAllocation(context, productionDay, effectiveList);
+            dayLimitInfo.put(productionDay, dayLimit);
+        }
+        dayProductionLimitInfo = dayLimitInfo;
+    }
+
+    /**
      * 增加结构的Sku日排产信息
      *
      * @param skuDayProductionInfo 排产SKu信息
@@ -825,7 +857,7 @@ public class ProductionPlanGroupInfo {
                 return;
             }
             //剔除不排产的计划
-            List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction())).collect(Collectors.toList());
+            List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag())).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(productionPlanList)) {
                 groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
                 return;
