@@ -5,43 +5,42 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import javax.validation.constraints.NotNull;
-import java.io.Serializable;
 
 /**
- * 分厂排产条件对象
+ * 工厂排产条件对象
  *
  * @author ZLT
- * @date 20250310
+ * @date 20251203
  */
 @Data
-@ApiModel(value = "分厂排产条件对象", description = "分厂排产条件对象")
-public class FactoryProductionParamVo implements Serializable {
+@ApiModel(value = "工厂排产条件对象", description = "工厂排产条件对象")
+public class FactoryProductionParamVo extends FactoryProductionPlanVo {
     /**
-     * 分厂编号
+     * 工厂编码
      */
     @NotNull
-    @ApiModelProperty(required = true, value = "分厂编号", name = "factoryCode")
+    @ApiModelProperty(required = true, value = "工厂编码", name = "factoryCode")
     private String factoryCode;
 
     /**
-     * 年度
+     * 年份
      */
     @NotNull
-    @ApiModelProperty(required = true, value = "计划年度", name = "year")
+    @ApiModelProperty(required = true, value = "年份", name = "year")
     private Integer year;
 
     /**
      * 月份
      */
     @NotNull
-    @ApiModelProperty(required = true, value = "计划月份", name = "month")
+    @ApiModelProperty(required = true, value = "月份", name = "month")
     private Integer month;
 
     /**
-     * 月度销售生产需求计划版本
+     * 需求版本
      */
     @NotNull
-    @ApiModelProperty(required = true, value = "月生产计划版本", name = "monthPlanVersion")
+    @ApiModelProperty(required = true, value = "需求版本", name = "monthPlanVersion")
     private String monthPlanVersion;
 
     /**

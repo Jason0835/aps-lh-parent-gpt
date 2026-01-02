@@ -1,17 +1,20 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -119,8 +122,80 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         productionVersionQueryWrapper.eq("FACTORY_CODE", factoryCode);
         productionVersionQueryWrapper.eq("YEAR", year);
         productionVersionQueryWrapper.eq("MONTH", month);
-        productionVersionQueryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getValue());
+        productionVersionQueryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
         productionVersionQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return factoryProductionVersionMapper.selectOne(productionVersionQueryWrapper);
+    }
+
+    @Override
+    public AjaxResult flagProductionRequireVersion(FactoryProductionPlanVo selectedRequireVersion) {
+        if (isEmptyMonthPlanVersion(selectedRequireVersion)) {
+            return AjaxResult.success();
+        }
+        String factoryCode = selectedRequireVersion.getFactoryCode();
+        Integer year = selectedRequireVersion.getYear();
+        Integer month = selectedRequireVersion.getMonth();
+        String monthPlanVersion = selectedRequireVersion.getMonthPlanVersion();
+        if (isFinalByFactoryAndYearMonth(factoryCode, year, month)) {
+            //已经定稿
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.exist"));
+        }
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        queryWrapper.eq("YEAR", year);
+        queryWrapper.eq("MONTH", month);
+        queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
+        queryWrapper.isNull("PRODUCTION_INIT_VERSION");
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        MpFactoryProductionVersion find = factoryProductionVersionMapper.selectOne(queryWrapper);
+        //数据不存在
+        if (null == find) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.param.factoryRequireVersionNoExist"));
+        }
+        //已经加入列表
+        if (YesOrNoEnum.YES.getCode().equals(find.getIsSelectedDemand())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.param.factoryRequireVersionIsSelected"));
+        }
+        find.setIsSelectedDemand(YesOrNoEnum.YES.getCode());
+        factoryProductionVersionMapper.updateById(find);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 判断是否定稿
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return
+     */
+    private boolean isFinalByFactoryAndYearMonth(String factoryCode, Integer year, Integer month) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        queryWrapper.eq("YEAR", year);
+        queryWrapper.eq("MONTH", month);
+        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return factoryProductionVersionMapper.exists(queryWrapper);
+    }
+
+    /**
+     * 是否为空需求版本
+     * true表示空，false表示不空
+     *
+     * @param param
+     * @return
+     */
+    private boolean isEmptyMonthPlanVersion(FactoryProductionPlanVo param) {
+        if (null == param) {
+            return true;
+        }
+        if (StringUtils.isBlank(param.getFactoryCode()) || StringUtils.isBlank(param.getMonthPlanVersion())) {
+            return true;
+        }
+        if (null == param.getYear() || null == param.getMonth()) {
+            return true;
+        }
+        return false;
     }
 }

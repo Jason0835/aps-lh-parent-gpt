@@ -34,12 +34,13 @@ public interface IFactoryConsoleService {
     /**
      * 一键排产，生产模具排产计划
      * 1.第一步初始化
-     * 2.第二步模具排产
+     * 2.第二步排分组产能(结构)
+     * 3.第三步模具排产
      *
      * @param factoryProductionParam
      * @return
      */
-    AjaxResult factoryWholeCourseProduction(FactoryProductionParamVo factoryProductionParam);
+    AjaxResult oneClickProductionProcess(FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 重新初始化模具排产的初始化数据

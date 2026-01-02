@@ -1,7 +1,9 @@
 package com.zlt.aps.monthplan.factory.service;
 
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 
 import java.util.Date;
 
@@ -60,4 +62,12 @@ public interface IFactoryProductionVersionService {
      * @return
      */
     MpFactoryProductionVersion getFinalVersionByYearMonth(String factoryCode, Integer year, Integer month);
+
+    /**
+     * 对选中的工厂、年份、月份、需求版本计划标记可进行工厂排产计划
+     *
+     * @param selectedRequireVersion 需求版本
+     * @return
+     */
+    AjaxResult flagProductionRequireVersion(FactoryProductionPlanVo selectedRequireVersion);
 }

@@ -43,6 +43,16 @@ public interface IFactoryConsoleRemoteService {
     TableDataInfo getNoSelectedVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
 
     /**
+     * 确认对工厂 + 年月 + 需求计划版本进行工厂排产
+     *
+     * @param confirmParam 需求信息
+     * @return 结果信息
+     */
+    @ApiOperation("查询分厂月份对应还没选择的需求计划版本列表")
+    @PostMapping("/factoryConsole/confirmProductionRequireVersion")
+    AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam);
+
+    /**
      * 创建导入模板的版本信息，主要获取版本周期
      *
      * @param param 分厂编码、年份、月份
@@ -93,14 +103,15 @@ public interface IFactoryConsoleRemoteService {
     AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产
+     * 按工厂 + 年月 + 需求版本的方式进行工厂一键排产
+     * 初始化->排结构->排模具
      *
-     * @param factoryProductionParam 分厂排产参数
+     * @param factoryProductionParam 工厂排产参数
      * @return
      */
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产")
-    @PostMapping("/factoryConsole/factoryWholeCourseProduction")
-    AjaxResult factoryWholeCourseProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
+    @PostMapping("/factoryConsole/oneClickProductionProcess")
+    AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本

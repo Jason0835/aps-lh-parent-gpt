@@ -3,18 +3,16 @@ package com.zlt.aps.monthplan.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
-import com.tlt.aps.constant.StringConstant;
-import com.tlt.aps.enums.*;
+import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.StockHedgingOptionsEnum;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IProductMinConfigurationService;
-import com.zlt.aps.maindata.utils.FactoryParamUtils;
-import com.zlt.aps.monthplan.api.domain.dto.ProductStockInfo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
@@ -22,8 +20,6 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.demand.mapper.MonthPlanSaleOrderMapper;
 import com.zlt.aps.monthplan.enums.StockHedgingComparatorEnum;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
-import com.zlt.aps.monthplan.factory.dto.YearSaleMinProdVo;
-import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryConsoleMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
@@ -31,16 +27,15 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.*;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -103,9 +98,8 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         return factoryConsoleMapper.getNoSelectedVersionList(queryCondition);
     }
 
-
     @Override
-    public AjaxResult factoryWholeCourseProduction(FactoryProductionParamVo factoryProductionParam) {
+    public AjaxResult oneClickProductionProcess(FactoryProductionParamVo factoryProductionParam) {
         String factoryCode = factoryProductionParam.getFactoryCode();
         Integer year = factoryProductionParam.getYear();
         Integer month = factoryProductionParam.getMonth();
@@ -118,7 +112,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         queryWrapper.eq("YEAR", year);
         queryWrapper.eq("MONTH", month);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getValue());
+        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
         MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
         if (null != version) {
             //分厂在%s-%s年月已定稿，不可重新排产
@@ -135,6 +129,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (CollectionUtils.isEmpty(requireVersionList)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
         }
+        factoryProductionParam.setProductTypeCode(requireVersionList.get(BigDecimal.ZERO.intValue()).getProductTypeCode());
         Context context = buildContext(factoryProductionParam);
         monthPlanProductionSchedulingService.general(context);
         return AjaxResult.success();
@@ -278,6 +273,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         }
         return totalStockQty;
     }
+
     /**
      * 是否加入超欠产，根据控制参数SYS018
      * N表示不加，其它都是加入
@@ -388,7 +384,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         context.setMonthPlanVersion(factoryProductionParam.getMonthPlanVersion());
         context.setProductionVersion(factoryProductionParam.getProductionVersion());
         context.setPrefixVersion(factoryProductionParam.getPrefixVersion());
-        context.setProductType(ProductTypeEnum.SEMI_STEEL);
+        context.setProductType(ProductTypeEnum.getEnumByValue(factoryProductionParam.getProductTypeCode()));
         return context;
     }
 
