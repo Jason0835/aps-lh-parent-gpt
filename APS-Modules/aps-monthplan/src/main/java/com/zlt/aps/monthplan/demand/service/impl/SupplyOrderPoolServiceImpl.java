@@ -575,6 +575,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             long stockLimit = BigDecimalUtils.multiply(turnOverDays,BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
                 .divideToIntegralValue(BigDecimal.valueOf(30)).longValue();
             supplyOrderPool.setStockLimit(stockLimit);
+        }else{
+            supplyOrderPool.setStockLimit(BigDecimal.ZERO.longValue());
         }
         //   (3)通过成品库存表，获取超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
         List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.getMpFinishedProductStockByMaterialCode(supplyOrderPool.getMaterialCode());
