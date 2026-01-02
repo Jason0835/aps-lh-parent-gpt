@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
@@ -22,10 +21,11 @@ import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
@@ -37,7 +37,8 @@ import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
-import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
@@ -87,7 +88,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private static final String PREFIX = "REQ";
 
     private final DpDemandPlanEntityMapper demandPlanEntityMapper;
-    private final FactoryProductionVersionMapper factoryProductionVersionMapper;
+    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
@@ -181,13 +182,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion, List<SalesOrderPool> salesOrders) {
-        FactoryProductionVersion version = new FactoryProductionVersion();
+        MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
         version.setMonth(yearMonth.getMonthValue());
         version.setMonthPlanVersion(monthPlanVersion);
         version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
-        version.setIsFinal(Constant.FALSE);
+        version.setIsFinal(YesOrNoEnum.NO.getCode());
         // 取销售订单的胎别
         if (CollectionUtils.isNotEmpty(salesOrders)) {
             SalesOrderPool saleOrder = salesOrders.get(0);
@@ -197,7 +198,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(FactoryProductionVersion finalVersion) {
+    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(MpFactoryProductionVersion finalVersion) {
         LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DpDemandPlan::getFactoryCode, finalVersion.getFactoryCode());
         wrapper.eq(DpDemandPlan::getYear, finalVersion.getYear());
@@ -247,11 +248,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private void validateProductionVersionFinalized(DpDemandPlan createCondition) {
         Long count = factoryProductionVersionMapper.selectCount(
-            Wrappers.<FactoryProductionVersion>lambdaQuery()
-                .eq(FactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
-                .eq(FactoryProductionVersion::getYear, createCondition.getYear())
-                .eq(FactoryProductionVersion::getMonth, createCondition.getMonth())
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)
+            Wrappers.<MpFactoryProductionVersion>lambdaQuery()
+                .eq(MpFactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
+                .eq(MpFactoryProductionVersion::getYear, createCondition.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, createCondition.getMonth())
+                .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
         );
         if (count != null && count > 0) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.demandPlan.checkFinal"));

@@ -7,7 +7,6 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
@@ -23,7 +22,7 @@ import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.service.*;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
-import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -64,7 +63,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
     private final RequirementVersionService requirementVersionService;
 
-    private final FactoryProductionVersionMapper factoryProductionVersionMapper;
+    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     // 销售订单
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
@@ -125,11 +124,11 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges();
         // 3、检查是否已有T月月度计划(定稿)
         //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-        List<FactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRangeResult.getTMonth());
+        List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRangeResult.getTMonth());
         if (CollectionUtils.isEmpty(finalVersions)) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
-        FactoryProductionVersion finalVersion =  finalVersions.get(0);
+        MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
         Map<String, Long>  tMonthSaleQty =   this.mpHistorySaleRecordService.calculateMonthSaleQty(6);
         // 生成T月模拟需求计划
         List<DpDemandPlan> tMonthDemands = createDemandPlan(monthRangeResult.getTMonth(),tMonthSaleQty);
@@ -142,7 +141,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         List<DpDemandPlan> tPlus1MonthDemands = createDemandPlan(monthRangeResult.getTPlus1Month(),tPlus1MonthSaleQty);
         // 调用接口生成月度排产   12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
         // T+1月排产结束后：计算得到T+2月的(实单+暂缓+周期储备排产)未排量 = 高优先级未排产量 + 中优先级未排产量 + 暂缓订单未排量 + 周期排产储备未排产量
-        FactoryProductionVersion tPlus1MonthProductionVersion = new FactoryProductionVersion();
+        MpFactoryProductionVersion tPlus1MonthProductionVersion = new MpFactoryProductionVersion();
         tPlus1MonthProductionVersion.setFactoryCode(tMonthDemands.get(0).getFactoryCode());
         tPlus1MonthProductionVersion.setYear(tMonthDemands.get(0).getYear());
         tPlus1MonthProductionVersion.setMonth(tMonthDemands.get(0).getMonth());
@@ -159,7 +158,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return AjaxResult.success();
     }
 
-    private List<MpProductionPrediction> buildProductionPrediction(Map<String, Long> tMonthDemandQty, Map<String, Long> tPlus1MonthDemandQty, Map<String, Long> tPlus2MonthDemandQty, Map<String, MdmMaterialInfo> materialInfoMap,FactoryProductionVersion finalVersion) {
+    private List<MpProductionPrediction> buildProductionPrediction(Map<String, Long> tMonthDemandQty, Map<String, Long> tPlus1MonthDemandQty, Map<String, Long> tPlus2MonthDemandQty, Map<String, MdmMaterialInfo> materialInfoMap,MpFactoryProductionVersion finalVersion) {
         List<MpProductionPrediction> list = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
         tMonthDemandQty.forEach((materialCode, productionQty) -> {
@@ -178,13 +177,12 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setMonth1(productionQty);
                 productionPrediction.setMonth2(tPlus1MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.longValue()));
                 productionPrediction.setMonth3(tPlus2MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.longValue()));
-                productionPrediction.setProductionVersion(finalVersion.getProductionVersion());
                 list.add(productionPrediction);
         });
         return list;
     }
 
-    private Map<String, Long> calculateMonthDemandQty(FactoryProductionVersion finalVersion) {
+    private Map<String, Long> calculateMonthDemandQty(MpFactoryProductionVersion finalVersion) {
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
         if(CollectionUtils.isEmpty(productionFinalResults)) {
             return Collections.emptyMap();
@@ -219,7 +217,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return mergedDemandPlans;
     }
 
-    private Map<String, Long> calculateMonthDemandQty(List<DpDemandPlan>  demandPlans,YearMonth yearMonth,FactoryProductionVersion finalVersion) {
+    private Map<String, Long> calculateMonthDemandQty(List<DpDemandPlan>  demandPlans,YearMonth yearMonth,MpFactoryProductionVersion finalVersion) {
         if(CollectionUtils.isEmpty(demandPlans) || null == finalVersion) {
             return Collections.emptyMap();
         }
@@ -467,6 +465,9 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap) {
         Optional.ofNullable(skuMap.get(demandPlan.getMaterialCode()))
             .ifPresent(materialInfo -> {
+                demandPlan.setMaterialDesc(materialInfo.getMaterialDesc());
+                demandPlan.setProductTypeCode(materialInfo.getProductTypeCode());
+                demandPlan.setBrand(materialInfo.getBrand());
                 demandPlan.setMesMaterialCode(materialInfo.getMesMaterialCode());
                 demandPlan.setLocationType(materialInfo.getCommonType());
                 demandPlan.setStructureName(materialInfo.getStructureName());
@@ -648,13 +649,13 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
      *       (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
      * @param tMonth T月
      */
-    private List<FactoryProductionVersion> validateProductionVersionFinalized(YearMonth tMonth) {
+    private List<MpFactoryProductionVersion> validateProductionVersionFinalized(YearMonth tMonth) {
         return factoryProductionVersionMapper.selectList(
-            Wrappers.<FactoryProductionVersion>lambdaQuery()
-                .eq(FactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
-                .eq(FactoryProductionVersion::getYear, tMonth.getYear())
-                .eq(FactoryProductionVersion::getMonth, tMonth.getMonthValue())
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)
+            Wrappers.<MpFactoryProductionVersion>lambdaQuery()
+                .eq(MpFactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
+                .eq(MpFactoryProductionVersion::getYear, tMonth.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, tMonth.getMonthValue())
+                .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
         );
     }
 
@@ -797,13 +798,13 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
     private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion, List<SalesOrderPool> salesOrders) {
-        FactoryProductionVersion version = new FactoryProductionVersion();
+        MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
         version.setMonth(yearMonth.getMonthValue());
         version.setMonthPlanVersion(monthPlanVersion);
         version.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
-        version.setIsFinal(Constant.FALSE);
+        version.setIsFinal(YesOrNoEnum.NO.getCode());
         // 取销售订单的胎别
         if (CollectionUtils.isNotEmpty(salesOrders)) {
             SalesOrderPool saleOrder = salesOrders.get(0);
