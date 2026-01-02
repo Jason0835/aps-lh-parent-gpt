@@ -576,6 +576,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                 .divideToIntegralValue(BigDecimal.valueOf(30)).longValue();
             supplyOrderPool.setStockLimit(stockLimit);
         }else{
+            supplyOrderPool.setThreeAverageQty(BigDecimal.ZERO.longValue());
+            supplyOrderPool.setSixAverageQty(BigDecimal.ZERO.longValue());
+            supplyOrderPool.setDeliveryFrequency(BigDecimal.ZERO.intValue());
+            supplyOrderPool.setAverageSaleQty(BigDecimal.ZERO.longValue());
             supplyOrderPool.setStockLimit(BigDecimal.ZERO.longValue());
         }
         //   (3)通过成品库存表，获取超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
@@ -589,6 +593,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setSixOverdueStockQty(sixOverdueStockQty);
             supplyOrderPool.setNightOverdueStockQty(nightOverdueStockQty);
             supplyOrderPool.setTwelveOverdueStockQty(twelveOverdueStockQty);
+        }else{
+            supplyOrderPool.setThreeOverdueStockQty(BigDecimal.ZERO.longValue());
+            supplyOrderPool.setSixOverdueStockQty(BigDecimal.ZERO.longValue());
+            supplyOrderPool.setNightOverdueStockQty(BigDecimal.ZERO.longValue());
+            supplyOrderPool.setTwelveOverdueStockQty(BigDecimal.ZERO.longValue());
         }
         //通过月度生产计划表，获取近12个月有排产的月份个数
         // 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
@@ -881,6 +890,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             // 5、计算备库上限：备库上限/月均销量 * 30 = 30（天）注：第1个30，月度天数（固定）；第2个30，周转天数（可配置）；月均销量（6个月）。
             BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
             order.setStockLimit(stockLimit.longValue());
+        }else{
+            order.setThreeAverageQty(BigDecimal.ZERO.longValue());
+            order.setSixAverageQty(BigDecimal.ZERO.longValue());
+            order.setDeliveryFrequency(BigDecimal.ZERO.intValue());
+            order.setStockLimit(BigDecimal.ZERO.longValue());
         }
     }
 
