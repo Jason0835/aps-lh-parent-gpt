@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionSchedulingMapper">
 
-    <update id="updateProductionVersionInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion">
+    <update id="updateProductionVersionInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion">
         UPDATE t_mp_proc_version
            SET IS_NATURAL_MONTH = #{isNaturalMonth,jdbcType=DECIMAL},
                PRODUCTION_START_DATE = #{productionStartDate,jdbcType=DATE},
