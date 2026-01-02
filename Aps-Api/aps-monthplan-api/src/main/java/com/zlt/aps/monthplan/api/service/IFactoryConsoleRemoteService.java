@@ -4,7 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 /**
- * 分厂月度计划控制台业务
+ * 工厂月度计划控制台业务
  *
  * @author ZLT
  * @date 20250213
@@ -28,7 +28,7 @@ public interface IFactoryConsoleRemoteService {
      * @param queryCondition 查询条件
      * @return 结果集合
      */
-    @ApiOperation("查询分厂的月份排产计划----分厂同一计划可写入多个版本")
+    @ApiOperation("查询工厂的月份排产计划----分厂同一计划可写入多个版本")
     @PostMapping("/factoryConsole/productionVersionList")
     TableDataInfo getProductionVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
 
@@ -50,7 +50,7 @@ public interface IFactoryConsoleRemoteService {
      */
     @ApiOperation("根据分厂、年、月获取其周期信息")
     @PostMapping("/factoryConsole/createImportVersion")
-    FactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param);
+    MpFactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param);
 
     /**
      * 按分厂+年月的方式生成销售需求月度计划

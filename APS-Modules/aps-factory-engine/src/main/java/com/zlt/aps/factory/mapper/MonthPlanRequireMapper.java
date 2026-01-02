@@ -1,7 +1,6 @@
 package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

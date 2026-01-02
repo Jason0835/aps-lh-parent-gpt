@@ -1,7 +1,7 @@
 package com.zlt.aps.monthplan.factory.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 
 import java.util.Date;
 
@@ -31,7 +31,7 @@ public interface IFactoryProductionVersionService {
      *
      * @param factoryProductionVersion
      */
-    void setProductionVersionCycleDate(FactoryProductionVersion factoryProductionVersion);
+    void setProductionVersionCycleDate(MpFactoryProductionVersion factoryProductionVersion);
 
 
     /**
@@ -41,7 +41,7 @@ public interface IFactoryProductionVersionService {
      * @param date        日期
      * @return
      */
-    FactoryProductionVersion getFinalVersion(String factoryCode, Date date);
+    MpFactoryProductionVersion getFinalVersion(String factoryCode, Date date);
 
     /**
      * 根据排产版本，获取排产版本信息
@@ -49,7 +49,7 @@ public interface IFactoryProductionVersionService {
      * @param productionVersion 排产版本号
      * @return
      */
-    FactoryProductionVersion getProductionVersion(String productionVersion);
+    MpFactoryProductionVersion getProductionVersion(String productionVersion);
 
     /**
      * 根据分厂编码、年、月获取定稿版本信息
@@ -59,5 +59,5 @@ public interface IFactoryProductionVersionService {
      * @param month       月
      * @return
      */
-    FactoryProductionVersion getFinalVersionByYearMonth(String factoryCode, Integer year, Integer month);
+    MpFactoryProductionVersion getFinalVersionByYearMonth(String factoryCode, Integer year, Integer month);
 }

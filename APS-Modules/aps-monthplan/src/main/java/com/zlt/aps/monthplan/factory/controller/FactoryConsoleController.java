@@ -7,7 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
@@ -24,7 +24,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 分厂月份计划控制台
+ * 工厂月份计划排产控制台
+ * 后台业务服务入口
  *
  * @author ZLT
  * @date 20251201
@@ -94,7 +95,7 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
-     * 查询分厂的月份排产计划
+     * 查询工厂的月份排产计划
      *
      * @param queryCondition 查询条件
      * @return 结果集合
@@ -109,6 +110,9 @@ public class FactoryConsoleController extends BaseController {
         return getDataTable(dataList);
     }
 
+    public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo queryCondition){
+        return AjaxResult.success();
+    }
     /**
      * 创建导入模板的版本信息，主要获取版本周期
      *
@@ -117,7 +121,7 @@ public class FactoryConsoleController extends BaseController {
      */
     @ApiOperation("根据分厂、年、月获取其周期信息")
     @PostMapping("/createImportVersion")
-    public FactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param) {
+    public MpFactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param) {
         if (null == param) {
             return null;
         }
@@ -127,7 +131,7 @@ public class FactoryConsoleController extends BaseController {
         if (StringUtils.isBlank(factoryCode) || null == year || null == month) {
             return null;
         }
-        FactoryProductionVersion version = new FactoryProductionVersion();
+        MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(factoryCode);
         version.setYear(year);
         version.setMonth(month);
@@ -146,7 +150,7 @@ public class FactoryConsoleController extends BaseController {
         if (null == productionDate || StringUtils.isBlank(factoryCode)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.factoryMonthPlanProdFinal.factoryProductionDateNoEmpty"));
         }
-        FactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
         if (null == finalVersion) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.factoryMonthPlanProdFinal.factoryNoFinal"));
         }

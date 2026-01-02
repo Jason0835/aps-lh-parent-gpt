@@ -43,7 +43,7 @@ public interface ProductionSchedulingDataService {
      * @param context 排产上下文
      * @return
      */
-    FactoryProductionVersion getFactoryMonthPlanVersion(Context context);
+    MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context);
 
     /**
      * 根据工厂编码、年份、月份获取对应的定稿版本信息
@@ -53,7 +53,7 @@ public interface ProductionSchedulingDataService {
      * @param month       月份
      * @return
      */
-    FactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month);
+    MpFactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month);
 
     /**
      * 更新分厂排程版本
@@ -62,7 +62,7 @@ public interface ProductionSchedulingDataService {
      * @param updateVersion
      * @return
      */
-    int updateFactoryProductionVersion(FactoryProductionVersion updateVersion);
+    int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
 
     /**
      * 根据排产版本号，更新排产月份模式及排产开始、结束日
@@ -70,7 +70,7 @@ public interface ProductionSchedulingDataService {
      * @param updateVersion
      * @return
      */
-    int updateProductionVersionInfo(FactoryProductionVersion updateVersion);
+    int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion);
 
     /**
      * 增加一条分厂排程版本记录
@@ -78,7 +78,7 @@ public interface ProductionSchedulingDataService {
      * @param updateVersion
      * @return
      */
-    int addFactoryProductionVersion(FactoryProductionVersion updateVersion);
+    int addFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
 
     /**
      * 根据工厂、排产信息获取工厂对应的月计划开停产工作日历

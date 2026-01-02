@@ -29,9 +29,9 @@ public class FactoryProductionPlanVo implements Serializable {
     private Integer month;
 
     /**
-     * 分厂编码
+     * 工厂编码
      */
-    @ApiModelProperty(value = "分厂编码", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     private String factoryCode;
 
     /**

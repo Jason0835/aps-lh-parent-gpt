@@ -7,8 +7,8 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
-import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +29,12 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class FactoryProductionVersionServiceImpl implements IFactoryProductionVersionService {
 
-    private final FactoryProductionVersionMapper factoryProductionVersionMapper;
+    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
 
     private final IFactoryParamService factoryParamService;
 
     @Override
-    public void setProductionVersionCycleDate(FactoryProductionVersion factoryProductionVersion) {
+    public void setProductionVersionCycleDate(MpFactoryProductionVersion factoryProductionVersion) {
         if (null == factoryProductionVersion) {
             return;
         }
@@ -45,7 +45,7 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         }
         //默认为自然月的起始日
         YearMonth yearMonth = YearMonth.of(year, month);
-        factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.YES.getValue());
+        factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.YES.getCode());
         factoryProductionVersion.setProductionStartDate(DateUtils.getDate(yearMonth.atDay(FactoryConstant.MONTH_START_DAY)));
         factoryProductionVersion.setProductionEndDate(DateUtils.getDate(yearMonth.atEndOfMonth()));
         String factoryCode = factoryProductionVersion.getFactoryCode();
@@ -61,7 +61,7 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
             return;
         }
         //值在2~28之间，则为非自然月
-        factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.NO.getValue());
+        factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.NO.getCode());
         YearMonth previousMonth = yearMonth.minusMonths(1);
         Date cycleStartDate = DateUtils.getDate(LocalDate.of(previousMonth.getYear(), previousMonth.getMonthValue(), startDay));
         factoryProductionVersion.setProductionStartDate(cycleStartDate);
@@ -76,12 +76,12 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
      * @param date        日期
      */
     @Override
-    public FactoryProductionVersion getFinalVersion(String factoryCode, Date date) {
+    public MpFactoryProductionVersion getFinalVersion(String factoryCode, Date date) {
         if (StringUtils.isBlank(factoryCode) || null == date) {
             return null;
         }
         //根据分厂，及日期确定排产版本计划
-        QueryWrapper<FactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpFactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
         productionVersionQueryWrapper.eq("FACTORY_CODE", factoryCode);
         productionVersionQueryWrapper.le("PRODUCTION_START_DATE", date);
         productionVersionQueryWrapper.ge("PRODUCTION_END_DATE", date);
@@ -91,12 +91,12 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
     }
 
     @Override
-    public FactoryProductionVersion getProductionVersion(String productionVersion) {
+    public MpFactoryProductionVersion getProductionVersion(String productionVersion) {
         if (StringUtils.isBlank(productionVersion)) {
             return null;
         }
         //排产版本号确定排产版本计划
-        QueryWrapper<FactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpFactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
         productionVersionQueryWrapper.eq("PRODUCTION_VERSION", productionVersion);
         productionVersionQueryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return factoryProductionVersionMapper.selectOne(productionVersionQueryWrapper);
@@ -110,12 +110,12 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
      * @param month       月
      */
     @Override
-    public FactoryProductionVersion getFinalVersionByYearMonth(String factoryCode, Integer year, Integer month) {
+    public MpFactoryProductionVersion getFinalVersionByYearMonth(String factoryCode, Integer year, Integer month) {
         if (StringUtils.isBlank(factoryCode) || null == year || null == month) {
             return null;
         }
         //根据分厂，及年、月确定排产版本计划
-        QueryWrapper<FactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpFactoryProductionVersion> productionVersionQueryWrapper = new QueryWrapper<>();
         productionVersionQueryWrapper.eq("FACTORY_CODE", factoryCode);
         productionVersionQueryWrapper.eq("YEAR", year);
         productionVersionQueryWrapper.eq("MONTH", month);

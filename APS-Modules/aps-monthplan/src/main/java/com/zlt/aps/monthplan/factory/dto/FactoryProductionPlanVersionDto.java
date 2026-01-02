@@ -8,13 +8,13 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 分厂生产计划控制版本对象
+ * 工厂月份排产计划控制版本对象
  *
  * @author ZLT
- * @date 20250213
+ * @date 20251201
  */
 @Data
-@ApiModel(value = "分厂生产计划控制版本对象", description = "分厂生产计划控制版本对象")
+@ApiModel(value = "工厂月份排产计划控制版本对象", description = "工厂月份排产计划控制版本对象")
 public class FactoryProductionPlanVersionDto implements Serializable {
 
     /**
@@ -30,9 +30,9 @@ public class FactoryProductionPlanVersionDto implements Serializable {
     private Integer month;
 
     /**
-     * 分厂编码
+     * 工厂编码
      */
-    @ApiModelProperty(value = "分厂编码", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     private String factoryCode;
 
     /**
@@ -51,10 +51,16 @@ public class FactoryProductionPlanVersionDto implements Serializable {
      */
     @ApiModelProperty(value = "分厂初始化排产版本", name = "initVersion")
     private String initVersion;
+
     /**
-     * 分厂排产版本
+     * 工厂结构排产版本
      */
-    @ApiModelProperty(value = "分厂排产版本集合", name = "productionVersion")
+    @ApiModelProperty(value = "工厂结构排产版本", name = "productionStVersion")
+    private String productionStVersion;
+    /**
+     * 工厂排产版本
+     */
+    @ApiModelProperty(value = "工厂排产版本", name = "productionVersion")
     private String productionVersion;
     /**
      * 是否定稿
@@ -80,7 +86,7 @@ public class FactoryProductionPlanVersionDto implements Serializable {
     private Integer isNaturalMonth;
 
     /**
-     * 获取分厂销售需求版本计划分组Key
+     * 获取工厂销售需求版本计划分组Key
      *
      * @return
      */

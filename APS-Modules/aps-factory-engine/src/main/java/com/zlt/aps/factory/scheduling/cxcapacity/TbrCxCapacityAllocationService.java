@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.ruoyi.common.core.utils.DateUtils;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
@@ -757,7 +756,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         LocalDate previousMonth = context.getPreviousMonth();
         Integer year = previousMonth.getYear();
         Integer month = previousMonth.getMonthValue();
-        FactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
+        MpFactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
         if (null == previousVersion) {
             return Collections.emptyMap();
         }
@@ -872,8 +871,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         BeanUtils.copyProperties(context, productionContext);
         //基础数据容器存储
         productionContext.setBaseDataContainer(new BaseDataContainer());
-        productionContext.createNewProductionVersion();
-        productionContext.setOperationWorkNo(DateUtils.dateTimeNow());
+        context.setProductionVersion(productionContext.createNewProductionVersion());
+        context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
         productionContext.setLogBuilder(new StringBuilder());
         setProductionCycleInfo(productionContext);
         return productionContext;
@@ -893,8 +892,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private ProductionContext buildDefaultProductionContext(Context context) {
         ProductionContext productionContext = new ProductionContext();
         BeanUtils.copyProperties(context, productionContext);
-        productionContext.createNewProductionVersion();
-        productionContext.setOperationWorkNo(DateUtils.dateTimeNow());
+        context.setProductionVersion(productionContext.createNewProductionVersion());
+        context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
         productionContext.setLogBuilder(new StringBuilder());
         setProductionCycleInfo(productionContext);
         return productionContext;
@@ -907,12 +906,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param context
      */
     private void setProductionCycleInfo(Context context) {
-        FactoryProductionVersion productionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion productionVersion = getDataService().getFactoryMonthPlanVersion(context);
         if (null != productionVersion) {
-            Date productionStartDate = productionVersion.getProductionStartDate();
-            context.setProductionStartDate(productionStartDate);
-            context.setStartDay(com.zlt.aps.factory.utils.DateUtils.getDaysByMonth(productionStartDate));
-            context.setProductionEndDate(productionVersion.getProductionEndDate());
+            return;
         }
+        Date productionStartDate = productionVersion.getProductionStartDate();
+        context.setProductionStartDate(productionStartDate);
+        context.setStartDay(com.zlt.aps.factory.utils.DateUtils.getDaysByMonth(productionStartDate));
+        context.setProductionEndDate(productionVersion.getProductionEndDate());
     }
 }

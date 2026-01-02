@@ -1,6 +1,6 @@
 package com.zlt.aps.factory.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -19,6 +19,6 @@ import org.apache.ibatis.annotations.Mapper;
  * @date 2025-03-19
  */
 @Mapper
-public interface FactoryEngineProductionVersionMapper extends CommBaseMapper<FactoryProductionVersion> {
+public interface FactoryEngineProductionVersionMapper extends CommBaseMapper<MpFactoryProductionVersion> {
 
 }

@@ -9,13 +9,13 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 月计划选择需求计划记录对象
+ * 月计划选择需求计划参数对象
  *
  * @author ZLT
  * @date 20251201
  */
 @Data
-@ApiModel(value = "月份计划-计划调整参数对象", description = "月份计划-计划调整参数对象")
+@ApiModel(value = "月份计划-选择需求计划参数对象", description = "月份计划-选择需求计划参数对象")
 public class FactoryMonthPlanVersionVo implements Serializable {
 
     /**

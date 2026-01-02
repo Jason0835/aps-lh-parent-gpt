@@ -2,7 +2,7 @@ package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -24,7 +24,7 @@ public interface FactoryProductionSchedulingMapper {
      * @param updateVersion
      * @return
      */
-    int updateProductionVersionInfo(FactoryProductionVersion updateVersion);
+    int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion);
 
     /**
      * 获取所有施工信息，

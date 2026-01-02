@@ -25,14 +25,14 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.Date;
 
 /**
- * 分厂月生产计划控制台业务服务类
+ * 工厂月生产计划控制台业务服务类
  *
  * @author ZLT
  * @date 20251201
  */
 @Controller
 @RequestMapping("/factory/console")
-@Api(tags = "分厂月生产计划控制台业务-服务类")
+@Api(tags = "工厂月生产计划控制台业务-服务类")
 @RequiredArgsConstructor
 public class FactoryConsoleUIController extends BaseController {
 
@@ -41,7 +41,7 @@ public class FactoryConsoleUIController extends BaseController {
     private final IFactoryMonthPlanProdFinalRemoteService iFactoryMonthPlanProdFinalRemoteService;
 
     /**
-     * 根据条件查询分厂需要排产及已经排产的销售生产需求计划列表
+     * 根据条件查询工厂需要排产及已经排产的销售生产需求计划列表
      */
     @ResponseBody
     @PostMapping("/list")
@@ -51,11 +51,11 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
-     * 查询分厂月份对应还没选择的需求计划版本列表
+     * 查询工厂月份对应还没选择的需求计划版本列表
      */
     @ResponseBody
     @PostMapping("/noSelectedVersionList")
-    @ApiOperation(value = "查询分厂月份对应还没选择的需求计划版本列表", notes = "查询分厂月份对应还没选择的需求计划版本列表")
+    @ApiOperation(value = "查询工厂月份对应还没选择的需求计划版本列表", notes = "查询分厂月份对应还没选择的需求计划版本列表")
     public TableDataInfo getNoSelectedVersionList(FactoryProductionPlanVo queryCondition) {
         return factoryConsoleService.getNoSelectedVersionList(queryCondition);
     }

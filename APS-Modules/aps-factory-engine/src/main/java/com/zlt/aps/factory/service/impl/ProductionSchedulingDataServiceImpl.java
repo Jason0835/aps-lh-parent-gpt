@@ -114,19 +114,23 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public FactoryProductionVersion getFactoryMonthPlanVersion(Context context) {
-        QueryWrapper<FactoryProductionVersion> queryWrapper = new QueryWrapper();
+    public MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
         queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
-        queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
+        if (!Boolean.TRUE.equals(context.getInsertNewProductionVersion())) {
+            queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
+            return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
+        }
+        queryWrapper.isNull("PRODUCTION_INIT_VERSION");
         return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
     }
 
     @Override
-    public FactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month) {
-        QueryWrapper<FactoryProductionVersion> queryWrapper = new QueryWrapper();
+    public MpFactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("YEAR", year);
         queryWrapper.eq("MONTH", month);
@@ -138,7 +142,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
 
     @Override
-    public int updateFactoryProductionVersion(FactoryProductionVersion updateVersion) {
+    public int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion) {
         if (null == updateVersion || null == updateVersion.getId()) {
             return 0;
         }
@@ -146,7 +150,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public int updateProductionVersionInfo(FactoryProductionVersion updateVersion) {
+    public int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion) {
         if (null == updateVersion || StringUtils.isBlank(updateVersion.getProductionVersion())) {
             return 0;
         }
@@ -154,7 +158,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public int addFactoryProductionVersion(FactoryProductionVersion addVersion) {
+    public int addFactoryProductionVersion(MpFactoryProductionVersion addVersion) {
         if (null == addVersion) {
             return 0;
         }

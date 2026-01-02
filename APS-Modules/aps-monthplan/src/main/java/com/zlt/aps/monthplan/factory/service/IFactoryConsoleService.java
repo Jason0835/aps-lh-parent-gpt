@@ -1,14 +1,11 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -25,6 +22,7 @@ public interface IFactoryConsoleService {
      * @return
      */
     List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition);
+
     /**
      * 根据条件，获取对应分厂的还未选择的销售需求计划版本信息
      *
