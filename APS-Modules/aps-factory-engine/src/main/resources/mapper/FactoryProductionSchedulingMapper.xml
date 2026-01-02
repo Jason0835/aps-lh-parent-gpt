@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.factory.mapper.FactoryProductionSchedulingMapper">
 
-    <update id="updateProductionVersionInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion">
+    <update id="updateProductionVersionInfo" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion">
         UPDATE t_mp_proc_version
            SET IS_NATURAL_MONTH = #{isNaturalMonth,jdbcType=DECIMAL},
                PRODUCTION_START_DATE = #{productionStartDate,jdbcType=DATE},
@@ -96,24 +96,12 @@
     </select>
 
     <delete id="deleteProductionInitVersion">
-        DELETE FROM t_mp_month_plan_pre_capacity
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_proc_month_plan_init
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_proc_no_production_record
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
     <delete id="deleteProductionMouldVersion">
@@ -129,23 +117,28 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_moulding_day_result_detail
+        DELETE FROM t_mp_mould_day_detail_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_moulding_helper
+        DELETE FROM t_mp_mould_lh_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_production_group_helper
+        DELETE FROM t_mp_structure_allocation
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mould_use_status_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
@@ -170,21 +163,6 @@
           FROM t_mdm_molding_machine tmmm
          WHERE IFNULL(tmmm.IS_DELETE, 0) = 0
            AND tmmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-    </select>
-
-    <select id="getFactoryAverageSaleProduct" resultType="com.zlt.aps.factory.domain.vo.ProductAverageSaleVo">
-        SELECT PRODUCT_CODE,
-               AVERAGE_VALUE
-          FROM (SELECT DISTINCT PRODUCT_CODE,
-                       SUM(AVERAGE_VALUE) AS AVERAGE_VALUE
-                  FROM t_mdm_stock_up_plan
-                 WHERE IFNULL(IS_DELETE, 0) = 0
-                   AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                   AND YEAR = #{year,jdbcType=DECIMAL}
-                   AND MONTH = #{month,jdbcType=DECIMAL}
-                 GROUP BY PRODUCT_CODE
-               ) A
-         WHERE A.AVERAGE_VALUE >= #{averageValue,jdbcType=DECIMAL}
     </select>
 
     <select id="getRequireMinConfiguration" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration">

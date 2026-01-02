@@ -4,6 +4,7 @@ import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Set;
 
 /**
  * 硫化排产量辅助对象
@@ -21,7 +22,7 @@ public class LhProductionQtyHelper implements Serializable {
     /**
      * 成型机台
      */
-    private CxMachineBaseInfoVo cxMachineInfo;
+    private Set<String> cxMachineInfo;
     /**
      * 成型机台的硫化组
      */
@@ -49,7 +50,7 @@ public class LhProductionQtyHelper implements Serializable {
      * @param realSumProductionQty 实际排产总量
      * @param dayMaxProductionQty  日双模最大硫化量
      */
-    public LhProductionQtyHelper(ProductionPlanGroupInfo productionPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxLhProductionHelper cxLhGroup, Long sumProductionQty, Long realSumProductionQty, Long dayMaxProductionQty) {
+    public LhProductionQtyHelper(ProductionPlanGroupInfo productionPlanInfo, Set<String> cxMachineInfo, CxLhProductionHelper cxLhGroup, Long sumProductionQty, Long realSumProductionQty, Long dayMaxProductionQty) {
         this.productionPlanInfo = productionPlanInfo;
         this.cxMachineInfo = cxMachineInfo;
         this.cxLhGroup = cxLhGroup;

@@ -1,10 +1,12 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.Set;
 
 /**
  * Sku日排产信息对象
@@ -28,6 +30,14 @@ public class SkuDayProductionInfoHelper implements Serializable {
      */
     private String materialCode;
     /**
+     * 生胎代码
+     */
+    private String embryoCode;
+    /**
+     * 使用的模具编号
+     */
+    private Set<String> usedMouldSet;
+    /**
      * 分组名
      * TBR 结构名
      * PCR 英寸
@@ -46,15 +56,48 @@ public class SkuDayProductionInfoHelper implements Serializable {
      * 创建空排产数据对象
      *
      * @param productionDay  排产日
-     * @param productionPlan 排产计划
+     * @param productionPlan 排产计划--无关具体Id
+     * @param productionQty  排产量
+     * @param usedMouldSet   排产的模具集合
      */
-    public static SkuDayProductionInfoHelper buildEmpty(Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan) {
+    public static SkuDayProductionInfoHelper buildEmpty(Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, Integer productionQty, Set<String> usedMouldSet) {
         String materialDesc = productionPlan.getMaterialDesc();
         String materialCode = productionPlan.getMaterialCode();
         String groupName = productionPlan.getStructureName();
         Integer dayVulcanizationQty = productionPlan.getDayVulcanizationQty().intValue();
         SkuDayProductionInfoHelper helper = new SkuDayProductionInfoHelper(productionDay, materialDesc, materialCode, groupName, dayVulcanizationQty);
+        helper.sumProductionQty = productionQty;
+        helper.embryoCode = productionPlan.getEmbryoCode();
+        helper.usedMouldSet = usedMouldSet;
         return helper;
+    }
+
+    /**
+     * 增加排产量
+     *
+     * @param productionQty 需要增加的排产量
+     */
+    public void addProductionDayQty(Integer productionQty) {
+        if (null == sumProductionQty) {
+            sumProductionQty = BigDecimal.ZERO.intValue();
+        }
+        if (null == productionQty) {
+            productionQty = BigDecimal.ZERO.intValue();
+        }
+        sumProductionQty = sumProductionQty + productionQty;
+    }
+
+    /**
+     * 是否匹配同日同Sku
+     *
+     * @param currentProduction
+     * @return
+     */
+    public boolean isMatchSameDayAndSku(SkuDayProductionInfoHelper currentProduction) {
+        if (!productionDay.equals(currentProduction.getProductionDay())) {
+            return false;
+        }
+        return embryoCode.equals(currentProduction.getEmbryoCode());
     }
 
     /**
@@ -73,5 +116,23 @@ public class SkuDayProductionInfoHelper implements Serializable {
         this.groupName = groupName;
         this.sumProductionQty = BigDecimal.ZERO.intValue();
         this.dayVulcanizationQty = dayVulcanizationQty;
+    }
+
+    /**
+     * 最后余量
+     *
+     * @return
+     */
+    public Integer getLastRemainder() {
+        return sumProductionQty % getDayLhMachineQty();
+    }
+
+    /**
+     * 硫化机台日硫化量
+     *
+     * @return
+     */
+    public Integer getDayLhMachineQty() {
+        return dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 }

@@ -1,6 +1,6 @@
 package com.zlt.aps.common.utils;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -27,7 +27,7 @@ public class ProductionPlanTemplateExcelUtils {
      * @param version
      * @return
      */
-    public static List<Integer> getCycleDayList(FactoryProductionVersion version) {
+    public static List<Integer> getCycleDayList(MpFactoryProductionVersion version) {
         Date startDate = version.getProductionStartDate();
         Date endDate = version.getProductionEndDate();
         List<Integer> dayList = new ArrayList<>();

@@ -5,8 +5,8 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
-import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
 import com.zlt.common.utils.PubUtil;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -37,12 +37,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 有模具基础信息的模具数量(模具台账或是新模具到货计划)
      */
     private Integer baseMouldQty;
-
+    /**
+     * 产品状态？
+     */
+    private String productStatus;
     /**
      * 不可生产标志
      */
     private String cantProduce;
-
+    /**
+     * 排产标记 默认可排产
+     */
+    private String productionFlag;
     /**
      * 是否没有配置关系
      */
@@ -63,11 +69,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private Long cxCapacityRequireQty;
     /**
-     * 高优先级还需排产量
+     * 高优先级还需排产量，只有排产高优级量时才扣减
      */
     private Long heightProductionQty;
     /**
-     * 总的还需排产量
+     * 总的还需排产量，每次排产完高优先级需要同步扣减
+     * 排产非高优先级时，也同步扣减
      */
     private Long productionQty;
     /**
@@ -82,6 +89,38 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 是否按总需求量排产 1 是 0 否
      */
     private Integer isProductionBySum;
+    /**
+     * 本轮次是否参与排产 1 是 0 否
+     */
+    private Integer isThisRound;
+
+    /**
+     * 初始的排产数据设置
+     * 标记初始的排产标记
+     * 产能预算的产能需求量
+     * 高优级待排产量
+     * 总需求排量量
+     */
+    public void initProductionDataInfo() {
+        productionFlag = getIsProduction();
+        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
+        cxCapacityRequireQty = getHeightLossQty() + getFactProdReqQty();
+        heightProductionQty = getHeightLossQty();
+        productionQty = cxCapacityRequireQty;
+    }
+
+    /**
+     * 重置排产数据设置
+     * 标记初始的排产标记
+     * 产能预算的产能需求量
+     * 高优级待排产量
+     * 总需求排量量
+     * 初始的库销比
+     */
+    public void resetProductionDataInfo() {
+        initProductionDataInfo();
+        calculateInventorySalesRatio(BigDecimal.ZERO.longValue());
+    }
 
     /**
      * 获取计划可排产量 = 排产净需求 + 常规储备 + 可能排产(暂缓)
@@ -171,7 +210,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param require           需求计划信息
      * @return
      */
-    public static MonthPlanProductionRequirePlanVo buildInitProductionPlan(Context context, String productionVersion, SaleMonthPlanRequire require) {
+    public static MonthPlanProductionRequirePlanVo buildInitProductionPlan(Context context, String productionVersion, DpDemandPlan require) {
         MonthPlanProductionRequirePlanVo plan = new MonthPlanProductionRequirePlanVo();
         BeanUtils.copyProperties(require, plan);
         plan.setId(null);
@@ -180,8 +219,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //默认可生产
         plan.setCantProduce(YesOrNoEnum.NO.getCode());
         //排产为空，则默认可排产
-        if (StringUtils.isBlank("")) {
+        if (StringUtils.isBlank(require.getIsProduction())) {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());
+        } else {
+            plan.setIsProduction(require.getIsProduction());
         }
         return plan;
     }
@@ -275,6 +316,19 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 如果不排产，则不排
+     * 否则判断本轮次排产标记
+     *
+     * @return
+     */
+    public boolean hasProductionThisRound() {
+        if (hasProduction()) {
+            return YesOrNoEnum.YES.getValue().equals(isThisRound);
+        }
+        return YesOrNoEnum.YES.getValue().equals(isThisRound);
+    }
+
+    /**
      * 是否还需排产
      * 排产标记 = 1 且还有可排产量
      * true表示还需排产 false表示无需排产
@@ -283,7 +337,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public boolean hasProduction() {
         //标记不排产
-        if (YesOrNoEnum.NO.getCode().equals(getIsProduction())) {
+        if (YesOrNoEnum.NO.getCode().equals(getProductionFlag())) {
             return false;
         }
         //总的还需排产量为零
@@ -368,6 +422,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     /**
      * 检测基本的排产条件
      * 并标记不排产原因及不排产标记
+     * 初始化阶段使用
      */
     public void checkProductionConditionByBase() {
         //检测是否符合不排产，且不用往下继续检测的业务场景
@@ -393,6 +448,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 3、计划没有排产需求
      * 4、工厂不排产
      * 5、停产
+     * 初始化阶段使用
      *
      * @return
      */

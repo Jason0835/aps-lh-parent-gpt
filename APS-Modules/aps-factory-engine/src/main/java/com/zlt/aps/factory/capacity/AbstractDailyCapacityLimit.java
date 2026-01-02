@@ -39,7 +39,7 @@ public abstract class AbstractDailyCapacityLimit {
             // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
             setMaxLhMachinesWithEmbryoTypes(mpStructAllocList,i,dailyCapacityLimitVo);
             // 2、计算每日硫化机台数、每日胎胚种类数
-            calcLhMachinesWithEmbryoTypes(mpProdFinalList,i,dailyCapacityLimitVo);
+            calcLhMachinesWithEmbryoTypes(mpProdFinalList,i,dailyCapacityLimitVo,null);
         }
         return dailyCapacityLimitVoMap;
     }
@@ -77,12 +77,20 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mpProdFinalList 月计划定稿
      * @param iDay 第X天
      * @param dailyCapacityLimitVo 日产能限制Vo
+     * @param mainPattern 主花纹
      */
     public void calcLhMachinesWithEmbryoTypes(List<? extends BaseEntity> mpProdFinalList, int iDay,
-                                               MpDailyCapacityLimitVo dailyCapacityLimitVo) {
+                                               MpDailyCapacityLimitVo dailyCapacityLimitVo,String mainPattern) {
+        // 按日期向下，统计日硫化机台数
         int intPart = 0;
         int remainderCount = 0;
         int changeMouldCount = 0;
+
+        // 按日期+主花纹向下，统计日硫化机台数
+        int patternIntPart = 0;
+        int patternRemainderCount = 0;
+        int patternChangeMouldCount = 0;
+
         int dayPlanQty,dailyLhQty;
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         // 次日字段
@@ -102,14 +110,31 @@ public abstract class AbstractDailyCapacityLimit {
                 // 若次日计划量 比 当日计划量 大，说明在增模
                 // 日计划量 / 日单台硫化量 向上取整
                 intPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+
+                // 计算主花纹向下的硫化机台数
+                if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
+                    patternIntPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+                }
+
             }else {
                 // 取整(日计划量/日单台硫化量)
                 intPart += dayPlanQty / dailyLhQty;
                 // 统计有余数的SKU个数
                 remainderCount += dayPlanQty % dailyLhQty > 0 ? 1:0;
+
+                // 计算主花纹向下的硫化机台数
+                if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
+                    patternIntPart += dayPlanQty / dailyLhQty;
+                    patternRemainderCount += dayPlanQty % dailyLhQty > 0 ? 1:0;
+                }
+
             }
             // 统计换模的SKU个数
             changeMouldCount += dayPlanQty > 0 && dayPlanQty < dailyLhQty ? 1:0;
+            // 计算主花纹向下的硫化机台数
+            if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
+                patternChangeMouldCount += dayPlanQty > 0 && dayPlanQty < dailyLhQty ? 1:0;
+            }
 
             // 统计胎胚种类数
             embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
@@ -117,10 +142,50 @@ public abstract class AbstractDailyCapacityLimit {
         }
         int iCount = Math.max(remainderCount,changeMouldCount);
 
-        // 日硫化机台数
+        // 已用硫化机台数
         dailyCapacityLimitVo.setUsedLhMachines(intPart + iCount);
-        // 每日胎胚种类数
+        // 已用胎胚种类数
         dailyCapacityLimitVo.setUsedEmbryoTypes(dailyCapacityLimitVo.getEmbryoCodes().size());
+
+        // 计算主花纹向下的硫化机台数
+        int iPatternCount = Math.max(patternRemainderCount,patternChangeMouldCount);
+        dailyCapacityLimitVo.setPatternUsedLhMachines(patternIntPart + iPatternCount);
+    }
+
+    /**
+     * 获取新的上机日期
+     * @param startDay 开始日
+     * @param endDay 结束日
+     * @param dailyCapacityLimitVoMap 日产能Map
+     * @return 新的上机日期
+     */
+    public Integer getNewOnLineDay(int startDay,int endDay, Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap){
+        if (PubUtil.isEmpty(dailyCapacityLimitVoMap)){
+            return null;
+        }
+        if (startDay >= endDay){
+            return null;
+        }
+
+        MpDailyCapacityLimitVo dailyCapacityLimitVo;
+        for (int i = startDay; i< endDay; i++){
+            dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
+            if (dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
+                    dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines()){
+                return i;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检查产能是否满足
+     * @param dailyCapacityLimitVo 日产能限制
+     * @return true-满足，false-不满足
+     */
+    public boolean checkCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
+                dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
     }
 
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo){
@@ -133,5 +198,13 @@ public abstract class AbstractDailyCapacityLimit {
      */
     public  String getEmbryoCodeField(){
         return "embryoCode";
+    }
+
+    /**
+     * 获取主花纹字段
+     * @return
+     */
+    public  String getMainPatternField(){
+        return "mainPattern";
     }
 }

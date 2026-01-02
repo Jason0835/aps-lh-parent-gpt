@@ -25,7 +25,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     public MonthPlanProductionSchedulingService(@Qualifier("tbrProductionInitService") IProductionBusinessService generalInitService,
                                                 @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService
-                                                ) {
+    ) {
         this.generalInitService = generalInitService;
         this.wholeCourseProductionService = wholeCourseProductionService;
     }
@@ -52,7 +52,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
     public void general(Context context) {
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
-        if (ProductTypeEnum.SEMI_STEEL == productType) {
+        if (ProductTypeEnum.WHOLE_STEEL == productType) {
             wholeCourseProductionService.run(context, new Object());
             return;
         }

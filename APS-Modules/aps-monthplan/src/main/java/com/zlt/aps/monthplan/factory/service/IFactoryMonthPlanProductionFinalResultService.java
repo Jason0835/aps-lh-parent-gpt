@@ -3,8 +3,8 @@ package com.zlt.aps.monthplan.factory.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 
 import java.util.List;
 import java.util.Map;
@@ -25,28 +25,35 @@ import java.util.Map;
  */
 public interface IFactoryMonthPlanProductionFinalResultService extends IService<FactoryMonthPlanProductionFinalResult> {
 
-  /**
-   * 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
-   * @return 定稿的月度排产计划
-   */
-  List<FactoryMonthPlanProductionFinalResult> findLastTwelveMonthProdFinalPlan();
-  /**
-   *  根据物料编号,通过月度生产计划表，获取近12个月有排产的月份个数
-   * @param materialCode 物料编号
-   * @return 近12个月有排产的月份个数
-   */
-  int getProductionMonthInLastTwelveMonth(String materialCode);
-  /**
-   *   库存抓取日~（同月）月底的月度计划量汇总
-   * @param requireVersion 需求版本号
-   * @param finishedProductStocks 成品库存
-   * @return 月度计划量汇总
-   */
-  Map<String,Long> calculateMonthSurplus(String requireVersion,List<MdmProductStock> finishedProductStocks);
-  /**
-   *  获取最终排产结果
-   * @param finalVersion
-   * @return
-   */
-  List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(FactoryProductionVersion finalVersion);
+    /**
+     * 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
+     *
+     * @return 定稿的月度排产计划
+     */
+    List<FactoryMonthPlanProductionFinalResult> findLastTwelveMonthProdFinalPlan();
+
+    /**
+     * 根据物料编号,通过月度生产计划表，获取近12个月有排产的月份个数
+     *
+     * @param materialCode 物料编号
+     * @return 近12个月有排产的月份个数
+     */
+    int getProductionMonthInLastTwelveMonth(String materialCode);
+
+    /**
+     * 库存抓取日~（同月）月底的月度计划量汇总
+     *
+     * @param requireVersion        需求版本号
+     * @param finishedProductStocks 成品库存
+     * @return 月度计划量汇总
+     */
+    Map<String, Long> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks);
+
+    /**
+     * 获取最终排产结果
+     *
+     * @param finalVersion
+     * @return
+     */
+    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
 }

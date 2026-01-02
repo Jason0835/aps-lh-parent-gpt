@@ -17,6 +17,12 @@ import java.io.Serializable;
 public class FactoryProductionPlanVo implements Serializable {
 
     /**
+     * 工厂编码
+     */
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
+    private String factoryCode;
+
+    /**
      * 年份
      */
     @ApiModelProperty(value = "年份", name = "year")
@@ -27,12 +33,6 @@ public class FactoryProductionPlanVo implements Serializable {
      */
     @ApiModelProperty(value = "月份", name = "month")
     private Integer month;
-
-    /**
-     * 分厂编码
-     */
-    @ApiModelProperty(value = "分厂编码", name = "factoryCode")
-    private String factoryCode;
 
     /**
      * 胎别

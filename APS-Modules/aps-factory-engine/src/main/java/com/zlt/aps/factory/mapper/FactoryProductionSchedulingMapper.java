@@ -2,7 +2,7 @@ package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -24,7 +24,7 @@ public interface FactoryProductionSchedulingMapper {
      * @param updateVersion
      * @return
      */
-    int updateProductionVersionInfo(FactoryProductionVersion updateVersion);
+    int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion);
 
     /**
      * 获取所有施工信息，
@@ -129,20 +129,6 @@ public interface FactoryProductionSchedulingMapper {
      * @return
      */
     Integer getFormingMachineCount(@Param("factoryCode") String factoryCode);
-
-    /**
-     * 获取分厂在年月上月均销量大于等于averageValue的物料集合
-     *
-     * @param factoryCode  分厂编码
-     * @param year         年份
-     * @param month        月份
-     * @param averageValue 月均销量
-     * @return
-     */
-    List<ProductAverageSaleVo> getFactoryAverageSaleProduct(@Param("factoryCode") String factoryCode,
-                                                            @Param("year") Integer year,
-                                                            @Param("month") Integer month,
-                                                            @Param("averageValue") Integer averageValue);
 
     /**
      * 根据需求，获取其最小批量配置

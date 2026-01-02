@@ -25,14 +25,14 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.Date;
 
 /**
- * 分厂月生产计划控制台业务服务类
+ * 工厂月生产计划控制台业务服务类
  *
  * @author ZLT
  * @date 20251201
  */
 @Controller
 @RequestMapping("/factory/console")
-@Api(tags = "分厂月生产计划控制台业务-服务类")
+@Api(tags = "工厂月生产计划控制台业务-服务类")
 @RequiredArgsConstructor
 public class FactoryConsoleUIController extends BaseController {
 
@@ -41,7 +41,7 @@ public class FactoryConsoleUIController extends BaseController {
     private final IFactoryMonthPlanProdFinalRemoteService iFactoryMonthPlanProdFinalRemoteService;
 
     /**
-     * 根据条件查询分厂需要排产及已经排产的销售生产需求计划列表
+     * 根据条件查询工厂需要排产及已经排产的销售生产需求计划列表
      */
     @ResponseBody
     @PostMapping("/list")
@@ -51,17 +51,54 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
-     * 查询分厂月份对应还没选择的需求计划版本列表
+     * 查询工厂月份对应还没选择的需求计划版本列表
      */
     @ResponseBody
     @PostMapping("/noSelectedVersionList")
-    @ApiOperation(value = "查询分厂月份对应还没选择的需求计划版本列表", notes = "查询分厂月份对应还没选择的需求计划版本列表")
+    @ApiOperation(value = "查询工厂月份对应还没选择的需求计划版本列表", notes = "查询分厂月份对应还没选择的需求计划版本列表")
     public TableDataInfo getNoSelectedVersionList(FactoryProductionPlanVo queryCondition) {
         return factoryConsoleService.getNoSelectedVersionList(queryCondition);
     }
 
     /**
-     * 按分厂 + 年月+需求计划版本的方式初始化分厂排产信息
+     * 确认对工厂 + 年月 + 需求计划版本进行工厂排产
+     *
+     * @param confirmParam 工厂需排产的需求信息
+     * @return
+     */
+    @ResponseBody
+    @ApiOperation("按分厂 + 年月 + 需求计划版本的方式初始化分厂排产")
+    @PostMapping("/confirmProductionRequireVersion")
+    public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
+        AjaxResult checkParamResult = checkEmptyMonthPlanVersion(confirmParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryConsoleService.confirmProductionRequireVersion(confirmParam);
+    }
+
+    /**
+     * 按工厂 + 年月 + 需求版本的方式进行工厂一键排产
+     * 初始化->排结构->排模具
+     *
+     * @param factoryProductionParam
+     * @return
+     */
+    @ResponseBody
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
+    @PostMapping("/oneClickProductionProcess")
+    public AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        AjaxResult checkParamResult = checkEmptyMonthPlanVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryConsoleService.oneClickProductionProcess(factoryProductionParam);
+    }
+
+    /**
+     * 按工厂 + 年月+需求计划版本的方式初始化分厂排产信息
      *
      * @param factoryProductionParam 分厂排产初始化
      * @return
@@ -69,6 +106,7 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @ApiOperation("按分厂 + 年月 + 需求计划版本的方式初始化分厂排产")
     @PostMapping("/initFactoryProduction")
+    @Deprecated
     AjaxResult initFactoryProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -84,7 +122,7 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
-     * 按分厂 + 排产日期获取分厂的定稿版本信息
+     * 按工厂 + 排产日期获取分厂的定稿版本信息
      *
      * @param queryCondition 查询条件
      * @return
@@ -92,6 +130,7 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @ApiOperation("按分厂 + 排产日期获取分厂的定稿版本信息")
     @PostMapping("/getFinalVersionInfo")
+    @Deprecated
     AjaxResult getFinalVersion(@RequestBody FactoryFinalVersionQueryDto queryCondition) {
         if (null == queryCondition) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -128,37 +167,15 @@ public class FactoryConsoleUIController extends BaseController {
         return factoryConsoleService.factoryMouldingProduction(factoryProductionParam);
     }
 
-    /**
-     * 按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产
-     *
-     * @param factoryProductionParam
-     * @return
-     */
-    @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产")
-    @PostMapping("/factoryWholeCourseProduction")
-    public AjaxResult factoryWholeCourseProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        if (null == factoryProductionParam) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
-        }
-        String factoryCode = factoryProductionParam.getFactoryCode();
-        Integer year = factoryProductionParam.getYear();
-        Integer month = factoryProductionParam.getMonth();
-        String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
-        }
-        return factoryConsoleService.factoryWholeCourseProduction(factoryProductionParam);
-    }
 
     /**
-     * 按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
+     * 按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本
      *
      * @param factoryProductionParam
      * @return
      */
     @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本")
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本")
     @PostMapping("/deleteMonthPlanRequire")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
@@ -204,8 +221,25 @@ public class FactoryConsoleUIController extends BaseController {
     @RequiresPermissions("monthplan:console:finalized")
     @ResponseBody
     @PostMapping("/finalized")
-    @ApiOperation("定稿 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @ApiOperation("定稿 - 对选定的年月 + 工厂+ 需求计划版本 + 工厂月计划排产版本进行定稿")
     public AjaxResult finalized(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal) {
         return iFactoryMonthPlanProdFinalRemoteService.finalized(factoryMonthPlanProdFinal);
+    }
+
+    /**
+     * 参数校验
+     * 工厂、年份、月份、需求计划版本
+     *
+     * @param checkParam
+     * @return
+     */
+    private AjaxResult checkEmptyMonthPlanVersion(FactoryProductionPlanVo checkParam) {
+        if (null == checkParam) {
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
+        }
+        if (StringUtils.isBlank(checkParam.getFactoryCode()) || null == checkParam.getYear() || null == checkParam.getMonth() || StringUtils.isBlank(checkParam.getMonthPlanVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
+        }
+        return AjaxResult.success();
     }
 }

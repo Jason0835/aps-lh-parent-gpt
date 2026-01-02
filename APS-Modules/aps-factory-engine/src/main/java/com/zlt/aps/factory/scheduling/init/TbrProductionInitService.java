@@ -2,6 +2,7 @@ package com.zlt.aps.factory.scheduling.init;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
@@ -12,7 +13,8 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -58,13 +60,21 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     @Override
     public void run(Context context, Object userObj) {
+        if (null == context.getInsertNewProductionVersion()) {
+            context.setInsertNewProductionVersion(Boolean.FALSE);
+        }
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        //保存或是创建排产版本表记录
+        saveProductionVersionRecord(productionContext);
         //开始初始化日志
         String startInitLog = TbrProductionLogUtils.addStartInitLog(productionContext);
         log.info(startInitLog);
         //获取需求计划
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
+        String planType = requirePlanList.get(BigDecimal.ZERO.intValue()).getPlanType();
+        context.setPlanType(planType);
+        productionContext.setPlanType(planType);
         //获取初始化业务参数设定
         ProductionInitParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
         //SKU-损耗处理
@@ -109,6 +119,32 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
     }
 
     /**
+     * 在版本表中，保存工厂排产记录
+     * 如果排产版本表已经存在，则更新其排产周期和自然月标记
+     *
+     * @param context
+     */
+    private void saveProductionVersionRecord(Context context) {
+        //工厂排产版本更新或是插入记录
+        MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        if (null != factoryProductionVersion) {
+            setProductionVersionCycleInfo(factoryProductionVersion, context);
+            getDataService().updateFactoryProductionVersion(factoryProductionVersion);
+            return;
+        }
+        //不存在，则表示新插入记录
+        factoryProductionVersion = new MpFactoryProductionVersion();
+        factoryProductionVersion.setFactoryCode(context.getFactoryCode());
+        factoryProductionVersion.setYear(context.getYear());
+        factoryProductionVersion.setMonth(context.getMonth());
+        factoryProductionVersion.setMonthPlanVersion(context.getMonthPlanVersion());
+        factoryProductionVersion.setProductTypeCode(context.getProductType().getValue());
+        //设置月份排产模式自然月或非自然月及开始、结束排产日期
+        setProductionVersionCycleInfo(factoryProductionVersion, context);
+        getDataService().addFactoryProductionVersion(factoryProductionVersion);
+    }
+
+    /**
      * 根据工厂编码 + 年月 + 需求计划版本，获取对应的月需要排产的需求计划
      *
      * @param productionContext
@@ -116,7 +152,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private List<MonthPlanProductionRequirePlanVo> getMonthPlanRequirePlan(TbrProductionContext productionContext) {
         //得到制造需求计划
-        List<SaleMonthPlanRequire> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
+        List<DpDemandPlan> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
         if (CollectionUtils.isEmpty(monthPlanRequireList)) {
             String planListIsNull = I18nUtil.getMessage("alg.data.alter.message.planListIsNull");
             throw new BusinessException(String.format(planListIsNull, productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion()));
@@ -337,6 +373,28 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //删除版本已有数据
         getDataService().deletedInitData(productionContext);
         getDataService().deletedMouldProductionData(productionContext);
+    }
+
+    /**
+     * 设置分厂排产周期相关信息
+     * 标记是自然月排产还是非自然月排产
+     * 排产周期的起始日期
+     *
+     * @param factoryProductionVersion 分厂排产信息对象
+     * @param context                  排产上下文
+     */
+    private void setProductionVersionCycleInfo(MpFactoryProductionVersion factoryProductionVersion, Context context) {
+        String productionVersion = context.getProductionVersion();
+        factoryProductionVersion.setProductionInitVersion(productionVersion);
+        factoryProductionVersion.setProductionStVersion(productionVersion);
+        factoryProductionVersion.setProductionVersion(productionVersion);
+        factoryProductionVersion.setProductionStartDate(context.getProductionStartDate());
+        factoryProductionVersion.setProductionEndDate(context.getProductionEndDate());
+        if (context.isNaturalMonth()) {
+            factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.YES.getCode());
+        } else {
+            factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.NO.getCode());
+        }
     }
 
 }

@@ -1,10 +1,12 @@
 package com.zlt.aps.factory.scheduling;
 
-import com.ruoyi.common.core.utils.DateUtils;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.monthplan.api.domain.entity.MouldProductionLog;
+import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 
 import java.time.LocalDate;
@@ -44,6 +46,30 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
     }
 
     /**
+     * 保存日志
+     *
+     * @param context
+     */
+    protected void saveProductionProcessLog(Context context, ProductionProcessStage processStage) {
+        StringBuilder logBuilder = context.getLogBuilder();
+        String logContent = logBuilder.toString();
+        if (StringUtils.isBlank(logContent)) {
+            return;
+        }
+        logContent = String.format("%s流程日志:%s%s", processStage.getDesc(), System.lineSeparator(), logContent);
+        MouldProductionLog log = new MouldProductionLog();
+        log.setFactoryCode(context.getFactoryCode());
+        log.setYear(context.getYear());
+        log.setMonth(context.getMonth());
+        log.setMonthPlanVersion(context.getMonthPlanVersion());
+        log.setProductionVersion(context.getProductionVersion());
+        log.setPlanType(context.getPlanType());
+        log.setWorkNo(context.getOperationWorkNo());
+        log.setLogContent(logContent);
+        dataService.saveMouldProductionLog(log);
+    }
+
+    /**
      * 构建全钢排产上下文
      *
      * @param context
@@ -52,8 +78,8 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
     private TbrProductionContext buildTbrProductionContext(Context context) {
         TbrProductionContext productionContext = new TbrProductionContext();
         BeanUtils.copyProperties(context, productionContext);
-        productionContext.createNewProductionVersion();
-        productionContext.setOperationWorkNo(DateUtils.dateTimeNow());
+        context.setProductionVersion(productionContext.createNewProductionVersion());
+        context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
         productionContext.setLogBuilder(new StringBuilder());
         setProductionCycleInfo(productionContext);
         return productionContext;
@@ -69,8 +95,8 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
     private ProductionContext buildDefaultProductionContext(Context context) {
         ProductionContext productionContext = new ProductionContext();
         BeanUtils.copyProperties(context, productionContext);
-        productionContext.createNewProductionVersion();
-        productionContext.setOperationWorkNo(DateUtils.dateTimeNow());
+        context.setProductionVersion(productionContext.createNewProductionVersion());
+        context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
         productionContext.setLogBuilder(new StringBuilder());
         setProductionCycleInfo(productionContext);
         return productionContext;

@@ -96,6 +96,7 @@ public class CxMouldDayProductionHelper implements Serializable {
      * @param cxLhProductionHelper 硫化组信息
      * @return
      */
+    @Deprecated
     public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, String cxMachineCode, Integer day, Long productionQty, CxLhProductionHelper cxLhProductionHelper) {
         CxMouldDayProductionHelper mouldProductionHelper = new CxMouldDayProductionHelper();
         BeanUtils.copyProperties(groupPlan, mouldProductionHelper);

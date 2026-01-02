@@ -19,8 +19,8 @@ import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanRequireStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanDayProductionInfoVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanProdFinalVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanTypeVo;
@@ -146,7 +146,7 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
         if (null == queryCondition || StringUtils.isBlank(queryCondition.getFactoryCode()) || null == queryCondition.getProductionDate()) {
             return Collections.emptyList();
         }
-        FactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
         if (null == finalVersion) {
             return Collections.emptyList();
         }
@@ -234,10 +234,10 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
     @ApiOperation("导出分厂月生产计划排产最终结果数据-即定稿后的数据，包含调整")
     public byte[] exportData(@RequestBody FactoryMonthPlanProdFinal queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        FactoryProductionVersion version = factoryProductionVersionService.getFinalVersionByYearMonth(queryVO.getFactoryCode(), queryVO.getYear(), queryVO.getMonth());
+        MpFactoryProductionVersion version = factoryProductionVersionService.getFinalVersionByYearMonth(queryVO.getFactoryCode(), queryVO.getYear(), queryVO.getMonth());
         ExportLog exportLog = new ExportLog();
         List<FactoryMonthPlanProdFinal> list = getData(queryVO, false);
-        if (null == version || YesOrNoEnum.YES.getValue().equals(version.getIsNaturalMonth())) {
+        if (null == version || YesOrNoEnum.YES.getCode().equals(version.getIsNaturalMonth())) {
             ExcelUtil<FactoryMonthPlanProdFinal> util = new ExcelUtil(FactoryMonthPlanProdFinal.class);
             byte[] resultBytes = ExcelExportUtils.fillExcelAndLog(response, util, list, fileName, queryVO, exportLog, "0");
             this.iExportLogService.add(exportLog);

@@ -54,6 +54,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     private Integer minRatio;
     /**
+     * 最大胎胚种类数
+     */
+    private Integer maxEmbryoCodeCount;
+    /**
      * 实际排产规格计划
      */
     private List<MonthPlanProductionRequirePlanVo> realProductionPlanList;
@@ -63,22 +67,33 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      *
      * @param cxMachineCode      成型机台
      * @param productionPlanInfo 分配的分组计划信息
-     * @param maxRatio           最高硫化配比
+     * @param lhRatio            硫化配比信息
      * @param continueSkuMap     续作规格信息
      * @param allocationDay      分配的天数
      * @param startDay           起始天数
      * @param endDay             结束天数
      */
-    public CxMachineAllocationPlanHelper(String cxMachineCode, ProductionPlanGroupInfo productionPlanInfo, Integer maxRatio, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
+    public CxMachineAllocationPlanHelper(String cxMachineCode, ProductionPlanGroupInfo productionPlanInfo, ProductGroupCxCapacityInfo lhRatio, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer endDay) {
         this.cxMachineCode = cxMachineCode;
         this.productionPlanInfo = productionPlanInfo;
-        this.maxRatio = maxRatio;
+        this.maxRatio = lhRatio.getMaxLhMachineCount();
         this.minRatio = productionPlanInfo.getClosureMinLhRatio();
+        this.maxEmbryoCodeCount = lhRatio.getMaxEmbryoCodeCount();
         this.continueSkuMap = continueSkuMap;
         this.allocationDay = allocationDay;
         this.startDay = startDay;
         this.endDay = endDay;
         this.realProductionPlanList = new ArrayList<>();
+    }
+
+    /**
+     * 机台分配的天产能范围只能有一个结构
+     *
+     * @return
+     */
+    public String getDuplicateKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, cxMachineCode, startDay, endDay);
     }
 
     /**

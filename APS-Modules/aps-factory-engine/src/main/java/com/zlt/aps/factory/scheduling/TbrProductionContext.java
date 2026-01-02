@@ -29,9 +29,13 @@ public class TbrProductionContext extends Context {
      */
     private BaseDataContainer baseDataContainer;
     /**
-     * 排产计划信息
+     * 排产计划信息-按Sku分组
      */
     Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuProductionPlan;
+    /**
+     * 所有排产计划，以计划Id为key
+     */
+    Map<Long, MonthPlanProductionRequirePlanVo> allProductionPlan;
     /**
      * sku的已排产量统计
      */

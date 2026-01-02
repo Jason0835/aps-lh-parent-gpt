@@ -51,9 +51,13 @@ public class Context {
     private String productionVersion;
 
     /**
-     * 是否生成
+     * 计划类型
      */
-    private Boolean general = false;
+    private String planType;
+    /**
+     * 是否插入新的排产版本标记
+     */
+    private Boolean insertNewProductionVersion;
 
     /**
      * 版本前缀
@@ -139,6 +143,23 @@ public class Context {
     }
 
     /**
+     * 获取前一天
+     *
+     * @param currentDay
+     * @return
+     */
+    public Integer getPreviousDay(Integer currentDay) {
+        if (ProductionConstant.MONTH_START_DAY.equals(currentDay)) {
+            return null;
+        }
+        Integer previousDay = currentDay - BigDecimal.ONE.intValue();
+        if (stopDays.contains(previousDay)) {
+            return getPreviousDay(previousDay);
+        }
+        return previousDay;
+    }
+
+    /**
      * 创建新的版本号，如果排产版本号已经有值，则不进行创建
      * 否则创建新的排产版本号：规则 前缀 + yyyyMMddHHMMSS
      *
@@ -154,6 +175,20 @@ public class Context {
         }
         productionVersion = prefix + DateUtils.dateTimeNow();
         return productionVersion;
+    }
+
+    /**
+     * 创建新的操作批次号，如果已经有操作批次号，则不进行创建
+     * 否则创建新的操作批次号：规则 yyyyMMddHHMMSS
+     *
+     * @return
+     */
+    public String createNewOperationWorkNo() {
+        if (StringUtils.isNotBlank(operationWorkNo)) {
+            return operationWorkNo;
+        }
+        operationWorkNo = DateUtils.dateTimeNow();
+        return operationWorkNo;
     }
 
     /**

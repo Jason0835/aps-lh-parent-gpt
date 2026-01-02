@@ -31,10 +31,10 @@ public class MouldProductionLog extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 生产分厂编号
+     * 工厂编码
      */
     @Excel(name = "ui.data.column.mouldProductionLog.factoryCode")
-    @ApiModelProperty(value = "生产分厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -63,10 +63,10 @@ public class MouldProductionLog extends BaseEntity {
     private String monthPlanVersion;
 
     /**
-     * 分厂版本
+     * 排产版本
      */
     @Excel(name = "ui.data.column.mouldProductionLog.productionVersion")
-    @ApiModelProperty(value = "分厂版本", name = "productionVersion")
+    @ApiModelProperty(value = "排产版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
@@ -86,13 +86,6 @@ public class MouldProductionLog extends BaseEntity {
     @TableField(value = "WORK_NO")
     private String workNo;
 
-    /**
-     * 日志类型 1 初始化 2 排产顺序分组 3 单计划排产 4 单计划交期排产 5 单计划通用排产 6 同模具交期分组排产 7 同规格分组排产 8 同模具无交期分组排产
-     */
-    @Excel(name = "ui.data.column.mouldProductionLog.logType")
-    @ApiModelProperty(value = "日志类型 1 初始化 2 排产顺序分组 3 单计划排产 4 单计划交期排产 5 单计划通用排产 6 同模具交期分组排产 7 同规格分组排产 8 同模具无交期分组排产", name = "logType")
-    @TableField(value = "LOG_TYPE")
-    private Integer logType;
 
     /**
      * 日志内容

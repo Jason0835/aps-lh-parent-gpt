@@ -145,7 +145,15 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     protected List<MdmAreaCapaAllocation> listExportData(MdmAreaCapaAllocation obj) {
         QueryWrapper<MdmAreaCapaAllocation> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MdmAreaCapaAllocation> list = entityMapper.selectList(wrapper);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(list, MdmAreaCapaAllocation.class);
+        return list;
     }
 
     @Override
