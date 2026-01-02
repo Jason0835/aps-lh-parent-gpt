@@ -1,12 +1,18 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.google.common.collect.Sets;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
@@ -16,12 +22,18 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -48,6 +60,9 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     @Autowired
     private SupplyOrderPoolEntityMapper entityMapper;
 
+    @Autowired
+    private DpAreaEntityMapper dpAreaEntityMapper;
+
     /**
      * 查询供应链订单池列表
      */
@@ -55,7 +70,32 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody SupplyOrderPool queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableResult = super.list(queryVO);
+        if(CollectionUtils.isEmpty(tableResult.getRows())) {
+            return tableResult;
+        }
+        this.translationList((List<SupplyOrderPool>)tableResult.getRows());
+        return tableResult;
+    }
+
+    private void translationList(List<SupplyOrderPool> rows) {
+        // 加载区域
+        LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
+        areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+        Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
+            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+        for (SupplyOrderPool item: rows) {
+            String area = item.getSaleArea();
+            if(StringUtils.isBlank(area)) {
+                item.setSaleAreaName(StringUtils.EMPTY);
+                continue;
+            }
+            Set<String> areaSet = Sets.newHashSet();
+            Arrays.stream(area.split(StringConstant.COMMA)).forEach(areaCode -> {
+                areaSet.add(areaMap.getOrDefault(areaCode, StringUtils.EMPTY));
+            });
+            item.setSaleAreaName(String.join(StringConstant.COMMA, areaSet));
+        }
     }
 
     @Override

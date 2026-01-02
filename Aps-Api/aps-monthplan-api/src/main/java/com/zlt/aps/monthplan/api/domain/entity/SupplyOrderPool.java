@@ -173,6 +173,11 @@ public class SupplyOrderPool extends BaseEntity {
     @TableField(exist = false)
     private String structureName;
 
+    /** 区域 */
+    @ApiModelProperty(value = "区域", name = "area")
+    @TableField(exist = false)
+    private String saleAreaName;
+
     /**
      * 以分厂+物料为维度，转换销售订单
      */
