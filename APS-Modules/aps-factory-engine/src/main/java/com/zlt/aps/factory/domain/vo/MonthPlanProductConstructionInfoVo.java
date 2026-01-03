@@ -63,6 +63,12 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
     private Integer curingTime2;
 
     /**
+     * 模具型腔
+     */
+    @ApiModelProperty(value = "模具型腔", name = "mouldCavity")
+    private String mouldCavity;
+
+    /**
      * 合模压力
      */
     @ApiModelProperty(value = "合模压力", name = "mouldClampingPressure")

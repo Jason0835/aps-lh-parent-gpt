@@ -59,7 +59,7 @@ public class ContinueSkuCalculator {
             if (CollectionUtils.isEmpty(planList)) {
                 return;
             }
-            Long planDemandQty = getContinueSkuSummaryQty(planList);
+            Integer planDemandQty = getContinueSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet());
@@ -131,19 +131,20 @@ public class ContinueSkuCalculator {
      * @param planList 续作Sku计划集合
      * @return
      */
-    public static Long getContinueSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
+    public static Integer getContinueSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
         if (CollectionUtils.isEmpty(planList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         //是否按总需求排产
         Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
         if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
             //总净需求量
-            return planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         }
         //高优先级排产量
-        return planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+        return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
+
     /**
      * 结构计划下的续作Sku分配硫化组信息
      *

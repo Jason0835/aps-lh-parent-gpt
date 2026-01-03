@@ -117,10 +117,10 @@ public class CxContinueSkuProductionHandler {
         List<ProductionMouldInfoVo> selectedMouldList = selectedEnableMouldByNumber(context, mouldNumber, mouldList, startDay, endDay);
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = productionPlanList.stream().filter(groupPlan -> materialDesc.equals(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         //日硫化量
-        Long dayMaxProductionQty = continueSkuPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = continueSkuPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //得到续作sku可排产量
-        Long sumProductionQty = getContinueSkuTheoryProductionQty(context, paramHelper, productionPlanList, selectedMouldList, continueSkuInfo);
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer sumProductionQty = getContinueSkuTheoryProductionQty(context, paramHelper, productionPlanList, selectedMouldList, continueSkuInfo);
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         for (int lhCount = BigDecimal.ONE.intValue(); lhCount <= lhMachineCount; lhCount++) {
             //设置硫化组排产信息并得到对应模具--续作Sku
             CxLhProductionHelper cxLhProductionHelper = cxLhRatioMap.get(cxLhGroupNo);
@@ -128,7 +128,7 @@ public class CxContinueSkuProductionHandler {
             //硫化组编号+1
             cxLhGroupNo = cxLhGroupNo + BigDecimal.ONE.intValue();
             //没有需求量或是没有模具
-            if (sumProductionQty <= BigDecimal.ZERO.longValue() || CollectionUtils.isEmpty(selectedDouble)) {
+            if (sumProductionQty <= BigDecimal.ZERO.intValue() || CollectionUtils.isEmpty(selectedDouble)) {
                 continue;
             }
             //逐日进行排产 todo 成型机台信息
@@ -188,11 +188,11 @@ public class CxContinueSkuProductionHandler {
         }
         ProductionSkuParamHelper paramHelper = new ProductionSkuParamHelper(startDay, endDay, cxMachineCode, earliestConclusionLhGroup.getLhGroupNo(), selectedMaterialDesc);
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = sameSpecificationsAndPatternList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        Long sumProductionQty = getSelectedSkuNeedProductionQty(context, paramHelper, selectedMouldList, selectedProductionPlanList, productionPlanList, continueProductInfoHelper);
+        Integer sumProductionQty = getSelectedSkuNeedProductionQty(context, paramHelper, selectedMouldList, selectedProductionPlanList, productionPlanList, continueProductInfoHelper);
         //日硫化量
-        Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         //todo 成型机台信息
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), null, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
@@ -249,11 +249,11 @@ public class CxContinueSkuProductionHandler {
         }
         ProductionSkuParamHelper paramHelper = new ProductionSkuParamHelper(startDay, endDay, cxMachineCode, earliestConclusionLhGroup.getLhGroupNo(), selectedMaterialDesc);
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = sameEmbryoCodeAndMouldList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        Long sumProductionQty = getSelectedSkuNeedProductionQty(context, paramHelper, selectedMouldList, selectedProductionPlanList, productionPlanList, continueProductInfoHelper);
+        Integer sumProductionQty = getSelectedSkuNeedProductionQty(context, paramHelper, selectedMouldList, selectedProductionPlanList, productionPlanList, continueProductInfoHelper);
         //日硫化量
-        Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         //todo 成型机台信息
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), null, earliestConclusionLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
@@ -305,26 +305,26 @@ public class CxContinueSkuProductionHandler {
      * @param continueSkuInfo    续作Sku信息-规格、花纹、生胎等信息
      * @return
      */
-    private static Long getContinueSkuTheoryProductionQty(Context context, ProductionSkuParamHelper paramHelper, List<MonthPlanProductionRequirePlanVo> productionPlanList, List<ProductionMouldInfoVo> selectedMouldList, CxContinueSkuInfoHelper continueSkuInfo) {
+    private static Integer getContinueSkuTheoryProductionQty(Context context, ProductionSkuParamHelper paramHelper, List<MonthPlanProductionRequirePlanVo> productionPlanList, List<ProductionMouldInfoVo> selectedMouldList, CxContinueSkuInfoHelper continueSkuInfo) {
         Integer startDay = paramHelper.getStartDay();
         Integer endDay = paramHelper.getEndDay();
         String materialDesc = paramHelper.getMaterialDesc();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = productionPlanList.stream().filter(groupPlan -> materialDesc.equals(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         //共用模具sku信息
         Set<String> shareMaterialDesc = new HashSet<>();
         selectedMouldList.forEach(productionMouldInfo -> shareMaterialDesc.addAll(productionMouldInfo.getAssociationMaterialSet()));
         //续作SKU高优先级待排产量
-        Long heightProductionQty = continueSkuPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+        Integer heightProductionQty = continueSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
         //续作SKU所有待排产量
-        Long sumProductionQty = continueSkuPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+        Integer sumProductionQty = continueSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         //日硫化量
-        Long dayMaxProductionQty = continueSkuPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = continueSkuPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //其它共用模具的高优先级待排产量
-        Long otherShareMouldHeightQty = getShareMouldOtherHeightQty(materialDesc, continueSkuInfo, shareMaterialDesc, productionPlanList);
-        Long maxCapacity = getMaxCapacityQty(context, selectedMouldList, dayMaxProductionQty, startDay, endDay);
+        Integer otherShareMouldHeightQty = getShareMouldOtherHeightQty(materialDesc, continueSkuInfo, shareMaterialDesc, productionPlanList);
+        Integer maxCapacity = getMaxCapacityQty(context, selectedMouldList, dayMaxProductionQty, startDay, endDay);
         //得到续作sku可排产量
         sumProductionQty = getContinueSkuSumProductionQty(sumProductionQty, heightProductionQty, maxCapacity, otherShareMouldHeightQty);
         return sumProductionQty;
@@ -464,23 +464,23 @@ public class CxContinueSkuProductionHandler {
      * @param productionPlanList         分组下所有计划(包含同规格同花纹、共生胎同模具的计划)
      * @return
      */
-    private static Long getSelectedSkuNeedProductionQty(Context context, ProductionSkuParamHelper paramHelper, List<ProductionMouldInfoVo> selectedMouldList, List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxContinueSkuInfoHelper continueProductInfoHelper) {
+    private static Integer getSelectedSkuNeedProductionQty(Context context, ProductionSkuParamHelper paramHelper, List<ProductionMouldInfoVo> selectedMouldList, List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxContinueSkuInfoHelper continueProductInfoHelper) {
         Integer startDay = paramHelper.getStartDay();
         Integer endDay = paramHelper.getEndDay();
         String materialDesc = paramHelper.getMaterialDesc();
         //日硫化量
-        Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         //模具最大产能
-        Long maxCapacity = getMaxCapacityQty(context, selectedMouldList, dayMaxProductionQty, startDay, endDay);
+        Integer maxCapacity = getMaxCapacityQty(context, selectedMouldList, dayMaxProductionQty, startDay, endDay);
         //高优先级排产量
-        Long sumHeightProductionQty = selectedProductionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+        Integer sumHeightProductionQty = selectedProductionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
         //总的需排产量
-        Long sumNeedProductionQty = selectedProductionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+        Integer sumNeedProductionQty = selectedProductionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         //共用模具sku信息
         Set<String> shareMaterialDesc = new HashSet<>();
         selectedMouldList.forEach(productionMouldInfo -> shareMaterialDesc.addAll(productionMouldInfo.getAssociationMaterialSet()));
         //其它共用模具的高优先级待排产量
-        Long otherShareMouldHeightQty = getShareMouldOtherHeightQty(materialDesc, continueProductInfoHelper, shareMaterialDesc, productionPlanList);
+        Integer otherShareMouldHeightQty = getShareMouldOtherHeightQty(materialDesc, continueProductInfoHelper, shareMaterialDesc, productionPlanList);
         return getContinueSkuSumProductionQty(sumNeedProductionQty, sumHeightProductionQty, maxCapacity, otherShareMouldHeightQty);
     }
 
@@ -526,13 +526,13 @@ public class CxContinueSkuProductionHandler {
      * @param productionPlanList  结构下的所有SKU计划
      * @return
      */
-    private static Long getShareMouldOtherHeightQty(String materialDesc, CxContinueSkuInfoHelper continueProductInfo, Set<String> shareMaterialDesc, List<MonthPlanProductionRequirePlanVo> productionPlanList) {
+    private static Integer getShareMouldOtherHeightQty(String materialDesc, CxContinueSkuInfoHelper continueProductInfo, Set<String> shareMaterialDesc, List<MonthPlanProductionRequirePlanVo> productionPlanList) {
         //没有模具关系，续作模具数，结构排产计划则直接返回
         if (CollectionUtils.isEmpty(productionPlanList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         if (CollectionUtils.isEmpty(shareMaterialDesc)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         List<MonthPlanProductionRequirePlanVo> shareMouldPlanList = new ArrayList<>();
         productionPlanList.forEach(productionPlan -> {
@@ -553,10 +553,10 @@ public class CxContinueSkuProductionHandler {
             shareMouldPlanList.add(productionPlan);
         });
         if (CollectionUtils.isEmpty(shareMouldPlanList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         //提取高优先级数量
-        return shareMouldPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+        return shareMouldPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 
     /**
@@ -569,9 +569,9 @@ public class CxContinueSkuProductionHandler {
      * @param endDay              排产结束天数
      * @return
      */
-    private static Long getMaxCapacityQty(Context context, List<ProductionMouldInfoVo> selectedMouldList, Long dayMaxProductionQty, Integer startDay, Integer endDay) {
+    private static Integer getMaxCapacityQty(Context context, List<ProductionMouldInfoVo> selectedMouldList, Integer dayMaxProductionQty, Integer startDay, Integer endDay) {
         Integer lhMachineCount = selectedMouldList.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        Long dayMaxCapacity = dayMaxProductionQty * lhMachineCount;
+        Integer dayMaxCapacity = dayMaxProductionQty * lhMachineCount;
         int realDays = BigDecimal.ZERO.intValue();
         Set<Integer> stopDays = context.getStopDays();
         for (int day = startDay; day <= endDay; day++) {
@@ -593,22 +593,22 @@ public class CxContinueSkuProductionHandler {
      * @param otherShareMouldHeightQty       共用模具其它高优先级待排产量
      * @return
      */
-    private static Long getContinueSkuSumProductionQty(Long continueSkuSumProductionQty, Long continueSkuHeightProductionQty, Long maxCapacity, Long otherShareMouldHeightQty) {
+    private static Integer getContinueSkuSumProductionQty(Integer continueSkuSumProductionQty, Integer continueSkuHeightProductionQty, Integer maxCapacity, Integer otherShareMouldHeightQty) {
         //模具最大产能不足以满足续作Sku的高优先级排产量
         if (continueSkuHeightProductionQty >= maxCapacity) {
             return continueSkuHeightProductionQty;
         }
         //获得所有高优先级待排产量
-        Long allHeightProductionQty = continueSkuHeightProductionQty + otherShareMouldHeightQty;
+        Integer allHeightProductionQty = continueSkuHeightProductionQty + otherShareMouldHeightQty;
         if (allHeightProductionQty >= maxCapacity) {
             return continueSkuHeightProductionQty;
         }
         //最大高优先级可排产量
-        Long maxHeightProductionQty = Math.min(allHeightProductionQty, maxCapacity);
+        Integer maxHeightProductionQty = Math.min(allHeightProductionQty, maxCapacity);
         //在高优先级量的基础上，可增加的量
-        Long diffQty = maxCapacity - maxHeightProductionQty;
+        Integer diffQty = maxCapacity - maxHeightProductionQty;
         //理论最大可排产量
-        Long theoryMaxQty = continueSkuHeightProductionQty + diffQty;
+        Integer theoryMaxQty = continueSkuHeightProductionQty + diffQty;
         return Math.min(theoryMaxQty, continueSkuSumProductionQty);
     }
 
@@ -622,7 +622,7 @@ public class CxContinueSkuProductionHandler {
      */
     private static void addContinueSkuInfo(Integer startDay, CxLhProductionHelper cxLhProductionHelper, CxContinueSkuInfoHelper continueSkuInfo, List<ProductionMouldInfoVo> selectedDoubleList) {
         cxLhProductionHelper.setProductionDay(startDay);
-        cxLhProductionHelper.setProductionQty(BigDecimal.ZERO.longValue());
+        cxLhProductionHelper.setProductionQty(BigDecimal.ZERO.intValue());
         cxLhProductionHelper.setMaterialCode(continueSkuInfo.getMaterialCode());
         cxLhProductionHelper.setMaterialDesc(continueSkuInfo.getMaterialDesc());
         if (CollectionUtils.isEmpty(selectedDoubleList)) {

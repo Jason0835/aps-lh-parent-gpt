@@ -46,7 +46,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 分配产能的总需求量
      */
-    private Long sumPlanQty;
+    private Integer sumPlanQty;
     /**
      * 最小硫化机台数(结构与硫化配比，取最小)
      */
@@ -54,7 +54,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 结构的SKU中最小的日硫化产能
      */
-    private Long minLhDayCapacityQty;
+    private Integer minLhDayCapacityQty;
     /**
      * 分组的计划信息
      */
@@ -303,7 +303,7 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         //剩余需求量
-        Long remainingProductionQty = getRemainingProductionQty();
+        Integer remainingProductionQty = getRemainingProductionQty();
         if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
@@ -338,16 +338,15 @@ public class ProductionPlanGroupInfo {
      *
      * @return
      */
-    public Long getRemainingProductionQty() {
-        List<MonthPlanProductionRequirePlanVo> groupPlanData = getGroupPlanData();
+    public Integer getRemainingProductionQty() {
         if (CollectionUtils.isEmpty(groupPlanData)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
-        return hasProductionList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+        return hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
     }
 
     /**
@@ -853,19 +852,19 @@ public class ProductionPlanGroupInfo {
         groupInfoMap.forEach((structureName, groupInfo) -> {
             List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
             if (CollectionUtils.isEmpty(groupPlanData)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
+                groupInfo.setSumPlanQty(BigDecimal.ZERO.intValue());
                 return;
             }
             //剔除不排产的计划
             List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag())).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(productionPlanList)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.longValue());
+                groupInfo.setSumPlanQty(BigDecimal.ZERO.intValue());
                 return;
             }
             //最小日硫化量
-            Long minDayLhCapacity = productionPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().getAsLong();
+            Integer minDayLhCapacity = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().getAsInt();
             groupInfo.setMinLhDayCapacityQty(minDayLhCapacity);
-            List<Long> mainPatternEffectiveQty = new ArrayList<>();
+            List<Integer> mainPatternEffectiveQty = new ArrayList<>();
             //按主花纹分组需求
             Map<String, List<MonthPlanProductionRequirePlanVo>> mainPatternGroup = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMainPattern));
             mainPatternGroup.forEach((mainPattern, groupPlanList) -> {
@@ -875,11 +874,11 @@ public class ProductionPlanGroupInfo {
                     maxMouldNumber = BigDecimal.ZERO.intValue();
                 }
                 Integer lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                Long sumPlanQty = groupPlanList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
-                Long maxMouldCapacity = lhMachineCount * minDayLhCapacity * ProductionConstant.DOUBLE_MOULD_PRODUCTION * context.getMaxProductionDays();
+                Integer sumPlanQty = groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
+                Integer maxMouldCapacity = lhMachineCount * minDayLhCapacity * ProductionConstant.DOUBLE_MOULD_PRODUCTION * context.getMaxProductionDays();
                 mainPatternEffectiveQty.add(Math.min(sumPlanQty, maxMouldCapacity));
             });
-            Long sumPlanQty = mainPatternEffectiveQty.stream().mapToLong(Long::longValue).sum();
+            Integer sumPlanQty = mainPatternEffectiveQty.stream().mapToInt(Integer::intValue).sum();
             groupInfo.setSumPlanQty(sumPlanQty);
         });
     }

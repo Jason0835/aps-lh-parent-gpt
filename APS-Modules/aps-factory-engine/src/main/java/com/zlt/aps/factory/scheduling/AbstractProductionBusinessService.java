@@ -80,7 +80,9 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        productionContext.setLogBuilder(new StringBuilder());
+        StringBuilder logBuilder = new StringBuilder();
+        context.setLogBuilder(logBuilder);
+        productionContext.setLogBuilder(logBuilder);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -97,7 +99,9 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        productionContext.setLogBuilder(new StringBuilder());
+        StringBuilder logBuilder = new StringBuilder();
+        context.setLogBuilder(logBuilder);
+        productionContext.setLogBuilder(logBuilder);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }

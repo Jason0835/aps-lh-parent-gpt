@@ -42,11 +42,13 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
      */
     @Override
     public void run(Context context, Object userObj) {
-        context.setInsertNewProductionVersion(true);
+        context.setInsertNewProductionVersion(Boolean.TRUE);
         //初始化
         tbrProductionInitService.run(context, userObj);
+        context.setInsertNewProductionVersion(Boolean.FALSE);
         //排结构、排模具
         tbrCxCapacityAllocationService.run(context, userObj);
+        //保存日志
         saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
     }
 

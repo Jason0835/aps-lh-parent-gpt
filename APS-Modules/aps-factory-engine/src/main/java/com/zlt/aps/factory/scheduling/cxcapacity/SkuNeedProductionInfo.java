@@ -39,14 +39,14 @@ public class SkuNeedProductionInfo implements Serializable {
      *
      * @return
      */
-    public Long getSumNeedProductionQty() {
+    public Integer getSumNeedProductionQty() {
         if (CollectionUtils.isEmpty(needProductionList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         if (ProductionQtyModelEnum.NET_QTY == productionQtyModel) {
-            return needProductionList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+            return needProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         }
-        return needProductionList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+        return needProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 
     /**
@@ -54,9 +54,9 @@ public class SkuNeedProductionInfo implements Serializable {
      *
      * @return
      */
-    public Long getDayMaxProductionQty() {
+    public Integer getDayMaxProductionQty() {
         if (CollectionUtils.isEmpty(needProductionList)) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         return needProductionList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }

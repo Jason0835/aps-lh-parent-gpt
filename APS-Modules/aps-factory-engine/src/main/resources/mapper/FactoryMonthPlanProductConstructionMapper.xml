@@ -11,9 +11,9 @@
                mpc.MOULD_METHOD,
                mpc.CURING_TIME,
                mpc.CURING_TIME2,
-               mpc.MOLD_CAVITY,
+               mpc.MOULD_CAVITY,
                mpc.MOULD_CLAMPING_PRESSURE
-          FROM t_mp_product_require_plan prp
+          FROM t_dp_demand_plan prp
           LEFT JOIN t_mdm_sku_construction_ref mpc
             ON mpc.FACTORY_CODE = prp.FACTORY_CODE
            AND mpc.MATERIAL_CODE = prp.MATERIAL_CODE

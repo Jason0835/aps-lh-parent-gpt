@@ -88,12 +88,12 @@ public class ProductionConstant {
     /**
      * 偶数增加的损耗量 2
      */
-    public final static Long ADD_LOSS_QTY_EVEN_NUMBER = 2L;
+    public final static Integer ADD_LOSS_QTY_EVEN_NUMBER = 2;
 
     /**
      * 偶数增加的损耗量 3
      */
-    public final static Long ADD_LOSS_QTY_ODD_NUMBER = 3L;
+    public final static Integer ADD_LOSS_QTY_ODD_NUMBER = 3;
     /**
      * 新模具到货的模壳标准赋值 -99
      */

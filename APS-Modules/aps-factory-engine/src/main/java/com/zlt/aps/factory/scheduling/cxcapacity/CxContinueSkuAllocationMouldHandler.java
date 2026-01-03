@@ -264,7 +264,7 @@ public class CxContinueSkuAllocationMouldHandler {
         embryoGroupMap.forEach((embryoCode, continueSkuList) -> {
             CxContinueEmbryoInfoHelper continueEmbryoInfo = CxContinueEmbryoInfoHelper.buildEmpty(continueSkuList.get(BigDecimal.ZERO.intValue()));
             Integer mouldNumber = continueSkuList.stream().mapToInt(CxContinueSkuInfoHelper::getMouldNumber).sum();
-            Long planDemandQty = continueSkuList.stream().mapToLong(CxContinueSkuInfoHelper::getPlanDemandQty).sum();
+            Integer planDemandQty = continueSkuList.stream().mapToInt(CxContinueSkuInfoHelper::getPlanDemandQty).sum();
             continueEmbryoInfo.setPlanDemandQty(planDemandQty);
             continueEmbryoInfo.setMouldNumber(mouldNumber);
             continueEmbryoInfoList.add(continueEmbryoInfo);

@@ -38,18 +38,18 @@ public class CxContinueEmbryoInfoHelper implements Serializable {
     /**
      * 计划需求量--高优先级或是总排产量？
      */
-    private Long planDemandQty;
+    private Integer planDemandQty;
 
     /**
      * 计划量/与模具数的比值
      *
      * @return
      */
-    public Long getDemandMouldRatioInfo() {
+    public Integer getDemandMouldRatioInfo() {
         if (mouldNumber <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
-        return BigDecimal.valueOf(planDemandQty).divide(BigDecimal.valueOf(mouldNumber), 0, RoundingMode.UP).longValue();
+        return BigDecimal.valueOf(planDemandQty).divide(BigDecimal.valueOf(mouldNumber), 0, RoundingMode.UP).intValue();
     }
 
     /**
@@ -62,7 +62,7 @@ public class CxContinueEmbryoInfoHelper implements Serializable {
     public static CxContinueEmbryoInfoHelper buildEmpty(CxContinueSkuInfoHelper continueSkuInfo) {
         CxContinueEmbryoInfoHelper continueEmbryoInfo = new CxContinueEmbryoInfoHelper();
         BeanUtils.copyProperties(continueSkuInfo, continueEmbryoInfo);
-        continueEmbryoInfo.setPlanDemandQty(BigDecimal.ZERO.longValue());
+        continueEmbryoInfo.setPlanDemandQty(BigDecimal.ZERO.intValue());
         continueEmbryoInfo.setMouldNumber(BigDecimal.ZERO.intValue());
         return continueEmbryoInfo;
     }
