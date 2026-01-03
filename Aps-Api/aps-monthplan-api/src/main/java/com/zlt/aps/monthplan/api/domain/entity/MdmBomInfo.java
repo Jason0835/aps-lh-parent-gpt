@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -36,6 +37,7 @@ public class MdmBomInfo extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 工厂编号 */
+    @Excel(name = "ui.data.column.mdmBomInfo.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -77,7 +79,8 @@ public class MdmBomInfo extends BaseEntity {
     private BigDecimal dosage;
 
     /** 组成用量，单胎需要的数量 */
-    @Excel(name = "ui.data.column.mdmBomInfo.dosageForm")
+    @Excel(name = "ui.data.column.mdmBomInfo.dosageForm", cellType = Excel.ColumnType.NUMERIC)
+    @ImportExcelValidated(digits = true, min = 0, max = 9999)
     @ApiModelProperty(value = "组成用量，单胎需要的数量", name = "dosageForm")
     @TableField(value = "DOSAGE_FORM")
     private Integer dosageForm;
@@ -131,7 +134,7 @@ public class MdmBomInfo extends BaseEntity {
     private String childMaterialVersion;
 
     /** BOM类型 */
-    @Excel(name = "ui.data.column.mdmBomInfo.bomType")
+//    @Excel(name = "ui.data.column.mdmBomInfo.bomType")
     @ApiModelProperty(value = "BOM类型", name = "bomType")
     @TableField(value = "BOM_TYPE")
     private String bomType;
