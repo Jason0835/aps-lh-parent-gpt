@@ -51,15 +51,15 @@ public class MdmStructureLhRatio extends BaseEntity {
     private String structureName;
 
     /** 最大硫化机台数 */
-    @ImportExcelValidated(digits = true, min = 0, max = 99)
-    @Excel(name = "ui.data.column.mdmStructureLhRatio.lhMachineMaxQty")
+    @ImportExcelValidated(required = true, digits = true, min = 1, max = 99)
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.lhMachineMaxQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最大硫化机台数", name = "lhMachineMaxQty")
     @TableField(value = "LH_MACHINE_MAX_QTY")
     private Integer lhMachineMaxQty;
 
     /** 最大胎胚数 */
-    @ImportExcelValidated(digits = true, min = 0, max = 99)
-    @Excel(name = "ui.data.column.mdmStructureLhRatio.maxEmbryoQty")
+    @ImportExcelValidated(required = true, digits = true, min = 1, max = 99)
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.maxEmbryoQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最大胎胚数", name = "maxEmbryoQty")
     @TableField(value = "MAX_EMBRYO_QTY")
     private Integer maxEmbryoQty;
