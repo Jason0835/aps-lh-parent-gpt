@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -208,6 +209,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return this.demandPlanEntityMapper.selectList(wrapper);
     }
 
+    @Override
+    public Set<String> findMonthPlanVersion(DpDemandPlan queryCondition) {
+        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpDemandPlan::getFactoryCode, queryCondition.getFactoryCode());
+        wrapper.eq(DpDemandPlan::getYear, queryCondition.getYear());
+        wrapper.eq(DpDemandPlan::getMonth, queryCondition.getMonth());
+        wrapper.eq(DpDemandPlan::getPlanType, ProductionPlanType.NORMAL.getPlanType());
+        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.orderByDesc(DpDemandPlan::getMonthPlanVersion);
+        List<DpDemandPlan> list =  this.demandPlanEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptySet();
+        }
+        return list.stream().map(DpDemandPlan::getMonthPlanVersion).collect(Collectors.toSet());
+    }
+
     /**
      *  8. 保存订单池快照
      * @param createCondition 需求计划参数
@@ -227,7 +244,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         DataCollection data) {
 
         // 获取最小投产量
-        long minProductionQty = getMinProductionQty(
+        int minProductionQty = getMinProductionQty(
             createCondition.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
 
         // 获取SKU映射
@@ -275,7 +292,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
             CompletableFuture.supplyAsync(this::fetchSupplyOrderPool);
 
-        CompletableFuture<Map<String, Long>> monthlySaleQtyFuture =
+        CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
 
         // 等待所有任务完成
@@ -290,14 +307,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
 
-            Map<String, Long>  monthlySaleQty = monthlySaleQtyFuture.get();
+            Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Long> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion,finishedProductStocks);
+            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion,finishedProductStocks);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
@@ -327,7 +344,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String monthPlanVersion,
         List<SalesOrderPool> allocationOrders,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
-        Map<String, Long> monthSurplusMap) {
+        Map<String, Integer> monthSurplusMap) {
 
         if (CollectionUtils.isEmpty(allocationOrders)) {
             return new OrderAllocationResult(
@@ -459,7 +476,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    private Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+    private Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode() {
         return mpHistorySaleRecordService.calculateMonthSaleQty(6);
     }
 
@@ -480,7 +497,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,long minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Long> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Long> monthlySaleQty) {
+    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -502,12 +519,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     private DpDemandPlan buildMergedDemandPlan(
         List<DpDemandPlan> groupPlans,
-        long minProductionQty,
+        int minProductionQty,
         Map<String, MdmMaterialInfo> skuMap,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
-        Map<String, Long> mdmMonthSurplusMap,
+        Map<String, Integer> mdmMonthSurplusMap,
         Map<String, String> productionTypeMap,
-        Map<String, Long> monthlySaleQty) {
+        Map<String, Integer> monthlySaleQty) {
 
         // 验证分组数据有效性
         if (CollectionUtils.isEmpty(groupPlans)) {
@@ -535,8 +552,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return mergedPlan;
     }
 
-    private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Long> monthlySaleQty) {
-        mergedPlan.setAverageSaleQty(BigDecimal.valueOf(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0L)));
+    private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Integer> monthlySaleQty) {
+        mergedPlan.setAverageSaleQty(monthlySaleQty.getOrDefault(mergedPlan.getMaterialCode(), 0));
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
@@ -582,25 +599,25 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setStockAndSurplusInfo(
         DpDemandPlan demandPlan,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
-        Map<String, Long> mdmMonthSurplusMap) {
+        Map<String, Integer> mdmMonthSurplusMap) {
 
         String factoryMaterialKey = demandPlan.getGroupFactoryAndMaterialKey();
 
         // 计算库存数量（优化getStockQty方法）
-        demandPlan.setStockQty(BigDecimal.valueOf(calculateStockQty(finishedProductStockMap, factoryMaterialKey)));
+        demandPlan.setStockQty(calculateStockQty(finishedProductStockMap, factoryMaterialKey));
         // 结余库存
-        demandPlan.setRemainingQty(BigDecimal.valueOf(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey)));
+        demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
-        demandPlan.setPlannedSurplus(BigDecimal.valueOf(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey)));
+        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
     }
 
-    private Long calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
+    private int calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
         if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
+        return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
     }
 
     /**
@@ -610,22 +627,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setQuantityStatistics(
         DpDemandPlan demandPlan,
         List<DpDemandPlan> groupPlans,
-        long minProductionQty) {
+        int minProductionQty) {
 
         // 使用统计对象收集所有数据，避免多次遍历
         QuantityStatistics statistics = groupPlans.stream()
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
 
         // 设置基本数量
-        demandPlan.setOrderQty(BigDecimal.valueOf(statistics.totalOrderQty));
-        demandPlan.setNetQty(BigDecimal.valueOf(statistics.totalNetQty));
+        demandPlan.setOrderQty(statistics.totalOrderQty);
+        demandPlan.setNetQty(statistics.totalNetQty);
 
         // 设置优先级相关数量
-        demandPlan.setHeightQty(BigDecimal.valueOf(statistics.heightQty));
-        demandPlan.setMidQty(BigDecimal.valueOf(statistics.midQty));
-        demandPlan.setPostponeQty(BigDecimal.valueOf(statistics.postponeQty));
-        demandPlan.setCycleReserveQty(BigDecimal.valueOf(statistics.cycleReserveQty));
-        demandPlan.setConventionReserveQty(BigDecimal.valueOf(statistics.conventionReserveQty));
+        demandPlan.setHeightQty(statistics.heightQty);
+        demandPlan.setMidQty(statistics.midQty);
+        demandPlan.setPostponeQty(statistics.postponeQty);
+        demandPlan.setCycleReserveQty(statistics.cycleReserveQty);
+        demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
 
         // 计算派生数量
         calculateDerivedQuantities(demandPlan, statistics);
@@ -636,17 +653,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
 
 
-    private Long calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
+    private int calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
         if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().mapToLong(MdmProductStock::getStockQty).sum();
+        return finishedProductStocks.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     }
 
-    private Long calculatePlannedSurplus(Map<String, Long> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
+    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
         if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(groupFactoryAndMaterialKey)){
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         return mdmMonthSurplusMap.get(groupFactoryAndMaterialKey);
     }
@@ -658,7 +675,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
-        demandPlan.setOrderQty(BigDecimal.valueOf(supplyOrder.getQty()==null? BigDecimal.ZERO.longValue() : supplyOrder.getQty()));
+        demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.intValue() : supplyOrder.getQty());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
@@ -674,7 +691,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setYearWeek(postponeOrder.getWeekYear());
         demandPlan.setIsDynamicBalance(postponeOrder.getIsDynamicBalance());
         demandPlan.setIsUniformity(postponeOrder.getIsUniformity());
-        demandPlan.setOrderQty(BigDecimal.valueOf(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.longValue() : postponeOrder.getOrdQty().longValue()));
+        demandPlan.setOrderQty(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.intValue() : postponeOrder.getOrdQty().intValue());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
@@ -684,16 +701,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 获取最小投产量
      * @return 最小投产量
      */
-    private long getMinProductionQty(String factoryCode, String productTypeCode) {
+    private int getMinProductionQty(String factoryCode, String productTypeCode) {
         FactoryParam factoryParam = new FactoryParam();
         factoryParam.setFactoryCode(factoryCode);
         factoryParam.setParamCode(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
         factoryParam.setProductTypeCode(productTypeCode);
         FactoryParam param = factoryParamService.getFacParamSingle(factoryParam);
-        long paramValue = BigDecimal.ZERO.longValue();
+        int paramValue = BigDecimal.ZERO.intValue();
         if (param != null) {
-            paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? Long.valueOf(param.getParamValue())
-                : Long.valueOf(param.getDefauleValue());
+            paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? Integer.valueOf(param.getParamValue())
+                : Integer.valueOf(param.getDefauleValue());
         }
         return paramValue;
     }
@@ -710,8 +727,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         private final List<SupplyOrderPool> supplyOrderPools;
         private final List<SalesOrderPool> allocationOrders;
         private final List<SalesOrderPool> postponeOrders;
-        private final Map<String, Long> monthSurplusMap;
-        private final Map<String, Long>  monthlySaleQty;
+        private final Map<String, Integer> monthSurplusMap;
+        private final Map<String, Integer>  monthlySaleQty;
 
         public DataCollection(
             List<SalesOrderPool> salesOrders,
@@ -721,8 +738,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             List<SupplyOrderPool> supplyOrderPools,
             List<SalesOrderPool> allocationOrders,
             List<SalesOrderPool> postponeOrders,
-            Map<String, Long> monthSurplusMap,
-            Map<String, Long>  monthlySaleQty) {
+            Map<String, Integer> monthSurplusMap,
+            Map<String, Integer>  monthlySaleQty) {
             this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
             this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
             this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
@@ -759,25 +776,25 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 使用累加器模式，单次遍历完成所有统计
      */
     private static class QuantityStatistics {
-        long totalOrderQty = 0L;
-        long totalNetQty = 0L;
-        long heightQty = 0L;
-        long midQty = 0L;
-        long postponeQty = 0L;
-        long cycleReserveQty = 0L;
-        long conventionReserveQty = 0L;
+        int totalOrderQty = 0;
+        int totalNetQty = 0;
+        int heightQty = 0;
+        int midQty = 0;
+        int postponeQty = 0;
+        int cycleReserveQty = 0;
+        int conventionReserveQty = 0;
 
         void accumulate(DpDemandPlan plan) {
             if (plan == null) {
                 return;
             }
 
-            totalOrderQty += plan.getOrderQty() == null? 0: plan.getOrderQty().longValue();
-            totalNetQty += plan.getNetQty()== null? 0: plan.getNetQty().longValue();
+            totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
+            totalNetQty += plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             // 根据订单优先级累加对应数量
             String priority = plan.getOrderPriority();
-            long netQty = plan.getNetQty() == null? 0: plan.getNetQty().longValue();
+            int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {
                 heightQty += netQty;
@@ -808,10 +825,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private void calculateDerivedQuantities(DpDemandPlan demandPlan, QuantityStatistics statistics) {
         // (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
-        demandPlan.setPostponeNetQty(BigDecimal.valueOf(statistics.heightQty + statistics.midQty + statistics.postponeQty));
+        demandPlan.setPostponeNetQty(statistics.heightQty + statistics.midQty + statistics.postponeQty);
 
         // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
-        demandPlan.setUnPostponeNetQty(BigDecimal.valueOf(statistics.heightQty + statistics.midQty));
+        demandPlan.setUnPostponeNetQty(statistics.heightQty + statistics.midQty);
     }
 
     /**
@@ -820,7 +837,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setProductionAndPriorityFlags(
         DpDemandPlan demandPlan,
         List<DpDemandPlan> groupPlans,
-        long minProductionQty,
+        int minProductionQty,
         long totalNetQty) {
 
         // 生产标识

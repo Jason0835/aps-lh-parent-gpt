@@ -75,7 +75,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
     }
 
     @Override
-    public Map<String, Long> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks) {
+    public Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks) {
         if (CollectionUtils.isEmpty(finishedProductStocks)) {
             return Collections.emptyMap();
         }
@@ -95,11 +95,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
         }
-        Map<String, Long> monthSurplusMap = Maps.newHashMap();
+        Map<String, Integer> monthSurplusMap = Maps.newHashMap();
         List<MdmMonthSurplus> result = Lists.newArrayList();
         Map<String, List<FactoryMonthPlanProductionFinalResult>> groupByMaterialCode = this.getGroupMonthProdFinalPlanByMaterialCode(factoryMonthPlanProdFinals);
         groupByMaterialCode.forEach((key, value) -> {
-            long planSurplusQty = this.calculateMonthSurplus(value, stockDay);
+            int planSurplusQty = this.calculateMonthSurplus(value, stockDay);
             if (planSurplusQty <= BigDecimal.ZERO.longValue()) {
                 return;
             }
@@ -125,12 +125,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         return monthSurplusMap;
     }
 
-    private long calculateMonthSurplus(List<FactoryMonthPlanProductionFinalResult> productionFinalResults, int stockDay) {
-        long totalMonthSuplus = BigDecimal.ZERO.longValue();
+    private int calculateMonthSurplus(List<FactoryMonthPlanProductionFinalResult> productionFinalResults, int stockDay) {
+        int totalMonthSuplus = BigDecimal.ZERO.intValue();
         //统计汇总值
         Integer[] dayList = FactoryConstant.PRODUCTION_CYCLE;
         String fieldName;
-        long dayValue;
+        int dayValue;
         for (FactoryMonthPlanProductionFinalResult productionFinalResult : productionFinalResults) {
             for (Integer day : dayList) {
                 if (day < stockDay) {
@@ -140,7 +140,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
 
                 Object value = productionFinalResult.getFieldValueByFieldName(fieldName);
                 if (null == value) {
-                    dayValue = BigDecimal.ZERO.longValue();
+                    dayValue = BigDecimal.ZERO.intValue();
                 } else {
                     dayValue = (Integer) value;
                 }

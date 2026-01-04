@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.monthplan.factory.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
