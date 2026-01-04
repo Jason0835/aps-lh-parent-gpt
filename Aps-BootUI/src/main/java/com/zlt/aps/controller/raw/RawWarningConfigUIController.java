@@ -173,7 +173,7 @@ public class RawWarningConfigUIController extends BaseUIController<RawWarningCon
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawWarningConfigService.importData(context,false);
+        AjaxResult ajaxResult = iRawWarningConfigService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

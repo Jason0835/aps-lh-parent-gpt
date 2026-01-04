@@ -173,7 +173,7 @@ public class RawMaterialOutboundRecordUIController extends BaseUIController<RawM
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawMaterialOutboundRecordService.importData(context,true);
+        AjaxResult ajaxResult = iRawMaterialOutboundRecordService.importData(context,updateSupport);
         return ajaxResult;
     }
 

@@ -168,7 +168,7 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawMaterialRequirePlanService.importData(context,false);
+        AjaxResult ajaxResult = iRawMaterialRequirePlanService.importData(context,updateSupport);
         return ajaxResult;
     }
 
