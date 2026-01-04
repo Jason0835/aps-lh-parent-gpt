@@ -74,16 +74,17 @@ public class MdmBomInfo extends BaseEntity {
 
     /** 用量，单胎消耗量 */
     @Excel(name = "ui.data.column.mdmBomInfo.dosage")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "用量，单胎消耗量", name = "dosage")
     @TableField(value = "DOSAGE")
     private BigDecimal dosage;
 
     /** 组成用量，单胎需要的数量 */
-    @Excel(name = "ui.data.column.mdmBomInfo.dosageForm", cellType = Excel.ColumnType.NUMERIC)
-    @ImportExcelValidated(digits = true, min = 0, max = 9999)
+    @Excel(name = "ui.data.column.mdmBomInfo.dosageForm")
+    @ImportExcelValidated(number = true)
     @ApiModelProperty(value = "组成用量，单胎需要的数量", name = "dosageForm")
     @TableField(value = "DOSAGE_FORM")
-    private Integer dosageForm;
+    private BigDecimal dosageForm;
 
     /** 父物料品号 */
     @Excel(name = "ui.data.column.mdmBomInfo.parentMaterialCode")
