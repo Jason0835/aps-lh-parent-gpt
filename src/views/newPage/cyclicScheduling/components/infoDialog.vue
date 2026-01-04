@@ -216,7 +216,7 @@ export default {
           type: "number",
         },
         {
-          prop: "saleArea",
+          prop: "saleAreaName",
           label: this.$t("ui.data.defectiveStock.saleArea"),
           disabled: true,
         },

@@ -26,7 +26,7 @@
           plain
           @click="generPlan"
           v-hasPermi="['monthplan:productionPrediction:createMonthPrediction']"
-          >{{ $t("生成") }}
+          >{{ $t("common.button.generate") }}
         </el-button>
         <el-button
           @click="handleExport"

@@ -198,8 +198,9 @@ export default {
           label: this.$t("ui.data.defectiveStock.qty"),
         },
         {
-          prop: "saleArea",
+          prop: "saleAreaName",
           label: this.$t("ui.data.defectiveStock.saleArea"),
+          width:180
         },
         {
           prop: "threeAverageQty",

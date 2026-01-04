@@ -76,11 +76,11 @@ export default {
         // },
         {
           prop: "structureName",
-          label: this.$t("产品结构"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           width: 120,
         },
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -106,17 +106,17 @@ export default {
 
         {
           prop: "mainMaterialDesc",
-          label: this.$t("主物料"),
+          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
           width: 180,
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width: 300,
         },
         {
           prop: "mainPattern",
-          label: this.$t("花纹"),
+          label: this.$t("ui.data.column.confMinProd.pattern"),
           width: 120,
         },
 
@@ -136,12 +136,12 @@ export default {
         },
         {
           prop: "heightQty",
-          label: this.$t("高优先级"),
+          label: this.$t("ui.data.DemandPlan.heightQty"),
           width: 120,
         },
         {
           prop: "averageQty",
-          label: this.$t("月均销量"),
+          label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
           width: 120,
         },
         {
@@ -173,19 +173,19 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("产品结构"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
         },
         {
-          label: this.$t("主物料"),
+          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
           prop: "mainMaterialDesc",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("花纹"),
+          label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "mainPattern",
         },
         // {
@@ -199,11 +199,11 @@ export default {
         //   prop: "materialDesc",
         // },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           type: "select",
           dictData: this.dict.type.biz_product_type,

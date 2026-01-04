@@ -118,7 +118,7 @@ export default {
         allocationQty: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "change",
           },
           {

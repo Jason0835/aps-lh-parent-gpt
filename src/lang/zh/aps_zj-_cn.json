@@ -2,7 +2,7 @@
   "ui.data.column.scheduleAdjust.productCodeDesc": "物料描述",
   "ui.data.column.scheduleAdjust.seep": "速级",
   "ui.data.column.scheduleAdjust.hierarchy": "层级",
-  "ui.data.column.scheduleAdjust.proSize": "轮辋尺寸",
+  "ui.data.column.scheduleAdjust.proSize": "英寸",
   "ui.data.column.scheduleAdjust.ability": "性能",
   "ui.data.column.scheduleAdjust.cantProduce": "是否不可生产",
   "ui.data.column.scheduleAdjust.updata": "更新日期",
@@ -73,8 +73,8 @@
   "ui.data.column.skuConstruction.embryoCode": "胚胎号",
   "ui.data.column.skuConstruction.mouldCavity": "模具型腔",
   "ui.data.column.skuConstruction.constructionCode": "施工代号",
-  "ui.data.column.skuConstruction.curingTime": "夏季机械硫化时间(秒)",
-  "ui.data.column.skuConstruction.curingTime2": "冬季机械硫化时间(秒)",
+  "ui.data.column.skuConstruction.curingTime": "夏季硫化时间(分)",
+  "ui.data.column.skuConstruction.curingTime2": "冬季硫化时间(分)",
   "ui.data.column.skuConstruction.hydraulicPressureCuringTime": "夏季液压硫化时间(秒)",
   "ui.data.column.skuConstruction.hydraulicPressureCuringTime2": "冬季液压硫化时间(秒)",
   "ui.data.column.curingPlan.classCapacity": "班产",
@@ -136,7 +136,7 @@
   "ui.data.column.workWearInfo.disableMaterialCode": "不可作业SKU",
   "ui.data.column.WorkWearInfo.workWearStatus": "工装状态",
   "ui.data.column.WorkWearInfo.usedType": "使用机型",
-  "ui.data.column.capsuleChuck.specifications": "TBR卡盘",
+  "ui.data.column.capsuleChuck.specifications": "TBR卡盘(规格)",
   "ui.data.column.capsuleChuck.internalQty": "国内转移",
   "ui.data.column.capsuleChuck.newChuckQty": "JINYU新卡盘",
   "ui.data.column.capsuleChuck.productTypeCode": "产品分类",
@@ -251,7 +251,7 @@
   "ui.data.column.oderPool.lock": "锁定",
   "ui.data.column.boom.parentVersion": "父物料版本",
   "ui.data.column.boom.childMaterialVersion": "子物料版本",
-  "ui.data.column.capsuleChuck.proSize": "TBR卡盘英寸",
+  "ui.data.column.capsuleChuck.proSize": "TBR卡盘(英寸)",
   "common.rule.lengMax": "成型鼓周长下限不能大于成型鼓周长上限",
   "ui.data.DemandPlan.createMonthRequire": "生成需求计划",
 
@@ -260,6 +260,12 @@
   "ui.data.orderForecast.month1": "T月",
   "ui.data.orderForecast.month2": "T+1月",
   "ui.data.orderForecast.month3": "T+2月",
-  "ui.data.orderForecast.updateTime": "生成时间"
-
+  "ui.data.orderForecast.updateTime": "生成时间",
+  "ui.data.monthlyProductionPlan.planType": "计划类型",
+  "ui.data.monthlyProductionPlan.constructionStage": "施工阶段",
+  "ui.data.monthlyProductionPlan.mouldCavityQty": "型腔",
+  "ui.data.monthlyProductionPlan.typeBlockQty": "活块",
+  "ui.data.monthlyProductionPlan.prodReqPlan": "净需求",
+  "ui.data.monthlyProductionPlan.inventorySalesRatio": "库销比",
+  "ui.data.monthlyProductionPlan.dayVulcanizationQty": "日硫化量"
 }
