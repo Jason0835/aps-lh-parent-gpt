@@ -130,7 +130,7 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         entity.setCustomCode(saleOrder.getSalCode());
         // entity.setCustomName();
         entity.setCustomNationCode(saleOrder.getSalNCode());
-        entity.setDemandQty(saleOrder.getOrdQty() == null?0L:saleOrder.getOrdQty().longValue());
+        entity.setDemandQty(saleOrder.getOrdQty() == null?0:saleOrder.getOrdQty().intValue());
         entity.setDestinationNationCode(saleOrder.getNatCode());
         entity.setIsDynamicBalance(saleOrder.getIsDynamicBalance());
         entity.setIsUniformity(saleOrder.getIsUniformity());

@@ -98,8 +98,8 @@ public class StockAllocationHelper {
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     if(plannedSurplus == 0L) {
       for (SalesOrderPool order : saleOrders) {
-        long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
-        allocations.add(buildAllocation(order, monthPlanVersion,yearMonth,0L,plannedSurplus, 0L,orderQty));
+        int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
+        allocations.add(buildAllocation(order, monthPlanVersion,yearMonth,0,plannedSurplus, 0,orderQty));
       }
       return allocations;
     }
@@ -490,7 +490,7 @@ public class StockAllocationHelper {
   /**
    * 构建分配记录
    */
-  private static DpOrderOffsetDetail buildAllocation(SalesOrderPool order, String version,YearMonth yearMonth,long stockQty,long plannedSurplus,long allocationQty,long produceQtyDue) {
+  private static DpOrderOffsetDetail buildAllocation(SalesOrderPool order, String version,YearMonth yearMonth,int stockQty,int plannedSurplus,int allocationQty,int produceQtyDue) {
     DpOrderOffsetDetail allocation = new DpOrderOffsetDetail();
     BeanUtils.copyProperties(order, allocation);
     allocation.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -511,7 +511,7 @@ public class StockAllocationHelper {
     allocation.setPlannedSurplus(plannedSurplus);
     // allocation.setMesMaterialCode();
     // allocation.setLocationType(order);
-    allocation.setOrderQty(order.getOrdQty().longValue());
+    allocation.setOrderQty(order.getOrdQty() == null?BigDecimal.ZERO.intValue():order.getOrdQty().intValue());
     allocation.setStockQty(stockQty);
     allocation.setAllocationQty(allocationQty);
     allocation.setProduceQtyDue(produceQtyDue);

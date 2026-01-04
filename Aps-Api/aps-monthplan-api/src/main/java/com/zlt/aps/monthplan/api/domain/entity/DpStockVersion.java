@@ -107,14 +107,14 @@ public class DpStockVersion extends BaseEntity {
     @Excel(name = "ui.data.column.mdmFinishStock.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存数量", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Long stockQty;
+    private Integer stockQty;
     /**
      * 需求对冲后-余量库存
      */
     @Excel(name = "ui.data.column.mdmFinishStock.remainingQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
     @TableField(value = "REMAINING_QTY")
-    private Long remainingQty;
+    private Integer remainingQty;
     /**
      * 年周号
      */
