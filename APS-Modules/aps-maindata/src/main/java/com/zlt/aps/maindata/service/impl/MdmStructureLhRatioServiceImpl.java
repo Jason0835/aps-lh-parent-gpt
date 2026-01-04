@@ -57,6 +57,6 @@ public class MdmStructureLhRatioServiceImpl extends AbstractDocService<MdmStruct
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("cxMachineBrandCode", "structureName"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "cxMachineBrandCode", "structureName"));
     }
 }

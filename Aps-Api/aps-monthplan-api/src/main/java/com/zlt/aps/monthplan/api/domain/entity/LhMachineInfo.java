@@ -71,14 +71,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
 
     /** 生产寸口范围下限，单位：英寸 */
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.dimensionMinimum",sort = 60)
+    @Excel(name = "ui.data.column.info.dimensionMinimum", cellType = Excel.ColumnType.NUMERIC, sort = 60)
     @ApiModelProperty(value = "生产寸口范围下限，单位：英寸", name = "dimensionMinimum")
     @TableField(value = "DIMENSION_MINIMUM")
     private BigDecimal dimensionMinimum;
 
     /** 生产寸口范围上限，单位：英寸 */
     @ImportExcelValidated(required = true, digits = true, min = 1, max = 9999)
-    @Excel(name = "ui.data.column.info.dimensionMaximum",sort = 70)
+    @Excel(name = "ui.data.column.info.dimensionMaximum", cellType = Excel.ColumnType.NUMERIC, sort = 70)
     @ApiModelProperty(value = "生产寸口范围上限，单位：英寸", name = "dimensionMaximum")
     @TableField(value = "DIMENSION_MAXIMUM")
     private BigDecimal dimensionMaximum;
@@ -90,14 +90,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
 
     /** 最大使用模具数量，范围 0-255 */
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 255)
-    @Excel(name = "ui.data.column.info.maxMoldNum",sort = 80)
+    @Excel(name = "ui.data.column.info.maxMoldNum", cellType = Excel.ColumnType.NUMERIC, sort = 80)
     @ApiModelProperty(value = "模台数", name = "maxMoldNum")
     @TableField(value = "MAX_MOLD_NUM")
     private Integer maxMoldNum;
 
     /** 生产定额，单班一次生产量，单位：条 */
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.quota",sort = 90)
+    @Excel(name = "ui.data.column.info.quota", cellType = Excel.ColumnType.NUMERIC, sort = 90)
     @ApiModelProperty(value = "生产定额，单班一次生产量，单位：条", name = "quota")
     @TableField(value = "QUOTA")
     private Integer quota;
@@ -109,11 +109,13 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
 
     /** 是否启用 */
     @Excel(name = "ui.data.column.info.status",sort = 100,dictType = "sys_enable_disable")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "是否启用，字典：sys_enable_disable", name = "status")
     @TableField(value = "STATUS")
     private String status;
 
     @Excel(name = "ui.data.column.info.machineType",sort = 40,dictType = "LH_MACHINE_TYPE")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "机台类型，字典：LH_MACHINE_TYPE", name = "machineType")
     @TableField(value = "MACHINE_TYPE")
     private String machineType;
@@ -122,9 +124,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "MOLD_RELATION_LIST")
     private String moldRelationList;
 
-    @ImportExcelValidated(digits = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.machineOrder",sort = 42)
+    @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
+    @Excel(name = "ui.data.column.info.machineOrder", cellType = Excel.ColumnType.NUMERIC, sort = 110)
     @ApiModelProperty(value = "机台顺序", name = "machineOrder")
     @TableField(value = "MACHINE_ORDER", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.INTEGER)
     private Integer machineOrder;
+
+    @Excel(name = "ui.data.column.info.remark", sort = 120)
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField("REMARK")
+    private String remark;
 }

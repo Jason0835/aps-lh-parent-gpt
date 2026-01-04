@@ -88,11 +88,11 @@ public class CxContinueProductionHandler {
         }
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //总排产量
-        Long sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(selectedProductionPlanList);
+        Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(selectedProductionPlanList);
         //日硫化量
-        Long dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
+        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
 //        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
@@ -283,10 +283,10 @@ public class CxContinueProductionHandler {
         }
         //先取得高优先级量最大的
         Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = sameMultipleSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-        Map<String, Long> productionSkuMap = new HashMap<>();
+        Map<String, Integer> productionSkuMap = new HashMap<>();
         skuGroupMap.forEach((skuMaterialDesc, groupPlanList) -> {
-            Long sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(groupPlanList);
-            if (sumProductionQty > BigDecimal.ZERO.longValue()) {
+            Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(groupPlanList);
+            if (sumProductionQty > BigDecimal.ZERO.intValue()) {
                 productionSkuMap.put(skuMaterialDesc, sumProductionQty);
             }
         });
@@ -294,7 +294,7 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return "";
         }
-        Optional<Map.Entry<String, Long>> maxEntry = productionSkuMap.entrySet().stream().max(Map.Entry.comparingByValue());
+        Optional<Map.Entry<String, Integer>> maxEntry = productionSkuMap.entrySet().stream().max(Map.Entry.comparingByValue());
         return maxEntry.get().getKey();
     }
 }

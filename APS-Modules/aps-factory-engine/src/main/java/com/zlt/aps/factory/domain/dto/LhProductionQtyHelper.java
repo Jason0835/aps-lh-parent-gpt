@@ -30,15 +30,15 @@ public class LhProductionQtyHelper implements Serializable {
     /**
      * 需要排产的总量
      */
-    private Long sumProductionQty;
+    private Integer sumProductionQty;
     /**
      * 实际排产总量
      */
-    private Long realSumProductionQty;
+    private Integer realSumProductionQty;
     /**
      * 双模日硫化量
      */
-    private Long dayMaxProductionQty;
+    private Integer dayMaxProductionQty;
 
     /**
      * 构建对象实例
@@ -50,7 +50,7 @@ public class LhProductionQtyHelper implements Serializable {
      * @param realSumProductionQty 实际排产总量
      * @param dayMaxProductionQty  日双模最大硫化量
      */
-    public LhProductionQtyHelper(ProductionPlanGroupInfo productionPlanInfo, Set<String> cxMachineInfo, CxLhProductionHelper cxLhGroup, Long sumProductionQty, Long realSumProductionQty, Long dayMaxProductionQty) {
+    public LhProductionQtyHelper(ProductionPlanGroupInfo productionPlanInfo, Set<String> cxMachineInfo, CxLhProductionHelper cxLhGroup, Integer sumProductionQty, Integer realSumProductionQty, Integer dayMaxProductionQty) {
         this.productionPlanInfo = productionPlanInfo;
         this.cxMachineInfo = cxMachineInfo;
         this.cxLhGroup = cxLhGroup;

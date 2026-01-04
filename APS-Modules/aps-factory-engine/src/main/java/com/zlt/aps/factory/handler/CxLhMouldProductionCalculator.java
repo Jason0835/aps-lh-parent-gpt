@@ -47,7 +47,7 @@ public class CxLhMouldProductionCalculator {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //日硫化量，理论上productionQty不超过dayMaxProductionQty
-        Long dayMaxProductionQty = continueSkuInfo.getMaxDaySingleLhMachineQty();
+        Integer dayMaxProductionQty = continueSkuInfo.getMaxDaySingleLhMachineQty();
         boolean isDayFinish = productionQty >= dayMaxProductionQty ? true : false;
         Set<String> cxMachineCodeInfo = continueSkuInfo.getOnLineCxMachineSet();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = continueSkuInfo.getContinueSkuPlanList();
@@ -71,9 +71,9 @@ public class CxLhMouldProductionCalculator {
      */
     public static void lhProductionByLhGroupHandler(Context context, EarliestConclusionLhGroupHelper earliestConclusionLhGroup, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Long sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Long realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Long dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
+        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
+        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         Set<Integer> stopDay = context.getStopDays();
         //进行排产
@@ -86,7 +86,7 @@ public class CxLhMouldProductionCalculator {
                 continue;
             }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Long realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
             //todo 判断模具是否排产完毕
@@ -127,9 +127,9 @@ public class CxLhMouldProductionCalculator {
      */
     public static void lhProductionByGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Long sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Long realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Long dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
+        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
+        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //不关注具体Id，只为拿到生胎等信息
         MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
@@ -151,7 +151,7 @@ public class CxLhMouldProductionCalculator {
                 continue;
             }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Long realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
             //todo 判断模具是否排产完毕
@@ -179,9 +179,9 @@ public class CxLhMouldProductionCalculator {
      */
     public static void lhProductionByCxMachineHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Long sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Long realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Long dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
+        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
+        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         Set<String> cxMachineInfoSet = lhProductionQtyHelper.getCxMachineInfo();
         String cxMachineCode = new ArrayList<>(cxMachineInfoSet).get(BigDecimal.ZERO.intValue());
@@ -198,7 +198,7 @@ public class CxLhMouldProductionCalculator {
                 continue;
             }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Long realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
             //todo 判断模具是否排产完毕
@@ -212,7 +212,7 @@ public class CxLhMouldProductionCalculator {
             cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
             cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
             //记录已排产量及损耗量
-            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.longValue());
+            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
@@ -222,9 +222,9 @@ public class CxLhMouldProductionCalculator {
     @Deprecated
     public static void lhProductionByLhGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Long sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Long realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Long dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
+        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
+        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         String cxMachineCode = String.join(StringConstant.COMMA, cxLhGroup.getCxMachineInfo());
         String skuMaterialDesc = skuProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
@@ -240,7 +240,7 @@ public class CxLhMouldProductionCalculator {
                 continue;
             }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Long realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
             //todo 判断模具是否排产完毕
@@ -252,7 +252,7 @@ public class CxLhMouldProductionCalculator {
             cxLhGroup.setProductionDay(day);
             cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
             //记录已排产量及损耗量
-            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.longValue());
+            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
@@ -279,12 +279,12 @@ public class CxLhMouldProductionCalculator {
         Set<String> productionMouldSet = lhGroupInfo.getProductionMouldSet();
         Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
         productionMouldSet.forEach(mouldCode -> doubleMouldList.add(mouldInfoMap.get(mouldCode)));
-        Long dayMaxProductionQty = continueSkuInfo.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer dayMaxProductionQty = continueSkuInfo.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         boolean isDayFinish = productionQty >= dayMaxProductionQty ? true : false;
         String cxMachineCode = String.join(StringConstant.COMMA, continueSkuInfo.getOnLineCxMachineSet());
-        doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlanInfo, lhGroupInfo, isDayFinish, Long.valueOf(productionQty), dayMaxProductionQty, cxMachineCode, continueSkuInfo.getContinueSkuPlanList()));
+        doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlanInfo, lhGroupInfo, isDayFinish, productionQty, dayMaxProductionQty, cxMachineCode, continueSkuInfo.getContinueSkuPlanList()));
         //更新硫化组日期和日排产量
-        lhGroupInfo.setProductionQty(Long.valueOf(productionQty));
+        lhGroupInfo.setProductionQty(productionQty);
         lhGroupInfo.setProductionDay(productionDay);
         lhGroupInfo.setDayMaxProductionQty(dayMaxProductionQty);
     }
@@ -314,7 +314,7 @@ public class CxLhMouldProductionCalculator {
         //模具排产信息-计划分配
         updateMouldDayProductionInfo(doubleMouldList, skuProductionPlanList, updateInfo);
         //记录已排产量及损耗量
-        productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, Long.valueOf(realDayProductionQty), Long.valueOf(lossQty));
+        productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, lossQty);
     }
 
     /**
@@ -333,7 +333,7 @@ public class CxLhMouldProductionCalculator {
         Set<String> cxMachineInfo = updateInfo.getUsedCxMachineInfo();
         //模具排产信息-计划分配
         Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = skuProductionPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
-        Map<Long, Long> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(Long.valueOf(realDayProductionQty), skuProductionPlanList);
+        Map<Long, Integer> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(realDayProductionQty, skuProductionPlanList);
         productionPlanMap.forEach((monthPlanId, planProductionQty) -> {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));

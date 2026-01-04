@@ -263,7 +263,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         }
         //计算日硫化产能
         lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
-        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity()));
+        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity(), (before, after) -> after));
     }
 
     /**
@@ -280,17 +280,27 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             //TODO 损耗率方式计算
             return;
         }
+        //对物料描述为空的进行过滤
+        List<MonthPlanProductionRequirePlanVo> effectiveList = requirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getMaterialDesc())).collect(Collectors.toList());
         //按SKU汇总需求，双数 +2 单数 +3。放置在第一条记录
-        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         productGroupMap.forEach((materialDesc, planList) -> {
             //统计需求量
             if (CollectionUtils.isEmpty(planList)) {
                 return;
             }
-            Long addLossQty = getAddLossQtyUnRatio(planList);
+            Integer addLossQty = getAddLossQtyUnRatio(planList);
             //排序，高优先级值高的在前，排产净需求值高的在前
-            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.reverseOrder()).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.reverseOrder()));
+            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.nullsLast(Comparator.reverseOrder())));
             addLossQtyUnRatio(planList.get(0), addLossQty);
+        });
+        requirePlanList.forEach(singlePlan -> {
+            if (null == singlePlan.getHeightLossQty()) {
+                singlePlan.setHeightLossQty(singlePlan.getHeightQty());
+            }
+            if (null == singlePlan.getFactProdReqQty()) {
+                singlePlan.setFactProdReqQty(singlePlan.getNetQty());
+            }
         });
     }
 
@@ -301,11 +311,15 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * @param requireList
      * @return
      */
-    private Long getAddLossQtyUnRatio(List<MonthPlanProductionRequirePlanVo> requireList) {
+    private Integer getAddLossQtyUnRatio(List<MonthPlanProductionRequirePlanVo> requireList) {
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = requireList.stream().filter(singlePlan -> null != singlePlan.getNetQty()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return BigDecimal.ZERO.intValue();
+        }
         //汇总排产净需求量
-        Long sumQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        Integer sumQty = hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         if (sumQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         //偶数+2
         if (sumQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
@@ -321,17 +335,23 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * @param plan       计划
      * @param addLossQty 增加的损耗量
      */
-    private void addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Long addLossQty) {
-        if (null == addLossQty || addLossQty <= BigDecimal.ZERO.longValue()) {
+    private void addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
+        if (null == addLossQty || addLossQty <= BigDecimal.ZERO.intValue()) {
             plan.setHeightLossQty(plan.getHeightQty());
             plan.setFactProdReqQty(plan.getNetQty());
             return;
         }
-        Long heightQty = plan.getHeightQty();
-        Long netQty = plan.getNetQty();
-        Long addHeightLossQty = BigDecimal.ZERO.longValue();
+        Integer heightQty = plan.getHeightQty();
+        if (null == heightQty) {
+            heightQty = BigDecimal.ZERO.intValue();
+        }
+        Integer netQty = plan.getNetQty();
+        if (null == netQty) {
+            netQty = BigDecimal.ZERO.intValue();
+        }
+        Integer addHeightLossQty = BigDecimal.ZERO.intValue();
         //有高优先级需求，则加在高优先级上
-        if (heightQty > BigDecimal.ZERO.longValue()) {
+        if (heightQty > BigDecimal.ZERO.intValue()) {
             if (heightQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
                 addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
             } else {
@@ -341,7 +361,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //高优先级损耗值
         plan.setHeightLossQty(heightQty + addHeightLossQty);
         //除高优先级的损耗值
-        Long otherLossQty = addLossQty - addHeightLossQty;
+        Integer otherLossQty = addLossQty - addHeightLossQty;
         plan.setFactProdReqQty(netQty + otherLossQty);
     }
 

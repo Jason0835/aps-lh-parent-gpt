@@ -23,7 +23,7 @@ public class ProductionPlanDistributor {
      * @param continueSkuPlanList  sku的排产计划集合
      * @return
      */
-    public Map<Long, Long> allocationProductionQty(Long realDayProductionQty, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
+    public Map<Long, Integer> allocationProductionQty(Integer realDayProductionQty, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
             return Collections.emptyMap();
         }
@@ -32,7 +32,7 @@ public class ProductionPlanDistributor {
             return Collections.emptyMap();
         }
         //todo 怎么分配
-        Map<Long, Long> realDeductionMap = new HashMap<>();
+        Map<Long, Integer> realDeductionMap = new HashMap<>();
         //先高优先级，再其他净需求
         List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
         realDayProductionQty = deductionHeightProductionQty(heightPlanList, realDeductionMap, realDayProductionQty);
@@ -54,28 +54,28 @@ public class ProductionPlanDistributor {
      * @param realDayProductionQty
      * @return
      */
-    private Long deductionHeightProductionQty(List<MonthPlanProductionRequirePlanVo> heightPlanList, Map<Long, Long> realDeductionMap, Long realDayProductionQty) {
+    private Integer deductionHeightProductionQty(List<MonthPlanProductionRequirePlanVo> heightPlanList, Map<Long, Integer> realDeductionMap, Integer realDayProductionQty) {
         if (CollectionUtils.isEmpty(heightPlanList)) {
             return realDayProductionQty;
         }
         //高优先级量降序排序
         heightPlanList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightProductionQty, Comparator.reverseOrder()));
         for (MonthPlanProductionRequirePlanVo productionPlan : heightPlanList) {
-            if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
+            if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
                 break;
             }
             Long monthPlanId = productionPlan.getMonthPlanId();
-            Long heightProductionQty = productionPlan.getHeightProductionQty();
-            if (heightProductionQty <= BigDecimal.ZERO.longValue()) {
+            Integer heightProductionQty = productionPlan.getHeightProductionQty();
+            if (heightProductionQty <= BigDecimal.ZERO.intValue()) {
                 continue;
             }
-            Long realDeductionQty = Math.min(heightProductionQty, realDayProductionQty);
-            if (realDeductionQty > BigDecimal.ZERO.longValue()) {
+            Integer realDeductionQty = Math.min(heightProductionQty, realDayProductionQty);
+            if (realDeductionQty > BigDecimal.ZERO.intValue()) {
                 //扣减计划需求量，并汇总计划总扣减量
                 deductionHeightProductionQty(productionPlan, realDeductionQty);
-                Long sumDeductionQty = realDeductionMap.get(monthPlanId);
+                Integer sumDeductionQty = realDeductionMap.get(monthPlanId);
                 if (null == sumDeductionQty) {
-                    sumDeductionQty = BigDecimal.ZERO.longValue();
+                    sumDeductionQty = BigDecimal.ZERO.intValue();
                 }
                 sumDeductionQty = sumDeductionQty + realDeductionQty;
                 realDeductionMap.put(monthPlanId, sumDeductionQty);
@@ -93,7 +93,7 @@ public class ProductionPlanDistributor {
      * @param realDayProductionQty 需扣减量
      * @return
      */
-    private Long deductionNoHeightQty(List<MonthPlanProductionRequirePlanVo> noHeightPlanList, Map<Long, Long> realDeductionMap, Long realDayProductionQty) {
+    private Integer deductionNoHeightQty(List<MonthPlanProductionRequirePlanVo> noHeightPlanList, Map<Long, Integer> realDeductionMap, Integer realDayProductionQty) {
         if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
             return realDayProductionQty;
         }
@@ -103,21 +103,21 @@ public class ProductionPlanDistributor {
         //非高优先级量降序排序
         noHeightPlanList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getProductionQty, Comparator.reverseOrder()));
         for (MonthPlanProductionRequirePlanVo productionPlan : noHeightPlanList) {
-            if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
+            if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
                 break;
             }
             Long monthPlanId = productionPlan.getMonthPlanId();
-            Long noHeightProductionQty = productionPlan.getProductionQty();
-            if (noHeightProductionQty <= BigDecimal.ZERO.longValue()) {
+            Integer noHeightProductionQty = productionPlan.getProductionQty();
+            if (noHeightProductionQty <= BigDecimal.ZERO.intValue()) {
                 continue;
             }
-            Long realDeductionQty = Math.min(noHeightProductionQty, realDayProductionQty);
-            if (realDeductionQty > BigDecimal.ZERO.longValue()) {
+            Integer realDeductionQty = Math.min(noHeightProductionQty, realDayProductionQty);
+            if (realDeductionQty > BigDecimal.ZERO.intValue()) {
                 //扣减计划需求量，并汇总计划总扣减量
                 deductionNoHeightProductionQty(productionPlan, realDeductionQty);
-                Long sumDeductionQty = realDeductionMap.get(monthPlanId);
+                Integer sumDeductionQty = realDeductionMap.get(monthPlanId);
                 if (null == sumDeductionQty) {
-                    sumDeductionQty = BigDecimal.ZERO.longValue();
+                    sumDeductionQty = BigDecimal.ZERO.intValue();
                 }
                 sumDeductionQty = sumDeductionQty + realDeductionQty;
                 realDeductionMap.put(monthPlanId, sumDeductionQty);
@@ -134,14 +134,14 @@ public class ProductionPlanDistributor {
      * @param productionPlan   计划
      * @param dayProductionQty 真实日排产量
      */
-    private void deductionHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Long dayProductionQty) {
-        Long heightProductionQty = productionPlan.getHeightProductionQty();
-        Long productionQty = productionPlan.getProductionQty();
+    private void deductionHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Integer dayProductionQty) {
+        Integer heightProductionQty = productionPlan.getHeightProductionQty();
+        Integer productionQty = productionPlan.getProductionQty();
         heightProductionQty = heightProductionQty - dayProductionQty;
         productionQty = productionQty - dayProductionQty;
         productionPlan.setHeightProductionQty(heightProductionQty);
         productionPlan.setProductionQty(productionQty);
-        if (productionQty <= BigDecimal.ZERO.longValue()) {
+        if (productionQty <= BigDecimal.ZERO.intValue()) {
             productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
         }
     }
@@ -153,11 +153,11 @@ public class ProductionPlanDistributor {
      * @param productionPlan   计划
      * @param dayProductionQty 真实日排产量
      */
-    private void deductionNoHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Long dayProductionQty) {
-        Long productionQty = productionPlan.getProductionQty();
+    private void deductionNoHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Integer dayProductionQty) {
+        Integer productionQty = productionPlan.getProductionQty();
         productionQty = productionQty - dayProductionQty;
         productionPlan.setProductionQty(productionQty);
-        if (productionQty <= BigDecimal.ZERO.longValue()) {
+        if (productionQty <= BigDecimal.ZERO.intValue()) {
             productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
         }
     }

@@ -82,10 +82,10 @@ public class GroupProductionConversionHandler {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return allocationInfo;
         }
-        Long sum = groupPlanData.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
-        Long heightLossQty = groupPlanData.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Long noHeightLossQty = groupPlanData.stream().mapToLong(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        Long lossQty = heightLossQty + noHeightLossQty;
+        Integer sum = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        Integer heightLossQty = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightLossQty = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        Integer lossQty = heightLossQty + noHeightLossQty;
         allocationInfo.setNetQty(sum.intValue());
         allocationInfo.setLossQty(lossQty.intValue());
         return allocationInfo;

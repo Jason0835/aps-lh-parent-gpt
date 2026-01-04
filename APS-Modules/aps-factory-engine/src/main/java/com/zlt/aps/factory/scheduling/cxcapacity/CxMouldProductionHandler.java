@@ -147,7 +147,7 @@ public class CxMouldProductionHandler {
         cxMachineInfo.add(cxMachineCode);
         CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, cxMachineInfo);
         newHelper.setProductionDay(startDay);
-        newHelper.setProductionQty(BigDecimal.ZERO.longValue());
+        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
         cxLhRatioMap.put(cxLhGroupNo, newHelper);
     }
 

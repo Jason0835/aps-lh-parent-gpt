@@ -13,7 +13,7 @@
            AND mcd.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND EXISTS (SELECT 1
                          FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
-                        WHERE IFNULL(smr.IS_DELETE, 0) = 0)
+                        WHERE IFNULL(smr.IS_DELETE, 0) = 0
                           AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND smr.MATERIAL_CODE = mcd.CHILD_MATERIAL_CODE)
            AND EXISTS (SELECT 1

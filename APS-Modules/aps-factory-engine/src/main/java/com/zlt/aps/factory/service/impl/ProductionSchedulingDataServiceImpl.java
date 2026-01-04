@@ -492,13 +492,15 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         factoryProductionSchedulingMapper.deleteProductionMouldVersion(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
     }
-
+    //先使用独立事务，看数据
     @Override
+//    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList) {
         if (CollectionUtils.isEmpty(monthPlanInitList)) {
             return;
         }
         List<ProductionMonthPlanInit> saveMonthPlanInitList = BeanCopyUtils.copyBeanList(monthPlanInitList, ProductionMonthPlanInit.class);
+//        baseDao.insertBatch(saveMonthPlanInitList);
         factoryProductionMonthPlanInitService.saveBatch(saveMonthPlanInitList);
     }
 

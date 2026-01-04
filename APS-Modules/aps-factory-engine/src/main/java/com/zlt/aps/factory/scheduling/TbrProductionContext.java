@@ -39,11 +39,11 @@ public class TbrProductionContext extends Context {
     /**
      * sku的已排产量统计
      */
-    Map<String, Long> skuPlannedQtyMap;
+    Map<String, Integer> skuPlannedQtyMap;
     /**
      * sku损耗量统计(因换模、换活字块导致)
      */
-    Map<String, Long> skuWastageQtyMap;
+    Map<String, Integer> skuWastageQtyMap;
     /**
      * 分组排产计划
      * key 结构名 value 排产计划集合
@@ -87,7 +87,7 @@ public class TbrProductionContext extends Context {
      * @param plannedQty   增加的排产量
      * @param wastageQty   增加的损耗量
      */
-    public void addSkuProductionAndWastageQty(String materialDesc, Long plannedQty, Long wastageQty) {
+    public void addSkuProductionAndWastageQty(String materialDesc, Integer plannedQty, Integer wastageQty) {
         if (StringUtils.isBlank(materialDesc)) {
             return;
         }
@@ -205,14 +205,14 @@ public class TbrProductionContext extends Context {
      * @param addQty        增加的量
      * @param handlerQtyMap 处理的集合
      */
-    private void addQtyHandler(String materialDesc, Long addQty, Map<String, Long> handlerQtyMap) {
+    private void addQtyHandler(String materialDesc, Integer addQty, Map<String, Integer> handlerQtyMap) {
         //已排产量处理
         if (null == addQty || addQty <= BigDecimal.ZERO.longValue()) {
-            addQty = BigDecimal.ZERO.longValue();
+            addQty = BigDecimal.ZERO.intValue();
         }
-        Long sumQty = handlerQtyMap.get(materialDesc);
+        Integer sumQty = handlerQtyMap.get(materialDesc);
         if (null == sumQty) {
-            sumQty = BigDecimal.ZERO.longValue();
+            sumQty = BigDecimal.ZERO.intValue();
         }
         sumQty = sumQty + addQty;
         handlerQtyMap.put(materialDesc, sumQty);
@@ -231,11 +231,11 @@ public class TbrProductionContext extends Context {
         if (CollectionUtils.isEmpty(skuPlanList)) {
             return;
         }
-        Long sumPlannedQty = skuPlannedQtyMap.get(materialDesc);
+        Integer sumPlannedQty = skuPlannedQtyMap.get(materialDesc);
         if (null == sumPlannedQty) {
-            sumPlannedQty = BigDecimal.ZERO.longValue();
+            sumPlannedQty = BigDecimal.ZERO.intValue();
         }
-        Long plannedQty = sumPlannedQty;
+        Integer plannedQty = sumPlannedQty;
         skuPlanList.forEach(plan -> plan.calculateInventorySalesRatio(plannedQty));
     }
 

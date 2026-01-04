@@ -626,8 +626,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //已排产量和损耗量为零
         ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
         skuRequirePlanMap.forEach((materialDesc, productionPlanList) -> {
-            productionContext.getSkuPlannedQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
-            productionContext.getSkuWastageQtyMap().put(materialDesc, BigDecimal.ZERO.longValue());
+            productionContext.getSkuPlannedQtyMap().put(materialDesc, BigDecimal.ZERO.intValue());
+            productionContext.getSkuWastageQtyMap().put(materialDesc, BigDecimal.ZERO.intValue());
             if (CollectionUtils.isEmpty(productionPlanList)) {
                 return;
             }
@@ -655,7 +655,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             }
         });
         //计算初始的库销比
-        requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.longValue()));
+        requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.intValue()));
     }
 
     /**
@@ -873,7 +873,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setBaseDataContainer(new BaseDataContainer());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        productionContext.setLogBuilder(new StringBuilder());
+        StringBuilder logBuilder = new StringBuilder();
+        context.setLogBuilder(logBuilder);
+        productionContext.setLogBuilder(logBuilder);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -894,7 +896,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        productionContext.setLogBuilder(new StringBuilder());
+        StringBuilder logBuilder = new StringBuilder();
+        context.setLogBuilder(logBuilder);
+        productionContext.setLogBuilder(logBuilder);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -907,7 +911,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      */
     private void setProductionCycleInfo(Context context) {
         MpFactoryProductionVersion productionVersion = getDataService().getFactoryMonthPlanVersion(context);
-        if (null != productionVersion) {
+        if (null == productionVersion) {
             return;
         }
         Date productionStartDate = productionVersion.getProductionStartDate();

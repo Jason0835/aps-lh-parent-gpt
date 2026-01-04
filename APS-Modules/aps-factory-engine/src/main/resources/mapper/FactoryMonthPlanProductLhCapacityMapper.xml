@@ -10,7 +10,7 @@
                msc.STANDARD_CAPACITY,
                msc.APS_CAPACITY,
                msc.VULCANIZATION_TIME
-          FROM t_mp_product_require_plan prp
+          FROM t_dp_demand_plan prp
           LEFT JOIN t_mdm_sku_lh_capacity msc
             ON msc.FACTORY_CODE = prp.FACTORY_CODE
            AND msc.MATERIAL_DESC = prp.MATERIAL_DESC

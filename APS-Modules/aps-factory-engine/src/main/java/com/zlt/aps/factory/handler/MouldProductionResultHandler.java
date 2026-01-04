@@ -156,7 +156,7 @@ public class MouldProductionResultHandler {
         logDetail.setAverageQty(planInfo.getAverageSaleQty().intValue());
         logDetail.setInventorySalesRatio(BigDecimal.valueOf(planInfo.getInventorySalesRatio()));
         //统计总排产量
-        Long totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);
+        Integer totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);
         logDetail.setTotalQty(totalValue.intValue());
     }
 
@@ -176,14 +176,14 @@ public class MouldProductionResultHandler {
          * 汇总需求信息-净需求(含损耗)、高优先级数量
          */
         //高优先级量
-        Long heightNetQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
+        Integer heightNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
         dayResult.setHeightQty(heightNetQty.intValue());
         //总需求(不含损耗)
-        Long sumNetQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        Integer sumNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         dayResult.setProdReqPlan(sumNetQty.intValue());
         //总需求(含损耗)
-        Long heightQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Long noHeightQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        Integer heightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
         dayResult.setFactProdReqQty(heightQty.intValue() + noHeightQty.intValue());
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
@@ -224,7 +224,7 @@ public class MouldProductionResultHandler {
      * @param productionDate   排产日
      * @param productionQty    排产量
      */
-    private static void setProductionDateQty(FactoryMonthPlanMouldDayDetail productionDetail, Integer productionDate, Long productionQty) {
+    private static void setProductionDateQty(FactoryMonthPlanMouldDayDetail productionDetail, Integer productionDate, Integer productionQty) {
         String fieldName;
         if (productionDate > 0) {
             fieldName = "day";
@@ -232,14 +232,14 @@ public class MouldProductionResultHandler {
             fieldName = "preDay";
         }
         fieldName = fieldName + Math.abs(productionDate);
-        Long oldValue;
+        Integer oldValue;
         Object value = productionDetail.getFieldValueByFieldName(fieldName);
         if (null == value) {
-            oldValue = BigDecimal.ZERO.longValue();
+            oldValue = BigDecimal.ZERO.intValue();
         } else {
-            oldValue = (Long) value;
+            oldValue = (Integer) value;
         }
-        Long newValue = oldValue + productionQty;
+        Integer newValue = oldValue + productionQty;
         productionDetail.setFieldValueByFieldName(fieldName, newValue);
         //起始日赋值
         Integer beginDay = productionDetail.getBeginDay();

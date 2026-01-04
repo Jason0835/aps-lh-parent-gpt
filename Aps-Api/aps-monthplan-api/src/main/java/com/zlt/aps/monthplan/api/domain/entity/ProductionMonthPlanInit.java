@@ -171,7 +171,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 全规格代号信息 包含规格代号及对应的成型法
      */
     @ApiModelProperty(value = "全规格代号信息", name = "specCodeInfo")
-    @TableField(value = "SPEC_CODE_INFO")
+    @TableField(exist = false)
     private String specCodeInfo;
 
     /**
@@ -285,7 +285,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
-    private Long heightQty;
+    private Integer heightQty;
 
     /**
      * 中优先级
@@ -293,7 +293,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
-    private Long midQty;
+    private Integer midQty;
 
     /**
      * 暂缓订单
@@ -301,7 +301,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.postponeQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
     @TableField(value = "POSTPONE_QTY")
-    private Long postponeQty;
+    private Integer postponeQty;
 
     /**
      * 周期排产储备
@@ -309,7 +309,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
     @TableField(value = "CYCLE_RESERVE_QTY")
-    private Long cycleReserveQty;
+    private Integer cycleReserveQty;
 
     /**
      * 常规储备
@@ -317,7 +317,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
-    private Long conventionReserveQty;
+    private Integer conventionReserveQty;
 
     /**
      * 排产净需求
@@ -325,7 +325,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求", name = "netQty")
     @TableField(value = "NET_QTY")
-    private Long netQty;
+    private Integer netQty;
 
     /**
      * 净需求(含暂缓)
@@ -333,7 +333,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
     @TableField(value = "POSTPONE_NET_QTY")
-    private Long postponeNetQty;
+    private Integer postponeNetQty;
 
     /**
      * 净需求(不含暂缓)
@@ -341,14 +341,14 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
-    private Long unPostponeNetQty;
+    private Integer unPostponeNetQty;
     /**
      * 高优先级需求(含损耗)
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.heightLossQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级需求(含损耗)", name = "heightLossQty")
     @TableField(value = "HEIGHT_LOSS_QTY")
-    private Long heightLossQty;
+    private Integer heightLossQty;
 
     /**
      * 实际生产需求(含损耗，排除高优先级损耗)
@@ -356,7 +356,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.factProdReqQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "实际生产需求(含损耗，排除高优先级损耗)", name = "factProdReqQty")
     @TableField(value = "FACT_PROD_REQ_QTY")
-    private Long factProdReqQty;
+    private Integer factProdReqQty;
 
     /**
      * 等级码
@@ -458,7 +458,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.dayVulcanizationQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
     @TableField(value = "DAY_VULCANIZATION_QTY")
-    private Long dayVulcanizationQty;
+    private Integer dayVulcanizationQty;
 
     /**
      * 库存数量(成品总库存)
@@ -466,7 +466,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存数量(成品总库存)", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Long stockQty;
+    private Integer stockQty;
 
     /**
      * 月均销量
@@ -474,7 +474,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @Excel(name = "ui.data.column.productionMonthPlanInit.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
-    private Long averageSaleQty;
+    private Integer averageSaleQty;
 
     /**
      * 可用模具数量

@@ -386,7 +386,7 @@ public class CxCapacityAllocationHandler {
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         String brandCode = cxMachineInfo.getCxMachineBrandCode();
         estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> {
-            Long minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
+            Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
             if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
                 //todo 记录日志
                 return;
@@ -408,13 +408,13 @@ public class CxCapacityAllocationHandler {
             }
             //记录配比-需要传递
             cxMachineInfo.setRatio(ratio);
-            Long remainingProductionQty = groupPlan.getRemainingProductionQty();
-            if (remainingProductionQty <= BigDecimal.ZERO.longValue()) {
+            Integer remainingProductionQty = groupPlan.getRemainingProductionQty();
+            if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
                 //todo 记录日志
                 return;
             }
             //成型剩余产能
-            Long remainingCapacityQty = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ratio)).multiply(BigDecimal.valueOf(remainingDays)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).longValue();
+            Integer remainingCapacityQty = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ratio)).multiply(BigDecimal.valueOf(remainingDays)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).intValue();
             if (remainingCapacityQty < remainingProductionQty) {
                 return;
             }
@@ -544,8 +544,8 @@ public class CxCapacityAllocationHandler {
      * @param addNewGroupPlan   新增结构
      */
     private static void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo addNewGroupPlan) {
-        //4、断面宽差值±10 todo 断面宽差值范围
-        Integer diffValue = 0;
+        //4、断面宽差值±10 断面宽差值范围参数
+        Integer diffValue = ((TbrProductionContext)context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
         fixedPriorityList.forEach(cxMachineInfo -> {
             List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();

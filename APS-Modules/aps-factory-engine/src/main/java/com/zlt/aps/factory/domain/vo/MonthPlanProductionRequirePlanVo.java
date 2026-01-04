@@ -67,16 +67,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 首轮 = 净需求
      * 第二轮 = 模拟模具已排产量 + 换模损耗量
      */
-    private Long cxCapacityRequireQty;
+    private Integer cxCapacityRequireQty;
     /**
      * 高优先级还需排产量，只有排产高优级量时才扣减
      */
-    private Long heightProductionQty;
+    private Integer heightProductionQty;
     /**
      * 总的还需排产量，每次排产完高优先级需要同步扣减
      * 排产非高优先级时，也同步扣减
      */
-    private Long productionQty;
+    private Integer productionQty;
     /**
      * 是否含有特殊材料 1 含有 0 不含有
      */
@@ -119,7 +119,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public void resetProductionDataInfo() {
         initProductionDataInfo();
-        calculateInventorySalesRatio(BigDecimal.ZERO.longValue());
+        calculateInventorySalesRatio(BigDecimal.ZERO.intValue());
     }
 
     /**
@@ -127,8 +127,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @return
      */
-    public Long getPlanNeedProductionQty() {
-        Long sum = BigDecimal.ZERO.longValue();
+    public Integer getPlanNeedProductionQty() {
+        Integer sum = BigDecimal.ZERO.intValue();
         if (null != getNetQty()) {
             sum = sum + getNetQty();
         }
@@ -150,7 +150,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @return
      */
-    public Long getVirtualProductionQty() {
+    public Integer getVirtualProductionQty() {
         if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
             return getHeightProductionQty();
         }
@@ -189,16 +189,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @param productionQty
      */
-    public void calculateInventorySalesRatio(Long productionQty) {
+    public void calculateInventorySalesRatio(Integer productionQty) {
         //月均销量没有或是为零，则表示库销比越低，最高
-        Long averageSaleQty = getAverageSaleQty();
-        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.longValue()) {
+        Integer averageSaleQty = getAverageSaleQty();
+        if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.intValue()) {
             inventorySalesRatio = BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
         }
-        if (null == productionQty || productionQty < BigDecimal.ZERO.longValue()) {
-            productionQty = BigDecimal.ZERO.longValue();
+        if (null == productionQty || productionQty < BigDecimal.ZERO.intValue()) {
+            productionQty = BigDecimal.ZERO.intValue();
         }
-        Long sumStockQty = getStockQty() + productionQty;
+        Integer sumStockQty = getStockQty() + productionQty;
         inventorySalesRatio = BigDecimal.valueOf(sumStockQty).divide(BigDecimal.valueOf(averageSaleQty), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
@@ -224,6 +224,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             plan.setIsProduction(require.getIsProduction());
         }
+        //需求量处理 todo 无效代码-类型没有统一
+        plan.setHeightQty(require.getHeightQty().intValue());
+        plan.setMidQty(require.getMidQty().intValue());
+        plan.setPostponeQty(require.getPostponeQty().intValue());
+        plan.setCycleReserveQty(require.getCycleReserveQty().intValue());
+        plan.setConventionReserveQty(require.getConventionReserveQty().intValue());
+        plan.setNetQty(require.getNetQty().intValue());
+        plan.setPostponeNetQty(require.getPostponeNetQty().intValue());
+        plan.setUnPostponeNetQty(require.getUnPostponeNetQty().intValue());
+        plan.setAverageSaleQty(require.getAverageSaleQty().intValue());
+        plan.setStockQty(require.getStockQty().intValue());
         return plan;
     }
 
@@ -371,7 +382,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @return
      */
-    public Long getMaxDaySingleLhMachineQty() {
+    public Integer getMaxDaySingleLhMachineQty() {
         return getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 
@@ -466,7 +477,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return YesOrNoEnum.NO.getCode();
         }
         //无排产量
-        if (getPlanNeedProductionQty() <= BigDecimal.ZERO.longValue()) {
+        if (getPlanNeedProductionQty() <= BigDecimal.ZERO.intValue()) {
             String noProductionQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_QTY);
             addNoProductionReason(noProductionQtyReason);
             setIsProduction(YesOrNoEnum.NO.getCode());

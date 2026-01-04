@@ -22,8 +22,8 @@ public class DayProductionHandler {
      * @param dayQtyInfo
      * @return
      */
-    public static Long summaryDayQty(BaseEntity dayQtyInfo, Integer[] dayList) {
-        Long totalValue = BigDecimal.ZERO.longValue();
+    public static Integer summaryDayQty(BaseEntity dayQtyInfo, Integer[] dayList) {
+        Integer totalValue = BigDecimal.ZERO.intValue();
         if (null == dayQtyInfo || null == dayList || dayList.length <= BigDecimal.ZERO.intValue()) {
             return totalValue;
         }
@@ -35,12 +35,12 @@ public class DayProductionHandler {
                 fieldName = "preDay";
             }
             fieldName = fieldName + Math.abs(day);
-            Long dayValue;
+            Integer dayValue;
             Object value = dayQtyInfo.getFieldValueByFieldName(fieldName);
             if (null == value) {
-                dayValue = BigDecimal.ZERO.longValue();
+                dayValue = BigDecimal.ZERO.intValue();
             } else {
-                dayValue = Long.valueOf("" + value);
+                dayValue = Integer.valueOf("" + value);
             }
             totalValue = totalValue + dayValue;
         }
@@ -74,13 +74,13 @@ public class DayProductionHandler {
             if (null == value) {
                 continue;
             }
-            Long productionValue = Long.valueOf("" + value);
+            Integer productionValue = Integer.valueOf("" + value);
             Object previousValue = target.getFieldValueByFieldName(fieldName);
-            Long sumValue;
+            Integer sumValue;
             if (null == previousValue) {
-                sumValue = BigDecimal.ZERO.longValue();
+                sumValue = BigDecimal.ZERO.intValue();
             } else {
-                sumValue = Long.valueOf("" + previousValue);
+                sumValue = Integer.valueOf("" + previousValue);
             }
             sumValue = sumValue + productionValue;
             target.setFieldValueByFieldName(fieldName, sumValue);

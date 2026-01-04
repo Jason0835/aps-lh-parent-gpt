@@ -71,10 +71,10 @@ public class CxAddSkuProductionHandler {
             //todo 记录日志
             return;
         }
-        Long sumProductionQty = needProductionInfo.getSumNeedProductionQty();
-        Long dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
+        Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
@@ -124,10 +124,10 @@ public class CxAddSkuProductionHandler {
             //todo 记录日志
             return;
         }
-        Long sumProductionQty = needProductionInfo.getSumNeedProductionQty();
-        Long dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
+        Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         Set<String> cxMachineInfoSet = new HashSet<>();
         cxMachineInfoSet.add(cxMachineCode);
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfoSet, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);

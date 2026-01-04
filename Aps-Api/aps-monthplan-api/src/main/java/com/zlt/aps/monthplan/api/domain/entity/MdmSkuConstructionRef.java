@@ -110,28 +110,28 @@ public class MdmSkuConstructionRef extends BaseEntity {
 
     /** 夏季机械硫化时间(秒) */
     @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime", sort = 35)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime", width = 25, sort = 35)
     @ApiModelProperty(value = "夏季机械硫化时间(秒)", name = "curingTime")
     @TableField(value = "CURING_TIME")
     private Integer curingTime;
 
     /** 夏季液压硫化时间(秒) */
     @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime", sort = 50)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime", width = 25, sort = 50)
     @ApiModelProperty(value = "夏季液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
     @TableField(value = "HY_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;
 
     /** 冬季机械硫化时间(秒) */
     @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime2", sort = 40)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime2", width = 25, sort = 40)
     @ApiModelProperty(value = "冬季机械硫化时间(秒)", name = "curingTime2")
     @TableField(value = "CURING_TIME2")
     private Integer curingTime2;
 
     /** 冬季液压硫化时间(秒) */
     @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime2", sort = 55)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.hydraulicPressureCuringTime2", width = 25, sort = 55)
     @ApiModelProperty(value = "冬季液压硫化时间(秒)", name = "hydraulicPressureCuringTime2")
     @TableField(value = "HY_PRESSURE_CURING_TIME2")
     private Integer hydraulicPressureCuringTime2;

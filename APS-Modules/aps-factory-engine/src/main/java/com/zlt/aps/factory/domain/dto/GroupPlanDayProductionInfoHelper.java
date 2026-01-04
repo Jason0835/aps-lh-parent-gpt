@@ -56,12 +56,12 @@ public class GroupPlanDayProductionInfoHelper implements Serializable {
     /**
      * 日排产量
      */
-    private Long productionQty;
+    private Integer productionQty;
     /**
      * 日损耗量：换模或是换活字块损耗
      * 不到具体的计划ID
      */
-    private Long lossQty;
+    private Integer lossQty;
     /**
      * 成型机台信息
      */
@@ -81,7 +81,7 @@ public class GroupPlanDayProductionInfoHelper implements Serializable {
      * @param isVirtual            是否虚单 1 是 0 否
      * @return
      */
-    public static GroupPlanDayProductionInfoHelper buildDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, CxLhProductionHelper cxLhProductionHelper, Long productionQty, Long lossQty, String isVirtual) {
+    public static GroupPlanDayProductionInfoHelper buildDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, CxLhProductionHelper cxLhProductionHelper, Integer productionQty, Integer lossQty, String isVirtual) {
         GroupPlanDayProductionInfoHelper productionInfo = new GroupPlanDayProductionInfoHelper(groupPlan.getMonthPlanId(), cxLhProductionHelper.getProductionDay(), cxLhProductionHelper.getLhGroupNo(), groupPlan.getStructureName());
         //排产量
         productionInfo.setProductionQty(productionQty);
@@ -113,7 +113,7 @@ public class GroupPlanDayProductionInfoHelper implements Serializable {
      * @param isVirtual         是否虚单 1 是 0 否
      * @return
      */
-    public static GroupPlanDayProductionInfoHelper buildDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Integer productionDay, Set<String> cxMachineCodeInfo, List<ProductionMouldInfoVo> doubleMouldList, Long productionQty, Long lossQty, String isVirtual) {
+    public static GroupPlanDayProductionInfoHelper buildDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Integer productionDay, Set<String> cxMachineCodeInfo, List<ProductionMouldInfoVo> doubleMouldList, Integer productionQty, Integer lossQty, String isVirtual) {
         GroupPlanDayProductionInfoHelper productionInfo = new GroupPlanDayProductionInfoHelper(groupPlan.getMonthPlanId(), productionDay, null, groupPlan.getStructureName());
         //排产量
         productionInfo.setProductionQty(productionQty);
