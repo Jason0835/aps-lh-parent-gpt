@@ -8,6 +8,21 @@ export function listConsole(query) {
     data: query
   })
 }
+export function versionListConsole(query) {
+  return request({
+    url: '/factory/console/noSelectedVersionList',
+    method: 'post',
+    data: query
+  })
+}
+export function versionConfirm(query) {
+  return request({
+    url: '​/factory​/console​/confirmProductionRequireVersion',
+    method: 'post',
+    data: query
+  })
+}
+
 export function editConsole(query) {
   return request({
     url: '/factory/console/save',

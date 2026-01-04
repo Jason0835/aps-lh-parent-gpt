@@ -120,7 +120,7 @@ export default {
         {
           prop: "salCodePo",
           label: this.$t("ui.data.column.monthplan.salCodePo"),
-          disabled: true,
+
         },
         {
           prop: "scmPriority",

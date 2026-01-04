@@ -138,6 +138,11 @@ export default {
           disabled: true,
         },
         {
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          prop: "mainPattern",
+          disabled: true,
+        },
+        {
           label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "pattern",
           disabled: true,

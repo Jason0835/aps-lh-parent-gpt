@@ -97,6 +97,8 @@
     />
     <infoDialog ref="infoRef" @success="getList" />
     <addDialog ref="addRef" @success="getList" />
+    <noVersionList ref="noVersionListRef" @success="getList" />
+
     <finalizedDialog ref="finRef" @success="getList" />
   </basic-container>
 </template>
@@ -123,6 +125,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 import addDialog from "./components/addDialog.vue";
 import finalizedDialog from "./components/finalizedDialog.vue";
+import noVersionList from "./components/noVersionList.vue";
 
 export default {
   name: "Console",
@@ -131,6 +134,7 @@ export default {
     addDialog,
     infoDialog,
     finalizedDialog,
+    noVersionList
   },
   dicts: [
     "biz_factory_name",
@@ -206,15 +210,15 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthSaleOrderPlan.factoryCode"),
+          label: this.$t("common.factory"),
           align: "center",
 
           formatter: (row) => {
-            // return this.selectDictLabel(
-            //   this.dict.type.biz_factory_name,
-            //   row.factoryCode
-            // );
-            return  116
+            return this.selectDictLabel(
+              this.dict.type.biz_factory_name,
+              row.factoryCode
+            );
+
           },
         },
         {
@@ -382,9 +386,10 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthSaleOrderPlan.factoryCode"),
+          label: this.$t("common.factory"),
           type: "select",
-          // dictData: this.dict.type.biz_factory_name,
+          dictData: this.dict.type.biz_factory_name,
+          clearable: false,
         },
         {
           label: this.$t("产品品类"),
@@ -399,8 +404,12 @@ export default {
   },
   methods: {
     handleAdd() {
-      if (this.$refs.addRef) {
-        this.$refs.addRef.show();
+      if (this.$refs.noVersionListRef) {
+        const params = {
+        ...this.query,
+        ...this.sort,
+      };
+        this.$refs.noVersionListRef.show(params);
       }
     },
     handleEdit(row) {
@@ -626,7 +635,6 @@ export default {
         this.map[row.monthPlanVersion]
       ) {
         let arr = this.map[row.monthPlanVersion];
-
         let length = arr.length;
         if (row.productionVersion === arr[0].productionVersion) {
           return {
@@ -728,6 +736,7 @@ export default {
     const date = moment();
     let defaultParams = {
       yearMonth: date.format("yyyy-MM"),
+      factoryCode:'116'
     };
     this.search = {
       ...defaultParams,
@@ -735,9 +744,10 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.getList();
   },
   activated() {
-    this.getList();
+
   },
 };
 </script>
