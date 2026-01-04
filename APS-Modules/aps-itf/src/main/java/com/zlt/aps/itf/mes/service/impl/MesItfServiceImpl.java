@@ -202,6 +202,7 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncProductStock(MdmProductStock mdmProductStock) throws ParseException {
         List<MdmProductStock> productStockList = this.getProductStock(mdmProductStock);
         try {
+            List<MdmProductStock> saveList = new ArrayList<>();
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
             List<String> materialCodeList = productStockList.stream().map(MdmProductStock::getMaterialCode).distinct().collect(Collectors.toList());
@@ -214,6 +215,7 @@ public class MesItfServiceImpl implements MesItfService {
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
                     stock.setProductTypeCode(materialInfo.getProductTypeCode());
+                    saveList.add(stock);
                 }
             }
             // 先删后增，日期
@@ -260,7 +262,7 @@ public class MesItfServiceImpl implements MesItfService {
             param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
             Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
 
-            List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(productStockList, 1000);
+            List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
             for (List<MdmProductStock> importList : splitList) {
                 List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
                 for (MdmProductStock productStock : importList) {
@@ -375,6 +377,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
+            List<MdmUnqualifiedStock> saveList = new ArrayList<>();
             List<String> materialCodeList = unqualifiedStock.stream().map(MdmUnqualifiedStock::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
             for (MdmUnqualifiedStock stock : unqualifiedStock) {
@@ -382,6 +385,7 @@ public class MesItfServiceImpl implements MesItfService {
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
                     stock.setMaterialDesc(materialInfo.getMaterialDesc());
+                    saveList.add(stock);
                 }
             }
             Date stockDate = mdmUnqualifiedStock.getStockDate();
@@ -391,7 +395,7 @@ public class MesItfServiceImpl implements MesItfService {
             Map<String, Object> map = new HashMap<>();
             map.put("STOCK_DATE", stockDate);
             baseDao.deleteByMap(ProductStockMonth.class, map);
-            List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(unqualifiedStock, 1000);
+            List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
             for (List<MdmUnqualifiedStock> importList : splitList) {
                 baseDao.insertBatch(importList);
             }
@@ -475,6 +479,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
+            List<RawMaterialOutboundRecord> saveList = new ArrayList<>();
             // 获取物料信息回写物料描述
             List<String> materialCodeList = rawMaterialOutboundRecords.stream().map(RawMaterialOutboundRecord::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
@@ -483,12 +488,13 @@ public class MesItfServiceImpl implements MesItfService {
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
                     record.setMaterialDesc(materialInfo.getMaterialDesc());
+                    saveList.add(record);
                 }
             }
             Map<String, Object> map = new HashMap<>(16);
             map.put("OUTBOUND_DATE", outboundDate);
             baseDao.deleteByMap(RawMaterialOutboundRecord.class, map);
-            baseDao.insertBatch(rawMaterialOutboundRecords);
+            baseDao.insertBatch(saveList);
         } finally {
             DynamicDataSourceContextHolder.clear();
             // 切换APS数据源 end
