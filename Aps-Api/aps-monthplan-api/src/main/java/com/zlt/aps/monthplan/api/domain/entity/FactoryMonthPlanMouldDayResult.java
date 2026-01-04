@@ -25,9 +25,9 @@ import java.math.BigDecimal;
  * @date 2025-12-31
  */
 
-@ApiModel(value = "S2-0604.排产结果-生产计划排产结果对象", description = "S2-0604.排产结果-生产计划排产结果对象 ")
 @Data
 @TableName(value = "T_MP_MOULDING_DAY_RESULT")
+@ApiModel(value = "S2-0604.排产结果-生产计划排产结果对象", description = "S2-0604.排产结果-生产计划排产结果对象 ")
 public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -655,6 +655,5 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "显示顺序", name = "displaySeq")
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
-
 
 }
