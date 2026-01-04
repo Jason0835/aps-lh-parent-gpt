@@ -321,17 +321,17 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                     if (i == passThreeMonth - 1) {
                         // 近3个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passThreeMonth), 0, RoundingMode.UP);
-                        monthlySaleQty.setPassThreeMonthSaleQty(result.longValue());
+                        monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
                 }
                 // 月均销量
                 BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passSixMonth), 0, RoundingMode.UP);
-                monthlySaleQty.setAverageSaleQty(result.longValue());
+                monthlySaleQty.setAverageSaleQty(result.intValue());
 
                 // 滚动月销量
                 if (rollMonthSaleQtyMap.containsKey(materialCode)) {
                     Integer saleQty = rollMonthSaleQtyMap.get(materialCode);
-                    monthlySaleQty.setRollTwelveMonthSaleQty(saleQty.longValue());
+                    monthlySaleQty.setRollTwelveMonthSaleQty(saleQty.intValue());
                 }
 
                 // 根据物料信息回写物料信息
