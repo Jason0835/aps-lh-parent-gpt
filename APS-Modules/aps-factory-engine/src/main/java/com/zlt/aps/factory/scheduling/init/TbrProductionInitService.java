@@ -72,6 +72,9 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         log.info(startInitLog);
         //获取需求计划
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
+        if(CollectionUtils.isEmpty(requirePlanList)){
+            throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
+        }
         String planType = requirePlanList.get(BigDecimal.ZERO.intValue()).getPlanType();
         context.setPlanType(planType);
         productionContext.setPlanType(planType);
@@ -129,16 +132,27 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
         if (null != factoryProductionVersion) {
             setProductionVersionCycleInfo(factoryProductionVersion, context);
+            context.setPlanType(factoryProductionVersion.getPlanType());
             getDataService().updateFactoryProductionVersion(factoryProductionVersion);
             return;
         }
-        //不存在，则表示新插入记录
+        //不存在，则表示新插入记录，此时需要获取计划类型等
+        MpFactoryProductionVersion firstVersion = getDataService().getFirstFactoryMonthPlanVersion(context);
+        if (null == firstVersion) {
+            String errorFormat = I18nUtil.getMessage("alg.data.before.production.planListIsNull");
+            String errorInfo = String.format(errorFormat, context.getYear(), context.getMonth(), context.getMonthPlanVersion());
+            throw new BusinessException(errorInfo);
+        }
+        //设置计划类型
+        context.setPlanType(firstVersion.getPlanType());
         factoryProductionVersion = new MpFactoryProductionVersion();
         factoryProductionVersion.setFactoryCode(context.getFactoryCode());
         factoryProductionVersion.setYear(context.getYear());
         factoryProductionVersion.setMonth(context.getMonth());
         factoryProductionVersion.setMonthPlanVersion(context.getMonthPlanVersion());
         factoryProductionVersion.setProductTypeCode(context.getProductType().getValue());
+        factoryProductionVersion.setPlanType(firstVersion.getPlanType());
+        factoryProductionVersion.setIsSelectedDemand(firstVersion.getIsSelectedDemand());
         //设置月份排产模式自然月或非自然月及开始、结束排产日期
         setProductionVersionCycleInfo(factoryProductionVersion, context);
         getDataService().addFactoryProductionVersion(factoryProductionVersion);

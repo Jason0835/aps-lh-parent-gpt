@@ -350,8 +350,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         Integer month = factoryProductionParam.getMonth();
         String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
         String productionVersion = factoryProductionParam.getProductionVersion();
-        //todo 正式需要排产版本号 || StringUtils.isBlank(productionVersion)
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
+        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.versionNoEmpty"));
         }
         QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
@@ -360,8 +359,8 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         queryWrapper.eq("MONTH", month);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
-        //todo 正式需要排产版本号 queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
-        queryWrapper.eq(StringUtils.isNotBlank(productionVersion), "PRODUCTION_VERSION", productionVersion);
+        //正式需要排产版本号 queryWrapper.eq(StringUtils.isNotBlank(productionVersion), "PRODUCTION_VERSION", productionVersion);
+        queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
         MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
         if (null == version) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));

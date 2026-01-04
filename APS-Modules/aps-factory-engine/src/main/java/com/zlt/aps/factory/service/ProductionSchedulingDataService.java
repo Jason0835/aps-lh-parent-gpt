@@ -46,6 +46,14 @@ public interface ProductionSchedulingDataService {
     MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context);
 
     /**
+     * 获取工厂需求计划版本第一个版本信息
+     * (可能没有排，也可能有排)
+     *
+     * @param context
+     * @return
+     */
+    MpFactoryProductionVersion getFirstFactoryMonthPlanVersion(Context context);
+    /**
      * 根据工厂编码、年份、月份获取对应的定稿版本信息
      *
      * @param factoryCode 工厂编码

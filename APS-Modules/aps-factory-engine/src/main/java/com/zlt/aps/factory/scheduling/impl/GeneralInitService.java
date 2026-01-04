@@ -33,10 +33,7 @@ public class GeneralInitService extends AbstractProductionBusinessService {
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
-            //todo 先设置可新增保存
-            context.setInsertNewProductionVersion(Boolean.TRUE);
             tbrProductionInitService.run(context, userObj);
-            context.setInsertNewProductionVersion(Boolean.FALSE);
             //保存日志
             saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
             return;
