@@ -254,6 +254,7 @@ public class MesItfServiceImpl implements MesItfService {
             param.setFactoryCode(factoryCode);
             param.setProductTypeCode(productTypeCode);
             param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
+            param.setProductTypeCode(mdmProductStock.getProductTypeCode());
             Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
 
             param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
@@ -502,6 +503,9 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     private Map<String, MdmMaterialInfo> getMaterialInfoMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
         List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
         List<List<String>> splitList = ScmListUtils.getSplitList(materialCodeList, 1000);
         for (List<String> codeList : splitList) {
