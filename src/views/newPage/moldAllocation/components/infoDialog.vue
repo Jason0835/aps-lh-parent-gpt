@@ -111,7 +111,7 @@ export default {
         mainPattern: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],

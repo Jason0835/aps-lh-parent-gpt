@@ -44,11 +44,11 @@
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <!-- <el-button
+        <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:ProductMoldingLimit:export']"
+          v-hasPermi="['monthplan:mdmSkuStructureRef:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        > -->
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -295,7 +295,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
+      downloadLink("/monthplan/mdmSkuStructureRef/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
