@@ -56,7 +56,7 @@ export default {
   components: {
     // tltUpload,
   },
-  dicts: ["biz_factory_name",'biz_product_type','biz_brand_type'],
+  dicts: ["biz_factory_name",'biz_product_type','biz_brand_type','biz_stor_type'],
   data() {
     return {
       createLoading:false,
@@ -103,6 +103,15 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
           width:120
+        },
+        {
+          prop: "locationType",
+          label: this.$t("ui.data.column.finishStock.wai"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
+          },
+          width:120
+
         },
         // {
         //   prop: "类型",

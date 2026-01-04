@@ -267,5 +267,6 @@
   "ui.data.monthlyProductionPlan.typeBlockQty": "活块",
   "ui.data.monthlyProductionPlan.prodReqPlan": "净需求",
   "ui.data.monthlyProductionPlan.inventorySalesRatio": "库销比",
-  "ui.data.monthlyProductionPlan.dayVulcanizationQty": "日硫化量"
+  "ui.data.monthlyProductionPlan.dayVulcanizationQty": "日硫化量",
+  "ui.data.productmodelrelation.updateMainPattern": "更新主花纹到物料信息表"
 }
