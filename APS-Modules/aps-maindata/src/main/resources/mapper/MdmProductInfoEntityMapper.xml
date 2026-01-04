@@ -108,6 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                tmpi.PRODUCT_TYPE_NAME,
                tmpi.MOULD_CATEGORY,
                tmpi.SPECIFICATIONS,
+        tmpi.MAIN_PATTERN,
                tmpi.PATTERN,
                tmpi.BRAND,
                tmpi.TIRE_TYPE,
