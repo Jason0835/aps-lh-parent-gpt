@@ -18,6 +18,7 @@ import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -112,7 +113,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //第二轮排产
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
         FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //todo 最后搭配排产 20260101
+        //最后搭配排产
+        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
 
         //保存模具排产结果
         saveMouldProductionInfo(productionContext);
