@@ -9,6 +9,7 @@
                PRODUCT_TYPE_CODE,
                MONTH_PLAN_VERSION,
                PRODUCTION_INIT_VERSION AS INIT_VERSION,
+               PRODUCTION_ST_VERSION,
                PRODUCTION_VERSION,
                CREATE_TIME,
                IS_FINAL,

@@ -3,7 +3,10 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -33,38 +36,6 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<MdmModelInfo> selectModelInfoList(MdmModelInfo modelInfo);
-
-    /**
-     * 查询成品库存列表
-     *
-     * @param productStockMonth 查询参数
-     * @return 结果
-     */
-    List<MdmProductStock> selectProductStock(MdmProductStock productStockMonth);
-
-    /**
-     * 查询不合格库存列表
-     *
-     * @param productStockMonth 查询参数
-     * @return 列表
-     */
-    List<MdmUnqualifiedStock> selectUnqualifiedStock(MdmUnqualifiedStock productStockMonth);
-
-    /**
-     * 查询原材料库存列表
-     *
-     * @param rawSpecialMaterialStock 查询参数
-     * @return 列表
-     */
-    List<RawSpecialMaterialStock> selectRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock);
-
-    /**
-     * 获取原材料出库记录列表
-     *
-     * @param materialOutboundRecord 同步数据日志
-     * @return 列表
-     */
-    List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord);
 
     /**
      * 获取成品物料信息

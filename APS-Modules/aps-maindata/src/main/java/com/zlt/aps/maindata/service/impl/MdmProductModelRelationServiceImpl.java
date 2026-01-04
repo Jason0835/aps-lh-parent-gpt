@@ -423,5 +423,18 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         }
         return iMesItfService.syncProductModRelation(new MdmSkuMouldRel());
     }
+
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult updateMainPatternToMaterial(MdmSkuMouldRel queryVO) {
+        queryVO.setBaseVale(null);
+        productInfoEntityMapper.updateMainPatternToMaterial(queryVO);
+        return AjaxResult.success();
+    }
 }
 

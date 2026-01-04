@@ -672,5 +672,12 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
 
+    /**
+     * 发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE
+     */
+    @Excel(name = "schedule.glueScheduleResult.releaseStatus")
+    @ApiModelProperty(value = "发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE", name = "isRelease")
+    @TableField(value = "IS_RELEASE")
+    private String isRelease;
 
 }

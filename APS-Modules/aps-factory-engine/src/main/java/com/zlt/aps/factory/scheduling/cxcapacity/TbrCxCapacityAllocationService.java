@@ -1,8 +1,10 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
@@ -73,8 +75,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
         if (CollectionUtils.isEmpty(requirePlanList)) {
-            //todo 记录日志
-            return;
+            throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
         }
         //设置初始的排产量数据信息
         requirePlanList.forEach(singlePlan -> singlePlan.initProductionDataInfo());

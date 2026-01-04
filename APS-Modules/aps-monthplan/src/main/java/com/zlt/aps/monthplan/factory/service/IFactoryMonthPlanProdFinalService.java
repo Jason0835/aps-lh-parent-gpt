@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanRequireStock;
 import com.zlt.aps.monthplan.api.domain.vo.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -134,5 +135,6 @@ public interface IFactoryMonthPlanProdFinalService {
      * @param factoryMonthPlanProdFinal 参数
      * @return 结果
      */
+    @Transactional(rollbackFor = Exception.class)
     AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal);
 }

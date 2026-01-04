@@ -3,6 +3,8 @@ package com.zlt.aps.monthplan.setting.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.ruoyi.common.text.Convert;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuLhCapacityService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
@@ -70,7 +72,39 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
         } catch (QueryExprException e) {
             throw new ServiceException("执行查询公式时发生错误.");
         }
+        // 计算APS日硫化量
+        calculateApsCapacity(tableDataInfo.getRows());
         return tableDataInfo;
+    }
+
+
+    /**
+     * 计算APS日硫化量
+     */
+    private void calculateApsCapacity(List<?> sourceList) {
+        if (PubUtil.isEmpty(sourceList)) {
+            return;
+        }
+        List<MdmSkuLhCapacity> mdmSkuLhCapacityList = (List<MdmSkuLhCapacity>) sourceList;
+        // 计算APS日硫化量：APS日硫化量 = 24 * 60 / 硫化总时间(min)
+        mdmSkuLhCapacityList.stream()
+                .filter(skuCapacity -> {
+                    Integer sum = skuCapacity.getSumVulcanization();
+                    return sum != null && sum > 0;
+                })
+                .forEach(skuCapacity -> {
+                    Integer sumVulcanization = skuCapacity.getSumVulcanization();
+                    double divisionResult = (double) ApsConstant.MINUTES_PER_DAY / sumVulcanization;
+                    double ceilResult = Math.ceil(divisionResult);
+                    skuCapacity.setApsCapacity(Convert.toInt(ceilResult));
+                });
+            // 设置默认值
+            mdmSkuLhCapacityList.stream()
+                    .filter(skuCapacity -> {
+                        Integer sum = skuCapacity.getSumVulcanization();
+                        return sum == null || sum <= 0;
+                    })
+                    .forEach(skuCapacity -> skuCapacity.setApsCapacity(0));
     }
 
 
