@@ -215,17 +215,17 @@ export default {
           width: 160,
         },
 
-        {
-          prop: "hydraulicPressureCuringTime",
-          label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime"),
-          align:'left',
-          width: 160,
-        },
-        {
-          prop: "hydraulicPressureCuringTime2",
-          label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime2"),
-          width: 160,
-        },
+        // {
+        //   prop: "hydraulicPressureCuringTime",
+        //   label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime"),
+        //   align:'left',
+        //   width: 160,
+        // },
+        // {
+        //   prop: "hydraulicPressureCuringTime2",
+        //   label: this.$t("ui.data.column.skuConstruction.hydraulicPressureCuringTime2"),
+        //   width: 160,
+        // },
         {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),

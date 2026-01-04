@@ -43,3 +43,11 @@ export function mesCapture(query) {
     data: query
   })
 }
+
+export function updateMaterial(query) {
+  return request({
+    url: '/maindata/relation/updateMainPatternToMaterial',
+    method: 'post',
+    data: query
+  })
+}

@@ -157,8 +157,8 @@ export default {
             });
           } else {
             this.$modal.msgSuccess(res.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
+            // this.$set(this.page, "current", 1);
+            this.$emit("success");
           }
           this.hide();
         }

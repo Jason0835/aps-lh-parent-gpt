@@ -86,7 +86,7 @@ export default {
         ],
         specifications: [
           {
-            required: true,
+            required: false,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },

@@ -42,9 +42,14 @@
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
-        <el-button type="primary" plain  v-hasPermi="['maindata:relation:mesCapture']" @click="capture">{{
-          $t("ui.data.column.moldLedger.mes")
-        }}</el-button>
+        <el-button
+          type="primary"
+          :loading="scmLoading"
+          plain
+          v-hasPermi="['maindata:relation:mesCapture']"
+          @click="capture"
+          >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
+        >
         <el-button
           v-hasPermi="['maindata:relation:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -54,6 +59,13 @@
           @click="handleExport"
           v-hasPermi="['maindata:relation:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
+        >
+        <el-button
+          @click="handleUpdate"
+          :loading="updateLoading"
+          type="primary"
+          v-hasPermi="['maindata:relation:updateMainPattern']"
+          >{{ $t("更新主花纹到物料信息表") }}</el-button
         >
       </template>
     </page-table>
@@ -67,7 +79,7 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-    downloadUrl="/maindata/relation/importTemplate"
+      downloadUrl="/maindata/relation/importTemplate"
       uploadUrl="/maindata/relation/importData"
       @uploadSuccess="getList"
       labelWidth="0"
@@ -86,6 +98,7 @@ import {
   listRelation,
   removeRelation,
   mesCapture,
+  updateMaterial,
 } from "@/api/maindata/relation";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -97,7 +110,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm
+    TltUploadForm,
   },
   dicts: ["biz_factory_name", "biz_brand_type", "molding_method", "biz_yes_no"],
   provide() {
@@ -124,6 +137,8 @@ export default {
         },
       ],
       loading: false,
+      scmLoading:false,
+      updateLoading:false,
       data: [],
       selection: [],
       page: {
@@ -222,7 +237,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300,
+          width: 300,
         },
         {
           prop: "mainPattern",
@@ -231,7 +246,7 @@ export default {
         {
           prop: "isSamePatternPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
-          width:80,
+          width: 80,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -272,7 +287,6 @@ export default {
             );
           },
         },
-
       ];
 
       return columns;
@@ -311,14 +325,30 @@ export default {
     },
   },
   methods: {
+    async handleUpdate() {
+      try {
+        this.updateLoading=true
+        let res = await updateMaterial();
+        this.$modal.msgSuccess(res.msg);
+        // this.$set(this.page, "current", 1);
+        // this.getList();
+        this.updateLoading=false
+      } catch (err) {
+        console.log(err);
+        this.updateLoading=false
+      }
+    },
     async capture() {
       try {
+        this.scmLoading=true
         let res = await mesCapture();
         this.$modal.msgSuccess(res.msg);
         this.$set(this.page, "current", 1);
         this.getList();
+        this.scmLoading=false
       } catch (err) {
-        console.log(err)
+        console.log(err);
+        this.scmLoading=false
       }
     },
     handleAdd() {
@@ -335,7 +365,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = rows.id
+        const ids = rows.id;
         removeRelation({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
@@ -350,7 +380,7 @@ export default {
         if (i == this.selection.length - 1) {
           ids = ids + this.selection[i].id;
         } else {
-          ids = ids +  this.selection[i].id + ",";
+          ids = ids + this.selection[i].id + ",";
         }
       }
       this.$confirm(this.$t("common.confirm.delete"), {

@@ -33,10 +33,11 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
+import moldLedgerSelect from "@/views/components/moldLedgerSelect.vue";
 import { editRelation } from "@/api/maindata/relation";
 
 export default {
-  components: { infoForm,materialCodeSelect },
+  components: { infoForm,materialCodeSelect,moldLedgerSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -115,10 +116,27 @@ export default {
         {
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
           prop: "mouldCode",
+          render: (form) => {
+            return (
+              <moldLedgerSelect
+                key={form.mouldCode}
+                v-model={form.mouldCode}
+                onChange={this.handleMoldLedgerChange}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.rubberMaterial.shareMouldCode"),
           prop: "shareMouldCode",
+          render: (form) => {
+            return (
+              <moldLedgerSelect
+                key={form.shareMouldCode}
+                v-model={form.shareMouldCode}
+              />
+            );
+          },
         },
         {
           prop: "materialCode",
@@ -141,6 +159,7 @@ export default {
         {
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
           prop: "mainPattern",
+          disabled:true
         },
         {
           prop: "isSamePatternPanel",
@@ -213,6 +232,13 @@ export default {
         this.$set(this.form, "materialDesc", row.materialDesc);
       } else {
         this.$set(this.form, "materialDesc", "");
+      }
+    },
+    handleMoldLedgerChange(val, row) {
+      if (val) {
+        this.$set(this.form, "mainPattern", row.mainPattern);
+      } else {
+        this.$set(this.form, "mainPattern", "");
       }
     },
   },

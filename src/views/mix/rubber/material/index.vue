@@ -263,6 +263,13 @@ export default {
           label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
         },
         {
+          prop: "mainPattern",
+          halign: "center",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+        },
+        {
           prop: "pattern",
           halign: "center",
           align: "center",
