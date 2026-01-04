@@ -137,7 +137,7 @@ export default {
         if (this.isLock) {
           let res = await lockPool(obj);
           this.loading = false;
-          this.$modal.msgSuccess(res.msg);
+          this.$modal.msgSuccess(this.$t('common.msg.success.operate'));
           this.$emit("success");
           this.hide();
         } else {

@@ -344,6 +344,12 @@ export default {
           label: this.$t("ui.data.rubberMaterial.sectionWidth"),
         },
         {
+          prop: "productTypeName",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.column.monthplan.productType"),
+        },
+        {
           prop: "remark",
           halign: "center",
           align: "center",

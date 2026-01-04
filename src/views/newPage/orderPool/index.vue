@@ -242,7 +242,8 @@ export default {
         {
           prop: "ordQty",
           label: this.$t("common.num"),
-          width:120
+          width:120,
+          align:'left'
         },
         {
           prop: "weekYear",
