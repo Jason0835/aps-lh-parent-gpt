@@ -57,13 +57,13 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmSkuStructureRef queryVO) {
-        TableDataInfo tableDataInfo = super.list(queryVO);
-        try {
-            QueryFormulaUtil.execFormula(tableDataInfo.getRows(), this.getQueryFormulas());
-        } catch (QueryExprException e) {
-            throw new ServiceException("执行查询公式时发生错误.");
-        }
-        return tableDataInfo;
+        QueryWrapper<MdmSkuStructureRef> queryWrapper = new QueryWrapper<>();
+        // 条件拼接
+        builderCondition(queryWrapper, queryVO);
+        startPage();
+        List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(queryWrapper);
+        clearPage();
+        return getDataTable(list);
     }
 
     @Override
@@ -143,7 +143,7 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     protected List<MdmSkuStructureRef> listExportData(MdmSkuStructureRef obj) {
         QueryWrapper<MdmSkuStructureRef> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        return entityMapper.getMdmSkuStructureRefList(wrapper);
     }
 
     @Override
@@ -159,10 +159,13 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
      */
     @Override
     protected void builderCondition(QueryWrapper<MdmSkuStructureRef> queryWrapper, MdmSkuStructureRef queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "a.FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "a.MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "a.MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "a.STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        // 新增：MATERIAL_DESC 模糊查询（关联 T_MDM_MATERIAL_INFO 表）
+        Object materialDesc = queryVO.getFieldValueByFieldName("materialDesc");
+        queryWrapper.like(PubUtil.isNotEmpty(materialDesc), "b.MATERIAL_DESC", materialDesc);
     }
 
 
