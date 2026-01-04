@@ -86,7 +86,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     @Excel(name = "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty")
     @ApiModelProperty(value = "滚动12个月销量", name = "rollTwelveMonthSaleQty")
     @TableField(value = "ROLL_TWELVE_MONTH_SALE_QTY")
-    private Long rollTwelveMonthSaleQty;
+    private Integer rollTwelveMonthSaleQty;
 
     /**
      * 月均销量
@@ -94,7 +94,7 @@ public class MpMonthlySaleQty extends BaseEntity {
     @Excel(name = "ui.data.column.mpMonthlySaleQty.averageSaleQty")
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
-    private Long averageSaleQty;
+    private Integer averageSaleQty;
 
     /**
      * 近3个月均销量
@@ -102,14 +102,14 @@ public class MpMonthlySaleQty extends BaseEntity {
     @Excel(name = "ui.data.column.mpMonthlySaleQty.passThreeMonthSaleQty")
     @ApiModelProperty(value = "近3个月均销量", name = "passThreeMonthSaleQty")
     @TableField(value = "PASS_THREE_MONTH_SALE_QTY")
-    private Long passThreeMonthSaleQty;
+    private Integer passThreeMonthSaleQty;
     /**
      * 近6个月均销量
      */
 //    @Excel(name = "ui.data.column.mpMonthlySaleQty.passSixMonthSaleQty")
     @ApiModelProperty(value = "近6个月均销量", name = "passThreeMonthSaleQty")
     @TableField(value = "PASS_SIX_MONTH_SALE_QTY")
-    private Long passSixMonthSaleQty;
+    private Integer passSixMonthSaleQty;
     /** 近12个月的发货频次 */
 //    @Excel(name = "ui.data.column.mpMonthlySaleQty.deliveryFrequency")
     @ApiModelProperty(value = "近12个月发货频次", name = "deliveryFrequency")

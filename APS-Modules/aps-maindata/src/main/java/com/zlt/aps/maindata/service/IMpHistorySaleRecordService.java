@@ -30,5 +30,5 @@ public interface IMpHistorySaleRecordService extends IDocService<MpHistorySaleRe
    * @param months 月份数
    * @return 月均销量
    */
-  Map<String,Long> calculateMonthSaleQty(int months);
+  Map<String,Integer> calculateMonthSaleQty(int months);
 }

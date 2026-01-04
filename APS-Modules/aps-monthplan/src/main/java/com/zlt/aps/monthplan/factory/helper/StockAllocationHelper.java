@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
 
-import cn.hutool.core.io.unit.DataUnit;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.utils.ApsCommonUtil;
@@ -45,7 +44,7 @@ public class StockAllocationHelper {
       YearMonth yearMonth,
       Map<String, List<SalesOrderPool>> saleOrderGroupMap,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
-      Map<String,Long> mdmMonthSurplusMap) {
+      Map<String,Integer> mdmMonthSurplusMap) {
     List<DpOrderOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(saleOrderGroupMap)) {
       return result;
@@ -75,7 +74,7 @@ public class StockAllocationHelper {
       String monthPlanVersion,
       YearMonth yearMonth,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
-      Map<String,Long> mdmMonthSurplusMap,
+      Map<String,Integer> mdmMonthSurplusMap,
       String groupKey,
       List<SalesOrderPool> saleOrders) {
     List<MdmProductStock> stockInfos = finishedProductStockMap.get(groupKey);
@@ -94,9 +93,9 @@ public class StockAllocationHelper {
   /**
    * 为无库存订单创建零分配记录
    */
-  private static List<DpOrderOffsetDetail> createZeroAllocations(String monthPlanVersion,YearMonth yearMonth,Map<String,Long> mdmMonthSurplusMap,String groupKey, List<SalesOrderPool> saleOrders) {
+  private static List<DpOrderOffsetDetail> createZeroAllocations(String monthPlanVersion,YearMonth yearMonth,Map<String,Integer> mdmMonthSurplusMap,String groupKey, List<SalesOrderPool> saleOrders) {
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
-    long plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0L);
+    int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     if(plannedSurplus == 0L) {
       for (SalesOrderPool order : saleOrders) {
         long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
@@ -219,8 +218,8 @@ public class StockAllocationHelper {
   /**
    * 为订单列表执行库存分配
    */
-  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Long> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
-    Long plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0L);
+  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
+    int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
         stockInfos
@@ -233,7 +232,7 @@ public class StockAllocationHelper {
     return new StockAllocationResult(allocations);
   }
 
-  private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Long plannedSurplus, List<SalesOrderPool> sortedOrders) {
+  private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Integer plannedSurplus, List<SalesOrderPool> sortedOrders) {
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
         null
@@ -252,18 +251,18 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static DpOrderOffsetDetail allocateStockForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    long stockQty = context.getStockInfos().stream().filter(item -> null != item.getLeftOverQty()).mapToLong(MdmProductStock::getLeftOverQty).sum();
+    int stockQty = context.getStockInfos().stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
-    long orderQty = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
+    int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
     // 库存分配量
-    long allocationQty = calculateAllocationQuantity(order, context);
-    Long plannedSurplus =  context.plannedSurplus;
-    long produceQtyDue = orderQty - allocationQty;
-    if (plannedSurplus.compareTo(produceQtyDue) >= 0) {
+    int allocationQty = calculateAllocationQuantity(order, context);
+    int plannedSurplus =  context.plannedSurplus;
+    int produceQtyDue = orderQty - allocationQty;
+    if (plannedSurplus  >= produceQtyDue) {
       plannedSurplus = plannedSurplus - produceQtyDue;
-      produceQtyDue = BigDecimal.ZERO.longValue();
+      produceQtyDue = BigDecimal.ZERO.intValue();
     } else {
-      plannedSurplus =  BigDecimal.ZERO.longValue();
+      plannedSurplus =  BigDecimal.ZERO.intValue();
       produceQtyDue = produceQtyDue - plannedSurplus;
     }
     context.setPlannedSurplus(plannedSurplus);
@@ -272,13 +271,13 @@ public class StockAllocationHelper {
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
     // 5、库存冲减后，继续扣减月底计划余量部分
-    long produceQtyDue = null == order.getOrdQty()?BigDecimal.ZERO.longValue():order.getOrdQty().longValue();
-    Long plannedSurplus =  context.plannedSurplus;
-    if (plannedSurplus.compareTo(produceQtyDue) >= 0) {
+    int produceQtyDue = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
+    int plannedSurplus =  context.plannedSurplus;
+    if (plannedSurplus  >= produceQtyDue) {
       plannedSurplus = plannedSurplus - produceQtyDue;
-      produceQtyDue = BigDecimal.ZERO.longValue();
+      produceQtyDue = BigDecimal.ZERO.intValue();
     } else {
-      plannedSurplus =  BigDecimal.ZERO.longValue();
+      plannedSurplus =  BigDecimal.ZERO.intValue();
       produceQtyDue = produceQtyDue - plannedSurplus;
     }
     context.setPlannedSurplus(plannedSurplus);
@@ -288,7 +287,7 @@ public class StockAllocationHelper {
   /**
    * 计算单个订单的分配数量
    */
-  private static long calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
+  private static int calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
     List<MdmProductStock> stockInfos = context.getStockInfos();
     // 订单有年周号要求
     if(StringUtils.isNotBlank(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
@@ -319,39 +318,39 @@ public class StockAllocationHelper {
    * @param stockInfos 库存
    * @return 冲减结果
    */
-  private static long reduceInventoryByWeekYear(SalesOrderPool order, List<MdmProductStock> stockInfos) {
+  private static int reduceInventoryByWeekYear(SalesOrderPool order, List<MdmProductStock> stockInfos) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
-      return BigDecimal.ZERO.longValue();
+      return BigDecimal.ZERO.intValue();
     }
     int orderWeekYear = Integer.parseInt(order.getWeekYear());
     // 3. 过滤和排序库存
     List<MdmProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
-      return BigDecimal.ZERO.longValue();
+      return BigDecimal.ZERO.intValue();
     }
     // 4. 执行冲减
     ReductionDetail detail = performReduction(eligibleStocks, orderQty);
-    return orderQty.subtract(detail.getRemainingOrderQty()).longValue();
+    return orderQty.subtract(detail.getRemainingOrderQty()).intValue();
   }
 
-  private static long reduceInventory(SalesOrderPool order, List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
+  private static int reduceInventory(SalesOrderPool order, List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
-      return BigDecimal.ZERO.longValue();
+      return BigDecimal.ZERO.intValue();
     }
     // 3. 过滤和排序库存
     List<MdmProductStock> eligibleStocks = intelligentStockSelection(stockInfos, requiresDynamicBalance,requiresUniformity);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
-      return BigDecimal.ZERO.longValue();
+      return BigDecimal.ZERO.intValue();
     }
     // 4. 执行冲减
     ReductionDetail detail = performReduction(eligibleStocks, orderQty);
-    return orderQty.subtract(detail.getRemainingOrderQty()).longValue();
+    return orderQty.subtract(detail.getRemainingOrderQty()).intValue();
   }
 
 
@@ -448,13 +447,13 @@ public class StockAllocationHelper {
       item.setOriginalStockQty(stockQty);
       if (stockQty.compareTo(remainingQty) >= 0) {
         // 当前库存足够冲减
-        stock.setLeftOverQty(stockQty.subtract(remainingQty).longValue());
+        stock.setLeftOverQty(stockQty.subtract(remainingQty).intValue());
         item.setReducedQty(remainingQty);
         item.setRemainingStockQty(BigDecimal.valueOf(stock.getLeftOverQty()));
         remainingQty = BigDecimal.ZERO;
       } else {
         // 当前库存不足，全部冲减
-        stock.setLeftOverQty(0L);
+        stock.setLeftOverQty(0);
         item.setReducedQty(stockQty);
         item.setRemainingStockQty(BigDecimal.ZERO);
         remainingQty = remainingQty.subtract(stockQty);
@@ -525,10 +524,10 @@ public class StockAllocationHelper {
   @Setter
   @Getter
   private static class StockAllocationContext {
-    private Long plannedSurplus;
+    private Integer plannedSurplus;
     private List<MdmProductStock> stockInfos;
 
-    public StockAllocationContext(Long plannedSurplus,List<MdmProductStock> stockInfos) {
+    public StockAllocationContext(Integer plannedSurplus,List<MdmProductStock> stockInfos) {
       this.plannedSurplus = plannedSurplus;
       this.stockInfos = stockInfos;
     }

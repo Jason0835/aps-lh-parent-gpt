@@ -47,7 +47,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * @param finishedProductStocks 成品库存
      * @return 月度计划量汇总
      */
-    Map<String, Long> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks);
+    Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks);
 
     /**
      * 获取最终排产结果

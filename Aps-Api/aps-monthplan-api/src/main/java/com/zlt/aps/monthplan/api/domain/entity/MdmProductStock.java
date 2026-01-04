@@ -188,7 +188,7 @@ public class MdmProductStock extends BaseEntity {
      * 对冲后，剩余库存总量
      */
     @TableField(exist = false)
-    private Long leftOverQty;
+    private Integer leftOverQty;
 
     /**
      * 以分厂+物料为维度，转换库存
