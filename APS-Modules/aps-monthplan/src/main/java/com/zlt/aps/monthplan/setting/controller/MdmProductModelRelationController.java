@@ -287,4 +287,16 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     public AjaxResult mesCapture() {
         return mdmProductModelRelationService.mesCapture();
     }
+
+    /**
+     * 更新主花纹到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新主花纹到物料表")
+    @PostMapping("/updateMainPatternToMaterial")
+    public AjaxResult updateMainPatternToMaterial(@RequestBody MdmSkuMouldRel queryVO) {
+        return mdmProductModelRelationService.updateMainPatternToMaterial(queryVO);
+    }
 }

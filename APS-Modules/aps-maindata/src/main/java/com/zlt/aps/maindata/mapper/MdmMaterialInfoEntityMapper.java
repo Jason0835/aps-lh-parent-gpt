@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -57,4 +58,12 @@ public interface MdmMaterialInfoEntityMapper extends CommBaseMapper<MdmMaterialI
      */
     List<MdmMaterialInfo> queryByFactoryCodeAndProductCodes(@Param("factoryCode") String factoryCode,
                                                            @Param("productCodes") List<String> productCodes);
+
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    int updateMainPatternToMaterial(MdmSkuMouldRel queryVO);
 }
