@@ -131,37 +131,37 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @Excel(name = "ui.data.column.orderOffsetDetail.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单数量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
-    private Long orderQty;
+    private Integer orderQty;
 
     /** 库存总数 */
     @Excel(name = "ui.data.column.orderOffsetDetail.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存总数", name = "stockQty")
     @TableField(value = "STOCK_QTY")
-    private Long stockQty;
+    private Integer stockQty;
 
     /** 库存分配量 */
     @Excel(name = "ui.data.column.orderOffsetDetail.allocationQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存分配量", name = "allocationQty")
     @TableField(value = "ALLOCATION_QTY")
-    private Long allocationQty;
+    private Integer allocationQty;
 
     /** 月底计划余量分配量 */
     @Excel(name = "ui.data.column.orderOffsetDetail.plannedSurplus", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月底计划余量分配量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
-    private Long plannedSurplus;
+    private Integer plannedSurplus;
 
     /** 预计需要生产量 */
     @Excel(name = "ui.data.column.orderOffsetDetail.produceQtyDue", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
     @TableField(value = "PRODUCE_QTY_DUE")
-    private Long produceQtyDue;
+    private Integer produceQtyDue;
 
     /** 计划排产量 */
     @Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "计划排产量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
-    private Long productionQty;
+    private Integer productionQty;
 
     /** 供应链优先级 */
     @Excel(name = "ui.data.column.orderOffsetDetail.scmPriority")

@@ -179,7 +179,7 @@ public class RawSpecialMaterialRecordUIController extends BaseUIController<RawSp
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawSpecialMaterialRecordService.importData(context,true);
+        AjaxResult ajaxResult = iRawSpecialMaterialRecordService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

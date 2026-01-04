@@ -95,7 +95,7 @@ public class DpOrderPoolSnapshot extends BaseEntity {
     @Excel(name = "ui.data.column.orderPoolSnapshot.demandQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "需求量", name = "demandQty")
     @TableField(value = "DEMAND_QTY")
-    private Long demandQty;
+    private Integer demandQty;
 
     /** 区域 */
     @Excel(name = "ui.data.column.orderPoolSnapshot.areaCode")

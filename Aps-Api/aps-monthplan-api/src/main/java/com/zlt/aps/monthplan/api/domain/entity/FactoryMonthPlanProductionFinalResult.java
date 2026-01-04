@@ -672,4 +672,5 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
 
+
 }
