@@ -11,7 +11,7 @@ import lombok.Data;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：FactoryProductionVersion.java
+ * 文件名称：MpFactoryProductionVersion.java
  * 描    述：分厂月度计划模具状态日志记录对象 T_MP_MOULD_USE_STATUS_LOG
  *
  * @author zlt

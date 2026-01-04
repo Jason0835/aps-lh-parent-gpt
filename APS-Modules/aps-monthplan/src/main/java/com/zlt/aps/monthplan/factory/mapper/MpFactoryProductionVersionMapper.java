@@ -1,6 +1,6 @@
 package com.zlt.aps.monthplan.factory.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -17,10 +17,10 @@ import org.apache.ibatis.annotations.Mapper;
  * 修改时间：...
  * 修 改 人：zlt
  * 修改内容：...
- * @date 2025-03-19
+ * @date 20251203
  */
 @Mapper
-public interface FactoryProductionVersionMapper extends CommBaseMapper<FactoryProductionVersion> {
+public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFactoryProductionVersion> {
     /**
      * 根据分厂、年份、月份。需求版本，删除需求版本计划
      * t_mp_product_require_plan

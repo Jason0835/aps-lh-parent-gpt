@@ -27,6 +27,11 @@ public class MpDailyCapacityLimitVo {
     private Integer maxEmbryoTypes;
 
     /**
+     * 主花纹向下的  已用硫化机台数
+     */
+    private Integer patternUsedLhMachines;
+
+    /**
      * 已用硫化机台数
      */
     private Integer usedLhMachines;

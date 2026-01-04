@@ -1,14 +1,11 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -25,6 +22,7 @@ public interface IFactoryConsoleService {
      * @return
      */
     List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition);
+
     /**
      * 根据条件，获取对应分厂的还未选择的销售需求计划版本信息
      *
@@ -36,12 +34,13 @@ public interface IFactoryConsoleService {
     /**
      * 一键排产，生产模具排产计划
      * 1.第一步初始化
-     * 2.第二步模具排产
+     * 2.第二步排分组产能(结构)
+     * 3.第三步模具排产
      *
      * @param factoryProductionParam
      * @return
      */
-    AjaxResult factoryWholeCourseProduction(FactoryProductionParamVo factoryProductionParam);
+    AjaxResult oneClickProductionProcess(FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 重新初始化模具排产的初始化数据

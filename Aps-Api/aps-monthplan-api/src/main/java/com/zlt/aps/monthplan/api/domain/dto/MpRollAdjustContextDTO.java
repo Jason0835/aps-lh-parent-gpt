@@ -50,7 +50,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "产品结构")
     private String structureName;
 
-    /** 排产机台,多个机台用逗号分隔 */
+    /**
+     * 排产机台,多个机台用逗号分隔
+     */
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
 
@@ -64,7 +66,7 @@ public class MpRollAdjustContextDTO implements Serializable {
     private List<SalesOrderPool> salesOrderPoolList;
 
     @ApiModelProperty(value = "排产版本列表")
-    private List<FactoryProductionVersion> factoryProductionVersionList;
+    private List<MpFactoryProductionVersion> factoryProductionVersionList;
 
     @ApiModelProperty(value = "试制量试计划列表")
     private List<MpTrialPlan> mpTrialPlanList;

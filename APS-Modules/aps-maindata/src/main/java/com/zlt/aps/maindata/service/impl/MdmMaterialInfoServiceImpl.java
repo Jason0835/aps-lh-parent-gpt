@@ -679,7 +679,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
         }
         return materialInfos.stream()
             .filter(Objects::nonNull)
-            .filter(material -> org.apache.commons.lang3.StringUtils.isNotBlank(material.getMaterialCode()))
+            .filter(material -> StringUtils.isNotBlank(material.getMaterialCode()))
             .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode,
                 material -> material,
                 (existing, replacement) -> existing

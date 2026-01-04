@@ -21,7 +21,7 @@
          WHERE IFNULL(mmi.IS_DELETE, 0) = 0
            AND mmi.MATERIAL_CATEGORY = '01'
            AND EXISTS (SELECT 1
-                         FROM t_mp_product_require_plan prp
+                         FROM t_dp_demand_plan prp
                         WHERE IFNULL(prp.IS_DELETE, 0) = 0
                           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND prp.YEAR = #{year,jdbcType=DECIMAL}

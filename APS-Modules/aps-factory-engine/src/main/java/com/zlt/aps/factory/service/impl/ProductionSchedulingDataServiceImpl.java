@@ -14,10 +14,7 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultService;
-import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
-import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
@@ -31,7 +28,6 @@ import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +75,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final FactoryMonthPlanSpecialMaterialInfoMapper factoryMonthPlanSpecialMaterialInfoMapper;
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
-    
+
     private final MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
     private final BaseDao baseDao;
@@ -95,6 +91,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
 
     private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
+
+    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
 
 
     @Override
@@ -116,19 +114,23 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public FactoryProductionVersion getFactoryMonthPlanVersion(Context context) {
-        QueryWrapper<FactoryProductionVersion> queryWrapper = new QueryWrapper();
+    public MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
         queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
-        queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
+        if (!Boolean.TRUE.equals(context.getInsertNewProductionVersion())) {
+            queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
+            return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
+        }
+        queryWrapper.isNull("PRODUCTION_INIT_VERSION");
         return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
     }
 
     @Override
-    public FactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month) {
-        QueryWrapper<FactoryProductionVersion> queryWrapper = new QueryWrapper();
+    public MpFactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("YEAR", year);
         queryWrapper.eq("MONTH", month);
@@ -140,7 +142,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
 
     @Override
-    public int updateFactoryProductionVersion(FactoryProductionVersion updateVersion) {
+    public int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion) {
         if (null == updateVersion || null == updateVersion.getId()) {
             return 0;
         }
@@ -148,7 +150,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public int updateProductionVersionInfo(FactoryProductionVersion updateVersion) {
+    public int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion) {
         if (null == updateVersion || StringUtils.isBlank(updateVersion.getProductionVersion())) {
             return 0;
         }
@@ -156,7 +158,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public int addFactoryProductionVersion(FactoryProductionVersion addVersion) {
+    public int addFactoryProductionVersion(MpFactoryProductionVersion addVersion) {
         if (null == addVersion) {
             return 0;
         }
@@ -274,11 +276,11 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<SaleMonthPlanRequire> getFactoryMonthPlan(Context context) {
+    public List<DpDemandPlan> getFactoryMonthPlan(Context context) {
         if (isEmptyFactoryAndRequireVersion(context)) {
             return Collections.emptyList();
         }
-        QueryWrapper<SaleMonthPlanRequire> queryWrapper = new QueryWrapper();
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper();
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
@@ -331,17 +333,18 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode());
     }
-    
+
     /**
      * 获取成品库存
+     *
      * @param context 排产上下文
      * @return
      */
     @Override
     public List<MdmProductStock> getMdmProductStock(Context context) {
-    	LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
-    	queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
-    	return mdmProductStockEntityMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
+        return mdmProductStockEntityMapper.selectList(queryWrapper);
     }
 
     @Override
@@ -489,13 +492,15 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         factoryProductionSchedulingMapper.deleteProductionMouldVersion(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
     }
-
+    //先使用独立事务，看数据
     @Override
+//    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList) {
         if (CollectionUtils.isEmpty(monthPlanInitList)) {
             return;
         }
         List<ProductionMonthPlanInit> saveMonthPlanInitList = BeanCopyUtils.copyBeanList(monthPlanInitList, ProductionMonthPlanInit.class);
+//        baseDao.insertBatch(saveMonthPlanInitList);
         factoryProductionMonthPlanInitService.saveBatch(saveMonthPlanInitList);
     }
 
@@ -523,12 +528,37 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
+    public void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList) {
+        if (CollectionUtils.isEmpty(detailLogList)) {
+            return;
+        }
+        factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
+    }
+
+    @Override
+    public void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList) {
+        if (CollectionUtils.isEmpty(dayResultList)) {
+            return;
+        }
+        factoryProductionDayProductionResultService.saveBatch(dayResultList);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveMouldProductionLog(MouldProductionLog productionLog) {
         if (null == productionLog) {
             return;
         }
         baseDao.insert(productionLog);
+    }
+
+    @Override
+    public void saveGroupConversionResult(List<MpStructureAllocation> allocationResult) {
+        if (CollectionUtils.isEmpty(allocationResult)) {
+            return;
+        }
+        //数据不会太多
+        baseDao.insertBatch(allocationResult);
     }
 
     @Override
@@ -545,23 +575,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             vulcanizationMachineCount = BigDecimal.ZERO.intValue();
         }
         return new MachineCountDto(formingMachineCount, vulcanizationMachineCount);
-    }
-
-    @Override
-    public Set<String> getExportOemBrand(String factoryCode) {
-        return factoryParamService.getNoStockUpPlanBrand(factoryCode);
-    }
-
-    @Override
-    public Set<String> getGreaterAverageValueProductInfo(String factoryCode, Integer year, Integer month, Integer averageValue) {
-        if (StringUtils.isBlank(factoryCode) || null == averageValue) {
-            return Collections.emptySet();
-        }
-        List<ProductAverageSaleVo> averageSaleList = factoryProductionSchedulingMapper.getFactoryAverageSaleProduct(factoryCode, year, month, averageValue);
-        if (CollectionUtils.isEmpty(averageSaleList)) {
-            return Collections.emptySet();
-        }
-        return averageSaleList.stream().map(ProductAverageSaleVo::getProductCode).collect(Collectors.toSet());
     }
 
     /**

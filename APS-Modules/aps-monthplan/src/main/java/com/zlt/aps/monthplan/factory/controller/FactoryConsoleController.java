@@ -7,7 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
@@ -24,7 +24,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 分厂月份计划控制台
+ * 工厂月份计划排产控制台
+ * 后台业务服务入口
  *
  * @author ZLT
  * @date 20251201
@@ -94,7 +95,7 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
-     * 查询分厂的月份排产计划
+     * 查询工厂的月份排产计划
      *
      * @param queryCondition 查询条件
      * @return 结果集合
@@ -110,6 +111,41 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
+     * 确认对工厂 + 年月 + 需求计划版本进行工厂排产
+     *
+     * @param confirmParam 查询条件
+     * @return 结果信息
+     */
+    @ApiOperation("确认对工厂 + 年月 + 需求计划版本进行工厂排产")
+    @PostMapping("/confirmProductionRequireVersion")
+    public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
+        AjaxResult checkParamResult = checkEmptyMonthPlanVersion(confirmParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryProductionVersionService.flagProductionRequireVersion(confirmParam);
+    }
+
+    /**
+     * 按工厂 + 年月 + 需求版本的方式进行工厂一键排产
+     * 初始化->排结构->排模具
+     *
+     * @param factoryProductionParam
+     * @return
+     */
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
+    @PostMapping("/oneClickProductionProcess")
+    public AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        AjaxResult checkParamResult = checkEmptyMonthPlanVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryConsoleService.oneClickProductionProcess(factoryProductionParam);
+    }
+
+    /**
      * 创建导入模板的版本信息，主要获取版本周期
      *
      * @param param 分厂编码、年份、月份
@@ -117,7 +153,7 @@ public class FactoryConsoleController extends BaseController {
      */
     @ApiOperation("根据分厂、年、月获取其周期信息")
     @PostMapping("/createImportVersion")
-    public FactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param) {
+    public MpFactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param) {
         if (null == param) {
             return null;
         }
@@ -127,7 +163,7 @@ public class FactoryConsoleController extends BaseController {
         if (StringUtils.isBlank(factoryCode) || null == year || null == month) {
             return null;
         }
-        FactoryProductionVersion version = new FactoryProductionVersion();
+        MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(factoryCode);
         version.setYear(year);
         version.setMonth(month);
@@ -146,7 +182,7 @@ public class FactoryConsoleController extends BaseController {
         if (null == productionDate || StringUtils.isBlank(factoryCode)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.factoryMonthPlanProdFinal.factoryProductionDateNoEmpty"));
         }
-        FactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), queryCondition.getProductionDate());
         if (null == finalVersion) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.factoryMonthPlanProdFinal.factoryNoFinal"));
         }
@@ -200,28 +236,6 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产
-     *
-     * @param factoryProductionParam
-     * @return
-     */
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂一键模具排产")
-    @PostMapping("/factoryWholeCourseProduction")
-    public AjaxResult factoryWholeCourseProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        if (null == factoryProductionParam) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
-        }
-        String factoryCode = factoryProductionParam.getFactoryCode();
-        Integer year = factoryProductionParam.getYear();
-        Integer month = factoryProductionParam.getMonth();
-        String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.requireVersionNoEmpty"));
-        }
-        return factoryConsoleService.factoryWholeCourseProduction(factoryProductionParam);
-    }
-
-    /**
      * 按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
      *
      * @param factoryProductionParam
@@ -266,5 +280,21 @@ public class FactoryConsoleController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.versionNoEmpty"));
         }
         return factoryConsoleService.deleteMonthPlanProductionVersion(factoryProductionParam);
+    }
+
+    /**
+     * 校验空的需求版本信息
+     *
+     * @param checkParam
+     * @return
+     */
+    private AjaxResult checkEmptyMonthPlanVersion(FactoryProductionPlanVo checkParam) {
+        if (null == checkParam) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
+        }
+        if (StringUtils.isBlank(checkParam.getFactoryCode()) || null == checkParam.getYear() || null == checkParam.getMonth() || StringUtils.isBlank(checkParam.getMonthPlanVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.requireVersionNoEmpty"));
+        }
+        return AjaxResult.success();
     }
 }

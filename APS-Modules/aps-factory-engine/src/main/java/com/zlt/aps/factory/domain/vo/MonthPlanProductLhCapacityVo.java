@@ -37,19 +37,19 @@ public class MonthPlanProductLhCapacityVo implements Serializable {
      * MES的日硫化量
      */
     @ApiModelProperty(value = "MES的日硫化量", name = "mesCapacity")
-    private Long mesCapacity;
+    private Integer mesCapacity;
 
     /**
      * 标准日硫化量
      */
     @ApiModelProperty(value = "标准日硫化量", name = "standardCapacity")
-    private Long standardCapacity;
+    private Integer standardCapacity;
 
     /**
      * APS的日硫化量
      */
     @ApiModelProperty(value = "APS的日硫化量", name = "apsCapacity")
-    private Long apsCapacity;
+    private Integer apsCapacity;
 
     /**
      * 总硫化时间(单位s)
@@ -66,7 +66,7 @@ public class MonthPlanProductLhCapacityVo implements Serializable {
      * 日硫化量
      */
     @ApiModelProperty(value = "总硫化时间(单位s)", name = "vulcanizationTime")
-    private Long dayVulcanizationQty;
+    private Integer dayVulcanizationQty;
 
     /**
      * 日硫化量计算(双模)

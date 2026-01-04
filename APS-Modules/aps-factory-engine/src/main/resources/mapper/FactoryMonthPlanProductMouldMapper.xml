@@ -15,14 +15,14 @@
                mmi.LOGISTICS_STATUS,
                '01' AS RELATION_TYPE
           FROM t_mdm_sku_mould_rel msm
-          LEFT JOIN t_mdm_model_info mmi
+          LEFT JOIN t_mdm_mould_info mmi
             ON mmi.FACTORY_CODE = msm.FACTORY_CODE
            AND mmi.MOULD_CODE = msm.MOULD_CODE
            AND IFNULL(mmi.IS_DELETE, 0) = 0
          WHERE IFNULL(msm.IS_DELETE, 0) = 0
            AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND EXISTS (SELECT 1
-                         FROM t_mp_product_require_plan prp
+                         FROM t_dp_demand_plan prp
                         WHERE IFNULL(prp.IS_DELETE, 0) = 0
                           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND prp.YEAR = #{year,jdbcType=DECIMAL}
@@ -44,12 +44,12 @@
                '-99' AS SHELL_STANDARD,
                1 AS LOGISTICS_STATUS,
                '02' AS RELATION_TYPE
-          FROM t_mp_mould_delivery_plan mdp
+          FROM t_mdm_mould_delivery_plan mdp
          WHERE IFNULL(mdp.IS_DELETE, 0) = 0
            AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
            AND mdp.BOARDING_DATE  &lt;= #{productionEndDate,jdbcType=DATE}
            AND EXISTS (SELECT 1
-                         FROM t_mp_product_require_plan prp
+                         FROM t_dp_demand_plan prp
                         WHERE IFNULL(prp.IS_DELETE, 0) = 0
                           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND prp.YEAR = #{year,jdbcType=DECIMAL}
@@ -73,7 +73,7 @@
                mmi.LOGISTICS_STATUS,
                '01' AS RELATION_TYPE
           FROM t_mdm_sku_mould_rel msm
-          LEFT JOIN t_mdm_model_info mmi
+          LEFT JOIN t_mdm_mould_info mmi
             ON mmi.FACTORY_CODE = msm.FACTORY_CODE
            AND mmi.MOULD_CODE = msm.MOULD_CODE
            AND IFNULL(mmi.IS_DELETE, 0) = 0
@@ -106,7 +106,7 @@
                '-99' AS SHELL_STANDARD,
                1 AS LOGISTICS_STATUS,
                '02' AS RELATION_TYPE
-          FROM t_mp_mould_delivery_plan mdp
+          FROM t_mdm_mould_delivery_plan mdp
          WHERE IFNULL(mdp.IS_DELETE, 0) = 0
            AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
            AND mdp.BOARDING_DATE  &lt;= #{productionEndDate,jdbcType=DATE}

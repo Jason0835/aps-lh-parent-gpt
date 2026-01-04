@@ -105,6 +105,26 @@ public class ProductGroupCxCapacityInfo implements Serializable {
     }
 
     /**
+     * 根据机台、结构成型硫化配比配置
+     * 转化成结构产能对象
+     *
+     * @param cxMachineCode 成型机台
+     * @param lhRatio       对应的结构成型硫化配比配置
+     * @return
+     */
+    public static ProductGroupCxCapacityInfo buildCxCapacityInfo(String cxMachineCode, MonthPlanStructureLhRatioVo lhRatio) {
+        if (null == lhRatio || StringUtils.isBlank(cxMachineCode)) {
+            return null;
+        }
+        ProductGroupCxCapacityInfo capacityInfo = createEmptyGroupCxCapacityInfo(lhRatio.getStructureName(), cxMachineCode);
+        //设置对应的最大胎胚数和最大硫化机台数、最低硫化机台数
+        capacityInfo.setMaxEmbryoCodeCount(lhRatio.getMaxEmbryoQty());
+        capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
+        capacityInfo.setMinLhMachineCount(lhRatio.getLhMachineMinQty());
+        return capacityInfo;
+    }
+
+    /**
      * 构建空的成型产能对象实例
      * 只有分组名、成型机台编号
      *

@@ -4,28 +4,28 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.enums.DemandPlanTypeEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
-import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
+import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
@@ -37,7 +37,8 @@ import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.monthplan.factory.helper.StockAllocationHelper;
-import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Getter;
@@ -87,7 +88,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private static final String PREFIX = "REQ";
 
     private final DpDemandPlanEntityMapper demandPlanEntityMapper;
-    private final FactoryProductionVersionMapper factoryProductionVersionMapper;
+    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
     private final ISalesOrderPoolService salesOrderPoolService;
     // 成品库存
@@ -108,8 +109,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IFactoryParamService factoryParamService;
     // 物料信息
     private final IMdmMaterialInfoService materialInfoService;
-    // 月均销量
-    private final IMpMonthlySaleQtyService monthlySaleQtyService;
+    // 历史销售记录
+    private final IMpHistorySaleRecordService mpHistorySaleRecordService;
 
     @Override
     protected String getDocTypeCode() {
@@ -176,10 +177,28 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
+        // 9. 保存分厂排产版本
+        saveFactoryProductionVersion(tMonth,monthPlanVersion,data.getSalesOrders());
+    }
+
+    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion, List<SalesOrderPool> salesOrders) {
+        MpFactoryProductionVersion version = new MpFactoryProductionVersion();
+        version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        version.setYear(yearMonth.getYear());
+        version.setMonth(yearMonth.getMonthValue());
+        version.setMonthPlanVersion(monthPlanVersion);
+        version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
+        version.setIsFinal(YesOrNoEnum.NO.getCode());
+        // 取销售订单的胎别
+        if (CollectionUtils.isNotEmpty(salesOrders)) {
+            SalesOrderPool saleOrder = salesOrders.get(0);
+            version.setProductTypeCode(saleOrder.getProductType());
+        }
+        factoryProductionVersionMapper.insert(version);
     }
 
     @Override
-    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(FactoryProductionVersion finalVersion) {
+    public List<DpDemandPlan> findDemandPlanByMonthPlanVersion(MpFactoryProductionVersion finalVersion) {
         LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DpDemandPlan::getFactoryCode, finalVersion.getFactoryCode());
         wrapper.eq(DpDemandPlan::getYear, finalVersion.getYear());
@@ -229,11 +248,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private void validateProductionVersionFinalized(DpDemandPlan createCondition) {
         Long count = factoryProductionVersionMapper.selectCount(
-            Wrappers.<FactoryProductionVersion>lambdaQuery()
-                .eq(FactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
-                .eq(FactoryProductionVersion::getYear, createCondition.getYear())
-                .eq(FactoryProductionVersion::getMonth, createCondition.getMonth())
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE)
+            Wrappers.<MpFactoryProductionVersion>lambdaQuery()
+                .eq(MpFactoryProductionVersion::getFactoryCode, createCondition.getFactoryCode())
+                .eq(MpFactoryProductionVersion::getYear, createCondition.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, createCondition.getMonth())
+                .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
         );
         if (count != null && count > 0) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.demandPlan.checkFinal"));
@@ -441,7 +460,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
 
     private Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
-        return monthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
+        return mpHistorySaleRecordService.calculateMonthSaleQty(6);
     }
 
     /**
@@ -497,6 +516,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 获取基础模板（第一个元素）
         DpDemandPlan template = groupPlans.get(0);
+        if(!skuMap.containsKey(template.getMaterialCode())) {
+            return null;
+        }
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置物料信息（使用computeIfAbsent优化Map访问）
@@ -539,6 +561,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap) {
         Optional.ofNullable(skuMap.get(demandPlan.getMaterialCode()))
             .ifPresent(materialInfo -> {
+                demandPlan.setMaterialDesc(materialInfo.getMaterialDesc());
+                demandPlan.setProductTypeCode(materialInfo.getProductTypeCode());
+                demandPlan.setBrand(materialInfo.getBrand());
                 demandPlan.setMesMaterialCode(materialInfo.getMesMaterialCode());
                 demandPlan.setLocationType(materialInfo.getCommonType());
                 demandPlan.setStructureName(materialInfo.getStructureName());
@@ -812,7 +837,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         // 设置其他固定值
         demandPlan.setMinProductionQty(minProductionQty);
-        demandPlan.setPlanType(DemandPlanTypeEnum.MONTH_DEMAND.getCode());
+        demandPlan.setPlanType(ProductionPlanType.NORMAL.getPlanType());
         demandPlan.setIsImport(YesOrNoEnum.NO.getCode());
     }
 

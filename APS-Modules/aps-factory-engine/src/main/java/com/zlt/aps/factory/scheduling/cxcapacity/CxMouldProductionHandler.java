@@ -37,6 +37,7 @@ public class CxMouldProductionHandler {
      * @param mouldInfoMap   模具关系信息
      * @param mouldShellMap  模壳信息
      */
+    @Deprecated
     public static void continueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan, CxContinueInfoHelper cxContinueInfo, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlan.getProductionPlanInfo().getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -99,12 +100,10 @@ public class CxMouldProductionHandler {
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
         buildNewLhConclusionInfo(cxMachineInfo, cxLhRatio.getLhMachineMaxQty(), productionPlan);
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
-        //todo 搭配排产
-
     }
 
     /**
-     * 重新构建成型对应的收尾信息，重分配的起始天数开始
+     * 重新构建成型对应的收尾信息，从分配的起始天数开始
      *
      * @param cxMachineInfo  成型机台
      * @param maxLhCount     最大硫化数
@@ -148,7 +147,7 @@ public class CxMouldProductionHandler {
         cxMachineInfo.add(cxMachineCode);
         CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, cxMachineInfo);
         newHelper.setProductionDay(startDay);
-        newHelper.setProductionQty(BigDecimal.ZERO.longValue());
+        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
         cxLhRatioMap.put(cxLhGroupNo, newHelper);
     }
 

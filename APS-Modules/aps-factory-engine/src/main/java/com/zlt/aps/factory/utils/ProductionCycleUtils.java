@@ -2,7 +2,7 @@ package com.zlt.aps.factory.utils;
 
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -26,7 +26,7 @@ public class ProductionCycleUtils {
      * @param productionDayInfo 对应的月份排产日历
      * @return
      */
-    public static Integer getLastProductionDay(FactoryProductionVersion productionVersion, List<ProductionDayInfoVo> productionDayInfo) {
+    public static Integer getLastProductionDay(MpFactoryProductionVersion productionVersion, List<ProductionDayInfoVo> productionDayInfo) {
         Date productionStartDate = productionVersion.getProductionStartDate();
         //理论结束天数 = 月份周期最大天数
         Integer maxDay = DateUtils.getIntervalDays(productionStartDate, productionVersion.getProductionEndDate());

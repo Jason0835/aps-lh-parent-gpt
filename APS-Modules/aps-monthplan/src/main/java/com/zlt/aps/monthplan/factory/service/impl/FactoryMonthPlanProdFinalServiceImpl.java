@@ -33,7 +33,7 @@ import com.zlt.aps.monthplan.demand.mapper.SaleMonthPlanRequireStockMapper;
 import com.zlt.aps.monthplan.demand.service.IOrderPlanAllocationService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
-import com.zlt.aps.monthplan.factory.mapper.FactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanNoProductionPlanService;
@@ -83,7 +83,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
 
     private final MdmMaterialInfoEntityMapper productInfoEntityMapper;
 
-    private final FactoryProductionVersionMapper factoryProductionVersionMapper;
+    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
 
     private final MdmProductConstructionEntityMapper mdmProductConstructionMapper;
 
@@ -143,7 +143,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         if (StringUtils.isBlank(productionVersion)) {
             return resultData;
         }
-        FactoryProductionVersion version = factoryProductionVersionService.getProductionVersion(productionVersion);
+        MpFactoryProductionVersion version = factoryProductionVersionService.getProductionVersion(productionVersion);
 //    ProductionPlanExcelUtils.handlerBeginAndEndDay(version, resultData);
         return resultData;
     }
@@ -152,7 +152,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
     public List<FactoryMonthPlanDayProductionInfoVo> getMonthPlanDayProductionInfo(FactoryMonthPlanProdFinalQueryDto queryCondition) {
         Date productionDate = queryCondition.getProductionDate();
         //根据分厂，及日期确定排产版本计划
-        FactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), productionDate);
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(queryCondition.getFactoryCode(), productionDate);
         if (null == finalVersion) {
             return Collections.emptyList();
         }
@@ -195,13 +195,13 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
         if (StringUtils.isBlank(factoryCode) || null == year || null == month) {
             return null;
         }
-        QueryWrapper<FactoryProductionVersion> queryVersion = new QueryWrapper<>();
+        QueryWrapper<MpFactoryProductionVersion> queryVersion = new QueryWrapper<>();
         queryVersion.eq("FACTORY_CODE", factoryCode);
         queryVersion.eq("YEAR", year);
         queryVersion.eq("MONTH", month);
-        queryVersion.eq("IS_FINAL", YesOrNoEnum.YES.getValue());
+        queryVersion.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
         queryVersion.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        FactoryProductionVersion result = factoryProductionVersionMapper.selectOne(queryVersion);
+        MpFactoryProductionVersion result = factoryProductionVersionMapper.selectOne(queryVersion);
         if (null == result) {
             return null;
         }
@@ -213,7 +213,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
     @Override
     public FactoryMonthPlanFinalVersionInfoVo getFinalVersionInfoByDate(String factoryCode, Date date) {
         //根据分厂，及日期确定排产版本计划
-        FactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(factoryCode, date);
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(factoryCode, date);
         if (null == finalVersion) {
             return null;
         }
@@ -256,14 +256,14 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
 //        }
 
         // 更新版本表-是否定稿
-        FactoryProductionVersion productionVersion = new FactoryProductionVersion();
-        productionVersion.setIsFinal(Constant.TRUE);
-        factoryProductionVersionMapper.update(productionVersion, Wrappers.lambdaQuery(FactoryProductionVersion.class)
-                .eq(FactoryProductionVersion::getYear, param.getYear())
-                .eq(FactoryProductionVersion::getMonth, param.getMonth())
-                .eq(FactoryProductionVersion::getFactoryCode, param.getFactoryCode())
-                .eq(FactoryProductionVersion::getMonthPlanVersion, param.getMonthPlanVersion())
-                .eq(FactoryProductionVersion::getProductionVersion, param.getProductionVersion()));
+        MpFactoryProductionVersion productionVersion = new MpFactoryProductionVersion();
+        productionVersion.setIsFinal(YesOrNoEnum.YES.getCode());
+        factoryProductionVersionMapper.update(productionVersion, Wrappers.lambdaQuery(MpFactoryProductionVersion.class)
+                .eq(MpFactoryProductionVersion::getYear, param.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, param.getMonth())
+                .eq(MpFactoryProductionVersion::getFactoryCode, param.getFactoryCode())
+                .eq(MpFactoryProductionVersion::getMonthPlanVersion, param.getMonthPlanVersion())
+                .eq(MpFactoryProductionVersion::getProductionVersion, param.getProductionVersion()));
 
         String monthPlanVersion = incrementService
                 .getBillNoSequenceByExpire(IncrementConstant.MONTH_FINAL + DateUtils.dateTimeNow("yyyyMMdd"), 3, 60 * 24 * 7);
@@ -530,7 +530,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
             }
         }
         //根据版本信息，调整起始日，开始日及day排产量的值
-        FactoryProductionVersion productionVersion = factoryProductionVersionService.getProductionVersion(list.get(0).getProductionVersion());
+        MpFactoryProductionVersion productionVersion = factoryProductionVersionService.getProductionVersion(list.get(0).getProductionVersion());
 //    ProductionPlanExcelUtils.handlerFinalProductionDayQty(productionVersion, list);
         // 国际化提示
         Map<String, String> errorInfoMap = buildErrorInfoMap();
@@ -623,11 +623,11 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      * @return true已定稿， false未定稿
      */
     private boolean isFinal(String factoryCode, Integer year, Integer month) {
-        Long finalVersionCount = factoryProductionVersionMapper.selectCount(Wrappers.lambdaQuery(FactoryProductionVersion.class)
-                .eq(FactoryProductionVersion::getFactoryCode, factoryCode)
-                .eq(FactoryProductionVersion::getYear, year)
-                .eq(FactoryProductionVersion::getMonth, month)
-                .eq(FactoryProductionVersion::getIsFinal, Constant.TRUE));
+        Long finalVersionCount = factoryProductionVersionMapper.selectCount(Wrappers.lambdaQuery(MpFactoryProductionVersion.class)
+                .eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, Constant.TRUE));
         return finalVersionCount > 0;
     }
 
@@ -1123,7 +1123,7 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
      * @param date         停工日
      * @return true 表示一直， false表示不一致
      */
-    private boolean isProductionMonth(FactoryProductionVersion finalVersion, LocalDate date) {
+    private boolean isProductionMonth(MpFactoryProductionVersion finalVersion, LocalDate date) {
         Integer year = finalVersion.getYear();
         Integer month = finalVersion.getMonth();
         Integer dateYear = date.getYear();

@@ -59,18 +59,7 @@ public class ContinueSkuCalculator {
             if (CollectionUtils.isEmpty(planList)) {
                 return;
             }
-            Long planDemandQty;
-            Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
-            if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
-                //总净需求量
-                planDemandQty = planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-            } else {
-                //高优先级排产量
-                planDemandQty = planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
-            }
-            if (null == planDemandQty) {
-                planDemandQty = BigDecimal.ZERO.longValue();
-            }
+            Integer planDemandQty = getContinueSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet());
@@ -109,12 +98,13 @@ public class ContinueSkuCalculator {
         }
         Set<String> cxMachineInfo = groupContinueInfo.getCxMachineCodeSet();
         String groupName = groupPlanInfo.getGroupName();
-        Map<Integer, GroupPlanCxLhCapacityLimitHelper> limitMap = new HashMap<>();
         Integer maxEmbryoCodeCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMaxEmbryoCodeCount).sum();
         Integer maxLhMachineCount = cxCapacityInfoList.stream().mapToInt(ProductGroupCxCapacityInfo::getMaxLhMachineCount).sum();
         Map<String, Integer> minLhMachineInfo = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, ProductGroupCxCapacityInfo::getMinLhMachineCount));
         Integer maxDays = context.getMonthDays();
         Set<Integer> stopDays = context.getStopDays();
+        //初始限制设置--随着续作Sku排产及后续排产会进行更新变化
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> limitMap = new HashMap<>();
         for (int day = ProductionConstant.MONTH_START_DAY; day <= maxDays; day++) {
             if (stopDays.contains(day)) {
                 continue;
@@ -123,13 +113,36 @@ public class ContinueSkuCalculator {
             limitHelper.getMinLhMachineInfo().putAll(minLhMachineInfo);
             limitMap.put(day, limitHelper);
         }
+        groupPlanInfo.setDayProductionLimitInfo(limitMap);
+        //硫化分组设置?
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = new HashMap<>(maxLhMachineCount);
         for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhMachineCount; lhGroupNo++) {
             CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupName, lhGroupNo, cxMachineInfo);
             cxLhRatioMap.put(lhGroupNo, cxLhGroup);
         }
         groupPlanInfo.setCxLhRatioMap(cxLhRatioMap);
-        groupPlanInfo.setDayProductionLimitInfo(limitMap);
+    }
+
+    /**
+     * 汇总续作Sku初始排产量
+     * 如果是按总量排，则Sum(净需求排产量)
+     * 否则Sum(高优先级排产量)
+     *
+     * @param planList 续作Sku计划集合
+     * @return
+     */
+    public static Integer getContinueSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
+        if (CollectionUtils.isEmpty(planList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //是否按总需求排产
+        Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
+        if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
+            //总净需求量
+            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+        }
+        //高优先级排产量
+        return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 
     /**

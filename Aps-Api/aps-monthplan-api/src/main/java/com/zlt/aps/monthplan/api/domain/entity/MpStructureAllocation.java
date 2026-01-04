@@ -155,4 +155,17 @@ public class MpStructureAllocation extends BaseEntity {
     @TableField(value = "ALLOT_DAYS")
     private Integer allotDays;
 
+    /**
+     * 判断productionDay是否在beginDay与endDay范围内
+     * true表示在，false表示不在
+     *
+     * @param productionDay
+     * @return
+     */
+    public boolean hasRange(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
+        return beginDay <= productionDay && productionDay <= endDay;
+    }
 }

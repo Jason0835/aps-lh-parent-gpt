@@ -254,7 +254,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setMaterialDesc(vo.getSpecDesc());
 			newVO.setNatCode(vo.getNatCode());
 			newVO.setOrderPriority(salPriority);
-			newVO.setOrdQty(vo.getOrdQty());
+			newVO.setOrdQty(vo.getPlanedNotShipQty()); // 数量为已计划未发货量
 			newVO.setOriMaterialCode(vo.getOriMaterialCode());
 			newVO.setProductType(Optional.ofNullable(vo.getProductType()).orElse(ProductTypeEnum.WHOLE_STEEL.getValue()));
 			newVO.setSalCode(vo.getSalCode());

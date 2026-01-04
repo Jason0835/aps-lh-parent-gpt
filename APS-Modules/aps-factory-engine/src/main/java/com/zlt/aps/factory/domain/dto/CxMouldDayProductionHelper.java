@@ -80,7 +80,7 @@ public class CxMouldDayProductionHelper implements Serializable {
     /**
      * 排产数量
      */
-    private Long productionQty;
+    private Integer productionQty;
     /**
      * 排产日 1~31
      */
@@ -96,7 +96,8 @@ public class CxMouldDayProductionHelper implements Serializable {
      * @param cxLhProductionHelper 硫化组信息
      * @return
      */
-    public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, String cxMachineCode, Integer day, Long productionQty, CxLhProductionHelper cxLhProductionHelper) {
+    @Deprecated
+    public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, String cxMachineCode, Integer day, Integer productionQty, CxLhProductionHelper cxLhProductionHelper) {
         CxMouldDayProductionHelper mouldProductionHelper = new CxMouldDayProductionHelper();
         BeanUtils.copyProperties(groupPlan, mouldProductionHelper);
         mouldProductionHelper.setMonthPlanId(groupPlan.getMonthPlanId());
@@ -116,7 +117,7 @@ public class CxMouldDayProductionHelper implements Serializable {
      * @param productionQty     双模排产量
      * @return
      */
-    public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Set<String> cxMachineCodeInfo, Integer day, Long productionQty) {
+    public static CxMouldDayProductionHelper createCxMouldDayProductionInfo(MonthPlanProductionRequirePlanVo groupPlan, Set<String> cxMachineCodeInfo, Integer day, Integer productionQty) {
         CxMouldDayProductionHelper mouldProductionHelper = new CxMouldDayProductionHelper();
         BeanUtils.copyProperties(groupPlan, mouldProductionHelper);
         mouldProductionHelper.setMonthPlanId(groupPlan.getMonthPlanId());

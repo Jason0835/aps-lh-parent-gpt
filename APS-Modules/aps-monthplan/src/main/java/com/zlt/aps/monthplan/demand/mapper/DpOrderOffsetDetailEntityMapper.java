@@ -4,6 +4,9 @@ package com.zlt.aps.monthplan.demand.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,4 +24,8 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface DpOrderOffsetDetailEntityMapper extends CommBaseMapper<DpOrderOffsetDetail> {
 
+    /**
+     * 批量更新生产数量
+     */
+    int updateBatchProductionQty(@Param("list") List<DpOrderOffsetDetail> list);
 }

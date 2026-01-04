@@ -70,11 +70,11 @@ public class CxContinueSkuInfoHelper implements Serializable {
     /**
      * 计划需求量--高优先级或是总排产量？
      */
-    private Long planDemandQty;
+    private Integer planDemandQty;
     /**
      * 日硫化量(单模)
      */
-    private Long dayVulcanizationQty;
+    private Integer dayVulcanizationQty;
     /**
      * 在机结构构建续作信息时赋值
      * 续作sku的排产计划集合
@@ -118,7 +118,7 @@ public class CxContinueSkuInfoHelper implements Serializable {
      *
      * @return
      */
-    public Long getMaxDaySingleLhMachineQty() {
+    public Integer getMaxDaySingleLhMachineQty() {
         return dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 

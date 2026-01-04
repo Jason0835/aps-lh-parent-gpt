@@ -74,7 +74,7 @@ public class CxCapacityAllocationHandler {
 //                        cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
                 Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
                 cxMachineBaseInfo.setRemainingDays(BigDecimal.ZERO.intValue());
-                CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
+                CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
                 cxMachineBaseInfo.addAllocationPlanInfo(helper);
                 continueAllocationMap.put(cxCapacityInfo.getCxMachineCode(), helper);
             }
@@ -87,7 +87,7 @@ public class CxCapacityAllocationHandler {
             //小数部分的天数
             BigDecimal decimalPart = machineCount.subtract(integerPart);
             Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
-            CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, minLhRatio, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
+            CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
             cxMachineBaseInfo.addAllocationPlanInfo(helper);
             continueAllocationMap.put(cxMachineBaseInfo.getCxMachineCode(), helper);
             Integer newRemainingDays = cxMachineBaseInfo.getRemainingDays() - allocationDay;
@@ -104,7 +104,7 @@ public class CxCapacityAllocationHandler {
      * 对成型机台创建分配集合对象-按最小硫化配比分配
      *
      * @param cxMachineBaseInfo 成型机台信息
-     * @param maxLhRatio        最高硫化配比
+     * @param lhRatio           硫化配比信息
      * @param groupPlanInfo     分配的分组计划
      * @param continueSkuMap    续作规格信息
      * @param allocationDay     分配天数
@@ -112,7 +112,7 @@ public class CxCapacityAllocationHandler {
      * @param monthDays         月份最大天数
      * @return
      */
-    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, Integer maxLhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
+    public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, ProductGroupCxCapacityInfo lhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
         Integer startAllocationDay = BigDecimal.ZERO.intValue();
         Integer endAllocationDay = BigDecimal.ZERO.intValue();
         Set<Integer> stopDayInfo = cxMachineBaseInfo.getStopDayInfo();
@@ -141,7 +141,7 @@ public class CxCapacityAllocationHandler {
         if (null == continueSkuMap) {
             continueSkuMap = new HashMap<>();
         }
-        return new CxMachineAllocationPlanHelper(cxMachineBaseInfo.getCxMachineCode(), groupPlanInfo, maxLhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
+        return new CxMachineAllocationPlanHelper(cxMachineBaseInfo.getCxMachineCode(), groupPlanInfo, lhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
     }
 
     /**
@@ -222,15 +222,17 @@ public class CxCapacityAllocationHandler {
             //todo 记录日志
             return;
         }
-        Integer lhRatio = cxMachineInfo.getRatio();
-        //判断成型鼓是否符合条件
+        ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
+        //cxMachineInfo.getRatio();
+        Integer lhRatio = lhRatioInfo.getMaxLhMachineCount();
+        //todo 判断成型鼓是否符合条件
         Integer needAllocationDays = allocationGroupPlan.calculateNeedDays(lhRatio);
         //更新剩余时间
         Integer leftOver = remainingDays - needAllocationDays;
         cxMachineInfo.setRemainingDays(leftOver);
         CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
         Integer startDay = lastHelper.getEndDay() + BigDecimal.ONE.intValue();
-        CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatio, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
+        CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(addHelper);
         //todo 对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
@@ -384,7 +386,7 @@ public class CxCapacityAllocationHandler {
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         String brandCode = cxMachineInfo.getCxMachineBrandCode();
         estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> {
-            Long minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
+            Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
             if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
                 //todo 记录日志
                 return;
@@ -406,13 +408,13 @@ public class CxCapacityAllocationHandler {
             }
             //记录配比-需要传递
             cxMachineInfo.setRatio(ratio);
-            Long remainingProductionQty = groupPlan.getRemainingProductionQty();
-            if (remainingProductionQty <= BigDecimal.ZERO.longValue()) {
+            Integer remainingProductionQty = groupPlan.getRemainingProductionQty();
+            if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
                 //todo 记录日志
                 return;
             }
             //成型剩余产能
-            Long remainingCapacityQty = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ratio)).multiply(BigDecimal.valueOf(remainingDays)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).longValue();
+            Integer remainingCapacityQty = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ratio)).multiply(BigDecimal.valueOf(remainingDays)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).intValue();
             if (remainingCapacityQty < remainingProductionQty) {
                 return;
             }
@@ -503,7 +505,8 @@ public class CxCapacityAllocationHandler {
         }
         List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
         CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
-        List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getRealProductionPlanList();
+        //取前规格排产计划-所有
+        List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getProductionPlanInfo().getGroupPlanData();
         //2、与前结构含有同规格的优先
         List<ProductionPlanGroupInfo> sameSpecificationsList = fixedGroupPlanList.stream().filter(fixedPlan -> fixedPlan.hasSameSpecifications(realProductionPlanList)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(sameSpecificationsList)) {
@@ -541,8 +544,8 @@ public class CxCapacityAllocationHandler {
      * @param addNewGroupPlan   新增结构
      */
     private static void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo addNewGroupPlan) {
-        //4、断面宽差值±10 todo 断面宽差值范围
-        Integer diffValue = 0;
+        //4、断面宽差值±10 断面宽差值范围参数
+        Integer diffValue = ((TbrProductionContext)context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
         fixedPriorityList.forEach(cxMachineInfo -> {
             List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();

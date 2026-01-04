@@ -2,6 +2,7 @@ package com.zlt.aps.factory.scheduling.init;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
@@ -12,7 +13,8 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.SaleMonthPlanRequire;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -58,13 +60,21 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     @Override
     public void run(Context context, Object userObj) {
+        if (null == context.getInsertNewProductionVersion()) {
+            context.setInsertNewProductionVersion(Boolean.FALSE);
+        }
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        //保存或是创建排产版本表记录
+        saveProductionVersionRecord(productionContext);
         //开始初始化日志
         String startInitLog = TbrProductionLogUtils.addStartInitLog(productionContext);
         log.info(startInitLog);
         //获取需求计划
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
+        String planType = requirePlanList.get(BigDecimal.ZERO.intValue()).getPlanType();
+        context.setPlanType(planType);
+        productionContext.setPlanType(planType);
         //获取初始化业务参数设定
         ProductionInitParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
         //SKU-损耗处理
@@ -109,6 +119,32 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
     }
 
     /**
+     * 在版本表中，保存工厂排产记录
+     * 如果排产版本表已经存在，则更新其排产周期和自然月标记
+     *
+     * @param context
+     */
+    private void saveProductionVersionRecord(Context context) {
+        //工厂排产版本更新或是插入记录
+        MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        if (null != factoryProductionVersion) {
+            setProductionVersionCycleInfo(factoryProductionVersion, context);
+            getDataService().updateFactoryProductionVersion(factoryProductionVersion);
+            return;
+        }
+        //不存在，则表示新插入记录
+        factoryProductionVersion = new MpFactoryProductionVersion();
+        factoryProductionVersion.setFactoryCode(context.getFactoryCode());
+        factoryProductionVersion.setYear(context.getYear());
+        factoryProductionVersion.setMonth(context.getMonth());
+        factoryProductionVersion.setMonthPlanVersion(context.getMonthPlanVersion());
+        factoryProductionVersion.setProductTypeCode(context.getProductType().getValue());
+        //设置月份排产模式自然月或非自然月及开始、结束排产日期
+        setProductionVersionCycleInfo(factoryProductionVersion, context);
+        getDataService().addFactoryProductionVersion(factoryProductionVersion);
+    }
+
+    /**
      * 根据工厂编码 + 年月 + 需求计划版本，获取对应的月需要排产的需求计划
      *
      * @param productionContext
@@ -116,7 +152,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private List<MonthPlanProductionRequirePlanVo> getMonthPlanRequirePlan(TbrProductionContext productionContext) {
         //得到制造需求计划
-        List<SaleMonthPlanRequire> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
+        List<DpDemandPlan> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
         if (CollectionUtils.isEmpty(monthPlanRequireList)) {
             String planListIsNull = I18nUtil.getMessage("alg.data.alter.message.planListIsNull");
             throw new BusinessException(String.format(planListIsNull, productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion()));
@@ -227,7 +263,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         }
         //计算日硫化产能
         lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
-        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity()));
+        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity(), (before, after) -> after));
     }
 
     /**
@@ -244,17 +280,27 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             //TODO 损耗率方式计算
             return;
         }
+        //对物料描述为空的进行过滤
+        List<MonthPlanProductionRequirePlanVo> effectiveList = requirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getMaterialDesc())).collect(Collectors.toList());
         //按SKU汇总需求，双数 +2 单数 +3。放置在第一条记录
-        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         productGroupMap.forEach((materialDesc, planList) -> {
             //统计需求量
             if (CollectionUtils.isEmpty(planList)) {
                 return;
             }
-            Long addLossQty = getAddLossQtyUnRatio(planList);
+            Integer addLossQty = getAddLossQtyUnRatio(planList);
             //排序，高优先级值高的在前，排产净需求值高的在前
-            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.reverseOrder()).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.reverseOrder()));
+            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.nullsLast(Comparator.reverseOrder())));
             addLossQtyUnRatio(planList.get(0), addLossQty);
+        });
+        requirePlanList.forEach(singlePlan -> {
+            if (null == singlePlan.getHeightLossQty()) {
+                singlePlan.setHeightLossQty(singlePlan.getHeightQty());
+            }
+            if (null == singlePlan.getFactProdReqQty()) {
+                singlePlan.setFactProdReqQty(singlePlan.getNetQty());
+            }
         });
     }
 
@@ -265,11 +311,15 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * @param requireList
      * @return
      */
-    private Long getAddLossQtyUnRatio(List<MonthPlanProductionRequirePlanVo> requireList) {
+    private Integer getAddLossQtyUnRatio(List<MonthPlanProductionRequirePlanVo> requireList) {
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = requireList.stream().filter(singlePlan -> null != singlePlan.getNetQty()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return BigDecimal.ZERO.intValue();
+        }
         //汇总排产净需求量
-        Long sumQty = requireList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        Integer sumQty = hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         if (sumQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.longValue();
+            return BigDecimal.ZERO.intValue();
         }
         //偶数+2
         if (sumQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
@@ -285,17 +335,23 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * @param plan       计划
      * @param addLossQty 增加的损耗量
      */
-    private void addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Long addLossQty) {
-        if (null == addLossQty || addLossQty <= BigDecimal.ZERO.longValue()) {
+    private void addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
+        if (null == addLossQty || addLossQty <= BigDecimal.ZERO.intValue()) {
             plan.setHeightLossQty(plan.getHeightQty());
             plan.setFactProdReqQty(plan.getNetQty());
             return;
         }
-        Long heightQty = plan.getHeightQty();
-        Long netQty = plan.getNetQty();
-        Long addHeightLossQty = BigDecimal.ZERO.longValue();
+        Integer heightQty = plan.getHeightQty();
+        if (null == heightQty) {
+            heightQty = BigDecimal.ZERO.intValue();
+        }
+        Integer netQty = plan.getNetQty();
+        if (null == netQty) {
+            netQty = BigDecimal.ZERO.intValue();
+        }
+        Integer addHeightLossQty = BigDecimal.ZERO.intValue();
         //有高优先级需求，则加在高优先级上
-        if (heightQty > BigDecimal.ZERO.longValue()) {
+        if (heightQty > BigDecimal.ZERO.intValue()) {
             if (heightQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
                 addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
             } else {
@@ -305,7 +361,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //高优先级损耗值
         plan.setHeightLossQty(heightQty + addHeightLossQty);
         //除高优先级的损耗值
-        Long otherLossQty = addLossQty - addHeightLossQty;
+        Integer otherLossQty = addLossQty - addHeightLossQty;
         plan.setFactProdReqQty(netQty + otherLossQty);
     }
 
@@ -337,6 +393,28 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //删除版本已有数据
         getDataService().deletedInitData(productionContext);
         getDataService().deletedMouldProductionData(productionContext);
+    }
+
+    /**
+     * 设置分厂排产周期相关信息
+     * 标记是自然月排产还是非自然月排产
+     * 排产周期的起始日期
+     *
+     * @param factoryProductionVersion 分厂排产信息对象
+     * @param context                  排产上下文
+     */
+    private void setProductionVersionCycleInfo(MpFactoryProductionVersion factoryProductionVersion, Context context) {
+        String productionVersion = context.getProductionVersion();
+        factoryProductionVersion.setProductionInitVersion(productionVersion);
+        factoryProductionVersion.setProductionStVersion(productionVersion);
+        factoryProductionVersion.setProductionVersion(productionVersion);
+        factoryProductionVersion.setProductionStartDate(context.getProductionStartDate());
+        factoryProductionVersion.setProductionEndDate(context.getProductionEndDate());
+        if (context.isNaturalMonth()) {
+            factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.YES.getCode());
+        } else {
+            factoryProductionVersion.setIsNaturalMonth(YesOrNoEnum.NO.getCode());
+        }
     }
 
 }

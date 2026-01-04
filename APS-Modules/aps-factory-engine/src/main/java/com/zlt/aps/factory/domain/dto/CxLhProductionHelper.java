@@ -39,7 +39,7 @@ public class CxLhProductionHelper implements Serializable {
     /**
      * 当天排产量
      */
-    private Long productionQty;
+    private Integer productionQty;
 
     /**
      * 排产模具
@@ -54,7 +54,7 @@ public class CxLhProductionHelper implements Serializable {
     /**
      * 天日硫化量--满产
      */
-    private Long dayMaxProductionQty;
+    private Integer dayMaxProductionQty;
     /**
      * 成型机台编码信息
      * 有可能一个，也有可能多个
@@ -88,7 +88,7 @@ public class CxLhProductionHelper implements Serializable {
     public void resetProductionInfoByNewGroupName(String groupName, Integer startDay) {
         this.groupName = groupName;
         this.productionDay = startDay;
-        this.productionQty = BigDecimal.ZERO.longValue();
+        this.productionQty = BigDecimal.ZERO.intValue();
         this.dayMaxProductionQty = null;
         this.materialCode = null;
         this.materialDesc = null;

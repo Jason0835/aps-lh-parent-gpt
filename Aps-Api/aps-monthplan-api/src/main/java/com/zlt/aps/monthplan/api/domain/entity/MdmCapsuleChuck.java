@@ -32,7 +32,7 @@ public class MdmCapsuleChuck extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.factoryCode", dictType = "biz_factory_name", sort = 1)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
@@ -40,28 +40,28 @@ public class MdmCapsuleChuck extends BaseEntity {
 
     /** TBR卡盘英寸 多个以,分隔 */
     @ImportExcelValidated(required = true, maxLength = 1024)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.proSize")
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.proSize", sort = 3)
     @ApiModelProperty(value = "TBR卡盘英寸 多个以,分隔", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
     /** TBR卡盘 多个以,分隔 */
-    @ImportExcelValidated(required = true, maxLength = 1024)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.specifications")
+    @ImportExcelValidated(maxLength = 1024)
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.specifications", sort = 2)
     @ApiModelProperty(value = "TBR卡盘 多个以,分隔", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
 
     /** 国内转移 */
     @ImportExcelValidated(required = true,digits = true,min = 0,max = 9999999)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.internalQty")
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.internalQty", sort = 4)
     @ApiModelProperty(value = "国内转移", name = "internalQty")
     @TableField(value = "INTERNAL_QTY")
     private Integer internalQty;
 
     /** JINYU新卡盘 */
     @ImportExcelValidated(required = true,digits = true,min = 0,max = 9999999)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.newChuckQty")
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.newChuckQty", sort = 5)
     @ApiModelProperty(value = "JINYU新卡盘", name = "newChuckQty")
     @TableField(value = "NEW_CHUCK_QTY")
     private Integer newChuckQty;

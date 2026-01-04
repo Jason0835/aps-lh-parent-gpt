@@ -3,16 +3,14 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
-import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
+import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
-import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -31,8 +29,64 @@ import java.util.stream.Collectors;
 public class CxAddSkuProductionHandler {
 
     /**
-     * 新增规格排产
-     * 按优先级估算
+     * 在机结构 - 在产机台的新增规格排产
+     * 按优先级估算,此时经过在机结构对续作部分排产，
+     * 已经初步进行在产机台的分配
+     *
+     * @param context       排产上下文
+     * @param groupPlanInfo 分组排产计划信息，包含分组名(TBR=结构名)、起始及理论收尾日期
+     */
+    public static void productionAddSkuByContinueCxMachine(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            //todo 记录日志
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
+            //todo 记录日志
+            return;
+        }
+        //获取最先收尾的硫化组
+        EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext);
+        Integer startDay = lhGroup.getClosingDay();
+        //成型分配的排产范围起始日~分组收尾日
+        Integer endDay = groupPlanInfo.getLatestEndDay();
+        if (startDay >= endDay) {
+            //todo 记录日志
+            return;
+        }
+        //获取优先级最高的Sku信息
+        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
+        if (StringUtils.isBlank(materialDesc)) {
+            //todo 记录日志
+            return;
+        }
+        //选择模具
+        List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        //计算需要排产的量
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(leftOverHasProductionList, materialDesc);
+        if (null == needProductionInfo) {
+            //todo 记录日志
+            return;
+        }
+        Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
+        //实际排产量
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        //开始排产
+        CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+//        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+        //递归：重新获取下一组
+        productionAddSkuByContinueCxMachine(context, groupPlanInfo);
+    }
+
+    /**
+     * 新增结构新增规格排产
+     * 或是在机结构新增机台排产
+     * 按优先级估算，此时是按机台+结构方式排产
      *
      * @param context            排产上下文
      * @param cxMachineCode      成型机台
@@ -42,12 +96,12 @@ public class CxAddSkuProductionHandler {
      */
     public static void productionAddSku(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxMachineAllocationPlanHelper productionPlan, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        //获取最先收尾的硫化组
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
             //todo 记录日志
             return;
         }
+        //获取最先收尾的硫化组
         CxLhProductionHelper cxLhGroup = cxMachineInfo.getEarliestConclusionLhGroup();
         Integer startDay = cxLhGroup.getProductionDay();
         //成型分配的排产范围起始日~分组收尾日
@@ -70,13 +124,15 @@ public class CxAddSkuProductionHandler {
             //todo 记录日志
             return;
         }
-        Long sumProductionQty = needProductionInfo.getSumNeedProductionQty();
-        Long dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
+        Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
-        Long realSumProductionQty = BigDecimal.ZERO.longValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfo, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
+        Set<String> cxMachineInfoSet = new HashSet<>();
+        cxMachineInfoSet.add(cxMachineCode);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfoSet, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
-        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+        CxLhMouldProductionCalculator.lhProductionByCxMachineHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
     }
