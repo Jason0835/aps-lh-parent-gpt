@@ -64,5 +64,10 @@ public class MdmStructureLhRatio extends BaseEntity {
     @TableField(value = "MAX_EMBRYO_QTY")
     private Integer maxEmbryoQty;
 
+    @Excel(name = "ui.data.column.mdmStructureLhRatio.remark")
+    @ApiModelProperty("备注")
+    @TableField(value = "REMARK")
+    private String remark;
+
 
 }
