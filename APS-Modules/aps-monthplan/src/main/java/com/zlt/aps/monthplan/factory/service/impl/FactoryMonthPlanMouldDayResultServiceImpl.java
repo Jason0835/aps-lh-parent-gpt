@@ -1,9 +1,9 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.maindata.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
