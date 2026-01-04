@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -20,6 +21,7 @@ import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
@@ -1185,17 +1187,41 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
                 || StringUtils.isBlank(param.getMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
-        // steve's TODO 更新发布状态=发布中
+        // 查询可发布的数据
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear());
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth());
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion());
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion());
-//        wrapper.eq(FactoryMonthPlanProductionFinalResult::getPublishStatus, PublishStatusEnum.PUBLISHING.getCode());
+        wrapper.in(FactoryMonthPlanProductionFinalResult::getIsRelease,
+                Arrays.asList(ReleaseStatusEnum.UN_RELEASE.getCode(), ReleaseStatusEnum.RELEASE_FAIL.getCode(),
+                        ReleaseStatusEnum.TIME_OUT_FAIL.getCode(), ReleaseStatusEnum.WAIT_RELEASE.getCode()));
         List<FactoryMonthPlanProductionFinalResult> monthPlanProdFinalList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(monthPlanProdFinalList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.noData"));
+        }
+        // 更新发布状态=发布中
+        LambdaUpdateWrapper<FactoryMonthPlanProductionFinalResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
+                .set(FactoryMonthPlanProductionFinalResult::getIsRelease, ReleaseStatusEnum.RELEASING.getCode());
+        factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
         mesItfService.issueMonthPlan(monthPlanProdFinalList);
-        // 更新发布状态=发布成功
+        // 更新发布状态=已发布
+        updateWrapper.clear();
+        updateWrapper
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
+                .set(FactoryMonthPlanProductionFinalResult::getIsRelease, ReleaseStatusEnum.RELEASE.getCode());
+        factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
         return AjaxResult.success();
     }
 }
