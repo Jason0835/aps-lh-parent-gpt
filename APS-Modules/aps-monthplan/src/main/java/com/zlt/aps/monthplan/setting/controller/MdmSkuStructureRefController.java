@@ -63,6 +63,11 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         startPage();
         List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(queryWrapper);
         clearPage();
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
         return getDataTable(list);
     }
 
@@ -143,7 +148,13 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     protected List<MdmSkuStructureRef> listExportData(MdmSkuStructureRef obj) {
         QueryWrapper<MdmSkuStructureRef> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.getMdmSkuStructureRefList(wrapper);
+        List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(wrapper);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        return list;
     }
 
     @Override
