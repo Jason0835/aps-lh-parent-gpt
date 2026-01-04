@@ -11,51 +11,35 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * 一键生成工厂排产计划，包含
- * 初始化，
+ * 工厂排产-分阶段-初始化，
  * 排分组：TBR 为结构 PCR 为英寸、寸别、寸口
- * 按分组排模具
- * 主要针对半钢，全钢业务
  *
  * @author
  */
 @Slf4j
-@Service(value = "wholeCourseProductionService")
-public class WholeCourseProductionService extends AbstractProductionBusinessService {
+@Service(value = "generalInitService")
+public class GeneralInitService extends AbstractProductionBusinessService {
 
     private final IProductionBusinessService tbrProductionInitService;
 
-    private final IProductionBusinessService tbrCxCapacityAllocationService;
-
-    public WholeCourseProductionService(ProductionSchedulingDataService dataService,
-                                        @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,
-                                        @Qualifier("tbrCxCapacityAllocationService") IProductionBusinessService tbrCxCapacityAllocationService) {
+    public GeneralInitService(ProductionSchedulingDataService dataService,
+                              @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService) {
         super(dataService);
         this.tbrProductionInitService = tbrProductionInitService;
-        this.tbrCxCapacityAllocationService = tbrCxCapacityAllocationService;
     }
 
-    /**
-     * 一键排产
-     *
-     * @param context 排产上下文
-     * @param userObj 用户数据
-     */
     @Override
     public void run(Context context, Object userObj) {
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
+            //todo 先设置可新增保存
             context.setInsertNewProductionVersion(Boolean.TRUE);
-            //初始化
             tbrProductionInitService.run(context, userObj);
             context.setInsertNewProductionVersion(Boolean.FALSE);
-            //排结构、排模具
-            tbrCxCapacityAllocationService.run(context, userObj);
             //保存日志
-            saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
+            saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
+            return;
         }
     }
-
-
 }

@@ -109,4 +109,14 @@ public interface IMdmProductModelRelationRemoteService {
     @ApiOperation("抓取MES数据")
     @PostMapping("/relation/mesCapture")
     AjaxResult mesCapture();
+
+    /**
+     * 更新主花纹到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新主花纹到物料表")
+    @PostMapping("/relation/updateMainPatternToMaterial")
+    public AjaxResult updateMainPatternToMaterial(@RequestBody MdmSkuMouldRel queryVO);
 }

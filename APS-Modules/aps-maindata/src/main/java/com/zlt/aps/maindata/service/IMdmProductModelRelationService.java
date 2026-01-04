@@ -59,4 +59,12 @@ public interface IMdmProductModelRelationService extends IDocService<MdmSkuMould
      * @return 结果
      */
     AjaxResult mesCapture();
+
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    AjaxResult updateMainPatternToMaterial(MdmSkuMouldRel queryVO);
 }
