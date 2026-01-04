@@ -435,6 +435,11 @@ public class ApsConstant {
     public static final String SCM_DELIVERY_MODE_SPLIT = "20";
 
     /**
+     * 每日分钟数
+     */
+    public static final int MINUTES_PER_DAY = 24 * 60;
+
+    /**
      * 硫化排程管理，自动排程
      */
     public static final String REDIS_APS_LH_AUTO_SCHEDULE = "APS:LH:AUTO:SCHEDULE:";
