@@ -179,10 +179,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion,data.getSalesOrders());
+        saveFactoryProductionVersion(tMonth,monthPlanVersion);
     }
 
-    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion, List<SalesOrderPool> salesOrders) {
+    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion) {
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
@@ -190,11 +190,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         version.setMonthPlanVersion(monthPlanVersion);
         version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
         version.setIsFinal(YesOrNoEnum.NO.getCode());
-        // 取销售订单的胎别
-        if (CollectionUtils.isNotEmpty(salesOrders)) {
-            SalesOrderPool saleOrder = salesOrders.get(0);
-            version.setProductTypeCode(saleOrder.getProductType());
-        }
+        version.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         factoryProductionVersionMapper.insert(version);
     }
 
