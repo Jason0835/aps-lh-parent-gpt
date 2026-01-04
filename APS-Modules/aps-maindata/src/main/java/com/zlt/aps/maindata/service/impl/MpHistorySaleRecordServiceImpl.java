@@ -100,7 +100,7 @@ public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistory
     }
 
     @Override
-    public Map<String, Long> calculateMonthSaleQty(int months) {
+    public Map<String, Integer> calculateMonthSaleQty(int months) {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         YearMonth lastYearMonth =  currentYearMonth.minusMonths(months);
@@ -126,8 +126,7 @@ public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistory
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
                 entry -> BigDecimal.valueOf(entry.getValue())
-                    .divide(BigDecimal.valueOf(months), 0, RoundingMode.HALF_UP)
-                    .longValue()
+                    .divide(BigDecimal.valueOf(months), 0, RoundingMode.HALF_UP).intValue()
             ));
     }
 

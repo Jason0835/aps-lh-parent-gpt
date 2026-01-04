@@ -155,7 +155,8 @@
         SECTION_WIDTH,
         DATA_VERSION,
         COMPANY_CODE,
-        FACTORY_CODE
+        FACTORY_CODE,
+        CONCAT(IFNULL(SPECIFICATIONS, ''), IFNULL(PATTERN, '')) AS structureName
         FROM MES_BAS_MATERIAL
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
