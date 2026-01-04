@@ -1,14 +1,20 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.demand.mapper.DpOrderPoolSnapshotEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -39,7 +45,10 @@ import com.ruoyi.common.exception.ServiceException;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
+@RequiredArgsConstructor
 public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPoolSnapshot>  implements IDpOrderPoolSnapshotService {
+
+    private final DpOrderPoolSnapshotEntityMapper dpOrderPoolSnapshotEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2025122615";
@@ -92,6 +101,38 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         }
     }
 
+    @Override
+    public List<SupplyOrderPool> fetchSupplyOrderPool(MpFactoryProductionVersion finalVersion) {
+        LambdaQueryWrapper<DpOrderPoolSnapshot> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpOrderPoolSnapshot::getFactoryCode, finalVersion.getFactoryCode());
+        wrapper.eq(DpOrderPoolSnapshot::getYear, finalVersion.getYear());
+        wrapper.eq(DpOrderPoolSnapshot::getMonth, finalVersion.getMonth());
+        wrapper.eq(DpOrderPoolSnapshot::getMonthPlanVersion,finalVersion.getMonthPlanVersion());
+        wrapper.in(DpOrderPoolSnapshot::getOrderPriority,Lists.newArrayList(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP,ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP));
+        wrapper.eq(DpOrderPoolSnapshot::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<DpOrderPoolSnapshot> list =  this.dpOrderPoolSnapshotEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyList();
+        }
+        List<SupplyOrderPool> result = Lists.newArrayList();
+        list.forEach(orderPoolSnapshot -> result.add(buildSupplyOrderPool(orderPoolSnapshot)));
+        return result;
+    }
+
+    private SupplyOrderPool buildSupplyOrderPool(DpOrderPoolSnapshot orderPoolSnapshot) {
+        SupplyOrderPool supplyOrderPool = new SupplyOrderPool();
+        supplyOrderPool.setFactoryCode(orderPoolSnapshot.getFactoryCode());
+        supplyOrderPool.setYear(orderPoolSnapshot.getYear());
+        supplyOrderPool.setMonth(orderPoolSnapshot.getMonth());
+        supplyOrderPool.setBrand(orderPoolSnapshot.getBrand());
+        supplyOrderPool.setOrderType(orderPoolSnapshot.getOrderPriority());
+        supplyOrderPool.setMaterialCode(orderPoolSnapshot.getMaterialCode());
+        supplyOrderPool.setMaterialDesc(orderPoolSnapshot.getMaterialDesc());
+        supplyOrderPool.setQty(orderPoolSnapshot.getDemandQty());
+        supplyOrderPool.setSaleArea(orderPoolSnapshot.getAreaCode());
+        return supplyOrderPool;
+    }
+
     private DpOrderPoolSnapshot buildOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, SupplyOrderPool supplyOrder) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(supplyOrder, entity);
@@ -130,7 +171,7 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         entity.setCustomCode(saleOrder.getSalCode());
         // entity.setCustomName();
         entity.setCustomNationCode(saleOrder.getSalNCode());
-        entity.setDemandQty(saleOrder.getOrdQty() == null?0L:saleOrder.getOrdQty().longValue());
+        entity.setDemandQty(saleOrder.getOrdQty() == null?0:saleOrder.getOrdQty().intValue());
         entity.setDestinationNationCode(saleOrder.getNatCode());
         entity.setIsDynamicBalance(saleOrder.getIsDynamicBalance());
         entity.setIsUniformity(saleOrder.getIsUniformity());

@@ -197,24 +197,24 @@ public class OrderAllocationServiceImpl{
             if (totalAllocationQty == null || totalAllocationQty <= 0) {
                 // 没有该物料的分配量，将所有订单的生产量设为0
                 for (DpOrderOffsetDetail order : orderList) {
-                    order.setProductionQty(0L);
+                    order.setProductionQty(0);
                     ordersToUpdate.add(order);
                 }
                 continue;
             }
 
             // 分配逻辑
-            long remainingQty = totalAllocationQty;
+            int remainingQty = totalAllocationQty;
 
             for (DpOrderOffsetDetail order : orderList) {
                 if (remainingQty <= 0) {
-                    order.setProductionQty(0L);
+                    order.setProductionQty(0);
                     ordersToUpdate.add(order);
                     continue;
                 }
 
-                long maxAllocatable = order.getProduceQtyDue() != null ? order.getProduceQtyDue() : 0L;
-                long allocatedQty = Math.min(maxAllocatable, remainingQty);
+                int maxAllocatable = order.getProduceQtyDue() != null ? order.getProduceQtyDue() : 0;
+                int allocatedQty = Math.min(maxAllocatable, remainingQty);
 
                 order.setProductionQty(allocatedQty);
                 ordersToUpdate.add(order);

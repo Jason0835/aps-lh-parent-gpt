@@ -120,12 +120,29 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
         queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getCode());
         if (!Boolean.TRUE.equals(context.getInsertNewProductionVersion())) {
             queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
             return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
         }
         queryWrapper.isNull("PRODUCTION_INIT_VERSION");
         return factoryEngineProductionVersionMapper.selectOne(queryWrapper);
+    }
+
+    @Override
+    public MpFactoryProductionVersion getFirstFactoryMonthPlanVersion(Context context) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("YEAR", context.getYear());
+        queryWrapper.eq("MONTH", context.getMonth());
+        queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getCode());
+        List<MpFactoryProductionVersion> dataList = factoryEngineProductionVersionMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(dataList)) {
+            return null;
+        }
+        dataList.sort(Comparator.comparing(MpFactoryProductionVersion::getId));
+        return dataList.get(BigDecimal.ZERO.intValue());
     }
 
     @Override
@@ -492,6 +509,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         factoryProductionSchedulingMapper.deleteProductionMouldVersion(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
     }
+
     //先使用独立事务，看数据
     @Override
 //    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)

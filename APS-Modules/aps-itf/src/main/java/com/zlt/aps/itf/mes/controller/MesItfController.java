@@ -1,6 +1,9 @@
 package com.zlt.aps.itf.mes.controller;
 
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
@@ -8,6 +11,7 @@ import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.ParseException;
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -73,6 +79,18 @@ public class MesItfController {
     @ApiOperation("同步成品库存")
     @PostMapping("/syncProductStock")
     public AjaxResult syncProductStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException {
+        String factoryCode = mdmProductStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmProductStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = mdmProductStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            mdmProductStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
+        String productTypeCode = mdmProductStock.getProductTypeCode();
+        if (StringUtils.isBlank(productTypeCode)) {
+            mdmProductStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        }
         return mesItfService.syncProductStock(mdmProductStock);
     }
 

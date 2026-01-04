@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
-import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -207,8 +206,8 @@ public class SaleRequirePlanHelper {
         }
 
         private int compareOrdQty(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
-            Long q1 = o1.getProduceQtyDue();
-            Long q2 = o2.getProduceQtyDue();
+            Integer q1 = o1.getProduceQtyDue();
+            Integer q2 = o2.getProduceQtyDue();
 
             if (q1 == null && q2 == null) {
                 return 0;
@@ -249,7 +248,7 @@ public class SaleRequirePlanHelper {
     private static DpDemandPlan buildDemandPlanFromAllocation(DpOrderOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
-        demandPlan.setNetQty(BigDecimal.valueOf(netDemand.getProduceQtyDue()));
+        demandPlan.setNetQty(netDemand.getProduceQtyDue());
         demandPlan.setYearWeek(netDemand.getWeekYear());
         return demandPlan;
     }

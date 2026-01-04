@@ -108,6 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                tmpi.PRODUCT_TYPE_NAME,
                tmpi.MOULD_CATEGORY,
                tmpi.SPECIFICATIONS,
+        tmpi.MAIN_PATTERN,
                tmpi.PATTERN,
                tmpi.BRAND,
                tmpi.TIRE_TYPE,
@@ -242,4 +243,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{materialCode}
         </foreach>
     </select>
+
+    <update id="updateMainPatternToMaterial">
+        UPDATE T_MDM_MATERIAL_INFO t1
+            JOIN T_MDM_SKU_MOULD_REL t2
+        ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE AND t2.IS_DELETE = 0
+            SET t1.MAIN_PATTERN = t2.MAIN_PATTERN, t1.UPDATE_BY = #{updateBy}, t1.UPDATE_TIME = #{updateTime}
+        WHERE t1.IS_DELETE = 0
+    </update>
 </mapper>

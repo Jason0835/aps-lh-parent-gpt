@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.service.impl;
 
-import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
@@ -23,7 +22,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     private final IProductionBusinessService wholeCourseProductionService;
 
-    public MonthPlanProductionSchedulingService(@Qualifier("tbrProductionInitService") IProductionBusinessService generalInitService,
+    public MonthPlanProductionSchedulingService(@Qualifier("generalInitService") IProductionBusinessService generalInitService,
                                                 @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService
     ) {
         this.generalInitService = generalInitService;
@@ -33,12 +32,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void init(Context context) {
-        //根据类别进行
-        ProductTypeEnum productType = context.getProductType();
-        if (ProductTypeEnum.SEMI_STEEL == productType) {
-            generalInitService.run(context, new Object());
-            return;
-        }
+        generalInitService.run(context, new Object());
     }
 
     @Override
@@ -50,12 +44,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void general(Context context) {
-        //根据类别进行
-        ProductTypeEnum productType = context.getProductType();
-        if (ProductTypeEnum.WHOLE_STEEL == productType) {
-            wholeCourseProductionService.run(context, new Object());
-            return;
-        }
+        wholeCourseProductionService.run(context, new Object());
     }
 
     @Override

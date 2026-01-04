@@ -359,6 +359,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         queryWrapper.eq("MONTH", month);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
+        //正式需要排产版本号 queryWrapper.eq(StringUtils.isNotBlank(productionVersion), "PRODUCTION_VERSION", productionVersion);
         queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
         MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
         if (null == version) {
