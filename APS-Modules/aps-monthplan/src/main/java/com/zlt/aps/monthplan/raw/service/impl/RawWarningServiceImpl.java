@@ -419,6 +419,14 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                     usage.calculateDeviation();
                     usage.setRemark("已更新最新实际用量" + usage.getActualQty());
                     rawWeekUsageEntityMapper.updateById(usage);
+                }else {
+                    usage.setActualQty(BigDecimal.valueOf(0));
+                    // 重新计算偏差
+                    usage.calculateDeviation();
+                    usage.setRemark("未找到该周的实际用量数据");
+                    rawWeekUsageEntityMapper.updateById(usage);
+                    log.warn("未找到该周的实际用量数据，工厂：{}，年份：{}，周次：{}，原材料：{}",
+                            factoryCode, year, week, usage.getMaterialCode());
                 }
             }
 
@@ -502,8 +510,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
         if (record == null) {
             return AjaxResult.error("预警记录不存在");
         }
-
-        record.setStatus("1"); // 已处理
+        // 已处理
+        record.setStatus("1");
         record.setHandler(handler);
         record.setHandleOpinion(opinion);
         record.setHandleTime(new Date());

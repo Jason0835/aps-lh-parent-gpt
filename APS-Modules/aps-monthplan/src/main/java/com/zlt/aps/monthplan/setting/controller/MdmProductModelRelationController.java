@@ -2,12 +2,16 @@ package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.FactoryConstant;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
@@ -15,6 +19,7 @@ import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
@@ -32,10 +37,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -70,6 +72,9 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
 
     @Autowired
     private MdmModelInfoEntityMapper mdmModelInfoEntityMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
     /**
      * 查询SKU与模具关系列表
@@ -156,7 +161,20 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MdmSkuMouldRel billVO) {
-        return super.save(billVO);
+        AjaxResult save = super.save(billVO);
+        String factoryCode = billVO.getFactoryCode();
+        String mainPattern = billVO.getMainPattern();
+        String materialCode = billVO.getMaterialCode();
+        // 把主花纹回写到物料信息表
+        LambdaUpdateWrapper<MdmMaterialInfo> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper
+                .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                .eq(MdmMaterialInfo::getMaterialCode, materialCode)
+                .set(MdmMaterialInfo::getMainPattern, mainPattern)
+                .set(BaseEntity::getUpdateTime, new Date())
+                .set(BaseEntity::getUpdateBy, SecurityUtils.getUsername());
+        materialInfoEntityMapper.update(null, updateWrapper);
+        return save;
     }
 
     /**

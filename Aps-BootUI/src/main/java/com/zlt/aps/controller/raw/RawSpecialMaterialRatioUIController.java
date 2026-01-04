@@ -173,7 +173,7 @@ public class RawSpecialMaterialRatioUIController extends BaseUIController<RawSpe
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,true);
+        AjaxResult ajaxResult = iRawSpecialMaterialRatioService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

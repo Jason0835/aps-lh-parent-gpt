@@ -107,8 +107,8 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 主花纹
      */
-//    @ImportExcelValidated(required = true, maxLength = 20)
-//    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern", sort = 8)
+    @ImportExcelValidated(maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;

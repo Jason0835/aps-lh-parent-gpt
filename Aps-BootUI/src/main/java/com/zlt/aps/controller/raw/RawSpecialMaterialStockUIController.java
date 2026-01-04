@@ -173,7 +173,7 @@ public class RawSpecialMaterialStockUIController extends BaseUIController<RawSpe
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iRawSpecialMaterialStockService.importData(context,true);
+        AjaxResult ajaxResult = iRawSpecialMaterialStockService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

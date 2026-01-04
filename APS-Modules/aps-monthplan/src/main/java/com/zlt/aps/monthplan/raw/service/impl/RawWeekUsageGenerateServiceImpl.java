@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
@@ -281,6 +282,9 @@ public class RawWeekUsageGenerateServiceImpl {
         for (Map.Entry<String, BigDecimal> entry : materialUsage.entrySet()) {
             String materialKey = entry.getKey();
             BigDecimal planQty = entry.getValue();
+
+            // 设置精度：保留4位小数，使用四舍五入
+            planQty = planQty.setScale(4, RoundingMode.HALF_UP);
 
             String[] parts = materialKey.split("\\|");
             String materialCode = parts[0];
