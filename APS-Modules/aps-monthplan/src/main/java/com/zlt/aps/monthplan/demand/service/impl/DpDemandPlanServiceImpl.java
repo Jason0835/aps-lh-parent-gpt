@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -206,6 +207,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         wrapper.eq(DpDemandPlan::getMonthPlanVersion, finalVersion.getMonthPlanVersion());
         wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.demandPlanEntityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public Set<String> findMonthPlanVersion(DpDemandPlan queryCondition) {
+        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpDemandPlan::getFactoryCode, queryCondition.getFactoryCode());
+        wrapper.eq(DpDemandPlan::getYear, queryCondition.getYear());
+        wrapper.eq(DpDemandPlan::getMonth, queryCondition.getMonth());
+        wrapper.eq(DpDemandPlan::getPlanType, ProductionPlanType.NORMAL.getPlanType());
+        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.orderByDesc(DpDemandPlan::getMonthPlanVersion);
+        List<DpDemandPlan> list =  this.demandPlanEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptySet();
+        }
+        return list.stream().map(DpDemandPlan::getMonthPlanVersion).collect(Collectors.toSet());
     }
 
     /**
