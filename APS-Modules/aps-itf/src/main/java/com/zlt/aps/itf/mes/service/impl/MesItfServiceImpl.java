@@ -8,6 +8,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
+import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -40,6 +41,8 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MesItfMapper mesItfMapper;
+    @Autowired
+    private MesViewMapper mesViewMapper;
     @Autowired
     private MdmProductModelRelationEntityMapper productModelRelationEntityMapper;
     @Autowired
@@ -354,7 +357,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmProductStock> getProductStock(MdmProductStock productStockMonth) {
         // 查询视图
-        return mesItfMapper.selectProductStock(productStockMonth);
+        return mesViewMapper.selectProductStock(productStockMonth);
     }
 
     /**
@@ -407,7 +410,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmUnqualifiedStock> getUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock) {
         // 查询视图
-        return mesItfMapper.selectUnqualifiedStock(mdmUnqualifiedStock);
+        return mesViewMapper.selectUnqualifiedStock(mdmUnqualifiedStock);
     }
 
     /**
@@ -451,7 +454,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock) {
         // 查询视图
-        return mesItfMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
+        return mesViewMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
     /**
@@ -466,7 +469,7 @@ public class MesItfServiceImpl implements MesItfService {
         if (outboundDate == null) {
             outboundDate = DateUtils.getNowDate("yyyy-MM-dd");
         }
-        List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesItfMapper.syncRawMaterialOutboundRecord(materialOutboundRecord);
+        List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesViewMapper.syncRawMaterialOutboundRecord(materialOutboundRecord);
         try {
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
