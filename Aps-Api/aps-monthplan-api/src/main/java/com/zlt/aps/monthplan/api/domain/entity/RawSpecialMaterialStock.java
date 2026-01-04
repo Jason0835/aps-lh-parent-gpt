@@ -46,7 +46,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.rawSpecialMaterialStock.stockDate")
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.stockDate", dateFormat = "yyyy-MM-dd")
     @ImportExcelValidated(required = true, date = true)
     @ApiModelProperty(value = "库存日期", name = "stockDate")
     @TableField(value = "STOCK_DATE")
