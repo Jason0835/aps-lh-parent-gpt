@@ -283,7 +283,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
             }
         }
         if (StringUtils.isBlank(importDocEntity.getProductTypeCode())) {
-            importDocEntity.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
+            importDocEntity.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         }
         if (StringUtils.isNotBlank(importDocEntity.getMaterialCode())) {
             ProductTypeEnum enumByValue = ProductTypeEnum.getEnumByValue(importDocEntity.getProductTypeCode());
