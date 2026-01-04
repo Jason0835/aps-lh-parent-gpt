@@ -194,6 +194,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         Integer averageSaleQty = getAverageSaleQty();
         if (null == averageSaleQty || averageSaleQty <= BigDecimal.ZERO.intValue()) {
             inventorySalesRatio = BigDecimal.valueOf(Integer.MIN_VALUE).doubleValue();
+            return;
         }
         if (null == productionQty || productionQty < BigDecimal.ZERO.intValue()) {
             productionQty = BigDecimal.ZERO.intValue();
@@ -240,6 +241,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
 
     /**
      * 设置物料基础信息属性
+     * 结构名
      * 不可生产标志等
      *
      * @param productBaseInfo
@@ -248,6 +250,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         if (null == productBaseInfo) {
             return;
         }
+        setStructureName(productBaseInfo.getStructureName());
         setCantProduce(productBaseInfo.getCantProduce());
     }
 
@@ -267,6 +270,11 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         setEmbryoCode(constructionInfo.getEmbryoCode());
         setMouldMethod(constructionInfo.getMouldMethod());
         setSpecCode(constructionInfo.getSpecCode());
+        if (StringUtils.isBlank(constructionInfo.getIsZeroRack())) {
+            setIsZeroRack(YesOrNoEnum.NO.getCode());
+        } else {
+            setIsZeroRack(constructionInfo.getIsZeroRack());
+        }
     }
 
     /**
@@ -464,13 +472,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @return
      */
     private String checkNoContinueCondition() {
+        //不排产
         if (YesOrNoEnum.NO.getCode().equals(getIsProduction())) {
             String planNoProductionReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PLAN_NO_PRODUCTION);
             addNoProductionReason(planNoProductionReason);
             return YesOrNoEnum.NO.getCode();
         }
         //没有物料编码
-        if (StringUtils.isBlank(getMaterialCode())) {
+        if (StringUtils.isBlank(getMaterialCode()) || StringUtils.isBlank(getMaterialDesc())) {
             String noHasMaterialCode = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_HAS_PRODUCT_CODE);
             addNoProductionReason(noHasMaterialCode);
             setIsProduction(YesOrNoEnum.NO.getCode());
@@ -539,10 +548,13 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             //优先一次法 按成型法排序 1-1次法 2-2次法
             constructionConfigurationList.sort(Comparator.comparing(MonthPlanProductConstructionInfoVo::getMouldMethod));
         }
-        MonthPlanProductConstructionInfoVo constructionInfo = constructionConfigurationList.get(0);
+        MonthPlanProductConstructionInfoVo constructionInfo = constructionConfigurationList.get(BigDecimal.ZERO.intValue());
         String constructionCode = constructionInfo.getConstructionCode();
         if (isPCR) {
-            setConstructionStage(ConstructionStageEnum.matchByConstructionCode(constructionCode).getStage());
+            ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(constructionCode);
+            if (null != stage) {
+                setConstructionStage(stage.getStage());
+            }
             return constructionInfo;
         }
         //全钢TBR -施工阶段-正式

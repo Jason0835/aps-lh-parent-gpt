@@ -125,7 +125,7 @@
 
     <select id="getMouldShellInfo" resultType="com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo">
         SELECT FACTORY_CODE,
-               MOLD_MODEL_CODE,
+               MOULD_SET_CODE,
                MACHINE_QTY,
                ON_HAND_QTY
           FROM t_mdm_mould_shell_info
