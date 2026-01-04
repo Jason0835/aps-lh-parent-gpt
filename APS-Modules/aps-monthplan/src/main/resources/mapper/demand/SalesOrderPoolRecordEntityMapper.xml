@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolRecordEntityMapper">
+	<insert id="batchInsert">
+		INSERT INTO T_DP_SALES_ORDER_POOL_RECORD (
+			FACTORY_CODE,
+			YEAR,
+			MONTH,
+			PRODUCT_TYPE,
+			ORDER_PRIORITY,
+			AREA,
+			SAL_CODE,
+			SAL_N_CODE,
+			NAT_CODE,
+			BRAND,
+			SAL_CODE_PO,
+			BILL_DATE,
+			ORI_MATERIAL_CODE,
+			MATERIAL_DESC,
+			ORD_QTY,
+			WEEK_YEAR,
+			IS_DYNAMIC_BALANCE,
+			IS_UNIFORMITY,
+			IS_EUDR,
+			DELIVER_GOODS_TYPE,
+			SCM_PRIORITY,
+			SCM_DETAIL_ID,
+			REMARK,
+			IS_DELETE,
+			CREATE_BY,
+			CREATE_TIME,
+			UPDATE_BY,
+			UPDATE_TIME
+		) VALUES
+        <foreach collection="list" item="saleOrderPool" separator=",">
+            (
+            #{saleOrderPool.factoryCode,jdbcType=VARCHAR},
+            #{saleOrderPool.year,jdbcType=INTEGER},
+            #{saleOrderPool.month,jdbcType=INTEGER},
+            #{saleOrderPool.productType,jdbcType=VARCHAR},
+            #{saleOrderPool.orderPriority,jdbcType=VARCHAR},
+            #{saleOrderPool.area,jdbcType=VARCHAR},
+            #{saleOrderPool.salCode,jdbcType=VARCHAR},
+            #{saleOrderPool.salNCode,jdbcType=VARCHAR},
+            #{saleOrderPool.natCode,jdbcType=VARCHAR},
+            #{saleOrderPool.brand,jdbcType=VARCHAR},
+            #{saleOrderPool.salCodePo,jdbcType=VARCHAR},
+            #{saleOrderPool.billDate,jdbcType=DATE},
+            #{saleOrderPool.oriMaterialCode,jdbcType=VARCHAR},
+            #{saleOrderPool.materialDesc,jdbcType=VARCHAR},
+            #{saleOrderPool.ordQty,jdbcType=NUMERIC},
+            #{saleOrderPool.weekYear,jdbcType=VARCHAR},
+            #{saleOrderPool.isDynamicBalance,jdbcType=VARCHAR},
+            #{saleOrderPool.isUniformity,jdbcType=VARCHAR},
+            #{saleOrderPool.isEudr,jdbcType=VARCHAR},
+            #{saleOrderPool.deliverGoodsType,jdbcType=VARCHAR},
+            #{saleOrderPool.scmPriority,jdbcType=VARCHAR},
+            #{saleOrderPool.scmDetailId,jdbcType=BIGINT},
+            #{saleOrderPool.remark,jdbcType=VARCHAR},
+            0,
+            #{saleOrderPool.createBy,jdbcType=DATE},
+            #{saleOrderPool.createTime,jdbcType=VARCHAR},
+            #{saleOrderPool.updateBy,jdbcType=DATE},
+            #{saleOrderPool.updateTime,jdbcType=VARCHAR}
+            )
+        </foreach>
+    </insert>
+</mapper>
