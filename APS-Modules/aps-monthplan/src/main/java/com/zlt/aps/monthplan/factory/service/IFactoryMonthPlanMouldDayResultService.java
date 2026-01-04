@@ -1,8 +1,9 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.monthplan.factory.service;
 
 
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.bill.common.service.IDocService;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IFactoryMonthPlanMouldDayResultService.java
@@ -16,6 +17,6 @@ import com.zlt.bill.common.service.IDocService;
  *     修 改 人：zlt
  *     修改内容：...
  */
-public interface IFactoryMonthPlanMouldDayResultService  extends IDocService<FactoryMonthPlanMouldDayResult>{
+public interface IFactoryMonthPlanMouldDayResultService extends IDocService<FactoryMonthPlanMouldDayResult>{
 
 }
