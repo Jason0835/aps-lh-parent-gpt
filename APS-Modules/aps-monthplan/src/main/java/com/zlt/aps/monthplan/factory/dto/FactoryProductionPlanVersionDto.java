@@ -66,7 +66,7 @@ public class FactoryProductionPlanVersionDto implements Serializable {
      * 是否定稿
      */
     @ApiModelProperty(value = "是否定稿", name = "isFinal")
-    private Integer isFinal;
+    private String isFinal;
     /**
      * 创建时间
      */
@@ -83,7 +83,7 @@ public class FactoryProductionPlanVersionDto implements Serializable {
      * 0 不是自然月 1 是自然月
      */
     @ApiModelProperty(value = "0 不是自然月 1 是自然月", name = "isNaturalMonth")
-    private Integer isNaturalMonth;
+    private String isNaturalMonth;
 
     /**
      * 获取工厂销售需求版本计划分组Key

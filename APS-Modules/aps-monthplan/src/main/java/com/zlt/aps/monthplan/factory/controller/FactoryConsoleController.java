@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
@@ -71,10 +72,12 @@ public class FactoryConsoleController extends BaseController {
             if (StringUtils.isNotBlank(initVersion)) {
                 FactoryProductionVersionVo factoryProductionVersion = new FactoryProductionVersionVo();
                 factoryProductionVersion.setInitVersion(initVersion);
-                factoryProductionVersion.setCreateTime(factoryProductionPlanVersion.getCreateTime());
+                factoryProductionVersion.setProductionStVersion(factoryProductionPlanVersion.getProductionStVersion());
                 factoryProductionVersion.setProductionVersion(productionVersion);
+                factoryProductionVersion.setCreateTime(factoryProductionPlanVersion.getCreateTime());
                 factoryProductionVersion.setIsFinal(factoryProductionPlanVersion.getIsFinal());
-                if (YesOrNoEnum.NO.getValue().equals(factoryProductionPlanVersion.getIsNaturalMonth())) {
+                factoryProductionVersion.setIsNaturalMonth(factoryProductionPlanVersion.getIsNaturalMonth());
+                if (YesOrNoEnum.NO.getCode().equals(factoryProductionPlanVersion.getIsNaturalMonth())) {
                     factoryProductionVersion.setProductionStartDate(factoryProductionPlanVersion.getProductionStartDate());
                 }
                 result.getProductVersionList().add(factoryProductionVersion);
@@ -134,8 +137,14 @@ public class FactoryConsoleController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
-    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
     @PostMapping("/oneClickProductionProcess")
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
+    @DistributedLock(key = "'redissonLock:factoryConsole:oneClickProductionProcess:'#factoryProductionParam.factoryCode" + "#factoryProductionParam.year" + "#factoryProductionParam.month" + "#factoryProductionParam.monthPlanVersion",
+            failMsg = "ui.data.alert.factoryConsole.oneClickProductionProcess.run",
+            args = {"#factoryProductionParam.monthPlanVersion", "#factoryProductionParam.factoryCode"},
+            waitTime = 5,
+            leaseTime = 300
+    )
     public AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkParamResult = checkEmptyMonthPlanVersion(factoryProductionParam);
         //校验没通过
@@ -151,8 +160,14 @@ public class FactoryConsoleController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
-    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
     @PostMapping("/resetConfigurationInitProduction")
+    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
+    @DistributedLock(key = "'redissonLock:factoryConsole:resetConfigurationInitProduction:'#factoryProductionParam.factoryCode" + "#factoryProductionParam.year" + "#factoryProductionParam.month" + "#factoryProductionParam.monthPlanVersion" + "#factoryProductionParam.productionVersion",
+            failMsg = "ui.data.alert.factoryConsole.resetConfigurationInitProduction.run",
+            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryCode"},
+            waitTime = 5,
+            leaseTime = 300
+    )
     public AjaxResult resetConfigurationInitProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkParamResult = checkEmptyProductionVersion(factoryProductionParam);
         //校验没通过
@@ -286,8 +301,8 @@ public class FactoryConsoleController extends BaseController {
         if (null == checkParam) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
         }
-        //todo 正式需要加入排产版本号 || StringUtils.isBlank(checkParam.getProductionVersion())
-        if (StringUtils.isBlank(checkParam.getFactoryCode()) || null == checkParam.getYear() || null == checkParam.getMonth() || StringUtils.isBlank(checkParam.getMonthPlanVersion())) {
+        //正式需要加入排产版本号
+        if (StringUtils.isBlank(checkParam.getFactoryCode()) || null == checkParam.getYear() || null == checkParam.getMonth() || StringUtils.isBlank(checkParam.getMonthPlanVersion()) || StringUtils.isBlank(checkParam.getProductionVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.versionNoEmpty"));
         }
         return AjaxResult.success();
