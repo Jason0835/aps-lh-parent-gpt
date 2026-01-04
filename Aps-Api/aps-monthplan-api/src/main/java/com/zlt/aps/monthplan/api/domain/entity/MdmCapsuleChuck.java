@@ -40,14 +40,14 @@ public class MdmCapsuleChuck extends BaseEntity {
 
     /** TBR卡盘英寸 多个以,分隔 */
     @ImportExcelValidated(required = true, maxLength = 1024)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.proSize", sort = 3)
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.proSize", width = 25, sort = 3)
     @ApiModelProperty(value = "TBR卡盘英寸 多个以,分隔", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
     /** TBR卡盘 多个以,分隔 */
     @ImportExcelValidated(maxLength = 1024)
-    @Excel(name = "ui.data.column.mdmCapsuleChuck.specifications", sort = 2)
+    @Excel(name = "ui.data.column.mdmCapsuleChuck.specifications", width = 25, sort = 2)
     @ApiModelProperty(value = "TBR卡盘 多个以,分隔", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;

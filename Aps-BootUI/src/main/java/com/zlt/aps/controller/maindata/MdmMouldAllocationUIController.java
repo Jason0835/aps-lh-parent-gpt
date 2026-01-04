@@ -206,7 +206,7 @@ public class MdmMouldAllocationUIController extends BaseUIController<MdmMouldAll
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMouldAllocationService.importData(context,false);
+        AjaxResult ajaxResult = iMdmMouldAllocationService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

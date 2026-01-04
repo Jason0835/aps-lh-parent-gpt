@@ -206,7 +206,7 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmMoldingMachineService.importData(context,false);
+        AjaxResult ajaxResult = iMdmMoldingMachineService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
