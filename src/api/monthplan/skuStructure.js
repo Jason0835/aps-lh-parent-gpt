@@ -27,3 +27,10 @@ export function selectSkuStructure(query) {
     data: query
   })
 }
+export function updateMaterial(query) {
+  return request({
+    url: '/monthplan/mdmSkuStructureRef/updateStructureToMaterial',
+    method: 'post',
+    data: query
+  })
+}

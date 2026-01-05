@@ -317,7 +317,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
-          prop: "samePatternPanel",
+          prop: "isSamePatternPanel",
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },

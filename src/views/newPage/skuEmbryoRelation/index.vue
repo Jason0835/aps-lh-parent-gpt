@@ -49,6 +49,13 @@
           v-hasPermi="['monthplan:mdmSkuStructureRef:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleUpdate"
+          :loading="updateLoading"
+          type="primary"
+          v-hasPermi="['monthplan:mdmSkuStructureRef:updateStructure']"
+          >{{ $t("更新主花纹到物料信息表") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -79,6 +86,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listSkuStructure,
   removeSkuStructure,
+  updateMaterial
 } from "@/api/monthplan/skuStructure";
 
 //components
@@ -117,6 +125,7 @@ export default {
           },
         },
       ],
+      updateLoading:false,
       loading: false,
       data: [],
       selection: [],
@@ -225,6 +234,19 @@ export default {
     },
   },
   methods: {
+    async handleUpdate() {
+      try {
+        this.updateLoading=true
+        let res = await updateMaterial();
+        this.$modal.msgSuccess(res.msg);
+        // this.$set(this.page, "current", 1);
+        // this.getList();
+        this.updateLoading=false
+      } catch (err) {
+        console.log(err);
+        this.updateLoading=false
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();

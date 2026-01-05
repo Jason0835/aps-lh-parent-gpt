@@ -61,9 +61,9 @@ export default {
 
       // 转换为数字
       const numValue = Number(strValue);
-      // if (numValue > 999999) {
-      //   return callback(new Error(this.$t("common.rule.inoutMax")));
-      // }
+      if (numValue > 999999) {
+        return callback(new Error(this.$t("common.rule.inoutMax")));
+      }
 
       if (!Number.isInteger(numValue)) {
         return callback(new Error(this.$t("common.rule.peleaseInteger")));
@@ -230,14 +230,13 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
           type:'number',
           max:999999,
-          min:1
+
         },
         {
           prop: "perimeterMax",
           label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
           type:'number',
           max:999999,
-          min:1
         },
 
         {
@@ -307,10 +306,13 @@ export default {
     show(data) {
       this.visible = true;
       if (data) {
+        data.perimeterMin = data.perimeterMin || undefined;
+        data.perimeterMax = data.perimeterMax || undefined;
         this.isEdit = true;
         this.form = {
           ...data,
         };
+
       } else {
         this.form = {
           factoryCode: "116",

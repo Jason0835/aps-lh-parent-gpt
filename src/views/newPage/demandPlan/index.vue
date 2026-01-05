@@ -222,6 +222,11 @@ export default {
           },
         },
         {
+          prop: "monthPlanVersion",
+          label: this.$t("需求计划版本号"),
+          width:180
+        },
+        {
           prop: "brand",
           label: this.$t("common.brand"),
           formatter: (row, column, value) => {
