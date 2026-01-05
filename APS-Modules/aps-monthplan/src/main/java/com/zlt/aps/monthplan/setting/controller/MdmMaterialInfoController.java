@@ -98,10 +98,13 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
         for (List<MdmMaterialInfo> materialInfoList : splitList) {
             List<String> materialCodeList = materialInfoList.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toList());
-            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
-            queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
-            List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+            List<MdmSkuConstructionRef> mdmSkuConstructionRefList = new ArrayList<>();
+            if (CollectionUtils.isEmpty(materialCodeList)) {
+                LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
+                queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
+                mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+            }
             Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
             if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
                 skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
