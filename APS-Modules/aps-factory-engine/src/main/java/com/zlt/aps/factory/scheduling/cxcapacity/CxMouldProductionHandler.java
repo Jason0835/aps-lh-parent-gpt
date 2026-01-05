@@ -75,19 +75,23 @@ public class CxMouldProductionHandler {
      */
     public static void noContinueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlan.getProductionPlanInfo().getGroupPlanData();
+        ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
+        String groupName = productionPlanInfo.getGroupName();
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionPlanList)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoPlanLog(context, groupName, cxMachineCode));
             return;
         }
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoFindMachineInfoLog(context, groupName, cxMachineCode));
             return;
         }
         //根据新的分组计划，构建新的硫化配比
-        Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = productionPlan.getProductionPlanInfo().getCxMachineLhRationMap();
+        Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = productionPlanInfo.getCxMachineLhRationMap();
         if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
             //todo 记录日志
             return;
@@ -131,6 +135,8 @@ public class CxMouldProductionHandler {
     }
 
     /**
+     * 根据硫化组编号，更新最新的硫化组信息，如果一开始没有则表示新增
+     *
      * @param cxLhRatioMap
      * @param cxLhGroupNo
      * @param groupName

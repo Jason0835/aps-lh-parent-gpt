@@ -2,6 +2,8 @@ package com.zlt.aps.factory.domain.vo;
 
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
@@ -284,5 +286,52 @@ public class CxMachineBaseInfoVo implements Serializable {
         cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
         return cxLhGroupList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 设置成型机与当前加入的分组排产计划是否同规格、同花纹、同英寸、断面宽等信息
+     *
+     * @param addGroupPlan 即将要加入的分组计划
+     * @param diffValue    断面宽差值范围
+     */
+    public void setSameInfoByCurrentGroupPlan(ProductionPlanGroupInfo addGroupPlan, Integer diffValue) {
+        //没有排产信息，默认匹配
+        if (CollectionUtils.isEmpty(allocationList)) {
+            sameSpecifications = YesOrNoEnum.YES.getCode();
+            sameProSize = YesOrNoEnum.YES.getCode();
+            sectionWidthCondition = YesOrNoEnum.YES.getCode();
+            return;
+        }
+        //取得最后一个分配的分组结构计划
+        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getRealProductionPlanList();
+        String sameSpecifications = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSameSpecifications(realProductionPlanList)) {
+            sameSpecifications = YesOrNoEnum.YES.getCode();
+        }
+        this.sameSpecifications = sameSpecifications;
+        String sameProSize = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSameProSize(realProductionPlanList)) {
+            sameProSize = YesOrNoEnum.YES.getCode();
+        }
+        this.sameProSize = sameProSize;
+        String sectionWidthCondition = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)) {
+            sectionWidthCondition = YesOrNoEnum.YES.getCode();
+        }
+        this.sectionWidthCondition = sectionWidthCondition;
+    }
+
+    /**
+     * 获取成型机台当前可分配的起始日
+     *
+     * @return
+     */
+    public Integer getAllocationStartDay() {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return ProductionConstant.MONTH_START_DAY;
+        }
+        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        return lastHelper.getEndDay() + BigDecimal.ONE.intValue();
     }
 }
