@@ -608,6 +608,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 mdmMonthSurplusMap,
                 productionTypeMap,monthlySaleQty));
         });
+        log.info("mergedDemandPlanMap:{}",mergedDemandPlanMap.keySet());
         return list;
     }
 
@@ -697,7 +698,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
-        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
+        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, demandPlan.getMaterialCode()));
     }
 
     private int calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
@@ -716,11 +717,11 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
     }
 
-    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
-        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(groupFactoryAndMaterialKey)){
+    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String materialCode) {
+        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(materialCode)){
             return BigDecimal.ZERO.intValue();
         }
-        return mdmMonthSurplusMap.get(groupFactoryAndMaterialKey);
+        return mdmMonthSurplusMap.get(materialCode);
     }
 
     /**

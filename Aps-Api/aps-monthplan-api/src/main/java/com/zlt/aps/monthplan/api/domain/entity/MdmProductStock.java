@@ -197,7 +197,7 @@ public class MdmProductStock extends BaseEntity {
      */
     public String getGroupKey() {
         String keyFormat = "%s|*|%s";
-        return String.format(keyFormat, factoryCode, materialCode);
+        return String.format(keyFormat, factoryCode, materialDesc);
     }
 
     /**
