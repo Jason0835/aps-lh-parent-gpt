@@ -81,6 +81,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private String monthPlanVersion;
 
     /**
+     * 最新需求计划版本
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.lastMonthPlanVersion")
+    @ApiModelProperty(value = "最新需求计划版本", name = "lastMonthPlanVersion")
+    @TableField(value = "LAST_MONTH_PLAN_VERSION")
+    private String lastMonthPlanVersion;
+    
+    /**
      * 排产计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")

@@ -62,8 +62,6 @@ public class CxMouldProductionHandler {
             return;
         }
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
-        //todo 搭配排产
-
     }
 
     /**
@@ -93,12 +91,15 @@ public class CxMouldProductionHandler {
         //根据新的分组计划，构建新的硫化配比
         Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = productionPlanInfo.getCxMachineLhRationMap();
         if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoRatioLog(context, groupName, cxMachineCode));
             return;
         }
-        MonthPlanStructureLhRatioVo cxLhRatio = cxMachineLhRationMap.get(cxMachineInfo.getCxMachineBrandCode());
+        String brandCode = cxMachineInfo.getCxMachineBrandCode();
+        MonthPlanStructureLhRatioVo cxLhRatio = productionPlanInfo.getLhRatio(cxMachineInfo);
         if (null == cxLhRatio) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, brandCode));
             return;
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());

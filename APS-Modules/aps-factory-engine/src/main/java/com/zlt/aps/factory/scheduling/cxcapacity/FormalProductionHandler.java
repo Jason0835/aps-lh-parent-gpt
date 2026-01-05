@@ -36,7 +36,7 @@ public class FormalProductionHandler {
      * @param allContinueInfo  在机结构信息
      */
     public static void productionContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
-        if (CollectionUtils.isEmpty(allContinueInfo) || CollectionUtils.isEmpty(allContinueInfo)) {
+        if (CollectionUtils.isEmpty(allGroupPlanInfo) && CollectionUtils.isEmpty(allContinueInfo)) {
             //todo 记录日志
             return;
         }

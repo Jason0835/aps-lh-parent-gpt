@@ -176,8 +176,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param minQty
      * @return
      */
-    public boolean isLess(Long minQty) {
-        if (getHeightProductionQty() > BigDecimal.ZERO.longValue()) {
+    public boolean isLess(Integer minQty) {
+        if (getHeightProductionQty() > BigDecimal.ZERO.intValue()) {
             return getHeightProductionQty() < minQty;
         }
         return getProductionQty() < minQty;

@@ -112,7 +112,7 @@ public class CxCapacityAllocationHandler {
      * @return
      */
     public static CxMachineAllocationPlanHelper createAllocationPlanHelper(CxMachineBaseInfoVo cxMachineBaseInfo, ProductGroupCxCapacityInfo lhRatio, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Integer allocationDay, Integer startDay, Integer monthDays) {
-        Integer startAllocationDay = BigDecimal.ZERO.intValue();
+        Integer startAllocationDay = monthDays;
         Integer endAllocationDay = BigDecimal.ZERO.intValue();
         Set<Integer> stopDayInfo = cxMachineBaseInfo.getStopDayInfo();
         if (null == stopDayInfo) {
@@ -121,7 +121,7 @@ public class CxCapacityAllocationHandler {
         //分配的天数
         int index = BigDecimal.ZERO.intValue();
         Integer day = startDay + index;
-        for (; index <= allocationDay && day <= monthDays; ) {
+        for (; index < allocationDay && day <= monthDays; ) {
             //停产日
             if (stopDayInfo.contains(day)) {
                 day = day + BigDecimal.ONE.intValue();
@@ -131,13 +131,14 @@ public class CxCapacityAllocationHandler {
             if (day > monthDays) {
                 break;
             }
-            index = index + BigDecimal.ONE.intValue();
-            if (startAllocationDay < day) {
+            if (startAllocationDay > day) {
                 startAllocationDay = day;
             }
             if (day > endAllocationDay) {
                 endAllocationDay = day;
             }
+            index = index + BigDecimal.ONE.intValue();
+            day = day + BigDecimal.ONE.intValue();
         }
         if (null == continueSkuMap) {
             continueSkuMap = new HashMap<>();
@@ -345,7 +346,7 @@ public class CxCapacityAllocationHandler {
                 return;
             }
             String brandCode = cxMachineInfo.getCxMachineBrandCode();
-            MonthPlanStructureLhRatioVo lhRatioInfo = addNewGroupPlan.getCxMachineLhRationMap().get(brandCode);
+            MonthPlanStructureLhRatioVo lhRatioInfo = addNewGroupPlan.getLhRatio(cxMachineInfo);
             if (null == lhRatioInfo) {
                 //记录日志
                 log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, brandCode));
@@ -406,7 +407,7 @@ public class CxCapacityAllocationHandler {
                 //todo 记录日志
                 return;
             }
-            MonthPlanStructureLhRatioVo lhRatio = lhRatioMap.get(brandCode);
+            MonthPlanStructureLhRatioVo lhRatio = groupPlan.getLhRatio(cxMachineInfo);
             if (null == lhRatio) {
                 //todo 记录日志
                 return;
