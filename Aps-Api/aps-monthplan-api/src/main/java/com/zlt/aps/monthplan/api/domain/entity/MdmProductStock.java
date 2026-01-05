@@ -173,7 +173,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 是否超龄胎
      */
-//    @Excel(name = "ui.data.column.productStock.isExceedTire", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.productStock.isExceedTire", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超龄胎 ", name = "isExceedTire")
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
