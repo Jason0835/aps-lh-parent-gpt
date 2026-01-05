@@ -23,9 +23,11 @@ import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutShipDmdOrdResultVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
+import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -83,6 +85,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
     @Autowired
     private ISysConfigService sysConfigService;
+
+    @Autowired
+    private IFactoryParamService iFactoryParamService;
 
     @Override
     protected String getDocTypeCode() {
@@ -154,6 +159,17 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         int passSixMonth = 6;
         int passTwelveMonth = 12;
         instance.setTime(nowDate);
+        // 查询参数
+        FactoryParam param = new FactoryParam();
+        param.setFactoryCode(factoryCode);
+        param.setParamCode(MonthPlanEnums.MONTH_AVG_HIS_SUB_MONTH.getCode());
+        param.setProductTypeCode(mpMonthlySaleQty.getProductTypeCode());
+        FactoryParam overdueParam = iFactoryParamService.getFacParamSingle(param);
+        if (overdueParam != null) {
+            String paramValue = StringUtils.defaultIfBlank(overdueParam.getParamValue(), overdueParam.getDefauleValue());
+            passSixMonth = Integer.parseInt(paramValue);
+        }
+
         instance.add(Calendar.MONTH, -passSixMonth);
         int last6Year = instance.get(Calendar.YEAR);
         String last6Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
@@ -209,6 +225,11 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 mpHistorySaleRecord.setGenrateDate(nowDate);
                 saveList.add(mpHistorySaleRecord);
             }
+            Map<String, Object> map = new HashMap<>();
+            map.put("FACTORY_CODE", factoryCode);
+            map.put("YEAR", lastYear);
+            map.put("MONTH", lastMonth);
+            baseDao.deleteByMap(MpHistorySaleRecord.class, map);
             baseDao.saveBatch(saveList);
         }
     }
@@ -438,6 +459,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 skuScheduleCategoryList.add(skuScheduleCategory);
             }
             if (CollectionUtils.isNotEmpty(skuScheduleCategoryList)) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", factoryCode);
+                baseDao.deleteByMap(MdmSkuScheduleCategory.class, map);
                 baseDao.saveBatch(skuScheduleCategoryList);
             }
         }

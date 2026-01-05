@@ -135,6 +135,10 @@ public enum MonthPlanEnums {
      * SYS0101003 超期胎预警月份数
      */
     OVERDUE_TIRE_WARNING("SYS0101003", "单位：月，超期胎预警月份数"),
+    /**
+     * SYS0103002 月均销量统计之前月份的历史销售记录
+     */
+    MONTH_AVG_HIS_SUB_MONTH("SYS0103002", "单位：月，月均销量统计之前月份的历史销售记录"),
     ;
 
     private final String code;
