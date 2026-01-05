@@ -176,7 +176,7 @@ public class SalesOrderPool extends BaseEntity{
      */
     public String getGroupKey() {
         String keyFormat = "%s|*|%s";
-        return String.format(keyFormat, factoryCode, oriMaterialCode);
+        return String.format(keyFormat, factoryCode, materialDesc);
     }
 
     /**

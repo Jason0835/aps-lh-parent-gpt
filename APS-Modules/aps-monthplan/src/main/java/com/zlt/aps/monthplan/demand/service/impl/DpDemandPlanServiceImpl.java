@@ -604,7 +604,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
-        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, factoryMaterialKey));
+        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, demandPlan.getMaterialCode()));
     }
 
     private int calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
@@ -656,11 +656,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return finishedProductStocks.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     }
 
-    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String groupFactoryAndMaterialKey) {
-        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(groupFactoryAndMaterialKey)){
+    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String materialCode) {
+        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(materialCode)){
             return BigDecimal.ZERO.intValue();
         }
-        return mdmMonthSurplusMap.get(groupFactoryAndMaterialKey);
+        return mdmMonthSurplusMap.get(materialCode);
     }
 
     private DpDemandPlan buildDemandPlan(SupplyOrderPool supplyOrder, DpDemandPlan createCondition) {

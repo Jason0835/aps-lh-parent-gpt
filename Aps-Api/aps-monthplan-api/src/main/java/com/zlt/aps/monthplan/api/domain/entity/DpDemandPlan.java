@@ -9,7 +9,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -430,6 +429,6 @@ public class DpDemandPlan extends BaseEntity {
 
     public String getGroupFactoryAndMaterialKey() {
         String keyFormat = "%s|*|%s";
-        return String.format(keyFormat, factoryCode, materialCode);
+        return String.format(keyFormat, factoryCode, materialDesc);
     }
 }
