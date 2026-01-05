@@ -171,6 +171,13 @@ export default {
           },
         },
         {
+          prop: "isExceedTire",
+          label: this.$t("ui.data.column.finishStock.isExceedMonth"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
+        },
+        {
           prop: "isExceedThreeMonth",
           label: this.$t("ui.data.column.finishStock.isExceedThreeMonth"),
           formatter: (row, column, value) => {

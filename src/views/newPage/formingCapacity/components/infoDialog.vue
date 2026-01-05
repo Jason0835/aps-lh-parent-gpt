@@ -163,7 +163,7 @@ export default {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           type: "select",
-          dictData: this.parentDict.type.biz_class_type,
+          dictData: this.parentDict.type.cx_machine_type_code,
         },
         {
           prop: "rollOverType",

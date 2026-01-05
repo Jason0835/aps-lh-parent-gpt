@@ -88,7 +88,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["biz_work_unit", "biz_work_type", "biz_factory_name",'biz_available_status','biz_machine_brand','biz_class_type'],
+  dicts: ["biz_work_unit", "biz_work_type", "biz_factory_name",'biz_available_status','biz_machine_brand','biz_class_type','cx_machine_type_code'],
   provide() {
     return {
       parentDict: this.dict,
@@ -212,6 +212,9 @@ export default {
         {
           prop: "usedType",
           label: this.$t("ui.data.column.WorkWearInfo.usedType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
+          },
           width:180
         },
         {

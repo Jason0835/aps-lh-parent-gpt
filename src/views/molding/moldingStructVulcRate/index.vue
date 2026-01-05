@@ -150,6 +150,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          minWidth:180
         },
         {
           prop: "lhMachineMaxQty",

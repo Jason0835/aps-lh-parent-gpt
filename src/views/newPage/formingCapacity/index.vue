@@ -88,7 +88,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["roll_over_type", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type'],
+  dicts: ["roll_over_type", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type','cx_machine_type_code'],
   provide() {
     return {
       parentDict: this.dict,
@@ -149,7 +149,7 @@ export default {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_class_type, value);
+            return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
         },
         {
@@ -245,7 +245,7 @@ export default {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           type: "select",
-          dictData: this.dict.type.biz_class_type,
+          dictData: this.dict.type.cx_machine_type_code,
         },
       ];
     },

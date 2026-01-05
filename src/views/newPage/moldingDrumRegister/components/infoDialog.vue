@@ -261,15 +261,17 @@ export default {
         {
           prop: "usedType",
           label: this.$t("ui.data.column.WorkWearInfo.usedType"),
-          render: (form) => {
-            return (
-              <formingCapacitySelect
-                factoryCode={form.factoryCode}
-                key={form.usedType}
-                v-model={form.usedType}
-              />
-            );
-          },
+          // render: (form) => {
+          //   return (
+          //     <formingCapacitySelect
+          //       factoryCode={form.factoryCode}
+          //       key={form.usedType}
+          //       v-model={form.usedType}
+          //     />
+          //   );
+          // },
+          type: "select",
+          dictData: this.parentDict.type.cx_machine_type_code,
         },
         {
           prop: "remark",
