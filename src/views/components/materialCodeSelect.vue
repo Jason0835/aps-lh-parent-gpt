@@ -18,6 +18,7 @@
         :data="data"
         :toolbar="false"
         :page="page"
+         :search="search"
         :highlight-current-row="true"
         @current-change="handleCurrentChange"
         @row-dblclick="handleDbClick"
@@ -31,14 +32,14 @@
 </template>
 
 <script>
-  //物料选择
+//物料选择
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
 import { listProductinfo } from "@/api/lean/productinfo";
 export default {
   components: { selectDialog },
-
+  inject: ["parentDict"],
   model: {
     prop: "value",
     event: "change",
@@ -55,13 +56,15 @@ export default {
   },
   data() {
     return {
+      search:{},
       searchKey: "",
-      searchColumns: [
-        {
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-          prop: "materialCode",
-        },
-      ],
+      // searchColumns: [
+
+      //   {
+      //     label: this.$t("ui.data.colume.wms.unused.productCode"),
+      //     prop: "materialCode",
+      //   },
+      // ],
       filterKey: "",
       page: {
         current: 1,
@@ -77,6 +80,20 @@ export default {
     };
   },
   computed: {
+    searchColumns: function () {
+      return [
+              {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select", //GLUE_TYPE
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          prop: "materialCode",
+        },
+      ];
+    },
     columns: function () {
       const list = [
         {
@@ -216,6 +233,15 @@ export default {
     },
 
     handleShow() {
+      let defaultParams = {
+        factoryCode: "116",
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
       this.getList();
     },
     handleCancel() {

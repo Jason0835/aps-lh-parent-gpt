@@ -183,6 +183,7 @@ export default {
         columns[columns.length - 3].children.push({
           prop: this.areaList[i].areaCodeShow,
           label: this.areaList[i].areaCodeNameI18n,
+          minWidth:120,
           render: ({ row }) => {
             return (
               <div
@@ -191,7 +192,7 @@ export default {
                   height: "100%", // 缺少引号
                 }}
               >
-                {row[this.areaList[i].areaCodeShow+'isYell'] == 1 && (
+                {row[this.areaList[i].areaCodeShow + "isYell"] == 1 && (
                   <div
                     style={{
                       width: "100%", // 缺少引号
@@ -202,7 +203,9 @@ export default {
                     {row[this.areaList[i].areaCodeShow]}
                   </div>
                 )}
-                {row[this.areaList[i].areaCodeShow+'isYell'] != 1 && <div style={{}}>  {row[this.areaList[i].areaCodeShow]}</div>}
+                {row[this.areaList[i].areaCodeShow + "isYell"] != 1 && (
+                  <div style={{}}> {row[this.areaList[i].areaCodeShow]}</div>
+                )}
               </div>
             );
           },
@@ -212,6 +215,7 @@ export default {
         columns[columns.length - 2].children.push({
           prop: this.monthList[i].monthShow,
           label: this.monthList[i].month + this.$t("common.month"),
+          minWidth:120,
         });
       }
       return columns;
@@ -356,7 +360,7 @@ export default {
           for (let j = 0; j < data[i].areaGroupList.length; j++) {
             data[i][data[i].areaGroupList[j].areaCodeShow] =
               data[i].areaGroupList[j].saleQty;
-            data[i][data[i].areaGroupList[j].areaCodeShow+'isYell'] =
+            data[i][data[i].areaGroupList[j].areaCodeShow + "isYell"] =
               data[i].areaGroupList[j].yellowColorFlag;
           }
           for (let k = 0; k < data[i].monthGroupList.length; k++) {

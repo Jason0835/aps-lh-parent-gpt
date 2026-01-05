@@ -147,6 +147,11 @@ export default {
           label: this.$t("ui.data.column.finishStock.stockQty"),
         },
         {
+          prop: "stockDate",
+          label: this.$t("ui.data.defectiveStock.stockDate"),
+          width:120
+        },
+        {
           prop: "weekYear",
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
