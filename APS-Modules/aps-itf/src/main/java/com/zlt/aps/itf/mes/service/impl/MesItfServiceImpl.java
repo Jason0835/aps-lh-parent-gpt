@@ -4,6 +4,7 @@ import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.tlt.aps.enums.LocationTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.constant.DataSource;
@@ -217,6 +218,8 @@ public class MesItfServiceImpl implements MesItfService {
             List<String> materialCodeList = productStockList.stream().map(MdmProductStock::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
             for (MdmProductStock stock : productStockList) {
+                // 默认外销
+                stock.setLocationType(LocationTypeEnum.FOREIGN_LOCATION.getValue());
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
