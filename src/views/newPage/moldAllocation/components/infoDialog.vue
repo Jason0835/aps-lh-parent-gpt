@@ -158,7 +158,7 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
           dictData: this.parentDict.type.biz_product_type,
         },

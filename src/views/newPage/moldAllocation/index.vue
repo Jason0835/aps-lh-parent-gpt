@@ -150,7 +150,7 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -235,7 +235,7 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
