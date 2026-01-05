@@ -232,17 +232,21 @@ export default {
         {
           prop: "scmPriority",
           label: this.$t("ui.data.column.monthplan.scmPriority"),
+          // width:120,
+          // formatter: (row, column, value) => {
+          //   return this.selectDictLabel(this.dict.type.biz_order_type, value);
+          // },
           render: ({ row }) => {
             return (
               <div>
                 {this.hasPermission("monthplan:demandPlan:edit") && (
                   <el-select
                     v-if={this.hasPermission("monthplan:demandPlan:edit")}
-                    placeholder="请选择"
+
                     v-model={row.scmPriority}
                     onChange={(val) => this.handlePriorityChange(row, val)}
                   >
-                    {this.dict.type.biz_order_type.map((item) => (
+                    {this.dict.type.biz_yes_no.map((item) => (
                       <el-option
                         key={item.value}
                         label={item.label}
@@ -254,7 +258,7 @@ export default {
                 {!this.hasPermission("monthplan:demandPlan:edit") && (
                   <span>
                     {this.selectDictLabel(
-                      this.dict.type.biz_order_type,
+                      this.dict.type.biz_yes_no,
                       row.scmPriority
                     )}
                   </span>
