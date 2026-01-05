@@ -699,7 +699,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         demandPlan.setRemainingQty(calculateRemainingQty(finishedProductStockMap, factoryMaterialKey));
 
         // 计算月底计划余量
-        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap, demandPlan.getMaterialCode()));
+        demandPlan.setPlannedSurplus(calculatePlannedSurplus(mdmMonthSurplusMap,factoryMaterialKey));
     }
 
     private int calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
@@ -718,11 +718,11 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return finishedProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
     }
 
-    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String materialCode) {
-        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(materialCode)){
+    private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String factoryMaterialKey) {
+        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(factoryMaterialKey)){
             return BigDecimal.ZERO.intValue();
         }
-        return mdmMonthSurplusMap.get(materialCode);
+        return mdmMonthSurplusMap.get(factoryMaterialKey);
     }
 
     /**
