@@ -150,11 +150,11 @@ public class MdmMaterialInfo extends BaseEntity {
     private String hierarchy;
 
     /**
-     * 轮辋尺寸（保留2位小数）
+     * 英寸（保留2位小数）
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmMaterialInfo.proSize")
-    @ApiModelProperty(value = "轮辋尺寸", name = "proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
@@ -363,4 +363,28 @@ public class MdmMaterialInfo extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 制造示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo", sort = 60)
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(exist = false)
+    private String embryoNo;
+
+    /**
+     * 文字示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textNo", sort = 75)
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(exist = false)
+    private String textNo;
+
+    /**
+     * 硫化示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhNo", sort = 90)
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(exist = false)
+    private String lhNo;
 }

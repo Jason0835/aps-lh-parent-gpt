@@ -230,7 +230,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public Map<String, Long> findMonthlySaleQtyGroupByMaterialCode() {
+    public Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode() {
         List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQty();
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
@@ -238,7 +238,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         return list.stream()
             .filter(Objects::nonNull)
             .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
-            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingLong(MpMonthlySaleQty::getAverageSaleQty)));
+            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
     }
 
     /**

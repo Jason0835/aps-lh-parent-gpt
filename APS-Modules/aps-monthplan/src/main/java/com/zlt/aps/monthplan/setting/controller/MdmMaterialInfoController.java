@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
@@ -17,11 +18,15 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
+import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
@@ -43,6 +48,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 物料信息表Controller
@@ -64,6 +71,8 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     private IImportLogService iImportLogService;
     @Autowired
     private IImportErrorLogService iImportErrorLogService;
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
 
     /**
      * 查询物料信息表列表
@@ -75,7 +84,39 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
+        this.setSkuConstructionRefField(productInfo, list);
         return getDataTable(list);
+    }
+
+    /**
+     * 赋值SKU与施工关系字段
+     *
+     * @param productInfo 查询条件
+     * @param list        要赋值列表
+     */
+    private void setSkuConstructionRefField(MdmMaterialInfo productInfo, List<MdmMaterialInfo> list) {
+        List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+        for (List<MdmMaterialInfo> materialInfoList : splitList) {
+            List<String> materialCodeList = materialInfoList.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toList());
+            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
+            queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
+            List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+            Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
+                skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
+            }
+
+            for (MdmMaterialInfo materialInfo : materialInfoList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(materialInfo.getFactoryCode(), materialInfo.getMaterialCode());
+                if (skuConstructionRefMap.containsKey(mapKey)) {
+                    MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(mapKey);
+                    materialInfo.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                    materialInfo.setTextNo(mdmSkuConstructionRef.getTextNo());
+                    materialInfo.setLhNo(mdmSkuConstructionRef.getLhNo());
+                }
+            }
+        }
     }
 
     /**

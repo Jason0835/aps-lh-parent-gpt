@@ -45,7 +45,7 @@ public class MdmProductStock extends BaseEntity {
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-//    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "库存日期", name = "stockDate")
     @TableField(value = "STOCK_DATE")
     private Date stockDate;

@@ -27,4 +27,39 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProdFinal {
     @TableField(exist = false)
     @ApiModelProperty(value = "空产能", name = "emptyQty")
     private Integer emptyQty;
+
+    /**
+     * 搭配量
+     */
+    private Integer matchQtyDay1;
+    private Integer matchQtyDay2;
+    private Integer matchQtyDay3;
+    private Integer matchQtyDay4;
+    private Integer matchQtyDay5;
+    private Integer matchQtyDay6;
+    private Integer matchQtyDay7;
+    private Integer matchQtyDay8;
+    private Integer matchQtyDay9;
+    private Integer matchQtyDay10;
+    private Integer matchQtyDay11;
+    private Integer matchQtyDay12;
+    private Integer matchQtyDay13;
+    private Integer matchQtyDay14;
+    private Integer matchQtyDay15;
+    private Integer matchQtyDay16;
+    private Integer matchQtyDay17;
+    private Integer matchQtyDay18;
+    private Integer matchQtyDay19;
+    private Integer matchQtyDay20;
+    private Integer matchQtyDay21;
+    private Integer matchQtyDay22;
+    private Integer matchQtyDay23;
+    private Integer matchQtyDay24;
+    private Integer matchQtyDay25;
+    private Integer matchQtyDay26;
+    private Integer matchQtyDay27;
+    private Integer matchQtyDay28;
+    private Integer matchQtyDay29;
+    private Integer matchQtyDay30;
+    private Integer matchQtyDay31;
 }

@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.dto;
 
+import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
@@ -8,6 +9,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Sandy
@@ -88,6 +90,5 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "调整结果列表")
     private List<MpAdjustResult> adjustResultList;
-
 
 }
