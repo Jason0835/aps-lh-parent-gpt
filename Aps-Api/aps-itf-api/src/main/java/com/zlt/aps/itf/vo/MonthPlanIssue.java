@@ -3,10 +3,11 @@ package com.zlt.aps.itf.vo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.io.Serializable;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -25,7 +26,7 @@ import lombok.Data;
 @ApiModel(value = "月计划下发对象", description = "月计划下发对象 ")
 @Data
 @TableName(value = "MONTH_PLAN_ISSUE")
-public class MonthPlanIssue extends BaseEntity {
+public class MonthPlanIssue implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
