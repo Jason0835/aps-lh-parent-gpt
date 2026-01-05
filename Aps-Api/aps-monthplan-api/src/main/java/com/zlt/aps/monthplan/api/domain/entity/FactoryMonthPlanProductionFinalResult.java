@@ -680,4 +680,12 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
+    /**
+     *  月底计划剩余量key
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialDesc);
+    }
+
 }

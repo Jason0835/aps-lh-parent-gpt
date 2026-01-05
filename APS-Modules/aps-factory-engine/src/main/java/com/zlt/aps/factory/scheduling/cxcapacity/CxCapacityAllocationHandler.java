@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
@@ -120,10 +119,12 @@ public class CxCapacityAllocationHandler {
             stopDayInfo = new HashSet<>();
         }
         //分配的天数
-        for (int index = BigDecimal.ZERO.intValue(); index <= allocationDay; ) {
-            Integer day = startDay + index;
+        int index = BigDecimal.ZERO.intValue();
+        Integer day = startDay + index;
+        for (; index <= allocationDay && day <= monthDays; ) {
             //停产日
             if (stopDayInfo.contains(day)) {
+                day = day + BigDecimal.ONE.intValue();
                 continue;
             }
             //超出月份周期
@@ -160,7 +161,8 @@ public class CxCapacityAllocationHandler {
         //获取收尾机台信息
         Set<String> reverseFindSet = productionContext.getReverseFindSet();
         if (CollectionUtils.isEmpty(reverseFindSet)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addNoContinueGroupReverseProductionLog(context));
             return;
         }
         List<CxMachineBaseInfoVo> reverseCxMachineList = new ArrayList<>();
@@ -293,6 +295,7 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        String structureName = addNewGroupPlan.getGroupName();
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         if (CollectionUtils.isEmpty(allCxMachineMap)) {
             return null;
@@ -300,19 +303,23 @@ public class CxCapacityAllocationHandler {
         List<CxMachineBaseInfoVo> cxMachineList = new ArrayList<>(allCxMachineMap.values());
         List<CxMachineBaseInfoVo> leftOverCxMachineList = cxMachineList.stream().filter(cxMachine -> cxMachine.getRemainingDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(leftOverCxMachineList)) {
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLeftOverCapacityLog(context, structureName));
             return null;
         }
         String isZeroRack = addNewGroupPlan.getIsZero();
-        String structureName = addNewGroupPlan.getGroupName();
         //零度匹配，不可作业剔除
         List<CxMachineBaseInfoVo> enableCxMachineList = new ArrayList<>(leftOverCxMachineList.size());
         leftOverCxMachineList.forEach(cxMachineInfo -> {
-            if (!isZeroRack.equals(cxMachineInfo.getIsZeroRack())) {
-                //todo 记录日志
+            String cxMachineCode = cxMachineInfo.getCxMachineCode();
+            String machineIsZeroRack = cxMachineInfo.getIsZeroRack();
+            if (!isZeroRack.equals(machineIsZeroRack)) {
+                //记录日志
+                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedZeroMatchLog(context, structureName, isZeroRack, cxMachineCode, machineIsZeroRack));
                 return;
             }
             if (cxMachineInfo.isNoProductionStructure(structureName)) {
-                //todo 记录日志
+                //记录日志
+                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
                 return;
             }
             List<MonthPlanProductionRequirePlanVo> groupPlanData = addNewGroupPlan.getGroupPlanData();
@@ -333,19 +340,22 @@ public class CxCapacityAllocationHandler {
                 }
             }
             if (!isProduction) {
-                //todo 记录日志
+                //记录日志
+                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
                 return;
             }
             String brandCode = cxMachineInfo.getCxMachineBrandCode();
             MonthPlanStructureLhRatioVo lhRatioInfo = addNewGroupPlan.getCxMachineLhRationMap().get(brandCode);
             if (null == lhRatioInfo) {
-                //todo 记录日志
+                //记录日志
+                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, brandCode));
                 return;
             }
             cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
             enableCxMachineList.add(cxMachineInfo);
         });
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
         //设置机台固定
@@ -545,29 +555,11 @@ public class CxCapacityAllocationHandler {
      */
     private static void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo addNewGroupPlan) {
         //4、断面宽差值±10 断面宽差值范围参数
-        Integer diffValue = ((TbrProductionContext)context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
+        Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
-        fixedPriorityList.forEach(cxMachineInfo -> {
-            List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-            CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
-            List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getRealProductionPlanList();
-            String sameSpecifications = YesOrNoEnum.NO.getCode();
-            if (addNewGroupPlan.hasSameSpecifications(realProductionPlanList)) {
-                sameSpecifications = YesOrNoEnum.YES.getCode();
-            }
-            cxMachineInfo.setSameSpecifications(sameSpecifications);
-            String sameProSize = YesOrNoEnum.NO.getCode();
-            if (addNewGroupPlan.hasSameProSize(realProductionPlanList)) {
-                sameProSize = YesOrNoEnum.YES.getCode();
-            }
-            cxMachineInfo.setSameProSize(sameProSize);
-            String sectionWidthCondition = YesOrNoEnum.NO.getCode();
-            if (addNewGroupPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)) {
-                sectionWidthCondition = YesOrNoEnum.YES.getCode();
-            }
-            cxMachineInfo.setSectionWidthCondition(sectionWidthCondition);
-        });
+        fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(addNewGroupPlan, diffValue));
     }
+
 
     /**
      * 获取需要月初就需要释放的续作成型机台

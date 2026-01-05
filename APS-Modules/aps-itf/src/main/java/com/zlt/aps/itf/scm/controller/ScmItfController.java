@@ -66,4 +66,15 @@ public class ScmItfController {
 	public AjaxResult publicFacScheduleVersion(@RequestBody List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList) {
 		return scmItfService.publicFacScheduleVersion(outFacScheduleVersionList);
 	}
+	
+    /**
+     * 同步区域/国家数据
+     *
+     * @return 结果
+     */
+    @ApiOperation("同步区域/国家数据")
+    @PostMapping("/scm/syncArea")
+    public AjaxResult syncArea() {
+    	return scmItfService.syncArea();
+    }
 }

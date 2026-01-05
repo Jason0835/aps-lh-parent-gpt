@@ -47,5 +47,5 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * 根据编码获取月均销量
      * @return
      */
-    Map<String,Long> findMonthlySaleQtyGroupByMaterialCode();
+    Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode();
 }

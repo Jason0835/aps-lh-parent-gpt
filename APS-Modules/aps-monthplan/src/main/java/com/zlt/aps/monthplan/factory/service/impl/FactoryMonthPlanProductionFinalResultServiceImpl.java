@@ -172,9 +172,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         return factoryMonthPlanProdFinals
                 .parallelStream()
                 .filter(Objects::nonNull)
-                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .filter(item -> StringUtils.isNotBlank(item.getGroupKey()))
                 .collect(Collectors.groupingByConcurrent(
-                        FactoryMonthPlanProductionFinalResult::getMaterialCode,
+                        FactoryMonthPlanProductionFinalResult::getGroupKey,
                         Collectors.toCollection(ArrayList::new)
                 ));
     }

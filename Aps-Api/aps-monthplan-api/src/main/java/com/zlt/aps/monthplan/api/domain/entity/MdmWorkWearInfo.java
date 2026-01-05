@@ -130,10 +130,10 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String unit;
 
     /**
-     * 使用机型，长度20
+     * 适用机型，长度20
      */
-    @Excel(name = "ui.data.column.mdmWorkWearInfo.usedType")
-    @ApiModelProperty(value = "使用机型", name = "usedType")
+    @Excel(name = "ui.data.column.mdmWorkWearInfo.usedType", dictType = "cx_machine_type_code")
+    @ApiModelProperty(value = "适用机型", name = "usedType")
     @TableField(value = "USED_TYPE")
     private String usedType;
 

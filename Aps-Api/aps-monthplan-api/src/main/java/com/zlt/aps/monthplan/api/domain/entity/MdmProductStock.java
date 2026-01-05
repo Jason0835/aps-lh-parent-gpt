@@ -45,7 +45,7 @@ public class MdmProductStock extends BaseEntity {
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-//    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.productStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "库存日期", name = "stockDate")
     @TableField(value = "STOCK_DATE")
     private Date stockDate;
@@ -173,7 +173,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 是否超龄胎
      */
-//    @Excel(name = "ui.data.column.productStock.isExceedTire", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.productStock.isExceedTire", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超龄胎 ", name = "isExceedTire")
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
@@ -197,7 +197,7 @@ public class MdmProductStock extends BaseEntity {
      */
     public String getGroupKey() {
         String keyFormat = "%s|*|%s";
-        return String.format(keyFormat, factoryCode, materialCode);
+        return String.format(keyFormat, factoryCode, materialDesc);
     }
 
     /**

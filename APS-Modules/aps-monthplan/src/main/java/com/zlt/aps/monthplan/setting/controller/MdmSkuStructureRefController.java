@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
@@ -57,13 +58,18 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmSkuStructureRef queryVO) {
-        TableDataInfo tableDataInfo = super.list(queryVO);
+        QueryWrapper<MdmSkuStructureRef> queryWrapper = new QueryWrapper<>();
+        // 条件拼接
+        builderCondition(queryWrapper, queryVO);
+        startPage();
+        List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(queryWrapper);
+        clearPage();
         try {
-            QueryFormulaUtil.execFormula(tableDataInfo.getRows(), this.getQueryFormulas());
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
         } catch (QueryExprException e) {
             throw new ServiceException("执行查询公式时发生错误.");
         }
-        return tableDataInfo;
+        return getDataTable(list);
     }
 
     @Override
@@ -143,7 +149,13 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     protected List<MdmSkuStructureRef> listExportData(MdmSkuStructureRef obj) {
         QueryWrapper<MdmSkuStructureRef> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(wrapper);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        return list;
     }
 
     @Override
@@ -159,10 +171,14 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
      */
     @Override
     protected void builderCondition(QueryWrapper<MdmSkuStructureRef> queryWrapper, MdmSkuStructureRef queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "a.FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "a.MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "a.MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "a.STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq("a.IS_DELETE", YesOrNoEnum.NO.getValue());
+        // 新增：MATERIAL_DESC 模糊查询（关联 T_MDM_MATERIAL_INFO 表）
+        Object materialDesc = queryVO.getFieldValueByFieldName("materialDesc");
+        queryWrapper.like(PubUtil.isNotEmpty(materialDesc), "b.MATERIAL_DESC", materialDesc);
     }
 
 
@@ -193,4 +209,19 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         this.clearPage();
         return this.getDataTable(list);
     }
+
+    /**
+     * 更新结构到物料表
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新结构到物料表")
+    @PostMapping("/updateStructureToMaterial")
+    public AjaxResult updateStructureToMaterial(@RequestBody MdmSkuStructureRef queryVO) {
+        return mdmSkuStructureRefService.updateStructureToMaterial(queryVO);
+    }
+
+
+
+
 }

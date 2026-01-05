@@ -32,7 +32,7 @@ public class ApsBootuiApplication {
         String port = env.getProperty("server.port");
         log.info("\n----------------------------------------------------------\n\t" +
                 "Application APS-BootUI is running!\n\t" +
-                "特立通技术平台APS接口文档 URLs:\n\t" +
+                "特力通技术平台APS接口文档 URLs:\n\t" +
                 "APS-UI接口文档1: \thttp://" + ip + ":" + port + "/swagger-ui/index.html?group=APS\n\t" +
                 "----------------------------------------------------------\n\t"
         );

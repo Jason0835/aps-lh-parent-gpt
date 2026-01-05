@@ -22,7 +22,7 @@ public class MouldShellBaseInfoVo implements Serializable {
     /**
      * 模套型号-模壳
      */
-    private String moldModelCode;
+    private String mouldSetCode;
 
     /**
      * 在机数量
@@ -37,12 +37,12 @@ public class MouldShellBaseInfoVo implements Serializable {
     /**
      * 创建无限制的模壳实例
      *
-     * @param moldModelCode
+     * @param mouldSetCode
      * @return
      */
-    public static MouldShellBaseInfoVo createNoLimit(String moldModelCode) {
+    public static MouldShellBaseInfoVo createNoLimit(String mouldSetCode) {
         MouldShellBaseInfoVo noLimit = new MouldShellBaseInfoVo();
-        noLimit.setMoldModelCode(moldModelCode);
+        noLimit.setMouldSetCode(mouldSetCode);
         noLimit.setMachineQty(BigDecimal.ZERO.intValue());
         noLimit.setOnHandQty(Integer.MAX_VALUE);
         return noLimit;

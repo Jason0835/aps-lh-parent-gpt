@@ -1,9 +1,7 @@
 package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.itf.vo.MonthPlanIssue;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
@@ -21,7 +19,7 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-24
  */
-public interface IMonthPlanIssueService extends IDocService<MonthPlanIssue> {
+public interface IMonthPlanIssueService {
 
     /**
      * 下发月计划

@@ -55,7 +55,7 @@ public class FactoryConsoleController extends BaseController {
             return getDataTable(Collections.emptyList());
         }
         Map<String, FactoryProductionPlanResultVo> saleDemandMap = new HashMap<>();
-        //处理排结构、排模具版本信息，按年+月份+分厂+需求计划版本+胎别分组
+        //处理排结构、排模具版本信息，按年+月份+分厂+需求计划版本+产品品类分组
         dataList.stream().forEach(factoryProductionPlanVersion -> {
             if (StringUtils.isBlank(factoryProductionPlanVersion.getProductTypeCode())) {
                 factoryProductionPlanVersion.setProductTypeCode(ProductTypeEnum.SEMI_STEEL.getValue());
