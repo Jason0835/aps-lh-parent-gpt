@@ -359,7 +359,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					BigDecimal hightPriorityOrdQty = hightPriorityList.stream().map(SalesOrderPool::getOrdQty)
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 高优先级订单量合计
 					for (SalesOrderPool pool : hightPriorityList) {
-						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty)
+						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty, 4)
 								.compareTo(hightPriorityOrderRate) <= 0) { // 高优先级总量/所有总量<= 85%则结束，否则要把高优先级调成中优先级
 							break;
 						}
