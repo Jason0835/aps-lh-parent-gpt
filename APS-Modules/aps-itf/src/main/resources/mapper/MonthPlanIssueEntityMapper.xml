@@ -4,4 +4,171 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.MonthPlanIssueEntityMapper">
 
+    <insert id="batchInsertMonthPlanIssue" parameterType="list">
+        INSERT INTO MONTH_PLAN_ISSUE (
+        MP_VERSION_NO, MP_YEAR, MP_MONTH, ORDER_NO, STRUC_CODE,
+        MES_MATERIAL_CODE, SPEC_DESC, EMBRYO_SPEC, PATTERN, CAVITY,
+        LIVE_BLOCK, NET_DEMAND, ADV_NUM, MONTH_AVG_NUM, STOCK_SALE_RATIO,
+        DAY_VUL_QTY, ADJUST_QTY1, ADJUST_QTY2, ADJUST_QTY3, ADJUST_QTY4,
+        DAY1, DAY2, DAY3, DAY4, DAY5, DAY6, DAY7, DAY8, DAY9, DAY10,
+        DAY11, DAY12, DAY13, DAY14, DAY15, DAY16, DAY17, DAY18, DAY19,
+        DAY20, DAY21, DAY22, DAY23, DAY24, DAY25, DAY26, DAY27, DAY28,
+        DAY29, DAY30, DAY31, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+        CONSTRUCTION_STAGE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.mpVersionNo} AS MP_VERSION_NO,
+            #{item.mpYear} AS MP_YEAR,
+            #{item.mpMonth} AS MP_MONTH,
+            #{item.orderNo} AS ORDER_NO,
+            #{item.strucCode} AS STRUC_CODE,
+            #{item.mesMaterialCode} AS MES_MATERIAL_CODE,
+            #{item.specDesc} AS SPEC_DESC,
+            #{item.embryoSpec} AS EMBRYO_SPEC,
+            #{item.pattern} AS PATTERN,
+            #{item.cavity} AS CAVITY,
+            #{item.liveBlock} AS LIVE_BLOCK,
+            #{item.netDemand} AS NET_DEMAND,
+            #{item.advNum} AS ADV_NUM,
+            #{item.monthAvgNum} AS MONTH_AVG_NUM,
+            #{item.stockSaleRatio} AS STOCK_SALE_RATIO,
+            #{item.dayVulQty} AS DAY_VUL_QTY,
+            #{item.adjustQty1} AS ADJUST_QTY1,
+            #{item.adjustQty2} AS ADJUST_QTY2,
+            #{item.adjustQty3} AS ADJUST_QTY3,
+            #{item.adjustQty4} AS ADJUST_QTY4,
+            #{item.day1} AS DAY1,
+            #{item.day2} AS DAY2,
+            #{item.day3} AS DAY3,
+            #{item.day4} AS DAY4,
+            #{item.day5} AS DAY5,
+            #{item.day6} AS DAY6,
+            #{item.day7} AS DAY7,
+            #{item.day8} AS DAY8,
+            #{item.day9} AS DAY9,
+            #{item.day10} AS DAY10,
+            #{item.day11} AS DAY11,
+            #{item.day12} AS DAY12,
+            #{item.day13} AS DAY13,
+            #{item.day14} AS DAY14,
+            #{item.day15} AS DAY15,
+            #{item.day16} AS DAY16,
+            #{item.day17} AS DAY17,
+            #{item.day18} AS DAY18,
+            #{item.day19} AS DAY19,
+            #{item.day20} AS DAY20,
+            #{item.day21} AS DAY21,
+            #{item.day22} AS DAY22,
+            #{item.day23} AS DAY23,
+            #{item.day24} AS DAY24,
+            #{item.day25} AS DAY25,
+            #{item.day26} AS DAY26,
+            #{item.day27} AS DAY27,
+            #{item.day28} AS DAY28,
+            #{item.day29} AS DAY29,
+            #{item.day30} AS DAY30,
+            #{item.day31} AS DAY31,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE,
+            #{item.constructionStage} AS CONSTRUCTION_STAGE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+        SELECT 1 FROM MONTH_PLAN_ISSUE WHERE ORDER_NO = t.ORDER_NO
+        )
+    </insert>
+
+    <update id="batchUpdateMonthPlanIssue">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE MONTH_PLAN_ISSUE SET
+            MP_VERSION_NO = #{item.mpVersionNo},
+            MP_YEAR = #{item.mpYear},
+            MP_MONTH = #{item.mpMonth},
+            STRUC_CODE = #{item.strucCode},
+            MES_MATERIAL_CODE = #{item.mesMaterialCode},
+            SPEC_DESC = #{item.specDesc},
+            EMBRYO_SPEC = #{item.embryoSpec},
+            PATTERN = #{item.pattern},
+            CAVITY = #{item.cavity},
+            LIVE_BLOCK = #{item.liveBlock},
+            NET_DEMAND = #{item.netDemand},
+            ADV_NUM = #{item.advNum},
+            MONTH_AVG_NUM = #{item.monthAvgNum},
+            STOCK_SALE_RATIO = #{item.stockSaleRatio},
+            DAY_VUL_QTY = #{item.dayVulQty},
+            ADJUST_QTY1 = #{item.adjustQty1},
+            ADJUST_QTY2 = #{item.adjustQty2},
+            ADJUST_QTY3 = #{item.adjustQty3},
+            ADJUST_QTY4 = #{item.adjustQty4},
+            DAY1 = #{item.day1},
+            DAY2 = #{item.day2},
+            DAY3 = #{item.day3},
+            DAY4 = #{item.day4},
+            DAY5 = #{item.day5},
+            DAY6 = #{item.day6},
+            DAY7 = #{item.day7},
+            DAY8 = #{item.day8},
+            DAY9 = #{item.day9},
+            DAY10 = #{item.day10},
+            DAY11 = #{item.day11},
+            DAY12 = #{item.day12},
+            DAY13 = #{item.day13},
+            DAY14 = #{item.day14},
+            DAY15 = #{item.day15},
+            DAY16 = #{item.day16},
+            DAY17 = #{item.day17},
+            DAY18 = #{item.day18},
+            DAY19 = #{item.day19},
+            DAY20 = #{item.day20},
+            DAY21 = #{item.day21},
+            DAY22 = #{item.day22},
+            DAY23 = #{item.day23},
+            DAY24 = #{item.day24},
+            DAY25 = #{item.day25},
+            DAY26 = #{item.day26},
+            DAY27 = #{item.day27},
+            DAY28 = #{item.day28},
+            DAY29 = #{item.day29},
+            DAY30 = #{item.day30},
+            DAY31 = #{item.day31},
+            DATA_VERSION = #{item.dataVersion},
+            COMPANY_CODE = #{item.companyCode},
+            FACTORY_CODE = #{item.factoryCode},
+            CONSTRUCTION_STAGE = #{item.constructionStage}
+            WHERE ORDER_NO = #{item.orderNo}
+        </foreach>
+    </update>
+
+    <insert id="batchInsertCxMonthPlanIssue">
+        INSERT INTO CX_MONTH_PLAN_ISSUE (
+        MONTH, MATERIAL_CODE, CONSTRUCTION_STAGE, DEMAND_QTY, REMARK
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.month} AS `MONTH`,
+            #{item.materialCode} AS MATERIAL_CODE,
+            #{item.constructionStage} AS CONSTRUCTION_STAGE,
+            #{item.demandQty} AS DEMAND_QTY,
+            #{item.remark} AS REMARK
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+        SELECT 1 FROM CX_MONTH_PLAN_ISSUE
+        WHERE `MONTH` = t.MONTH AND MATERIAL_CODE = t.MATERIAL_CODE
+        )
+    </insert>
+
+    <update id="batchUpdateCxMonthPlanIssue">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE CX_MONTH_PLAN_ISSUE SET
+            CONSTRUCTION_STAGE = #{item.constructionStage},
+            DEMAND_QTY = #{item.demandQty},
+            REMARK = #{item.remark}
+            WHERE `MONTH` = #{item.month} AND MATERIAL_CODE = #{item.materialCode}
+        </foreach>
+    </update>
 </mapper>

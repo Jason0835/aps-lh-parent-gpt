@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
@@ -174,6 +175,7 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "a.MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "a.MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "a.STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq("a.IS_DELETE", YesOrNoEnum.NO.getValue());
         // 新增：MATERIAL_DESC 模糊查询（关联 T_MDM_MATERIAL_INFO 表）
         Object materialDesc = queryVO.getFieldValueByFieldName("materialDesc");
         queryWrapper.like(PubUtil.isNotEmpty(materialDesc), "b.MATERIAL_DESC", materialDesc);

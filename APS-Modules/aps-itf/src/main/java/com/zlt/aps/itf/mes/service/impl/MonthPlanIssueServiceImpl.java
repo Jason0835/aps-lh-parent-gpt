@@ -1,31 +1,32 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
+import com.zlt.aps.itf.mes.mapper.MonthPlanIssueEntityMapper;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
+import com.zlt.aps.itf.vo.CxMonthPlanIssue;
 import com.zlt.aps.itf.vo.MonthPlanIssue;
 import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
-import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.math.BigDecimal;
+import java.util.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -44,7 +45,7 @@ import java.util.List;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class MonthPlanIssueServiceImpl extends AbstractDocService<MonthPlanIssue> implements IMonthPlanIssueService {
+public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
 
     @Autowired
     private SyncDataHandle syncDataHandle;
@@ -52,31 +53,22 @@ public class MonthPlanIssueServiceImpl extends AbstractDocService<MonthPlanIssue
     @Autowired
     private SyncDataLogsService syncDataLogsService;
 
-    @Override
-    protected String getDocTypeCode() {
-        return "ITF1001";
-    }
+    @Autowired
+    private MonthPlanIssueEntityMapper monthPlanIssueEntityMapper;
 
-    @Override
-    protected SysDocType getSysDocType() {
-        SysDocType sysDocType = new SysDocType();
-        sysDocType.setDocTypeCode("ITF1001");
-        return sysDocType;
-    }
-
-    @Override
-    public String checkUnique(MonthPlanIssue docEntityVO) {
-        String unique = super.checkUnique(docEntityVO);
-        if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.monthPlanIssue.notUnique"));
+    private static void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<CxMonthPlanIssue> cxMonthPlanIssuesList) {
+        Set<Map.Entry<String, FactoryMonthPlanProductionFinalResult>> entrySet = groupMap.entrySet();
+        for (Map.Entry<String, FactoryMonthPlanProductionFinalResult> entry : entrySet) {
+            FactoryMonthPlanProductionFinalResult value = entry.getValue();
+            CxMonthPlanIssue cxMonthPlanIssue = new CxMonthPlanIssue();
+            cxMonthPlanIssue.setMonth(value.getMonth());
+            cxMonthPlanIssue.setMaterialCode(value.getMaterialCode());
+            cxMonthPlanIssue.setConstructionStage(value.getConstructionStage());
+            Map<String, Object> params = value.getParams();
+            BigDecimal totalDayResultOld = (BigDecimal) params.get("totalDayResult");
+            cxMonthPlanIssue.setDemandQty(totalDayResultOld);
+            cxMonthPlanIssuesList.add(cxMonthPlanIssue);
         }
-        return unique;
-    }
-
-    @Override
-    protected List<String> getCheckUniqueFields() {
-        // 唯一校验字段
-        return Collections.emptyList();
     }
 
     /**
@@ -91,38 +83,15 @@ public class MonthPlanIssueServiceImpl extends AbstractDocService<MonthPlanIssue
             return AjaxResult.success();
         }
         List<MonthPlanIssue> monthPlanIssues = new ArrayList<>();
-        for (FactoryMonthPlanProductionFinalResult finalResult : monthPlanIssueList) {
-            MonthPlanIssue monthPlanIssue = new MonthPlanIssue();
-            monthPlanIssue.setMpVersionNo(finalResult.getProductionVersion());
-            monthPlanIssue.setMpYear(String.valueOf(finalResult.getYear()));
-            monthPlanIssue.setMpMonth(String.valueOf(finalResult.getMonth()));
-            monthPlanIssue.setOrderNo(finalResult.getProductionNo());
-            monthPlanIssue.setStrucCode(finalResult.getStructureName());
-            monthPlanIssue.setMesMaterialCode(finalResult.getMaterialCode());
-            monthPlanIssue.setSpecDesc(finalResult.getMaterialDesc());
-            monthPlanIssue.setEmbryoSpec(finalResult.getMainMaterialDesc());
-            monthPlanIssue.setPattern(finalResult.getPattern());
-            monthPlanIssue.setCavity(finalResult.getMouldCavityQty());
-            monthPlanIssue.setLiveBlock(finalResult.getTypeBlockQty());
-            monthPlanIssue.setNetDemand(finalResult.getFactProdReqQty());
-            monthPlanIssue.setAdvNum(finalResult.getHeightProductionQty());
-            monthPlanIssue.setMonthAvgNum(finalResult.getAverageQty());
-            monthPlanIssue.setStockSaleRatio(finalResult.getInventorySalesRatio());
-            monthPlanIssue.setDayVulQty(finalResult.getDayVulcanizationQty());
-            /*monthPlanIssue.setAdjustQty1();
-            monthPlanIssue.setAdjustQty2();
-            monthPlanIssue.setAdjustQty3();
-            monthPlanIssue.setAdjustQty4();*/
-            for (int i = 1; i <= 31; i++) {
-                Object fieldValue = ReflectUtils.getFieldValue(finalResult, "day" + i);
-                ReflectUtils.setFieldValue(monthPlanIssue, "day" + i, fieldValue);
-            }
-            String dataVersion = String.valueOf(System.currentTimeMillis());
-            monthPlanIssue.setDataVersion(dataVersion);
-            monthPlanIssue.setCompanyCode(finalResult.getFactoryCode());
-            monthPlanIssue.setFactoryCode(finalResult.getFactoryCode());
-        }
-        baseDao.saveBatch(monthPlanIssues);
+        Map<String, FactoryMonthPlanProductionFinalResult> groupMap = new HashMap<>(16);
+        genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues);
+        monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
+        monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
+        // 成型月计划
+        List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
+        genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList);
+        monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
+        monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
         // 发送MQ
         AjaxResult ajaxResult = null;
         // 获取下发接口版本号
@@ -161,5 +130,70 @@ public class MonthPlanIssueServiceImpl extends AbstractDocService<MonthPlanIssue
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
         }
         return ajaxResult;
+    }
+
+    private void genMonthPlanIssueList(List<FactoryMonthPlanProductionFinalResult> monthPlanIssueList, Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<MonthPlanIssue> monthPlanIssues) {
+        List<List<FactoryMonthPlanProductionFinalResult>> splitList = ScmListUtils.getSplitList(monthPlanIssueList, 1000);
+        for (List<FactoryMonthPlanProductionFinalResult> finalResultList : splitList) {
+            for (FactoryMonthPlanProductionFinalResult finalResult : finalResultList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getFactoryCode(), finalResult.getMonth(), finalResult.getMaterialCode());
+                if (groupMap.containsKey(mapKey)) {
+                    FactoryMonthPlanProductionFinalResult result = groupMap.get(mapKey);
+                    BigDecimal totalDayResult = this.getTotalDayResult(result);
+                    Map<String, Object> params = result.getParams();
+                    BigDecimal totalDayResultOld = (BigDecimal) params.get("totalDayResult");
+                    params.put("totalDayResult", totalDayResult.add(totalDayResultOld));
+                } else {
+                    BigDecimal totalDayResult = this.getTotalDayResult(finalResult);
+                    finalResult.getParams().put("totalDayResult", totalDayResult);
+                    groupMap.put(mapKey, finalResult);
+                }
+                MonthPlanIssue monthPlanIssue = new MonthPlanIssue();
+                monthPlanIssue.setMpVersionNo(finalResult.getProductionVersion());
+                monthPlanIssue.setMpYear(String.valueOf(finalResult.getYear()));
+                monthPlanIssue.setMpMonth(String.valueOf(finalResult.getMonth()));
+                monthPlanIssue.setOrderNo(finalResult.getProductionNo());
+                monthPlanIssue.setStrucCode(finalResult.getStructureName());
+                monthPlanIssue.setMesMaterialCode(finalResult.getMaterialCode());
+                monthPlanIssue.setSpecDesc(finalResult.getMaterialDesc());
+                monthPlanIssue.setEmbryoSpec(finalResult.getMainMaterialDesc());
+                monthPlanIssue.setPattern(finalResult.getPattern());
+                monthPlanIssue.setCavity(finalResult.getMouldCavityQty());
+                monthPlanIssue.setLiveBlock(finalResult.getTypeBlockQty());
+                monthPlanIssue.setNetDemand(finalResult.getFactProdReqQty());
+                monthPlanIssue.setAdvNum(finalResult.getHeightProductionQty());
+                monthPlanIssue.setMonthAvgNum(finalResult.getAverageQty());
+                monthPlanIssue.setStockSaleRatio(finalResult.getInventorySalesRatio());
+                monthPlanIssue.setDayVulQty(finalResult.getDayVulcanizationQty());
+                /*monthPlanIssue.setAdjustQty1();
+                monthPlanIssue.setAdjustQty2();
+                monthPlanIssue.setAdjustQty3();
+                monthPlanIssue.setAdjustQty4();*/
+                for (int i = 1; i <= 31; i++) {
+                    Object fieldValue = ReflectUtils.getFieldValue(finalResult, "day" + i);
+                    ReflectUtils.setFieldValue(monthPlanIssue, "day" + i, fieldValue);
+                }
+                String dataVersion = String.valueOf(System.currentTimeMillis());
+                monthPlanIssue.setDataVersion(dataVersion);
+                monthPlanIssue.setCompanyCode(finalResult.getFactoryCode());
+                monthPlanIssue.setFactoryCode(finalResult.getFactoryCode());
+                monthPlanIssues.add(monthPlanIssue);
+            }
+        }
+    }
+
+    /**
+     * 获取总天数合计
+     *
+     * @param finalResult 定稿结果
+     * @return 结果
+     */
+    private BigDecimal getTotalDayResult(FactoryMonthPlanProductionFinalResult finalResult) {
+        BigDecimal result = BigDecimal.ZERO;
+        for (int i = 1; i <= 31; i++) {
+            BigDecimal fieldValue = ObjectUtils.defaultIfNull(ReflectUtils.getFieldValue(finalResult, "day" + i), BigDecimal.ZERO);
+            result = BigDecimalUtils.add(result, fieldValue);
+        }
+        return result;
     }
 }

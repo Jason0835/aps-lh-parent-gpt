@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.handler;
 
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
@@ -53,6 +54,7 @@ public class GroupProductionConversionHandler {
                 return;
             }
             MpStructureAllocation allocationInfo = conversion(allocationDetail);
+            setProductionVersionInfo(allocationInfo, productionContext);
             resultMap.put(key, allocationInfo);
         });
         if (CollectionUtils.isEmpty(resultMap)) {
@@ -89,5 +91,25 @@ public class GroupProductionConversionHandler {
         allocationInfo.setNetQty(sum.intValue());
         allocationInfo.setLossQty(lossQty.intValue());
         return allocationInfo;
+    }
+
+    /**
+     * 设置结构转产表的版本信息
+     *
+     * @param allocationInfo 结构转产配置
+     * @param context        版本信息
+     */
+    private static void setProductionVersionInfo(MpStructureAllocation allocationInfo, Context context) {
+        if (null == allocationInfo || null == context) {
+            return;
+        }
+        //工厂、年份、月份
+        allocationInfo.setFactoryCode(context.getFactoryCode());
+        allocationInfo.setYear(context.getYear());
+        allocationInfo.setMonth(context.getMonth());
+        //排产版本信息
+        allocationInfo.setMonthPlanVersion(context.getMonthPlanVersion());
+        allocationInfo.setProductionVersion(context.getProductionVersion());
+        allocationInfo.setPlanType(context.getPlanType());
     }
 }
