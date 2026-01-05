@@ -38,6 +38,10 @@ public class FactoryConstant {
      * 日期前缀
      */
     public static final String DAY_FIELD = "DAY_";
+    /**
+     * 搭配日期前缀
+     */
+    public static final String MATCH_DAY_FIELD = "matchQtyDay";
 
     /**
      * Y 值

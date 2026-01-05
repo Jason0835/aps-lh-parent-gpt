@@ -757,19 +757,23 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
         }
-        return demandPlans.parallelStream()
-            .collect(Collectors.groupingByConcurrent(DpDemandPlan::getGroupKey))
-            .values()
-            .stream()
-            .map(dpDemandPlans -> buildMergedDemandPlan(
-                dpDemandPlans,
+        List<DpDemandPlan> list = Lists.newArrayList();
+        Map<String,List<DpDemandPlan>>  mergedDemandPlanMap = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
+        mergedDemandPlanMap.forEach((groupKey, groupPlans) -> {
+            // 获取基础模板（第一个元素）
+            DpDemandPlan template = groupPlans.get(0);
+            if(!skuMap.containsKey(template.getMaterialCode())) {
+                return;
+            }
+            list.add(buildMergedDemandPlan(
+                groupPlans,
                 minProductionQty,
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap,monthlySaleQty))
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+                productionTypeMap,monthlySaleQty));
+        });
+        return list;
     }
 
     private DpDemandPlan buildMergedDemandPlan(
@@ -780,17 +784,8 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         Map<String, Integer> mdmMonthSurplusMap,
         Map<String, String> productionTypeMap,
         Map<String, Integer> monthlySaleQty) {
-
-        // 验证分组数据有效性
-        if (CollectionUtils.isEmpty(groupPlans)) {
-            return null;
-        }
-
         // 获取基础模板（第一个元素）
         DpDemandPlan template = groupPlans.get(0);
-        if(!skuMap.containsKey(template.getMaterialCode())) {
-            return null;
-        }
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置物料信息（使用computeIfAbsent优化Map访问）
