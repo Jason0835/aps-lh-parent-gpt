@@ -209,4 +209,19 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         this.clearPage();
         return this.getDataTable(list);
     }
+
+    /**
+     * 更新结构到物料表
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新结构到物料表")
+    @PostMapping("/updateStructureToMaterial")
+    public AjaxResult updateStructureToMaterial(@RequestBody MdmSkuStructureRef queryVO) {
+        return mdmSkuStructureRefService.updateStructureToMaterial(queryVO);
+    }
+
+
+
+
 }

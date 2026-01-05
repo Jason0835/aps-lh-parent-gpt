@@ -68,13 +68,13 @@ public class ScmItfController {
 	}
 	
     /**
-     * 同步区域
+     * 同步区域/国家数据
      *
      * @return 结果
      */
-    @ApiOperation("同步区域")
+    @ApiOperation("同步区域/国家数据")
     @PostMapping("/scm/syncArea")
-    public AjaxResult syncArea() { // TODO 取区域
-    	return AjaxResult.success();
+    public AjaxResult syncArea() {
+    	return scmItfService.syncArea();
     }
 }

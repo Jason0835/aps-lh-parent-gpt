@@ -43,4 +43,11 @@ public interface ScmItfService {
 	 * @return
 	 */
 	AjaxResult publicFacScheduleVersion(List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList);
+	
+	/**
+	 * 同步区域信息
+	 * 
+	 * @return
+	 */
+	AjaxResult syncArea();
 }
