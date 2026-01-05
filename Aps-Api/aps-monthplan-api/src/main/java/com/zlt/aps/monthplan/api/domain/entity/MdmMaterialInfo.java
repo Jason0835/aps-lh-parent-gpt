@@ -363,4 +363,28 @@ public class MdmMaterialInfo extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 制造示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoNo", sort = 60)
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(exist = false)
+    private String embryoNo;
+
+    /**
+     * 文字示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textNo", sort = 75)
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(exist = false)
+    private String textNo;
+
+    /**
+     * 硫化示方书号
+     */
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhNo", sort = 90)
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(exist = false)
+    private String lhNo;
 }

@@ -79,7 +79,7 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>();
     }
 
     @Override
