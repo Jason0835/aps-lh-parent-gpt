@@ -99,7 +99,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         for (List<MdmMaterialInfo> materialInfoList : splitList) {
             List<String> materialCodeList = materialInfoList.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toList());
             List<MdmSkuConstructionRef> mdmSkuConstructionRefList = new ArrayList<>();
-            if (CollectionUtils.isEmpty(materialCodeList)) {
+            if (CollectionUtils.isNotEmpty(materialCodeList)) {
                 LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
                 queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
                 queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
