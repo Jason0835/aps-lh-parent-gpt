@@ -55,10 +55,10 @@ public class ProductMinConfiguration extends BaseEntity {
     private String factoryCode;
 
     /**
-     * 胎别
+     * 产品品类
      */
     @Excel(name = "ui.data.column.productMinConfiguration.productType", dictType = "biz_product_type")
-    @ApiModelProperty(value = "胎别", name = "productType")
+    @ApiModelProperty(value = "产品品类", name = "productType")
     @TableField(value = "PRODUCT_TYPE")
     private String productType;
 
@@ -91,7 +91,7 @@ public class ProductMinConfiguration extends BaseEntity {
 
     /**
      * 通配符匹配的key
-     * 按分厂+胎别
+     * 按分厂+产品品类
      */
     public String getWildcardKey() {
         String keyFormat = "%s|*|%s";

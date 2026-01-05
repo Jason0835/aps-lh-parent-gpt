@@ -47,7 +47,7 @@ public class ProductALevel extends BaseEntity {
      */
     @ImportExcelValidated(required = true, isCode = true, maxLength = 20)
     @Excel(name = "ui.data.column.ProductALevel.productTypeCode", dictType = "biz_product_type")
-    @ApiModelProperty(value = "胎别，取字典：biz_product_type", name = "productTypeCode")
+    @ApiModelProperty(value = "产品品类，取字典：biz_product_type", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 

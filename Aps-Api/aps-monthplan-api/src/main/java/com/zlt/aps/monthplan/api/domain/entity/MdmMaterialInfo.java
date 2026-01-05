@@ -150,11 +150,11 @@ public class MdmMaterialInfo extends BaseEntity {
     private String hierarchy;
 
     /**
-     * 轮辋尺寸（保留2位小数）
+     * 英寸（保留2位小数）
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmMaterialInfo.proSize")
-    @ApiModelProperty(value = "轮辋尺寸", name = "proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 

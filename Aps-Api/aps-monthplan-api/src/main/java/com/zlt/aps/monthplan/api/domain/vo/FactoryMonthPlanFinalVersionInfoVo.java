@@ -41,9 +41,9 @@ public class FactoryMonthPlanFinalVersionInfoVo {
     @ApiModelProperty(value = "分厂版本", name = "productionVersion")
     private String productionVersion;
     /**
-     * 胎别
+     * 产品品类
      */
-    @ApiModelProperty(value = "胎别", name = "productTypeCode")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     private String productTypeCode;
 
     /**
