@@ -258,28 +258,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
         Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = getCxMachineStopInfo(context);
-        cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> {
-            CxDevicePlanShutInfoHelper stopInfoHelper = cxStopInfo.get(cxMachineCode);
-            if (null == stopInfoHelper) {
-                return;
-            }
-            //本身维修停机日
-            Set<Integer> stopDaySet = stopInfoHelper.getStopDaySet();
-            if (null == stopDaySet) {
-                stopDaySet = new HashSet<>();
-            }
-            //全局停工日
-            Set<Integer> wholeStop = context.getStopDays();
-            if (!CollectionUtils.isEmpty(wholeStop)) {
-                stopDaySet.addAll(wholeStop);
-            }
-            Integer monthDays = context.getMonthDays();
-            Integer maxProductionDays = monthDays - stopDaySet.size();
-            //排产日信息
-            cxMachineInfo.setStopDayInfo(stopDaySet);
-            cxMachineInfo.setMaxProductionDays(maxProductionDays);
-            cxMachineInfo.setRemainingDays(maxProductionDays);
-        });
+        cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> setCxMachineDayInfo(cxStopInfo, context, cxMachineInfo));
         return cxMachineInfoMap;
     }
 
@@ -644,6 +623,37 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             cxStopMap.put(cxMachineCode, helper);
         });
         return cxStopMap;
+    }
+
+    /**
+     * 设置成型机的排产天数信息
+     *
+     * @param cxStopInfo    成型机维修信息
+     * @param context       排产上下文
+     * @param cxMachineInfo 成型机信息
+     */
+    private void setCxMachineDayInfo(Map<String, CxDevicePlanShutInfoHelper> cxStopInfo, Context context, CxMachineBaseInfoVo cxMachineInfo) {
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (StringUtils.isBlank(cxMachineCode)) {
+            return;
+        }
+        Set<Integer> stopDaySet = new HashSet<>();
+        CxDevicePlanShutInfoHelper stopInfoHelper = cxStopInfo.get(cxMachineCode);
+        if (null != stopInfoHelper) {
+            //本身维修停机日
+            stopDaySet = stopInfoHelper.getStopDaySet();
+        }
+        //全局停工日
+        Set<Integer> wholeStop = context.getStopDays();
+        if (!CollectionUtils.isEmpty(wholeStop)) {
+            stopDaySet.addAll(wholeStop);
+        }
+        Integer monthDays = context.getMonthDays();
+        Integer maxProductionDays = monthDays - stopDaySet.size();
+        //排产日信息
+        cxMachineInfo.setStopDayInfo(stopDaySet);
+        cxMachineInfo.setMaxProductionDays(maxProductionDays);
+        cxMachineInfo.setRemainingDays(maxProductionDays);
     }
 
     /**

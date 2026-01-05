@@ -23,6 +23,14 @@ public class SpecialMaterialInfoVo implements Serializable {
      */
     private String materialDesc;
     /**
+     * 标准长
+     */
+    private Long standardLength;
+    /**
+     * 库存量
+     */
+    private Long stock;
+    /**
      * 总的已排产量
      */
     private Long sumProductionQty;
@@ -32,16 +40,19 @@ public class SpecialMaterialInfoVo implements Serializable {
     private Long existingInventoryCapacity;
 
     /**
-     * 创建初始化的特殊材料对象实例
+     * 创建初始化的特殊材料库存对象实例
      *
-     * @param materialCode 特殊材料编码
-     * @param materialDesc 特殊材料描述
+     * @param stockInfo 特殊材料编码
      * @return
      */
-    public static SpecialMaterialInfoVo createInitInfo(String materialCode, String materialDesc) {
+    public static SpecialMaterialInfoVo createInitInfo(SpecialMaterialStockVo stockInfo) {
         SpecialMaterialInfoVo info = new SpecialMaterialInfoVo();
-        info.setMaterialCode(materialCode);
-        info.setMaterialDesc(materialDesc);
+        info.setMaterialCode(stockInfo.getMaterialCode());
+        info.setMaterialDesc(stockInfo.getMaterialDesc());
+        info.setStandardLength(stockInfo.getStandardLength());
+        info.setStock(stockInfo.getStock());
+        info.setSumProductionQty(BigDecimal.ZERO.longValue());
+        info.setExistingInventoryCapacity(BigDecimal.ZERO.longValue());
         return info;
     }
 

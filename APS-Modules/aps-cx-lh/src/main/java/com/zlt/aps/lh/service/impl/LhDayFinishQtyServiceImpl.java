@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,6 @@ import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryProductionVersion;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -103,7 +103,7 @@ public class LhDayFinishQtyServiceImpl extends AbstractDocService<LhDayFinishQty
         queryDto.setFactoryCode(factoryCode);
         queryDto.setProductionDate(scheduleDate);
         AjaxResult ajaxResult = factoryConsoleRemoteService.getFinalVersion(queryDto);
-        FactoryProductionVersion productionVersion = new ObjectMapper().convertValue(ajaxResult.get(AjaxResult.DATA_TAG), FactoryProductionVersion.class);
+        MpFactoryProductionVersion productionVersion = new ObjectMapper().convertValue(ajaxResult.get(AjaxResult.DATA_TAG), MpFactoryProductionVersion.class);
         if (productionVersion == null){
             throw new BusinessException("获取不到月度计划定稿版本！");
         }else{

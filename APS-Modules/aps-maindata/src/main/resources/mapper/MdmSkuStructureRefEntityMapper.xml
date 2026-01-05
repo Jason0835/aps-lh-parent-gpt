@@ -19,4 +19,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </if>
         GROUP BY STRUCTURE_NAME
     </select>
+
+
+    <select id="getMdmSkuStructureRefList" parameterType="com.baomidou.mybatisplus.core.conditions.query.QueryWrapper" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef">
+        SELECT a.*
+        FROM T_MDM_SKU_STRUCTURE_REF a
+                 LEFT JOIN T_MDM_MATERIAL_INFO b ON a.MATERIAL_CODE = b.MATERIAL_CODE
+            ${ew.customSqlSegment}
+    </select>
+
+
 </mapper>

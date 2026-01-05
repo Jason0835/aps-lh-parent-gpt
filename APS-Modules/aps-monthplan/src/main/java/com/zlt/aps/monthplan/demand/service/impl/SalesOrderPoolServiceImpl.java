@@ -1,5 +1,23 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -11,6 +29,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.AppUtils;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -20,27 +39,21 @@ import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPoolRecord;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
+import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Copyright (c) 2022, All rights reserved。 文件名称：SalesOrderPoolServiceImpl.java
@@ -66,7 +79,11 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
+	private SalesOrderPoolRecordEntityMapper salesOrderPoolRecordEntityMapper;
+	@Autowired
 	private DpAreaEntityMapper dpAreaEntityMapper;
+    @Autowired
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -115,6 +132,11 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	 */
 	@Override
 	public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
+		LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
+		queryWrapper.eq(SalesOrderPool::getSalCodePo, salesOrderPool.getSalCodePo());
+		if (!salesOrderPoolEntityMapper.exists(queryWrapper)) {
+			return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.SalesOrderPool.salCodePo.noexists"));
+		}
 		LambdaUpdateWrapper<SalesOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
 		updateWrapper.eq(SalesOrderPool::getSalCodePo, salesOrderPool.getSalCodePo());
 		updateWrapper.set(SalesOrderPool::getScmPriority, salesOrderPool.getScmPriority());
@@ -145,9 +167,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		// 加载区域
 		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
 		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-		Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
-				.filter(s -> StringUtils.isNotEmpty(s.getRemark()))
-				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(areaQueryWrapper);
+        JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
+		Map<String, String> areaMap = dpAreaList.stream()
+				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
 		// 校验是否有没有录入优先级的数据
 		List<String> notPriorityAreaList = syncResultList.stream()
 				.filter(s -> StringUtils.isEmpty(s.getSalPriority()) && s.getEmployeeDept() != null)
@@ -210,29 +233,46 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	 * @param syncResultList 同步数据返回结果
 	 * @return
 	 */
-	private AjaxResult saveItfData(SalesOrderPool salesOrderPool, List<SyncPlanedNotShipResultVo> syncResultList) {
+	public AjaxResult saveItfData(SalesOrderPool salesOrderPool, List<SyncPlanedNotShipResultVo> syncResultList) {
 		// 根据年月取出年月现有数据
 		Integer year = salesOrderPool.getYear();
 		Integer month = salesOrderPool.getMonth();
 		String factoryCode = salesOrderPool.getFactoryCode();
-		LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
-		queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
-		queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
-		List<SalesOrderPool> salesOrderPoolList = salesOrderPoolEntityMapper.selectList(queryWrapper);
-		boolean isFirstCatch = CollectionUtils.isEmpty(salesOrderPoolList); // 如果抓取不到，是年月首次抓取
+		LambdaQueryWrapper<SalesOrderPoolRecord> recordQueryWrapper = new LambdaQueryWrapper<>();
+		recordQueryWrapper.eq(SalesOrderPoolRecord::getFactoryCode, factoryCode);
+		recordQueryWrapper.eq(SalesOrderPoolRecord::getYear, year);
+		recordQueryWrapper.eq(SalesOrderPoolRecord::getMonth, month);
+		recordQueryWrapper.eq(SalesOrderPoolRecord::getIsDelete, ApsConstant.APS_YES_NO_0);
+		boolean isFirstCatch = !salesOrderPoolRecordEntityMapper.exists(recordQueryWrapper); // 如果抓取不到，是年月首次抓取
 
 		// 排产参数
+		String scmOrderMatralCodePrefix = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
+				MonthPlanEnums.SCM_ORDER_MATRAL_CODE_PREFIX); // 从参数取出储备标记
 		String salesOrderStockFlag = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
 				MonthPlanEnums.SALESORDER_STOCK_FLAG); // 从参数取出储备标记
 		String hightPriorityOrderRateStr = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
 				MonthPlanEnums.HIGHT_PRIORITY_ORDER_RATE); // 高优先级订单占比
 		BigDecimal hightPriorityOrderRate = BigDecimalUtils
 				.percentages2Decimals(BigDecimalUtils.valueOf(hightPriorityOrderRateStr)); // 占比参数转换成小数
-
+		
+		// 加载物料明细，关联数据
+		LambdaQueryWrapper<MdmMaterialInfo> materialQueryWrapper = new LambdaQueryWrapper<MdmMaterialInfo>();
+		materialQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+		Map<String, MdmMaterialInfo> materialMap = mdmMaterialInfoEntityMapper.selectList(materialQueryWrapper).stream()
+				.collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+		
 		// 把接口数据转换成aps订单池对象
-		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().map(vo -> {
+		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().filter(s -> {
+			if (StringUtils.isEmpty(scmOrderMatralCodePrefix)) {
+				return true;
+			}
+			String[] prefixArr = StringUtils.split(scmOrderMatralCodePrefix, ",");
+			return Arrays.stream(prefixArr).anyMatch(p -> StringUtils.startsWith(s.getOriMaterialCode(), p));
+		} // 只要32、33开头的物料
+		).map(vo -> {
 			String salPriority = vo.getSalPriority(); // 销售优先级
 			String salCodePo = vo.getSalCodePo(); // po号
+			String oriMaterialCode = vo.getOriMaterialCode(); // 物料号
 			String shipType = null; // 发货模式，需要做字典映射
 			switch (vo.getShipType()) {
 			case ApsConstant.SCM_DELIVERY_MODE_ALL:
@@ -241,6 +281,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			default:
 				shipType = ApsConstant.DELIVERY_MODE_SPLIT;
 			}
+			// 从物料信息关联的数据
+			MdmMaterialInfo materialInfo = materialMap.get(oriMaterialCode);
+			String materialDesc = Optional.ofNullable(materialInfo).map(MdmMaterialInfo::getMaterialDesc).orElse(vo.getMaterialDesc());
+			String productType = Optional.ofNullable(materialInfo).map(MdmMaterialInfo::getProductTypeCode).orElse(ProductTypeEnum.WHOLE_STEEL.getValue());
 
 			SalesOrderPool newVO = new SalesOrderPool();
 			newVO.setFactoryCode(factoryCode);
@@ -251,18 +295,17 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setBrand(vo.getBrandName());
 			newVO.setDeliverGoodsType(shipType);
 			newVO.setIsEudr(vo.getEudrFlag());
-			newVO.setMaterialDesc(vo.getSpecDesc());
+			newVO.setMaterialDesc(materialDesc);
 			newVO.setNatCode(vo.getNatCode());
 			newVO.setOrderPriority(salPriority);
 			newVO.setOrdQty(vo.getPlanedNotShipQty()); // 数量为已计划未发货量
-			newVO.setOriMaterialCode(vo.getOriMaterialCode());
-			newVO.setProductType(Optional.ofNullable(vo.getProductType()).orElse(ProductTypeEnum.WHOLE_STEEL.getValue()));
+			newVO.setOriMaterialCode(oriMaterialCode);
+			newVO.setProductType(productType);
 			newVO.setSalCode(vo.getSalCode());
 			newVO.setSalCodePo(salCodePo);
 			newVO.setSalNCode(vo.getSalNCode());
 			newVO.setWeekYear(vo.getWeekYearRequirement());
-			newVO.setScmDetailId(vo.getSaleBillDetailId());
-//					newVO.setScmBillId(vo.getSaleBillId());
+			newVO.setScmDetailId(vo.getId());
 //					newVO.setDynamicBalance(dynamicBalance);
 //					newVO.setUniformity(uniformity);
 			String scmPriority = ApsConstant.SAL_PRIORITY_MID;
@@ -317,14 +360,19 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 高优先级订单量合计
 					for (SalesOrderPool pool : hightPriorityList) {
 						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty)
-								.compareTo(hightPriorityOrderRate) > 0) { // 高优先级总量/所有总量> 85%
-							pool.setScmPriority(ApsConstant.SAL_PRIORITY_MID); // 优先级设置未中
-							hightPriorityOrdQty = BigDecimalUtils.sub(hightPriorityOrdQty, pool.getOrdQty()); // 高优先级订单量合计扣减掉该订单量
+								.compareTo(hightPriorityOrderRate) <= 0) { // 高优先级总量/所有总量<= 85%则结束，否则要把高优先级调成中优先级
+							break;
 						}
+						pool.setScmPriority(ApsConstant.SAL_PRIORITY_MID); // 优先级设置未中
+						hightPriorityOrdQty = BigDecimalUtils.sub(hightPriorityOrdQty, pool.getOrdQty()); // 高优先级订单量合计扣减掉该订单量
 					}
 				}
 			}
 		} else { // 年月再次抓取数据
+			LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
+			queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
+			queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
+			List<SalesOrderPool> salesOrderPoolList = salesOrderPoolEntityMapper.selectList(queryWrapper);
 			Map<Long, List<SalesOrderPool>> scmDetailMap = salesOrderPoolList.stream()
 					.filter(s -> s.getScmDetailId() != null)
 					.collect(Collectors.groupingBy(SalesOrderPool::getScmDetailId));
@@ -345,9 +393,14 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		updateWrapper.exists("select 1 a"); // 加个条件用来绕过框架的防全表更新限制
 		updateWrapper.set(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_1);
 		salesOrderPoolEntityMapper.update(null, updateWrapper);
-
 		salesOrderPoolEntityMapper.batchInsert(newSalesOrderPoolList); // 新增一批数据
-
+		this.saveSyncRecord(syncResultList, year, month, factoryCode); // 记录同步操作日志
+		try {
+			// 同步区域表
+			iScmItfService.syncArea();
+		} catch (Exception e) { // 同步失败也不影响订单同步
+			log.error(e.getMessage(), e);
+		}
 		try {
 			// 触发调用itf接口同步成品库存
 			MdmProductStock productStock = new MdmProductStock();
@@ -358,6 +411,52 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			log.error(e.getMessage(), e);
 		}
 		return AjaxResult.success();
+	}
+
+	/**
+	 * 保存同步记录
+	 * 
+	 * @param syncResultList
+	 * @param year
+	 * @param month
+	 * @param factoryCode
+	 */
+	public void saveSyncRecord(List<SyncPlanedNotShipResultVo> syncResultList, Integer year, Integer month,
+			String factoryCode) {
+		// 把接口数据转换成aps订单池对象
+		List<SalesOrderPoolRecord> salesOrderPoolRecordList = syncResultList.stream().map(vo -> {
+			String shipType = null; // 发货模式，需要做字典映射
+			switch (vo.getShipType()) {
+			case ApsConstant.SCM_DELIVERY_MODE_ALL:
+				shipType = ApsConstant.DELIVERY_MODE_ALL;
+				break;
+			default:
+				shipType = ApsConstant.DELIVERY_MODE_SPLIT;
+			}
+			SalesOrderPoolRecord newVO = new SalesOrderPoolRecord();
+			newVO.setFactoryCode(factoryCode);
+			newVO.setYear(year);
+			newVO.setMonth(month);
+			newVO.setArea(String.valueOf(vo.getEmployeeDept()));
+			newVO.setBillDate(vo.getBillDate());
+			newVO.setBrand(vo.getBrandName());
+			newVO.setDeliverGoodsType(shipType);
+			newVO.setIsEudr(vo.getEudrFlag());
+			newVO.setMaterialDesc(vo.getMaterialDesc());
+			newVO.setNatCode(vo.getNatCode());
+			newVO.setOrderPriority(vo.getSalPriority());
+			newVO.setOrdQty(vo.getPlanedNotShipQty()); // 数量为已计划未发货量
+			newVO.setOriMaterialCode(vo.getOriMaterialCode());
+			newVO.setProductType(vo.getProductType());
+			newVO.setSalCode(vo.getSalCode());
+			newVO.setSalCodePo(vo.getSalCodePo());
+			newVO.setSalNCode(vo.getSalNCode());
+			newVO.setWeekYear(vo.getWeekYearRequirement());
+			newVO.setScmDetailId(vo.getId());
+			newVO.setBaseVale(newVO.getId());
+			return newVO;
+		}).collect(Collectors.toList());
+		salesOrderPoolRecordEntityMapper.batchInsert(salesOrderPoolRecordList); // 新增操作日志
 	}
 
 	/**

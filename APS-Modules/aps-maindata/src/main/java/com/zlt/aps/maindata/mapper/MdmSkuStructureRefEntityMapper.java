@@ -1,8 +1,10 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -29,4 +31,11 @@ public interface MdmSkuStructureRefEntityMapper extends CommBaseMapper<MdmSkuStr
      * @return 结果
      */
     List<MdmSkuStructureRef> getStructureSelectList(MdmSkuStructureRef queryVO);
+
+    /**
+     * 查询SKU与结构关系列表
+     * @param queryWrapper 查询对象
+     * @return 结果
+     */
+    List<MdmSkuStructureRef> getMdmSkuStructureRefList(@Param("ew") QueryWrapper<MdmSkuStructureRef> queryWrapper);
 }

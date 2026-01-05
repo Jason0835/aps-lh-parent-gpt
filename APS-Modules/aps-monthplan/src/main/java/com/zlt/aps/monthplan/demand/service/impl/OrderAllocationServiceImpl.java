@@ -35,9 +35,9 @@ public class OrderAllocationServiceImpl{
      *              版本
      */
     @Transactional(rollbackFor = Exception.class)
-    public void allocateProductionByMonth(Integer year, Integer month, String factoryCode) {
+    public void allocateProductionByMonth(Integer year, Integer month, String factoryCode, String monthPlanVersion) throws Exception {
         // 1. 获取月计划版本
-        String monthPlanVersion = getMonthPlanVersion(year, month, factoryCode);
+        // String monthPlanVersion = getMonthPlanVersion(year, month, factoryCode);
         if (StringUtils.isBlank(monthPlanVersion)) {
             throw new RuntimeException("未找到对应的月计划版本");
         }

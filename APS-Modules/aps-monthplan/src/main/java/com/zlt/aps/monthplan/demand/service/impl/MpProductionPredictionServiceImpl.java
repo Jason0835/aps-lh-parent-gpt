@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
@@ -84,8 +83,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final ISupplyOrderPoolService supplyOrderPoolService;
     // 订单快照
     private final IDpOrderPoolSnapshotService dpOrderPoolSnapshotService;
-    // 需求计划
-    private final IDpDemandPlanService dpDemandPlanService;
     // 历史销售记录
     private final IMpHistorySaleRecordService mpHistorySaleRecordService;
 
@@ -274,9 +271,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         }
         // 获取排序配置并排序订单
         List<DpDemandPlan> sortedDemandPlans = getSortedDemandPlans(tMonthDemands);
-        sortedDemandPlans.forEach(plan -> {
-             calculdateDemandQty(plan,productionFinalResults);
-        });
+        sortedDemandPlans.forEach(plan -> calculdateDemandQty(plan,productionFinalResults));
         return sortedDemandPlans;
     }
 
@@ -646,108 +641,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return mergedPlan;
     }
 
-    private Map<String, Long> calculateMonthDemandQty(List<DpDemandPlan>  demandPlans,YearMonth yearMonth,MpFactoryProductionVersion finalVersion) {
-        if(CollectionUtils.isEmpty(demandPlans) || null == finalVersion) {
-            return Collections.emptyMap();
-        }
-        // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
-        // 13、按【生成周期排产】、【生成储备排产】的逻辑得到T+2月的周期排产储备和常规储备数据(此时T+1月的月度计划已预测，故而结构最新排产月份会有变化)
-        // 生成周期排产储备
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(yearMonth);
-        // 生成常规储备
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(yearMonth);
-        List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
-        if(CollectionUtils.isNotEmpty(cycleStockUpOrders)){
-            allStockUpOrders.addAll(cycleStockUpOrders);
-        }
-        if(CollectionUtils.isNotEmpty(precedentStockUpOrders)){
-            allStockUpOrders.addAll(precedentStockUpOrders);
-        }
-        // (1) 生成的T+1月的周期排产储备和常规储备数据，保存录入(预测版本号)订单池快照表
-        saveOrderPoolSnapshot(demandPlans.get(0).getMonthPlanVersion(),yearMonth,allStockUpOrders);
-        // T月月度计划对应实单已排产量（销售订单）+ T月已生产量
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        //  T月实单未排产量：	300	(高优先级净需求+中优先级净需求+暂缓订单净需求-T月实单排产量+T月实单已完成量)
-        Map<String,Long> unProductionQty = this.getUnProductionQtyMap(demandPlans,productionFinalResults);
-        // 10、从月度计划定稿版本获取对应的周期储备排产，按SKU扣减T月月度计划对应周期储备已排产量得到T月周期储备还未排产量
-        // T月周期储备未排产量：	0	    SKU:T月定稿版本的周期排产储备量 - T月月度计划周期储备已排产量 + T月周期已完成量
-        Map<String,Long> unProductionQtyByCycleStockUp = this.getUnProductionQtyByCycleStockUp(demandPlans,productionFinalResults);
-        // T+1月的储备订单(包含周期排产储备+常规储备)
-        Map<String,Long> stockUpOrderQty = this.getStockUpOrderQtyMap(allStockUpOrders);
-        // 11、计算T+1月的需求量	 = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量 + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
-        return  calculateDemandQty(unProductionQty,unProductionQtyByCycleStockUp,stockUpOrderQty);
-    }
-
-    private Map<String, Long> getStockUpOrderQtyMap(List<SupplyOrderPool> allStockUpOrders) {
-        if(CollectionUtils.isEmpty(allStockUpOrders)){
-            return Collections.emptyMap();
-        }
-        return allStockUpOrders.stream()
-            .filter(Objects::nonNull)
-            .filter(supplyOrder -> StringUtils.isNotBlank(supplyOrder.getMaterialCode()) && null != supplyOrder.getQty())
-            .collect(Collectors.groupingBy(SupplyOrderPool::getMaterialCode, Collectors.summingLong(SupplyOrderPool::getQty)));
-    }
-
-    private Map<String,Long> calculateDemandQty(Map<String, Long> unProductionQty, Map<String, Long> unProductionQtyByCycleStockUp, Map<String,Long> stockUpOrderQty) {
-        Map<String,Long> tPlus1MonthDemandQty = Maps.newHashMap();
-        //  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量+ 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
-        unProductionQty.forEach((key,value) -> tPlus1MonthDemandQty.put(key,value
-            + unProductionQtyByCycleStockUp.getOrDefault(key,BigDecimal.ZERO.longValue())
-            + stockUpOrderQty.getOrDefault(key,BigDecimal.ZERO.longValue())));
-        return tPlus1MonthDemandQty;
-    }
-
-    private Map<String, Long> getUnProductionQtyByCycleStockUp(List<DpDemandPlan> tMonthDemandPlans, List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-        Map<String, Long> unProductioCycleReserveQtyMap = Maps.newHashMap();
-        Map<String,Long> cycleReserveQtyMap = this.getCycleReserveQtyMap(tMonthDemandPlans);
-        Map<String,Long> productionCycleReserveQtyMap = this.productionCycleReserveQtyMap(productionFinalResults);
-        cycleReserveQtyMap.forEach((key,value) -> unProductioCycleReserveQtyMap.put(key,value - productionCycleReserveQtyMap.getOrDefault(key,BigDecimal.ZERO.longValue())));
-        return unProductioCycleReserveQtyMap;
-    }
-
-    private Map<String, Long> productionCycleReserveQtyMap(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-        if(CollectionUtils.isEmpty(productionFinalResults)){
-            return Collections.emptyMap();
-        }
-        return productionFinalResults.stream()
-            .filter(Objects::nonNull)
-            .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && null != productionFinalResult.getCycleProductionQty())
-            .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode, Collectors.summingLong(FactoryMonthPlanProductionFinalResult::getCycleProductionQty)));
-    }
-
-    private Map<String, Long> getCycleReserveQtyMap(List<DpDemandPlan> tMonthDemandPlans) {
-        return tMonthDemandPlans.stream()
-            .filter(Objects::nonNull)
-            .filter(demandPlan -> StringUtils.isNotBlank(demandPlan.getMaterialCode()) && null != demandPlan.getCycleReserveQty())
-            .collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode, Collectors.summingLong(item -> item.getCycleReserveQty().longValue())));
-    }
-
-
-    private Map<String, Long> getUnProductionQtyMap(List<DpDemandPlan> tPlus1MonthDemandPlans, List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-
-        Map<String, Long> unProductionQtyMap = Maps.newHashMap();
-        Map<String,Long> postponeNetQtyMap = this.getPostponeNetQtyMap(tPlus1MonthDemandPlans);
-        Map<String,Long> productionQtyMap = this.getProductionQtyMap(productionFinalResults);
-        postponeNetQtyMap.forEach((key,value) -> unProductionQtyMap.put(key,value - productionQtyMap.getOrDefault(key,BigDecimal.ZERO.longValue())));
-        return unProductionQtyMap;
-    }
-
-    private Map<String, Long> getProductionQtyMap(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-        if(CollectionUtils.isEmpty(productionFinalResults)) {
-            return Maps.newHashMap();
-        }
-        return productionFinalResults.stream()
-            .filter(Objects::nonNull)
-            .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && null != productionFinalResult.getTotalQty())
-            .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode, Collectors.summingLong(FactoryMonthPlanProductionFinalResult::getTotalQty)));
-    }
-
-    private Map<String, Long> getPostponeNetQtyMap(List<DpDemandPlan> tPlus1MonthDemandPlans) {
-        return tPlus1MonthDemandPlans.stream()
-            .filter(Objects::nonNull)
-            .filter(demandPlan -> StringUtils.isNotBlank(demandPlan.getMaterialCode()) && null != demandPlan.getPostponeNetQty())
-            .collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode, Collectors.summingLong(item -> item.getPostponeNetQty().longValue())));
-    }
 
     private void saveOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, List<SupplyOrderPool> allStockUpOrders) {
         dpOrderPoolSnapshotService.saveOrderPoolSnapshot(predictionVersion,yearMonth,allStockUpOrders);

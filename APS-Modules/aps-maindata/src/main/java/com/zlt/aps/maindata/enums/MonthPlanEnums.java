@@ -44,6 +44,10 @@ public enum MonthPlanEnums {
      */
     TURN_OVER_DAYS("SYS0102003", "周转天数(全局参数) ,用于供应链订单池备库上限的计算"),
     /**
+     * SYS0102004 从供应链同步的订单物料信息只需要指定前缀的
+     */
+    SCM_ORDER_MATRAL_CODE_PREFIX("SYS0102004", "从供应链同步的订单物料信息只需要符合指定前缀的数据"),
+    /**
      *  SYS0103001 最小投产量
      */
     MIN_PRODUCTION_QTY("SYS0103001", "最小投产量"),

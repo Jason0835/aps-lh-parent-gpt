@@ -812,20 +812,30 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(allRequirePlanList)) {
             return Collections.emptyMap();
         }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = allRequirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getStructureName())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return Collections.emptyMap();
+        }
         //TBR-按结构名分组排产计划
-        Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = allRequirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
+        Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
             ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
             groupInfo.setGroupName(structureName);
             groupInfo.setProductType(context.getProductType());
+            groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
             groupInfo.setGroupPlanData(planList);
+            //是否零度结构
+            List<MonthPlanProductionRequirePlanVo> isZeroRackList = planList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack())).collect(Collectors.toList());
+            if (!CollectionUtils.isEmpty(isZeroRackList)) {
+                groupInfo.setIsZero(YesOrNoEnum.YES.getCode());
+            }
             //设置对应的硫化配比信息：分不同机型有不同配比
             List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
             if (CollectionUtils.isEmpty(cxLhRatioList)) {
                 groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
             } else {
-                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity()));
+                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity(), (before, after) -> after));
                 groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
             }
             groupInfoMap.put(structureName, groupInfo);
