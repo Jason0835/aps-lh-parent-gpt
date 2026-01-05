@@ -12,10 +12,7 @@ import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMouldShellInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
+import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -55,6 +52,8 @@ public class MesItfServiceImpl implements MesItfService {
     private BaseDao baseDao;
     @Autowired
     private IFactoryParamService iFactoryParamService;
+    @Autowired
+    private MdmCycleSchStruConfEntityMapper cycleSchStruConfEntityMapper;
 
     /**
      * 同步SKU与模具关系
@@ -166,11 +165,14 @@ public class MesItfServiceImpl implements MesItfService {
      * @param overdueCycleTime   超期周期时间
      * @param time               时间
      * @param mpOverdueSkuList   要添加的列表
+     * @param cycleSchStruConfMap 周期排产结构配置表
      */
-    private static void addOverdueSku(MdmProductStock productStock, int stockYear, int stockMonth, Date overdueRegularTime, Date overdueCycleTime, Date time, List<MpOverdueSku> mpOverdueSkuList) {
+    private static void addOverdueSku(MdmProductStock productStock, int stockYear, int stockMonth, Date overdueRegularTime, Date overdueCycleTime, Date time, List<MpOverdueSku> mpOverdueSkuList,
+                                      Map<String, MdmCycleSchStruConf> cycleSchStruConfMap) {
         if (YesOrNoEnum.YES.getCode().equals(productStock.getIsExceedTire())) {
             MpOverdueSku mpOverdueSku = new MpOverdueSku();
-            mpOverdueSku.setFactoryCode(productStock.getFactoryCode());
+            String factoryCode = productStock.getFactoryCode();
+            mpOverdueSku.setFactoryCode(factoryCode);
             mpOverdueSku.setYear(stockYear);
             mpOverdueSku.setMonth(stockMonth);
             mpOverdueSku.setMesMaterialCode(productStock.getMesMaterialCode());
@@ -182,12 +184,19 @@ public class MesItfServiceImpl implements MesItfService {
             mpOverdueSku.setIsOverdueCycle(YesOrNoEnum.NO.getCode());
             mpOverdueSku.setOverdueRegularDate(overdueRegularTime);
             mpOverdueSku.setOverdueCycleDate(overdueCycleTime);
-            if (time.before(overdueRegularTime)) {
+            String structureName = productStock.getStructureName();
+            String mapKey = GenerageMapKeyUtils.createMapKey(factoryCode, structureName);
+            if (cycleSchStruConfMap.containsKey(mapKey)) {
+                mpOverdueSku.setIsOverdueCycle(YesOrNoEnum.YES.getCode());
+            } else {
+                mpOverdueSku.setIsOverdueRegular(YesOrNoEnum.YES.getCode());
+            }
+            /*if (time.before(overdueRegularTime)) {
                 mpOverdueSku.setIsOverdueRegular(YesOrNoEnum.YES.getCode());
             }
             if (time.before(overdueCycleTime)) {
                 mpOverdueSku.setIsOverdueCycle(YesOrNoEnum.YES.getCode());
-            }
+            }*/
             mpOverdueSkuList.add(mpOverdueSku);
         }
     }
@@ -262,6 +271,19 @@ public class MesItfServiceImpl implements MesItfService {
             param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
             Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
 
+            param.setParamCode(MonthPlanEnums.OVERDUE_TIRE_WARNING.getCode());
+            Date overdueTireWaringTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+            // 查询周期排产结构配置表
+            LambdaQueryWrapper<MdmCycleSchStruConf> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, mdmProductStock.getFactoryCode());
+            queryWrapper.eq(MdmCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getCode());
+            List<MdmCycleSchStruConf> mdmCycleSchStruConfList = cycleSchStruConfEntityMapper.selectList(queryWrapper);
+            Map<String, MdmCycleSchStruConf> cycleSchStruConfMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(mdmCycleSchStruConfList)) {
+                cycleSchStruConfMap = mdmCycleSchStruConfList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureName()), Function.identity(), (v1, v2) -> v1));
+            }
+
             List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
             for (List<MdmProductStock> importList : splitList) {
                 List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
@@ -285,16 +307,18 @@ public class MesItfServiceImpl implements MesItfService {
                     Date time = instance.getTime();
                     // 赋值是否超期胎
                     productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
+
+                    boolean isExceedTire = time.before(overdueTireWaringTime);
                     if (time.before(subTime4)) {
-                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, true);
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, true);
                     } else if (time.before(subTime3)) {
-                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, true, false);
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, false);
                     } else if (time.before(subTime2)) {
-                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, true, false, false);
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, false, false);
                     } else if (time.before(subTime1)) {
-                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), true, true, false, false, false);
+                        productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, false, false, false);
                     }
-                    addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
+                    addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList, cycleSchStruConfMap);
                 }
                 baseDao.insertBatch(importList);
                 baseDao.insertBatch(mpOverdueSkuList);
