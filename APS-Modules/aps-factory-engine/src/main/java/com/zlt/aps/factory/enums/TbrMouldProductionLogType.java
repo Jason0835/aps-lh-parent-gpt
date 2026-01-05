@@ -119,6 +119,30 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_MOULD_NO_FIND_CX_MACHINE("30-01-02", "非在机结构模具排产没有找到机台信息"),
     /**
+     * 30-01-03 非在机结构模具排产结构分组没有找到硫化配比信息
+     */
+    GROUP_MOULD_GROUP_NO_FIND_RATIO_CX_MACHINE("30-01-03", "非在机结构模具排产结构分组没有找到硫化配比信息"),
+    /**
+     * 30-01-04 非在机结构模具排产结构分组没有找到机型硫化配比信息
+     */
+    GROUP_MOULD_GROUP_NO_FIND_BRAND_RATIO_CX_MACHINE("30-01-04", "非在机结构模具排产结构分组没有找到机型硫化配比信息"),
+    /**
+     * 30-02-01 非在机结构模具排产硫化组起始排产日超出收尾日
+     */
+    GROUP_MOULD_START_LIMIT_END_LH_GROUP("30-02-01", "非在机结构模具排产硫化组起始排产日超出收尾日"),
+    /**
+     * 30-02-02 非在机结构模具排产硫化组没有找到可排产Sku
+     */
+    GROUP_MOULD_NO_FIND_SKU_LH_GROUP("30-02-02", "非在机结构模具排产硫化组没有找到可排产Sku"),
+    /**
+     * 30-02-03 非在机结构模具排产硫化组排产Sku没有可排产量
+     */
+    GROUP_MOULD_SKU_NO_PRODUCTION_QTY_LH_GROUP("30-02-03", "非在机结构模具排产硫化组排产Sku没有可排产量"),
+    /**
+     * 30-02-04 非在机结构模具排产硫化组排产Sku没有合适的排产模具
+     */
+    GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-02-04", "非在机结构模具排产硫化组排产Sku没有合适的排产模具"),
+    /**
      * 99 一键排产结束
      */
     WHOLE_PRODUCTION_END("99", "一键排产结束"),

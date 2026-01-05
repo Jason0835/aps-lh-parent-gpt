@@ -29,6 +29,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.monthplan.api.domain.dto.SalesOrderPoolDto;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.service.ISalesOrderPoolRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -106,7 +107,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @RequiresPermissions("monthplan:SalesOrderPool:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(SalesOrderPool salesOrderPool) {
+    public AjaxResult save(SalesOrderPoolDto salesOrderPool) {
     	if (salesOrderPool.getId() == null) { // 新增直接返回
     		return AjaxResult.success();
     	}

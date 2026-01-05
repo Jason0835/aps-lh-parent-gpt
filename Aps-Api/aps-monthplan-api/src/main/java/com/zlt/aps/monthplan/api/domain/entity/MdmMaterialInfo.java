@@ -62,7 +62,7 @@ public class MdmMaterialInfo extends BaseEntity {
     /**
      * 结构
      */
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(maxLength = 20)
     @Excel(name = "ui.data.column.mdmMaterialInfo.structureName")
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")

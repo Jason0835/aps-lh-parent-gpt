@@ -32,12 +32,11 @@ public class OrderAllocationServiceImpl{
      * @param year 年份
      * @param month 月份
      * @param factoryCode 工厂代码
-     *              版本
+     * @param monthPlanVersion 需求版本
      */
     @Transactional(rollbackFor = Exception.class)
     public void allocateProductionByMonth(Integer year, Integer month, String factoryCode, String monthPlanVersion) throws Exception {
         // 1. 获取月计划版本
-        // String monthPlanVersion = getMonthPlanVersion(year, month, factoryCode);
         if (StringUtils.isBlank(monthPlanVersion)) {
             throw new RuntimeException("未找到对应的月计划版本");
         }
@@ -54,21 +53,6 @@ public class OrderAllocationServiceImpl{
 
         // 5. 分配生产量并批量更新
         allocateAndUpdateOrders(materialTotalQtyMap, groupedOrders);
-    }
-
-    /**
-     * 获取月计划版本
-     */
-    private String getMonthPlanVersion(Integer year, Integer month, String factoryCode) {
-        FactoryMonthPlanProductionFinalResult result = finalResultMapper.selectOne(
-                new LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult>()
-                        .select(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion)
-                        .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
-                        .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
-                        .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
-                        .last("LIMIT 1")
-        );
-        return result != null ? result.getMonthPlanVersion() : null;
     }
 
     /**

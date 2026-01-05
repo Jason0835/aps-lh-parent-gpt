@@ -139,7 +139,7 @@ public class TbrProductionContext extends Context {
         if (null == startDay || null == endDay) {
             return Collections.emptySet();
         }
-        if (startDay >= endDay) {
+        if (startDay > endDay) {
             return Collections.emptySet();
         }
         Set<String> enableSet = new HashSet<>();

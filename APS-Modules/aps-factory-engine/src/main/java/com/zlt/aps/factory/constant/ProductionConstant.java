@@ -98,4 +98,8 @@ public class ProductionConstant {
      * 新模具到货的模壳标准赋值 -99
      */
     public final static String NEW_MOULD_DELIVERY_SHELL = "-99";
+    /**
+     * 成型硫化配比，空值匹配
+     */
+    public final static String ALL_BRAND_CODE_MATCH = "**";
 }

@@ -1,10 +1,13 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
@@ -31,8 +34,12 @@ import com.ruoyi.common.exception.ServiceException;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class MdmSkuStructureRefServiceImpl extends AbstractDocService<MdmSkuStructureRef>  implements IMdmSkuStructureRefService {
+
+    private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MDM0134";
@@ -58,5 +65,17 @@ public class MdmSkuStructureRefServiceImpl extends AbstractDocService<MdmSkuStru
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "structureName"));
+    }
+
+    /**
+     * 更新结构到物料
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult updateStructureToMaterial(MdmSkuStructureRef queryVO) {
+        queryVO.setBaseVale(null);
+        mdmSkuStructureRefEntityMapper.updateStructureToMaterial(queryVO);
+        return AjaxResult.success();
     }
 }

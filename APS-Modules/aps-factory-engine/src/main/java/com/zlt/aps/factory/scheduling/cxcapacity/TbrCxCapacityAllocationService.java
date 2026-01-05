@@ -538,7 +538,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer leftOver = remainingDays - realAllocationDays;
         selectedCxMachine.setRemainingDays(leftOver);
         Integer startDay = selectedCxMachine.getAllocationStartDay();
-        CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
+        CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(addHelper);
         //TODO 对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
@@ -743,6 +743,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrProductionGroupLogRecorder.addCxLhGroupRatioEmptyLog(context));
             return Collections.emptyList();
         }
+        //机型为空值，表示所有机型匹配
+        structureLhRatioList.forEach(singleRatio -> {
+            if (StringUtils.isNotBlank(singleRatio.getCxMachineBrandCode())) {
+                return;
+            }
+            singleRatio.setCxMachineBrandCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
+        });
         //周期结构硫化配比
         List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
         Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
@@ -900,9 +907,11 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setBaseDataContainer(new BaseDataContainer());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        StringBuilder logBuilder = new StringBuilder();
-        context.setLogBuilder(logBuilder);
-        productionContext.setLogBuilder(logBuilder);
+        if (null == context.getLogBuilder()) {
+            StringBuilder logBuilder = new StringBuilder();
+            context.setLogBuilder(logBuilder);
+            productionContext.setLogBuilder(logBuilder);
+        }
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -923,9 +932,11 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        StringBuilder logBuilder = new StringBuilder();
-        context.setLogBuilder(logBuilder);
-        productionContext.setLogBuilder(logBuilder);
+        if (null == context.getLogBuilder()) {
+            StringBuilder logBuilder = new StringBuilder();
+            context.setLogBuilder(logBuilder);
+            productionContext.setLogBuilder(logBuilder);
+        }
         setProductionCycleInfo(productionContext);
         return productionContext;
     }

@@ -219,4 +219,19 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
     public TableDataInfo getStructureSelectList(MdmSkuStructureRef queryVO) {
         return iMdmSkuStructureRefService.getStructureSelectList(queryVO);
     }
+
+    /**
+     * 更新结构到物料表
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @RequiresPermissions("monthplan:mdmSkuStructureRef:updateStructure")
+    @ApiOperation("更新结构到物料表")
+    @PostMapping("/updateStructureToMaterial")
+    @ResponseBody
+    public AjaxResult updateStructureToMaterial(MdmSkuStructureRef queryVO) {
+        return iMdmSkuStructureRefService.updateStructureToMaterial(queryVO);
+    }
+
+
 }
