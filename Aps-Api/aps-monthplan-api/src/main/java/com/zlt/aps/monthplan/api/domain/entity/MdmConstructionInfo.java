@@ -288,11 +288,6 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "TIRE_BODY_CODE")
     private String tireBodyCode;
 
-    /** 胎侧SAP */
-//    @Excel(name = "ui.data.column.mdmConstructionInfo.sidewallSap")
-    @ApiModelProperty(value = "胎侧SAP", name = "sidewallSap")
-    @TableField(value = "SIDEWALL_SAP")
-    private String sidewallSap;
 
     /** 胎侧—BOM版本 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.sidewallVersion")
@@ -486,12 +481,6 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "BELT_CODE_RIGHT_CODE")
     private String beltCodeRightCode;
 
-    /** 2#钢带SAP */
-//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltSap2")
-    @ApiModelProperty(value = "2#钢带SAP", name = "beltSap2")
-    @TableField(value = "BELT_SAP2")
-    private String beltSap2;
-
     /** 2#钢带BOM版本 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.belt2Version")
     @ApiModelProperty(value = "2#钢带BOM版本", name = "belt2Version")
@@ -627,7 +616,7 @@ public class MdmConstructionInfo extends BaseEntity {
     /** 液压硫化时间(秒) */
     @Excel(name = "ui.data.column.mdmConstructionInfo.hydraulicPressureCuringTime")
     @ApiModelProperty(value = "液压硫化时间(秒)", name = "hydraulicPressureCuringTime")
-    @TableField(value = "HYDRAULIC_PRESSURE_CURING_TIME")
+    @TableField(value = "HY_PRESSURE_CURING_TIME")
     private Integer hydraulicPressureCuringTime;
 
     /** 模具型腔 */
