@@ -11,7 +11,6 @@ import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
-import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -68,7 +67,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //保存或是创建排产版本表记录
         saveProductionVersionRecord(productionContext);
         //开始初始化日志
-        String startInitLog = TbrProductionLogUtils.addStartInitLog(productionContext);
+        String startInitLog = TbrProductionInitLogRecorder.addStartInitLog(productionContext);
         log.info(startInitLog);
         //获取需求计划
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
@@ -113,11 +112,11 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         if (FactoryConstant.YES_VALUE.equalsIgnoreCase(paramConfiguration.getOpenPreemptionMouldCapacity())) {
             //TODO 模具产能预占计算
         }
-        String checkEndLog = TbrProductionLogUtils.addInitEndLog(productionContext);
+        String checkEndLog = TbrProductionInitLogRecorder.addInitEndLog(productionContext);
         log.info(checkEndLog);
         //保存初始化结果
         saveInitInfo(productionContext, requirePlanList);
-        String saveInitLog = TbrProductionLogUtils.addSaveInitDataLog(productionContext);
+        String saveInitLog = TbrProductionInitLogRecorder.addSaveInitDataLog(productionContext);
         log.info(saveInitLog);
     }
 
