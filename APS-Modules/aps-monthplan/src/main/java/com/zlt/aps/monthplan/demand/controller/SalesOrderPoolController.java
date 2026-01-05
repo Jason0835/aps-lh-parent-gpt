@@ -29,7 +29,9 @@ import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.domain.entity.DpNation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
@@ -68,6 +70,8 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     
 	@Autowired
 	private DpAreaEntityMapper dpAreaEntityMapper;
+	@Autowired
+	private DpNationEntityMapper dpNationEntityMapper;
 
     /**
      * 查询销售订单池列表
@@ -250,19 +254,22 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
      */
 	private List<SalesOrderPool> translationList(List<SalesOrderPool> resultList) {
 		// 加载区域
-		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
-		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(areaQueryWrapper);
+		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
 		JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
 		Map<String, String> areaMap = dpAreaList.stream()
 				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
+		// 加载国家地区
+		List<DpNation> dpNationList = dpNationEntityMapper.selectList(new LambdaQueryWrapper<>());
+		JsonI18nConvertUtils.conventJsonI18n(dpNationList, DpNation.class);
+		Map<String, String> nationMap = dpNationList.stream()
+				.collect(Collectors.toMap(DpNation::getNationCode, DpNation::getNationNameI18n));
 		for (SalesOrderPool item: resultList) {
 			String salNCode = item.getSalNCode();
 			String natCode = item.getNatCode();
 			String area = item.getArea();
-			item.setSalNCode(areaMap.getOrDefault(salNCode, salNCode));
-			item.setNatCode(areaMap.getOrDefault(natCode, natCode));
-			item.setArea(areaMap.getOrDefault(area, area));
+			item.setSalNCode(nationMap.getOrDefault(salNCode, ""));
+			item.setNatCode(nationMap.getOrDefault(natCode, ""));
+			item.setArea(areaMap.getOrDefault(area, ""));
 			item.setUpdateTimeExport(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
 		}
 		return resultList;
