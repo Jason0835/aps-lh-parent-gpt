@@ -143,7 +143,7 @@ export default {
           prop: "cxMachineBrandCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           type: "select",
-          dictData: this.parentDict.type.biz_machine_brand,
+          dictData: this.parentDict.type.cx_machine_type_code,
 
         },
         {

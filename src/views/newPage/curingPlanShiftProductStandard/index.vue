@@ -143,7 +143,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          width: 180,
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -156,7 +156,7 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300
+          width:350
         },
         {
           prop: "classCapacity",
