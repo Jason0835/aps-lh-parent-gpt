@@ -391,6 +391,11 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         List<DpDemandPlan> demandPlans = new ArrayList<>();
         // 处理净需求
         if (CollectionUtils.isNotEmpty(netDemands)) {
+            netDemands.forEach(netDemand -> {
+                netDemand.setMonthPlanVersion(predictionVersion);
+                netDemand.setYear(yearMonth.getYear());
+                netDemand.setMonth(yearMonth.getMonthValue());
+            });
             demandPlans.addAll(netDemands);
         }
         // 处理供应链订单
