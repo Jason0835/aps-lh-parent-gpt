@@ -189,6 +189,7 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("trialStatus")), "TRIAL_STATUS", queryVO.getFieldValueByFieldName("trialStatus"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("urgencyType")), "URGENCY_TYPE", queryVO.getFieldValueByFieldName("urgencyType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planDate")), "PLAN_DATE", queryVO.getFieldValueByFieldName("planDate"));
 
         queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planDateStartTime")), "PLAN_DATE", queryVO.getFieldValueByFieldName("planDateStartTime"));
         queryWrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planDateEndTime")), "PLAN_DATE", queryVO.getFieldValueByFieldName("planDateEndTime"));

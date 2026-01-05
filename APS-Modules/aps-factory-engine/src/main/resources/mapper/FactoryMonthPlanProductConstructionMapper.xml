@@ -9,6 +9,7 @@
                mpc.SPEC_CODE,
                mpc.EMBRYO_CODE,
                mpc.MOULD_METHOD,
+               mpc.IS_ZERO_RACK,
                mpc.CURING_TIME,
                mpc.CURING_TIME2,
                mpc.MOULD_CAVITY,

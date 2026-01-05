@@ -26,7 +26,7 @@
         SELECT STRUCTURE_NAME,
                CX_MACHINE_BRAND_CODE,
                LH_MACHINE_MAX_QTY,
-               MAX_EMBRYO_QTY,
+               MAX_EMBRYO_QTY
           FROM t_mdm_structure_lh_ratio
          WHERE IFNULL(IS_DELETE, 0) = 0
            AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -48,8 +48,8 @@
            AND IFNULL(msc.IS_DELETE, 0) = 0
          WHERE IFNULL(csc.IS_DELETE, 0) = 0
            AND csc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND csc.YEAR = #{year,jdbcType=DECIMAL}
-           AND csc.MONTH = #{month,jdbcType=DECIMAL}
+           AND msc.YEAR = #{year,jdbcType=DECIMAL}
+           AND msc.MONTH = #{month,jdbcType=DECIMAL}
     </select>
 
 </mapper>

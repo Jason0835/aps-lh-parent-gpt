@@ -146,7 +146,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 成型法
      */
-    @Excel(name = "ui.data.column.mdmProductConstruction.mouldMethod", dictType = "MACHINE_TYPE")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.mouldMethod", dictType = "MACHINE_TYPE")
     @ApiModelProperty(value = "成型法", name = "mouldMethod")
     @TableField(value = "MOULD_METHOD")
     private String mouldMethod;
@@ -154,7 +154,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 规格代号
      */
-    @Excel(name = "ui.data.column.monthPlanMouldingDayResult.specCode")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.specCode")
     @ApiModelProperty(value = "规格代号", name = "specCode")
     @TableField(value = "SPEC_CODE")
     private String specCode;
@@ -162,11 +162,19 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 生胎代码
      */
-    @Excel(name = "ui.data.column.monthPlanMouldingDayResult.embryoCode")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.embryoCode")
     @ApiModelProperty(value = "生胎代码", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;
 
+
+    /**
+     * 是否零度材料
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.isZeroRack")
+    @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
+    @TableField(value = "IS_ZERO_RACK")
+    private String isZeroRack;
     /**
      * 全规格代号信息 包含规格代号及对应的成型法
      */

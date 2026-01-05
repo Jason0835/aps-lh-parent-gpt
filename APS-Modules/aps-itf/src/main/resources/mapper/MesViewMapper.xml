@@ -7,7 +7,7 @@
         SELECT STOCK_DATE,
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
-        STOCK_NUM,
+        STOCK_NUM AS STOCK_QTY,
         WEEK_YEAR,
         IS_UNIFORMITY,
         IS_DYNAMIC_BALANCE,

@@ -44,6 +44,10 @@ public enum MonthPlanEnums {
      */
     TURN_OVER_DAYS("SYS0102003", "周转天数(全局参数) ,用于供应链订单池备库上限的计算"),
     /**
+     * SYS0102004 从供应链同步的订单物料信息只需要指定前缀的
+     */
+    SCM_ORDER_MATRAL_CODE_PREFIX("SYS0102004", "从供应链同步的订单物料信息只需要符合指定前缀的数据"),
+    /**
      *  SYS0103001 最小投产量
      */
     MIN_PRODUCTION_QTY("SYS0103001", "最小投产量"),
@@ -120,13 +124,17 @@ public enum MonthPlanEnums {
      */
     NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER("SYS0204008", "常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾"),
     /**
-     * SYS0209003 超期常规储备排产月数
+     * SYS0101001 超期常规储备排产月数
      */
     OVERDUE_REGULAR("SYS0101001", "单位：月,超期常规储备排产月数"),
     /**
-     * SYS0209004 超期周期储备排产月数
+     * SYS0101002 超期周期储备排产月数
      */
     OVERDUE_CYCLE("SYS0101002", "单位：月,超期周期储备排产月数"),
+    /**
+     * SYS0101003 超期胎预警月份数
+     */
+    OVERDUE_TIRE_WARNING("SYS0101003", "单位：月，超期胎预警月份数"),
     ;
 
     private final String code;

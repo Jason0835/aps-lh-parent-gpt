@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import net.bytebuddy.implementation.bind.annotation.FieldValue;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -43,9 +42,9 @@ public class FactoryMonthPlanProdFinalQueryDto implements Serializable {
     private String factoryCode;
 
     /**
-     * 胎别
+     * 产品品类
      */
-    @ApiModelProperty(value = "胎别", name = "productTypeCode")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     private String productTypeCode;
 
     /**

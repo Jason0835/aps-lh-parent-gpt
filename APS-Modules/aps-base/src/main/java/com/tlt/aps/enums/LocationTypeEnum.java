@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 库位列表枚举类
+ * 库位列表枚举类，字典：biz_stor_type
  *
  * @author ZLT
  * 20250217

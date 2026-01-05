@@ -14,7 +14,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
         <if test="mesMaterialCode != null and mesMaterialCode != ''">AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
-        <if test="structureName != null and structureName != ''">AND STRUCTURE_NAME = #{structureName}</if>
+        <if test="structureName != null and structureName != ''">AND STRUCTURE_NAME like
+            concat(concat('%',#{structureName}), '%')
+        </if>
         GROUP BY STRUCTURE_NAME
     </select>
 

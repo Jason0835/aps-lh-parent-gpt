@@ -51,7 +51,7 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
             tbrProductionInitService.run(context, userObj);
             context.setInsertNewProductionVersion(Boolean.FALSE);
             //排结构、排模具
-//            tbrCxCapacityAllocationService.run(context, userObj);
+            tbrCxCapacityAllocationService.run(context, userObj);
             //保存日志
             saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
         }

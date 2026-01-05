@@ -26,6 +26,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
@@ -251,8 +252,10 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 		// 加载区域
 		LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
 		areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-		Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
-				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(areaQueryWrapper);
+		JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
+		Map<String, String> areaMap = dpAreaList.stream()
+				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
 		for (SalesOrderPool item: resultList) {
 			String salNCode = item.getSalNCode();
 			String natCode = item.getNatCode();
