@@ -91,6 +91,17 @@ export default {
           disabled: true,
         },
         {
+          prop: "productTypeName",
+          disabled: true,
+          label: this.$t("ui.data.column.monthplan.productType"),
+        },
+        // {
+        //   prop: "productCategory",
+        //   disabled: true,
+        //   label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+        //   dictData: this.parentDict.type.product_category,
+        // },
+        {
           label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
           prop: "materialCategory",
           maxlength: "50",
@@ -231,6 +242,7 @@ export default {
           ...data,
         };
         this.form.cantProduce = data.cantProduce + "";
+
       } else {
         this.form = {
           classShift: "2",

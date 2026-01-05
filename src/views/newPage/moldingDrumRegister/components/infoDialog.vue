@@ -264,7 +264,7 @@ export default {
           render: (form) => {
             return (
               <formingCapacitySelect
-                factoryCode={form.usedType}
+                factoryCode={form.factoryCode}
                 key={form.usedType}
                 v-model={form.usedType}
               />

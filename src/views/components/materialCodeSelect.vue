@@ -127,12 +127,12 @@ export default {
           width: 120,
           label: this.$t("ui.data.column.scheduleAdjust.proSize"),
         },
-        {
-          prop: "ability",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.lean.productinfo.ability"),
-        },
+        // {
+        //   prop: "ability",
+        //   align: "center",
+        //   width: 120,
+        //   label: this.$t("ui.data.column.lean.productinfo.ability"),
+        // },
       ];
       if (this.multiple) {
         list.unshift({

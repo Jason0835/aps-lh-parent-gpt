@@ -221,7 +221,7 @@ export default {
     },
 
     handleShow() {
-      console.log("sss");
+      console.log(this.factoryCode);
       let defaultParams = {
         factoryCode: this.factoryCode ? this.factoryCode : "116",
       };

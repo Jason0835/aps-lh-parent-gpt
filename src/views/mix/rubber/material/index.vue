@@ -210,6 +210,12 @@ export default {
           },
         },
         {
+          prop: "productTypeName",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.column.monthplan.productType"),
+        },
+        {
           prop: "productCategory",
           label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
           formatter: (row, column, value) => {
@@ -343,12 +349,7 @@ export default {
           width: 120,
           label: this.$t("ui.data.rubberMaterial.sectionWidth"),
         },
-        {
-          prop: "productTypeName",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.monthplan.productType"),
-        },
+
         {
           prop: "remark",
           halign: "center",
