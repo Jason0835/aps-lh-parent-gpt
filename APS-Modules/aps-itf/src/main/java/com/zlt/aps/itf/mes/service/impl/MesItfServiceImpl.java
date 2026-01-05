@@ -297,7 +297,7 @@ public class MesItfServiceImpl implements MesItfService {
                     }
                     int week, year;
                     try {
-                        week = Integer.parseInt(weekYear.substring(2));
+                        week = Integer.parseInt(weekYear.substring(0, 2));
                         year = Integer.parseInt("20" + weekYear.substring(2, 4));
                     } catch (NumberFormatException e) {
                         log.error("解析年周号失败：{}", weekYear);
