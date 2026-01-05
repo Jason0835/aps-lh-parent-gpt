@@ -220,10 +220,13 @@ public class StockAllocationHelper {
    */
   private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
+    int stockQty = stockInfos.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
-        stockInfos
+        stockInfos,
+        stockQty
     );
+
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
       DpOrderOffsetDetail allocation = allocateStockForSingleOrder(monthPlanVersion,yearMonth,order,context);
@@ -235,7 +238,8 @@ public class StockAllocationHelper {
   private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Integer plannedSurplus, List<SalesOrderPool> sortedOrders) {
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
-        null
+        null,
+        0
     );
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
@@ -251,7 +255,6 @@ public class StockAllocationHelper {
    * 为单个订单分配库存
    */
   private static DpOrderOffsetDetail allocateStockForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    int stockQty = context.getStockInfos().stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
     // 5、库存冲减后，继续扣减月底计划余量部分
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
     // 库存分配量
@@ -266,7 +269,7 @@ public class StockAllocationHelper {
       produceQtyDue = produceQtyDue - plannedSurplus;
     }
     context.setPlannedSurplus(plannedSurplus);
-    return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
+    return buildAllocation(order, monthPlanVersion,yearMonth,context.stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
@@ -281,7 +284,7 @@ public class StockAllocationHelper {
       produceQtyDue = produceQtyDue - plannedSurplus;
     }
     context.setPlannedSurplus(plannedSurplus);
-    return buildAllocation(order, monthPlanVersion,yearMonth,0,context.plannedSurplus, 0,produceQtyDue);
+    return buildAllocation(order, monthPlanVersion,yearMonth,context.stockQty,context.plannedSurplus, 0,produceQtyDue);
   }
 
   /**
@@ -526,10 +529,12 @@ public class StockAllocationHelper {
   private static class StockAllocationContext {
     private Integer plannedSurplus;
     private List<MdmProductStock> stockInfos;
+    private Integer stockQty;
 
-    public StockAllocationContext(Integer plannedSurplus,List<MdmProductStock> stockInfos) {
+    public StockAllocationContext(Integer plannedSurplus,List<MdmProductStock> stockInfos,Integer stockQty) {
       this.plannedSurplus = plannedSurplus;
       this.stockInfos = stockInfos;
+      this.stockQty = stockQty;
     }
   }
 
