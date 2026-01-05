@@ -459,6 +459,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 skuScheduleCategoryList.add(skuScheduleCategory);
             }
             if (CollectionUtils.isNotEmpty(skuScheduleCategoryList)) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", factoryCode);
+                baseDao.deleteByMap(MdmSkuScheduleCategory.class, map);
                 baseDao.saveBatch(skuScheduleCategoryList);
             }
         }
