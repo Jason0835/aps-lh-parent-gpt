@@ -99,6 +99,6 @@ public interface IMdmSkuStructureRefRemoteService {
      * @return 结果
      */
     @ApiOperation("更新结构到物料表")
-    @PostMapping("/relation/updateStructureToMaterial")
+    @PostMapping("/mdmSkuStructureRef/updateStructureToMaterial")
     public AjaxResult updateStructureToMaterial(@RequestBody MdmSkuStructureRef queryVO);
 }
