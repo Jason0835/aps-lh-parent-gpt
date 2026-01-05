@@ -184,7 +184,10 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     protected List<MdmSkuLhCapacity> listExportData(MdmSkuLhCapacity obj) {
         QueryWrapper<MdmSkuLhCapacity> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MdmSkuLhCapacity> resultList = entityMapper.selectList(wrapper);
+        // 计算APS日硫化量
+        calculateApsCapacity(resultList);
+        return resultList;
     }
 
     @Override
