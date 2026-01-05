@@ -593,8 +593,9 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             return Collections.emptyList();
         }
         List<DpDemandPlan> list = Lists.newArrayList();
-        Map<String,List<DpDemandPlan>>  mergedDemandPlanMap = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
-        mergedDemandPlanMap.forEach((groupKey, groupPlans) -> {
+        Set<String>  groupKeys = demandPlans.stream().map(DpDemandPlan::getGroupKey).collect(Collectors.toSet());
+        groupKeys.forEach(groupKey -> {
+            List<DpDemandPlan> groupPlans = demandPlans.stream().filter(demandPlan -> groupKey.equals(demandPlan.getGroupKey())).collect(Collectors.toList());
             // 获取基础模板（第一个元素）
             DpDemandPlan template = groupPlans.get(0);
             if(!skuMap.containsKey(template.getMaterialCode())) {
@@ -608,7 +609,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 mdmMonthSurplusMap,
                 productionTypeMap,monthlySaleQty));
         });
-        log.info("mergedDemandPlanMap:{}",mergedDemandPlanMap.keySet());
+        log.info("groupKeys:{}",groupKeys);
         return list;
     }
 

@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -758,8 +759,9 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             return Collections.emptyList();
         }
         List<DpDemandPlan> list = Lists.newArrayList();
-        Map<String,List<DpDemandPlan>>  mergedDemandPlanMap = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
-        mergedDemandPlanMap.forEach((groupKey, groupPlans) -> {
+        Set<String> groupKeys = demandPlans.stream().map(DpDemandPlan::getGroupKey).collect(Collectors.toSet());
+        groupKeys.forEach(groupKey -> {
+            List<DpDemandPlan> groupPlans = demandPlans.stream().filter(demandPlan -> groupKey.equals(demandPlan.getGroupKey())).collect(Collectors.toList());
             // 获取基础模板（第一个元素）
             DpDemandPlan template = groupPlans.get(0);
             if(!skuMap.containsKey(template.getMaterialCode())) {
@@ -773,6 +775,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
                 mdmMonthSurplusMap,
                 productionTypeMap,monthlySaleQty));
         });
+        log.info("groupKeys:{}",groupKeys);
         return list;
     }
 
