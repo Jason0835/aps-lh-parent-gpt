@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -136,6 +137,7 @@ public class ProductionPlanGroupInfo {
         groupInfoMap.forEach((structureName, groupInfo) -> {
             MonthPlanStructureLhRatioVo ratioInfo = minLhRatioMap.get(structureName);
             if (null == ratioInfo) {
+                TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(context, structureName);
                 return;
             }
             groupInfo.setMinLhMachineCount(ratioInfo.getLhMachineMaxQty());

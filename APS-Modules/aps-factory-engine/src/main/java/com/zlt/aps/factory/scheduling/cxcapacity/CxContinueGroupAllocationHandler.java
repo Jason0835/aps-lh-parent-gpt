@@ -47,6 +47,7 @@ public class CxContinueGroupAllocationHandler {
      */
     public static List<CxMachineAllocationPlanHelper> allocationContinueAndProductionContinue(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
         if (CollectionUtils.isEmpty(allContinueInfo)) {
+            log.info(TbrProductionGroupLogRecorder.addContinueSkuNoContinueGroupProductionLog(context));
             return Collections.emptyList();
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;

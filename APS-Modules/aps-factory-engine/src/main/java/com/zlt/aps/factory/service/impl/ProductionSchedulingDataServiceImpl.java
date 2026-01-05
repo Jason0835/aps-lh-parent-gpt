@@ -14,6 +14,7 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
@@ -27,6 +28,7 @@ import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -44,6 +46,7 @@ import java.util.stream.Collectors;
  * @author ZLT
  * @date 20251208
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductionSchedulingDataServiceImpl implements ProductionSchedulingDataService {
@@ -254,6 +257,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         List<CxMachineBaseInfoVo> cxMachineInfoList = factoryMonthPlanCxInfoMapper.getMachineBaseInfo(factoryCode);
         if (CollectionUtils.isEmpty(cxMachineInfoList)) {
+            log.info(TbrProductionGroupLogRecorder.addCxMachineInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
@@ -603,6 +607,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //获取月计划-成型维修停机信息
         List<CxDevicePlanShutInfoVo> cxStopList = factoryMonthPlanCxInfoMapper.getDevicePlanShutInfo(factoryCode, productionStartDate, productionEndDate);
         if (CollectionUtils.isEmpty(cxStopList)) {
+            log.info(TbrProductionGroupLogRecorder.addCxMachineMaintenanceInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         //按成型机分组
@@ -633,6 +638,10 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
      * @param cxMachineInfo 成型机信息
      */
     private void setCxMachineDayInfo(Map<String, CxDevicePlanShutInfoHelper> cxStopInfo, Context context, CxMachineBaseInfoVo cxMachineInfo) {
+        //成型硫化配比信息--为后续准备
+        cxMachineInfo.setCxLhRatioMap(new HashMap<>());
+        cxMachineInfo.setAllocationList(new ArrayList<>());
+        //成型停产日
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (StringUtils.isBlank(cxMachineCode)) {
             return;
