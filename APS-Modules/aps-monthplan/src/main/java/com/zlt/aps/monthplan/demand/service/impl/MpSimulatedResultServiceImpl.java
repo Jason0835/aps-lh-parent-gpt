@@ -870,7 +870,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             return BigDecimal.ZERO.intValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
-        return finishedProductStocks.stream().mapToInt(MdmProductStock::getStockQty).sum();
+        return finishedProductStocks.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     }
 
     private int calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
