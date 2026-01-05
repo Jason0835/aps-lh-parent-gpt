@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.bill.common.service.IDocService;
 /**
@@ -16,6 +17,13 @@ import com.zlt.bill.common.service.IDocService;
  *     修 改 人：zlt
  *     修改内容：...
  */
-public interface IMdmSkuStructureRefService  extends IDocService<MdmSkuStructureRef>{
+public interface IMdmSkuStructureRefService  extends IDocService<MdmSkuStructureRef> {
+
+    /**
+     * 更新结构到物料
+     * @param queryVO
+     * @return
+     */
+    AjaxResult updateStructureToMaterial(MdmSkuStructureRef queryVO);
 
 }

@@ -38,4 +38,11 @@ public interface MdmSkuStructureRefEntityMapper extends CommBaseMapper<MdmSkuStr
      * @return 结果
      */
     List<MdmSkuStructureRef> getMdmSkuStructureRefList(@Param("ew") QueryWrapper<MdmSkuStructureRef> queryWrapper);
+
+    /**
+     * 更新结构到物料
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    int updateStructureToMaterial(MdmSkuStructureRef queryVO);
 }

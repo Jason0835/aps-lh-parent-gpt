@@ -92,4 +92,13 @@ public interface IMdmSkuStructureRefRemoteService {
     @ApiOperation("查询结构选择列表")
     @PostMapping("/mdmSkuStructureRef/getStructureSelectList")
     public TableDataInfo getStructureSelectList(@RequestBody MdmSkuStructureRef queryVO);
+
+    /**
+     * 更新结构到物料表
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新结构到物料表")
+    @PostMapping("/relation/updateStructureToMaterial")
+    public AjaxResult updateStructureToMaterial(@RequestBody MdmSkuStructureRef queryVO);
 }
