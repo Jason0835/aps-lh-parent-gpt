@@ -17,7 +17,7 @@ import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
-import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
+import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
@@ -110,8 +110,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IFactoryParamService factoryParamService;
     // 物料信息
     private final IMdmMaterialInfoService materialInfoService;
-    // 历史销售记录
-    private final IMpHistorySaleRecordService mpHistorySaleRecordService;
+    // 月均销量
+    private final IMpMonthlySaleQtyService mpMonthlySaleQtyService;
 
     @Override
     protected String getDocTypeCode() {
@@ -304,6 +304,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
 
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
+            if(CollectionUtils.isNotEmpty(finishedProductStocks)){
+                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
+            }
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
@@ -473,7 +476,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
 
     private Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode() {
-        return mpHistorySaleRecordService.calculateMonthSaleQty(6);
+        return  this.mpMonthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
     }
 
     /**
@@ -553,7 +556,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
-        mergedPlan.setProductionType(productionTypeMap.getOrDefault(mergedPlan.getGroupKey(),StringUtils.EMPTY));
+        mergedPlan.setProductionType(productionTypeMap.getOrDefault(mergedPlan.getMaterialCode(),StringUtils.EMPTY));
     }
 
     /**
@@ -644,7 +647,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         calculateDerivedQuantities(demandPlan, statistics);
 
         // 设置生产和优先级标识
-        setProductionAndPriorityFlags(demandPlan, groupPlans, minProductionQty, statistics.totalNetQty);
+        setProductionAndPriorityFlags(demandPlan, minProductionQty, statistics.totalNetQty);
     }
 
 
@@ -671,6 +674,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
+        demandPlan.setScmPriority(supplyOrder.getOrderType());
         demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.intValue() : supplyOrder.getQty());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
@@ -832,18 +836,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private void setProductionAndPriorityFlags(
         DpDemandPlan demandPlan,
-        List<DpDemandPlan> groupPlans,
         int minProductionQty,
         long totalNetQty) {
 
         // 生产标识
         demandPlan.setIsProduction(YesOrNoEnum.YES.getCode());
-
         // 供应链优先级
-        if (groupPlans.size() > 1) {
-            demandPlan.setScmPriority(StringUtils.EMPTY);
-        }
-
+        demandPlan.setScmPriority(YesOrNoEnum.NO.getCode());
         // 是否达到最小生产量
         demandPlan.setIsReachMinProductionQty(
             totalNetQty >= minProductionQty ?
