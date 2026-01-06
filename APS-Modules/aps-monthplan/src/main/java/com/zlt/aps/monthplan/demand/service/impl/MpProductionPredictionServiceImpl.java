@@ -668,8 +668,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
         // 设置基本数量
         demandPlan.setOrderQty(statistics.totalOrderQty);
-        demandPlan.setNetQty(statistics.totalNetQty);
-
         // 设置优先级相关数量
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
@@ -1075,9 +1073,10 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private void calculateDerivedQuantities(DpDemandPlan demandPlan, QuantityStatistics statistics) {
         // (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
         demandPlan.setPostponeNetQty(statistics.heightQty + statistics.midQty + statistics.postponeQty);
-
         // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
         demandPlan.setUnPostponeNetQty(statistics.heightQty + statistics.midQty);
+        // 实单高优先级+实单中优先级+周期排产储备
+        demandPlan.setNetQty(statistics.heightQty + statistics.midQty + statistics.cycleReserveQty);
     }
 
     /**
