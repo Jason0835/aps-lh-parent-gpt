@@ -644,7 +644,7 @@ public class StockAllocationHelper {
           String transformed = stock.getWeekYear().substring(2) + stock.getWeekYear().substring(0,2);
           int stockWeekYear = Integer.parseInt(transformed);
           stock.setStockWeekYear(stockWeekYear);
-          return stockWeekYear < orderWeekYear;
+          return stockWeekYear >= orderWeekYear;
         })
         // 收集为列表
         .collect(Collectors.toList());
