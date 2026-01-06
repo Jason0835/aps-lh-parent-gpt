@@ -72,11 +72,20 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     @Autowired
     private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
 
-    // 常量定义
+    /**
+     * redis 锁前缀
+     */
     private static final String LOCK_PREFIX = "CREATE_RAW_MATERIAL_REQUIRE_";
-    private static final int EUDR_WEEK_THRESHOLD = 3425;
-    private static final long LOCK_TIMEOUT = 300; // 5分钟
-    private static final int BATCH_SIZE = 1000; // 批量处理大小
+
+    /**
+     * redis 锁超时时间
+     */
+    private static final long LOCK_TIMEOUT = 300;
+
+    /**
+     * 批量插入条数
+     */
+    private static final int BATCH_SIZE = 1000;
 
     @Override
     protected String getDocTypeCode() {
@@ -104,7 +113,6 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         // 唯一校验字段
         return Collections.emptyList();
     }
-
 
     @Override
     @Transactional(rollbackFor = Exception.class)

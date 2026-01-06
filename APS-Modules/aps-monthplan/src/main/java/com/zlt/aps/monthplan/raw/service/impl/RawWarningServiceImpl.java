@@ -48,7 +48,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private static final String WARNING_PREFIX = "raw.warning.";
     // 日期格式化器
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月");
-    private static final DateTimeFormatter WEEK_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月第WW周");
+    private static final DateTimeFormatter WEEK_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月第W周");
 
     /**
      * 执行用量偏差预警
