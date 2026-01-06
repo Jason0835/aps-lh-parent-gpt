@@ -80,10 +80,17 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
 
     private void translationList(List<SupplyOrderPool> rows) {
         // 加载区域
-        LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
-        areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-        Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
+        LambdaQueryWrapper<DpArea> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<DpArea> areas = dpAreaEntityMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(areas)) {
+            return;
+        }
+        Map<String, String> areaMap = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark()))
             .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+        if(CollectionUtils.isEmpty(areaMap)) {
+            return;
+        }
         for (SupplyOrderPool item: rows) {
             String area = item.getSaleArea();
             if(StringUtils.isBlank(area)) {
