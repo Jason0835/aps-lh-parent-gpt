@@ -31,13 +31,4 @@ public interface IRawWarningService extends IService<RawWarningRecord> {
     List<RawWarningRecord> queryWarningRecords(String factoryCode, String warningType,
                                                Date startDate, Date endDate, String status);
 
-    /**
-     * 处理预警记录
-     */
-    AjaxResult handleWarning(Long id, String handler, String opinion);
-
-    /**
-     * 获取预警统计
-     */
-    Map<String, Object> getWarningStatistics(String factoryCode, String warningType, Integer days);
 }
