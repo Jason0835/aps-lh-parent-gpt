@@ -45,6 +45,16 @@ public class MpWeekRollAdjustUIController extends BaseController {
     }
 
     /**
+     * 自动调整
+     */
+    @ApiOperation("自动调整")
+    @PostMapping("/autoAdjust")
+    @ResponseBody
+    public AjaxResult autoAdjust(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        return mpWeekRollAdjustRemoteService.autoAdjust(weekRollAdjustDTO);
+    }
+
+    /**
      * 确认调整结果
      */
     @ApiOperation("确认调整结果")

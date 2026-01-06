@@ -33,6 +33,13 @@ public interface IMpWeekRollAdjustRemoteService {
     TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
 
     /**
+     * 自动调整
+     */
+    @ApiOperation("自动调整")
+    @PostMapping("/mpWeekRollAdjust/autoAdjust")
+    AjaxResult autoAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
+
+    /**
      * 确认调整结果
      */
     @ApiOperation("确认调整结果")
