@@ -19,9 +19,9 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain @click="mesCap">{{
+        <!-- <el-button type="primary" plain @click="mesCap">{{
           $t("ui.data.column.moldLedger.mes")
-        }}</el-button>
+        }}</el-button> -->
         <el-button
           v-hasPermi="['monthplan:mdmBomInfo:import']"
           @click="$refs.tltUpload.handleImport()"

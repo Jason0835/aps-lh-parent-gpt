@@ -26,14 +26,14 @@
           v-hasPermi="['monthplan:ProductMoldingLimit:add']"
           >{{ $t("新增") }}</el-button
         > -->
-          <el-button
+          <!-- <el-button
           type="primary"
           plain
             :loading="createLoading"
           v-hasPermi="['maindata:rawMaterialOutboundRecord:catch']"
           @click="mesBtn"
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['maindata:rawMaterialOutboundRecord:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -78,7 +78,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "RawMaterialRequirement‌",
+  name: "RawMaterialBatchConfig",
   components: {
     tltUpload,
     infoDialog,

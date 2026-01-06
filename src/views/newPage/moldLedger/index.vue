@@ -19,13 +19,13 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
             v-hasPermi="['maindata:mdmModelInfo:mesCapture']"
           plain
           @click="capture"
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
-        >
+        > -->
         <el-button
           type="primary"
           plain

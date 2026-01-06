@@ -19,12 +19,12 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
           plain
 
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
-        >
+        > -->
         <el-button
           type="primary"
           plain
@@ -82,7 +82,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "RawMaterialRequirement‌",
+  name: "SpecialRawMaterialConfig",
   components: {
     tltUpload,
     infoDialog,

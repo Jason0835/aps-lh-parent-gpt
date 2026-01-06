@@ -40,3 +40,12 @@ export function addAdjust(query) {
     data: query
   })
 }
+
+//自动调整
+export function autoAdjust(query) {
+  return request({
+    url: '/monthplan/mpWeekRollAdjust/autoAdjust',
+    method: 'post',
+    data: query
+  })
+}

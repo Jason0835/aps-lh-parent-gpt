@@ -44,7 +44,7 @@
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
-      <template slot="headerRight">
+      <!-- <template slot="headerRight">
         <span class="stat-info">
           <span
             >排产SAP个数:
@@ -70,7 +70,7 @@
             >备货量: <span class="stat-value">{{ stat.stockNum }}</span></span
           >
         </span>
-      </template>
+      </template> -->
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
@@ -96,6 +96,7 @@ import {
   getVersionList,
   statistics,
 } from "@/api/monthplan/mouldingDayResult";
+import { listProductionPlan } from "@/api/monthplan/monthlyProductionPlan";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -109,14 +110,7 @@ export default {
     infoDialog,
     specDialog,
   },
-  dicts: [
-    "biz_factory_name",
-    "biz_construction_stage",
-    "biz_stor_type",
-    "biz_yes_no",
-    "biz_channel_type",
-    "biz_brand_type",
-  ],
+  dicts: ["biz_factory_name", "biz_product_type", "biz_brand_type",'biz_plan_type','biz_construction_stage'],
   provide() {
     return {
       parentDict: this.dict,
@@ -146,66 +140,91 @@ export default {
   computed: {
     columns() {
       let columns = [
+        // {
+        //   prop: "productStatus",
+        //   label: this.$t("产品状态"),
+        //   width: 120,
+        // },
         {
-          label: this.$t("产品状态"),
-          prop: "productStatus",
-          minWidth: 100,
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          width: 180,
         },
         {
-          label: this.$t("产品结构"),
-          prop: "productStructure",
-          minWidth: 100,
+          label: this.$t("ui.data.column.monthplan.productType"),
+          prop: "productTypeCode",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
+          width: 120,
         },
         {
-          label: this.$t("主物料"),
-          prop: "mainMaterial",
-          minWidth: 100,
+          label: this.$t("ui.data.monthlyProductionPlan.planType"),
+          prop: "planType",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_plan_type, value);
+          },
+          width: 120,
         },
         {
-          label: this.$t("物料描述"),
-          prop: "materialDescription",
-          minWidth: 100,
+          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
+          prop: "constructionStage",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+          },
+          width: 120,
+        },
+
+        {
+          prop: "mainMaterialDesc",
+          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          width: 180,
         },
         {
-          label: this.$t("花纹"),
-          prop: "pattern",
-          minWidth: 100,
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width: 300,
         },
         {
-          label: this.$t("型腔"),
-          prop: "cavity",
-          minWidth: 100,
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.confMinProd.pattern"),
+          width: 120,
+        },
+
+        {
+          prop: "mouldCavityQty",
+          label: this.$t("ui.data.monthlyProductionPlan.mouldCavityQty"),
         },
         {
-          label: this.$t("活块"),
-          prop: "movingBlock",
-          minWidth: 100,
+          prop: "typeBlockQty",
+          label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
+          width: 120,
         },
         {
-          label: this.$t("净需求"),
-          prop: "netDemand",
-          minWidth: 100,
+          prop: "prodReqPlan",
+          label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
+          width: 120,
         },
         {
-          label: this.$t("高优先级"),
-          prop: "highPriority",
-          minWidth: 100,
+          prop: "heightQty",
+          label: this.$t("ui.data.DemandPlan.heightQty"),
+          width: 120,
         },
         {
-          label: this.$t("月均销量"),
-          prop: "monthlyAverageSales",
-          minWidth: 100,
+          prop: "averageQty",
+          label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
+          width: 120,
         },
         {
-          label: this.$t("库销比"),
           prop: "inventorySalesRatio",
-          minWidth: 100,
+          label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
+          width: 120,
         },
         {
-          label: this.$t("日硫化量"),
-          prop: "dailyVulcanization",
-          minWidth: 100,
-        }
+          prop: "dayVulcanizationQty",
+          label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
+          width: 120,
+        },
       ];
       if (this.dailyVisible) {
         const query = this.$route.query;
@@ -235,87 +254,73 @@ export default {
         //   }
 
         // } else {
-          //显示每日数据
-          // const date = moment(this.query.yearMonth);
-          // const year = date.year();
-          // const month = date.month() + 1;
-          const days = 31;
+        //显示每日数据
+        // const date = moment(this.query.yearMonth);
+        // const year = date.year();
+        // const month = date.month() + 1;
+        const days = 31;
 
-          for (let i = 0; i < days; i++) {
-            columns.push({
-              // label: `${i + 1}号`,
-              label: this.$t("ui.data.column.mouldingDayResult.day", {
-                day: i + 1,
-              }),
-              prop: `day${i + 1}`,
-              minWidth: "80px",
-              type: "number",
-            });
-          }
+        for (let i = 0; i < days; i++) {
+          columns.push({
+            // label: `${i + 1}号`,
+            label: this.$t("ui.data.column.mouldingDayResult.day", {
+              day: i + 1,
+            }),
+            prop: `day${i + 1}`,
+            minWidth: "80px",
+            type: "number",
+          });
+        }
         // }
       }
-      columns.push({
-        label: this.$t("ui.data.column.facMonthPlan.isImport"),
-        prop: "isImport",
-        align: "center",
-        formatter: (row) => {
-          return this.selectDictLabel(this.dict.type.biz_yes_no, row.isImport);
-        },
-      });
+      // columns.push({
+      //   label: this.$t("ui.data.column.facMonthPlan.isImport"),
+      //   prop: "isImport",
+      //   align: "center",
+      //   formatter: (row) => {
+      //     return this.selectDictLabel(this.dict.type.biz_yes_no, row.isImport);
+      //   },
+      // });
       return columns;
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          prop: "structureName",
+        },
+        {
+          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          prop: "mainMaterialDesc",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
+        },
+        {
+          label: this.$t("ui.data.column.confMinProd.pattern"),
+          prop: "mainPattern",
+        },
         // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.yearMonth"),
-        //   prop: "yearMonth",
-        //   type: "date",
-        //   dateType: "month",
-        //   valueFormat: "yyyy-MM",
-        //   clearable: false,
+        //   label: this.$t("产品状态"),
+        //   prop: "productStatus",
+        //   type: "select",
+        //   dictData: this.dict.type.biz_product_type,
+        // },
+        // {
+        //   label: this.$t("规格"),
+        //   prop: "materialDesc",
         // },
         {
-          label: this.$t("产品结构"),
-          prop: "productCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          prop: "materialCode",
         },
         {
-          label: this.$t("主物料"),
-          prop: "specCode",
-        },
-        {
-          label: this.$t("物料描述"),
-          prop: "embryoCode",
-        },
-        {
-          label: this.$t("花纹"),
-          prop: "productDesc",
-        },
-        {
-          prop: "locationType",
-          label: this.$t(
-            "产品状态"
-          ),
+          label: this.$t("ui.data.column.monthplan.productType"),
+          prop: "productTypeCode",
           type: "select",
-          dictData: this.dict.type.biz_stor_type,
+          dictData: this.dict.type.biz_product_type,
         },
-        {
-          label: this.$t("规格"),
-          prop: "channel",
-          type: "select",
-          dictData: this.dict.type.biz_channel_type,
-        },
-        {
-          label: this.$t("物料编码"),
-          prop: "brand",
-        },
-        {
-          label: this.$t("产品分类"),
-          prop: "specifications",
-        },
-        {
-          label: this.$t("备注"),
-          prop: "proSize",
-        }
       ];
     },
   },
@@ -394,7 +399,7 @@ export default {
 
     handleExport() {
       downloadLink(
-        "/monthplan/mouldingDayResult/export",
+        "/monthplan/factoryMonthPlanMouldDayResult/export",
         this.formatParams(false)
       );
     },
@@ -432,6 +437,12 @@ export default {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth = undefined;
+      }
 
       if (params.createTime && params.createTime[0]) {
         params.createTimeStart = params.createTime[0];
@@ -445,68 +456,10 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const mockData = [
-  {
-    // 基础信息字段
-    productStatus: "正规",
-    productStructure: "385/65R22.5",
-    mainMaterial: "24PR JT560 BL4EJY",
-    materialDescription: "24PR JT560 BL4EJY",
-    pattern: "JT560",
-    cavity: "8",
-    movingBlock: "8",
-    
-    // 需求相关字段
-    netDemand: "150",
-    highPriority: "50",
-    monthlyAverageSales: "",
-    inventorySalesRatio: "0.5",
-    dailyVulcanization: "46",
-    
-    // 每日数据字段（1-31号）
-    day1: "",
-    day2: "",
-    day3: "",
-    day4: "",
-    day5: "",
-    day6: "",
-    day7: "",
-    day8: "",
-    day9: "",
-    day10: "",
-    day11: "",
-    day12: "",
-    day13: "",
-    day14: "",
-    day15: "",
-    day16: "",
-    day17: "",
-    day18: "",
-    day19: "",
-    day20: "",
-    day21: "",
-    day22: "",
-    day23: "",
-    day24: "",
-    day25: "",
-    day26: "",
-    day27: "",
-    day28: "",
-    day29: "",
-    day30: "",
-    day31: "",
-    
-    // 系统字段
-    isImport: "0"
-  }
-];
-this.data = mockData;
-        this.page.total = 1;
-        // this.statistics(this.formatParams(false));
-        // const data = await listMouldingDayResult(this.formatParams());
-        // console.log(data);
-        // this.data = data.rows;
-        // this.page.total = data.total;
+        const data = await listProductionPlan(this.formatParams());
+        console.log(data);
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {
@@ -552,19 +505,17 @@ this.data = mockData;
     },
   },
   created() {
-    // const date = moment();
-    // let defaultParams = {
-    //   year: date.format("yyyy"),
-    //   month: date.format("MM"),
-    // };
-    // this.search = {
-    //   ...defaultParams,
-    // };
-    // this.query = {
-    //   ...defaultParams,
-    // };
-    if (this.$route.params.id) {
-      this.productionVersion = this.$route.params.id;
+    console.log(this.$route);
+    if (this.$route.query) {
+      let defaultParams = {
+       ...this.$route.query
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
     }
   },
   activated() {

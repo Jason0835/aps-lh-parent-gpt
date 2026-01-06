@@ -595,10 +595,12 @@ export default {
       });
     },
     handleRouterProductionVersions(row) {
+
       let query = {
         yearMonth: `${row.year}-${row.month}`,
         factoryCode: row.factoryCode,
         monthPlanVersion: row.monthPlanVersion,
+        productionStVersion:row.productionVersion
       };
       if (row.productionStartDate) {
         query.productionStartDate = row.productionStartDate;

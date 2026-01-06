@@ -90,6 +90,7 @@ import {
   getAdjustDetailList,
   listOutsideStructure,
   confirmAdjust,
+  autoAdjust
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -512,11 +513,32 @@ export default {
       //   this.loading = false;
       // }, 300);
     },
-    handShowResult() {
+  async  handShowResult() {
       this.show = false;
-      setTimeout(() => {
+      this.loading = true;
+      try{
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        let res=await autoAdjust(params)
+        console.log(res)
         this.show = true;
-      }, 1000);
+        this.loading = false;
+      }catch(err){
+        this.show = true;
+        this.loading = false;
+      }
+
+      // setTimeout(() => {
+      //   this.show = true;
+      // }, 1000);
       // this.$router.push("/new/rollingCycleResult");
       // // if (this.$refs.resultRef) {
       // //   this.$refs.resultRef.show(true);
@@ -633,7 +655,6 @@ export default {
         if (this.activeName == "second") {
           data = await listOutsideStructure(this.formatParams());
         }
-
         this.data = data.rows;
         this.page.total = data.total;
         this.show = true;
