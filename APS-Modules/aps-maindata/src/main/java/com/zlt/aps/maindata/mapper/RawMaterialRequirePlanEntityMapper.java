@@ -4,6 +4,9 @@ package com.zlt.aps.maindata.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -20,5 +23,12 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface RawMaterialRequirePlanEntityMapper extends CommBaseMapper<RawMaterialRequirePlan> {
+
+    /**
+     * 批量插入原材料需求计划
+     * @param list 需求计划列表
+     * @return 插入条数
+     */
+    int batchInsert(@Param("list") List<RawMaterialRequirePlan> list);
 
 }

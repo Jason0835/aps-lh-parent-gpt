@@ -335,18 +335,19 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                         .thenComparing(MpHistorySaleRecord::getMonth).reversed()).collect(Collectors.toList());
 
                 Integer totalSaleQty = 0;
-                for (int i = 0; i < sortedList.size(); i++) {
+                int size = sortedList.size();
+                for (int i = 0; i < size; i++) {
                     MpHistorySaleRecord historySaleRecord = sortedList.get(i);
                     Integer saleQty = historySaleRecord.getSaleQty();
                     totalSaleQty += saleQty;
-                    if (i == passThreeMonth - 1) {
+                    if (i <= passThreeMonth - 1) {
                         // 近3个月
-                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passThreeMonth), 0, RoundingMode.UP);
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(i + 1), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
                 }
                 // 月均销量
-                BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passSixMonth), 0, RoundingMode.UP);
+                BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(size), 0, RoundingMode.UP);
                 monthlySaleQty.setAverageSaleQty(result.intValue());
 
                 // 滚动月销量
@@ -363,6 +364,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                     monthlySaleQty.setLocationType(LocationTypeEnum.FOREIGN_LOCATION.getValue());
                     monthlySaleQty.setBrand(materialInfo.getBrand());
                     monthlySaleQty.setMaterialDesc(materialInfo.getMaterialDesc());
+                } else {
+                    // 没找到物料信息跳过
+                    continue;
                 }
 
                 monthlySaleQtyList.add(monthlySaleQty);

@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
@@ -11,13 +13,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +42,14 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     @Autowired
     private RawMaterialRequirePlanEntityMapper rawMaterialRequirePlanMapper;
 
+    // 批量处理大小
+    private static final int BATCH_SIZE = 500;
+    // 多语言键值前缀
+    private static final String WARNING_PREFIX = "raw.warning.";
+    // 日期格式化器
+    private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月");
+    private static final DateTimeFormatter WEEK_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月第WW周");
+
     /**
      * 执行用量偏差预警
      *
@@ -52,35 +63,29 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month) {
         try {
-            log.info("开始执行用量偏差预警，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
+            log.info(StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "start.usage.deviation"),
+                    factoryCode, year, week
+            ));
 
-            // 1. 获取本周的原材料用量记录
-            QueryWrapper<RawWeekUsage> usageWrapper = new QueryWrapper<>();
-            usageWrapper.eq("FACTORY_CODE", factoryCode);
-            usageWrapper.eq("YEAR", year);
-            usageWrapper.eq("MONTH", month);
-            usageWrapper.eq("WEEK", week);
-            List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
+            // 1. 批量获取本周的原材料用量记录
+            List<RawWeekUsage> weekUsages = getWeekUsages(factoryCode, year, month, week);
 
             if (weekUsages.isEmpty()) {
-                log.warn("未找到周用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
-                return AjaxResult.error(String.format("未找到周用量数据，工厂：%s，年份：%d，周次：%d", factoryCode, year, week));
+                String message = StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "no.week.usage.data"),
+                        factoryCode, year, week
+                );
+                log.warn(message);
+                return AjaxResult.error(message);
             }
 
-            // 2. 获取用量偏差预警配置
-            QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
-            configWrapper.eq("FACTORY_CODE", factoryCode);
-            // 用量偏差预警
-            configWrapper.eq("WARNING_TYPE", "1");
-            configWrapper.eq("ENABLED", 1);
-            List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
-
-            // 转换为Map，方便查找
-            Map<String, RawWarningConfig> configMap = warningConfigs.stream()
-                    .collect(Collectors.toMap(RawWarningConfig::getMaterialCode, config -> config));
+            // 2. 批量获取用量偏差预警配置
+            Map<String, RawWarningConfig> configMap = getUsageWarningConfigs(factoryCode);
 
             // 3. 检查每个原材料的用量偏差
             List<RawWarningRecord> warningRecords = new ArrayList<>();
+            List<RawWeekUsage> usagesToUpdate = new ArrayList<>();
             int warningCount = 0;
 
             for (RawWeekUsage usage : weekUsages) {
@@ -89,37 +94,86 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
                 // 检查是否需要预警
                 RawWarningConfig config = configMap.get(usage.getMaterialCode());
-                if (usage.checkWarning(config)) {
+                if (config != null && usage.checkWarning(config)) {
                     // 创建预警记录
                     RawWarningRecord warningRecord = createUsageWarningRecord(usage, config);
                     warningRecords.add(warningRecord);
                     warningCount++;
 
                     // 更新用量记录的预警状态
-                    usage.setHasWarning(1);
-                    usage.setWarningLevel(config.getWarningLevel());
-                    rawWeekUsageEntityMapper.updateById(usage);
+                    updateUsageWarningStatus(usage, config.getWarningLevel(), 1);
                 } else {
                     // 清除预警状态
-                    usage.setHasWarning(0);
-                    usage.setWarningLevel(null);
-                    rawWeekUsageEntityMapper.updateById(usage);
+                    updateUsageWarningStatus(usage, null, 0);
                 }
+                usagesToUpdate.add(usage);
             }
 
-            // 4. 保存预警记录
+            // 4. 批量保存预警记录
             if (!warningRecords.isEmpty()) {
-                saveBatch(warningRecords);
+                saveBatchWarningRecords(warningRecords);
             }
 
-            log.info("用量偏差预警执行完成，工厂：{}，年份：{}，周次：{}，生成预警记录：{}条",
-                    factoryCode, year, week, warningCount);
+            // 5. 批量更新用量记录
+            if (!usagesToUpdate.isEmpty()) {
+                batchUpdateWeekUsages(usagesToUpdate);
+            }
 
-            return AjaxResult.success(String.format("用量偏差预警执行完成，生成预警记录：%d条", warningCount));
+            String logMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.complete"),
+                    factoryCode, year, week, warningCount
+            );
+            log.info(logMessage);
+
+            String resultMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.result"),
+                    warningCount
+            );
+            return AjaxResult.success(resultMessage);
 
         } catch (Exception e) {
-            log.error("执行用量偏差预警失败", e);
-            return AjaxResult.error("执行用量偏差预警失败：" + e.getMessage());
+            log.error(I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.error"), e);
+            String errorMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.exception"),
+                    e.getMessage()
+            );
+            return AjaxResult.error(errorMessage);
+        }
+    }
+
+    /**
+     * 批量获取周用量记录
+     */
+    private List<RawWeekUsage> getWeekUsages(String factoryCode, Integer year, Integer month, Integer week) {
+        QueryWrapper<RawWeekUsage> usageWrapper = new QueryWrapper<>();
+        usageWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("WEEK", week);
+        return rawWeekUsageEntityMapper.selectList(usageWrapper);
+    }
+
+    /**
+     * 批量获取用量偏差预警配置
+     */
+    private Map<String, RawWarningConfig> getUsageWarningConfigs(String factoryCode) {
+        QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
+        configWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("WARNING_TYPE", "1") // 用量偏差预警
+                .eq("ENABLED", 1);
+        List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
+
+        return warningConfigs.stream()
+                .collect(Collectors.toMap(RawWarningConfig::getMaterialCode, Function.identity()));
+    }
+
+    /**
+     * 更新用量记录的预警状态
+     */
+    private void updateUsageWarningStatus(RawWeekUsage usage, String warningLevel, Integer hasWarning) {
+        usage.setHasWarning(hasWarning);
+        if (warningLevel != null) {
+            usage.setWarningLevel(warningLevel);
         }
     }
 
@@ -129,25 +183,30 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private RawWarningRecord createUsageWarningRecord(RawWeekUsage usage, RawWarningConfig config) {
         RawWarningRecord record = new RawWarningRecord();
         record.setFactoryCode(usage.getFactoryCode());
-        // 用量偏差预警
-        record.setWarningType("1");
+        record.setWarningType("1"); // 用量偏差预警
         record.setMaterialCode(usage.getMaterialCode());
         record.setMaterialDesc(usage.getMaterialDesc());
-        record.setRelatedMonth(String.format("%d年%d月", usage.getYear(), usage.getMonth()));
+        record.setRelatedMonth(StringUtils.format(
+                I18nUtil.getMessage("common.year.month.format"),
+                usage.getYear(), usage.getMonth()
+        ));
         record.setWarningLevel(config.getWarningLevel());
-        record.setRelatedWeek(String.format("%d年%d月第%02d周", usage.getYear(), usage.getMonth(), usage.getWeek()));
-        // 未处理
-        record.setStatus("0");
-        // 未通知
-        record.setNotified(0);
+        record.setRelatedWeek(StringUtils.format(
+                I18nUtil.getMessage("common.year.month.week.format"),
+                usage.getYear(), usage.getMonth(), usage.getWeek()
+        ));
+        record.setStatus("0"); // 未处理
+        record.setNotified(0); // 未通知
 
         // 设置预警标题和内容
-        String title = String.format("原材料用量偏差预警 - %s", usage.getMaterialDesc());
+        String title = StringUtils.format(
+                I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.title"),
+                usage.getMaterialDesc()
+        );
         record.setWarningTitle(title);
 
-        String content = String.format(
-                "工厂：%s，原材料：%s（%s），%d年%d月第%02d周用量偏差超限。\n" +
-                        "计划用量：%s，实际用量：%s，偏差量：%s，偏差率：%.2f%%",
+        String content = StringUtils.format(
+                I18nUtil.getMessage(WARNING_PREFIX + "usage.deviation.content"),
                 usage.getFactoryCode(),
                 usage.getMaterialDesc(),
                 usage.getMaterialCode(),
@@ -180,6 +239,34 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     }
 
     /**
+     * 批量保存预警记录
+     */
+    private void saveBatchWarningRecords(List<RawWarningRecord> warningRecords) {
+        // 分批保存
+        List<List<RawWarningRecord>> batches = splitIntoBatches(warningRecords, BATCH_SIZE);
+        batches.forEach(batch -> {
+            if (!CollectionUtils.isEmpty(batch)) {
+                // 使用自定义批量插入方法
+                rawWeekUsageEntityMapper.batchInsert(batch);
+            }
+        });
+    }
+
+    /**
+     * 批量更新周用量记录
+     */
+    private void batchUpdateWeekUsages(List<RawWeekUsage> usagesToUpdate) {
+        // 分批更新
+        List<List<RawWeekUsage>> batches = splitIntoBatches(usagesToUpdate, BATCH_SIZE);
+        batches.forEach(batch -> {
+            if (!CollectionUtils.isEmpty(batch)) {
+                // 使用自定义批量插入方法
+                rawWeekUsageEntityMapper.batchUpdate(batch);
+            }
+        });
+    }
+
+    /**
      * 执行新材料预警
      * @param factoryCode 工厂编码
      * @param currentYear 当前年份
@@ -190,7 +277,10 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth) {
         try {
-            log.info("开始执行新材料预警，工厂：{}，当前年月：{}-{}", factoryCode, currentYear, currentMonth);
+            log.info(StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "start.new.material"),
+                    factoryCode, currentYear, currentMonth
+            ));
 
             // 1. 获取上个月的年份和月份
             LocalDate currentDate = LocalDate.of(currentYear, currentMonth, 1);
@@ -198,78 +288,88 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             Integer previousYear = previousDate.getYear();
             Integer previousMonth = previousDate.getMonthValue();
 
-            // 2. 查询原材料月计划差异数据
-            QueryWrapper<RawMaterialMonthDiff> diffWrapper = new QueryWrapper<>();
-            diffWrapper.eq("FACTORY_CODE", factoryCode);
-            diffWrapper.eq("YEAR", currentYear);
-            diffWrapper.eq("MONTH", currentMonth);
-            List<RawMaterialMonthDiff> diffs = rawMaterialMonthDiffMapper.selectList(diffWrapper);
+            // 2. 批量查询原材料月计划差异数据
+            List<RawMaterialMonthDiff> diffs = getMaterialMonthDiffs(factoryCode, currentYear, currentMonth);
 
             if (diffs.isEmpty()) {
-                log.info("未找到新材料预警数据，工厂：{}，年月：{}-{}", factoryCode, currentYear, currentMonth);
-                return AjaxResult.success("未找到新材料预警数据");
+                String message = StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "no.new.material.data"),
+                        factoryCode, currentYear, currentMonth
+                );
+                log.info(message);
+                return AjaxResult.success(message);
             }
 
             // 3. 获取新材料预警配置
-            QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
-            configWrapper.eq("FACTORY_CODE", factoryCode);
-            // 新材料预警
-            configWrapper.eq("WARNING_TYPE", "2");
-            configWrapper.eq("ENABLED", 1);
-            List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
-
-            // 获取所有需要预警的原材料编码
-            Set<String> warningMaterialCodes = warningConfigs.stream()
-                    .map(RawWarningConfig::getMaterialCode)
-                    .collect(Collectors.toSet());
-
-            // 如果配置为空，则对所有新材料都预警
-            boolean warnAll = warningConfigs.isEmpty();
+            List<RawWarningConfig> warningConfigs = getNewMaterialWarningConfigs(factoryCode);
+            Set<String> warningMaterialCodes = extractWarningMaterialCodes(warningConfigs);
+            boolean warnAll = CollectionUtils.isEmpty(warningConfigs);
 
             // 4. 创建预警记录
-            List<RawWarningRecord> warningRecords = new ArrayList<>();
-            int warningCount = 0;
+            List<RawWarningRecord> warningRecords = createNewMaterialWarnings(
+                    factoryCode, currentYear, currentMonth, previousYear, previousMonth,
+                    diffs, warningMaterialCodes, warnAll
+            );
 
-            // 按差异类型分组
-            Map<String, List<RawMaterialMonthDiff>> diffByType = diffs.stream()
-                    .collect(Collectors.groupingBy(RawMaterialMonthDiff::getDiffType));
-
-            // 处理新增原材料
-            List<RawMaterialMonthDiff> newMaterials = diffByType.getOrDefault("新增", Collections.emptyList());
-            if (!newMaterials.isEmpty()) {
-                List<RawWarningRecord> newWarnings = createNewMaterialWarnings(
-                        factoryCode, currentYear, currentMonth, previousYear, previousMonth,
-                        newMaterials, warningMaterialCodes, warnAll, "新增"
-                );
-                warningRecords.addAll(newWarnings);
-                warningCount += newWarnings.size();
-            }
-
-            // 处理减少原材料
-            List<RawMaterialMonthDiff> removedMaterials = diffByType.getOrDefault("减少", Collections.emptyList());
-            if (!removedMaterials.isEmpty()) {
-                List<RawWarningRecord> removedWarnings = createNewMaterialWarnings(
-                        factoryCode, currentYear, currentMonth, previousYear, previousMonth,
-                        removedMaterials, warningMaterialCodes, warnAll, "减少"
-                );
-                warningRecords.addAll(removedWarnings);
-                warningCount += removedWarnings.size();
-            }
-
-            // 5. 保存预警记录
+            // 5. 批量保存预警记录
             if (!warningRecords.isEmpty()) {
-                saveBatch(warningRecords);
+                saveBatchWarningRecords(warningRecords);
             }
 
-            log.info("新材料预警执行完成，工厂：{}，当前年月：{}-{}，生成预警记录：{}条",
-                    factoryCode, currentYear, currentMonth, warningCount);
+            String logMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "new.material.complete"),
+                    factoryCode, currentYear, currentMonth, warningRecords.size()
+            );
+            log.info(logMessage);
 
-            return AjaxResult.success(String.format("新材料预警执行完成，生成预警记录：%d条", warningCount));
+            String resultMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "new.material.result"),
+                    warningRecords.size()
+            );
+            return AjaxResult.success(resultMessage);
 
         } catch (Exception e) {
-            log.error("执行新材料预警失败", e);
-            return AjaxResult.error("执行新材料预警失败：" + e.getMessage());
+            log.error(I18nUtil.getMessage(WARNING_PREFIX + "new.material.error"), e);
+            String errorMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "new.material.exception"),
+                    e.getMessage()
+            );
+            return AjaxResult.error(errorMessage);
         }
+    }
+
+    /**
+     * 批量查询原材料月计划差异数据
+     */
+    private List<RawMaterialMonthDiff> getMaterialMonthDiffs(String factoryCode, Integer year, Integer month) {
+        QueryWrapper<RawMaterialMonthDiff> diffWrapper = new QueryWrapper<>();
+        diffWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month);
+        return rawMaterialMonthDiffMapper.selectList(diffWrapper);
+    }
+
+    /**
+     * 获取新材料预警配置
+     */
+    private List<RawWarningConfig> getNewMaterialWarningConfigs(String factoryCode) {
+        QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
+        configWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("WARNING_TYPE", "2") // 新材料预警
+                .eq("ENABLED", 1);
+        return warningConfigMapper.selectList(configWrapper);
+    }
+
+    /**
+     * 提取预警材料编码
+     */
+    private Set<String> extractWarningMaterialCodes(List<RawWarningConfig> warningConfigs) {
+        if (CollectionUtils.isEmpty(warningConfigs)) {
+            return Collections.emptySet();
+        }
+        return warningConfigs.stream()
+                .map(RawWarningConfig::getMaterialCode)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -280,90 +380,142 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                                              Integer previousYear, Integer previousMonth,
                                                              List<RawMaterialMonthDiff> diffs,
                                                              Set<String> warningMaterialCodes,
-                                                             boolean warnAll,
-                                                             String diffType) {
+                                                             boolean warnAll) {
         List<RawWarningRecord> warnings = new ArrayList<>();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年MM月");
 
-        String currentMonthStr = LocalDate.of(currentYear, currentMonth, 1).format(formatter);
-        String previousMonthStr = LocalDate.of(previousYear, previousMonth, 1).format(formatter);
+        // 按差异类型分组
+        Map<String, List<RawMaterialMonthDiff>> diffByType = diffs.stream()
+                .collect(Collectors.groupingBy(RawMaterialMonthDiff::getDiffType));
+
+        // 处理新增原材料
+        List<RawMaterialMonthDiff> newMaterials = diffByType.getOrDefault(
+                I18nUtil.getMessage(WARNING_PREFIX + "diff.type.new"),
+                Collections.emptyList()
+        );
+        warnings.addAll(createMaterialWarningsByType(
+                factoryCode, currentYear, currentMonth, previousYear, previousMonth,
+                newMaterials, warningMaterialCodes, warnAll, true
+        ));
+
+        // 处理减少原材料
+        List<RawMaterialMonthDiff> removedMaterials = diffByType.getOrDefault(
+                I18nUtil.getMessage(WARNING_PREFIX + "diff.type.decrease"),
+                Collections.emptyList()
+        );
+        warnings.addAll(createMaterialWarningsByType(
+                factoryCode, currentYear, currentMonth, previousYear, previousMonth,
+                removedMaterials, warningMaterialCodes, warnAll, false
+        ));
+
+        return warnings;
+    }
+
+    /**
+     * 按类型创建材料预警记录
+     */
+    private List<RawWarningRecord> createMaterialWarningsByType(String factoryCode,
+                                                                Integer currentYear, Integer currentMonth,
+                                                                Integer previousYear, Integer previousMonth,
+                                                                List<RawMaterialMonthDiff> diffs,
+                                                                Set<String> warningMaterialCodes,
+                                                                boolean warnAll,
+                                                                boolean isNewMaterial) {
+        if (CollectionUtils.isEmpty(diffs)) {
+            return Collections.emptyList();
+        }
+
+        List<RawWarningRecord> warnings = new ArrayList<>();
+        String currentMonthStr = LocalDate.of(currentYear, currentMonth, 1).format(MONTH_FORMATTER);
+        String previousMonthStr = LocalDate.of(previousYear, previousMonth, 1).format(MONTH_FORMATTER);
 
         for (RawMaterialMonthDiff diff : diffs) {
-            // 检查是否需要预警（如果配置了特定材料，则只预警配置的材料）
+            // 检查是否需要预警
             if (!warnAll && !warningMaterialCodes.contains(diff.getMaterialCode())) {
                 continue;
             }
 
-            RawWarningRecord record = new RawWarningRecord();
-            record.setFactoryCode(factoryCode);
-            // 新材料预警
-            record.setWarningType("2");
-            record.setMaterialCode(diff.getMaterialCode());
-            record.setMaterialDesc(diff.getMaterialDesc());
-            // 中等级别
-            record.setWarningLevel("2");
-            record.setRelatedMonth(currentMonthStr);
-            // 未处理
-            record.setStatus("0");
-            // 未通知
-            record.setNotified(0);
-
-            // 设置预警标题和内容
-            String title = "新增".equals(diffType) ?
-                    String.format("新增原材料预警 - %s", diff.getMaterialDesc()) :
-                    String.format("减少原材料预警 - %s", diff.getMaterialDesc());
-            record.setWarningTitle(title);
-
-            String content = "新增".equals(diffType) ?
-                    String.format(
-                            "工厂：%s，检测到新增原材料。\n" +
-                                    "原材料：%s（%s）\n" +
-                                    "比较周期：%s（%d-%02d）→ %s（%d-%02d）\n" +
-                                    "上个月用量：%s，本月计划：%s，差异量：%s",
-                            factoryCode,
-                            diff.getMaterialDesc(),
-                            diff.getMaterialCode(),
-                            previousMonthStr, previousYear, previousMonth,
-                            currentMonthStr, currentYear, currentMonth,
-                            diff.getPrevMonthQty(),
-                            diff.getCurMonthQty(),
-                            diff.getDiffQty()
-                    ) :
-                    String.format(
-                            "工厂：%s，检测到减少原材料。\n" +
-                                    "原材料：%s（%s）\n" +
-                                    "比较周期：%s（%d-%02d）→ %s（%d-%02d）\n" +
-                                    "上个月用量：%s，本月计划：%s，差异量：%s",
-                            factoryCode,
-                            diff.getMaterialDesc(),
-                            diff.getMaterialCode(),
-                            previousMonthStr, previousYear, previousMonth,
-                            currentMonthStr, currentYear, currentMonth,
-                            diff.getPrevMonthQty(),
-                            diff.getCurMonthQty(),
-                            diff.getDiffQty()
-                    );
-            record.setWarningContent(content);
-
-            // 设置预警数据JSON
-            Map<String, Object> warningData = new HashMap<>();
-            warningData.put("diffType", diffType);
-            warningData.put("currentYear", currentYear);
-            warningData.put("currentMonth", currentMonth);
-            warningData.put("previousYear", previousYear);
-            warningData.put("previousMonth", previousMonth);
-            warningData.put("prevMonthQty", diff.getPrevMonthQty());
-            warningData.put("curMonthQty", diff.getCurMonthQty());
-            warningData.put("diffQty", diff.getDiffQty());
-            record.setWarningData(JSON.toJSONString(warningData));
-
-            record.setCreateTime(new Date());
-            record.setCreateBy("system");
-
-            warnings.add(record);
+            warnings.add(createSingleMaterialWarningRecord(
+                    factoryCode, currentYear, currentMonth, previousYear, previousMonth,
+                    diff, currentMonthStr, previousMonthStr, isNewMaterial
+            ));
         }
 
         return warnings;
+    }
+
+    /**
+     * 创建单个材料预警记录
+     */
+    private RawWarningRecord createSingleMaterialWarningRecord(String factoryCode,
+                                                               Integer currentYear, Integer currentMonth,
+                                                               Integer previousYear, Integer previousMonth,
+                                                               RawMaterialMonthDiff diff,
+                                                               String currentMonthStr,
+                                                               String previousMonthStr,
+                                                               boolean isNewMaterial) {
+        RawWarningRecord record = new RawWarningRecord();
+        record.setFactoryCode(factoryCode);
+        record.setWarningType("2"); // 新材料预警
+        record.setMaterialCode(diff.getMaterialCode());
+        record.setMaterialDesc(diff.getMaterialDesc());
+        record.setWarningLevel("2"); // 中等级别
+        record.setRelatedMonth(currentMonthStr);
+        record.setStatus("0"); // 未处理
+        record.setNotified(0); // 未通知
+
+        // 设置预警标题和内容
+        String title = isNewMaterial ?
+                StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "new.material.title"),
+                        diff.getMaterialDesc()
+                ) :
+                StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "decrease.material.title"),
+                        diff.getMaterialDesc()
+                );
+        record.setWarningTitle(title);
+
+        String content = isNewMaterial ?
+                StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "new.material.content"),
+                        factoryCode,
+                        diff.getMaterialDesc(),
+                        diff.getMaterialCode(),
+                        previousMonthStr, previousYear, previousMonth,
+                        currentMonthStr, currentYear, currentMonth,
+                        diff.getPrevMonthQty(),
+                        diff.getCurMonthQty(),
+                        diff.getDiffQty()
+                ) :
+                StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "decrease.material.content"),
+                        factoryCode,
+                        diff.getMaterialDesc(),
+                        diff.getMaterialCode(),
+                        previousMonthStr, previousYear, previousMonth,
+                        currentMonthStr, currentYear, currentMonth,
+                        diff.getPrevMonthQty(),
+                        diff.getCurMonthQty(),
+                        diff.getDiffQty()
+                );
+        record.setWarningContent(content);
+
+        // 设置预警数据JSON
+        Map<String, Object> warningData = new HashMap<>();
+        warningData.put("diffType", isNewMaterial ? "new" : "decrease");
+        warningData.put("currentYear", currentYear);
+        warningData.put("currentMonth", currentMonth);
+        warningData.put("previousYear", previousYear);
+        warningData.put("previousMonth", previousMonth);
+        warningData.put("prevMonthQty", diff.getPrevMonthQty());
+        warningData.put("curMonthQty", diff.getCurMonthQty());
+        warningData.put("diffQty", diff.getDiffQty());
+        record.setWarningData(JSON.toJSONString(warningData));
+
+        record.setCreateTime(new Date());
+        record.setCreateBy("system");
+
+        return record;
     }
 
     /**
@@ -372,82 +524,123 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
      * @param factoryCode 工厂编码
      * @param year        年份
      * @param week        周次
-     * @param month
+     * @param month      月份
      * @return 同步结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult syncWeekActualUsage(String factoryCode, Integer year, Integer week, Integer month) {
         try {
-            log.info("开始同步周维度实际用量数据，工厂：{}，年份：{}，周次：{}", factoryCode, year, week);
+            log.info(StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "start.sync.usage"),
+                    factoryCode, year, week
+            ));
 
             // 1. 获取周的开始和结束日期
             LocalDate weekStartDate = getWeekStartDate(year, month, week);
             LocalDate weekEndDate = getWeekEndDate(year, month, week);
 
-            // 2. 从MES系统查询该周的实际出库量
-            QueryWrapper<RawMaterialOutboundRecord> outboundWrapper = new QueryWrapper<>();
-            outboundWrapper.eq("FACTORY_CODE", factoryCode);
-            outboundWrapper.between("OUTBOUND_DATE", weekStartDate, weekEndDate);
-            List<RawMaterialOutboundRecord> outboundRecords = rawMaterialOutboundRecordMapper.selectList(outboundWrapper);
+            // 2. 从MES系统批量查询该周的实际出库量
+            Map<String, BigDecimal> actualUsageMap = getActualUsageMap(factoryCode, weekStartDate, weekEndDate);
 
-            // 按原材料分组汇总实际用量
-            Map<String, BigDecimal> actualUsageMap = outboundRecords.stream()
-                    .collect(Collectors.groupingBy(
-                            RawMaterialOutboundRecord::getMaterialCode,
-                            Collectors.reducing(
-                                    BigDecimal.ZERO,
-                                    RawMaterialOutboundRecord::getOutboundQty,
-                                    BigDecimal::add
-                            )
-                    ));
+            // 3. 批量获取该周的计划用量数据
+            List<RawWeekUsage> weekUsages = getWeekUsages(factoryCode, year, month, week);
 
-            // 3. 获取该周的计划用量数据
-            QueryWrapper<RawWeekUsage> usageWrapper = new QueryWrapper<>();
-            usageWrapper.eq("FACTORY_CODE", factoryCode);
-            usageWrapper.eq("YEAR", year);
-            usageWrapper.eq("MONTH", month);
-            usageWrapper.eq("WEEK", week);
-            List<RawWeekUsage> weekUsages = rawWeekUsageEntityMapper.selectList(usageWrapper);
-
-            // 4. 更新实际用量
-            for (RawWeekUsage usage : weekUsages) {
-                BigDecimal actualQty = actualUsageMap.get(usage.getMaterialCode());
-                if (actualQty != null) {
-                    usage.setActualQty(actualQty);
-                    // 重新计算偏差
-                    usage.calculateDeviation();
-                    usage.setRemark("已更新最新实际用量" + usage.getActualQty());
-                    rawWeekUsageEntityMapper.updateById(usage);
-                }else {
-                    usage.setActualQty(BigDecimal.valueOf(0));
-                    // 重新计算偏差
-                    usage.calculateDeviation();
-                    usage.setRemark("未找到该周的实际用量数据");
-                    rawWeekUsageEntityMapper.updateById(usage);
-                    log.warn("未找到该周的实际用量数据，工厂：{}，年份：{}，周次：{}，原材料：{}",
-                            factoryCode, year, week, usage.getMaterialCode());
-                }
+            if (weekUsages.isEmpty()) {
+                String message = StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "no.plan.usage.data"),
+                        factoryCode, year, week
+                );
+                log.warn(message);
+                return AjaxResult.error(message);
             }
 
-            log.info("同步周维度实际用量数据完成，工厂：{}，年份：{}，周次：{}，同步原材料数：{}",
-                    factoryCode, year, week, actualUsageMap.size());
+            // 4. 批量更新实际用量
+            List<RawWeekUsage> updatedUsages = updateWeekUsagesActualQty(weekUsages, actualUsageMap);
 
-            return AjaxResult.success(String.format("同步完成，共处理%d种原材料", actualUsageMap.size()));
+            // 5. 批量更新数据库
+            if (!updatedUsages.isEmpty()) {
+                batchUpdateWeekUsages(updatedUsages);
+            }
+
+            String logMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "sync.usage.complete"),
+                    factoryCode, year, week, actualUsageMap.size()
+            );
+            log.info(logMessage);
+
+            String resultMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "sync.usage.result"),
+                    actualUsageMap.size()
+            );
+            return AjaxResult.success(resultMessage);
 
         } catch (Exception e) {
-            log.error("同步周维度实际用量数据失败", e);
-            return AjaxResult.error("同步失败：" + e.getMessage());
+            log.error(I18nUtil.getMessage(WARNING_PREFIX + "sync.usage.error"), e);
+            String errorMessage = StringUtils.format(
+                    I18nUtil.getMessage(WARNING_PREFIX + "sync.usage.exception"),
+                    e.getMessage()
+            );
+            return AjaxResult.error(errorMessage);
         }
+    }
+
+    /**
+     * 获取实际用量Map
+     */
+    private Map<String, BigDecimal> getActualUsageMap(String factoryCode, LocalDate weekStartDate, LocalDate weekEndDate) {
+        QueryWrapper<RawMaterialOutboundRecord> outboundWrapper = new QueryWrapper<>();
+        outboundWrapper.eq("FACTORY_CODE", factoryCode)
+                .between("OUTBOUND_DATE", weekStartDate, weekEndDate);
+        List<RawMaterialOutboundRecord> outboundRecords = rawMaterialOutboundRecordMapper.selectList(outboundWrapper);
+
+        return outboundRecords.stream()
+                .collect(Collectors.groupingBy(
+                        RawMaterialOutboundRecord::getMaterialCode,
+                        Collectors.reducing(
+                                BigDecimal.ZERO,
+                                RawMaterialOutboundRecord::getOutboundQty,
+                                BigDecimal::add
+                        )
+                ));
+    }
+
+    /**
+     * 更新周用量记录的实际用量
+     */
+    private List<RawWeekUsage> updateWeekUsagesActualQty(List<RawWeekUsage> weekUsages,
+                                                         Map<String, BigDecimal> actualUsageMap) {
+        List<RawWeekUsage> updatedUsages = new ArrayList<>();
+
+        for (RawWeekUsage usage : weekUsages) {
+            BigDecimal actualQty = actualUsageMap.get(usage.getMaterialCode());
+            if (actualQty != null) {
+                usage.setActualQty(actualQty);
+                usage.setRemark(StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "usage.updated.remark"),
+                        usage.getActualQty()
+                ));
+            } else {
+                usage.setActualQty(BigDecimal.ZERO);
+                usage.setRemark(I18nUtil.getMessage(WARNING_PREFIX + "usage.no.data.remark"));
+                log.warn(StringUtils.format(
+                        I18nUtil.getMessage(WARNING_PREFIX + "usage.no.data.warning"),
+                        usage.getFactoryCode(), usage.getYear(), usage.getWeek(), usage.getMaterialCode()
+                ));
+            }
+            // 重新计算偏差
+            usage.calculateDeviation();
+            updatedUsages.add(usage);
+        }
+
+        return updatedUsages;
     }
 
     /**
      * 根据年份和周次获取周开始日期
      */
     private LocalDate getWeekStartDate(int year, int month, int week) {
-        // 假设第一周从1月1日开始
         LocalDate date = LocalDate.of(year, month, 1);
-        // 调整到该周的第一天（周一）
         date = date.plusWeeks(week - 1);
         date = date.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
         return date;
@@ -497,79 +690,13 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     }
 
     /**
-     * 处理预警记录
-     * @param id 预警记录ID
-     * @param handler 处理人
-     * @param opinion 处理意见
-     * @return 处理结果
+     * 将列表分成多个批次
      */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult handleWarning(Long id, String handler, String opinion) {
-        RawWarningRecord record = getById(id);
-        if (record == null) {
-            return AjaxResult.error("预警记录不存在");
+    private <T> List<List<T>> splitIntoBatches(List<T> list, int batchSize) {
+        List<List<T>> batches = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += batchSize) {
+            batches.add(list.subList(i, Math.min(i + batchSize, list.size())));
         }
-        // 已处理
-        record.setStatus("1");
-        record.setHandler(handler);
-        record.setHandleOpinion(opinion);
-        record.setHandleTime(new Date());
-        record.setUpdateTime(new Date());
-        record.setUpdateBy(handler);
-
-        updateById(record);
-
-        return AjaxResult.success("处理成功");
-    }
-
-    /**
-     * 统计预警信息
-     * @param factoryCode 工厂编码
-     * @param warningType 预警类型
-     * @param days 最近天数
-     * @return 统计结果
-     */
-    @Override
-    public Map<String, Object> getWarningStatistics(String factoryCode, String warningType, Integer days) {
-        LocalDate endDate = LocalDate.now();
-        LocalDate startDate = endDate.minusDays(days != null ? days : 30);
-
-        QueryWrapper<RawWarningRecord> wrapper = new QueryWrapper<>();
-        wrapper.eq("FACTORY_CODE", factoryCode);
-        if (StringUtils.hasText(warningType)) {
-            wrapper.eq("WARNING_TYPE", warningType);
-        }
-        wrapper.between("CREATE_TIME", startDate, endDate);
-
-        // 按预警级别统计
-        List<Map<String, Object>> levelStats = listMaps(
-                wrapper.select("WARNING_LEVEL", "COUNT(*) as count")
-                        .groupBy("WARNING_LEVEL")
-        );
-
-        // 按处理状态统计
-        List<Map<String, Object>> statusStats = listMaps(
-                wrapper.select("STATUS", "COUNT(*) as count")
-                        .groupBy("STATUS")
-        );
-
-        // 最近预警
-        wrapper.clear();
-        wrapper.eq("FACTORY_CODE", factoryCode);
-        if (StringUtils.hasText(warningType)) {
-            wrapper.eq("WARNING_TYPE", warningType);
-        }
-        wrapper.orderByDesc("CREATE_TIME");
-        wrapper.last("LIMIT 10");
-        List<RawWarningRecord> recentWarnings = list(wrapper);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("levelStats", levelStats);
-        result.put("statusStats", statusStats);
-        result.put("recentWarnings", recentWarnings);
-        result.put("totalCount", count(wrapper));
-
-        return result;
+        return batches;
     }
 }
