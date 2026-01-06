@@ -83,9 +83,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         if (CollectionUtils.isEmpty(stockDates)) {
             return Collections.emptyMap();
         }
-        int year = DateUtils.getYear(stockDates.get(0));
-        int month = DateUtils.getMonthsByYear(stockDates.get(0));
-        int stockDay = DateUtils.getDaysByMonth(stockDates.get(0));
+        Date maxDate = stockDates.stream()
+            .filter(Objects::nonNull)
+            .max(Date::compareTo).orElse(null);
+        if(null == maxDate) {
+            return Collections.emptyMap();
+        }
+        int year = DateUtils.getYear(maxDate);
+        int month = DateUtils.getMonthsByYear(maxDate);
+        int stockDay = DateUtils.getDaysByMonth(maxDate);
         // 获取当前年月
         String yearMonth = String.format("%s%02d", year, month);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
