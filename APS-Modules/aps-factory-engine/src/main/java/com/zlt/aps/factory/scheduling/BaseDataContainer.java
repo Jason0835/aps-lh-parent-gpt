@@ -40,6 +40,11 @@ public class BaseDataContainer implements Serializable {
      */
     Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
     /**
+     * 结构+主花纹的模具关系
+     * key=group+主花纹 : value=模具关系列表
+     */
+    Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap;
+    /**
      * 模壳总数信息
      * key=模块标准 : value=模块标准数量
      */

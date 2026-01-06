@@ -305,6 +305,40 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加结构没有匹配到成型机-分组计划没有排产计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 分组计划没有待排产计划====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param isZeroRack    分组是否要求零度
+     * @param cxMachineCode 成型机台
+     * @return
+     */
+    public static String addGroupNoSelectedGroupNoProductionLog(Context context, String groupName, String isZeroRack, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 分组计划没有待排产计划====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_SELECTED_GROUP_NO_PRODUCTION_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构没有匹配到成型机-分组计划没有物料编码信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 分组计划没有物料编码信息====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param isZeroRack    分组是否要求零度
+     * @param cxMachineCode 成型机台
+     * @return
+     */
+    public static String addGroupNoSelectedGroupMaterialDescExceptionLog(Context context, String groupName, String isZeroRack, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 分组计划没有物料编码信息====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_SELECTED_GROUP_MATERIAL_EXCEPTION_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构没有匹配到成型机-限制生产日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 没有成型硫化配比配置====
      *
@@ -319,6 +353,60 @@ public class TbrProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 没有成型硫化配比配置====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, brandCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_SELECTED_RATIO_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构匹配到成型机-初步被选中日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 初步被选中====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param isZeroRack    分组是否要求零度
+     * @param cxMachineCode 成型机台
+     * @param brandCode     机型
+     * @return
+     */
+    public static String addGroupSelectedCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String brandCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 初步被选中", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, brandCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FIRST_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构匹配到成型机-最终被选定日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param isZeroRack    分组是否要求零度
+     * @param cxMachineCode 成型机台
+     * @param brandCode     机型
+     * @return
+     */
+    public static String addGroupSelectedFixedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String brandCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, brandCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FIXED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构匹配到成型机-最终被选定日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮最终被选定====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名
+     * @param isZeroRack    分组是否要求零度
+     * @param cxMachineCode 成型机台
+     * @param brandCode     机型
+     * @return
+     */
+    public static String addGroupSelectedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String brandCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮最终被选定====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, brandCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
         return logContent;
     }
 
