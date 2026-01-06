@@ -143,10 +143,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     @Override
     public void createMonthRequire(DpDemandPlan createCondition) {
         createCondition.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        // 获取操作日所在月份
-        YearMonth currentMonth = YearMonth.from(LocalDate.now());
-        // T月 = 当月 + 1个月
-        YearMonth tMonth = currentMonth.plusMonths(1);
+        YearMonth tMonth;
+        if(null != createCondition.getYear() && null != createCondition.getMonth()){
+            tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
+        }else{
+            // 获取操作日所在月份
+            YearMonth currentMonth = YearMonth.from(LocalDate.now());
+            // T月 = 当月 + 1个月
+            tMonth = currentMonth.plusMonths(1);
+        }
         createCondition.setYear(tMonth.getYear());
         createCondition.setMonth(tMonth.getMonthValue());
         // 1. 前置校验
