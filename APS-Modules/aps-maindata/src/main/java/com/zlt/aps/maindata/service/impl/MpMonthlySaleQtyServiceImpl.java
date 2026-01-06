@@ -364,6 +364,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                     monthlySaleQty.setLocationType(LocationTypeEnum.FOREIGN_LOCATION.getValue());
                     monthlySaleQty.setBrand(materialInfo.getBrand());
                     monthlySaleQty.setMaterialDesc(materialInfo.getMaterialDesc());
+                } else {
+                    // 没找到物料信息跳过
+                    continue;
                 }
 
                 monthlySaleQtyList.add(monthlySaleQty);
