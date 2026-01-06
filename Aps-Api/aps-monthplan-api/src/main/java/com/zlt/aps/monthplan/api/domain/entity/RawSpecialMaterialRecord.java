@@ -45,7 +45,6 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.rubberSpec")
     @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "胶料", name = "rubberSpec")
-    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @TableField(value = "RUBBER_SPEC")
     private String rubberSpec;
 
@@ -59,7 +58,6 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     /** 物料描述 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialDesc")
     @ImportExcelValidated(required = true, maxLength = 100)
-    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
@@ -86,7 +84,6 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     private String unit;
 
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
-    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @ImportExcelValidated(maxLength = 300)
     @ApiModelProperty("备注")
     @TableField("REMARK")
