@@ -58,7 +58,8 @@ public class DeductMouldScheduler {
         deductMould.setMaterialCode(continueSkuInfo.getMaterialDesc());
         deductMould.setStartDate(ProductionConstant.MONTH_START_DAY);
         deductMould.setDeadline(deadLineDay);
-        deductMould.setTotalQty(continueSkuInfo.getPlanDemandQty().intValue());
+        deductMould.setTotalQty(continueSkuInfo.getPlanDemandQty());
+        deductMould.setRemainingQty(continueSkuInfo.getPlanDemandQty());
         Integer startLhMachineCount = continueSkuInfo.getMouldNumber() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         deductMould.setMachinesAssigned(startLhMachineCount);
         Integer dayLhCapacityQty = continueSkuInfo.getMaxDaySingleLhMachineQty().intValue();

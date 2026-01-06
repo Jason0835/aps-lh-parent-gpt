@@ -167,7 +167,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;
 
-
     /**
      * 是否零度材料
      */
@@ -175,6 +174,32 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
+
+
+    /**
+     * 制造示方书号
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
+
+    /**
+     * 文字示方书号
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.textNo")
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(value = "TEXT_NO")
+    private String textNo;
+
+    /**
+     * 硫化示方书号
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.lhNo")
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(value = "LH_NO")
+    private String lhNo;
+
     /**
      * 全规格代号信息 包含规格代号及对应的成型法
      */
