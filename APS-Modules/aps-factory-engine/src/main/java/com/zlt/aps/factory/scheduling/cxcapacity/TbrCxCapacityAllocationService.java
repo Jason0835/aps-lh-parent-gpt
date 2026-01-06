@@ -157,6 +157,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
         setMonthProductionDays(productionContext);
+        //构建日排产信息
+        buildDayCapacityLimitInfo(productionContext);
         //获取成型机台信息--日产信息
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
         productionContext.getBaseDataContainer().setCxMachineBaseInfo(cxMachineBaseInfo);
@@ -172,7 +174,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             return;
         }
         Set<String> isSetStructureNameSet = new HashSet<>();
-        //根据计划，补充模具关系中的物料结构名
+        //根据计划的物料描述，补充模具关系中的物料结构名
         requirePlanList.forEach(requirePlan -> {
             String materialDesc = requirePlan.getMaterialDesc();
             if (StringUtils.isBlank(materialDesc)) {
@@ -190,6 +192,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 mouldRelation.setStructureName(requirePlan.getStructureName());
             });
         });
+        //构建结构、主花纹的模具信息
+        buildGroupMainPatternInfo(productionContext);
     }
 
     /**
@@ -407,6 +411,58 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             });
         });
         return mouldInfoMap;
+    }
+
+    /**
+     * 构建分组+主花纹的模具信息
+     * TBR 为结构
+     *
+     * @param productionContext 排产上下文
+     * @return
+     */
+    private void buildGroupMainPatternInfo(TbrProductionContext productionContext) {
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldAssociationMap = baseDataContainer.getSkuMouldRelationMap();
+        Map<String, ProductionMouldInfoVo> allMouldMap = baseDataContainer.getMouldInfoMap();
+        if (CollectionUtils.isEmpty(mouldAssociationMap) || CollectionUtils.isEmpty(allMouldMap)) {
+            baseDataContainer.setGroupMainPatternMouldRelationMap(Collections.emptyMap());
+            return;
+        }
+        List<MonthPlanProductMouldInfoVo> allRelationList = new ArrayList<>();
+        mouldAssociationMap.forEach((materialDesc, relationList) -> {
+            if (CollectionUtils.isEmpty(relationList)) {
+                return;
+            }
+            allRelationList.addAll(relationList);
+        });
+        if (CollectionUtils.isEmpty(allRelationList)) {
+            baseDataContainer.setGroupMainPatternMouldRelationMap(Collections.emptyMap());
+            return;
+        }
+        Map<String, List<MonthPlanProductMouldInfoVo>> groupMainPatternMap = allRelationList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getStructureNameAndMainPattern));
+        Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldMap = new HashMap<>();
+        groupMainPatternMap.forEach((groupNameAndMainPattern, relationList) -> {
+            if (CollectionUtils.isEmpty(relationList)) {
+                return;
+            }
+            List<ProductionMouldInfoVo> groupMainPatternList = new ArrayList<>();
+            Set<String> mouldCodeSet = new HashSet<>();
+            relationList.forEach(singleRelation -> {
+                String mouldCode = singleRelation.getMouldCode();
+                if (mouldCodeSet.contains(mouldCode)) {
+                    return;
+                }
+                mouldCodeSet.add(mouldCode);
+                if (allMouldMap.containsKey(mouldCode)) {
+                    groupMainPatternList.add(allMouldMap.get(mouldCode));
+                }
+            });
+            if (CollectionUtils.isEmpty(groupMainPatternList)) {
+                return;
+            }
+            groupMainPatternMouldMap.put(groupNameAndMainPattern, groupMainPatternList);
+        });
+        baseDataContainer.setGroupMainPatternMouldRelationMap(groupMainPatternMouldMap);
     }
 
     /**
@@ -690,7 +746,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
-            log.info(TbrProductionGroupLogRecorder.addProductionCalendarEmptyLog((TbrProductionContext) context));
+            log.info(TbrProductionGroupLogRecorder.addProductionCalendarEmptyLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
@@ -710,7 +766,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //停产设置
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(stopDays)) {
-            log.info(TbrProductionGroupLogRecorder.addNoStopCalendarLog((TbrProductionContext) context));
+            log.info(TbrProductionGroupLogRecorder.addNoStopCalendarLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
@@ -721,6 +777,27 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             stopDaySet.add(stopDay);
         });
         context.setStopDays(stopDaySet);
+    }
+
+    /**
+     * 构建日产能限制对象信息
+     *
+     * @param productionContext 排产上下文
+     */
+    private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
+        if (CollectionUtils.isEmpty(startProductionRatioMap)) {
+            productionContext.getBaseDataContainer().setDayCapacityLimitMap(Collections.emptyMap());
+            return;
+        }
+        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(startProductionRatioMap.size());
+        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
+        startProductionRatioMap.forEach((productionDay, ratio) -> {
+            DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
+            dayCapacityLimitMap.put(productionDay, dayInitLimit);
+        });
+        baseDataContainer.setDayCapacityLimitMap(dayCapacityLimitMap);
     }
 
     /**

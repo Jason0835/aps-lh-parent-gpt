@@ -872,7 +872,7 @@ public class ProductionPlanGroupInfo {
      * @param groupInfoMap 结构分组计划
      */
     private static void calculateEffectiveByMouldMaxCapacity(Context context, Map<String, ProductionPlanGroupInfo> groupInfoMap) {
-        //得到结构主花纹下最大可用模具数
+        //得到结构主花纹下最大可用模具数-按物料描述分组取最大
         Map<String, Integer> structureMainPatternMaxMouldGroup = getStructureMainPatternMaxMouldNumber(context);
         /**
          * 1、剔除不可排产的

@@ -2,4 +2,155 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper">
 
+    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.RawWarningRecord">
+        <!-- 配置字段映射 -->
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="factory_code" property="factoryCode" jdbcType="VARCHAR"/>
+        <result column="warning_type" property="warningType" jdbcType="VARCHAR"/>
+        <result column="material_code" property="materialCode" jdbcType="VARCHAR"/>
+        <result column="material_desc" property="materialDesc" jdbcType="VARCHAR"/>
+        <result column="warning_level" property="warningLevel" jdbcType="VARCHAR"/>
+        <result column="related_month" property="relatedMonth" jdbcType="VARCHAR"/>
+        <result column="related_week" property="relatedWeek" jdbcType="VARCHAR"/>
+        <result column="warning_title" property="warningTitle" jdbcType="VARCHAR"/>
+        <result column="warning_content" property="warningContent" jdbcType="VARCHAR"/>
+        <result column="warning_data" property="warningData" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="notified" property="notified" jdbcType="INTEGER"/>
+        <result column="handler" property="handler" jdbcType="VARCHAR"/>
+        <result column="handle_opinion" property="handleOpinion" jdbcType="VARCHAR"/>
+        <result column="handle_time" property="handleTime" jdbcType="TIMESTAMP"/>
+        <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 批量插入预警记录 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO raw_warning_record (
+        factory_code,
+        warning_type,
+        material_code,
+        material_desc,
+        warning_level,
+        related_month,
+        related_week,
+        warning_title,
+        warning_content,
+        warning_data,
+        status,
+        notified,
+        create_by,
+        create_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.factoryCode},
+            #{item.warningType},
+            #{item.materialCode},
+            #{item.materialDesc},
+            #{item.warningLevel},
+            #{item.relatedMonth},
+            #{item.relatedWeek},
+            #{item.warningTitle},
+            #{item.warningContent},
+            #{item.warningData},
+            #{item.status},
+            #{item.notified},
+            #{item.createBy},
+            #{item.createTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 批量更新预警记录 -->
+    <update id="batchUpdateRawWarningRecord" parameterType="java.util.List">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE raw_warning_record
+            <set>
+                <if test="item.status != null">status = #{item.status},</if>
+                <if test="item.notified != null">notified = #{item.notified},</if>
+                <if test="item.handler != null">handler = #{item.handler},</if>
+                <if test="item.handleOpinion != null">handle_opinion = #{item.handleOpinion},</if>
+                <if test="item.handleTime != null">handle_time = #{item.handleTime},</if>
+                <if test="item.updateBy != null">update_by = #{item.updateBy},</if>
+                <if test="item.updateTime != null">update_time = #{item.updateTime}</if>
+            </set>
+            WHERE id = #{item.id}
+        </foreach>
+    </update>
+
+    <!-- 批量更新周用量记录（全字段更新） -->
+    <update id="batchUpdate" parameterType="java.util.List">
+        <foreach collection="list" item="item" index="index" separator=";">
+            UPDATE raw_week_usage
+            <set>
+                factory_code = #{item.factoryCode},
+                year = #{item.year},
+                month = #{item.month},
+                week = #{item.week},
+                material_code = #{item.materialCode},
+                material_desc = #{item.materialDesc},
+                material_type = #{item.materialType},
+                plan_qty = #{item.planQty},
+                actual_qty = #{item.actualQty},
+                deviation_qty = #{item.deviationQty},
+                deviation_rate = #{item.deviationRate},
+                has_warning = #{item.hasWarning},
+                warning_level = #{item.warningLevel},
+                remark = #{item.remark},
+                update_by = #{item.updateBy},
+                update_time = #{item.updateTime}
+            </set>
+            WHERE id = #{item.id}
+        </foreach>
+    </update>
+
+    <!-- 批量更新实际用量和偏差数据（优化版，使用CASE WHEN一次更新多条） -->
+    <update id="batchUpdateActualAndDeviation" parameterType="java.util.List">
+        UPDATE raw_week_usage
+        <trim prefix="SET" suffixOverrides=",">
+            actual_qty = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.actualQty}
+            </foreach>
+            END,
+            deviation_qty = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.deviationQty}
+            </foreach>
+            END,
+            deviation_rate = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.deviationRate}
+            </foreach>
+            END,
+            has_warning = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.hasWarning}
+            </foreach>
+            END,
+            warning_level = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.warningLevel}
+            </foreach>
+            END,
+            remark = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.remark}
+            </foreach>
+            END,
+            update_by = CASE id
+            <foreach collection="list" item="item">
+                WHEN #{item.id} THEN #{item.updateBy}
+            </foreach>
+            END,
+            update_time = NOW()
+        </trim>
+        WHERE id IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            #{item.id}
+        </foreach>
+    </update>
 </mapper>

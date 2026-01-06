@@ -163,22 +163,4 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
                                       @RequestParam("month") Integer month){
         return rawWarningService.syncWeekActualUsage(factoryCode, year, week, month);
     }
-
-    @PostMapping("/handle-warning")
-    @ApiOperation("处理预警记录")
-    public AjaxResult handleWarning(@RequestParam("id") Long id,
-                                    @RequestParam("handler") String handler,
-                                    @RequestParam("opinion") String opinion) {
-        return rawWarningService.handleWarning(id, handler, opinion);
-    }
-
-    @GetMapping("/statistics")
-    @ApiOperation("获取预警统计")
-    public AjaxResult getStatistics(@RequestParam("factoryCode") String factoryCode,
-                                    @RequestParam(value = "warningType", required = false) String warningType,
-                                    @RequestParam(value = "days", required = false) Integer days) {
-        Map<String, Object> statistics = rawWarningService.getWarningStatistics(
-                factoryCode, warningType, days);
-        return AjaxResult.success(statistics);
-    }
 }

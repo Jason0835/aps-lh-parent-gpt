@@ -1,10 +1,14 @@
 package com.zlt.aps.factory.handler;
 
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
@@ -14,6 +18,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -91,9 +96,32 @@ public class MouldProductionResultHandler {
             mergeNoProductionReason(dayResult, requireList);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
-            //使用模具数量信息
+
+
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
             resultList.add(dayResult);
+        });
+        if (CollectionUtils.isEmpty(resultList)) {
+            return Collections.emptyList();
+        }
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap = baseDataContainer.getGroupMainPatternMouldRelationMap();
+        Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = baseDataContainer.getSkuMouldRelationMap();
+        //模具信息
+        resultList.forEach(singleResult -> {
+            List<ProductionMouldInfoVo> maxMouldList = groupMainPatternMouldRelationMap.get(singleResult.getGroupAndMainPattern());
+            if (CollectionUtils.isEmpty(maxMouldList)) {
+                singleResult.setMouldCavityQty(BigDecimal.ZERO.intValue());
+            } else {
+                singleResult.setMouldCavityQty(maxMouldList.size());
+            }
+            List<MonthPlanProductMouldInfoVo> skuMaxUsedList = skuMouldRelationMap.get(singleResult.getMaterialDesc());
+            if (CollectionUtils.isEmpty(skuMaxUsedList)) {
+                singleResult.setTypeBlockQty(BigDecimal.ZERO.intValue());
+            } else {
+                singleResult.setTypeBlockQty(skuMaxUsedList.size());
+            }
+            setMouldUsedInfo(singleResult);
         });
         return resultList;
     }
@@ -182,9 +210,10 @@ public class MouldProductionResultHandler {
         Integer sumNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         dayResult.setProdReqPlan(sumNetQty.intValue());
         //总需求(含损耗)
-        Integer heightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        dayResult.setFactProdReqQty(heightQty.intValue() + noHeightQty.intValue());
+        Integer heightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
+        dayResult.setFactProdReqQty(sumNetQty + lossQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
         dayResult.setMidProductionQty(BigDecimal.ZERO.intValue());
@@ -342,5 +371,46 @@ public class MouldProductionResultHandler {
             dayResult.setEndDay(Math.max(endDate, singleData.getEndDay()));
         }
         DayProductionHandler.addDayQty(dayResult, singleData, FactoryConstant.PRODUCTION_CYCLE);
+    }
+
+    /**
+     * 根据每日排产量，得到模具使用变化
+     *
+     * @param result
+     */
+    private static void setMouldUsedInfo(FactoryMonthPlanMouldDayResult result) {
+        Map<Integer, Integer> dayProductionQty = DayProductionHandler.getDayQty(result, FactoryConstant.PRODUCTION_CYCLE);
+        if (CollectionUtils.isEmpty(dayProductionQty)) {
+            return;
+        }
+        Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Map<Integer, Integer> lhMachineCountMap = new HashMap<>();
+        dayProductionQty.forEach((day, productionQty) -> lhMachineCountMap.put(day, BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue()));
+        Map<Integer, Integer> lhMachineNumberDayMap = new HashMap<>();
+        //获取使用硫化机台数的日期值，只保留一个日，按排产日由小到大顺序遍历
+        lhMachineCountMap.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            Integer lhMachineCount = entry.getValue();
+            if (null == lhMachineCount) {
+                return;
+            }
+            Integer day = entry.getKey();
+            if (null == day) {
+                return;
+            }
+            if (lhMachineNumberDayMap.containsKey(lhMachineCount)) {
+                return;
+            }
+            lhMachineNumberDayMap.put(lhMachineCount, day);
+        });
+        if (CollectionUtils.isEmpty(lhMachineNumberDayMap)) {
+            return;
+        }
+        //获取模具使用数变化集合，按排产日由小到大顺序遍历
+        List<String> usedLhMachineCount = new ArrayList<>();
+        lhMachineNumberDayMap.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> {
+            Integer mouldNumber = entry.getKey() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            usedLhMachineCount.add(mouldNumber.toString());
+        });
+        result.setMouldChangeInfo(String.join(StringConstant.DASH, usedLhMachineCount));
     }
 }

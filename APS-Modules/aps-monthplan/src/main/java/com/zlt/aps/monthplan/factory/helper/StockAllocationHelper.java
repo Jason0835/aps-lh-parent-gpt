@@ -334,6 +334,10 @@ public class StockAllocationHelper {
       if (p2 == null) {
         return 1;
       }
+      String transformed1 = o1.getWeekYear().substring(2) + o1.getWeekYear().substring(0,2);
+      String transformed2 = o2.getWeekYear().substring(2) + o2.getWeekYear().substring(0,2);
+      p1 = parseParam(transformed1);
+      p2 = parseParam(transformed2);
       return Integer.compare(p1, p2);
     }
 
@@ -392,11 +396,37 @@ public class StockAllocationHelper {
     // 5、库存冲减后，继续扣减月底计划余量部分
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
     // 库存分配量
-    int allocationQty = calculateAllocationQuantity(order, context);
-    int stockQty = calculateMatchStockQty(allocationQty,context);
-    int plannedSurplus =  calculatePlannedSurplus(orderQty,allocationQty,context);
-    int produceQtyDue = orderQty - allocationQty - plannedSurplus;
+    List<MdmProductStock> matchProductStocks = filterAndSortStocks(order, context);
+    int stockQty  = calculateMatchStockQty(matchProductStocks);
+    int allocationQty = calculateAllocationQty(orderQty,matchProductStocks);
+    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,allocationQty,context);
     return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
+  }
+
+  private static int calculateAllocationQty(int orderQty, List<MdmProductStock> matchProductStocks) {
+     if(orderQty == BigDecimal.ZERO.intValue() || CollectionUtils.isEmpty(matchProductStocks)) {
+        return BigDecimal.ZERO.intValue();
+     }
+      BigDecimal oriOrderQty = BigDecimal.valueOf(orderQty);
+      BigDecimal remainingQty = BigDecimal.valueOf(orderQty);
+      for (MdmProductStock stock : matchProductStocks) {
+        if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
+          break;
+        }
+        // 获取当前库存数量
+        BigDecimal stockQty = BigDecimal.valueOf(stock.getLeftOverQty());
+        if (stockQty.compareTo(remainingQty) >= 0) {
+          // 当前库存足够冲减
+          stock.setLeftOverQty(stockQty.subtract(remainingQty).intValue());
+          remainingQty = BigDecimal.ZERO;
+        } else {
+          // 当前库存不足，全部冲减
+          stock.setLeftOverQty(0);
+          remainingQty = remainingQty.subtract(stockQty);
+        }
+      }
+      return oriOrderQty.subtract(remainingQty).intValue();
   }
 
   private static int calculatePlannedSurplus(int orderQty, int allocationQty, StockAllocationContext context) {
@@ -428,26 +458,44 @@ public class StockAllocationHelper {
     return plannedSurplus;
   }
 
-  private static int calculateMatchStockQty(int allocationQty, StockAllocationContext context) {
-      if(allocationQty == BigDecimal.ZERO.intValue()) {
+  private static int calculateMatchStockQty(List<MdmProductStock> matchProductStocks) {
+      if(CollectionUtils.isEmpty(matchProductStocks)) {
           return BigDecimal.ZERO.intValue();
       }
-      int matchStockQty = context.getMatchStockQty();
-      context.setMatchStockQty(matchStockQty - allocationQty);
-      return matchStockQty;
+      return  matchProductStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
   }
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int plannedSurplus =  calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
-    int produceQtyDue = orderQty  - plannedSurplus;
+    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
     return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
+  }
+
+  private static int calculateProduceQtyDue(int orderQty, int allocationQty, int plannedSurplus) {
+      if(orderQty == BigDecimal.ZERO.intValue()) {
+         return BigDecimal.ZERO.intValue();
+      }
+      if(allocationQty == BigDecimal.ZERO.intValue()) {
+        return plannedSurplus >= orderQty?BigDecimal.ZERO.intValue():orderQty - plannedSurplus;
+      }
+      if(allocationQty >= orderQty) {
+         return BigDecimal.ZERO.intValue();
+      }
+      int produceQtyDue = orderQty - allocationQty;
+      if(plannedSurplus == BigDecimal.ZERO.intValue()) {
+          return produceQtyDue;
+      }
+      if(plannedSurplus >= produceQtyDue) {
+        return BigDecimal.ZERO.intValue();
+      }
+      return produceQtyDue - plannedSurplus;
   }
 
   /**
    * 计算单个订单的分配数量
    */
-  private static int calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
+  private static List<MdmProductStock> filterAndSortStocks(SalesOrderPool order, StockAllocationContext context) {
     List<MdmProductStock> stockInfos = context.getStockInfos();
     // 订单有年周号要求
     if(StringUtils.isNotBlank(order.getWeekYear()) && !ZERO_YEAR_WEEK.equals(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
@@ -478,39 +526,36 @@ public class StockAllocationHelper {
    * @param stockInfos 库存
    * @return 冲减结果
    */
-  private static int reduceInventoryByWeekYear(SalesOrderPool order, List<MdmProductStock> stockInfos) {
+  private static List<MdmProductStock> reduceInventoryByWeekYear(SalesOrderPool order, List<MdmProductStock> stockInfos) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
-      return BigDecimal.ZERO.intValue();
+      return Collections.emptyList();
     }
-    int orderWeekYear = Integer.parseInt(order.getWeekYear());
+    String transformed = order.getWeekYear().substring(2) + order.getWeekYear().substring(0,2);
+    int orderWeekYear = Integer.parseInt(transformed);
     // 3. 过滤和排序库存
     List<MdmProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
-      return BigDecimal.ZERO.intValue();
+      return Collections.emptyList();
     }
-    // 4. 执行冲减
-    ReductionDetail detail = performReduction(eligibleStocks, orderQty);
-    return orderQty.subtract(detail.getRemainingOrderQty()).intValue();
+    return eligibleStocks;
   }
 
-  private static int reduceInventory(SalesOrderPool order, List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
+  private static List<MdmProductStock> reduceInventory(SalesOrderPool order, List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
     BigDecimal orderQty = order.getOrdQty();
     if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
       log.warn("数量无效，无法冲减库存");
-      return BigDecimal.ZERO.intValue();
+      return Collections.emptyList();
     }
     // 3. 过滤和排序库存
     List<MdmProductStock> eligibleStocks = intelligentStockSelection(stockInfos, requiresDynamicBalance,requiresUniformity);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
       log.warn("没有符合条件的库存可以冲减");
-      return BigDecimal.ZERO.intValue();
+      return Collections.emptyList();
     }
-    // 4. 执行冲减
-    ReductionDetail detail = performReduction(eligibleStocks, orderQty);
-    return orderQty.subtract(detail.getRemainingOrderQty()).intValue();
+    return eligibleStocks;
   }
 
 
@@ -596,9 +641,10 @@ public class StockAllocationHelper {
           if (StringUtils.isBlank(stock.getWeekYear()) || !ApsCommonUtil.isNumber(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
             return false;
           }
-          int stockWeekYear = Integer.parseInt(stock.getWeekYear());
+          String transformed = stock.getWeekYear().substring(2) + stock.getWeekYear().substring(0,2);
+          int stockWeekYear = Integer.parseInt(transformed);
           stock.setStockWeekYear(stockWeekYear);
-          return stockWeekYear < orderWeekYear;
+          return stockWeekYear >= orderWeekYear;
         })
         // 收集为列表
         .collect(Collectors.toList());

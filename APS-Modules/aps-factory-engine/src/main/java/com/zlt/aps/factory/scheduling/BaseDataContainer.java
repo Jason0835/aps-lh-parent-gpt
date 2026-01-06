@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling;
 
+import com.zlt.aps.factory.domain.dto.DayCapacityLimitHelper;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
@@ -40,6 +41,11 @@ public class BaseDataContainer implements Serializable {
      */
     Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
     /**
+     * 结构+主花纹的模具关系
+     * key=group+主花纹 : value=模具关系列表
+     */
+    Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap;
+    /**
      * 模壳总数信息
      * key=模块标准 : value=模块标准数量
      */
@@ -49,4 +55,9 @@ public class BaseDataContainer implements Serializable {
      * key=胎胚号 : value={ key=特殊原材料编码 : value=比例}
      */
     Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
+    /**
+     * 日产能控制信息
+     * key=排产日 : value=日排产控制信息
+     */
+    Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap;
 }
