@@ -399,8 +399,8 @@ public class StockAllocationHelper {
     List<MdmProductStock> matchProductStocks = filterAndSortStocks(order, context);
     int stockQty  = calculateMatchStockQty(matchProductStocks);
     int allocationQty = calculateAllocationQty(orderQty,matchProductStocks);
-    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,context.getPlannedSurplus());
     int plannedSurplus = calculatePlannedSurplus(orderQty,allocationQty,context);
+    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,plannedSurplus);
     return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
@@ -467,8 +467,8 @@ public class StockAllocationHelper {
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),context.getPlannedSurplus());
     int plannedSurplus = calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
+    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),plannedSurplus);
     return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
   }
 
