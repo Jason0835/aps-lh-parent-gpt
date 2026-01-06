@@ -96,6 +96,8 @@ public class MouldProductionResultHandler {
             mergeNoProductionReason(dayResult, requireList);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
+
+
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
             resultList.add(dayResult);
         });
@@ -208,9 +210,10 @@ public class MouldProductionResultHandler {
         Integer sumNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         dayResult.setProdReqPlan(sumNetQty.intValue());
         //总需求(含损耗)
-        Integer heightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        dayResult.setFactProdReqQty(heightQty.intValue() + noHeightQty.intValue());
+        Integer heightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
+        dayResult.setFactProdReqQty(sumNetQty + lossQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
         dayResult.setMidProductionQty(BigDecimal.ZERO.intValue());
