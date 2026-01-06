@@ -187,15 +187,15 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         // 执行表达式，转义区域
         try {
             QueryFormulaUtil.execFormula(convertVoList, new String[]{
-                    "areaCodeName->getcolvaluewithcondition(sys_dept, dept_name, dept_id, areaCode, del_flag = 0)",
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
             });
         } catch (QueryExprException e) {
             this.logger.error(e.getMessage(), e);
             throw new ServiceException("转换区域，执行查询公式时发生错误.");
         }
-//        JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
-        return convertVoList.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCodeName()))
-                .collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeName, (k1, k2) -> k1));
+        JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
+        return convertVoList.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCodeNameI18n()))
+                .collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n, (k1, k2) -> k1));
     }
 
     @Override
