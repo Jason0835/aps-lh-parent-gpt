@@ -10,6 +10,7 @@ import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,7 +169,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private Map<String, RawWarningConfig> getUsageWarningConfigs(String factoryCode) {
         QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
         configWrapper.eq("FACTORY_CODE", factoryCode)
-                .eq("WARNING_TYPE", "1") // 用量偏差预警
+                // 用量偏差预警
+                .eq("WARNING_TYPE", "1")
                 .eq("ENABLED", 1);
         List<RawWarningConfig> warningConfigs = warningConfigMapper.selectList(configWrapper);
 
@@ -192,7 +194,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private RawWarningRecord createUsageWarningRecord(RawWeekUsage usage, RawWarningConfig config) {
         RawWarningRecord record = new RawWarningRecord();
         record.setFactoryCode(usage.getFactoryCode());
-        record.setWarningType("1"); // 用量偏差预警
+        // 用量偏差预警
+        record.setWarningType("1");
         record.setMaterialCode(usage.getMaterialCode());
         record.setMaterialDesc(usage.getMaterialDesc());
         record.setRelatedMonth(StringUtils.format(
@@ -204,8 +207,10 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                 I18nUtil.getMessage("common.year.month.week.format"),
                 usage.getYear(), usage.getMonth(), usage.getWeek()
         ));
-        record.setStatus("0"); // 未处理
-        record.setNotified(0); // 未通知
+        // 未处理
+        record.setStatus("0");
+        // 未通知
+        record.setNotified(0);
 
         // 设置预警标题和内容
         String title = StringUtils.format(
@@ -230,6 +235,16 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
         record.setWarningContent(content);
 
         // 设置预警数据JSON
+        Map<String, Object> warningData = getStringObjectMap(usage, config);
+        record.setWarningData(JSON.toJSONString(warningData));
+
+        record.setCreateTime(new Date());
+        record.setCreateBy("system");
+
+        return record;
+    }
+
+    private static @NotNull Map<String, Object> getStringObjectMap(RawWeekUsage usage, RawWarningConfig config) {
         Map<String, Object> warningData = new HashMap<>();
         warningData.put("year", usage.getYear());
         warningData.put("week", usage.getWeek());
@@ -239,12 +254,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
         warningData.put("deviationRate", usage.getDeviationRate());
         warningData.put("configUpper", config.getDeviationUpper());
         warningData.put("configLower", config.getDeviationLower());
-        record.setWarningData(JSON.toJSONString(warningData));
-
-        record.setCreateTime(new Date());
-        record.setCreateBy("system");
-
-        return record;
+        return warningData;
     }
 
     /**
@@ -311,7 +321,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
             // 3. 获取新材料预警配置
             List<RawWarningConfig> warningConfigs = getNewMaterialWarningConfigs(factoryCode);
-            Set<String> warningMaterialCodes = extractWarningMaterialCodes(warningConfigs);
+            Map<String, RawWarningConfig> warningMaterialCodes = extractWarningMaterialCodes(warningConfigs);
             boolean warnAll = CollectionUtils.isEmpty(warningConfigs);
 
             // 4. 创建预警记录
@@ -364,7 +374,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     private List<RawWarningConfig> getNewMaterialWarningConfigs(String factoryCode) {
         QueryWrapper<RawWarningConfig> configWrapper = new QueryWrapper<>();
         configWrapper.eq("FACTORY_CODE", factoryCode)
-                .eq("WARNING_TYPE", "2") // 新材料预警
+                // 新材料预警
+                .eq("WARNING_TYPE", "2")
                 .eq("ENABLED", 1);
         return warningConfigMapper.selectList(configWrapper);
     }
@@ -372,13 +383,12 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     /**
      * 提取预警材料编码
      */
-    private Set<String> extractWarningMaterialCodes(List<RawWarningConfig> warningConfigs) {
+    private Map<String, RawWarningConfig> extractWarningMaterialCodes(List<RawWarningConfig> warningConfigs) {
         if (CollectionUtils.isEmpty(warningConfigs)) {
-            return Collections.emptySet();
+            return Collections.emptyMap();
         }
         return warningConfigs.stream()
-                .map(RawWarningConfig::getMaterialCode)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(RawWarningConfig::getMaterialCode, config -> config));
     }
 
     /**
@@ -388,10 +398,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                                              Integer currentYear, Integer currentMonth,
                                                              Integer previousYear, Integer previousMonth,
                                                              List<RawMaterialMonthDiff> diffs,
-                                                             Set<String> warningMaterialCodes,
+                                                             Map<String, RawWarningConfig> warningMaterialCodes,
                                                              boolean warnAll) {
-        List<RawWarningRecord> warnings = new ArrayList<>();
-
         // 按差异类型分组
         Map<String, List<RawMaterialMonthDiff>> diffByType = diffs.stream()
                 .collect(Collectors.groupingBy(RawMaterialMonthDiff::getDiffType));
@@ -401,7 +409,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                 I18nUtil.getMessage("raw.warning.diff.type.new"),
                 Collections.emptyList()
         );
-        warnings.addAll(createMaterialWarningsByType(
+        List<RawWarningRecord> warnings = new ArrayList<>(createMaterialWarningsByType(
                 factoryCode, currentYear, currentMonth, previousYear, previousMonth,
                 newMaterials, warningMaterialCodes, warnAll, true
         ));
@@ -426,7 +434,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                                                 Integer currentYear, Integer currentMonth,
                                                                 Integer previousYear, Integer previousMonth,
                                                                 List<RawMaterialMonthDiff> diffs,
-                                                                Set<String> warningMaterialCodes,
+                                                                Map<String, RawWarningConfig> warningMaterialCodes,
                                                                 boolean warnAll,
                                                                 boolean isNewMaterial) {
         if (CollectionUtils.isEmpty(diffs)) {
@@ -439,13 +447,13 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
 
         for (RawMaterialMonthDiff diff : diffs) {
             // 检查是否需要预警
-            if (!warnAll && !warningMaterialCodes.contains(diff.getMaterialCode())) {
+            if (!warnAll && !warningMaterialCodes.containsKey(diff.getMaterialCode())) {
                 continue;
             }
 
             warnings.add(createSingleMaterialWarningRecord(
                     factoryCode, currentYear, currentMonth, previousYear, previousMonth,
-                    diff, currentMonthStr, previousMonthStr, isNewMaterial
+                    diff, currentMonthStr, previousMonthStr, isNewMaterial, warningMaterialCodes.get(diff.getMaterialCode())
             ));
         }
 
@@ -461,16 +469,19 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                                                                RawMaterialMonthDiff diff,
                                                                String currentMonthStr,
                                                                String previousMonthStr,
-                                                               boolean isNewMaterial) {
+                                                               boolean isNewMaterial, RawWarningConfig rawWarningConfig) {
         RawWarningRecord record = new RawWarningRecord();
         record.setFactoryCode(factoryCode);
-        record.setWarningType("2"); // 新材料预警
+        // 新材料预警
+        record.setWarningType("2");
         record.setMaterialCode(diff.getMaterialCode());
         record.setMaterialDesc(diff.getMaterialDesc());
-        record.setWarningLevel("2"); // 中等级别
+        record.setWarningLevel(rawWarningConfig.getWarningLevel());
         record.setRelatedMonth(currentMonthStr);
-        record.setStatus("0"); // 未处理
-        record.setNotified(0); // 未通知
+        // 未处理
+        record.setStatus("0");
+        // 未通知
+        record.setNotified(0);
 
         // 设置预警标题和内容
         String title = isNewMaterial ?
