@@ -4,6 +4,9 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 对使用preDay1、preDay2、preDay3、day1、day2、day3.....等属性，
@@ -62,8 +65,8 @@ public class DayProductionHandler {
             return;
         }
         //日期合计汇总
+        String fieldName;
         for (Integer day : dayList) {
-            String fieldName = "";
             if (day > BigDecimal.ZERO.intValue()) {
                 fieldName = "day";
             } else {
@@ -85,5 +88,39 @@ public class DayProductionHandler {
             sumValue = sumValue + productionValue;
             target.setFieldValueByFieldName(fieldName, sumValue);
         }
+    }
+
+    /**
+     * 提取对应的日排产量
+     *
+     * @param source  元数据对象
+     * @param dayList 周期
+     * @return
+     */
+    public static Map<Integer, Integer> getDayQty(BaseEntity source, Integer[] dayList) {
+        if (null == source || null == dayList || dayList.length <= BigDecimal.ZERO.intValue()) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, Integer> dayQtyMap = new HashMap<>();
+        //日期量
+        String fieldName;
+        for (Integer day : dayList) {
+            if (day > BigDecimal.ZERO.intValue()) {
+                fieldName = "day";
+            } else {
+                fieldName = "preDay";
+            }
+            fieldName = fieldName + Math.abs(day);
+            Object value = source.getFieldValueByFieldName(fieldName);
+            if (null == value) {
+                continue;
+            }
+            Integer productionValue = Integer.valueOf("" + value);
+            if (productionValue <= BigDecimal.ZERO.intValue()) {
+                continue;
+            }
+            dayQtyMap.put(day, productionValue);
+        }
+        return dayQtyMap;
     }
 }

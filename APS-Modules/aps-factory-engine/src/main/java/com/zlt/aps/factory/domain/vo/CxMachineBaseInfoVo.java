@@ -128,6 +128,24 @@ public class CxMachineBaseInfoVo implements Serializable {
     private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
 
     /**
+     * 获取剩余产能，以剩余天数*此时的硫化配比
+     * 用于判断后续剩余产能判断
+     *
+     * @return
+     */
+    public Integer getRemainCapacity() {
+        Integer currentRemainDays = remainingDays;
+        if (null == currentRemainDays) {
+            currentRemainDays = BigDecimal.ZERO.intValue();
+        }
+        Integer currentRatio = ratio;
+        if (null == currentRatio) {
+            currentRatio = BigDecimal.ZERO.intValue();
+        }
+        return currentRemainDays * currentRatio;
+    }
+
+    /**
      * 获取固定信息的优先级
      * 固定SKU的优先级最高，其次是固定结构1,
      * 再次固定结构2，最后固定结构3

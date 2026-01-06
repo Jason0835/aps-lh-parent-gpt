@@ -6,6 +6,7 @@ import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
@@ -295,71 +296,35 @@ public class CxCapacityAllocationHandler {
         if (null == addNewGroupPlan) {
             return null;
         }
+        //获取机台信息
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String structureName = addNewGroupPlan.getGroupName();
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         if (CollectionUtils.isEmpty(allCxMachineMap)) {
             return null;
         }
+        //获取有剩余产能的机台信息
         List<CxMachineBaseInfoVo> cxMachineList = new ArrayList<>(allCxMachineMap.values());
         List<CxMachineBaseInfoVo> leftOverCxMachineList = cxMachineList.stream().filter(cxMachine -> cxMachine.getRemainingDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(leftOverCxMachineList)) {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLeftOverCapacityLog(context, structureName));
             return null;
         }
+        //成型机台基础条件匹配
         String isZeroRack = addNewGroupPlan.getIsZero();
-        //零度匹配，不可作业剔除
         List<CxMachineBaseInfoVo> enableCxMachineList = new ArrayList<>(leftOverCxMachineList.size());
         leftOverCxMachineList.forEach(cxMachineInfo -> {
-            String cxMachineCode = cxMachineInfo.getCxMachineCode();
-            String machineIsZeroRack = cxMachineInfo.getIsZeroRack();
-            if (!isZeroRack.equals(machineIsZeroRack)) {
-                //记录日志
-                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedZeroMatchLog(context, structureName, isZeroRack, cxMachineCode, machineIsZeroRack));
-                return;
+            //零度匹配，不可作业剔除
+            boolean isSelected = GroupPlanCxMachineSelector.isSelectMatchCxMachineForGroupPlan(context, addNewGroupPlan, cxMachineInfo);
+            if (isSelected) {
+                enableCxMachineList.add(cxMachineInfo);
             }
-            if (cxMachineInfo.isNoProductionStructure(structureName)) {
-                //记录日志
-                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
-                return;
-            }
-            List<MonthPlanProductionRequirePlanVo> groupPlanData = addNewGroupPlan.getGroupPlanData();
-            if (CollectionUtils.isEmpty(groupPlanData)) {
-                //todo 记录日志
-                return;
-            }
-            Set<String> materialCodeSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
-            if (CollectionUtils.isEmpty(materialCodeSet)) {
-                //todo 记录日志
-                return;
-            }
-            boolean isProduction = true;
-            for (String materialCode : materialCodeSet) {
-                if (cxMachineInfo.isNoProductionMaterial(materialCode)) {
-                    isProduction = false;
-                    break;
-                }
-            }
-            if (!isProduction) {
-                //记录日志
-                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
-                return;
-            }
-            String brandCode = cxMachineInfo.getCxMachineBrandCode();
-            MonthPlanStructureLhRatioVo lhRatioInfo = addNewGroupPlan.getLhRatio(cxMachineInfo);
-            if (null == lhRatioInfo) {
-                //记录日志
-                log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, brandCode));
-                return;
-            }
-            cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
-            enableCxMachineList.add(cxMachineInfo);
         });
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
-        //设置机台固定
+        //设置机台固定信息
         enableCxMachineList.stream().forEach(cxMachineInfo -> {
             cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(addNewGroupPlan));
         });
@@ -367,7 +332,9 @@ public class CxCapacityAllocationHandler {
         Integer minFixedPriority = enableCxMachineList.stream().mapToInt(CxMachineBaseInfoVo::getFixedPriority).min().getAsInt();
         List<CxMachineBaseInfoVo> fixedPriorityList = enableCxMachineList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
         if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
-            return fixedPriorityList.get(BigDecimal.ZERO.intValue());
+            CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineBrandCode()));
+            return fixedSelected;
         }
         //设置是否同规格，同英寸,断面宽
         setSameInfo(context, fixedPriorityList, addNewGroupPlan);
@@ -378,7 +345,9 @@ public class CxCapacityAllocationHandler {
                 .thenComparing(CxMachineBaseInfoVo::getRemainingDays, Comparator.reverseOrder())
                 .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
         fixedPriorityList.sort(sortComparator);
-        return fixedPriorityList.get(BigDecimal.ZERO.intValue());
+        CxMachineBaseInfoVo selected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
+        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineBrandCode()));
+        return selected;
     }
 
     /**
