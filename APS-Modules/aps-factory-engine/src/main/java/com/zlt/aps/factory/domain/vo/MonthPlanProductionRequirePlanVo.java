@@ -287,7 +287,11 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             noConfigurationLh = true;
             return;
         }
-        setDayVulcanizationQty(lhCapacity.getDayVulcanizationQty());
+        //单模产能
+        Integer singleLhMachineQty = lhCapacity.getDayVulcanizationQty();
+        if (null != singleLhMachineQty) {
+            setDayVulcanizationQty(singleLhMachineQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
+        }
         setCuringTime(lhCapacity.getVulcanizationTime());
     }
 

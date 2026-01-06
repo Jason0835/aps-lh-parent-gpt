@@ -4,9 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.adjust.service.impl.MpWeekAdjustFactory;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -17,6 +20,8 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.concurrent.TimeUnit;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -39,6 +44,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
     @Autowired
     private MpWeekAdjustFactory mpWeekAdjustFactory;
+
+    @Autowired
+    private RedisService redisService;
 
     /**
      * 获取调整明细列表
@@ -68,6 +76,37 @@ public class MpWeekRollAdjustController extends BaseController {
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
         // 返回结果处理
         return getDataTable(contextDTO.getAdjustDetailList());
+    }
+
+    /**
+     * 自动调整
+     */
+    @ApiOperation("自动调整")
+    @PostMapping("/autoAdjust")
+    public AjaxResult autoAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        String key = ApsConstant.REDIS_ADJUST_STRUCT_IN_AUTO + weekRollAdjustDTO.getFactoryCode();
+        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
+        }
+        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+        try{
+            // 获取周程滚动调整策略
+            IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
+            if (weekAdjustStrategy == null) {
+                throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
+            }
+            // 构建上下文对象
+            MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
+            log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                    contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+            // 执行周程滚动调整策略（自动调整）
+            weekAdjustStrategy.autoAdjust(contextDTO);
+            log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                    contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+            return AjaxResult.success();
+        }finally {
+            redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+        }
     }
 
     /**
