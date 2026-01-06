@@ -109,17 +109,17 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          prop: "materialCode",
+          prop: "mesMaterialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
         },
         {
-          prop: "mesMaterialCode",
+          prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
                 key={form.materialCode}
-                v-model={form.mesMaterialCode}
+                v-model={form.materialCode}
                 onChange={this.handleMaterialCodeChange}
               />
             );

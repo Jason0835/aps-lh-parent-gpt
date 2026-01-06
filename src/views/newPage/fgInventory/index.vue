@@ -64,7 +64,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "fgInventory",
+  name: "FgInventory",
   components: {
     tltUpload,
     // infoDialog,

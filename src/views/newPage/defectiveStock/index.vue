@@ -50,7 +50,7 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 export default {
-  name: "defectiveStock",
+  name: "DefectiveStock",
   components: {
     tltUpload,
   },

@@ -92,7 +92,7 @@ import infoDialog from "./components/infoDialog.vue";
 import scmoDialog from "./components/scmDialog.vue";
 
 export default {
-  name: "RegionalCapacityAllocation",
+  name: "OrderPool",
   components: {
     tltUpload,
     infoDialog,

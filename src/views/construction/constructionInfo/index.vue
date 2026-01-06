@@ -92,7 +92,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 // import addDialog from "./components/addDialog.vue";
 
 export default {
-  name: "Machine",
+  name: "ConstructionInfo",
   components: {
     tltUpload,
     TltUploadForm,

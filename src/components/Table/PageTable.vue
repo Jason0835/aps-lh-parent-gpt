@@ -142,7 +142,7 @@ export default {
       return rowHeight;
     },
     resize() {
-      console.log("resize");
+      console.log('resize');
       if (!this.calcHeight) {
         return;
       }

@@ -157,12 +157,12 @@ export default {
           width:120,
         },
         {
-          prop: "materialCode",
+          prop: "mesMaterialCode",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-          width:180,
+          width:350,
         },
         {
-          prop: "mesMaterialCode",
+          prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width:180,
         },

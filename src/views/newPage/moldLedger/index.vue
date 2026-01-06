@@ -88,7 +88,7 @@ import infoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
-  name: "moldingRestrictions",
+  name: "MoldLedger",
   components: {
     tltUpload,
     infoDialog,
