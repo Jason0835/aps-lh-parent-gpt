@@ -13,19 +13,21 @@ import java.util.List;
  * 文件名称：DpOrderOffsetDetailMapper.java
  * 描    述：S1-0604订单冲减分配Mapper接口
  *@author yelq
- *@date 2025-12-30
+ *@ time 2025-12-30
  *@version 1.0
  *
  *  修改记录：
  *     修改时间：...
- *     修 改 人：yelq
+ *     修 改 人：nick
  *     修改内容：...
  */
 @Mapper
 public interface DpOrderOffsetDetailEntityMapper extends CommBaseMapper<DpOrderOffsetDetail> {
 
     /**
-     * 批量更新生产数量
+     * 批量更新生产量
+     * @param list
+     * @return int
      */
     int updateBatchProductionQty(@Param("list") List<DpOrderOffsetDetail> list);
 }
