@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -29,7 +30,7 @@ import com.zlt.common.domain.CommonBusiEntity;
 @Data
 @TableName(value = "T_MDM_HOLIDAY")
 @KeySequence(value = "SEQ_HOLIDAY")
-public class MdmHoliday extends CommonBusiEntity{
+public class MdmHoliday extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
