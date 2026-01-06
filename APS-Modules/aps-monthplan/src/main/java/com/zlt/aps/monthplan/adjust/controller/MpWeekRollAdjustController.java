@@ -86,7 +86,7 @@ public class MpWeekRollAdjustController extends BaseController {
     public AjaxResult autoAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
         String key = ApsConstant.REDIS_ADJUST_STRUCT_IN_AUTO + weekRollAdjustDTO.getFactoryCode();
         if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
-            throw new CustomException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
         }
         redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         try{
