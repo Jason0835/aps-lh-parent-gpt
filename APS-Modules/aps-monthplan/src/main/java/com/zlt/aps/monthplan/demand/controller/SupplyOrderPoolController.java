@@ -10,6 +10,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
@@ -86,11 +87,13 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         if(CollectionUtils.isEmpty(areas)) {
             return;
         }
-        Map<String, String> areaMap = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark()))
-            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
-        if(CollectionUtils.isEmpty(areaMap)) {
+        List<DpArea> filterAreas = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark())).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(filterAreas)) {
             return;
         }
+        JsonI18nConvertUtils.conventJsonI18n(filterAreas, DpArea.class);
+        Map<String, String> areaMap = filterAreas.stream()
+            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
         for (SupplyOrderPool item: rows) {
             String area = item.getSaleArea();
             if(StringUtils.isBlank(area)) {
