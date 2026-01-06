@@ -533,6 +533,11 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(detailLogList)) {
             return;
         }
+        detailLogList.forEach(singleData -> {
+            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
+                singleData.setInventorySalesRatio(BigDecimal.ZERO);
+            }
+        });
         factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
     }
 
@@ -541,6 +546,14 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(dayResultList)) {
             return;
         }
+        dayResultList.forEach(singleData -> {
+            if (null == singleData.getInventorySalesRatio()) {
+                return;
+            }
+            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
+                singleData.setInventorySalesRatio(BigDecimal.ZERO);
+            }
+        });
         factoryProductionDayProductionResultService.saveBatch(dayResultList);
     }
 

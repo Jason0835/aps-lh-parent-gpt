@@ -177,6 +177,21 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public ProductGroupCxCapacityInfo getLhRatioByCxMachine(CxMachineBaseInfoVo cxMachineInfo) {
+        MonthPlanStructureLhRatioVo lhRatio = getLhRatio(cxMachineInfo);
+        if (null == lhRatio) {
+            return null;
+        }
+        return ProductGroupCxCapacityInfo.buildCxCapacityInfo(cxMachineInfo.getCxMachineCode(), lhRatio);
+    }
+
+    /**
+     * 从结构的成型硫化配比中，获取对应成型机机型的成型硫化配比
+     * 如果对应机型没有找到，则匹配机型为空的配比-**
+     *
+     * @param cxMachineInfo
+     * @return
+     */
+    public MonthPlanStructureLhRatioVo getLhRatio(CxMachineBaseInfoVo cxMachineInfo) {
         if (null == cxMachineInfo || StringUtils.isBlank(cxMachineInfo.getCxMachineBrandCode())) {
             return null;
         }
@@ -184,10 +199,10 @@ public class ProductionPlanGroupInfo {
             return null;
         }
         MonthPlanStructureLhRatioVo lhRatio = cxMachineLhRationMap.get(cxMachineInfo.getCxMachineBrandCode());
-        if (null == lhRatio) {
-            return null;
+        if (null != lhRatio) {
+            return lhRatio;
         }
-        return ProductGroupCxCapacityInfo.buildCxCapacityInfo(cxMachineInfo.getCxMachineCode(), lhRatio);
+        return cxMachineLhRationMap.get(ProductionConstant.ALL_BRAND_CODE_MATCH);
     }
 
     /**
@@ -221,7 +236,10 @@ public class ProductionPlanGroupInfo {
         hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
         Integer conclusionDay = selectedDayLimit.getDay();
-        Integer previousDay = context.getPreviousDay(conclusionDay);
+        if (isGroupStartDayByFormalProduction(conclusionDay)) {
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+        }
+        Integer previousDay = getPreviousDay(conclusionDay);
         if (null == previousDay) {
             return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
         }
@@ -646,6 +664,8 @@ public class ProductionPlanGroupInfo {
             dayProductionLimitInfo = new HashMap<>();
             return;
         }
+        Set<String> allocationCxMachineCodeSet = effectiveList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
+        this.allocationCxMachineCodeSet = allocationCxMachineCodeSet;
         Integer monthDays = context.getMonthDays();
         Set<Integer> stopDays = context.getStopDays();
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(monthDays);
@@ -804,7 +824,7 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 构建结构分组基础信息
-     * 结构对应的计划，已经结构下所有的硫化配比信息
+     * 结构对应的计划，以及结构下所有的硫化配比信息
      *
      * @param context            排产上下文
      * @param allRequirePlanList 所有排产计划
@@ -960,6 +980,38 @@ public class ProductionPlanGroupInfo {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 判断上机日是否为分组计划正式排产的最早排产日
+     *
+     * @return
+     */
+    private boolean isGroupStartDayByFormalProduction(Integer machineDay) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return true;
+        }
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        dayLimitList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
+        return machineDay.equals(dayLimitList.get(BigDecimal.ZERO.intValue()).getDay());
+    }
+
+    /**
+     * 获取前一天
+     *
+     * @param currentDay
+     * @return
+     */
+    public Integer getPreviousDay(Integer currentDay) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return currentDay;
+        }
+        Integer previousDay = currentDay - BigDecimal.ONE.intValue();
+        Set<Integer> productionDaySet = dayProductionLimitInfo.keySet();
+        if (productionDaySet.contains(previousDay)) {
+            return previousDay;
+        }
+        return getPreviousDay(previousDay);
     }
 
     /**

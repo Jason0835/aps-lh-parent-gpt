@@ -288,6 +288,13 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String isPrioritize;
 
     /**
+     * 最小投产量值
+     */
+    @Excel(name = "ui.data.column.demandPlan.minProductionQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "最小投产量值", name = "minProductionQty")
+    @TableField(value = "MIN_PRODUCTION_QTY")
+    private Integer minProductionQty;
+    /**
      * 高优先级
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)

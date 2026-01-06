@@ -315,7 +315,11 @@ public class MouldProductionResultHandler {
         if (null == total) {
             total = BigDecimal.ZERO;
         }
-        total = total.add(singleData.getTotalVulcanizationMinutes());
+        BigDecimal singleDataTotal = singleData.getTotalVulcanizationMinutes();
+        if (null == singleDataTotal) {
+            singleDataTotal = BigDecimal.ZERO;
+        }
+        total = total.add(singleDataTotal);
         dayResult.setTotalVulcanizationMinutes(total);
         //总排产量
         Integer totalQty = dayResult.getTotalQty();
