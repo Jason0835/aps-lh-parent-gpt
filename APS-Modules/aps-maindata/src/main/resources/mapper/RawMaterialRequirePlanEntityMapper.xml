@@ -4,4 +4,71 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.RawMaterialRequirePlanEntityMapper">
 
+    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan">
+        <!-- 这里配置字段映射 -->
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="year" property="year" jdbcType="INTEGER"/>
+        <result column="month" property="month" jdbcType="INTEGER"/>
+        <result column="material_code" property="materialCode" jdbcType="VARCHAR"/>
+        <result column="material_desc" property="materialDesc" jdbcType="VARCHAR"/>
+        <result column="material_type" property="materialType" jdbcType="VARCHAR"/>
+        <result column="factory_code" property="factoryCode" jdbcType="VARCHAR"/>
+        <result column="cur_month_qty" property="curMonthQty" jdbcType="DECIMAL"/>
+        <result column="cur_month_rudr_qty" property="curMonthRudrQty" jdbcType="DECIMAL"/>
+        <result column="t_month_qty" property="tMonthQty" jdbcType="DECIMAL"/>
+        <result column="t_month_eudr_qty" property="tMonthEudrQty" jdbcType="DECIMAL"/>
+        <result column="t1_month_qty" property="t1MonthQty" jdbcType="DECIMAL"/>
+        <result column="t1_month_eudr_qty" property="t1MonthEudrQty" jdbcType="DECIMAL"/>
+        <result column="t2_month_qty" property="t2MonthQty" jdbcType="DECIMAL"/>
+        <result column="t2_month_eudr_qty" property="t2MonthEudrQty" jdbcType="DECIMAL"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!-- 批量插入原材料需求计划 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO raw_material_require_plan (
+        year,
+        month,
+        material_code,
+        material_desc,
+        material_type,
+        factory_code,
+        cur_month_qty,
+        cur_month_rudr_qty,
+        t_month_qty,
+        t_month_eudr_qty,
+        t1_month_qty,
+        t1_month_eudr_qty,
+        t2_month_qty,
+        t2_month_eudr_qty,
+        remark,
+        create_by,
+        create_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.year},
+            #{item.month},
+            #{item.materialCode},
+            #{item.materialDesc},
+            #{item.materialType},
+            #{item.factoryCode},
+            #{item.curMonthQty},
+            #{item.curMonthRudrQty},
+            #{item.tMonthQty},
+            #{item.tMonthEudrQty},
+            #{item.t1MonthQty},
+            #{item.t1MonthEudrQty},
+            #{item.t2MonthQty},
+            #{item.t2MonthEudrQty},
+            #{item.remark},
+            #{item.createBy},
+            #{item.createTime}
+            )
+        </foreach>
+    </insert>
 </mapper>
