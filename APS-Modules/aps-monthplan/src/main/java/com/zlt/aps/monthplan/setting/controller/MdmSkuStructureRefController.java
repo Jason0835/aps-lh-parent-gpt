@@ -61,7 +61,7 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         QueryWrapper<MdmSkuStructureRef> queryWrapper = new QueryWrapper<>();
         // 条件拼接
         builderCondition(queryWrapper, queryVO);
-        startPage();
+        startPage(getOrderBy());
         List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(queryWrapper);
         clearPage();
         try {
@@ -82,7 +82,7 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time desc";
     }
 
     /**
