@@ -334,6 +334,10 @@ public class StockAllocationHelper {
       if (p2 == null) {
         return 1;
       }
+      String transformed1 = o1.getWeekYear().substring(2) + o1.getWeekYear().substring(0,2);
+      String transformed2 = o2.getWeekYear().substring(2) + o2.getWeekYear().substring(0,2);
+      p1 = parseParam(transformed1);
+      p2 = parseParam(transformed2);
       return Integer.compare(p1, p2);
     }
 
@@ -528,7 +532,8 @@ public class StockAllocationHelper {
       log.warn("数量无效，无法冲减库存");
       return Collections.emptyList();
     }
-    int orderWeekYear = Integer.parseInt(order.getWeekYear());
+    String transformed = order.getWeekYear().substring(2) + order.getWeekYear().substring(0,2);
+    int orderWeekYear = Integer.parseInt(transformed);
     // 3. 过滤和排序库存
     List<MdmProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
     if (CollectionUtils.isEmpty(eligibleStocks)) {
@@ -636,7 +641,8 @@ public class StockAllocationHelper {
           if (StringUtils.isBlank(stock.getWeekYear()) || !ApsCommonUtil.isNumber(stock.getWeekYear()) || stock.getLeftOverQty() == null || stock.getLeftOverQty() <= 0) {
             return false;
           }
-          int stockWeekYear = Integer.parseInt(stock.getWeekYear());
+          String transformed = stock.getWeekYear().substring(2) + stock.getWeekYear().substring(0,2);
+          int stockWeekYear = Integer.parseInt(transformed);
           stock.setStockWeekYear(stockWeekYear);
           return stockWeekYear < orderWeekYear;
         })
