@@ -88,7 +88,7 @@ export default {
           width: 120,
         },
         {
-          label: this.$t("计划类型"),
+          label: this.$t("ui.data.monthlyProductionPlan.planType"),
           prop: "planType",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_plan_type, value);
@@ -96,7 +96,7 @@ export default {
           width: 120,
         },
         {
-          label: this.$t("施工阶段"),
+          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
           prop: "constructionStage",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
@@ -122,16 +122,16 @@ export default {
 
         {
           prop: "mouldCavityQty",
-          label: this.$t("型腔"),
+          label: this.$t("ui.data.monthlyProductionPlan.mouldCavityQty"),
         },
         {
           prop: "typeBlockQty",
-          label: this.$t("活块"),
+          label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
           width: 120,
         },
         {
           prop: "prodReqPlan",
-          label: this.$t("净需求"),
+          label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
           width: 120,
         },
         {
@@ -146,12 +146,12 @@ export default {
         },
         {
           prop: "inventorySalesRatio",
-          label: this.$t("库销比"),
+          label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
           width: 120,
         },
         {
           prop: "dayVulcanizationQty",
-          label: this.$t("日硫化量"),
+          label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 120,
         },
       ];

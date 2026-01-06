@@ -107,7 +107,10 @@ import {
   removeCycleSchStruConf,
   getCycleSchStruConf,
 } from "@/api/monthplan/mdmCycleSchStruConf";
+import {
+  selectSkuStructure,
 
+} from "@/api/monthplan/skuStructure";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -161,6 +164,7 @@ export default {
       yearMonth: "",
       btnLoading: false,
       visible: false,
+      structureList:[]
     };
   },
   computed: {
@@ -238,11 +242,37 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          type: "select",
+          dictData:this.structureList
         },
       ];
     },
   },
   methods: {
+    async getStructureList() {
+      try {
+
+        const res = await selectSkuStructure({
+          pageSize: 1000,
+          pageNum: 1,
+
+        });
+        let list=[]
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj={
+            label:res.rows[i].structureName,
+            value:res.rows[i].structureName
+          }
+          list.push(obj)
+
+        }
+        this.structureList=list
+        console.log(res);
+      } catch (error) {
+        console.log(error);
+      } finally {
+      }
+    },
     async handleConfirm() {
       if (this.yearMonth == "") {
         this.$modal.msgWarning(this.$t('ui.data.column.construction.check.planMonth.isNull'));
@@ -386,6 +416,7 @@ export default {
     },
   },
   created() {
+    this.getStructureList()
     let defaultParams = {
       factoryCode: "116",
     };

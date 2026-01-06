@@ -134,6 +134,7 @@ export default {
           popper-class={item.popperClass || ""}
           disabled={item.disabled}
           default-time={item.defaultTime}
+          on={item.listeners}
         ></el-date-picker>
       );
     },

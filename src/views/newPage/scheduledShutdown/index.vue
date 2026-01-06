@@ -2,8 +2,8 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="cxFixedMachineMainTable"
       :calcHeight="true"
+      tableRef="cxFixedMachineMainTable"
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"

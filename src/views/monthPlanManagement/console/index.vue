@@ -383,6 +383,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "factoryCode",
@@ -403,6 +406,11 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      console.log(val);
+      this.query.yearMonth = val;
+      this.search.yearMonth = val;
+    },
     handleAdd() {
       if (this.$refs.noVersionListRef) {
         const params = {

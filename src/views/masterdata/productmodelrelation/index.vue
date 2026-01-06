@@ -65,7 +65,7 @@
           :loading="updateLoading"
           type="primary"
           v-hasPermi="['maindata:relation:updateMainPattern']"
-          >{{ $t("更新主花纹到物料信息表") }}</el-button
+          >{{ $t("ui.data.productmodelrelation.updateMainPattern") }}</el-button
         >
       </template>
     </page-table>

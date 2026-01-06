@@ -37,7 +37,7 @@
           type="primary"
           plain
           v-hasPermi="['monthplan:ProductMoldingLimit:add']"
-          >{{ $t("生成当前周期排产结构") }}</el-button
+          >{{ $t("生成当前周期排产ui.data.column.scheduleAdjust.structureCode") }}</el-button
         >
         <el-button
           type="warning"
@@ -77,7 +77,10 @@ import {
   listMonCycleSchStruConf,
   removeMonCycleSchStruConf,
 } from "@/api/monthplan/mdmMonCycleSchStruConf";
+import {
+  selectSkuStructure,
 
+} from "@/api/monthplan/skuStructure";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -97,6 +100,7 @@ export default {
   },
   data() {
     return {
+      structureList:[],
       loading: false,
       data: [],
       selection: [],
@@ -121,30 +125,30 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("工厂"),
+          label: this.$t("common.factory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("年份"),
+          label: this.$t("ui.data.colume.year"),
         },
         {
           prop: "month",
-          label: this.$t("月份"),
+          label: this.$t("ui.data.colume.month"),
         },
         {
           prop: "structureName",
-          label: this.$t("结构"),
+          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
         },
         {
           prop: "turnoverMonth",
-          label: this.$t("周转月数"),
+          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
-          label: this.$t("最低硫化机台数"),
+          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
         },
 
         // {
@@ -154,7 +158,30 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("更新日期"),
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+        },
+        {
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.btn.option"),
+          minWidth: 180,
+          width: 200,
+          fixed: "right",
+          render: ({ row }) => {
+            return (
+              <div>
+
+                <el-button
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                  v-hasPermi={["monthplan:mdmMonCycleSchStruConf:remove"]}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
+            );
+          },
         },
         // {
         //   align: "center",
@@ -184,20 +211,22 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("工厂"),
+          label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "yearMonth",
-          label: this.$t("年月"),
+          label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
           dateType: "month",
           valueFormat:'yyyy-MM',
         },
         {
           prop: "structureName",
-          label: this.$t("结构"),
+          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          type: "select",
+          dictData:this.structureList
         },
       ];
     },
@@ -309,10 +338,41 @@ export default {
         this.loading = false;
       }
     },
+    async getStructureList() {
+      try {
+
+        const res = await selectSkuStructure({
+          pageSize: 1000,
+          pageNum: 1,
+
+        });
+        let list=[]
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj={
+            label:res.rows[i].structureName,
+            value:res.rows[i].structureName
+          }
+          list.push(obj)
+
+        }
+        this.structureList=list
+        console.log(res);
+      } catch (error) {
+        console.log(error);
+      } finally {
+      }
+    },
   },
+
   created() {
+    this.getStructureList()
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0"); // ui.data.colume.month从0开始，需要+1
     let defaultParams = {
       factoryCode: "116",
+      yearMonth: `${year}-${month}`,
     };
     this.search = {
       ...defaultParams,

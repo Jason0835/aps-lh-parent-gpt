@@ -411,6 +411,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
 
         {
@@ -453,6 +456,11 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      console.log(val);
+      this.query.yearMonth = val;
+      this.search.yearMonth = val;
+    },
     hasPermission(permission) {
       const permissions = this.$store.state.user.permissions || [];
       if (Array.isArray(permission)) {

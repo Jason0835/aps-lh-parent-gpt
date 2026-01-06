@@ -137,19 +137,19 @@ export default {
         },
         {
           prop: "month1",
-          label: this.$t("T月"),
+          label: this.$t("ui.data.orderForecast.month1"),
           width:120
         },
 
         {
           prop: "month2",
-          label: this.$t("T+1月"),
+          label: this.$t("ui.data.orderForecast.month2"),
           width:120
 
         },
         {
           prop: "month3",
-          label: this.$t("T+2月"),
+          label: this.$t("ui.data.orderForecast.month3"),
           width:120
         },
         {
@@ -160,7 +160,7 @@ export default {
         },
         {
           prop: "updateTime",
-          label: this.$t("生成时间"),
+          label: this.$t("ui.data.orderForecast.updateTime"),
           width:180
         },
 

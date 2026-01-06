@@ -379,7 +379,7 @@ export default {
         let res = await areaList({
           pageSize: 1000,
           pageNum: 1,
-          factoryCode: 116,
+          // factoryCode: '116',
           status: 0,
         });
         let list=[]
