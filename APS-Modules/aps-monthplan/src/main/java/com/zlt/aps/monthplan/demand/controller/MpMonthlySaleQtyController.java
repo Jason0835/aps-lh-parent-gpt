@@ -167,9 +167,6 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     private List<MpHistorySaleRecord> getAreaGroupHistorySaleRecordList(String factoryCode, String last12YearMonth, String maxYearMonth, List<String> codeList) {
         List<MpHistorySaleRecord> sumQtyGroupByAreaList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByArea(factoryCode, last12YearMonth, maxYearMonth, codeList);
 
-        for (MpHistorySaleRecord record : sumQtyGroupByAreaList) {
-//            record.setColorFlag()
-        }
         // 执行表达式，转义区域
         try {
             QueryFormulaUtil.execFormula(sumQtyGroupByAreaList, new String[]{
