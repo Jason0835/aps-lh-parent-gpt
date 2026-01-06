@@ -33,7 +33,7 @@ public class MdmConstructionInfo extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 工厂编号 */
-    @Excel(name = "ui.data.column.mdmConstructionInfo.factoryCode", sort = 1)
+    @Excel(name = "ui.data.column.mdmConstructionInfo.factoryCode", dictType = "biz_factory_name", sort = 1)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
