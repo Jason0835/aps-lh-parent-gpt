@@ -201,6 +201,14 @@ public class MdmProductStock extends BaseEntity {
     }
 
     /**
+     * 是按年周号 + 动平衡 + 均匀性匹配的库存数
+     */
+    public String getStockGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, weekYear, isDynamicBalance,isUniformity);
+    }
+
+    /**
      * 初始化超龄状态
      *
      * @param code 状态码

@@ -50,6 +50,10 @@ public class CxAddSkuProductionHandler {
         }
         //获取最先收尾的硫化组
         EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext);
+        if(null == lhGroup){
+            //todo 记录日志
+            return;
+        }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = groupPlanInfo.getLatestEndDay();
@@ -96,9 +100,12 @@ public class CxAddSkuProductionHandler {
      */
     public static void productionAddSku(Context context, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxMachineAllocationPlanHelper productionPlan, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
+        String groupName = productionPlanInfo.getGroupName();
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoFindMachineInfoLog(context, groupName, cxMachineCode));
             return;
         }
         //获取最先收尾的硫化组
@@ -107,21 +114,29 @@ public class CxAddSkuProductionHandler {
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = productionPlan.getEndDay();
         if (startDay > endDay) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addLhGroupStartLimitEndLog(context, groupName, cxMachineCode, startDay, endDay));
             return;
         }
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
         if (StringUtils.isBlank(materialDesc)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addLhGroupNoFindSkuLog(context, groupName, cxMachineCode));
+            return;
+        }
+        //计算需要排产的量
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(productionPlanList, materialDesc);
+        if (null == needProductionInfo) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));
             return;
         }
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(productionPlanList, materialDesc);
-        if (null == needProductionInfo) {
-            //todo 记录日志
+        if (CollectionUtils.isEmpty(doubleMouldList)) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoFindMouldLog(context, groupName, cxMachineCode, materialDesc));
             return;
         }
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
@@ -130,7 +145,7 @@ public class CxAddSkuProductionHandler {
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         Set<String> cxMachineInfoSet = new HashSet<>();
         cxMachineInfoSet.add(cxMachineCode);
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlan.getProductionPlanInfo(), cxMachineInfoSet, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, cxMachineInfoSet, cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
         CxLhMouldProductionCalculator.lhProductionByCxMachineHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
@@ -190,8 +205,8 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(minInventorySalesRatioList)) {
             minInventorySalesRatioList = heightRequireList;
         }
-        //小于50条的优先
-        List<MonthPlanProductionRequirePlanVo> lessMinQtyList = minInventorySalesRatioList.stream().filter(plan -> plan.isLess(Long.valueOf(productionContext.getBaseDataContainer().getParamConfiguration().getMinQty()))).collect(Collectors.toList());
+        //小于50条的优先 productionContext.getBaseDataContainer().getParamConfiguration().getMinQty())
+        List<MonthPlanProductionRequirePlanVo> lessMinQtyList = minInventorySalesRatioList.stream().filter(plan -> plan.isLess(plan.getMinProductionQty())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(lessMinQtyList)) {
             lessMinQtyList = minInventorySalesRatioList;
         }

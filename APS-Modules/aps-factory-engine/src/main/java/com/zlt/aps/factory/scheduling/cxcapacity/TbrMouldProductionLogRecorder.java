@@ -18,7 +18,9 @@ public class TbrMouldProductionLogRecorder {
      * 增加分组结构排产成型机台没有需要排产的计划日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有待排产计划====
      *
-     * @param context 排程上下文
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
      * @return
      */
     public static String addGroupCxMachineMouldNoPlanLog(Context context, String groupName, String cxMachineCode) {
@@ -32,13 +34,116 @@ public class TbrMouldProductionLogRecorder {
      * 增加分组结构排产成型机台没有找到机台信息日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有找到机台====
      *
-     * @param context 排程上下文
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
      * @return
      */
     public static String addGroupCxMachineMouldNoFindMachineInfoLog(Context context, String groupName, String cxMachineCode) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有找到机台====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_NO_FIND_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台分组计划没有硫化配比信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，分组计划没有硫化配比信息====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @return
+     */
+    public static String addGroupCxMachineMouldGroupNoRatioLog(Context context, String groupName, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，分组计划没有硫化配比信息====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_GROUP_NO_FIND_RATIO_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台分组计划没有找到机型的硫化配比信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，分组计划没有机型：%s硫化配比信息====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @param brandCode     机型编号
+     * @return
+     */
+    public static String addGroupCxMachineMouldGroupNoBrandRatioLog(Context context, String groupName, String cxMachineCode, String brandCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，分组计划没有机型：%s硫化配比信息====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, brandCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_GROUP_NO_FIND_BRAND_RATIO_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台硫化组起始排产日超出收尾日日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，硫化组起始排产日：%s超出收尾日：%s====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @param startDay      起始排产日
+     * @param endDay        排产收尾日
+     * @return
+     */
+    public static String addLhGroupStartLimitEndLog(Context context, String groupName, String cxMachineCode, Integer startDay, Integer endDay) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，硫化组起始排产日：%s超出收尾日：%s====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_START_LIMIT_END_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台硫化组没有找到可排产Sku信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，硫化组没有找到可排产Sku====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @return
+     */
+    public static String addLhGroupNoFindSkuLog(Context context, String groupName, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，硫化组没有找到可排产Sku====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_NO_FIND_SKU_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台硫化组排产Sku没有可排产量信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有可排产量====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @param materialDesc  Sku信息
+     * @return
+     */
+    public static String addLhGroupSkuNoProductionQtyLog(Context context, String groupName, String cxMachineCode, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有可排产量====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_NO_PRODUCTION_QTY_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组结构排产成型机台硫化组排产Sku没有可排产量信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有找到合适的模具====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @param materialDesc  Sku信息
+     * @return
+     */
+    public static String addLhGroupSkuNoFindMouldLog(Context context, String groupName, String cxMachineCode, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有找到合适的模具====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP, logContent);
         return logContent;
     }
 

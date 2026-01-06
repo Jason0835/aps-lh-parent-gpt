@@ -201,7 +201,7 @@ public class CxLhMouldProductionCalculator {
             Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
-            //todo 判断模具是否排产完毕
+            //todo 判断当日模具是否排产完毕
             boolean isDayFinish = true;
             //更新模具日产信息
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, cxMachineInfoSet, BigDecimal.ZERO.intValue());

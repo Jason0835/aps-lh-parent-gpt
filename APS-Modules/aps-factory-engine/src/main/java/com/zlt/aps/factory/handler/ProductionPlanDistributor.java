@@ -34,13 +34,13 @@ public class ProductionPlanDistributor {
         //todo 怎么分配
         Map<Long, Integer> realDeductionMap = new HashMap<>();
         //先高优先级，再其他净需求
-        List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         realDayProductionQty = deductionHeightProductionQty(heightPlanList, realDeductionMap, realDayProductionQty);
-        if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
+        if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
             return realDeductionMap;
         }
         //再其它净需求
-        List<MonthPlanProductionRequirePlanVo> noHeightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> noHeightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         deductionNoHeightQty(noHeightPlanList, realDeductionMap, realDayProductionQty);
         return realDeductionMap;
     }
@@ -94,7 +94,7 @@ public class ProductionPlanDistributor {
      * @return
      */
     private Integer deductionNoHeightQty(List<MonthPlanProductionRequirePlanVo> noHeightPlanList, Map<Long, Integer> realDeductionMap, Integer realDayProductionQty) {
-        if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
+        if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
             return realDayProductionQty;
         }
         if (CollectionUtils.isEmpty(noHeightPlanList)) {

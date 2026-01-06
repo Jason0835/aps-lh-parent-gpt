@@ -398,9 +398,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         Integer    passSixMonthSaleQty = monthlySaleQty.getPassSixMonthSaleQty();
         Integer   deliveryFrequency = monthlySaleQty.getDeliveryFrequency();
         String    saleArea = monthlySaleQty.getSaleArea();
-        int stockLimit = BigDecimalUtils.multiply(context.getTurnOverDays(),BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
-                .divideToIntegralValue(BigDecimal.valueOf(30)).intValue();
-        entity.setStockLimit(stockLimit);
+        BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
+        entity.setStockLimit(stockLimit.intValue());
         entity.setQty(productionQty.intValue());
         entity.setBaseVale(null);
         entity.setIsDelete(YesOrNoEnum.NO.getValue());
@@ -570,11 +569,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setDeliveryFrequency(monthlySaleQty.getDeliveryFrequency());
             supplyOrderPool.setSaleArea(monthlySaleQty.getSaleArea());
             supplyOrderPool.setAverageSaleQty(monthlySaleQty.getAverageSaleQty());
-            // 周转天数
-            BigDecimal turnOverDays = this.getTurnOverDays();
-            int stockLimit = BigDecimalUtils.multiply(turnOverDays,BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
-                .divideToIntegralValue(BigDecimal.valueOf(30)).intValue();
-            supplyOrderPool.setStockLimit(stockLimit);
+            BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
+            supplyOrderPool.setStockLimit(stockLimit.intValue());
         }else{
             supplyOrderPool.setThreeAverageQty(BigDecimal.ZERO.intValue());
             supplyOrderPool.setSixAverageQty(BigDecimal.ZERO.intValue());
