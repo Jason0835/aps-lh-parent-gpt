@@ -61,7 +61,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
      */
     @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /**

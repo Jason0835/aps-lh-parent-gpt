@@ -639,6 +639,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             } else {
                 groupAllocationList = allAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
             }
+            //重新设置分配的机台
+            Set<String> allocationSet = groupAllocationList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
+            groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
         //处理计划的待排产量及排产标记重置
