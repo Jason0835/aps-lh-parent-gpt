@@ -69,7 +69,7 @@ export default {
     tltUpload,
     // infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no",'biz_stor_type'],
+  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no",'biz_stor_type','biz_brand_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -117,6 +117,10 @@ export default {
         {
           prop: "brand",
           label: this.$t("common.brand"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
+          minWidth:120
         },
         {
           prop: "structureName",

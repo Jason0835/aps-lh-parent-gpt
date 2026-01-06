@@ -17,9 +17,12 @@ export function versionListConsole(query) {
 }
 export function versionConfirm(query) {
   return request({
-    url: '​/factory​/console​/confirmProductionRequireVersion',
+    url: '/factory/console/confirmProductionRequireVersion',
     method: 'post',
-    data: query
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
   })
 }
 
@@ -75,7 +78,7 @@ export function factoryMouldingProduction(query) {
  */
 export function factoryWholeCourseProduction(query) {
   return request({
-    url: '/factory/console/factoryWholeCourseProduction',
+    url: '/factory/console/oneClickProductionProcess',
     method: 'post',
     data: query,
     headers: {

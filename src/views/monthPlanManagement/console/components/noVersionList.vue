@@ -94,28 +94,28 @@ export default {
           prop: "productTypeCode",
           align: "center",
 
-          render: ({ row }) => {
-            return (
-              <div>
-                <div>TBR</div>
-                <div>
-                  <text-button
-                    onClick={() => {
-                      this.handleGenerate(row);
-                    }}
-                  >
-                    {this.$t("生成")}
-                  </text-button>
-                </div>
-              </div>
-            );
-          },
+          // render: ({ row }) => {
+          //   return (
+          //     <div>
+          //       <div>TBR</div>
+          //       <div>
+          //         <text-button
+          //           onClick={() => {
+          //             this.handleGenerate(row);
+          //           }}
+          //         >
+          //           {this.$t("生成")}
+          //         </text-button>
+          //       </div>
+          //     </div>
+          //   );
+          // },
         },
-        {
-          label: this.$t("胎别"),
-          prop: "productTypeCode",
-          align: "center",
-        },
+        // {
+        //   label: this.$t("胎别"),
+        //   prop: "productTypeCode",
+        //   align: "center",
+        // },
 
         {
           label: this.$t("版本号"),
