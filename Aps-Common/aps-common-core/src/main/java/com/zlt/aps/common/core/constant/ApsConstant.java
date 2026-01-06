@@ -481,4 +481,11 @@ public class ApsConstant {
      * 生产顺序标识
      */
     public static final Integer PRODUCT_ORDER_FLAG = 1;
+
+
+    /**
+     * 结构内调整-自动调整
+     */
+    public static final String REDIS_ADJUST_STRUCT_IN_AUTO = "APS:STRUCT:IN:AUTO:";
+
 }
