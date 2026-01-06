@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class StockAllocationHelper {
+
+  private final static String ZERO_YEAR_WEEK = "0000";
   /**
    * 根据库存对冲顺序配置，进行库存分配
    */
@@ -99,7 +101,7 @@ public class StockAllocationHelper {
     if(plannedSurplus == 0L) {
       for (SalesOrderPool order : saleOrders) {
         int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-        allocations.add(buildAllocation(order, monthPlanVersion,yearMonth,0,plannedSurplus, 0,orderQty));
+        allocations.add(buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(),orderQty));
       }
       return allocations;
     }
@@ -125,6 +127,13 @@ public class StockAllocationHelper {
    */
   private static Comparator<SalesOrderPool> getHighPerformanceComparator() {
     return new SalesOrderComparator();
+  }
+
+  /**
+   * 高性能自定义比较器（适用于大数据量）
+   */
+  private static Comparator<MdmProductStock> getHighPerformanceComparator(boolean requireBalance,boolean requireUniformity) {
+    return new ProductStockComparator(requireBalance,requireUniformity);
   }
 
   /**
@@ -215,13 +224,140 @@ public class StockAllocationHelper {
     }
   }
 
+
+  /**
+   * 自定义高性能比较器实现
+   * 避免重复解析和lambda开销
+   */
+  private static class ProductStockComparator implements Comparator<MdmProductStock> {
+    private final boolean requiresDynamicBalance;
+    private final boolean requiresUniformity;
+
+    public ProductStockComparator(boolean requiresDynamicBalance, boolean requiresUniformity) {
+      this.requiresDynamicBalance = requiresDynamicBalance;
+      this.requiresUniformity = requiresUniformity;
+    }
+
+    @Override
+    public int compare(MdmProductStock o1, MdmProductStock o2) {
+        // 优先级1: 动平衡优先
+        if(requiresDynamicBalance) {
+            // 1. 比较供应链优先级
+            Integer dynamicBalanceCompare1 = isDynamicBalanceStock(o1) ? 0 : 1;
+            Integer dynamicBalanceCompare2 = isDynamicBalanceStock(o2) ? 0 : 1;
+            if(!dynamicBalanceCompare1.equals(dynamicBalanceCompare2)) {
+                return dynamicBalanceCompare1.compareTo(dynamicBalanceCompare2);
+            }
+            Integer uniformityCompare1 = !isUniformityStock(o1) ? 0 : 1;
+            Integer uniformityCompare2 = !isUniformityStock(o2) ? 0 : 1;
+            if(!uniformityCompare1.equals(uniformityCompare2)) {
+              return uniformityCompare1.compareTo(uniformityCompare2);
+            }
+            Integer yearWeekCompare = compareYearWeek(o1, o2);
+            if (yearWeekCompare != 0) {
+              return yearWeekCompare;
+            }
+            Integer leftStockQtyCompare = compareLeftStockQty(o1,o2);
+            if (leftStockQtyCompare != 0) {
+              return leftStockQtyCompare;
+            }
+            return o1.getId().compareTo(o2.getId());
+        }
+
+        if(requiresUniformity) {
+          Integer uniformityCompare1 = isUniformityStock(o1) ? 0 : 1;
+          Integer uniformityCompare2 = isUniformityStock(o2) ? 0 : 1;
+          if(!uniformityCompare1.equals(uniformityCompare2)) {
+            return uniformityCompare1.compareTo(uniformityCompare2);
+          }
+          Integer dynamicBalanceCompare1 = !isDynamicBalanceStock(o1) ? 0 : 1;
+          Integer dynamicBalanceCompare2 = !isDynamicBalanceStock(o2) ? 0 : 1;
+          if(!dynamicBalanceCompare1.equals(dynamicBalanceCompare2)) {
+            return dynamicBalanceCompare1.compareTo(dynamicBalanceCompare2);
+          }
+          Integer yearWeekCompare = compareYearWeek(o1, o2);
+          if (yearWeekCompare != 0) {
+            return yearWeekCompare;
+          }
+          Integer leftStockQtyCompare = compareLeftStockQty(o1,o2);
+          if (leftStockQtyCompare != 0) {
+            return leftStockQtyCompare;
+          }
+          return o1.getId().compareTo(o2.getId());
+        }
+
+      Integer uniformityCompare1 = !isUniformityStock(o1) ? 0 : 1;
+      Integer uniformityCompare2 = !isUniformityStock(o2) ? 0 : 1;
+      if(!uniformityCompare1.equals(uniformityCompare2)) {
+        return uniformityCompare1.compareTo(uniformityCompare2);
+      }
+      Integer dynamicBalanceCompare1 = !isDynamicBalanceStock(o1) ? 0 : 1;
+      Integer dynamicBalanceCompare2 = !isDynamicBalanceStock(o2) ? 0 : 1;
+      if(!dynamicBalanceCompare1.equals(dynamicBalanceCompare2)) {
+        return dynamicBalanceCompare1.compareTo(dynamicBalanceCompare2);
+      }
+      Integer yearWeekCompare = compareYearWeek(o1, o2);
+      if (yearWeekCompare != 0) {
+        return yearWeekCompare;
+      }
+      Integer leftStockQtyCompare = compareLeftStockQty(o1,o2);
+      if (leftStockQtyCompare != 0) {
+        return leftStockQtyCompare;
+      }
+      return o1.getId().compareTo(o2.getId());
+    }
+
+    private Integer compareLeftStockQty(MdmProductStock o1, MdmProductStock o2) {
+        Integer leftStockQty = o1.getLeftOverQty();
+        Integer rightStockQty = o2.getLeftOverQty();
+        if (leftStockQty == null && rightStockQty == null) {
+          return 0;
+        }
+        if (leftStockQty == null) {
+          return 1;
+        }
+        if (rightStockQty == null) {
+          return -1;
+        }
+        return rightStockQty.compareTo(leftStockQty);
+    }
+
+    private Integer compareYearWeek(MdmProductStock o1, MdmProductStock o2) {
+      Integer p1 = parseParam(o1.getWeekYear());
+      Integer p2 = parseParam(o2.getWeekYear());
+      if (p1 == null && p2 == null) {
+        return 0;
+      }
+      if (p1 == null) {
+        return -1; // null排最后
+      }
+      if (p2 == null) {
+        return 1;
+      }
+      return Integer.compare(p1, p2);
+    }
+
+    private Integer parseParam(String param) {
+      if (param == null || param.trim().isEmpty()) {
+        return null;
+      }
+      try {
+        return Integer.parseInt(param.trim());
+      } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+  }
+
   /**
    * 为订单列表执行库存分配
    */
   private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
+    int matchStockQty = stockInfos.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
+        matchStockQty,
         stockInfos
     );
 
@@ -236,6 +372,7 @@ public class StockAllocationHelper {
   private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Integer plannedSurplus, List<SalesOrderPool> sortedOrders) {
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
+        0,
         null
     );
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
@@ -256,41 +393,75 @@ public class StockAllocationHelper {
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
     // 库存分配量
     int allocationQty = calculateAllocationQuantity(order, context);
-    int plannedSurplus =  context.plannedSurplus;
-    int finalPlannedSurplus = 0;
-    int produceQtyDue = orderQty - allocationQty;
-    if(produceQtyDue != 0) {
-      if (plannedSurplus  >= produceQtyDue) {
-        finalPlannedSurplus = plannedSurplus - produceQtyDue;
-        produceQtyDue = BigDecimal.ZERO.intValue();
-        context.setPlannedSurplus(finalPlannedSurplus);
-      } else {
-        finalPlannedSurplus =  plannedSurplus;
-        produceQtyDue = produceQtyDue - plannedSurplus;
-        context.setPlannedSurplus(BigDecimal.ZERO.intValue());
-      }
+    int stockQty = calculateMatchStockQty(allocationQty,context);
+    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,allocationQty,context);
+    return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
+  }
 
+  private static int calculatePlannedSurplus(int orderQty, int allocationQty, StockAllocationContext context) {
+      int plannedSurplus = context.getPlannedSurplus();
+      if(orderQty == BigDecimal.ZERO.intValue() || plannedSurplus == BigDecimal.ZERO.intValue()) {
+          return BigDecimal.ZERO.intValue();
+      }
+      if(allocationQty == BigDecimal.ZERO.intValue()) {
+        if (plannedSurplus  >= orderQty) {
+          plannedSurplus = plannedSurplus - orderQty;
+          context.setPlannedSurplus(plannedSurplus);
+        } else {
+          plannedSurplus = orderQty - plannedSurplus;
+          context.setPlannedSurplus(BigDecimal.ZERO.intValue());
+        }
+        return plannedSurplus;
+      }
+      int produceQtyDue = orderQty - allocationQty;
+      if(produceQtyDue == BigDecimal.ZERO.intValue()) {
+        return BigDecimal.ZERO.intValue();
+      }
+    if (plannedSurplus  >= produceQtyDue) {
+      plannedSurplus = plannedSurplus - produceQtyDue;
+      context.setPlannedSurplus(plannedSurplus);
+    } else {
+      plannedSurplus = produceQtyDue - plannedSurplus;
+      context.setPlannedSurplus(BigDecimal.ZERO.intValue());
     }
-    int stockQty = 0;
-    if(!CollectionUtils.isEmpty(context.getStockInfos())) {
-      stockQty = context.getStockInfos().stream().filter(item -> order.getStockGroupKey().equals(item.getStockGroupKey()) && null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
-    }
-    return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,finalPlannedSurplus, allocationQty,produceQtyDue);
+    return plannedSurplus;
+  }
+
+  private static int calculateMatchStockQty(int allocationQty, StockAllocationContext context) {
+      if(allocationQty == BigDecimal.ZERO.intValue()) {
+          return BigDecimal.ZERO.intValue();
+      }
+      int matchStockQty = context.getMatchStockQty();
+      context.setMatchStockQty(matchStockQty - allocationQty);
+      return matchStockQty;
   }
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    // 5、库存冲减后，继续扣减月底计划余量部分
-    int produceQtyDue = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int plannedSurplus =  context.plannedSurplus;
-    if (plannedSurplus  >= produceQtyDue) {
-      plannedSurplus = plannedSurplus - produceQtyDue;
-      produceQtyDue = BigDecimal.ZERO.intValue();
-    } else {
-      plannedSurplus =  BigDecimal.ZERO.intValue();
-      produceQtyDue = produceQtyDue - plannedSurplus;
-    }
-    context.setPlannedSurplus(plannedSurplus);
-    return buildAllocation(order, monthPlanVersion,yearMonth,0,context.plannedSurplus, 0,produceQtyDue);
+    int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
+    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
+    return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
+  }
+
+  private static int calculateProduceQtyDue(int orderQty, int allocationQty, int plannedSurplus) {
+      if(orderQty == BigDecimal.ZERO.intValue()) {
+         return BigDecimal.ZERO.intValue();
+      }
+      if(allocationQty == BigDecimal.ZERO.intValue()) {
+        return plannedSurplus >= orderQty?BigDecimal.ZERO.intValue():orderQty - plannedSurplus;
+      }
+      if(allocationQty >= orderQty) {
+         return BigDecimal.ZERO.intValue();
+      }
+      int produceQtyDue = orderQty - allocationQty;
+      if(plannedSurplus == BigDecimal.ZERO.intValue()) {
+          return produceQtyDue;
+      }
+      if(plannedSurplus >= produceQtyDue) {
+        return BigDecimal.ZERO.intValue();
+      }
+      return produceQtyDue - plannedSurplus;
   }
 
   /**
@@ -299,7 +470,7 @@ public class StockAllocationHelper {
   private static int calculateAllocationQuantity(SalesOrderPool order, StockAllocationContext context) {
     List<MdmProductStock> stockInfos = context.getStockInfos();
     // 订单有年周号要求
-    if(StringUtils.isNotBlank(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
+    if(StringUtils.isNotBlank(order.getWeekYear()) && !ZERO_YEAR_WEEK.equals(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
         return reduceInventoryByWeekYear(
             order,
             stockInfos);
@@ -370,7 +541,7 @@ public class StockAllocationHelper {
       List<MdmProductStock> stockInfos,boolean requiresDynamicBalance,boolean requiresUniformity) {
     return stockInfos.stream()
         .filter(StockAllocationHelper::isValidStock)
-        .sorted(buildIntelligentComparator(requiresDynamicBalance,requiresUniformity))
+        .sorted(getHighPerformanceComparator(requiresDynamicBalance,requiresUniformity))
         .collect(Collectors.toList());
   }
 
@@ -380,43 +551,6 @@ public class StockAllocationHelper {
   private static boolean isValidStock(MdmProductStock stock) {
     return stock.getLeftOverQty() != null
         && stock.getLeftOverQty() > 0;
-  }
-
-  /**
-   * 构建智能比较器
-   */
-  private static Comparator<MdmProductStock> buildIntelligentComparator(
-      boolean requiresDynamicBalance,boolean requiresUniformity) {
-    List<Comparator<MdmProductStock>> comparators = new ArrayList<>();
-    if (requiresDynamicBalance) {
-      // 优先级1：动平衡库存优先
-      comparators.add(Comparator.comparing(
-          stock -> isDynamicBalanceStock(stock) ? 0 : 1
-      ));
-    }
-    if (requiresUniformity) {
-      // 优先级2：动平衡库存优先
-      comparators.add(Comparator.comparing(
-          stock -> isUniformityStock(stock) ? 0 : 1
-      ));
-    }
-    // 优先级3：库存数量大的优先（提高冲减效率）
-    comparators.add(Comparator.comparing(
-        MdmProductStock::getLeftOverQty,
-        Comparator.reverseOrder()
-    ));
-    // 优先级4：库存ID小的优先（先进先出，假设ID递增）
-    comparators.add(Comparator.comparing(MdmProductStock::getId));
-    // 组合所有比较器
-    Comparator<MdmProductStock> result = null;
-    for (Comparator<MdmProductStock> comparator : comparators) {
-      if (result == null) {
-        result = comparator;
-      } else {
-        result = result.thenComparing(comparator);
-      }
-    }
-    return result != null ? result : Comparator.comparing(MdmProductStock::getId);
   }
 
   /**
@@ -534,10 +668,12 @@ public class StockAllocationHelper {
   @Getter
   private static class StockAllocationContext {
     private Integer plannedSurplus;
+    private Integer  matchStockQty;
     private List<MdmProductStock> stockInfos;
 
-    public StockAllocationContext(Integer plannedSurplus,List<MdmProductStock> stockInfos) {
+    public StockAllocationContext(Integer plannedSurplus,Integer  matchStockQty,List<MdmProductStock> stockInfos) {
       this.plannedSurplus = plannedSurplus;
+      this.matchStockQty = matchStockQty;
       this.stockInfos = stockInfos;
     }
   }

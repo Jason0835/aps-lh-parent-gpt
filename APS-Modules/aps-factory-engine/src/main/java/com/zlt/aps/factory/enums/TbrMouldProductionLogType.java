@@ -100,11 +100,31 @@ public enum TbrMouldProductionLogType {
     /**
      * 20-16-03 机台限制生产
      */
-    GROUP_NO_SELECTED_LIMIT_CX_MACHINE("20-16-02", "机台限制生产"),
+    GROUP_NO_SELECTED_LIMIT_CX_MACHINE("20-16-03", "机台限制生产"),
     /**
      * 20-16-04 没有成型硫化配比
      */
     GROUP_NO_SELECTED_RATIO_CX_MACHINE("20-16-04", "没有成型硫化配比"),
+    /**
+     * 20-16-05 分组计划没有待排产计划
+     */
+    GROUP_NO_SELECTED_GROUP_NO_PRODUCTION_CX_MACHINE("20-16-05", "分组计划没有待排产计划"),
+    /**
+     * 20-16-06 分组计划没有物料描述信息
+     */
+    GROUP_NO_SELECTED_GROUP_MATERIAL_EXCEPTION_CX_MACHINE("20-16-06", "分组计划没有物料描述信息"),
+    /**
+     * 20-16-97 分组计划挑选机台-初步被选中
+     */
+    GROUP_SELECTED_FIRST_CX_MACHINE("20-16-97", "分组计划挑选机台-初步被选中"),
+    /**
+     * 20-16-98 分组计划挑选机台-固定优先被选中
+     */
+    GROUP_SELECTED_FIXED_FINAL_CX_MACHINE("20-16-98", "分组计划挑选机台-固定优先被选中"),
+    /**
+     * 20-16-99 分组计划挑选机台-最终被选中
+     */
+    GROUP_SELECTED_FINAL_CX_MACHINE("20-16-99", "分组计划挑选机台-最终被选中"),
     /**
      * 20-16 没有获取到下一组优先级高的分组计划
      */

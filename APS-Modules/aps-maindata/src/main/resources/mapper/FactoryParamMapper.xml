@@ -7,7 +7,7 @@
 
     <select id="getFacParamList" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam"
             resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam">
-        select * from T_MDM_FACTORY_PARAM
+        select * from T_MP_FACTORY_PARAM
         where is_delete = 0
         <if test="factoryCode != null  and factoryCode != ''">and factory_code = #{factoryCode}</if>
         <if test="productTypeCode != null  and productTypeCode != ''">and product_type_code = #{productTypeCode}</if>
