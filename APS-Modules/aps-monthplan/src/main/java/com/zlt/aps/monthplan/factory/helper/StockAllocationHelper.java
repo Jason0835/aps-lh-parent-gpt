@@ -394,8 +394,8 @@ public class StockAllocationHelper {
     // 库存分配量
     int allocationQty = calculateAllocationQuantity(order, context);
     int stockQty = calculateMatchStockQty(allocationQty,context);
-    int plannedSurplus =  calculatePlannedSurplus(orderQty,allocationQty,context);
-    int produceQtyDue = orderQty - allocationQty - plannedSurplus;
+    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,allocationQty,context);
     return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
@@ -439,9 +439,29 @@ public class StockAllocationHelper {
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int plannedSurplus =  calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
-    int produceQtyDue = orderQty  - plannedSurplus;
+    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),context.getPlannedSurplus());
+    int plannedSurplus = calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
     return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
+  }
+
+  private static int calculateProduceQtyDue(int orderQty, int allocationQty, int plannedSurplus) {
+      if(orderQty == BigDecimal.ZERO.intValue()) {
+         return BigDecimal.ZERO.intValue();
+      }
+      if(allocationQty == BigDecimal.ZERO.intValue()) {
+        return plannedSurplus >= orderQty?BigDecimal.ZERO.intValue():orderQty - plannedSurplus;
+      }
+      if(allocationQty >= orderQty) {
+         return BigDecimal.ZERO.intValue();
+      }
+      int produceQtyDue = orderQty - allocationQty;
+      if(plannedSurplus == BigDecimal.ZERO.intValue()) {
+          return produceQtyDue;
+      }
+      if(plannedSurplus >= produceQtyDue) {
+        return BigDecimal.ZERO.intValue();
+      }
+      return produceQtyDue - plannedSurplus;
   }
 
   /**
