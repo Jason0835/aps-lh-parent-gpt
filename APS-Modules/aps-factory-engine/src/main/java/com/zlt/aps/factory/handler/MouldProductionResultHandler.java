@@ -5,6 +5,7 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
@@ -105,6 +106,7 @@ public class MouldProductionResultHandler {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap = baseDataContainer.getGroupMainPatternMouldRelationMap();
         Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = baseDataContainer.getSkuMouldRelationMap();
+        Map<String, ProductionPlanGroupInfo> allGroupPlanInfo = productionContext.getGroupProductionInfo();
         //模具信息
         resultList.forEach(singleResult -> {
             List<ProductionMouldInfoVo> maxMouldList = groupMainPatternMouldRelationMap.get(singleResult.getGroupAndMainPattern());
@@ -120,6 +122,10 @@ public class MouldProductionResultHandler {
                 singleResult.setTypeBlockQty(skuMaxUsedList.size());
             }
             setMouldUsedInfo(singleResult);
+            Set<String> cxMachineCodeSet = allGroupPlanInfo.get(singleResult.getStructureName()).getAllocationCxMachineCodeSet();
+            if (!CollectionUtils.isEmpty(cxMachineCodeSet)) {
+                singleResult.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeSet));
+            }
         });
         return resultList;
     }
@@ -173,17 +179,21 @@ public class MouldProductionResultHandler {
         logDetail.setMesMaterialCode(planInfo.getMesMaterialCode());
         //硫化施工信息
         logDetail.setConstructionStage(planInfo.getConstructionStage());
-        logDetail.setDayVulcanizationQty(planInfo.getDayVulcanizationQty().intValue());
-        logDetail.setCuringTime(planInfo.getCuringTime().intValue());
+        logDetail.setDayVulcanizationQty(planInfo.getDayVulcanizationQty());
+        BigDecimal curingTime = planInfo.getCuringTime();
+        logDetail.setCuringTime(curingTime.intValue());
         //需求量信息
-        logDetail.setHeightQty(planInfo.getHeightQty().intValue());
-        logDetail.setProdReqPlan(planInfo.getNetQty().intValue());
-        logDetail.setFactProdReqQty(planInfo.getHeightLossQty().intValue() + planInfo.getFactProdReqQty().intValue());
-        logDetail.setAverageQty(planInfo.getAverageSaleQty().intValue());
+        logDetail.setHeightQty(planInfo.getHeightQty());
+        logDetail.setProdReqPlan(planInfo.getNetQty());
+        Integer lossQty = planInfo.getHeightLossQty() + planInfo.getFactProdReqQty() - planInfo.getHeightQty() - planInfo.getNetQty();
+        logDetail.setFactProdReqQty(planInfo.getFactProdReqQty() + lossQty);
+        logDetail.setAverageQty(planInfo.getAverageSaleQty());
         logDetail.setInventorySalesRatio(BigDecimal.valueOf(planInfo.getInventorySalesRatio()));
         //统计总排产量
         Integer totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);
         logDetail.setTotalQty(totalValue.intValue());
+        //总硫化时间
+        logDetail.setTotalVulcanizationMinutes(curingTime.multiply(BigDecimal.valueOf(totalValue)).divide(BigDecimal.valueOf(ProductionConstant.HOUR_SECOND), 1, BigDecimal.ROUND_FLOOR));
     }
 
     /**
@@ -198,6 +208,12 @@ public class MouldProductionResultHandler {
         BeanUtils.copyProperties(requirePlan, dayResult);
         dayResult.setId(null);
         dayResult.setIsImport(YesOrNoEnum.NO.getCode());
+        dayResult.setCuringTime(requirePlan.getCuringTime().intValue());
+        //设置年月值
+        Integer year = requirePlan.getYear();
+        Integer month = requirePlan.getMonth();
+        String yearAndMonth = String.format("%s%02d", year, month);
+        dayResult.setYearMonth(Integer.valueOf(yearAndMonth));
         /**
          * 汇总需求信息-净需求(含损耗)、高优先级数量
          */
@@ -208,9 +224,10 @@ public class MouldProductionResultHandler {
         Integer sumNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         dayResult.setProdReqPlan(sumNetQty.intValue());
         //总需求(含损耗)
-        Integer heightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        dayResult.setFactProdReqQty(heightQty.intValue() + noHeightQty.intValue());
+        Integer heightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
+        dayResult.setFactProdReqQty(sumNetQty + lossQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
         dayResult.setMidProductionQty(BigDecimal.ZERO.intValue());

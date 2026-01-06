@@ -629,18 +629,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 使用统计对象收集所有数据，避免多次遍历
         QuantityStatistics statistics = groupPlans.stream()
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
-
         // 设置基本数量
         demandPlan.setOrderQty(statistics.totalOrderQty);
-        demandPlan.setNetQty(statistics.totalNetQty);
-
         // 设置优先级相关数量
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
         demandPlan.setPostponeQty(statistics.postponeQty);
         demandPlan.setCycleReserveQty(statistics.cycleReserveQty);
         demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
-
         // 计算派生数量
         calculateDerivedQuantities(demandPlan, statistics);
 
@@ -827,6 +823,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
         demandPlan.setUnPostponeNetQty(statistics.heightQty + statistics.midQty);
+        // 实单高优先级+实单中优先级+周期排产储备
+        demandPlan.setNetQty(statistics.heightQty + statistics.midQty + statistics.cycleReserveQty);
     }
 
     /**

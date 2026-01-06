@@ -157,6 +157,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
         setMonthProductionDays(productionContext);
+        //构建日排产信息
+        buildDayCapacityLimitInfo(productionContext);
         //获取成型机台信息--日产信息
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
         productionContext.getBaseDataContainer().setCxMachineBaseInfo(cxMachineBaseInfo);
@@ -637,6 +639,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             } else {
                 groupAllocationList = allAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
             }
+            //重新设置分配的机台
+            Set<String> allocationSet = groupAllocationList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
+            groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
         //处理计划的待排产量及排产标记重置
@@ -744,7 +749,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
-            log.info(TbrProductionGroupLogRecorder.addProductionCalendarEmptyLog((TbrProductionContext) context));
+            log.info(TbrProductionGroupLogRecorder.addProductionCalendarEmptyLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
@@ -764,7 +769,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //停产设置
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(stopDays)) {
-            log.info(TbrProductionGroupLogRecorder.addNoStopCalendarLog((TbrProductionContext) context));
+            log.info(TbrProductionGroupLogRecorder.addNoStopCalendarLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
@@ -775,6 +780,27 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             stopDaySet.add(stopDay);
         });
         context.setStopDays(stopDaySet);
+    }
+
+    /**
+     * 构建日产能限制对象信息
+     *
+     * @param productionContext 排产上下文
+     */
+    private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
+        if (CollectionUtils.isEmpty(startProductionRatioMap)) {
+            productionContext.getBaseDataContainer().setDayCapacityLimitMap(Collections.emptyMap());
+            return;
+        }
+        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(startProductionRatioMap.size());
+        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
+        startProductionRatioMap.forEach((productionDay, ratio) -> {
+            DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
+            dayCapacityLimitMap.put(productionDay, dayInitLimit);
+        });
+        baseDataContainer.setDayCapacityLimitMap(dayCapacityLimitMap);
     }
 
     /**
