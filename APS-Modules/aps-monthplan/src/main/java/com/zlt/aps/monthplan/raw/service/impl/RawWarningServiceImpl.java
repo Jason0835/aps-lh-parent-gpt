@@ -23,6 +23,12 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * @author nick
+ * @date 2021/12/21 14:39
+ * @description 原材料用量偏差预警服务实现
+ *
+ */
 @Service
 @Slf4j
 public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMapper, RawWarningRecord> implements IRawWarningService {
