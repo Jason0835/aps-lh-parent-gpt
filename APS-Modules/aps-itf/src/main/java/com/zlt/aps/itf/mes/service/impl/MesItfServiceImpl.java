@@ -21,6 +21,7 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -66,8 +67,11 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncProductModRelation(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
         MdmSkuMouldRel mdmSkuMouldRel = new MdmSkuMouldRel();
-        mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
+        BeanUtils.copyProperties(syncDataLogs, mdmSkuMouldRel);
         List<MdmSkuMouldRel> list = this.getMdmSkuMouldRelList(mdmSkuMouldRel);
+        // 唯一键重复随机取一条
+        Map<String, MdmSkuMouldRel> groupMap = list.stream().collect(Collectors.toMap(item -> item.getFactoryCode() + "|" + item.getMouldCode() + "|" + item.getMaterialCode(), Function.identity(), (v1, v2) -> v1));
+        list = new ArrayList<>(groupMap.values());
         // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         try {
             // 切换APS数据源 start
@@ -77,9 +81,10 @@ public class MesItfServiceImpl implements MesItfService {
                 List<MdmSkuMouldRel> existsList = productModelRelationEntityMapper.selectByUniqueKeyList(skuMouldRelList);
                 Map<String, MdmSkuMouldRel> existsMap = new HashMap<>(16);
                 if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode(), item.getMaterialCode()), Function.identity()));
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmSkuMouldRel skuMouldRel : skuMouldRelList) {
+                    skuMouldRel.setBaseVale(null);
                     String mapKey = GenerageMapKeyUtils.createMapKey(skuMouldRel.getFactoryCode(), skuMouldRel.getMouldCode(), skuMouldRel.getMaterialCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmSkuMouldRel existsData = existsMap.get(mapKey);
@@ -104,9 +109,12 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncModelInfo(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
-        MdmModelInfo mdmSkuMouldRel = new MdmModelInfo();
-        mdmSkuMouldRel.setDataVersion(syncDataLogs.getDataVersion());
-        List<MdmModelInfo> list = getMdmModelInfoList(mdmSkuMouldRel);
+        MdmModelInfo mdmModelInfo = new MdmModelInfo();
+        BeanUtils.copyProperties(syncDataLogs, mdmModelInfo);
+        List<MdmModelInfo> list = getMdmModelInfoList(mdmModelInfo);
+        // 唯一键重复随机取一条
+        Map<String, MdmModelInfo> groupMap = list.stream().collect(Collectors.toMap(item -> item.getFactoryCode() + "|" + item.getMouldCode(), Function.identity(), (v1, v2) -> v1));
+        list = new ArrayList<>(groupMap.values());
         // 型腔模号+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         try {
             // 切换APS数据源 start
@@ -116,9 +124,10 @@ public class MesItfServiceImpl implements MesItfService {
                 List<MdmModelInfo> existsList = modelInfoEntityMapper.selectByUniqueKeyList(saveList);
                 Map<String, MdmModelInfo> existsMap = new HashMap<>(16);
                 if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode()), Function.identity()));
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmModelInfo entity : saveList) {
+                    entity.setBaseVale(null);
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmModelInfo existsData = existsMap.get(mapKey);
@@ -146,7 +155,7 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 获取AP与模具关系
+     * 获取SKU与模具关系
      *
      * @param mdmSkuMouldRel SKU与模具关系
      * @return 结果
@@ -511,6 +520,7 @@ public class MesItfServiceImpl implements MesItfService {
             List<String> materialCodeList = rawMaterialOutboundRecords.stream().map(RawMaterialOutboundRecord::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
             for (RawMaterialOutboundRecord record : rawMaterialOutboundRecords) {
+                record.setBaseVale(null);
                 String mapKey = GenerageMapKeyUtils.createMapKey(record.getFactoryCode(), record.getMaterialCode());
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
@@ -564,6 +574,9 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
         List<MdmMaterialInfo> list = getMaterialInfoList(syncDataLogs);
+        // 唯一键重复随机取一条
+        Map<String, MdmMaterialInfo> groupMap = list.stream().collect(Collectors.toMap(item -> item.getFactoryCode() + "|" + item.getMaterialCode(), Function.identity(), (v1, v2) -> v1));
+        list = new ArrayList<>(groupMap.values());
         // 工厂+物料编码作为匹配条件，如果存在，则更新，不存在则插入
         try {
             // 切换APS数据源 start
@@ -576,9 +589,10 @@ public class MesItfServiceImpl implements MesItfService {
                 List<MdmMaterialInfo> existsList = materialInfoEntityMapper.selectByUniqueKeyList(uniqueKeyList);
                 Map<String, MdmMaterialInfo> existsMap = new HashMap<>(16);
                 if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity()));
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmMaterialInfo entity : saveList) {
+                    entity.setBaseVale(null);
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmMaterialInfo existsData = existsMap.get(mapKey);
@@ -614,6 +628,9 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
         List<MdmMouldShellInfo> list = this.getMoldShellList(syncDataLogs);
+        // 唯一键重复随机取一条
+        Map<String, MdmMouldShellInfo> groupMap = list.stream().collect(Collectors.toMap(item -> item.getFactoryCode() + "|" + item.getMouldSetCode(), Function.identity(), (v1, v2) -> v1));
+        list = new ArrayList<>(groupMap.values());
         // 工厂+模套型号作为匹配条件，如果存在，则更新，不存在则插入
         try {
             // 切换APS数据源 start
@@ -624,9 +641,10 @@ public class MesItfServiceImpl implements MesItfService {
                 List<MdmMouldShellInfo> existsList = mouldShellInfoEntityMapper.selectByUniqueKeyList(saveList);
                 Map<String, MdmMouldShellInfo> existsMap = new HashMap<>(16);
                 if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldSetCode()), Function.identity()));
+                    existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMouldSetCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmMouldShellInfo entity : saveList) {
+                    entity.setBaseVale(null);
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldSetCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmMouldShellInfo existsData = existsMap.get(mapKey);

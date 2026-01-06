@@ -40,7 +40,8 @@ public class MesSyncListener {
     public void processor(String data, @Header(AmqpHeaders.CONSUMER_QUEUE) String queue) {
         try {
         	AuxReqSyncDataLogs syncDataLogs = syncDataMQService.handleMQProcess(data);
-            MesInterfaceCodeEnum mesInterfaceCodeEnum = MesInterfaceCodeEnum.getByCode(data);
+            String syncKey = syncDataLogs.getSyncKey();
+            MesInterfaceCodeEnum mesInterfaceCodeEnum = MesInterfaceCodeEnum.getByCode(syncKey);
             if (mesInterfaceCodeEnum != null) {
             	Object beanObj = SpringUtils.getBean(mesInterfaceCodeEnum.getServiceName()); // 从接口配置枚举获取处理类
             	String methodName = mesInterfaceCodeEnum.getMethodName(); // 从接口配置枚举获取处理方法
