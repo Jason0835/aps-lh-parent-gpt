@@ -10,6 +10,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
@@ -80,10 +81,19 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
 
     private void translationList(List<SupplyOrderPool> rows) {
         // 加载区域
-        LambdaQueryWrapper<DpArea> areaQueryWrapper = new LambdaQueryWrapper<>();
-        areaQueryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-        Map<String, String> areaMap = dpAreaEntityMapper.selectList(areaQueryWrapper).stream()
-            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getRemark));
+        LambdaQueryWrapper<DpArea> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<DpArea> areas = dpAreaEntityMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(areas)) {
+            return;
+        }
+        List<DpArea> filterAreas = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark())).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(filterAreas)) {
+            return;
+        }
+        JsonI18nConvertUtils.conventJsonI18n(filterAreas, DpArea.class);
+        Map<String, String> areaMap = filterAreas.stream()
+            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
         for (SupplyOrderPool item: rows) {
             String area = item.getSaleArea();
             if(StringUtils.isBlank(area)) {

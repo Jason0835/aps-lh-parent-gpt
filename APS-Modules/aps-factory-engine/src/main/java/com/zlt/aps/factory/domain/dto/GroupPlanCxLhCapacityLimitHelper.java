@@ -348,7 +348,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         if (initLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
             return;
         }
-        MonthPlanStructureLhRatioVo lhRatio = singleCxMachineAllocation.getProductionPlanInfo().getCxMachineLhRationMap().get(cxMachineInfo.getCxMachineBrandCode());
+        MonthPlanStructureLhRatioVo lhRatio = singleCxMachineAllocation.getProductionPlanInfo().getLhRatio(cxMachineInfo);
         if (null == lhRatio) {
             return;
         }

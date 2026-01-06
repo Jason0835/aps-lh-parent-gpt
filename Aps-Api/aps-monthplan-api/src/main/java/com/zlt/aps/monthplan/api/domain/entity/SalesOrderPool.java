@@ -172,14 +172,6 @@ public class SalesOrderPool extends BaseEntity{
     private Integer month;
 
     /**
-     * 以分厂+物料为维度，转换销售订单
-     */
-    public String getGroupKey() {
-        String keyFormat = "%s|*|%s";
-        return String.format(keyFormat, factoryCode, materialDesc);
-    }
-
-    /**
      * 提报日期开始时间
      */
     @ApiModelProperty(value = "提报日期开始时间", name = "billDateStartTime")
@@ -192,4 +184,20 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
     @TableField(exist = false)
     private String billDateEndTime;
+
+    /**
+     * 以分厂+物料为维度，转换销售订单
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialDesc);
+    }
+
+    /**
+     * 是按年周号 + 动平衡 + 均匀性匹配的库存数
+     */
+    public String getStockGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, weekYear, isDynamicBalance,isUniformity);
+    }
 }

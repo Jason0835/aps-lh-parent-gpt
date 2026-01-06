@@ -86,10 +86,11 @@ public class GroupProductionConversionHandler {
         }
         Integer sum = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         Integer heightLossQty = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer heightQty = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
         Integer noHeightLossQty = groupPlanData.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        Integer lossQty = heightLossQty + noHeightLossQty;
-        allocationInfo.setNetQty(sum.intValue());
-        allocationInfo.setLossQty(lossQty.intValue());
+        Integer lossQty = (heightLossQty - heightQty) + (noHeightLossQty - sum);
+        allocationInfo.setNetQty(sum);
+        allocationInfo.setLossQty(sum + lossQty);
         return allocationInfo;
     }
 
