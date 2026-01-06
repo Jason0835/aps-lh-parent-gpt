@@ -61,7 +61,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.productStock.brand")
+    @Excel(name = "ui.data.column.productStock.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
