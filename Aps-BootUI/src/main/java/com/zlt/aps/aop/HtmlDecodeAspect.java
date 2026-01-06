@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Map;
 import java.util.Set;
 
@@ -29,8 +30,12 @@ public class HtmlDecodeAspect {
         Object[] args = joinPoint.getArgs();
         for (int i = 0; i < args.length; i++) {
             Object arg = args[i];
-            Object escapeParamField = escapeParamField(arg);
-            args[i] = escapeParamField;
+            try {
+                Object escapeParamField = escapeParamField(arg);
+                args[i] = escapeParamField;
+            } catch (IllegalAccessException e) {
+                log.error("参数转义失败", e);
+            }
         }
     }
 
@@ -38,8 +43,13 @@ public class HtmlDecodeAspect {
     public Object afterList(ProceedingJoinPoint joinPoint) throws Throwable {
         Object[] args = joinPoint.getArgs();
         Object originalResult = joinPoint.proceed(args);
-        Object handleResult = unescapeResultData(originalResult);
-        log.debug("结果数据反向转义：{}", handleResult);
+        Object handleResult = originalResult;
+        try {
+            handleResult = unescapeResultData(originalResult);
+            log.debug("结果数据反向转义：{}", handleResult);
+        } catch (IllegalAccessException e) {
+            log.error("结果数据反向转义失败", e);
+        }
         return handleResult;
     }
 
@@ -83,7 +93,7 @@ public class HtmlDecodeAspect {
 
         //  情况4：参数是【基本类型/包装类型】（Integer/Long/Boolean等）→ 不处理，直接返回
         if (clazz.isPrimitive() || Number.class.isAssignableFrom(clazz)
-                || Boolean.class == clazz || Character.class == clazz) {
+                || Boolean.class == clazz || Character.class == clazz || Date.class == clazz) {
             return param;
         }
 
@@ -198,7 +208,7 @@ public class HtmlDecodeAspect {
 
         // 场景4：返回值是【基本类型/包装类型】→ 不处理，直接返回
         if (clazz.isPrimitive() || Number.class.isAssignableFrom(clazz)
-                || Boolean.class == clazz || Character.class == clazz) {
+                || Boolean.class == clazz || Character.class == clazz || Date.class == clazz) {
             return result;
         }
 
