@@ -95,7 +95,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         // 获取当前年月
         String yearMonth = String.format("%s%02d", year, month);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
