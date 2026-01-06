@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
@@ -127,7 +126,6 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     /**
      * 导出列表
      */
-    @RequiresPermissions( "monthplan:dpDemandPlan:export")
     @Log(title = "需求计划", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
