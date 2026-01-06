@@ -149,7 +149,9 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
     protected List<MdmSkuStructureRef> listExportData(MdmSkuStructureRef obj) {
         QueryWrapper<MdmSkuStructureRef> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        startPage(getOrderBy());
         List<MdmSkuStructureRef> list = entityMapper.getMdmSkuStructureRefList(wrapper);
+        clearPage();
         try {
             QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
         } catch (QueryExprException e) {
