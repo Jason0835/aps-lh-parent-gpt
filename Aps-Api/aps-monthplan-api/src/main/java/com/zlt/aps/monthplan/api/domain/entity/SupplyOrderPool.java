@@ -154,6 +154,11 @@ public class SupplyOrderPool extends BaseEntity {
     @TableField(value = "STOCK_LIMIT")
     private Integer stockLimit;
 
+    @Excel(name = "ui.data.column.supplyOrderPool.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
     /**
      * 月均销量
      */

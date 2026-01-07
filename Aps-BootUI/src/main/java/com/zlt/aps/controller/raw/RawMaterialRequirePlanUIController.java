@@ -178,7 +178,8 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
     @ResponseBody
     public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("year") Integer year,
-                               @RequestParam("month") Integer month) {
-        return iRawMaterialRequirePlanService.generate(factoryCode, year, month);
+                               @RequestParam("month") Integer month,
+                               @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth) {
+        return iRawMaterialRequirePlanService.generate(factoryCode, year, month, isSpringFestivalMonth);
     }
 }

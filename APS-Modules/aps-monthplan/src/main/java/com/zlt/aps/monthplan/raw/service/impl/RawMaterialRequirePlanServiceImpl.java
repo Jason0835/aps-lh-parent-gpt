@@ -146,10 +146,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 }
 
                 // 4. 检查订单预测生产计划
-                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
-                if (isSuccess(predictionCheck)) {
-                    return predictionCheck;
-                }
+//                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
+//                if (isSuccess(predictionCheck)) {
+//                    return predictionCheck;
+//                }
 
                 // 5. 查询特殊材料清单
                 List<RawSpecialMaterialRecord> specialMaterialRecordsList = getSpecialMaterialRecords(factoryCode);
@@ -168,10 +168,8 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
 
                 // 8. 获取预测计划并计算需求 todo 叶工来源会进行调整
-                Map<String, RawMaterialRequirePlan> t1Requirements = calculateT1MonthRequirements(
-                        year, month, specialMaterialCodes);
-                Map<String, RawMaterialRequirePlan> t2Requirements = calculateT2MonthRequirements(
-                        year, month, specialMaterialCodes, isSpringFestivalMonth);
+                Map<String, RawMaterialRequirePlan> t1Requirements = new HashMap<>();
+                Map<String, RawMaterialRequirePlan> t2Requirements = new HashMap<>();
 
                 // 9. 汇总并保存需求计划
                 saveRawMaterialRequirePlan(year, month, currentMonthRequirements,
@@ -499,6 +497,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private Map<String, List<MdmMaterialConsumeDetail>> getBomDetailsByEmbryoCodes(List<String> embryoCodes) {
         QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("EMBRYO_CODE", embryoCodes);
+
+        if (CollectionUtils.isEmpty(embryoCodes)){
+            return new HashMap<>();
+        }
         List<MdmMaterialConsumeDetail> allBomDetails = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
 
         return allBomDetails.stream()
