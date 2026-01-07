@@ -14,6 +14,8 @@ import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -29,6 +31,21 @@ import java.util.stream.Collectors;
  * @author hak
  */
 public class MatchingProductionHandler {
+	
+	/**
+	 * 搭配排产（调整入口）
+	 * @param planList
+	 */
+	public static void matchingProduction(List<FactoryMonthPlanProdFinal> planList) {
+		// TODO 构建参数
+		TbrProductionContext productionContext = new TbrProductionContext();
+		Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = new HashMap<>();
+		List<MonthPlanStructureLhRatioVo> structureLhRatioList = new ArrayList<>();
+		matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
+		// TODO 保存结果
+		
+	}
+	
     /**
      * 搭配排产
      *
@@ -87,7 +104,7 @@ public class MatchingProductionHandler {
             for (Entry<Integer, Integer> dayPlanEntry : dayPlanMap.entrySet()) {
                 startDay = dayPlanEntry.getKey();
                 Integer plan = dayPlanEntry.getValue();
-                if (plan < totalQuota) { // 计划小于定额，说明有空余，则从当天开始尝试搭配排产
+                if (plan < totalQuota) { // 计划小于定额，说明有空余，则从当天开始尝试搭配排产，TODO 还要判断满足其他条件
                     break;
                 }
             }
