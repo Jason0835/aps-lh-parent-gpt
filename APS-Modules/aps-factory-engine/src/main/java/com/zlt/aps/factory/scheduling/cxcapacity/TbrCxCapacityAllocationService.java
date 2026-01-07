@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -72,12 +73,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //开始进行成型产能分配-结构排产
-        String startInfoLog = TbrProductionGroupLogRecorder.addStartGroupLog(productionContext);
-        log.info(startInfoLog);
+        log.info(TbrProductionGroupLogRecorder.addStartGroupLog(productionContext));
         //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
-        String endGetDataLog = TbrProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext);
-        log.info(endGetDataLog);
+        log.info(TbrProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
             throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
         }
@@ -749,6 +748,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             Integer sumHeightProductionQty = hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
             if (sumProductionQty - sumHeightProductionQty <= param.getHeightDiffQty()) {
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
+            }
+        });
+        //周期结构-按总需求排产
+        requirePlanList.forEach(requirePlan -> {
+            //周期排产按总量排产
+            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(requirePlan.getStructureType())) {
+                requirePlan.setIsProductionBySum(Constant.TRUE);
             }
         });
         //计算初始的库销比
