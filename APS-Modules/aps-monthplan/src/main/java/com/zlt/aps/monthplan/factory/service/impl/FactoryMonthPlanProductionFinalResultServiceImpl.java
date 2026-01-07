@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.utils.DateUtils;
@@ -55,7 +54,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         return this.list(queryWrapper);
     }
@@ -68,7 +67,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
-                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
         return CollectionUtils.isEmpty(factoryMonthPlanProdFinals) ? 0 : factoryMonthPlanProdFinals.size();
