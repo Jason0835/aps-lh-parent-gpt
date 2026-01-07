@@ -231,4 +231,15 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
     {
         return AjaxResult.success(iSupplyOrderPoolService.queryRelationByMaterialCode(supplyOrderPool));
     }
+
+    /**
+     * 超期校验
+     */
+    @ApiOperation("超期校验")
+    @PostMapping("/checkOverdue")
+    @ResponseBody
+    public AjaxResult checkOverdue(SupplyOrderPool supplyOrderPool)
+    {
+        return iSupplyOrderPoolService.checkOverdue(supplyOrderPool);
+    }
 }

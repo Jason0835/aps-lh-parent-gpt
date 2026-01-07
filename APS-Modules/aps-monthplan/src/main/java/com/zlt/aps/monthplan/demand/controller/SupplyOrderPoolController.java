@@ -121,6 +121,10 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody SupplyOrderPool billVO){
+        //  (1).根据SKU、订单类型进行唯一性校验，如果存在，提示信息"xxx物料的周期排产/常规储备已经存在，请确认"，系统不做处理
+        //  (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
+        supplyOrderPoolService.checkUnique(billVO);
+
         return super.save(billVO);
     }
 
@@ -212,6 +216,16 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     public AjaxResult queryRelationByMaterialCode(@RequestBody SupplyOrderPool supplyOrderPool)
     {
         return AjaxResult.success(supplyOrderPoolService.queryRelationByMaterialCode(supplyOrderPool));
+    }
+
+    /**
+     * 超期校验
+     */
+    @ApiOperation("超期校验")
+    @PostMapping("/checkOverdue")
+    public AjaxResult checkOverdue(@RequestBody SupplyOrderPool supplyOrderPool)
+    {
+        return supplyOrderPoolService.checkOverdue(supplyOrderPool);
     }
 
     @Override

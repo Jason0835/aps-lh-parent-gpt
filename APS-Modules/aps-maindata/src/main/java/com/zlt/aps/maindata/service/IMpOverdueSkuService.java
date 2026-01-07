@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Set;
@@ -29,4 +30,11 @@ public interface IMpOverdueSkuService extends IDocService<MpOverdueSku>
    *  排除近12个月有常规储备超期胎的SKU(超期SKU表.超期储备排产 = 1)，剩下的SKU则可生成到供应链订单池-常规储备排产
    */
   Set<String> excludeOverduePrecedentProduction();
+
+  /**
+   *  超期校验
+   * @param supplyOrderPool
+   * @return
+   */
+  boolean checkOverdue(SupplyOrderPool supplyOrderPool);
 }
