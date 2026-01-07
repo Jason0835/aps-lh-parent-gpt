@@ -54,7 +54,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         return this.list(queryWrapper);
     }
@@ -67,7 +67,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
-                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
         return CollectionUtils.isEmpty(factoryMonthPlanProdFinals) ? 0 : factoryMonthPlanProdFinals.size();
@@ -173,5 +173,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
             return Collections.emptyMap();
         }
         return factoryMonthPlanProdFinals.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getGroupKey));
+    }
+
+    public static void main(String[] args) {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
+        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
+        System.out.println("yearMonth = " + yearMonth);
     }
 }
