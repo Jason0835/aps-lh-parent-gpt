@@ -3,8 +3,10 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.monthplan.api.annotation.HtmlEscapeSerializer;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -45,6 +47,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String factoryCode;
 
      /** 机台编号 */
+    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @Excel(name = "ui.data.column.info.machineCode",sort = 20)
     @ApiModelProperty(value = "机台编号", name = "machineCode")
     @ImportExcelValidated(required = true)
@@ -52,6 +55,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String machineCode;
 
     /** 机台名称 */
+    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.info.machineName",sort = 30)
     @ApiModelProperty(value = "机台名称", name = "machineName")
@@ -130,6 +134,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "MACHINE_ORDER", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.INTEGER)
     private Integer machineOrder;
 
+    @JsonSerialize(using = HtmlEscapeSerializer.class)
     @Excel(name = "ui.data.column.info.remark", sort = 120)
     @ApiModelProperty(value = "备注", name = "remark")
     @TableField("REMARK")
