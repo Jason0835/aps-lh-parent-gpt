@@ -97,14 +97,14 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         for (SupplyOrderPool item: rows) {
             String area = item.getSaleArea();
             if(StringUtils.isBlank(area)) {
-                item.setSaleAreaName(StringUtils.EMPTY);
+                item.setSaleArea(StringUtils.EMPTY);
                 continue;
             }
             Set<String> areaSet = Sets.newHashSet();
             Arrays.stream(area.split(StringConstant.COMMA)).forEach(areaCode -> {
                 areaSet.add(areaMap.getOrDefault(areaCode, StringUtils.EMPTY));
             });
-            item.setSaleAreaName(String.join(StringConstant.COMMA, areaSet));
+            item.setSaleArea(String.join(StringConstant.COMMA, areaSet));
         }
     }
 
@@ -181,8 +181,11 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     protected List<SupplyOrderPool> listExportData(SupplyOrderPool obj) {
         QueryWrapper<SupplyOrderPool> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<SupplyOrderPool> list = entityMapper.selectList(wrapper);
+        this.translationList(list);
+        return list;
     }
+
 
     @ApiOperation("生成周期排产储备")
     @RedissonLockAnno(uniqueMark = "redissonLock:supplyOrderPool:createCycleStockUp:",
