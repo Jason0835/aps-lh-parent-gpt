@@ -271,5 +271,6 @@
 
   "ui.data.skuEmbryoRelation.updateMainPattern": "更新结构到物料信息表",
   "ui.data.mouldingDayResult.totalQty": "生产实际排产量",
-  "ui.data.mouldingDayResult.differenceQty": "差异量（未排产数量）"
+  "ui.data.mouldingDayResult.differenceQty": "差异量（未排产数量）",
+  "ui.data.orderForecast.predictionVersion": "预测版本号"
 }

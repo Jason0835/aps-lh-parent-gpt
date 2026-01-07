@@ -97,6 +97,16 @@ export default {
           width:120
         },
         {
+          prop: "predictionVersion",
+          label: this.$t("预测版本号"),
+          width:120
+        },
+        // {
+        //   prop: "productionVersion",
+        //   label: this.$t("预测排产计划版"),
+        //   width:160
+        // },
+        {
           prop: "productTypeCode",
           label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {

@@ -69,7 +69,7 @@ export default {
     tltUpload,
     // infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no",'biz_brand_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -125,13 +125,16 @@ export default {
         {
           prop: "requireVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
-          width:120
+          width:150
         },
 
         {
           prop: "brand",
           label: this.$t("common.brand"),
-          width:120
+          width:120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
         },
         {
           prop: "materialCode",

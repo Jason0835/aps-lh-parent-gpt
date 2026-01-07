@@ -225,6 +225,7 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          width:150
         },
         {
           prop: "shareMouldCode",

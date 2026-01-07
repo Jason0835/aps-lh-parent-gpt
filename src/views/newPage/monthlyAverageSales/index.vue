@@ -155,6 +155,12 @@ export default {
           ),
         },
         {
+          prop: "deliveryFrequency",
+          label: this.$t(
+            "ui.data.defectiveStock.deliveryFrequency"
+          ),
+        },
+        {
           prop: "averageSaleQty",
           label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
         },
