@@ -293,7 +293,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mouldChangeInfo")
     @ApiModelProperty(value = "模具使用变化信息", name = "mouldChangeInfo")
     @TableField(value = "MOULD_CHANGE_INFO")
-    private Integer mouldChangeInfo;
+    private String mouldChangeInfo;
 
     /**
      * 动平衡数量
