@@ -114,6 +114,18 @@ public enum TbrMouldProductionLogType {
      */
     CX_GROUP_LH_RATIO_EMPTY("20-12", "成型硫化配比配置为空"),
     /**
+     * 20-13-01 分组主花纹产能预算
+     */
+    GROUP_MAIN_PATTERN_CAPACITY_INFO("20-13-01", "分组主花纹产能预算"),
+    /**
+     * 20-13-02 分组总产能预算
+     */
+    GROUP_SUM_CAPACITY_INFO("20-13-02", "分组总产能预算"),
+    /**
+     * 20-13-03 分组预算机台数
+     */
+    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-13-03", "分组预算机台数"),
+    /**
      * 20-13 分组没有成型硫化配比配置
      */
     SINGLE_GROUP_LH_RATIO_EMPTY("20-13", "分组没有成型硫化配比配置"),
