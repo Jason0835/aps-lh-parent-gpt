@@ -125,7 +125,7 @@ public interface ProductionSchedulingDataService {
     List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
 
     /**
-     * 获取续作SKU信息，包含续作机台及使用的模具数
+     * 获取在机结构信息，从结构排产表中获取
      *
      * @param factoryCode 工厂编码
      * @param year        年份

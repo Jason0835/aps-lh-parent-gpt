@@ -11,6 +11,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -32,14 +33,8 @@ import java.util.stream.Collectors;
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：RawMaterialRequirePlanServiceImpl.java
  * 描    述：RawMaterialRequirePlanServiceImpl原材料需求计划业务层处理
- *@author zlt
- *@date 2025-12-08
+ *@author nick
  *@version 1.0
- *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
  */
 @Slf4j
 @Service
@@ -74,6 +69,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Autowired
     private MdmHolidayEntityMapper mdmHolidayMapper;
+
+    @Autowired
+    private DpOrderOffsetDetailEntityMapper orderOffsetDetailMapper;
 
     /**
      * redis 锁前缀
@@ -119,7 +117,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month) {
+    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month, boolean isSpringFestivalMonth) {
         try {
             // 1. 检查生成状态
             AjaxResult checkResult = checkGeneratingStatus(year, month);
@@ -148,30 +146,32 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 }
 
                 // 4. 检查订单预测生产计划
-                AjaxResult predictionCheck = checkOrderPrediction(year, month);
+                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
                 if (isSuccess(predictionCheck)) {
                     return predictionCheck;
                 }
 
-                // 查询特殊材料清单
+                // 5. 查询特殊材料清单
                 List<RawSpecialMaterialRecord> specialMaterialRecordsList = getSpecialMaterialRecords(factoryCode);
+                // 5.1. 对特殊材料进行材料编码SET去重
                 Set<String> specialMaterialCodes = extractSpecialMaterialCodes(specialMaterialRecordsList);
 
-                // 5. 获取月度生产计划
-                List<FactoryMonthPlanProdFinal> monthPlans = getMonthProductionPlan(year, month);
+                // 6. 获取月度生产计划
+                List<FactoryMonthPlanProdFinal> monthPlans = getMonthProductionPlan(year, month, factoryCode);
+                // 6.1. 月计划依据订单冲减表分解EudR数量
+                splitAndSetEudrQuantities(monthPlans);
 
-                // 6. 计算当月原材料需求量
+                // 7. 计算当月原材料需求量
                 Map<String, RawMaterialRequirePlan> currentMonthRequirements = calculateCurrentMonthRequirements(
                         monthPlans, specialMaterialCodes);
+                // 7.1.1 计算当月原材料采购批次
+                calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
 
-                // 7. 获取预测计划并计算需求
+                // 8. 获取预测计划并计算需求 todo 叶工来源会进行调整
                 Map<String, RawMaterialRequirePlan> t1Requirements = calculateT1MonthRequirements(
                         year, month, specialMaterialCodes);
                 Map<String, RawMaterialRequirePlan> t2Requirements = calculateT2MonthRequirements(
-                        year, month, specialMaterialCodes);
-
-                // 8. 特殊材料批次计算
-                calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
+                        year, month, specialMaterialCodes, isSpringFestivalMonth);
 
                 // 9. 汇总并保存需求计划
                 saveRawMaterialRequirePlan(year, month, currentMonthRequirements,
@@ -310,7 +310,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 检查订单预测生产计划
      */
-    private AjaxResult checkOrderPrediction(Integer year, Integer month) {
+    private AjaxResult checkOrderPrediction(Integer year, Integer month, boolean isSpringFestivalMonth) {
         LocalDate date = LocalDate.of(year, month, 1);
 
         QueryWrapper<MpProductionPrediction> queryWrapper = new QueryWrapper<>();
@@ -327,7 +327,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         }
 
         // 如果是春节，检查T+2月
-        if (isSpringFestivalMonth(year, month)) {
+        if (isSpringFestivalMonth) {
             QueryWrapper<MpProductionPrediction> t2QueryWrapper = new QueryWrapper<>();
             LocalDate t2Date = date.plusMonths(2);
             t2QueryWrapper.eq("YEAR", t2Date.getYear())
@@ -346,75 +346,134 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
-     * 判断是否为春节月份
-     */
-    private boolean isSpringFestivalMonth(Integer year, Integer month) {
-        QueryWrapper<MdmHoliday> queryWrapper = new QueryWrapper<>();
-        queryWrapper.like("HOLIDAY_NAMES", "春节");
-        List<MdmHoliday> holidays = mdmHolidayMapper.selectList(queryWrapper);
-
-        if (CollectionUtils.isEmpty(holidays)) {
-            return false;
-        }
-
-        // 遍历所有春节记录，检查是否有符合年份和月份的春节
-        for (MdmHoliday holiday : holidays) {
-            // 假设 MdmHoliday 中有 holidayDate 字段表示假期日期
-            Date holidayDate = holiday.getHolidayDate();
-            if (holidayDate != null) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(holidayDate);
-
-                int holidayYear = cal.get(Calendar.YEAR);
-                int holidayMonth = cal.get(Calendar.MONTH) + 1;
-
-                // 检查年份和月份是否匹配
-                if (holidayYear == year && holidayMonth == month) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * 获取月度生产计划
      */
-    private List<FactoryMonthPlanProdFinal> getMonthProductionPlan(Integer year, Integer month) {
+    private List<FactoryMonthPlanProdFinal> getMonthProductionPlan(Integer year, Integer month, String factoryCode) {
         QueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("YEAR", year)
-                .eq("MONTH", month);
+                .eq("MONTH", month)
+                .eq("FACTORY_CODE", factoryCode);
         return factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
     }
 
     /**
-     * 计算当月原材料需求量（优化版）
+     * 分解 EudR 数量并设置到计划对象中
+     */
+    private void splitAndSetEudrQuantities(List<FactoryMonthPlanProdFinal> monthPlans) {
+        log.info("开始分解EudR数量，共{}个月度计划", monthPlans.size());
+
+        // 获取第一个计划的工厂、年份、月份信息
+        FactoryMonthPlanProdFinal firstPlan = monthPlans.get(0);
+        String factoryCode = firstPlan.getFactoryCode();
+        Integer year = firstPlan.getYear();
+        Integer month = firstPlan.getMonth();
+        String monthPlanVersion = firstPlan.getMonthPlanVersion();
+
+        // 查询订单冲减详情
+        QueryWrapper<DpOrderOffsetDetail> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("MONTH_PLAN_VERSION", monthPlanVersion);
+
+        List<DpOrderOffsetDetail> offsetDetails = orderOffsetDetailMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(offsetDetails)) {
+            // 如果没有订单冲减数据，则将所有数量视为非EudR
+            log.warn("工厂[{}] {}年{}月未找到订单冲减数据，所有物料按非EudR处理", factoryCode, year, month);
+            setDefaultEudrQuantities(monthPlans);
+            return;
+        }
+
+        // 计算EudR数量并设置到计划对象中
+        setEudrQuantitiesToPlans(monthPlans, offsetDetails);
+
+        log.info("EudR数量分解完成");
+    }
+
+    /**
+     * 计算EudR数量并设置到计划对象中
+     */
+    private void setEudrQuantitiesToPlans(List<FactoryMonthPlanProdFinal> monthPlans,
+                                          List<DpOrderOffsetDetail> offsetDetails) {
+
+        // 按物料编码分组，汇总EudR和非EudR数量
+        Map<String, Integer[]> materialEudrMap = new HashMap<>();
+
+        for (DpOrderOffsetDetail detail : offsetDetails) {
+            String materialCode = detail.getMaterialCode();
+            if (materialCode == null) {
+                continue;
+            }
+
+            // 初始化物料编码的EudR和非EudR数量
+            Integer[] quantities = materialEudrMap.computeIfAbsent(materialCode, k -> new Integer[]{0, 0});
+
+            // 获取冲减分配数量
+            int productionQty = detail.getProductionQty() != null ? detail.getProductionQty() : 0;
+
+            String weekYear = detail.getWeekYear();
+            // 判断是否为EudR：年周号大于3725
+            if (isEudrPlan(weekYear)) {
+                // EudR数量
+                quantities[1] += productionQty;
+            } else {
+                // 非EudR数量
+                quantities[0] += productionQty;
+            }
+        }
+
+        // 为每个计划设置EudR分解结果
+        for (FactoryMonthPlanProdFinal plan : monthPlans) {
+            if (plan.getMaterialCode() == null) {
+                continue;
+            }
+
+            Integer[] quantities = materialEudrMap.get(plan.getMaterialCode());
+            if (quantities != null) {
+                // 设置非EudR和EudR数量
+                plan.setNonEudrQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
+                plan.setEudrQty(quantities[1]);
+
+                log.debug("物料[{}] EudR分解：非EudR={}, EudR={}, 总计={}",
+                        plan.getMaterialCode(), quantities[0],
+                        quantities[1],  quantities[0] + quantities[1]);
+            } else {
+                // 对于计划中有但订单冲减中没有的物料，设置为非EudR
+                plan.setEudrQty(0);
+                plan.setNonEudrQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
+
+                log.info("物料[{}]在订单冲减数据中未找到，按非EudR处理", plan.getMaterialCode());
+            }
+        }
+    }
+
+    /**
+     * 设置默认EudR数量（全部为非EudR）
+     */
+    private void setDefaultEudrQuantities(List<FactoryMonthPlanProdFinal> monthPlans) {
+        for (FactoryMonthPlanProdFinal plan : monthPlans) {
+            plan.setEudrQty(0);
+            plan.setNonEudrQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
+        }
+    }
+
+    /**
+     * 计算当月原材料需求量
      */
     private Map<String, RawMaterialRequirePlan> calculateCurrentMonthRequirements(
             List<FactoryMonthPlanProdFinal> monthPlans, Set<String> specialMaterialCodes) {
 
-        if (CollectionUtils.isEmpty(monthPlans)) {
-            return Collections.emptyMap();
-        }
-
-        // 1. 收集所有不重复的胎胚代码
+        // 1. 收集所有不重复的胎胚代码，批量查询所有BOM结构
         List<String> embryoCodes = monthPlans.stream()
                 .map(FactoryMonthPlanProdFinal::getMainMaterialDesc)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-
-        if (embryoCodes.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        // 2. 批量查询所有BOM结构（避免循环内查数据库）
         Map<String, List<MdmMaterialConsumeDetail>> bomMap = getBomDetailsByEmbryoCodes(embryoCodes);
 
-        // 3. 计算需求
+        // 2. 计算原材料需求
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
-
         monthPlans.forEach(plan -> {
             Integer totalQty = plan.getTotalQty();
             if (totalQty == null || totalQty == 0) {
@@ -440,8 +499,6 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private Map<String, List<MdmMaterialConsumeDetail>> getBomDetailsByEmbryoCodes(List<String> embryoCodes) {
         QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("EMBRYO_CODE", embryoCodes);
-        // queryWrapper.eq("EMBRYO_VERSION", "1");
-
         List<MdmMaterialConsumeDetail> allBomDetails = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
 
         return allBomDetails.stream()
@@ -456,6 +513,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                                                Integer totalQty,
                                                Set<String> specialMaterialCodes,
                                                FactoryMonthPlanProdFinal plan) {
+        // 1.获取计划中已分解的EudR和非EudR数量
+        int nonEudrQty = plan.getNonEudrQty() != null ? plan.getNonEudrQty() : 0;
+        int eudrQty = plan.getEudrQty() != null ? plan.getEudrQty() : 0;
 
         bomDetails.forEach(detail -> {
             String materialCode = detail.getChildMaterialCode();
@@ -463,30 +523,71 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
             String materialType = specialMaterialCodes.contains(materialCode) ? "02" : "01";
 
-            // 计算需求数量
-            BigDecimal requiredQty = BigDecimal.valueOf(totalQty).multiply(dosage);
-
             RawMaterialRequirePlan requirement = requirements.computeIfAbsent(materialCode,
                     k -> new RawMaterialRequirePlan(materialCode, materialDesc, materialType));
 
-            // 判断EUDR
-            boolean isEudr = isEudrPlan(plan);
-            if (isEudr) {
-                requirement.setCurMonthRudrQty(requiredQty);
-            } else {
-                requirement.setCurMonthQty(requiredQty);
+            // 计算非EudR需求数量
+            if (nonEudrQty > 0) {
+                BigDecimal nonEudrRequiredQty = BigDecimal.valueOf(nonEudrQty).multiply(dosage);
+                requirement.addCurMonthQty(nonEudrRequiredQty);
+            }
+
+            // 计算EudR需求数量
+            if (eudrQty > 0) {
+                BigDecimal eudrRequiredQty = BigDecimal.valueOf(eudrQty).multiply(dosage);
+                requirement.addCurMonthRudrQty(eudrRequiredQty);
             }
         });
     }
 
     /**
-     * 判断是否为EUDR计划
+     * 判断是否为EudR计划
      */
-    private boolean isEudrPlan(FactoryMonthPlanProdFinal plan) {
-        // 根据年周号判断 todo 月计划字段还没加
-        // 这里需要根据实际情况获取年周号
-        // 简化处理，假设通过其他方式判断
-        return false;
+    private boolean isEudrPlan(String weekYear) {
+        if (StringUtils.isEmpty(weekYear) || weekYear.length() != 4) {
+            return false;
+        }
+
+        // 快速检查是否为纯数字
+        for (int i = 0; i < weekYear.length(); i++) {
+            if (!Character.isDigit(weekYear.charAt(i))) {
+                return false;
+            }
+        }
+
+        try {
+            // 解析周数和年份
+            int weekNum = Integer.parseInt(weekYear.substring(0, 2));
+            int yearNum = Integer.parseInt(weekYear.substring(2));
+
+            // 基本验证
+            if (weekNum < 1 || weekNum > 53) {
+                log.warn("周数超出合理范围: {}", weekYear);
+                return false;
+            }
+
+            if (yearNum < 0 || yearNum > 99) {
+                log.warn("年份超出合理范围: {}", weekYear);
+                return false;
+            }
+
+            // 逻辑比较：2025年第37周之后
+            // 1. 年份大于25（2025年之后）
+            // 2. 年份等于25且周数大于37（2025年第38周及以后）
+            if (yearNum > 25) {
+                // 2026年及以后的所有周都是EudR
+                return true; 
+            } else if (yearNum == 25) {
+                // 2025年第38周及以后是EudR
+                return weekNum > 37; 
+            } else {
+                // 2025年第37周及以前不是EudR
+                return false;
+            }
+
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**
@@ -503,8 +604,8 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 计算T+2月需求
      */
     private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(Integer year, Integer month,
-                                                                             Set<String> specialMaterialCodes) {
-        if (!isSpringFestivalMonth(year, month)) {
+                                                                             Set<String> specialMaterialCodes, boolean isSpringFestivalMonth) {
+        if (!isSpringFestivalMonth) {
             return Collections.emptyMap();
         }
 
@@ -611,11 +712,11 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
-     * 计算EUDR需求
+     * 计算EudR需求
      */
     private void calculateEudrRequirements(Map<String, RawMaterialRequirePlan>... requirementMaps) {
-        // 合并所有需求并计算EUDR
-        // 实现EUDR区分逻辑，这里简化处理
+        // 合并所有需求并计算EudR
+        // 实现EudR区分逻辑，这里简化处理
         for (Map<String, RawMaterialRequirePlan> requirementMap : requirementMaps) {
             requirementMap.values().forEach(requirement -> {
                 BigDecimal totalQty = requirement.getCurMonthQty();
@@ -774,11 +875,11 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         plan.setCurMonthQty(formatAndValidateBigDecimal(requirement.getCurMonthQty(), "CUR_MONTH_QTY"));
         plan.setCurMonthRudrQty(formatAndValidateBigDecimal(requirement.getCurMonthRudrQty(), "CUR_MONTH_RUDR_QTY"));
         plan.setTMonthQty(formatAndValidateBigDecimal(requirement.getTMonthQty(), "T_MONTH_QTY"));
-        plan.setTMonthEudrQty(formatAndValidateBigDecimal(requirement.getTMonthEudrQty(), "T_MONTH_EUDR_QTY"));
+        plan.setTMonthEudrQty(formatAndValidateBigDecimal(requirement.getTMonthEudrQty(), "T_MONTH_EudR_QTY"));
         plan.setT1MonthQty(formatAndValidateBigDecimal(requirement.getT1MonthQty(), "T1_MONTH_QTY"));
-        plan.setT1MonthEudrQty(formatAndValidateBigDecimal(requirement.getT1MonthEudrQty(), "T1_MONTH_EUDR_QTY"));
+        plan.setT1MonthEudrQty(formatAndValidateBigDecimal(requirement.getT1MonthEudrQty(), "T1_MONTH_EudR_QTY"));
         plan.setT2MonthQty(formatAndValidateBigDecimal(requirement.getT2MonthQty(), "T2_MONTH_QTY"));
-        plan.setT2MonthEudrQty(formatAndValidateBigDecimal(requirement.getT2MonthEudrQty(), "T2_MONTH_EUDR_QTY"));
+        plan.setT2MonthEudrQty(formatAndValidateBigDecimal(requirement.getT2MonthEudrQty(), "T2_MONTH_EudR_QTY"));
 
         // 设置创建信息
         plan.setCreateBy(username);
@@ -1135,4 +1236,5 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private void unlock(String lockKey) {
         redisTemplate.delete(lockKey);
     }
+
 }

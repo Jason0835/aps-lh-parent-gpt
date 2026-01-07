@@ -13,12 +13,14 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.enums.LocationTypeEnum;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutShipDmdOrdResultVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
@@ -124,6 +126,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
      */
     @Override
     public AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty) {
+        mpMonthlySaleQty.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         Map<String, Object> params = mpMonthlySaleQty.getParams();
         String redisValue = redisService.getCacheObject(OperationBusinessEnums.CREATE_MONTH_AVERAGE_SALE.getCode());
         if (StringUtils.isNotBlank(redisValue)) {
@@ -222,7 +225,16 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
         List<MpHistorySaleRecord> saveList = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(outShipDmdOrdResultVos)) {
-            for (SyncOutShipDmdOrdResultVo outShipDmdOrdResultVo : outShipDmdOrdResultVos) {
+            Map<String, SyncOutShipDmdOrdResultVo> groupMap = outShipDmdOrdResultVos.stream()
+                    .collect(Collectors.toMap(item -> item.getEmployeeDept() + "|" + item.getOriMaterialCode(),
+                            Function.identity(), (old, item) -> {
+                                BigDecimal dnNum = old.getDnNum();
+                                BigDecimal dnNum1 = item.getDnNum();
+                                old.setDnNum(BigDecimalUtils.add(dnNum, dnNum1));
+                                return old;
+                            }));
+
+            for (SyncOutShipDmdOrdResultVo outShipDmdOrdResultVo : groupMap.values()) {
                 MpHistorySaleRecord mpHistorySaleRecord = new MpHistorySaleRecord();
                 mpHistorySaleRecord.setBaseVale(null);
                 mpHistorySaleRecord.setFactoryCode(outShipDmdOrdResultVo.getFactory());
@@ -360,24 +372,28 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 monthlySaleQty.setPassSixMonthSaleQty(0);
                 monthlySaleQty.setRollTwelveMonthSaleQty(0);
 
+                // 不重复的年月集合
+                Set<Integer> yearMonthCount = new HashSet<>();
                 for (int i = 0; i < size; i++) {
                     MpHistorySaleRecord historySaleRecord = passSixMonthList.get(i);
                     Integer saleQty = historySaleRecord.getSaleQty();
                     totalSaleQty += saleQty;
                     Integer yearMonth = historySaleRecord.getYearMonth();
+
+                    yearMonthCount.add(yearMonth);
                     if (yearMonth > Integer.parseInt(last3YearMonth)) {
                         // 近3个月
-                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(i + 1), 0, RoundingMode.UP);
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
                     if (yearMonth > Integer.parseInt(last6YearMonth)) {
                         // 近6个月
-                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(i + 1), 0, RoundingMode.UP);
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassSixMonthSaleQty(result.intValue());
                     }
                 }
                 // 月均销量
-                BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(size), 0, RoundingMode.UP);
+                BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                 monthlySaleQty.setAverageSaleQty(result.intValue());
 
                 // 滚动月销量

@@ -88,11 +88,4 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
-
-    public RawSpecialMaterialRecord() {
-    }
-
-    public RawSpecialMaterialRecord(String materialCode) {
-        this.materialCode = materialCode;
-    }
 }
