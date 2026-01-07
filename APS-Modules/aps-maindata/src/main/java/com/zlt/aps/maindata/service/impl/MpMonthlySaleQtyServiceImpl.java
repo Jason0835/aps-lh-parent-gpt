@@ -353,7 +353,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
                 List<MpHistorySaleRecord> passSixMonthList = new ArrayList<>();
                 for (MpHistorySaleRecord record : value) {
-                    if (record.getYearMonth() == Integer.parseInt(last6YearMonth)) {
+                    if (record.getYearMonth() < Integer.parseInt(last6YearMonth)) {
                         break;
                     }
                     passSixMonthList.add(record);
