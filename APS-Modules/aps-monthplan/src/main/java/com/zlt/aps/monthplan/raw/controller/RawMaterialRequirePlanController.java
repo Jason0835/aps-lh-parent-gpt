@@ -185,7 +185,7 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("year") Integer year,
                                @RequestParam("month") Integer month,
-                                @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth) {
+                               @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth) {
         return rawMaterialRequirePlanService.generateRawMaterialRequirePlan(factoryCode, year, month, isSpringFestivalMonth);
     }
 
