@@ -14,6 +14,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
  * @date 20251212
  */
 @Data
+@Slf4j
 public class ProductionPlanGroupInfo {
     /**
      * 产品品类 TBR 全钢 PCR 半钢
@@ -137,12 +139,12 @@ public class ProductionPlanGroupInfo {
         groupInfoMap.forEach((structureName, groupInfo) -> {
             MonthPlanStructureLhRatioVo ratioInfo = minLhRatioMap.get(structureName);
             if (null == ratioInfo) {
-                TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(context, structureName);
+                log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(context, structureName));
                 return;
             }
             groupInfo.setMinLhMachineCount(ratioInfo.getLhMachineMaxQty());
             //粗算所需成型机台数
-            groupInfo.calculateNeedCxCapacityMachineCount(context.getMaxProductionDays());
+            groupInfo.calculateNeedCxCapacityMachineCount(context, context.getMaxProductionDays());
         });
         return groupInfoMap;
     }
@@ -245,7 +247,7 @@ public class ProductionPlanGroupInfo {
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
         Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
-        if(canAddCount <= BigDecimal.ZERO.intValue()){
+        if (canAddCount <= BigDecimal.ZERO.intValue()) {
             return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
         }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
@@ -278,9 +280,10 @@ public class ProductionPlanGroupInfo {
      * 如果 小数部分 >0.9，则向上取整
      * 否则 = 保留1位小数
      *
+     * @param context                排产上下文
      * @param monthMaxProductionDays 月度最大可生产天数
      */
-    public void calculateNeedCxCapacityMachineCount(Integer monthMaxProductionDays) {
+    public void calculateNeedCxCapacityMachineCount(Context context, Integer monthMaxProductionDays) {
         if (sumPlanQty <= BigDecimal.ZERO.intValue()) {
             setAllocationZero();
             return;
@@ -313,6 +316,7 @@ public class ProductionPlanGroupInfo {
         }
         this.theoryDays = theoryDays;
         needCxCapacityMachineCount = machineCount.setScale(1, RoundingMode.UP);
+        log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(context, groupName, sumPlanQty, minLhMachineCount, minLhDayCapacityQty, theoryDays, needCxCapacityMachineCount));
     }
 
     /**
@@ -911,9 +915,11 @@ public class ProductionPlanGroupInfo {
                 Integer lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
                 Integer sumPlanQty = groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
                 Integer maxMouldCapacity = lhMachineCount * minDayLhCapacity * ProductionConstant.DOUBLE_MOULD_PRODUCTION * context.getMaxProductionDays();
+                log.info(TbrProductionGroupLogRecorder.addGroupCalculateCapacityLog(context, groupKey, sumPlanQty, maxMouldNumber, maxMouldCapacity));
                 mainPatternEffectiveQty.add(Math.min(sumPlanQty, maxMouldCapacity));
             });
             Integer sumPlanQty = mainPatternEffectiveQty.stream().mapToInt(Integer::intValue).sum();
+            log.info(TbrProductionGroupLogRecorder.addGroupCalculateCapacityLog(context, structureName, sumPlanQty));
             groupInfo.setSumPlanQty(sumPlanQty);
         });
     }
