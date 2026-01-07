@@ -82,5 +82,6 @@ public interface IRawMaterialRequirePlanRemoteService {
     @ApiOperation("生成原材料需求计划")
     public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("year") Integer year,
-                               @RequestParam("month") Integer month);
+                               @RequestParam("month") Integer month,
+                               @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth);
 }
