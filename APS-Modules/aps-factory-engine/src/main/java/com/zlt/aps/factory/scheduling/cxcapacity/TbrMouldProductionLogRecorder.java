@@ -2,6 +2,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
+import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -144,6 +145,44 @@ public class TbrMouldProductionLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有找到合适的模具====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构续作Sku开始模具排产日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 开始进行模具排产====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param materialDesc Sku信息
+     * @return
+     */
+    public static String addContinueSkuStartMouldLog(Context context, String groupName, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 开始进行模具排产====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_START_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构续作Sku开始同规格同花纹或是同生胎共模具物料模具排产日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 开始进行%s物料：%s 模具排产====
+     *
+     * @param context             排程上下文
+     * @param groupName           分组名-结构
+     * @param materialDesc        Sku信息
+     * @param continueType        续作类型
+     * @param currentMaterialDesc 当前Sku
+     * @return
+     */
+    public static String addContinueSkuStartSameInfoMouldLog(Context context, String groupName, String materialDesc, ContinueTypeEnum continueType, String currentMaterialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 开始进行%s物料：%s 模具排产====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc, continueType.getDesc(), currentMaterialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_START_SAME_SPEC_MOULD_PRODUCTION, logContent);
+        } else {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_START_SAME_EMBRYO_MOULD_PRODUCTION, logContent);
+        }
         return logContent;
     }
 

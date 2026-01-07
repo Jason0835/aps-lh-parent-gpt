@@ -163,6 +163,18 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-02-04", "非在机结构模具排产硫化组排产Sku没有合适的排产模具"),
     /**
+     * 30-03-01 在机结构续作Sku开始模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_MOULD_PRODUCTION("30-03-01", "在机结构续作Sku开始模具排产"),
+    /**
+     * 30-03-02 在机结构续作Sku-开始同规格同花纹-模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_SAME_SPEC_MOULD_PRODUCTION("30-03-02", "在机结构续作Sku-开始同规格同花纹-模具排产"),
+    /**
+     * 30-03-03 在机结构续作Sku-开始同生胎同模具-模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_SAME_EMBRYO_MOULD_PRODUCTION("30-03-03", "在机结构续作Sku-开始同生胎同模具-模具排产"),
+    /**
      * 99 一键排产结束
      */
     WHOLE_PRODUCTION_END("99", "一键排产结束"),

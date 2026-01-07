@@ -13,7 +13,10 @@
                mpc.CURING_TIME,
                mpc.CURING_TIME2,
                mpc.MOULD_CAVITY,
-               mpc.MOULD_CLAMPING_PRESSURE
+               mpc.MOULD_CLAMPING_PRESSURE,
+               mpc.EMBRYO_NO,
+               mpc.LH_NO,
+               mpc.TEXT_NO
           FROM t_dp_demand_plan prp
           LEFT JOIN t_mdm_sku_construction_ref mpc
             ON mpc.FACTORY_CODE = prp.FACTORY_CODE

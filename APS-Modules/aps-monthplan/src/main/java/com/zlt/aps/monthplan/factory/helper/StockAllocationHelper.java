@@ -399,8 +399,18 @@ public class StockAllocationHelper {
     List<MdmProductStock> matchProductStocks = filterAndSortStocks(order, context);
     int stockQty  = calculateMatchStockQty(matchProductStocks);
     int allocationQty = calculateAllocationQty(orderQty,matchProductStocks);
-    int plannedSurplus = calculatePlannedSurplus(orderQty,allocationQty,context);
-    int produceQtyDue = calculateProduceQtyDue(orderQty,allocationQty,plannedSurplus);
+    int produceQtyDue = orderQty - allocationQty;
+    int plannedSurplus = BigDecimal.ZERO.intValue();
+    if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
+          plannedSurplus = context.getPlannedSurplus();
+          if(context.getPlannedSurplus() >= produceQtyDue) {
+            context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
+            produceQtyDue = BigDecimal.ZERO.intValue();
+          }else{
+            produceQtyDue = produceQtyDue  - plannedSurplus;
+            context.setPlannedSurplus(BigDecimal.ZERO.intValue());
+          }
+    }
     return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
@@ -467,8 +477,18 @@ public class StockAllocationHelper {
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
     int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int plannedSurplus = calculatePlannedSurplus(orderQty,BigDecimal.ZERO.intValue(),context);
-    int produceQtyDue = calculateProduceQtyDue(orderQty,BigDecimal.ZERO.intValue(),plannedSurplus);
+    int produceQtyDue = orderQty;
+    int plannedSurplus = BigDecimal.ZERO.intValue();
+    if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
+      plannedSurplus = context.getPlannedSurplus();
+      if(context.getPlannedSurplus() >= produceQtyDue) {
+        context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
+        produceQtyDue = BigDecimal.ZERO.intValue();
+      }else{
+        produceQtyDue = produceQtyDue  - plannedSurplus;
+        context.setPlannedSurplus(BigDecimal.ZERO.intValue());
+      }
+    }
     return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
   }
 

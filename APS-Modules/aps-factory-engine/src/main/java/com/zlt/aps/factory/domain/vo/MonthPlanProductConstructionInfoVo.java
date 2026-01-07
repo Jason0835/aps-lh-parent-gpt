@@ -43,6 +43,25 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
      */
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     private String isZeroRack;
+
+    /**
+     * 制造示方书号
+     */
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    private String embryoNo;
+
+    /**
+     * 文字示方书号
+     */
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    private String textNo;
+
+    /**
+     * 硫化示方书号
+     */
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    private String lhNo;
+
     /**
      * 胎胚号
      */

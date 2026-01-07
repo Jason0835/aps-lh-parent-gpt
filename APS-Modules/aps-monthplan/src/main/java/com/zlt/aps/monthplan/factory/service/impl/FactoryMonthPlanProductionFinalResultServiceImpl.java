@@ -95,7 +95,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         // 获取当前年月
         String yearMonth = String.format("%s%02d", year, month);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
@@ -135,15 +135,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         int totalMonthSuplus = BigDecimal.ZERO.intValue();
         //统计汇总值
         Integer[] dayList = FactoryConstant.PRODUCTION_CYCLE;
-        String fieldName;
-        int dayValue;
         for (FactoryMonthPlanProductionFinalResult productionFinalResult : productionFinalResults) {
             for (Integer day : dayList) {
                 if (day < stockDay) {
                     continue;
                 }
-                fieldName = "day" + Math.abs(day);
-
+                String fieldName = "day".concat(String.valueOf(day));
+                int dayValue;
                 Object value = productionFinalResult.getFieldValueByFieldName(fieldName);
                 if (null == value) {
                     dayValue = BigDecimal.ZERO.intValue();
@@ -175,13 +173,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
         }
-        return factoryMonthPlanProdFinals
-                .parallelStream()
-                .filter(Objects::nonNull)
-                .filter(item -> StringUtils.isNotBlank(item.getGroupKey()))
-                .collect(Collectors.groupingByConcurrent(
-                        FactoryMonthPlanProductionFinalResult::getGroupKey,
-                        Collectors.toCollection(ArrayList::new)
-                ));
+        return factoryMonthPlanProdFinals.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getGroupKey));
     }
 }
