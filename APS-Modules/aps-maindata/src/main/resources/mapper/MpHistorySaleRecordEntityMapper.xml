@@ -6,11 +6,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectRollMonthSaleQty" resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
         select MATERIAL_CODE,
-               SUM(SALE_QTY) as SALE_QTY
+               SUM(IFNULL(SALE_QTY, 0))     as SALE_QTY,
+               COUNT(DISTINCT `YEAR_MONTH`) AS deliveryFrequency
         from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
           AND `YEAR_MONTH` &gt;= #{minYearMonth}
           AND `YEAR_MONTH` &lt;= #{maxYearMonth}
+          AND IFNULL(SALE_QTY, 0) > 0
         group by MATERIAL_CODE
     </select>
 

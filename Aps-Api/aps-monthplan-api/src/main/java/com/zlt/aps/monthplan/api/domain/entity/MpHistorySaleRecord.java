@@ -129,4 +129,11 @@ public class MpHistorySaleRecord extends BaseEntity{
     @ApiModelProperty(value = "黄色标识，月均销量，前端展示、导出时标识使用", name = "yellowColorFlag")
     @TableField(exist = false)
     private String yellowColorFlag;
+
+    /**
+     * 近12个月的发货频次
+     */
+    @ApiModelProperty(value = "近12个月发货频次", name = "deliveryFrequency")
+    @TableField(exist = false)
+    private Integer deliveryFrequency;
 }
