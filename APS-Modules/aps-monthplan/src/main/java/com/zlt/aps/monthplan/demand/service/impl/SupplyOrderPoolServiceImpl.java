@@ -529,9 +529,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         BigDecimal turnOverDays,
         long stockWithoutOrder) {
         // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
-        return turnOverDays.divide(BigDecimal.valueOf(DAYS_PER_MONTH)).multiply(BigDecimal.valueOf(monthlyAverageSale))
-            .subtract(BigDecimal.valueOf(stockWithoutOrder))
-            .setScale(0, RoundingMode.HALF_UP);
+        return turnOverDays.divide(BigDecimal.valueOf(DAYS_PER_MONTH),0,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(monthlyAverageSale))
+            .subtract(BigDecimal.valueOf(stockWithoutOrder));
     }
 
     private Set<String> findEligibleSkus(PrecedentStockUpContext context) {
