@@ -2,8 +2,9 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
@@ -94,17 +95,19 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     @Override
     public String checkUnique(SupplyOrderPool docEntityVO) {
+        //  (1).根据SKU、订单类型进行唯一性校验，如果存在，提示信息"xxx物料的周期排产/常规储备已经存在，请确认"，系统不做处理
+        //  (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"));
+            String notUniqueMsg =  String.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
+            throw new BusinessException(notUniqueMsg);
         }
         return unique;
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        // 唯一校验字段
-        return Collections.emptyList();
+        return Lists.newArrayList("factoryCode","year","month","orderType","materialCode");
     }
 
     @Override
@@ -642,6 +645,14 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
         return recreateSupplyOrderPools(yearMonth,  eligibleSkus,context);
     }
+
+    @Override
+    public AjaxResult checkOverdue(SupplyOrderPool supplyOrderPool) {
+        // (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
+        boolean checkOverDue = overdueSkuService.checkOverdue(supplyOrderPool);
+        return checkOverDue?AjaxResult.error(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.overdue")):AjaxResult.success();
+    }
+
 
     /**
      * 获取配置信息
