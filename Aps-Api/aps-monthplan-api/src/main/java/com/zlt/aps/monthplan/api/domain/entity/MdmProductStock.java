@@ -208,6 +208,11 @@ public class MdmProductStock extends BaseEntity {
         return String.format(keyFormat, weekYear, isDynamicBalance,isUniformity);
     }
 
+    public String getStockWithoutOrderGroupKey() {
+        String keyFormat = "%s|%s|*|%s|*|%s";
+        return String.format(keyFormat, materialCode,weekYear, isDynamicBalance,isUniformity);
+    }
+
     /**
      * 初始化超龄状态
      *

@@ -200,4 +200,9 @@ public class SalesOrderPool extends BaseEntity{
         String keyFormat = "%s|*|%s|*|%s";
         return String.format(keyFormat, weekYear, isDynamicBalance,isUniformity);
     }
+
+    public String getStockWithoutOrderGroupKey() {
+        String keyFormat = "%s|%s|*|%s|*|%s";
+        return String.format(keyFormat, oriMaterialCode,weekYear, isDynamicBalance,isUniformity);
+    }
 }
