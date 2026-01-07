@@ -415,12 +415,12 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                     Integer yearMonth = historySaleRecord.getYearMonth();
 
                     yearMonthCount.add(yearMonth);
-                    if (yearMonth > Integer.parseInt(last3YearMonth)) {
+                    if (yearMonth >= Integer.parseInt(last3YearMonth)) {
                         // 近3个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
-                    if (yearMonth > Integer.parseInt(last6YearMonth)) {
+                    if (yearMonth >= Integer.parseInt(last6YearMonth)) {
                         // 近6个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassSixMonthSaleQty(result.intValue());
