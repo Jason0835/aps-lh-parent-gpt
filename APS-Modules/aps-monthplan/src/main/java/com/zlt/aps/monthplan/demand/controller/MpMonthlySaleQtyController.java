@@ -345,9 +345,10 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
                 String materialCode = monthlySaleQty.getMaterialCode();
                 if (sumQtyGroupByAreaMap.containsKey(materialCode)) {
                     List<MpHistorySaleRecord> areaGroupList = sumQtyGroupByAreaMap.get(materialCode);
+                    areaGroupList = areaGroupList.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed()).collect(Collectors.toList());
                     for (int i = 0; i < areaGroupList.size(); i++) {
                         MpHistorySaleRecord record = areaGroupList.get(i);
-                        if (i > 2) {
+                        if (i >= 3) {
                             record.setYellowColorFlag(YesOrNoEnum.NO.getCode());
                         } else {
                             record.setYellowColorFlag(YesOrNoEnum.YES.getCode());
