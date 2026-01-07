@@ -6,6 +6,8 @@ import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+
 /**
  * TBR 结构分组排产日志记录器
  *
@@ -183,6 +185,73 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加结构粗算产能日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构主花纹：%s 粗算产能：总需求 %s 使用最大模具数 %s 在%s天最大可排产量%s ====
+     *
+     * @param context              排程上下文
+     * @param groupMainPatternName 分组+主花纹名
+     * @param sumQty               总需求量
+     * @param maxMouldNumber       最大模具数
+     * @param maxCapacity          最大排产量
+     * @return
+     */
+    public static String addGroupCalculateCapacityLog(Context context, String groupMainPatternName, Integer sumQty, Integer maxMouldNumber, Integer maxCapacity) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构主花纹：%s 粗算产能：总需求 %s 使用最大模具数 %s 在%s天最大可排产量%s ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupMainPatternName, sumQty, maxMouldNumber, context.getMonthDays(), maxCapacity);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MAIN_PATTERN_CAPACITY_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构粗算总产能日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算总产能：%s ====
+     *
+     * @param context     排程上下文
+     * @param groupName   分组
+     * @param maxCapacity 最大排产量
+     * @return
+     */
+    public static String addGroupCalculateCapacityLog(Context context, String groupName, Integer maxCapacity) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算总产能：%s ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, maxCapacity);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SUM_CAPACITY_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构粗算成型机台数日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算：最大排产量：%s 最低硫化机台数：%s 最小日硫化量：%s 需排产天数：%s 估算机台数：%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组
+     * @param maxCapacity       最大排产量
+     * @param minLhMachineCount 最小硫化机台数
+     * @param minDayQty         最小日产能(单模)
+     * @param sumProductionDay  总生产天数
+     * @param cxMachineCount    估算机台数
+     * @return
+     */
+    public static String addGroupCalculateCxMachineCountLog(Context context,
+                                                            String groupName,
+                                                            Integer maxCapacity,
+                                                            Integer minLhMachineCount,
+                                                            Integer minDayQty,
+                                                            Integer sumProductionDay,
+                                                            BigDecimal cxMachineCount) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算：最大排产量：%s 最低硫化机台数：%s 最小日硫化量：%s 需排产天数：%s 估算机台数：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, maxCapacity, minLhMachineCount, minDayQty,
+                sumProductionDay, cxMachineCount);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SUM_CAPACITY_CX_MACHINE_INFO, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构没有获取到成型硫化配比数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有得到成型硫化配比====
      *
@@ -194,7 +263,6 @@ public class TbrProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有得到成型硫化配比====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SINGLE_GROUP_LH_RATIO_EMPTY, logContent);
-        log.info(logContent);
         return logContent;
     }
 
