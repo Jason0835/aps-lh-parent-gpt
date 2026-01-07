@@ -2,8 +2,9 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
@@ -37,6 +38,7 @@ import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -94,17 +96,19 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     @Override
     public String checkUnique(SupplyOrderPool docEntityVO) {
+        //  (1).根据SKU、订单类型进行唯一性校验，如果存在，提示信息"xxx物料的周期排产/常规储备已经存在，请确认"，系统不做处理
+        //  (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"));
+            String notUniqueMsg =  String.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
+            throw new BusinessException(notUniqueMsg);
         }
         return unique;
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        // 唯一校验字段
-        return Collections.emptyList();
+        return Lists.newArrayList("factoryCode","year","month","orderType","materialCode");
     }
 
     @Override
@@ -182,34 +186,30 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                 stocksFuture, salesOrderFuture, planFuture)
             .thenApply(v -> {
                 try {
-                    Map<String, MpMonthlySaleQty> sku2AverageSaleQty =
-                        sku2AverageSaleQty(monthlySaleQtyFuture.get());
+                    List<MpMonthlySaleQty> monthlySaleQties =  monthlySaleQtyFuture.get();
+                    List<MdmMaterialInfo> materials = materialsFuture.get();
+                    List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
+                    List<MdmProductStock> productStocks = stocksFuture.get();
+                    List<SalesOrderPool> salesOrderPools = salesOrderFuture.get();
+                    List<FactoryMonthPlanProductionFinalResult> planFinalResults = planFuture.get();
 
-                    Map<String, MdmMaterialInfo> sku2StructureMap =
-                        sku2Structure(materialsFuture.get());
+                    Map<String, MpMonthlySaleQty> sku2AverageSaleQty = sku2AverageSaleQty(monthlySaleQties);
 
-                    Map<String, Integer> structure2TurnoverMonthMap =
-                        structure2TurnoverMonth(cycleSchStruConfFuture.get());
+                    Map<String, MdmMaterialInfo> sku2StructureMap = sku2Structure(materials);
 
-                    Map<String, Integer> stockMap =
-                        convertToGroupedSumStockQtyMap(stocksFuture.get());
+                    Map<String, Integer> structure2TurnoverMonthMap = structure2TurnoverMonth(cycleSchStruConfs);
+                    Map<String,List<MdmProductStock>> stockMap = this.getProductStockMapGroupByMaterialCode(productStocks);
+                    Map<String,Integer> stockWithoutOrderMap = calculateStockWithoutOrder(productStocks,salesOrderPools);
 
-                    Map<String, Integer> saleOrderMap =
-                        convertToGroupedSumOrderQtyMap(salesOrderFuture.get());
 
-                    Map<String, List<MdmProductStock>> finishedProductStockMap =
-                        getFinishedProductMap(stocksFuture.get());
-
-                    Map<String, Integer> countSkuMap =
-                        countSkuMap(planFuture.get());
+                    Map<String, Integer> countSkuMap = countSkuMap(planFinalResults);
 
                     return new CalculationData(
                         sku2AverageSaleQty,
                         sku2StructureMap,
                         structure2TurnoverMonthMap,
                         stockMap,
-                        saleOrderMap,
-                        finishedProductStockMap,
+                        stockWithoutOrderMap,
                         countSkuMap
                     );
                 } catch (Exception e) {
@@ -338,16 +338,112 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         List<MpMonthlySaleQty> monthlySaleQtyList =   monthlySaleQtyService.findCurrentMonthlySaleQty();
         Map<String,MpMonthlySaleQty> monthlySaleQtyMap = sku2AverageSaleQty(monthlySaleQtyList);
         List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.findCurrentFinishStock();
-        Map<String,List<MdmProductStock>> stockMap  = this.getFinishedProductMap(finishedProductStocks);
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
-        Map<String, Integer> salesOrderMap = this.convertToGroupedSumOrderQtyMap(salesOrderPools);
+        Map<String,Integer> stockWithoutOrderMap = calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
+        Map<String,List<MdmProductStock>> stockMap = this.getProductStockMapGroupByMaterialCode(finishedProductStocks);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.factoryMonthPlanProductionFinalResultService.findLastTwelveMonthProdFinalPlan();
         Map<String,Integer> productionCountMap = this.countSkuMap(factoryMonthPlanProdFinals);
         return eligibleSkus.parallelStream()
-            .map(sku -> calculateOrderForSku(yearMonth,sku, context, monthlySaleQtyMap,
-                stockMap, salesOrderMap, productionCountMap))
+            .map(sku -> calculateOrderForSku(yearMonth,sku, context, monthlySaleQtyMap,stockMap, stockWithoutOrderMap, productionCountMap))
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
+    }
+
+    private Map<String, List<MdmProductStock>> getProductStockMapGroupByMaterialCode(List<MdmProductStock> finishedProductStocks) {
+        if(CollectionUtils.isEmpty(finishedProductStocks)) {
+            return Collections.emptyMap();
+        }
+        return  finishedProductStocks.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.groupingBy(MdmProductStock::getMaterialCode));
+    }
+
+    private Map<String, Integer> calculateStockWithoutOrder(List<MdmProductStock> finishedProductStocks, List<SalesOrderPool> salesOrderPools) {
+        if(CollectionUtils.isEmpty(finishedProductStocks)){
+            return Collections.emptyMap();
+        }
+
+        Map<String, MdmProductStock> stockMap = this.calculateStockQtyMap(finishedProductStocks);
+        if(org.springframework.util.CollectionUtils.isEmpty(stockMap)){
+            return Collections.emptyMap();
+        }
+        Map<String,Integer> stockWithoutOrderMap = new HashMap<>();
+        Map<String, SalesOrderPool> salesOrderMap = this.calculateOrderQtyMap(salesOrderPools);
+        stockMap.forEach((key,value) -> {
+            if(!salesOrderMap.containsKey(key)){
+                return;
+            }
+            value.setStockQty(value.getStockQty() - salesOrderMap.get(key).getOrdQty().intValue());
+            if(!stockWithoutOrderMap.containsKey(value.getMaterialCode())){
+                stockWithoutOrderMap.put(value.getMaterialCode(),value.getStockQty());
+                return;
+            }
+            stockWithoutOrderMap.compute(value.getMaterialCode(), (k, stockWithoutOrder) -> (stockWithoutOrder==null?0:stockWithoutOrder) + value.getStockQty());
+        });
+        return stockWithoutOrderMap;
+    }
+
+    private Map<String, MdmProductStock> calculateStockQtyMap(List<MdmProductStock> finishedProductStocks) {
+        if(CollectionUtils.isEmpty(finishedProductStocks)){
+            return Collections.emptyMap();
+        }
+        return finishedProductStocks.parallelStream()
+            .collect(Collectors.toMap(
+                MdmProductStock::getStockWithoutOrderGroupKey,
+                Function.identity(),
+                this::mergeProductStocks,
+                ConcurrentHashMap::new
+            ));
+    }
+
+
+    /**
+     * 合并具有相同键的SalesOrderPool对象
+     * 主要合并ordQty，其他字段取第一个出现的值
+     */
+    private MdmProductStock mergeProductStocks(MdmProductStock existing, MdmProductStock incoming) {
+        int existOrdQty = null == existing.getStockQty()?BigDecimal.ZERO.intValue():existing.getStockQty();
+        int incomingQty = null == incoming.getStockQty()?BigDecimal.ZERO.intValue():incoming.getStockQty();
+        // 累加数量
+        int totalQty = existOrdQty + incomingQty;
+        // 创建新的合并对象（避免修改原对象）
+        MdmProductStock merged = new MdmProductStock();
+        merged.setWeekYear(existing.getWeekYear());
+        merged.setIsUniformity(existing.getIsUniformity());
+        merged.setIsDynamicBalance(existing.getIsDynamicBalance());
+        merged.setMaterialCode(existing.getMaterialCode());
+        merged.setStockQty(totalQty);
+        return merged;
+    }
+
+    private Map<String, SalesOrderPool> calculateOrderQtyMap(List<SalesOrderPool> salesOrderPools) {
+        if(CollectionUtils.isEmpty(salesOrderPools)){
+            return Collections.emptyMap();
+        }
+        return salesOrderPools.parallelStream()
+            .collect(Collectors.toMap(
+                SalesOrderPool::getStockWithoutOrderGroupKey,
+                Function.identity(),
+                this::mergeSalesOrderPools,
+                ConcurrentHashMap::new
+            ));
+    }
+
+    /**
+     * 合并具有相同键的SalesOrderPool对象
+     * 主要合并ordQty，其他字段取第一个出现的值
+     */
+    private SalesOrderPool mergeSalesOrderPools(SalesOrderPool existing, SalesOrderPool incoming) {
+        BigDecimal existOrdQty = null == existing.getOrdQty()?BigDecimal.ZERO:existing.getOrdQty();
+        BigDecimal incomingQty = null == incoming.getOrdQty()?BigDecimal.ZERO:incoming.getOrdQty();
+        // 累加数量
+        BigDecimal totalQty = existOrdQty.add(incomingQty);
+        // 创建新的合并对象（避免修改原对象）
+        SalesOrderPool merged = new SalesOrderPool();
+        merged.setWeekYear(existing.getWeekYear());
+        merged.setIsUniformity(existing.getIsUniformity());
+        merged.setIsDynamicBalance(existing.getIsDynamicBalance());
+        merged.setOriMaterialCode(existing.getOriMaterialCode());
+        merged.setOrdQty(totalQty);
+        return merged;
     }
 
     private SupplyOrderPool calculateOrderForSku(
@@ -355,34 +451,26 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         String materialCode,
         PrecedentStockUpContext context,
         Map<String, MpMonthlySaleQty> monthlySaleQtyMap,
-        Map<String, List<MdmProductStock>> stockMap,
-        Map<String, Integer> salesOrderMap,
+        Map<String,List<MdmProductStock>> stockMap,
+        Map<String,Integer> stockWithoutOrderMap,
         Map<String, Integer> productionCountMap) {
-
         MdmMaterialInfo materialInfo = context.getMaterialCodeToInfoMap().get(materialCode);
         if (materialInfo == null) {
             log.warn("Material info not found for SKU: {}", materialCode);
             return null;
         }
-
         MpMonthlySaleQty monthlySaleQty = monthlySaleQtyMap.get(materialCode);
         if (monthlySaleQty == null || monthlySaleQty.getAverageSaleQty() <= 0) {
             return null;
         }
-        long stockWithoutOrder = calculateStockWithoutOrder(materialCode,
-            stockMap,
-            salesOrderMap);
+        int stockWithoutOrder = stockWithoutOrderMap.getOrDefault(materialCode, BigDecimal.ZERO.intValue());
+        // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
         BigDecimal productionQty = calculateProductionQty(
             monthlySaleQty.getAverageSaleQty(),
             context.getTurnOverDays(),
             stockWithoutOrder
         );
-
-        if (productionQty.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
         SupplyOrderPool entity = new SupplyOrderPool();
-        // SKU的周期性排产量：月均销量 * 周转月数 - 无订单库存
         entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         entity.setOrderType(SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
         entity.setMaterialCode(materialCode);
@@ -408,15 +496,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         int nightOverdueStockQty = 0;
         int twelveOverdueStockQty = 0;
         // 6、查询成品库存表，汇总计算超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
-        if(!org.springframework.util.CollectionUtils.isEmpty(stockMap)) {
-            for(Map.Entry<String, List<MdmProductStock>> entry : stockMap.entrySet()) {
-                if(entry.getKey().contains(materialCode)) {
-                    threeOverdueStockQty = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    sixOverdueStockQty = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    nightOverdueStockQty = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    twelveOverdueStockQty  = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                }
-            }
+        if(stockMap.containsKey(materialCode)) {
+            List<MdmProductStock> list = stockMap.get(materialCode);
+            threeOverdueStockQty = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            sixOverdueStockQty = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            nightOverdueStockQty = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            twelveOverdueStockQty  = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToInt(MdmProductStock::getStockQty).sum();
         }
         entity.setThreeOverdueStockQty(threeOverdueStockQty);
         entity.setSixOverdueStockQty(sixOverdueStockQty);
@@ -444,25 +529,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         BigDecimal turnOverDays,
         long stockWithoutOrder) {
         // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
-        return BigDecimal.valueOf(monthlyAverageSale).multiply(turnOverDays)
-            .subtract(BigDecimal.valueOf(stockWithoutOrder))
-            .setScale(0, RoundingMode.HALF_UP);
-    }
-
-    private long calculateStockWithoutOrder(String materialCode, Map<String, List<MdmProductStock>> stockMap, Map<String, Integer> salesOrderMap) {
-        int notOrderStockQty = BigDecimal.ZERO.intValue();
-        if(org.springframework.util.CollectionUtils.isEmpty(stockMap)) {
-            return notOrderStockQty;
-        }
-        for(Map.Entry<String,List<MdmProductStock>> entry:stockMap.entrySet()) {
-            if(entry.getKey().contains(materialCode)) {
-                int totalStockQty = entry.getValue().stream().filter(stock -> null != stock.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
-                int saleOrderQty = salesOrderMap.getOrDefault(entry.getKey(), 0);
-                notOrderStockQty += totalStockQty - saleOrderQty;
-            }
-        }
-        // 无订单库存 = 成品库存 - 销售订单池提报量
-        return notOrderStockQty;
+        return turnOverDays.divide(BigDecimal.valueOf(DAYS_PER_MONTH),0,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(monthlyAverageSale))
+            .subtract(BigDecimal.valueOf(stockWithoutOrder));
     }
 
     private Set<String> findEligibleSkus(PrecedentStockUpContext context) {
@@ -643,6 +711,14 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return recreateSupplyOrderPools(yearMonth,  eligibleSkus,context);
     }
 
+    @Override
+    public AjaxResult checkOverdue(SupplyOrderPool supplyOrderPool) {
+        // (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
+        boolean checkOverDue = overdueSkuService.checkOverdue(supplyOrderPool);
+        return checkOverDue?AjaxResult.error(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.overdue")):AjaxResult.success();
+    }
+
+
     /**
      * 获取配置信息
      *
@@ -697,72 +773,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             ));
     }
 
-
-    private Map<String, Integer> convertToGroupedSumOrderQtyMap(List<SalesOrderPool> salesOrderPools) {
-        if (CollectionUtils.isEmpty(salesOrderPools)) {
-            return Collections.emptyMap();
-        }
-
-        return salesOrderPools.stream()
-            .filter(Objects::nonNull)
-            .filter(salesOrder -> StringUtils.isNotBlank(salesOrder.getOriMaterialCode()) && salesOrder.getOrdQty() != null)
-            .collect(Collectors.groupingBy(
-                salesOrder -> createCompositeKey(
-                    salesOrder.getOriMaterialCode(),
-                    salesOrder.getWeekYear(),
-                    salesOrder.getIsDynamicBalance(),
-                    salesOrder.getIsUniformity()
-                ),
-                Collectors.summingInt(item -> item.getOrdQty().intValue())
-            ));
-    }
-
-    private Map<String,List<MdmProductStock>> getFinishedProductMap(List<MdmProductStock> finishedProductStocks) {
-        if (CollectionUtils.isEmpty(finishedProductStocks)) {
-            return Collections.emptyMap();
-        }
-        return finishedProductStocks.stream()
-            .filter(Objects::nonNull)
-            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()))
-            .collect(Collectors.groupingBy(
-                stock -> createCompositeKey(
-                    stock.getMaterialCode(),
-                    stock.getWeekYear(),
-                    stock.getIsDynamicBalance(),
-                    stock.getIsUniformity()
-                )));
-    }
-
-    public Map<String, Integer> convertToGroupedSumStockQtyMap(List<MdmProductStock> finishedProductStocks) {
-        if (CollectionUtils.isEmpty(finishedProductStocks)) {
-            return Collections.emptyMap();
-        }
-
-        return finishedProductStocks.stream()
-            .filter(Objects::nonNull)
-            .filter(stock -> StringUtils.isNotBlank(stock.getMaterialCode())  && stock.getStockQty() != null)
-            .collect(Collectors.groupingBy(
-                stock -> createCompositeKey(
-                    stock.getMaterialCode(),
-                    stock.getWeekYear(),
-                    stock.getIsDynamicBalance(),
-                    stock.getIsUniformity()
-                ),
-                Collectors.summingInt(MdmProductStock::getStockQty)
-            ));
-    }
-
-    private String createCompositeKey(String materialCode, String weekYear,
-                                      String dynamicBalance, String uniformity) {
-        // 使用分隔符连接四个维度，确保唯一性
-        // 使用特殊分隔符避免与内容冲突
-        return String.join("|",
-            Optional.ofNullable(materialCode).orElse(""),
-            Optional.ofNullable(weekYear).orElse(""),
-            Optional.ofNullable(dynamicBalance).orElse(""),
-            Optional.ofNullable(uniformity).orElse("")
-        );
-    }
 
     private Map<String, MpMonthlySaleQty> sku2AverageSaleQty(List<MpMonthlySaleQty> monthlySaleQtyList) {
         if (CollectionUtils.isEmpty(monthlySaleQtyList)) {
@@ -831,45 +841,24 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      */
     private void calculateStockMetrics(SupplyOrderPool order, CalculationData data) {
         // 计算无订单库存
-        int notOrderStockQty = calculateNotOrderStockQty(order.getMaterialCode(),data);
-        Map<String, List<MdmProductStock>> finishedProductStockMap =   data.getFinishedProductStockMap();
+        int notOrderStockQty = data.getStockWithoutOrderMap().getOrDefault(order.getMaterialCode(), BigDecimal.ZERO.intValue());
+        Map<String, List<MdmProductStock>> finishedProductStockMap =   data.getStockMap();
         int threeOverdueStockQty = 0;
         int sixOverdueStockQty = 0;
         int nightOverdueStockQty = 0;
         int twelveOverdueStockQty = 0;
-        if(!org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
-            for(Map.Entry<String,List<MdmProductStock>> entry: finishedProductStockMap.entrySet()) {
-                if(entry.getKey().contains(order.getMaterialCode())) {
-                    threeOverdueStockQty = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    sixOverdueStockQty =   entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    nightOverdueStockQty =  entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                    twelveOverdueStockQty  = entry.getValue().stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToInt(MdmProductStock::getStockQty).sum();
-                }
-            }
+        if(finishedProductStockMap.containsKey(order.getMaterialCode())) {
+            List<MdmProductStock> list = finishedProductStockMap.get(order.getMaterialCode());
+            threeOverdueStockQty = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedThreeMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            sixOverdueStockQty =   list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedSixMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            nightOverdueStockQty =  list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedNineMonth())).mapToInt(MdmProductStock::getStockQty).sum();
+            twelveOverdueStockQty  = list.stream().filter(finishedProductStock -> YesOrNoEnum.YES.getCode().equals(finishedProductStock.getIsExceedTwelveMonth())).mapToInt(MdmProductStock::getStockQty).sum();
         }
         order.setThreeOverdueStockQty(threeOverdueStockQty);
         order.setSixOverdueStockQty(sixOverdueStockQty);
         order.setNightOverdueStockQty(nightOverdueStockQty);
         order.setTwelveOverdueStockQty(twelveOverdueStockQty);
         order.setNotOrderStockQty(notOrderStockQty);
-    }
-
-    /**
-     * 计算无订单库存
-     */
-    private int calculateNotOrderStockQty(String materialCode,CalculationData data) {
-        int notOrderStockQty = BigDecimal.ZERO.intValue();
-        if(org.springframework.util.CollectionUtils.isEmpty(data.getStockMap())) {
-            return notOrderStockQty;
-        }
-        for(Map.Entry<String,Integer> entry:data.getStockMap().entrySet()) {
-            if(entry.getKey().contains(materialCode)) {
-                int saleOrderQty = data.getSaleOrderMap().getOrDefault(entry.getKey(), 0);
-                notOrderStockQty += entry.getValue() - saleOrderQty;
-            }
-        }
-        // 无订单库存 = 成品库存 - 销售订单池提报量
-        return notOrderStockQty;
     }
 
     /**
@@ -961,12 +950,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     @Builder
     @Getter
     private static class CalculationData {
+
         private final Map<String, MpMonthlySaleQty> sku2AverageSaleQty;
         private final Map<String, MdmMaterialInfo> sku2StructureMap;
         private final Map<String, Integer> structure2TurnoverMonthMap;
-        private final Map<String, Integer> stockMap;
-        private final Map<String, Integer> saleOrderMap;
-        private final Map<String, List<MdmProductStock>> finishedProductStockMap;
+        private final  Map<String,List<MdmProductStock>> stockMap;
+        private final Map<String,Integer> stockWithoutOrderMap;
         private final Map<String, Integer> countSkuMap;
     }
 

@@ -88,7 +88,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "bill_date desc";
     }
 
     /**
