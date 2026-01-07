@@ -197,7 +197,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "create_time, id desc";
     }
 
     /**
