@@ -124,6 +124,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
      */
     @Override
     public AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty) {
+        Map<String, Object> params = mpMonthlySaleQty.getParams();
         String redisValue = redisService.getCacheObject(OperationBusinessEnums.CREATE_MONTH_AVERAGE_SALE.getCode());
         if (StringUtils.isNotBlank(redisValue)) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.mpMonthlySaleQty.generating"));
@@ -152,12 +153,21 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         String lastYearMonth = lastYear + lastMonth;
         Date lastMonthDate = instance.getTime();
         // 查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表
-        genMpHistorySaleRecord(factoryCode, nowDate, lastMonthDate, lastYear, lastMonth);
+        if (params == null || !params.containsKey("continueGenMpHistorySaleRecord")) {
+            genMpHistorySaleRecord(factoryCode, nowDate, lastMonthDate, lastYear, lastMonth);
+        }
 
         // 获取当前年月及之前6个月的历史销售记录
         int passThreeMonth = 3;
         int passSixMonth = 6;
         int passTwelveMonth = 12;
+
+        instance.setTime(nowDate);
+        instance.add(Calendar.MONTH, -passThreeMonth);
+        int last3Year = instance.get(Calendar.YEAR);
+        String last3Month = String.format("%02d", instance.get(Calendar.MONTH) + 1);
+        String last3YearMonth = last3Year + last3Month;
+
         instance.setTime(nowDate);
         // 查询参数
         FactoryParam param = new FactoryParam();
@@ -182,7 +192,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         String last12YearMonth = last12Year + last12Month;
 
         // 生成月均销量
-        genMonthSaleQty(factoryCode, last12YearMonth, maxYearMonth, last6YearMonth, passThreeMonth, passSixMonth);
+        genMonthSaleQty(factoryCode, last12YearMonth, maxYearMonth, last3YearMonth, last6YearMonth, passThreeMonth, passSixMonth);
         // 生成SKU排产分类
         genSkuClassify(factoryCode, last12YearMonth, maxYearMonth);
         return AjaxResult.success();
@@ -272,7 +282,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
      * @param passThreeMonth  减3月
      * @param passSixMonth    减6月
      */
-    private void genMonthSaleQty(String factoryCode, String last12YearMonth, String maxYearMonth, String last6YearMonth, int passThreeMonth, int passSixMonth) {
+    private void genMonthSaleQty(String factoryCode, String last12YearMonth, String maxYearMonth, String last3YearMonth, String last6YearMonth, int passThreeMonth, int passSixMonth) {
         List<MpHistorySaleRecord> rollMonthSaleQtyList = mpHistorySaleRecordEntityMapper.selectRollMonthSaleQty(factoryCode, last12YearMonth, maxYearMonth);
         Map<String, Integer> rollMonthSaleQtyMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(rollMonthSaleQtyList)) {
@@ -330,11 +340,10 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 monthlySaleQty.setMaterialCode(materialCode);
 
                 List<MpHistorySaleRecord> passSixMonthList = new ArrayList<>();
-                for (int i = 0; i < value.size(); i++) {
-                    if (i == passSixMonth) {
+                for (MpHistorySaleRecord record : value) {
+                    if (record.getYearMonth() == Integer.parseInt(last6YearMonth)) {
                         break;
                     }
-                    MpHistorySaleRecord record = value.get(i);
                     passSixMonthList.add(record);
                 }
 
@@ -346,14 +355,25 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 // 月均销量=销量汇总/6，近3个月销量=取月份最大三个月汇总/3，向上取整
                 Integer totalSaleQty = 0;
                 int size = passSixMonthList.size();
+
+                monthlySaleQty.setPassThreeMonthSaleQty(0);
+                monthlySaleQty.setPassSixMonthSaleQty(0);
+                monthlySaleQty.setRollTwelveMonthSaleQty(0);
+
                 for (int i = 0; i < size; i++) {
                     MpHistorySaleRecord historySaleRecord = passSixMonthList.get(i);
                     Integer saleQty = historySaleRecord.getSaleQty();
                     totalSaleQty += saleQty;
-                    if (i <= passThreeMonth - 1) {
+                    Integer yearMonth = historySaleRecord.getYearMonth();
+                    if (yearMonth > Integer.parseInt(last3YearMonth)) {
                         // 近3个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(i + 1), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
+                    }
+                    if (yearMonth > Integer.parseInt(last6YearMonth)) {
+                        // 近6个月
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(i + 1), 0, RoundingMode.UP);
+                        monthlySaleQty.setPassSixMonthSaleQty(result.intValue());
                     }
                 }
                 // 月均销量
@@ -363,7 +383,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 // 滚动月销量
                 if (rollMonthSaleQtyMap.containsKey(materialCode)) {
                     Integer saleQty = rollMonthSaleQtyMap.get(materialCode);
-                    monthlySaleQty.setRollTwelveMonthSaleQty(saleQty.intValue());
+                    monthlySaleQty.setRollTwelveMonthSaleQty(saleQty);
                 }
 
                 // 根据物料信息回写物料信息
@@ -420,7 +440,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 skuScheduleCategory.setGenrateDate(new Date());
                 // 12月平均销量
                 long sumSaleQty = value.stream().mapToLong(MpHistorySaleRecord::getSaleQty).sum();
-                BigDecimal averageSaleQty = BigDecimal.valueOf(sumSaleQty).divide(BigDecimal.valueOf(12), 0, RoundingMode.UP);
+                int size = value.size();
+                BigDecimal averageSaleQty = BigDecimal.valueOf(sumSaleQty).divide(BigDecimal.valueOf(size), 0, RoundingMode.UP);
 
                 // 年月汇总，把不同区域的销量汇总
                 Map<String, MpHistorySaleRecord> monthSaleQtyMap = value.stream().collect(Collectors
