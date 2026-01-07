@@ -124,20 +124,20 @@ public class DpStockVersion extends BaseEntity {
     private String weekYear;
 
     /**
-     * 均匀性，字典：biz_yes_no，1 是 0 否
-     */
-    @Excel(name = "ui.data.column.mdmFinishStock.dynamicBalance", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "均匀性，字典：biz_yes_no，1 是 0 否", name = "dynamicBalance")
-    @TableField(value = "DYNAMIC_BALANCE")
-    private String dynamicBalance;
-
-    /**
      * 动平衡，字典：biz_yes_no，1 是 0 否
      */
-    @Excel(name = "ui.data.column.mdmFinishStock.uniformity", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "动平衡，字典：biz_yes_no，1 是 0 否", name = "uniformity")
-    @TableField(value = "UNIFORMITY")
-    private String uniformity;
+    @Excel(name = "ui.data.column.mdmFinishStock.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡，字典：biz_yes_no，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
+
+    /**
+     * 均匀性，字典：biz_yes_no，1 是 0 否
+     */
+    @Excel(name = "ui.data.column.mdmFinishStock.isUniformity", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "均匀性，字典：biz_yes_no，1 是 0 否", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
 
     /**
      * 是否超3个月胎，字典：biz_yes_no，1 是 0 否
