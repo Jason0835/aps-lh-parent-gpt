@@ -96,4 +96,10 @@ public interface ISupplyOrderPoolRemoteService {
     @ApiOperation("输入物料编码，带出对应信息")
     @PostMapping("/supplyOrderPool/queryRelationByMaterialCode")
     AjaxResult queryRelationByMaterialCode(@RequestBody  SupplyOrderPool supplyOrderPool);
+    /**
+     * 超期校验
+     */
+    @ApiOperation("超期校验")
+    @PostMapping("/supplyOrderPool/checkOverdue")
+    AjaxResult checkOverdue(@RequestBody   SupplyOrderPool supplyOrderPool);
 }

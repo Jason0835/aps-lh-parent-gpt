@@ -167,7 +167,37 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
+    /**
+     * 是否零度材料
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isZeroRack")
+    @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
+    @TableField(value = "IS_ZERO_RACK")
+    private String isZeroRack;
 
+    /**
+     * 制造示方书号
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
+
+    /**
+     * 文字示方书号
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.textNo")
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(value = "TEXT_NO")
+    private String textNo;
+
+    /**
+     * 硫化示方书号
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.lhNo")
+    @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
+    @TableField(value = "LH_NO")
+    private String lhNo;
     /**
      * 品牌
      */

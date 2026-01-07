@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.utils.DateUtils;
@@ -174,5 +173,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
             return Collections.emptyMap();
         }
         return factoryMonthPlanProdFinals.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getGroupKey));
+    }
+
+    public static void main(String[] args) {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
+        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
+        System.out.println("yearMonth = " + yearMonth);
     }
 }

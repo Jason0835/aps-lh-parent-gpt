@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -72,12 +73,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //开始进行成型产能分配-结构排产
-        String startInfoLog = TbrProductionGroupLogRecorder.addStartGroupLog(productionContext);
-        log.info(startInfoLog);
+        log.info(TbrProductionGroupLogRecorder.addStartGroupLog(productionContext));
         //获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
-        String endGetDataLog = TbrProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext);
-        log.info(endGetDataLog);
+        log.info(TbrProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
             throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
         }
@@ -95,7 +94,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         //todo 记录日志 续作结构排产分配
         //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
-        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(context, structureLhRatioList);
+        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(productionContext, structureLhRatioList);
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
@@ -241,6 +240,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
+        //降膜排产相关
+        paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         //获取数据
@@ -269,6 +276,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
+        //降膜排产相关
+        configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));
+        configuration.setFirstNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
+        configuration.setFirstNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode()));
+        configuration.setSecondNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
+        configuration.setSecondNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_DAY.getCode()));
+        configuration.setLastNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
+        configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         return configuration;
     }
 
@@ -735,6 +750,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
             }
         });
+        //周期结构-按总需求排产
+        requirePlanList.forEach(requirePlan -> {
+            //周期排产按总量排产
+            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(requirePlan.getStructureType())) {
+                requirePlan.setIsProductionBySum(Constant.TRUE);
+            }
+        });
         //计算初始的库销比
         requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.intValue()));
     }
@@ -932,7 +954,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
         List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
-        if (!CollectionUtils.isEmpty(continueGroupInfoList)) {
+        if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             log.info(TbrProductionGroupLogRecorder.addContinueSkuEmptyLog(context));
             return Collections.emptyMap();
         }

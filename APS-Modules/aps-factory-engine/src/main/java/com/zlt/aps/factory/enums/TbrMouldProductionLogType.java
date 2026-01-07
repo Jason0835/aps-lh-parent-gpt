@@ -14,6 +14,50 @@ public enum TbrMouldProductionLogType {
      */
     START_INIT("10-01", "开始初始化"),
     /**
+     * 10-02-01 初始化读取业务参数为空
+     */
+    INIT_GET_PARAM_DATA("10-02-01", "初始化读取业务参数为空"),
+    /**
+     * 10-02-02 初始化计算物料损耗量
+     */
+    INIT_LOSS_QTY("10-02-02", "初始化计算物料损耗量"),
+    /**
+     * 10-02-03 初始化读取物料基础数据为空
+     */
+    INIT_MATERIAL_DATA("10-02-03", "初始化读取物料基础数据为空"),
+    /**
+     * 10-02-04 初始化没有找到物料基础信息
+     */
+    INIT_SINGLE_MATERIAL_DATA("10-02-04", "初始化没有找到物料基础信息"),
+    /**
+     * 10-02-05 初始化读取Sku施工信息数据为空
+     */
+    INIT_CONSTRUCTION_DATA("10-02-05", "初始化读取Sku施工信息数据为空"),
+    /**
+     * 10-02-06 初始化没有找到Sku施工关系
+     */
+    INIT_SINGLE_CONSTRUCTION_DATA("10-02-06", "初始化没有找到Sku施工关系"),
+    /**
+     * 10-02-07 初始化读取Sku日硫化量信息数据为空
+     */
+    INIT_DAY_LH_CAPACITY_DATA("10-02-07", "初始化读取Sku日硫化量信息数据为空"),
+    /**
+     * 10-02-08 初始化没有找到Sku日硫化量信息
+     */
+    INIT_SINGLE_DAY_LH_CAPACITY_DATA("10-02-08", "初始化没有找到Sku日硫化量信息"),
+    /**
+     * 10-02-09 初始化读取模具关系配置为空
+     */
+    INIT_MOULD_RELATION_INFO_EMPTY("10-02-09", "初始化读取模具关系配置为空"),
+    /**
+     * 10-02-10 初始化新模具到货配置为空
+     */
+    INIT_MOULD_DELIVERY_INFO_EMPTY("10-02-10", "初始化新模具到货配置为空"),
+    /**
+     * 10-02-11 初始化没有找到模具配置
+     */
+    INIT_SINGLE_MOULD_INFO_EMPTY("10-02-11", "初始化没有找到模具配置"),
+    /**
      * 10-04 初始化结束
      */
     INIT_COMPLETE("10-04", "初始化结束"),
@@ -162,6 +206,18 @@ public enum TbrMouldProductionLogType {
      * 30-02-04 非在机结构模具排产硫化组排产Sku没有合适的排产模具
      */
     GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-02-04", "非在机结构模具排产硫化组排产Sku没有合适的排产模具"),
+    /**
+     * 30-03-01 在机结构续作Sku开始模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_MOULD_PRODUCTION("30-03-01", "在机结构续作Sku开始模具排产"),
+    /**
+     * 30-03-02 在机结构续作Sku-开始同规格同花纹-模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_SAME_SPEC_MOULD_PRODUCTION("30-03-02", "在机结构续作Sku-开始同规格同花纹-模具排产"),
+    /**
+     * 30-03-03 在机结构续作Sku-开始同生胎同模具-模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_START_SAME_EMBRYO_MOULD_PRODUCTION("30-03-03", "在机结构续作Sku-开始同生胎同模具-模具排产"),
     /**
      * 99 一键排产结束
      */

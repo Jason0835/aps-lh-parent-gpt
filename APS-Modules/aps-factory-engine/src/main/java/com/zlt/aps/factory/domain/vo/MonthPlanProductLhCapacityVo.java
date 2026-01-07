@@ -65,7 +65,7 @@ public class MonthPlanProductLhCapacityVo implements Serializable {
     /**
      * 日硫化量
      */
-    @ApiModelProperty(value = "总硫化时间(单位s)", name = "vulcanizationTime")
+    @ApiModelProperty(value = "日硫化量(单位条)", name = "dayVulcanizationQty")
     private Integer dayVulcanizationQty;
 
     /**

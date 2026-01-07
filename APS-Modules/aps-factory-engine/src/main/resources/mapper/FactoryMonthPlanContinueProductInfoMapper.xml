@@ -13,6 +13,7 @@
                ppf.PATTERN,
                ppf.CX_MACHINE_CODE,
                ppf.DAY_VULCANIZATION_QTY,
+               ppf.MOULD_CHANGE_INFO,
                ppf.DAY_${lastDay} AS PRODUCTION_QTY
           FROM t_mp_month_plan_prod_final ppf
          WHERE IFNULL(ppf.IS_DELETE, 0) = 0
@@ -24,7 +25,7 @@
     
     <select id="getContinueGroupInfo" resultType="com.zlt.aps.factory.domain.dto.ContinueGroupInfo">
         SELECT msa.CX_MACHINE_CODE,
-               msa.STRUCTURE_NAME
+               msa.STRUCTURE_NAME AS GROUP_NAME
           FROM t_mp_structure_allocation msa
          WHERE IFNULL(msa.IS_DELETE, 0) = 0
            AND msa.PLAN_TYPE = '01'
