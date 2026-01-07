@@ -113,6 +113,19 @@ public class CxContinueSkuInfoHelper implements Serializable {
     }
 
     /**
+     * 是否需要排产
+     * 计划排产量大于零
+     *
+     * @return
+     */
+    public boolean hasProduction() {
+        if (null == planDemandQty) {
+            return false;
+        }
+        return planDemandQty > BigDecimal.ZERO.intValue();
+    }
+
+    /**
      * 获取天单硫化机台产能
      * 单硫化机台天产能 = 双模产能 = 单模天产能 * 2
      *

@@ -74,6 +74,10 @@ public enum TbrMouldProductionLogType {
      */
     END_GET_VERSION_DATA("20-02", "获取排产版本计划数据"),
     /**
+     * 20-03-00 开始排产前数据加载
+     */
+    START_BEFORE_PRODUCTION_DATA("20-03-00", "开始排产前数据加载"),
+    /**
      * 20-03 读取排产参数配置
      */
     END_READER_PARAM_DATA("20-03", "读取排产参数配置"),
@@ -114,6 +118,10 @@ public enum TbrMouldProductionLogType {
      */
     CX_GROUP_LH_RATIO_EMPTY("20-12", "成型硫化配比配置为空"),
     /**
+     * 20-13-00 开始分组粗算成型机台数
+     */
+    START_GROUP_CAPACITY_CALCULATE("20-13-00", "开始分组粗算成型机台数"),
+    /**
      * 20-13-01 分组主花纹产能预算
      */
     GROUP_MAIN_PATTERN_CAPACITY_INFO("20-13-01", "分组主花纹产能预算"),
@@ -134,9 +142,29 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_SKU_DATA_EMPTY("20-14-01", "没有获取到续作Sku信息"),
     /**
+     * 20-14-00 分组计划为非在机分组(TBR结构)
+     */
+    GROUP_NO_CONTINUE_GROUP_INFO("20-14-00", "分组计划为非在机分组(TBR结构)"),
+    /**
+     * 20-14-00-01 在机分组(TBR结构)没有排产计划
+     */
+    CONTINUE_GROUP_NO_PRODUCTION_PLAN_INFO("20-14-00-01", "在机分组(TBR结构)没有排产计划"),
+    /**
+     * 20-14-00-02 在机分组(TBR结构)没有续作Sku信息
+     */
+    CONTINUE_GROUP_NO_CONTINUE_SKU_INFO("20-14-00-02", "在机分组(TBR结构)没有续作Sku信息"),
+    /**
+     * 20-14-00-03 在机分组(TBR结构)续作没有排产计划
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_EMPTY_INFO("20-14-00-03", "在机分组(TBR结构)续作没有排产计划"),
+    /**
+     * 20-14-00-04 在机分组(TBR结构)续作Sku没有排产计划
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_NO_PLAN_INFO("20-14-00-04", "在机分组(TBR结构)续作Sku没有排产计划"),
+    /**
      * 20-14-02 在机分组计划没有数据，故而在机分组环节无需排产
      */
-    CONTINUE_GROUP_NO_CONTINUE_PRODUCTION("20-14-01", "在机分组计划没有数据，故而在机分组环节无需排产"),
+    CONTINUE_GROUP_NO_CONTINUE_PRODUCTION("20-14-02", "在机分组计划没有数据，故而在机分组环节无需排产"),
     /**
      * 20-14-03 在产分组机台反向匹配分组计划没有收尾的机台
      */
@@ -223,6 +251,14 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_CONTINUE_SKU_START_MOULD_PRODUCTION("30-03-01", "在机结构续作Sku开始模具排产"),
     /**
+     * 30-03-01-01 在机结构续作Sku开始模具排产当前阶段没有排产量
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY("30-03-01-01", "在机结构续作Sku开始模具排产当前阶段没有排产量"),
+    /**
+     * 30-03-01-02 在机结构续作Sku降膜排产没有结果
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_RESULT("30-03-01-02", "在机结构续作Sku降膜排产没有结果"),
+    /**
      * 30-03-02 在机结构续作Sku-开始同规格同花纹-模具排产
      */
     CONTINUE_GROUP_CONTINUE_SKU_START_SAME_SPEC_MOULD_PRODUCTION("30-03-02", "在机结构续作Sku-开始同规格同花纹-模具排产"),
@@ -230,6 +266,42 @@ public enum TbrMouldProductionLogType {
      * 30-03-03 在机结构续作Sku-开始同生胎同模具-模具排产
      */
     CONTINUE_GROUP_CONTINUE_SKU_START_SAME_EMBRYO_MOULD_PRODUCTION("30-03-03", "在机结构续作Sku-开始同生胎同模具-模具排产"),
+    /**
+     * 40-01 分组计划正式开始模具排产
+     */
+    FORMAL_MOULD_START("40-01", "分组计划正式开始模具排产"),
+    /**
+     * 40-02 分组计划正式开始模具排产数据重置完成
+     */
+    FORMAL_MOULD_RESET_DATA_FINISH("40-02", "分组计划正式开始模具排产数据重置完成"),
+    /**
+     * 40-03 分组计划正式开始模具排产数据为空
+     */
+    FORMAL_MOULD_DATA_EMPTY("40-03", "分组计划正式开始模具排产数据为空"),
+    /**
+     * 40-04 分组计划正式开始模具排产-排产在机结构
+     */
+    FORMAL_MOULD_CONTINUE_GROUP_PRODUCTION("40-04", "分组计划正式开始模具排产-排产在机结构"),
+    /**
+     * 40-04-01 在机结构正式开始续作排产
+     */
+    FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP("40-04-01", "在机结构正式开始续作排产"),
+    /**
+     * 40-04-02 在机结构正式排产没有计划
+     */
+    FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP_NO_PLAN("40-04-02", "在机结构正式排产没有计划"),
+    /**
+     * 40-04-02 在机结构正式排产没有续作Sku
+     */
+    FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP_NO_CONTINUE_SKU("40-04-03", "在机结构正式排产没有续作Sku"),
+    /**
+     * 40-04-02 在机结构正式开始新增Sku排产
+     */
+    FORMAL_MOULD_CONTINUE_GROUP_SINGLE_ADD_GROUP("40-04-02", "在机结构正式开始新增Sku排产"),
+    /**
+     * 40-05 新增结构开始正式排产
+     */
+    FORMAL_MOULD_ADD_GROUP_SINGLE_GROUP("40-05", "新增结构开始正式排产"),
     /**
      * 99 一键排产结束
      */

@@ -280,7 +280,7 @@ public class ProductionMouldInfoVo implements Serializable {
         productionPlan.setHeightProductionQty(heightProductionQty);
         productionPlan.setProductionQty(productionQty);
         if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
+            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
         }
     }
 
@@ -296,7 +296,7 @@ public class ProductionMouldInfoVo implements Serializable {
         productionQty = productionQty - dayProductionQty;
         productionPlan.setProductionQty(productionQty);
         if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
+            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
         }
     }
 

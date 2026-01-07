@@ -37,22 +37,27 @@ public class FormalProductionHandler {
      */
     public static void productionContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
         if (CollectionUtils.isEmpty(allGroupPlanInfo) && CollectionUtils.isEmpty(allContinueInfo)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldFormalProductionLogRecorder.addDataEmptyLog(context));
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, MouldShellBaseInfoVo> mouldShellMap = productionContext.getBaseDataContainer().getMouldShellMap();
         allGroupPlanInfo.forEach((structureName, groupPlanInfo) -> groupPlanInfo.setThisRoundCanProduction());
+        log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //1、续作先排
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SKU));
             productionContinueByType(productionContext, allGroupPlanInfo, structureName, cxContinueInfo, mouldShellMap, ContinueTypeEnum.SAME_SKU);
         });
         //2、接着进行同规格同花纹的续作高优先级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN));
             productionContinueByType(productionContext, allGroupPlanInfo, structureName, cxContinueInfo, mouldShellMap, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
         });
         //3、接着进行共生胎，同模具的续作高优级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD));
             productionContinueByType(productionContext, allGroupPlanInfo, structureName, cxContinueInfo, mouldShellMap, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
         });
         //4、在机机构新增Sku排产
@@ -61,6 +66,7 @@ public class FormalProductionHandler {
             if (null == groupPlan) {
                 return;
             }
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName));
             CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan);
         });
         //5、非在机结构，新增规格排产
@@ -68,6 +74,7 @@ public class FormalProductionHandler {
             if (allContinueInfo.containsKey(structureName)) {
                 return;
             }
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName));
             CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan);
         });
     }
@@ -86,11 +93,13 @@ public class FormalProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
         if (null == groupPlan) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(context, groupName, type));
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = cxContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuInfoMap)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoContinueSkuLog(context, groupName, type));
             return;
         }
         Integer monthDays = productionContext.getMonthDays();

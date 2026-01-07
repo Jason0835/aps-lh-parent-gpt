@@ -262,13 +262,18 @@ public class CxContinueGroupAllocationHandler {
         String groupName = groupPlanInfo.getGroupName();
         continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
             log.info(TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc));
-            Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty().intValue();
+            if (!cxContinueSkuInfo.hasProduction()) {
+                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc));
+                return;
+            }
+            Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(monthDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {
-                //todo 记录日志
+                //记录日志
+                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc));
                 return;
             }
             //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
