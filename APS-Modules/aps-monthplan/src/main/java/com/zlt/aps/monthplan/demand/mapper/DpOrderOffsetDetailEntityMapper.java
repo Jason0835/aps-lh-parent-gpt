@@ -26,8 +26,8 @@ public interface DpOrderOffsetDetailEntityMapper extends CommBaseMapper<DpOrderO
 
     /**
      * 批量更新生产量
-     * @param list
-     * @return int
+     * @param list 订单冲减分配列表
+     * @return int  影响行数
      */
     int updateBatchProductionQty(@Param("list") List<DpOrderOffsetDetail> list);
 }
