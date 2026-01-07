@@ -298,4 +298,64 @@ public class RawMaterialRequirePlan extends BaseEntity {
         return String.format("%s_%d_%d_%s",
                 factoryCode, year, month, materialCode);
     }
+
+    public void addCurMonthQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.curMonthQty == null) {
+                this.curMonthQty = qty;
+            } else {
+                this.curMonthQty = this.curMonthQty.add(qty);
+            }
+        }
+    }
+
+    public void addCurMonthRudrQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.curMonthRudrQty == null) {
+                this.curMonthRudrQty = qty;
+            } else {
+                this.curMonthRudrQty = this.curMonthRudrQty.add(qty);
+            }
+        }
+    }
+
+    public void addT1MonthQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.t1MonthQty == null) {
+                this.t1MonthQty = qty;
+            } else {
+                this.t1MonthQty = this.t1MonthQty.add(qty);
+            }
+        }
+    }
+
+    public void addT1MonthEudrQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.t1MonthEudrQty == null) {
+                this.t1MonthEudrQty = qty;
+            } else {
+                this.t1MonthEudrQty = this.t1MonthEudrQty.add(qty);
+            }
+        }
+    }
+
+    public void addT2MonthQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.t2MonthQty == null) {
+                this.t2MonthQty = qty;
+            } else {
+                this.t2MonthQty = this.t2MonthQty.add(qty);
+            }
+        }
+    }
+
+    public void addT2MonthEudrQty(BigDecimal qty) {
+        if (qty != null) {
+            if (this.t2MonthEudrQty == null) {
+                this.t2MonthEudrQty = qty;
+            } else {
+                this.t2MonthEudrQty = this.t2MonthEudrQty.add(qty);
+            }
+        }
+    }
 }

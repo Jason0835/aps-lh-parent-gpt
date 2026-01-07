@@ -170,7 +170,8 @@ public class RawWeekUsageGenerateServiceImpl {
      */
     private int getWeekOfMonth(LocalDate date) {
         // 使用ISO周标准
-        WeekFields weekFields = WeekFields.of(DayOfWeek.MONDAY, 4); // 周一开始，最少4天
+        // 周一开始，最少4天
+        WeekFields weekFields = WeekFields.of(DayOfWeek.MONDAY, 4);
         int weekOfMonth = date.get(weekFields.weekOfMonth());
 
         // 调整：第一周可能跨月，所以第0周应该算作第1周
@@ -521,7 +522,6 @@ public class RawWeekUsageGenerateServiceImpl {
     private List<MdmMaterialConsumeDetail> getBomDetails(String embryoCode) {
         QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("EMBRYO_CODE", embryoCode);
-        //queryWrapper.eq("EMBRYO_VERSION", "1");
         return mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
     }
 

@@ -282,4 +282,18 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProductionFinalRe
     @TableField(exist = false)
     private String reasonI18n;
 
+
+    /**
+     * eudr数量
+     */
+    @ApiModelProperty(value = "eudr数量", name = "eudrQty")
+    @TableField(exist = false)
+    private Integer eudrQty;
+
+    /**
+     * 非eudr数量
+     */
+    @ApiModelProperty(value = "非eudr数量", name = "nonEudrQty")
+    @TableField(exist = false)
+    private Integer nonEudrQty;
 }
