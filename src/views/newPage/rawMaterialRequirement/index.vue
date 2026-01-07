@@ -29,6 +29,13 @@
         <el-button type="primary" v-hasPermi="['maindata:rawMaterialRequirePlan:generate']" @click="generatePlan">{{
           $t("ui.data.column.rawMaterial.genger")
         }}</el-button>
+          <el-button
+          type="danger"
+           v-hasPermi="['maindata:rawMaterialRequirePlan:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+          >{{ $t("ui.frame.btn.delete") }}</el-button
+        >
         <!-- <el-button
           type="primary"
           plain
@@ -297,6 +304,25 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
+        removeMdmProductConstruction({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
         removeMdmProductConstruction({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);

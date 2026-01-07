@@ -28,7 +28,7 @@
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
-          type="warning"
+          type="danger"
           v-hasPermi="['monthplan:mdmMoldingMachine:remove']"
           :disabled="selection.length== 0"
           @click="handleDeleteAll"

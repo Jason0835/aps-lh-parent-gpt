@@ -321,7 +321,7 @@ export default {
         {
           label: this.$t("common.option"),
           prop: "option",
-          width: "100px",
+          width: "160px",
           fixed: "right",
           align: "center",
           render: ({ row }) => {
@@ -337,6 +337,15 @@ export default {
                 >
                   {this.$t("common.button.modify")}
                 </el-button>
+                <el-button
+                  v-hasPermi={["maindata:rawMaterialRequirePlan:remove"]}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+
               </div>
             );
           },
@@ -392,7 +401,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeVulcanizingMachine({ ids }).then((data) => {
+        removeMachine({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();

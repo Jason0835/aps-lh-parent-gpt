@@ -132,6 +132,7 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
+
       return [
         {
           prop: "factoryCode",

@@ -27,7 +27,7 @@
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
-          type="warning"
+          type="danger"
           v-hasPermi="['maindata:rawSpecialMaterialRatio:remove']"
           @click="handleDeleteAll"
           :disabled="selection.length==0"
@@ -185,7 +185,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["maindata:rawSpecialMaterialRatio:removee"]}
+                  v-hasPermi={["maindata:rawSpecialMaterialRatio:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}

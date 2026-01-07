@@ -8,6 +8,7 @@ import cache from '@/plugins/cache'
 import { saveAs } from 'file-saver'
 import { serialize } from '@/utils/object-to-formdata'
 import i18n from '@/lang'
+import cos from 'highlight.js/lib/languages/cos'
 
 let downloadLoadingInstance
 // 是否显示重新登录
@@ -255,8 +256,13 @@ service.interceptors.response.use(
       }
       return Promise.reject('redirect')
     } else if (code === 500) {
-      Message({ message: msg, type: 'error' })
-      return Promise.reject(new Error(msg))
+      if (res.config.url.indexOf('/monthplan/supplyOrderPool/checkOverdue') != -1) {
+        return Promise.reject(msg)
+      } else {
+        Message({ message: msg, type: 'error' })
+        return Promise.reject(new Error(msg))
+      }
+
     } else if (code === 601) {
       Message({ message: msg, type: 'warning' })
       return Promise.reject('error')
@@ -266,7 +272,7 @@ service.interceptors.response.use(
       Notification.error({ title: msg })
       return Promise.reject('error')
     } else {
-      if ( res.data.data == '0' || res.data.data == '1') {
+      if (res.data.data == '0' || res.data.data == '1') {
         return res.data;
       }
       if (res.data?.data) {
