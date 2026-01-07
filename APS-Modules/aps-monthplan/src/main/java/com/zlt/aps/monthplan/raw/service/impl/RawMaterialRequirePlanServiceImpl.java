@@ -72,6 +72,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     @Autowired
     private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
 
+    @Autowired
+    private MdmHolidayEntityMapper mdmHolidayMapper;
+
     /**
      * redis 锁前缀
      */
@@ -346,9 +349,33 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 判断是否为春节月份
      */
     private boolean isSpringFestivalMonth(Integer year, Integer month) {
-        // 这里实现春节判断逻辑，简化处理
-        // 实际应该查询节假日表
-        return (month == 1 || month == 2);
+        QueryWrapper<MdmHoliday> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("HOLIDAY_NAMES", "春节");
+        List<MdmHoliday> holidays = mdmHolidayMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(holidays)) {
+            return false;
+        }
+
+        // 遍历所有春节记录，检查是否有符合年份和月份的春节
+        for (MdmHoliday holiday : holidays) {
+            // 假设 MdmHoliday 中有 holidayDate 字段表示假期日期
+            Date holidayDate = holiday.getHolidayDate();
+            if (holidayDate != null) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(holidayDate);
+
+                int holidayYear = cal.get(Calendar.YEAR);
+                int holidayMonth = cal.get(Calendar.MONTH) + 1;
+
+                // 检查年份和月份是否匹配
+                if (holidayYear == year && holidayMonth == month) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

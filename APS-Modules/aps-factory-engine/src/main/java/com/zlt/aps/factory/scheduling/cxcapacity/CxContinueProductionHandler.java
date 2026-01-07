@@ -53,7 +53,7 @@ public class CxContinueProductionHandler {
             return;
         }
         Integer startDay = earliestConclusionLhGroup.getClosingDay();
-        if (startDay >= endDay) {
+        if (startDay > endDay) {
             //todo 记录日志
             return;
         }
@@ -86,6 +86,7 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return;
         }
+        log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, productionPlanInfo.getGroupName(), materialDesc, continueType, selectedMaterialDesc));
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //总排产量
         Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(selectedProductionPlanList);

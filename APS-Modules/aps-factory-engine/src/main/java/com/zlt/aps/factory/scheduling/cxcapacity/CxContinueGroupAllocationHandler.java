@@ -259,7 +259,9 @@ public class CxContinueGroupAllocationHandler {
         Integer monthDays = context.getMonthDays();
         ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
         //续作Sku轮询排产
+        String groupName = groupPlanInfo.getGroupName();
         continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc));
             Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty().intValue();
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(monthDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);

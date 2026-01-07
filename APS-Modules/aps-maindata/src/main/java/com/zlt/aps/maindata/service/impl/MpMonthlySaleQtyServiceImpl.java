@@ -282,23 +282,23 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         List<MpMonthlySaleQty> monthlySaleQtyList = new ArrayList<>();
         LambdaQueryWrapper<MpHistorySaleRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpHistorySaleRecord::getFactoryCode, factoryCode)
-                .ge(MpHistorySaleRecord::getYearMonth, last6YearMonth)
+                .ge(MpHistorySaleRecord::getYearMonth, last12YearMonth)
                 .le(MpHistorySaleRecord::getYearMonth, maxYearMonth);
-        List<MpHistorySaleRecord> last6MonthHistorySaleList = mpHistorySaleRecordEntityMapper.selectList(wrapper);
+        List<MpHistorySaleRecord> last12MonthHistorySaleList = mpHistorySaleRecordEntityMapper.selectList(wrapper);
 
         // 执行表达式，转义区域
         try {
-            QueryFormulaUtil.execFormula(last6MonthHistorySaleList, new String[]{
+            QueryFormulaUtil.execFormula(last12MonthHistorySaleList, new String[]{
                     "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
             });
         } catch (QueryExprException e) {
             this.logger.error(e.getMessage(), e);
             throw new ServiceException("转换区域，执行查询公式时发生错误.");
         }
-        JsonI18nConvertUtils.conventJsonI18n(last6MonthHistorySaleList, MpHistorySaleRecord.class);
+        JsonI18nConvertUtils.conventJsonI18n(last12MonthHistorySaleList, MpHistorySaleRecord.class);
 
         List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
-        List<String> materialCodeList = last6MonthHistorySaleList.stream().map(MpHistorySaleRecord::getMaterialCode).collect(Collectors.toList());
+        List<String> materialCodeList = last12MonthHistorySaleList.stream().map(MpHistorySaleRecord::getMaterialCode).collect(Collectors.toList());
         List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000);
         for (List<String> codeList : materialCodeSplitList) {
             LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
@@ -313,31 +313,41 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
         }
 
         Map<String, List<MpHistorySaleRecord>> groupMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(last6MonthHistorySaleList)) {
-            groupMap = last6MonthHistorySaleList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
+        if (CollectionUtils.isNotEmpty(last12MonthHistorySaleList)) {
+            groupMap = last12MonthHistorySaleList.stream().collect(Collectors.groupingBy(MpHistorySaleRecord::getMaterialCode));
             Set<Map.Entry<String, List<MpHistorySaleRecord>>> entrySet = groupMap.entrySet();
             for (Map.Entry<String, List<MpHistorySaleRecord>> entry : entrySet) {
                 String materialCode = entry.getKey();
                 List<MpHistorySaleRecord> value = entry.getValue();
+
+                // 年月排序，取最近的月份
+                value = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getYear).reversed()
+                        .thenComparing(MpHistorySaleRecord::getMonth).reversed()).collect(Collectors.toList());
 
                 MpMonthlySaleQty monthlySaleQty = new MpMonthlySaleQty();
                 monthlySaleQty.setBaseVale(null);
                 monthlySaleQty.setFactoryCode(factoryCode);
                 monthlySaleQty.setMaterialCode(materialCode);
 
+                List<MpHistorySaleRecord> passSixMonthList = new ArrayList<>();
+                for (int i = 0; i < value.size(); i++) {
+                    if (i == passSixMonth) {
+                        break;
+                    }
+                    MpHistorySaleRecord record = value.get(i);
+                    passSixMonthList.add(record);
+                }
+
                 // 按SKU分组，销量降序，适销区域用逗号分隔
-                String area = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed())
+                String area = passSixMonthList.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed())
                         .map(MpHistorySaleRecord::getAreaCode).distinct().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
                 monthlySaleQty.setSaleArea(area);
 
                 // 月均销量=销量汇总/6，近3个月销量=取月份最大三个月汇总/3，向上取整
-                List<MpHistorySaleRecord> sortedList = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getYear).reversed()
-                        .thenComparing(MpHistorySaleRecord::getMonth).reversed()).collect(Collectors.toList());
-
                 Integer totalSaleQty = 0;
-                int size = sortedList.size();
+                int size = passSixMonthList.size();
                 for (int i = 0; i < size; i++) {
-                    MpHistorySaleRecord historySaleRecord = sortedList.get(i);
+                    MpHistorySaleRecord historySaleRecord = passSixMonthList.get(i);
                     Integer saleQty = historySaleRecord.getSaleQty();
                     totalSaleQty += saleQty;
                     if (i <= passThreeMonth - 1) {

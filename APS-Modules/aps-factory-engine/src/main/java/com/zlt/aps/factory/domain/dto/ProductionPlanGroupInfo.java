@@ -245,6 +245,9 @@ public class ProductionPlanGroupInfo {
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
         Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        if(canAddCount <= BigDecimal.ZERO.intValue()){
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+        }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
         if (BigDecimal.ONE.intValue() == canAddCount) {
             return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, previousSku.getUsedMouldSet());
