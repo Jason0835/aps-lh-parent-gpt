@@ -134,13 +134,19 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['sidebarRouters', 'collectMenu'])
+    ...mapGetters(['sidebarRouters', 'collectMenu']),
+
   },
   mounted() {
     this.getMessageData()
     this.getTaskData()
   },
+  created() {
+    // 组件创建时获取数据
+
+  },
   methods: {
+
     async getMessageData() {
       // const messageData = await messageListNoticeMessage({ 'receivedBy': 'admin' })
       // this.messageList = messageData?.rows || []

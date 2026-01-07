@@ -66,7 +66,7 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import { mapState,mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -127,6 +127,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -149,7 +150,7 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           minWidth:180
         },
         {
@@ -216,10 +217,11 @@ export default {
           dictData: this.dict.type.cx_machine_type_code, // "JOB_TYPE",
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
           prop: "structureName",
-          // type: "select",
-          // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
       ];
     },
@@ -334,6 +336,8 @@ export default {
     },
   },
   created() {
+    console.log(this.structureList)
+    console.log('Store state:', this.$store.state)
     let defaultParams = {
       factoryCode: "116",
     };

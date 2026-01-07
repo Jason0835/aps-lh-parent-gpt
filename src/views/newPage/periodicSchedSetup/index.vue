@@ -37,7 +37,7 @@
           type="primary"
           plain
           v-hasPermi="['monthplan:ProductMoldingLimit:add']"
-          >{{ $t("生成当前周期排产ui.data.column.scheduleAdjust.structureCode") }}</el-button
+          >{{ $t("生成当前周期排产") }}</el-button
         >
         <el-button
           type="warning"
@@ -140,7 +140,7 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
         },
         {
           prop: "turnoverMonth",
@@ -224,9 +224,10 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList
+          dictData:this.structureList,
+          filterable: true
         },
       ];
     },

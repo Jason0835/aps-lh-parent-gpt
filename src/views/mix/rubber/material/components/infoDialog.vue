@@ -111,7 +111,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
           maxlength: "20",
           required: true,

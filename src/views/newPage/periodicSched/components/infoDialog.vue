@@ -153,7 +153,7 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           maxlength:100,
           render: (form) => {
             return (

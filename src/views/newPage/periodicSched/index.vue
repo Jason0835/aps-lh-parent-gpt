@@ -183,7 +183,7 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           width:300
         },
         {
@@ -241,9 +241,10 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList
+          dictData:this.structureList,
+          filterable: true
         },
       ];
     },

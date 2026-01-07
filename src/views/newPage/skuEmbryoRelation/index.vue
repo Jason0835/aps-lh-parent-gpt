@@ -79,7 +79,7 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import { mapState,mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -142,6 +142,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -172,7 +173,7 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
         },
         {
           align: "center",
@@ -228,7 +229,10 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.scheduleAdjust.structureCode"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          // type: "select",
+          // dictData:this.structureList,
+          // filterable: true
         },
       ];
     },

@@ -54,6 +54,8 @@ router.beforeEach(async (to, from, next) => {
           router.addRoutes(accessRoutes) // 动态添加可访问路由表
           next({ ...to, replace: true }) // hack方法 确保addRoutes已完成
         })
+        console.log('uuu')
+        store.dispatch('globalList/fetchGlobalList')
       })
       .catch((err) => {
         console.error(err)

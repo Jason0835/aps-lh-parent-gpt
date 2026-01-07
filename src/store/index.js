@@ -21,6 +21,7 @@ import insideLiner from './modules/semifinished/insideLiner'
 import sidewall from './modules/semifinished/sidewall'
 import fiberPress from './modules/semifinished/fiberPress'
 import steelPress from './modules/semifinished/steelPress'
+import globalList from './modules/globalList'
 
 
 import getters from './getters'
@@ -35,6 +36,7 @@ const store = new Vuex.Store({
     tagsView,
     permission,
     settings,
+    globalList,
 
     // 成型
     molding,
