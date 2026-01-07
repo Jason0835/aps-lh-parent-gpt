@@ -1,14 +1,5 @@
 package com.zlt.aps.itf.mes.service.impl;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -26,6 +17,13 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.core.dao.basedao.BaseDao;
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * MES接口-Bom相关接口
@@ -67,6 +65,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 					Map<String, List<MdmSkuConstructionRef>> refMap = syncList.stream()
 							.collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
 					apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+						item.setBaseVale(null);
 						List<MdmSkuConstructionRef> updateList = refMap.get(this.getMapKey(item));
 						for (MdmSkuConstructionRef updateItem : updateList) {
 							updateItem.setId(item.getId());

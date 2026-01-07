@@ -9,7 +9,7 @@
             MATERIAL_CODE,
             MATERIAL_CODE SPEC_CODE,
             MES_MATERIAL_CODE,
-            EMBRYO_VERSION BOM_VERSION,
+--             EMBRYO_VERSION BOM_VERSION,业务逻辑没用，MES中间表无此字段暂时去除
             EMBRYO_CODE,
             EMBRYO_CODE CONSTRUCTION_CODE,
             SPEC_DESC,
@@ -29,8 +29,7 @@
             CURING_TIME CURING_TIME2,
             CURING_TIME2 HYDRAULIC_PRESSURE_CURING_TIME2,
             DEL_FLAG IS_DELETE,
-            FACTORY_CODE,
-            CREATE_TIME
+            FACTORY_CODE
         FROM LH_CONSTRUCTION_INFO
         WHERE DEL_FLAG = 0
           AND FACTORY_CODE = #{factoryCode}

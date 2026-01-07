@@ -128,6 +128,8 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 for (MdmModelInfo entity : saveList) {
                     entity.setBaseVale(null);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmModelInfo existsData = existsMap.get(mapKey);
@@ -593,6 +595,8 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 for (MdmMaterialInfo entity : saveList) {
                     entity.setBaseVale(null);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmMaterialInfo existsData = existsMap.get(mapKey);
@@ -645,6 +649,8 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 for (MdmMouldShellInfo entity : saveList) {
                     entity.setBaseVale(null);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMouldSetCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmMouldShellInfo existsData = existsMap.get(mapKey);
