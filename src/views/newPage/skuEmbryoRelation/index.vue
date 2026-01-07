@@ -54,7 +54,7 @@
           :loading="updateLoading"
           type="primary"
           v-hasPermi="['monthplan:mdmSkuStructureRef:updateStructure']"
-          >{{ $t("ui.data.productmodelrelation.updateMainPattern") }}</el-button
+          >{{ $t("更新结构到物料信息表") }}</el-button
         >
       </template>
     </page-table>

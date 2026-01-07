@@ -254,9 +254,6 @@
   "ui.data.column.capsuleChuck.proSize": "TBR卡盘(英寸)",
   "common.rule.lengMax": "成型鼓周长下限不能大于成型鼓周长上限",
   "ui.data.DemandPlan.createMonthRequire": "生成需求计划",
-
-
-
   "ui.data.orderForecast.month1": "T月",
   "ui.data.orderForecast.month2": "T+1月",
   "ui.data.orderForecast.month3": "T+2月",
@@ -268,5 +265,11 @@
   "ui.data.monthlyProductionPlan.prodReqPlan": "净需求",
   "ui.data.monthlyProductionPlan.inventorySalesRatio": "库销比",
   "ui.data.monthlyProductionPlan.dayVulcanizationQty": "日硫化量",
-  "ui.data.productmodelrelation.updateMainPattern": "更新主花纹到物料信息表"
+  "ui.data.productmodelrelation.updateMainPattern": "更新主花纹到物料信息表",
+
+
+
+  "ui.data.skuEmbryoRelation.updateMainPattern": "更新结构到物料信息表",
+  "ui.data.mouldingDayResult.totalQty": "生产实际排产量",
+  "ui.data.mouldingDayResult.differenceQty": "差异量（未排产数量）"
 }

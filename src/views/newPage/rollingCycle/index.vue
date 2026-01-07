@@ -520,6 +520,8 @@ export default {
         let params = {
           ...this.query,
           ...this.sort,
+          adjustType: this.adjustType,
+          adjustResultList:this.data
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
@@ -527,6 +529,7 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+        console.log(params)
         let res=await autoAdjust(params)
         console.log(res)
         this.show = true;

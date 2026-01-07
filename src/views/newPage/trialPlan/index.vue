@@ -82,7 +82,7 @@ import infoDialog from "./components/infoDialog.vue";
 import { di } from "@fullcalendar/core/internal-common";
 
 export default {
-  name: "trialPlan",
+  name: "TrialPlan",
   components: {
     tltUpload,
     infoDialog,

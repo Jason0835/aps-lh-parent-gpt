@@ -206,6 +206,16 @@ export default {
           width: 120,
         },
         {
+          prop: "totalQty",
+          label: this.$t("生产实际排产量"),
+          width: 120,
+        },
+        {
+          prop: "differenceQty",
+          label: this.$t("差异量（未排产数量）"),
+          width: 120,
+        },
+        {
           prop: "heightQty",
           label: this.$t("ui.data.DemandPlan.heightQty"),
           width: 120,
@@ -228,50 +238,50 @@ export default {
       ];
       if (this.dailyVisible) {
         const query = this.$route.query;
-        // if (query.productionStartDate) {
-        //   //
-        //   let start = moment(query.productionStartDate);
-        //   let end =  moment(query.productionStartDate).add(1 ,"M");
+        if (query.productionStartDate) {
+          //
+          let start = moment(query.productionStartDate);
+          let end =  moment(query.productionStartDate).add(1 ,"M");
 
-        //   let list = [];
+          let list = [];
 
-        //   while(start.isBefore(end)) {
-        //     list.push(start.format("DD"))
-        //     start.add(1, 'd')
-        //   }
-        //   // console.log(list);
-        //   for (let i = 0; i < list.length; i++) {
-        //     let dayNumStr = list[i];
-        //     columns.push({
-        //       // label: `${i + 1}号`,
-        //       label: this.$t("ui.data.column.mouldingDayResult.day", {
-        //         day: Number(dayNumStr),
-        //       }),
-        //       prop: `day${i+1}`,
-        //       minWidth: "80px",
-        //       type: "number",
-        //     });
-        //   }
+          while(start.isBefore(end)) {
+            list.push(start.format("DD"))
+            start.add(1, 'd')
+          }
+          // console.log(list);
+          for (let i = 0; i < list.length; i++) {
+            let dayNumStr = list[i];
+            columns.push({
+              label: `${Number(dayNumStr)}号`,
+              // label: this.$t("ui.data.column.mouldingDayResult.day", {
+              //   day: Number(dayNumStr),
+              // }),
+              prop: `day${i+1}`,
+              minWidth: "80px",
+              type: "number",
+            });
+          }
 
-        // } else {
-        //显示每日数据
-        // const date = moment(this.query.yearMonth);
-        // const year = date.year();
-        // const month = date.month() + 1;
-        const days = 31;
+        } else {
+          //显示每日数据
+          // const date = moment(this.query.yearMonth);
+          // const year = date.year();
+          // const month = date.month() + 1;
+          const days = 31;
 
-        for (let i = 0; i < days; i++) {
-          columns.push({
-            // label: `${i + 1}号`,
-            label: this.$t("ui.data.column.mouldingDayResult.day", {
-              day: i + 1,
-            }),
-            prop: `day${i + 1}`,
-            minWidth: "80px",
-            type: "number",
-          });
+          for (let i = 0; i < days; i++) {
+            columns.push({
+              label: `${i + 1}号`,
+              // label: this.$t("ui.data.column.mouldingDayResult.day", {
+              //   day: i + 1,
+              // }),
+              prop: `day${i + 1}`,
+              minWidth: "80px",
+              type: "number",
+            });
+          }
         }
-        // }
       }
       // columns.push({
       //   label: this.$t("ui.data.column.facMonthPlan.isImport"),

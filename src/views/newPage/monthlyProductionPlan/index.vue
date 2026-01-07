@@ -44,7 +44,7 @@ import {
 //components
 
 export default {
-  name: "monthlyProductionPlan",
+  name: "MonthlyProductionPlan",
   components: {
     // tltUpload,
   },

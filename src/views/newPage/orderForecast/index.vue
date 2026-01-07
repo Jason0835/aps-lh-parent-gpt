@@ -52,7 +52,7 @@ import {
 //components
 
 export default {
-  name: "orderForecast",
+  name: "OrderForecast",
   components: {
     // tltUpload,
   },
