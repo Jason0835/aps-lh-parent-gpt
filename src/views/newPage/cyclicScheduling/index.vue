@@ -245,6 +245,27 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width:180
         },
+        {
+          align: "center",
+          label: this.$t("common.option"),
+          fixed: "right",
+          width:120,
+          render: ({ row }) => {
+            return (
+              <div>
+
+                <el-button
+                  v-hasPermi={["monthplan:supplyOrderPool:remove"]}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
+            );
+          },
+        },
       ];
 
       return columns;

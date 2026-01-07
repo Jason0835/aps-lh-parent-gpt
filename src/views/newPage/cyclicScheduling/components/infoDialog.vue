@@ -31,12 +31,16 @@
 <script>
 import { mapState } from "vuex";
 
-import { saveSupplyOrderPool ,queryRelationByMaterialCode} from "@/api/monthplan/supplyOrderPool";
+import {
+  saveSupplyOrderPool,
+  queryRelationByMaterialCode,
+  checkSupplyOrderPool,
+} from "@/api/monthplan/supplyOrderPool";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm ,materialCodeSelect},
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     const validatePositiveInteger = (rule, value, callback) => {
@@ -50,9 +54,7 @@ export default {
 
       // 检查是否只包含数字
       if (!/^\d+$/.test(strValue)) {
-        return callback(
-          new Error(this.$t("common.rule.noPoint"))
-        );
+        return callback(new Error(this.$t("common.rule.noPoint")));
       }
 
       // 转换为数字
@@ -110,7 +112,7 @@ export default {
           },
         ],
         qty: [
-        {
+          {
             validator: (rule, value, callback) => {
               validatePositiveInteger({ required: false }, value, callback);
             },
@@ -168,7 +170,6 @@ export default {
           label: this.$t("ui.data.column.finishStock.wai"),
           type: "select",
           dictData: this.parentDict.type.biz_stor_type,
-
         },
         {
           prop: "qty",
@@ -223,8 +224,8 @@ export default {
         {
           prop: "threeOverdueStockQty",
           label: this.$t("ui.data.defectiveStock.threeOverdueStockQty"),
-           disabled: true,
-          type: "number"
+          disabled: true,
+          type: "number",
         },
         {
           prop: "sixOverdueStockQty",
@@ -241,8 +242,8 @@ export default {
         {
           prop: "twelveOverdueStockQty",
           label: this.$t("ui.data.defectiveStock.twelveOverdueStockQty"),
-             disabled: true,
-          type: "number"
+          disabled: true,
+          type: "number",
         },
         {
           prop: "stockLimit",
@@ -252,39 +253,66 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          maxlength:200
+          maxlength: 200,
         },
       ];
     },
   },
   methods: {
-   async blurMaterialCode(){
-
-      let res=await queryRelationByMaterialCode({materialCode:this.form.materialCode});
-      console.log(res);
-      let defultdata=JSON.parse(JSON.stringify(this.form))
-      this.form={
+    async blurMaterialCode() {
+      let res = await queryRelationByMaterialCode({
+        materialCode: this.form.materialCode,
+      });
+      let defultdata = JSON.parse(JSON.stringify(this.form));
+      this.form = {
         ...res.data,
-        ...defultdata
-      }
+        ...defultdata,
+      };
+      console.log(this.form);
     },
     // api
     async save(params) {
+      let arr = params.yearMonth.split("-");
+      params.year = arr[0];
+      params.month = arr[1];
+      let that = this;
       try {
         this.loading = true;
-        let arr=params.yearMonth.split("-");
-        params.year=arr[0];
-        params.month=arr[1];
+
+        let res = await checkSupplyOrderPool(params);
+        this.confirmSave(params);
+      } catch (error) {
+        console.log(error);
+        this.noCheckConfirmSave(error, params);
+
+        this.loading = false;
+      }
+    },
+    async confirmSave(params) {
+      try {
         const res = await saveSupplyOrderPool(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
-      } catch (error) {
-        console.log(error);
-        this.loading = false;
+      } catch (e) {
+        return;
       }
+    },
+    async noCheckConfirmSave(error, params) {
+      console.log("错误提示");
+
+      this.$confirm(error, {
+        type: "warning",
+      })
+        .then(() => {
+          this.confirmSave(params)
+        })
+        .catch((action) => {
+          this.hide();
+          // 用户点击"取消"
+
+        });
     },
 
     //utils
@@ -298,7 +326,7 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
-          locationType: '2'
+          locationType: "2",
         };
       }
     },
@@ -317,12 +345,11 @@ export default {
         this.$set(this.form, "materialDesc", row.materialDesc);
         this.$set(this.form, "productTypeCode", row.productTypeCode);
         this.$set(this.form, "materialbrandDesc", row.brand);
-        this.blurMaterialCode()
-
+        this.blurMaterialCode();
       } else {
-        this.$set(this.form, "materialDesc", '');
-        this.$set(this.form, "productTypeCode", '');
-        this.$set(this.form, "materialbrandDesc", '');
+        this.$set(this.form, "materialDesc", "");
+        this.$set(this.form, "productTypeCode", "");
+        this.$set(this.form, "materialbrandDesc", "");
       }
     },
   },

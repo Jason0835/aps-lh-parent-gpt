@@ -14,6 +14,13 @@ export function saveSupplyOrderPool(query) {
     data: query
   })
 }
+export function checkSupplyOrderPool(query) {
+  return request({
+    url: '/monthplan/supplyOrderPool/checkOverdue',
+    method: 'post',
+    data: query
+  })
+}
 export function removeSupplyOrderPool(query) {
   return request({
     url: '/monthplan/supplyOrderPool/remove',
