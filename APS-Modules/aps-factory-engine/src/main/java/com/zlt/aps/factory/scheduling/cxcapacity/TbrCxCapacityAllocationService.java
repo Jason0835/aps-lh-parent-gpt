@@ -50,7 +50,8 @@ import java.util.stream.Collectors;
  * 5.5、近1个月历史结构在期日期近的优先(最后一个排产日)
  * 5.6、近3个月历史结构在机次数多的优先(一个月算一次)
  *
- * @author
+ * @author ZLT
+ * @date 20251209
  */
 @Slf4j
 @Service(value = "tbrCxCapacityAllocationService")
@@ -74,7 +75,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
         //开始进行成型产能分配-结构排产
         log.info(TbrProductionGroupLogRecorder.addStartGroupLog(productionContext));
-        //获取排产计划信息
+        //1、获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
         log.info(TbrProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
@@ -82,42 +83,47 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //设置初始的排产量数据信息
         requirePlanList.forEach(singlePlan -> singlePlan.initProductionDataInfo());
-        //初始排产需要的基础数据，成型、模具关系、计划初始库销比
+        //2、初始排产需要的基础数据，成型、模具关系、计划初始库销比
+        log.info(TbrProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
         initProductionBaseData(productionContext, requirePlanList);
         //获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
-        //todo 记录日志-粗算成型机台数
-        //按结构分组，汇总结构净需求量，粗算需要的机台数
+        //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数
+        log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(productionContext, requirePlanList, structureLhRatioList);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
-        //todo 记录日志 续作结构排产分配
-        //获取上个月度的月度定稿排产计划，得到在产结构及结构在产成型机、在产SKU和SKU在产模具数
+        /**
+         * 5、构建续作信息
+         * 5.1、获取上个月度的月度定稿排产计划，得到在产Sku
+         * 5.2、获取上个月度的结构排产信息，得到在产结构在产机台信息
+         * 并构建续作Sku及其对应结构及结构在产成型机、在产SKU和SKU使用模具数
+         */
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(productionContext, structureLhRatioList);
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //先对续作结构进行成型机台分配-并记录在机结构的收尾匹配
-        productionContext.setReverseFindSet(new HashSet<>());
         //todo 采用新的逻辑进行分配在机结构的在产机台
-//        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = CxCapacityAllocationHandler.continueGroupPlanAllocation(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
+        productionContext.setReverseFindSet(new HashSet<>());
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //对成型机台进行模拟模具排产
-//        mouldProductionByCxMachine(productionContext, continueAllocationMap, cxContinueInfoMap, productionContext.getBaseDataContainer().getMouldShellMap());
+        //在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
-        //对收尾成型机台，反向匹配待排结构
+        //7、对收尾成型机台，反向匹配待排结构
         CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
-        //对还需排产结构，获取优先级最高的结构--结构新增
+        //8、对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
         //todo 记录日志
-        //保存结构成型排程结果
+        //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
-        //第二轮排产
+        //10、第二轮排产
+        log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
+        log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
         FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //最后搭配排产 TODO 报错，先注释掉
+        //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
-        //保存模具排产结果
+        //12、保存模具排产结果
         saveMouldProductionInfo(productionContext);
     }
 
@@ -878,7 +884,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * 获取续作排产信息
      * 续作的分组信息(结构)，对应的成型产能机台和续作的SKU，使用模具-硫化机台数
      * key = structureName(TBR)
-     * CxContinueInfoHelper.cxMachineGroup = { key = cxMachineCode : value = {key = materialDesc : value = 硫化机台数(模具数)}}
+     * CxContinueInfoHelper.continueSkuMouldNumberMap = { key = materialDesc : value = 胎胚、硫化机台数(模具数)等}
      *
      * @param context              排产上下文
      * @param structureLhRatioList 成型结构硫化配比信息
@@ -927,15 +933,16 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param allCxContinueInfoMap 续作分组信息
      */
     private void statisticsGroupContinueInfo(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allCxContinueInfoMap) {
-        if (CollectionUtils.isEmpty(allGroupPlanMap) || CollectionUtils.isEmpty(allGroupPlanMap)) {
+        if (CollectionUtils.isEmpty(allGroupPlanMap) || CollectionUtils.isEmpty(allCxContinueInfoMap)) {
             return;
         }
         allGroupPlanMap.forEach((structureName, groupPlanInfo) -> {
             CxContinueInfoHelper cxContinueInfoHelper = allCxContinueInfoMap.get(structureName);
             if (null == cxContinueInfoHelper) {
+                log.info(TbrProductionGroupLogRecorder.addGroupNoContinueGroupLog(context, structureName));
                 return;
             }
-            ContinueSkuCalculator.setContinueSkuPlanDemandQty(groupPlanInfo, cxContinueInfoHelper);
+            ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, cxContinueInfoHelper);
             ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
         });
     }

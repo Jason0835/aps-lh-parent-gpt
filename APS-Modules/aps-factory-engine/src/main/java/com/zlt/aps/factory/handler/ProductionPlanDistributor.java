@@ -24,6 +24,7 @@ public class ProductionPlanDistributor {
      * @return
      */
     public Map<Long, Integer> allocationProductionQty(Integer realDayProductionQty, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
+        Integer inventorySalesRatioQty = realDayProductionQty;
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
             return Collections.emptyMap();
         }
@@ -31,7 +32,6 @@ public class ProductionPlanDistributor {
         if (CollectionUtils.isEmpty(hasProductionList)) {
             return Collections.emptyMap();
         }
-        //todo 怎么分配
         Map<Long, Integer> realDeductionMap = new HashMap<>();
         //先高优先级，再其他净需求
         List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
@@ -42,6 +42,8 @@ public class ProductionPlanDistributor {
         //再其它净需求
         List<MonthPlanProductionRequirePlanVo> noHeightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         deductionNoHeightQty(noHeightPlanList, realDeductionMap, realDayProductionQty);
+        //重新计算库销比
+        continueSkuPlanList.forEach(singlePlan -> singlePlan.calculateInventorySalesRatio(inventorySalesRatioQty));
         return realDeductionMap;
     }
 
@@ -142,7 +144,7 @@ public class ProductionPlanDistributor {
         productionPlan.setHeightProductionQty(heightProductionQty);
         productionPlan.setProductionQty(productionQty);
         if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
+            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
         }
     }
 
@@ -158,7 +160,7 @@ public class ProductionPlanDistributor {
         productionQty = productionQty - dayProductionQty;
         productionPlan.setProductionQty(productionQty);
         if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setIsProduction(YesOrNoEnum.NO.getCode());
+            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
         }
     }
 }

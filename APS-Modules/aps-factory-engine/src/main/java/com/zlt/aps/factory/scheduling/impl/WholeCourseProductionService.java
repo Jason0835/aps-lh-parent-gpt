@@ -46,14 +46,18 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
-            context.setInsertNewProductionVersion(Boolean.TRUE);
-            //初始化
-            tbrProductionInitService.run(context, userObj);
-            context.setInsertNewProductionVersion(Boolean.FALSE);
-            //排结构、排模具
-            tbrCxCapacityAllocationService.run(context, userObj);
-            //保存日志
-            saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
+            try {
+                context.setInsertNewProductionVersion(Boolean.TRUE);
+                //初始化
+                tbrProductionInitService.run(context, userObj);
+                context.setInsertNewProductionVersion(Boolean.FALSE);
+                //排结构、排模具
+                tbrCxCapacityAllocationService.run(context, userObj);
+            }finally {
+                //保存日志
+                saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
+
+            }
         }
     }
 

@@ -45,6 +45,21 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加获排产前的数据加载日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始排产前数据准备加载====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addStartBeforeProductionDataLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始排产前数据准备加载====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.START_BEFORE_PRODUCTION_DATA, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加获取排产参数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取排产参数====
      *
@@ -205,6 +220,21 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加开始结构粗算成型机台数日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行分组计划粗算成型机台数====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addStartGroupCalculateCapacityLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行分组计划粗算成型机台数====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.START_GROUP_CAPACITY_CALCULATE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构粗算总产能日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算总产能：%s ====
      *
@@ -280,6 +310,91 @@ public class TbrProductionGroupLogRecorder {
         return logContent;
     }
 
+    /**
+     * 增加结构为非在机机构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有续作信息，非在机结构====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名
+     * @return
+     */
+    public static String addGroupNoContinueGroupLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有续作信息，非在机结构====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_CONTINUE_GROUP_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构为在机机构没有排产计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，但没有排产计划====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名
+     * @return
+     */
+    public static String addContinueGroupNoGroupPlanLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，但没有排产计划====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_NO_PRODUCTION_PLAN_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构为在机机构没有续作Sku信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，没有续作Sku信息====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名
+     * @return
+     */
+    public static String addContinueGroupNoContinueSkuLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，没有续作Sku信息====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_NO_CONTINUE_SKU_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构为在机机构没有续作Sku排产计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，没有续作排产计划====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名
+     * @return
+     */
+    public static String addContinueGroupContinueSkuEmptyPlanLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在机，没有续作排产计划====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_EMPTY_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构为在机机构没有续作Sku排产计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku %s 在机，没有排产计划====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名
+     * @param materialDesc 续作Sku
+     * @return
+     */
+    public static String addContinueGroupContinueSkuNoPlanLog(Context context, String groupName, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku %s 在机，没有排产计划====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_NO_PLAN_INFO, logContent);
+        return logContent;
+    }
     /**
      * 增加没有在机分组计划排产日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组计划没有数据，故而在机分组环节无需排产====
