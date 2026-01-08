@@ -405,7 +405,6 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 monthlySaleQty.setRollTwelveMonthSaleQty(0);
 
                 Map<String, Integer> areaSaleQtyMap = new HashMap<>();
-                Set<Integer> deliveryFrequencySet = new HashSet<>();
                 // 不重复的年月集合
                 Set<Integer> yearMonthCount = new HashSet<>();
                 for (int i = 0; i < size; i++) {
