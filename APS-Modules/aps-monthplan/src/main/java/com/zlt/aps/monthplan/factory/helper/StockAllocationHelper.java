@@ -398,7 +398,7 @@ public class StockAllocationHelper {
     int plannedSurplus = BigDecimal.ZERO.intValue();
     if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
       if(context.getPlannedSurplus() >= produceQtyDue) {
-        plannedSurplus = context.getPlannedSurplus() - produceQtyDue;
+        plannedSurplus = produceQtyDue;
         context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
         produceQtyDue = BigDecimal.ZERO.intValue();
       }else{
@@ -447,7 +447,7 @@ public class StockAllocationHelper {
     int plannedSurplus = BigDecimal.ZERO.intValue();
     if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
       if(context.getPlannedSurplus() >= produceQtyDue) {
-        plannedSurplus = context.getPlannedSurplus() - produceQtyDue;
+        plannedSurplus = produceQtyDue;
         context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
         produceQtyDue = BigDecimal.ZERO.intValue();
       }else{
