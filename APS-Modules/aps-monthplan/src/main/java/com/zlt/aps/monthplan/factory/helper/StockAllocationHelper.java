@@ -8,11 +8,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -20,7 +16,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -402,14 +397,15 @@ public class StockAllocationHelper {
     int produceQtyDue = orderQty - allocationQty;
     int plannedSurplus = BigDecimal.ZERO.intValue();
     if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
-          plannedSurplus = context.getPlannedSurplus();
-          if(context.getPlannedSurplus() >= produceQtyDue) {
-            context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
-            produceQtyDue = BigDecimal.ZERO.intValue();
-          }else{
-            produceQtyDue = produceQtyDue  - plannedSurplus;
-            context.setPlannedSurplus(BigDecimal.ZERO.intValue());
-          }
+      if(context.getPlannedSurplus() >= produceQtyDue) {
+        plannedSurplus = context.getPlannedSurplus() - produceQtyDue;
+        context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
+        produceQtyDue = BigDecimal.ZERO.intValue();
+      }else{
+        plannedSurplus = context.getPlannedSurplus();
+        produceQtyDue = produceQtyDue  - context.getPlannedSurplus();
+        context.setPlannedSurplus(BigDecimal.ZERO.intValue());
+      }
     }
     return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
@@ -439,35 +435,6 @@ public class StockAllocationHelper {
       return oriOrderQty.subtract(remainingQty).intValue();
   }
 
-  private static int calculatePlannedSurplus(int orderQty, int allocationQty, StockAllocationContext context) {
-      int plannedSurplus = context.getPlannedSurplus();
-      if(orderQty == BigDecimal.ZERO.intValue() || plannedSurplus == BigDecimal.ZERO.intValue()) {
-          return BigDecimal.ZERO.intValue();
-      }
-      if(allocationQty == BigDecimal.ZERO.intValue()) {
-        if (plannedSurplus  >= orderQty) {
-          plannedSurplus = plannedSurplus - orderQty;
-          context.setPlannedSurplus(plannedSurplus);
-        } else {
-          plannedSurplus = orderQty - plannedSurplus;
-          context.setPlannedSurplus(BigDecimal.ZERO.intValue());
-        }
-        return plannedSurplus;
-      }
-      int produceQtyDue = orderQty - allocationQty;
-      if(produceQtyDue == BigDecimal.ZERO.intValue()) {
-        return BigDecimal.ZERO.intValue();
-      }
-    if (plannedSurplus  >= produceQtyDue) {
-      plannedSurplus = plannedSurplus - produceQtyDue;
-      context.setPlannedSurplus(plannedSurplus);
-    } else {
-      plannedSurplus = produceQtyDue - plannedSurplus;
-      context.setPlannedSurplus(BigDecimal.ZERO.intValue());
-    }
-    return plannedSurplus;
-  }
-
   private static int calculateMatchStockQty(List<MdmProductStock> matchProductStocks) {
       if(CollectionUtils.isEmpty(matchProductStocks)) {
           return BigDecimal.ZERO.intValue();
@@ -476,40 +443,20 @@ public class StockAllocationHelper {
   }
 
   private static DpOrderOffsetDetail allocateMonthSurplusForSingleOrder(String monthPlanVersion,YearMonth yearMonth,SalesOrderPool order, StockAllocationContext context) {
-    int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-    int produceQtyDue = orderQty;
+    int produceQtyDue = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
     int plannedSurplus = BigDecimal.ZERO.intValue();
     if(produceQtyDue > 0 && context.getPlannedSurplus() > 0) {
-      plannedSurplus = context.getPlannedSurplus();
       if(context.getPlannedSurplus() >= produceQtyDue) {
+        plannedSurplus = context.getPlannedSurplus() - produceQtyDue;
         context.setPlannedSurplus(context.getPlannedSurplus() - produceQtyDue);
         produceQtyDue = BigDecimal.ZERO.intValue();
       }else{
-        produceQtyDue = produceQtyDue  - plannedSurplus;
+        plannedSurplus = context.getPlannedSurplus();
+        produceQtyDue = produceQtyDue  - context.getPlannedSurplus();
         context.setPlannedSurplus(BigDecimal.ZERO.intValue());
       }
     }
     return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
-  }
-
-  private static int calculateProduceQtyDue(int orderQty, int allocationQty, int plannedSurplus) {
-      if(orderQty == BigDecimal.ZERO.intValue()) {
-         return BigDecimal.ZERO.intValue();
-      }
-      if(allocationQty == BigDecimal.ZERO.intValue()) {
-        return plannedSurplus >= orderQty?BigDecimal.ZERO.intValue():orderQty - plannedSurplus;
-      }
-      if(allocationQty >= orderQty) {
-         return BigDecimal.ZERO.intValue();
-      }
-      int produceQtyDue = orderQty - allocationQty;
-      if(plannedSurplus == BigDecimal.ZERO.intValue()) {
-          return produceQtyDue;
-      }
-      if(plannedSurplus >= produceQtyDue) {
-        return BigDecimal.ZERO.intValue();
-      }
-      return produceQtyDue - plannedSurplus;
   }
 
   /**
@@ -613,47 +560,6 @@ public class StockAllocationHelper {
   }
 
 
-
-  /**
-   * 执行冲减逻辑
-   */
-  private static ReductionDetail performReduction(
-      List<MdmProductStock> eligibleStocks,
-      BigDecimal orderQty) {
-    ReductionDetail detail = new ReductionDetail();
-    BigDecimal remainingQty = orderQty;
-    List<ReductionItem> reductionItems = new ArrayList<>();
-    for (MdmProductStock stock : eligibleStocks) {
-      if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-        break;
-      }
-      // 获取当前库存数量
-      BigDecimal stockQty = BigDecimal.valueOf(stock.getLeftOverQty());
-      ReductionItem item = new ReductionItem();
-      item.setStockId(stock.getId());
-      item.setStockWeekYear(stock.getWeekYear());
-      item.setOriginalStockQty(stockQty);
-      if (stockQty.compareTo(remainingQty) >= 0) {
-        // 当前库存足够冲减
-        stock.setLeftOverQty(stockQty.subtract(remainingQty).intValue());
-        item.setReducedQty(remainingQty);
-        item.setRemainingStockQty(BigDecimal.valueOf(stock.getLeftOverQty()));
-        remainingQty = BigDecimal.ZERO;
-      } else {
-        // 当前库存不足，全部冲减
-        stock.setLeftOverQty(0);
-        item.setReducedQty(stockQty);
-        item.setRemainingStockQty(BigDecimal.ZERO);
-        remainingQty = remainingQty.subtract(stockQty);
-      }
-      reductionItems.add(item);
-    }
-    detail.setReductionItems(reductionItems);
-    detail.setRemainingOrderQty(remainingQty);
-    detail.setFullyReduced(remainingQty.compareTo(BigDecimal.ZERO) == 0);
-    return detail;
-  }
-
   private static List<MdmProductStock> filterAndSortStocksByWeekYear(List<MdmProductStock> stockInfos, int orderWeekYear) {
     List<MdmProductStock> result =  stockInfos.stream()
         // 过滤：库存年周号晚于订单年周号
@@ -734,39 +640,6 @@ public class StockAllocationHelper {
     public StockAllocationResult(List<DpOrderOffsetDetail> allocations) {
       this.allocations = allocations;
     }
-
-  }
-
-  /**
-   * 冲减项
-   */
-  @Data
-  @Builder
-  @AllArgsConstructor
-  @NoArgsConstructor
-  private static class ReductionItem {
-    private Long stockId;
-    private String stockWeekYear;
-    private BigDecimal originalStockQty;
-    private BigDecimal reducedQty;
-    private BigDecimal remainingStockQty;
-    private LocalDate reductionTime;
-
-  }
-  /**
-   * 冲减详情
-   */
-  @Data
-  @Builder
-  @AllArgsConstructor
-  @NoArgsConstructor
-  private static class ReductionDetail {
-    private List<ReductionItem> reductionItems;
-    private BigDecimal remainingOrderQty;
-    private boolean fullyReduced;
-    private BigDecimal totalReducedQty;
-    private BigDecimal earliestStockWeekYear;
-    private BigDecimal latestStockWeekYear;
 
   }
 
