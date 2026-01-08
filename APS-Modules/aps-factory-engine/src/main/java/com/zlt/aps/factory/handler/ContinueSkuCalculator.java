@@ -160,6 +160,7 @@ public class ContinueSkuCalculator {
      * @param continueSkuInfo   待分配硫化组的续作Sku信息
      * @return
      */
+    @Deprecated
     public static List<CxLhProductionHelper> continueSkuAllocationLhGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> assignedLhGroupNo, CxContinueSkuInfoHelper continueSkuInfo) {
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = groupPlanInfo.getCxLhRatioMap();
         Integer maxLhGroupNo = cxLhRatioMap.size();

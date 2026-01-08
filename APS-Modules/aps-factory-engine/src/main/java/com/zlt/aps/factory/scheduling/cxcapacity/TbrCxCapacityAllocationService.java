@@ -525,11 +525,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        //在机结构-在产机台限制
+        //在机结构-在产机台新增Sku排产
         allContinueMap.forEach((structureName, cxContinueInfo) -> {
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName));
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
@@ -923,7 +924,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo();
-        setContinueGroupByProduct(continueProductionInfoList, continueGroupInfo);
+        setContinueGroupByProduct(context, continueProductionInfoList, continueGroupInfo);
         return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
     }
 
@@ -945,6 +946,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 log.info(TbrProductionGroupLogRecorder.addGroupNoContinueGroupLog(context, structureName));
                 return;
             }
+            log.info(TbrProductionGroupLogRecorder.addOnLineGroupSetUpDataLog(context, structureName));
             ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, cxContinueInfoHelper);
             ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
         });
@@ -989,7 +991,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param continueSkuInfo   续作的Sku规格
      * @param continueGroupInfo 续作的分组信息-含机台
      */
-    private void setContinueGroupByProduct(List<ContinueProductInfo> continueSkuInfo, Map<String, Set<String>> continueGroupInfo) {
+    private void setContinueGroupByProduct(Context context, List<ContinueProductInfo> continueSkuInfo, Map<String, Set<String>> continueGroupInfo) {
         if (CollectionUtils.isEmpty(continueGroupInfo) || CollectionUtils.isEmpty(continueGroupInfo)) {
             return;
         }
@@ -998,7 +1000,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             if (StringUtils.isBlank(groupName)) {
                 return;
             }
-            continueSku.setContinueCxMachineCodeSet(continueGroupInfo.get(groupName));
+            Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
+            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName));
+            continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }
 

@@ -329,8 +329,6 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
                     break;
                 }
             }
-
-//            addLossQtyUnRatio(planList.get(0), addLossQty);
         });
         requirePlanList.forEach(singlePlan -> {
             if (null == singlePlan.getHeightLossQty()) {
@@ -431,10 +429,10 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         Integer otherLossQty = addLossQty - addHeightLossQty;
         if (otherLossQty < BigDecimal.ZERO.intValue()) {
             plan.setFactProdReqQty(netQty);
-        } else {
-            plan.setFactProdReqQty(netQty + otherLossQty);
+            return otherLossQty;
         }
-        return otherLossQty;
+        plan.setFactProdReqQty(netQty + otherLossQty);
+        return BigDecimal.ZERO.intValue();
     }
 
     /**

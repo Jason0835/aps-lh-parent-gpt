@@ -2,10 +2,10 @@ package com.zlt.aps.factory.handler;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -46,33 +46,7 @@ public class SkuMouldSelector {
                 selectedMouldRelationList.add(mouldRelationInfo);
             }
         });
-        //选中的续作模具
-        return selectedEnableMouldByNumber(context, ProductionConstant.DOUBLE_MOULD_PRODUCTION, selectedMouldRelationList, startDay, endDay);
-    }
-
-    /**
-     * 获取选中模具信息
-     *
-     * @param context                   排产上下文
-     * @param selectedMaterialDesc      选中的sku
-     * @param earliestConclusionLhGroup 收尾硫化组
-     * @param startDay                  排产开始日
-     * @param endDay                    排产结束日
-     * @return
-     */
-    @Deprecated
-    public static List<ProductionMouldInfoVo> getSelectedMouldList(Context context, String selectedMaterialDesc, CxLhProductionHelper earliestConclusionLhGroup, Integer startDay, Integer endDay) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Map<String, List<MonthPlanProductMouldInfoVo>> allMouldInfo = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
-        List<MonthPlanProductMouldInfoVo> allMouldList = allMouldInfo.get(selectedMaterialDesc);
-        Set<String> productionMouldSet = earliestConclusionLhGroup.getProductionMouldSet();
-        List<MonthPlanProductMouldInfoVo> selectedMouldRelationList = new ArrayList<>();
-        allMouldList.forEach(mouldRelationInfo -> {
-            if (productionMouldSet.contains(mouldRelationInfo.getMouldCode())) {
-                selectedMouldRelationList.add(mouldRelationInfo);
-            }
-        });
-        //选中的续作模具
+        //选中的模具
         return selectedEnableMouldByNumber(context, ProductionConstant.DOUBLE_MOULD_PRODUCTION, selectedMouldRelationList, startDay, endDay);
     }
 
@@ -95,12 +69,14 @@ public class SkuMouldSelector {
         if (CollectionUtils.isEmpty(skuRelationList)) {
             return Collections.emptyList();
         }
-        List<ProductionMouldInfoVo> effectiveList = getEffectiveInit(baseDataContainer, skuRelationList);
+        List<ProductionMouldInfoVo> effectiveList = getEffectiveContinueRelation(baseDataContainer, skuRelationList);
         Integer max = effectiveList.size();
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
-        effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue).thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
+        effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
+                .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
+                .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
         if (max >= mouldNumber) {
             return effectiveList.subList(BigDecimal.ZERO.intValue(), mouldNumber);
         }
@@ -162,17 +138,22 @@ public class SkuMouldSelector {
     }
 
     /**
-     * 根据模具关系，获取在startDay~endDay有效排产的模具信息
+     * 根据模具关系获取续作模具关系信息
+     * 排除新模具到货计划的模具关系
      *
      * @param baseDataContainer 基础数据配置容器
      * @param skuRelationList   配置的模具关系
      * @return
      */
-    private static List<ProductionMouldInfoVo> getEffectiveInit(BaseDataContainer baseDataContainer, List<MonthPlanProductMouldInfoVo> skuRelationList) {
+    private static List<ProductionMouldInfoVo> getEffectiveContinueRelation(BaseDataContainer baseDataContainer, List<MonthPlanProductMouldInfoVo> skuRelationList) {
         List<ProductionMouldInfoVo> effectiveList = new ArrayList<>();
         skuRelationList.forEach(skuRelation -> {
             ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
             if (null == mouldInfo) {
+                return;
+            }
+            //排除不是模具关系的数据
+            if (MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION != mouldInfo.getRelationType()) {
                 return;
             }
             effectiveList.add(mouldInfo);

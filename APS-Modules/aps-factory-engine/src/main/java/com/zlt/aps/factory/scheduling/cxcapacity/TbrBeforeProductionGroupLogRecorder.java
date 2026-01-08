@@ -247,6 +247,25 @@ public class TbrBeforeProductionGroupLogRecorder {
         return logContent;
     }
 
+
+    /**
+     * 增加在机分组计划没有在产机台信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 没有在产机台====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名
+     * @return
+     */
+    public static String addContinueGroupNoOnLineMachineLog(Context context, String groupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 没有在产机台====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_NO_ON_LINE_MACHINE_EMPTY, logContent);
+        return logContent;
+    }
+
     private TbrBeforeProductionGroupLogRecorder() {
 
     }
