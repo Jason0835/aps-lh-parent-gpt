@@ -16,6 +16,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +65,70 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(String.format(I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.notUnique"), docEntityVO.getCxMachineCode()));
         }
+        // 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
+        String structureErrorMsg = this.checkFixedStructure(docEntityVO);
+        // 校验固定SKU，对比不可作业SKU，不可有相同
+        String materialCodeErrorMsg = this.checkFixedMaterialCode(docEntityVO);
+        if (StringUtils.isNotBlank(structureErrorMsg) || StringUtils.isNotBlank(materialCodeErrorMsg)) {
+            throw new RuntimeException(structureErrorMsg + materialCodeErrorMsg);
+        }
         return unique;
+    }
+
+    /**
+     * 校验固定SKU，对比不可作业SKU，不可有相同
+     *
+     * @param docEntityVO 校验对象
+     */
+    private String checkFixedMaterialCode(MdmCxMachineFixed docEntityVO) {
+        String fixedMaterialCode = StringUtils.defaultIfBlank(docEntityVO.getFixedMaterialCode(), "");
+        List<String> fixedMaterialCodeList = Arrays.stream(fixedMaterialCode.split(",")).collect(Collectors.toList());
+
+        String disableMaterialCode = StringUtils.defaultIfBlank(docEntityVO.getDisableMaterialCode(), "");
+        List<String> disableMaterialCodeList = Arrays.stream(disableMaterialCode.split(",")).collect(Collectors.toList());
+
+        if (CollectionUtils.isNotEmpty(fixedMaterialCodeList) && CollectionUtils.isNotEmpty(disableMaterialCodeList)) {
+            List<String> errorMaterialCode = new ArrayList<>();
+            for (String materialCode : disableMaterialCodeList) {
+                if (fixedMaterialCodeList.contains(materialCode)) {
+                    errorMaterialCode.add(materialCode);
+                }
+            }
+            if (CollectionUtils.isNotEmpty(errorMaterialCode)) {
+                String message = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.skuRepeat");
+                return String.format(message, String.join(",", errorMaterialCode));
+            }
+        }
+        return StringUtils.EMPTY;
+    }
+
+    /**
+     * 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
+     *
+     * @param docEntityVO 校验对象
+     */
+    private String checkFixedStructure(MdmCxMachineFixed docEntityVO) {
+        String fixedStructure1 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure1(), "");
+        List<String> fixedStructureList = Arrays.stream(fixedStructure1.split(",")).collect(Collectors.toList());
+        String fixedStructure2 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure2(), "");
+        fixedStructureList.addAll(Arrays.asList(fixedStructure2.split(",")));
+        String fixedStructure3 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure3(), "");
+        fixedStructureList.addAll(Arrays.asList(fixedStructure3.split(",")));
+        String disableStructure = StringUtils.defaultIfBlank(docEntityVO.getDisableStructure(), "");
+        List<String> disableStructureList = Arrays.stream(disableStructure.split(",")).collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(fixedStructureList) && CollectionUtils.isNotEmpty(disableStructureList)) {
+            List<String> errorStructure = new ArrayList<>();
+            for (String structure : disableStructureList) {
+                if (fixedStructureList.contains(structure)) {
+                    errorStructure.add(structure);
+                }
+            }
+            if (CollectionUtils.isNotEmpty(errorStructure)) {
+                String message = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.structureRepeat");
+                return String.format(message, String.join(",", errorStructure));
+            }
+        }
+        return StringUtils.EMPTY;
     }
 
     @Override
@@ -102,6 +166,15 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
                         errorRowNum, String.format(message, cxMachineCode), importErrorLogs);
                 return Boolean.FALSE;
             }
+        }
+        // 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
+        String structureErrorMsg = this.checkFixedStructure(importDocEntity);
+        // 校验固定SKU，对比不可作业SKU，不可有相同
+        String materialCodeErrorMsg = this.checkFixedMaterialCode(importDocEntity);
+        if (StringUtils.isNotBlank(structureErrorMsg) || StringUtils.isNotBlank(materialCodeErrorMsg)) {
+            String message = structureErrorMsg + materialCodeErrorMsg;
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
