@@ -91,7 +91,7 @@ import com.ruoyi.common.exception.ServiceException;
 @RequiredArgsConstructor
 public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulatedResult>  implements IMpSimulatedResultService {
     private static final String PREFIX = "VM";
-
+    private final static String ZERO_YEAR_WEEK = "0000";
     private final RequirementVersionService requirementVersionService;
 
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
@@ -978,6 +978,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         BeanUtils.copyProperties(supplyOrder, demandPlan);
         demandPlan.setYear(yearMonth.getYear());
         demandPlan.setMonth(yearMonth.getMonthValue());
+        demandPlan.setYearWeek(ZERO_YEAR_WEEK);
         demandPlan.setMonthPlanVersion(predictionVersion);
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());

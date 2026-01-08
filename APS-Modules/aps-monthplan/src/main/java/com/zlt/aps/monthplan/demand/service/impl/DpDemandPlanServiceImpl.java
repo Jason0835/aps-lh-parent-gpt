@@ -87,7 +87,7 @@ import com.ruoyi.common.exception.ServiceException;
 @RequiredArgsConstructor
 public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  implements IDpDemandPlanService {
     private static final String PREFIX = "REQ";
-
+    private final static String ZERO_YEAR_WEEK = "0000";
     private final DpDemandPlanEntityMapper demandPlanEntityMapper;
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     private final RequirementVersionService requirementVersionService;
@@ -666,6 +666,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         BeanUtils.copyProperties(supplyOrder, demandPlan);
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
+        demandPlan.setYearWeek(ZERO_YEAR_WEEK);
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());
