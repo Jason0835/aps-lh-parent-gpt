@@ -74,6 +74,10 @@ public enum TbrMouldProductionLogType {
      */
     END_GET_VERSION_DATA("20-02", "获取排产版本计划数据"),
     /**
+     * 20-02-01 排产前计划初始数据设置
+     */
+    PLAN_INIT_DATA("20-02-01", "排产前计划初始数据设置"),
+    /**
      * 20-03-00 开始排产前数据加载
      */
     START_BEFORE_PRODUCTION_DATA("20-03-00", "开始排产前数据加载"),
@@ -170,6 +174,34 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_MACHINE_NO_CLOSING_MACHINE("20-14-03", "在产分组机台反向匹配分组计划没有收尾的机台"),
     /**
+     * 20-14-04 收尾机台在基础信息中没有找到
+     */
+    REVERSE_MACHINE_NO_FIND_MACHINE("20-14-04", "收尾机台在基础信息中没有找到"),
+    /**
+     * 20-14-05 收尾机台没有排产计划
+     */
+    REVERSE_MACHINE_NO_FIND_GROUP_PLAN("20-14-05", "收尾机台没有排产计划"),
+    /**
+     * 20-14-06 收尾机台没有剩余产能
+     */
+    REVERSE_MACHINE_NO_REMAINING_CAPACITY("20-14-06", "收尾机台没有剩余产能"),
+    /**
+     * 20-14-07 收尾机台没有找到产能可覆盖的计划
+     */
+    REVERSE_MACHINE_CAPACITY_NO_COVER_PLAN("20-14-07", "收尾机台没有找到产能可覆盖的计划"),
+    /**
+     * 20-14-08 收尾机台没有找到产能可覆盖机台又匹配的计划
+     */
+    REVERSE_MACHINE_CAPACITY_COVER_NO_MATCH_PLAN("20-14-08", "收尾机台没有找到产能可覆盖机台又匹配的计划"),
+    /**
+     * 20-14-09 收尾机台反向匹配到计划分组
+     */
+    REVERSE_MACHINE_SELECTED_GROUP_PLAN("20-14-09", "收尾机台反向匹配到计划分组"),
+    /**
+     * 20-14-10 收尾机台还有剩余产能反向匹配下一组计划分组
+     */
+    REVERSE_MACHINE_SELECTED_NEXT_GROUP_PLAN("20-14-10", "收尾机台还有剩余产能反向匹配下一组计划分组"),
+    /**
      * 20-15 没有获取到下一组优先级高的分组计划
      */
     NO_NEXT_ADD_GROUP_PLAN("20-15", "没有获取到下一组优先级高的分组计划"),
@@ -214,6 +246,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_NO_SELECTED_CX_MACHINE("20-16", "分组计划没有找到合适的机台"),
 
+    /**
+     * 30-01-00 开始分组计划模具排产
+     */
+    START_CX_MACHINE_GROUP_MOULD_PRODUCTION("30-01-00", "开始分组计划模具排产"),
     /**
      * 30-01-01 非在机结构模具排产没有排产计划数据
      */
