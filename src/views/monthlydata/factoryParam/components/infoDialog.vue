@@ -54,10 +54,10 @@ export default {
             trigger: "blur",
           },
         ],
-        levelCode: [
+        paramValue: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],

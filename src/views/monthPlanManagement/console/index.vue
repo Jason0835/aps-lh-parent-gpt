@@ -383,9 +383,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-          listeners: {
-            change: this.handleYearMonthChange,
-          },
+          // listeners: {
+          //   change: this.handleYearMonthChange,
+          // },
         },
         {
           prop: "factoryCode",

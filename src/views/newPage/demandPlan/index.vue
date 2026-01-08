@@ -5,6 +5,7 @@
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"
+      :row-class-name="tableRowClassName"
       :data="data"
       :page="page"
       :search="search"
@@ -74,7 +75,7 @@
       uploadUrl="/monthplan/productionMouldConfiguration/importData"
       @uploadSuccess="getList"
     />
-    <!-- <infoDialog ref="infoRef" @success="getList" /> -->
+    <infoDialog ref="infoRef" @success="getList" />
     <el-dialog
       :title="title"
       :visible="visible"
@@ -114,16 +115,15 @@ import {
   genenrDemandPlan,
 } from "@/api/monthplan/demandPlan";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
 import infoForm from "@/views/components/infoForm.vue";
-// import infoDialog from "./components/infoDialog.vue";
+import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "DemandPlan",
   components: {
     tltUpload,
     infoForm,
-    // infoDialog,
+    infoDialog,
   },
   dicts: [
     "biz_factory_name",
@@ -133,6 +133,7 @@ export default {
     "biz_stor_type",
     "biz_brand_type",
     "biz_product_characteristics",
+    "biz_schedule_type"
   ],
   provide() {
     return {
@@ -246,7 +247,6 @@ export default {
               <div>
                 {this.hasPermission("monthplan:demandPlan:edit") && (
                   <el-select
-                    v-if={this.hasPermission("monthplan:demandPlan:edit")}
 
                     v-model={row.scmPriority}
                     onChange={(val) => this.handlePriorityChange(row, val)}
@@ -295,9 +295,10 @@ export default {
         {
           prop: "productionType",
           label: this.$t("ui.data.DemandPlan.productionType"),
+          width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(
-              this.dict.type.biz_product_characteristics,
+              this.dict.type.biz_schedule_type,
               value
             );
           },
@@ -374,8 +375,37 @@ export default {
         {
           prop: "isReachMinProductionQty",
           label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          // formatter: (row, column, value) => {
+          //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          // },
+          render: ({ row }) => {
+            return (
+              <div>
+                {this.hasPermission("monthplan:demandPlan:edit") && (
+                  <el-select
+
+                    v-model={row.isReachMinProductionQty}
+                    onChange={(val) => this.handlePriorityChange(row, val)}
+                  >
+                    {this.dict.type.biz_yes_no.map((item) => (
+                      <el-option
+                        key={item.value}
+                        label={item.label}
+                        value={item.value}
+                      ></el-option>
+                    ))}
+                  </el-select>
+                )}
+                {!this.hasPermission("monthplan:demandPlan:edit") && (
+                  <span>
+                    {this.selectDictLabel(
+                      this.dict.type.biz_yes_no,
+                      row.handlePriorityChange
+                    )}
+                  </span>
+                )}
+              </div>
+            );
           },
         },
         {
@@ -411,9 +441,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-          listeners: {
-            change: this.handleYearMonthChange,
-          },
+          // listeners: {
+          //   change: this.handleYearMonthChange,
+          // },
         },
 
         {
@@ -440,7 +470,7 @@ export default {
         },
         {
           prop: "isReachMinProductionQty",
-          label: this.$t("不足最小投产量"),
+          label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
@@ -456,10 +486,26 @@ export default {
     },
   },
   methods: {
+    tableRowClassName({row, rowIndex}) {
+        if (row.isReachMinProductionQty ==0) {
+          return 'warning-row';
+        }
+        return '';
+      },
     handleYearMonthChange(val) {
-      console.log(val);
-      this.query.yearMonth = val;
-      this.search.yearMonth = val;
+
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      console.log(this.search);
+      console.log(this.query);
+      // this.query.yearMonth = val;
+      // this.search.yearMonth = val;
     },
     hasPermission(permission) {
       const permissions = this.$store.state.user.permissions || [];
@@ -469,6 +515,8 @@ export default {
       return permissions.includes(permission);
     },
     async generPlan() {
+      // this.handleAdd()
+      // return
       try {
         this.createLoading=true
         let res = await genenrDemandPlan(this.formatParams());
@@ -511,7 +559,7 @@ export default {
     },
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show(this.query);
       }
     },
     handleEdit(row) {

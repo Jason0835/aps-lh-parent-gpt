@@ -330,11 +330,13 @@ export default {
         ...this.sort,
       };
       if (params.isExceedMonth) {
-        params.isExceedThreeMonth = 1;
-        params.isExceedSixMonth = 1;
-        params.isExceedNineMonth = 1;
-        params.isExceedTwelveMonth = 1;
+        // params.isExceedThreeMonth = 1;
+        // params.isExceedSixMonth = 1;
+        // params.isExceedNineMonth = 1;
+        // params.isExceedTwelveMonth = 1;
+        params.isExceedTire=1
       } else {
+        params.isExceedTire=''
         // params.isExceedThreeMonth = 0;
         // params.isExceedSixMonth = 0;
         // params.isExceedNineMonth = 0;

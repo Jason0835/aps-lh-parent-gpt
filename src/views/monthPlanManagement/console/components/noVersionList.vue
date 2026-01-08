@@ -3,39 +3,47 @@
     :title="title"
     :visible="visible"
     width="800px"
+    style="height: 820px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <page-table
-      tableRef="ConsoleMainTable"
-      :calcHeight="true"
-      v-loading="loading"
-      :columns="columns"
-      :searchColumns="searchColumns"
-      :data="data"
-      :page="undefined"
-      :search="search"
-      @refresh="getList"
-      @search="handleSearch"
-      @pageChange="handlePageChange"
-      @sort-change="handleSortChange"
-      @selection-change="handleSelectionChange"
-      :showSummary="false"
-      :selectArea="false"
-    >
-    </page-table>
-    <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
-      <el-button
-        type="primary"
-        :disabled="selection.length != 1"
-        :loading="loading"
-        @click="handleConfirm"
-        >{{ this.$t("common.button.confirm") }}</el-button
+    <div style="height:400px; overflow-y: auto">
+
+      <page-table
+        tableRef="ConsoleMainTable"
+        :calcHeight="true"
+        v-loading="loading"
+        :columns="columns"
+        :searchColumns="searchColumns"
+        :data="data"
+        :page="undefined"
+        :search="search"
+        @refresh="getList"
+        @search="handleSearch"
+        @pageChange="handlePageChange"
+        @sort-change="handleSortChange"
+        @selection-change="handleSelectionChange"
+        :showSummary="false"
+        :selectArea="false"
+        :toolbar="false"
       >
-    </template>
+      </page-table>
+
+    </div>
+    <template slot="footer">
+        <el-button @click="hide">{{
+          this.$t("common.button.cancel")
+        }}</el-button>
+        <el-button
+          type="primary"
+          :disabled="selection.length != 1"
+          :loading="loading"
+          @click="handleConfirm"
+          >{{ this.$t("common.button.confirm") }}</el-button
+        >
+      </template>
   </el-dialog>
 </template>
 
@@ -71,7 +79,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("common.button.add");
+      return this.$t("选择需求计划版本");
     },
     columns() {
       let columns = [
@@ -79,7 +87,7 @@ export default {
 
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthSaleOrderPlan.factoryCode"),
+          label: this.$t("common.factory"),
           align: "center",
 
           formatter: (row) => {
@@ -132,7 +140,21 @@ export default {
       return columns;
     },
     searchColumns() {
-      return [];
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "yearMonth",
+          label: this.$t("ui.data.colume.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+        },
+      ];
     },
   },
   methods: {
@@ -233,7 +255,7 @@ export default {
       this.query = {
         ...data,
       };
-      this.paramsDate = {
+      this.search = {
         ...data,
       };
       this.getList();
@@ -253,8 +275,6 @@ export default {
           ...this.query,
           ...this.selection[0],
         };
-
-
 
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");

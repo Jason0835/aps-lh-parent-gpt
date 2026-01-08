@@ -444,7 +444,9 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+
 .page-table {
+
   &-header {
     display: flex;
     justify-content: space-between;
@@ -486,6 +488,9 @@ export default {
   flex-direction: column;
   height: 100%;
 }
+::v-deep .warning-row {
+    background: #FFCCCC;
+  }
 
 ::v-deep .el-table__header-wrapper {
   .cell.is-required::before {

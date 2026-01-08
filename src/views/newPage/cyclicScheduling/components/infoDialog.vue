@@ -297,6 +297,8 @@ export default {
         this.hide();
         this.loading = false;
       } catch (e) {
+        this.hide();
+        this.loading = false;
         return;
       }
     },
