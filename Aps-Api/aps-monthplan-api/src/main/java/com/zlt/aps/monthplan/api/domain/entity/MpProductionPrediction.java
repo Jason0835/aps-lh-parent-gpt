@@ -1,5 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -7,6 +9,9 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import org.apache.ibatis.type.JdbcType;
+
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -31,7 +36,7 @@ public class MpProductionPrediction extends BaseEntity {
 
      /** 工厂编号 */
     @Excel(name = "ui.data.column.productionPrediction.factoryCode")
-    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
@@ -47,15 +52,21 @@ public class MpProductionPrediction extends BaseEntity {
     @TableField(value = "MONTH")
     private Integer month;
 
+    /** 预测版本号 */
+    @Excel(name = "ui.data.column.productionPrediction.predictionVersion")
+    @ApiModelProperty(value = "预测版本号", name = "predictionVersion")
+    @TableField(value = "PREDICTION_VERSION")
+    private String predictionVersion;
+
     /** 产品品类 */
     @Excel(name = "ui.data.column.productionPrediction.productTypeCode")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
-    /** 库位类别 */
+    /** 内外销 */
     @Excel(name = "ui.data.column.productionPrediction.locationType")
-    @ApiModelProperty(value = "库位类别", name = "locationType")
+    @ApiModelProperty(value = "内外销", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
 
@@ -64,12 +75,6 @@ public class MpProductionPrediction extends BaseEntity {
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
-
-    /** MES物料编码 */
-    @Excel(name = "ui.data.column.productionPrediction.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
 
     /** 物料编码 */
     @Excel(name = "ui.data.column.productionPrediction.materialCode")
@@ -83,110 +88,113 @@ public class MpProductionPrediction extends BaseEntity {
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
-    /** 第1个月排产量 */
+    /** MES物料编码 */
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
+
+
+
+    /** T月 */
     @Excel(name = "ui.data.column.productionPrediction.month1")
-    @ApiModelProperty(value = "第1个月排产量", name = "month1")
+    @ApiModelProperty(value = "T月", name = "month1")
     @TableField(value = "MONTH_1")
     private Integer month1;
 
-    /** 第2个月排产量 */
+    /** T+1月 */
     @Excel(name = "ui.data.column.productionPrediction.month2")
-    @ApiModelProperty(value = "第2个月排产量", name = "month2")
+    @ApiModelProperty(value = "T+1月", name = "month2")
     @TableField(value = "MONTH_2")
     private Integer month2;
 
-    /** 第3个月排产量 */
+    /** T+2月 */
     @Excel(name = "ui.data.column.productionPrediction.month3")
-    @ApiModelProperty(value = "第3个月排产量", name = "month3")
+    @ApiModelProperty(value = "T+2月", name = "month3")
     @TableField(value = "MONTH_3")
     private Integer month3;
 
-    /** 预测版本号 */
-    @Excel(name = "ui.data.column.productionPrediction.predictionVersion")
-    @ApiModelProperty(value = "预测版本号", name = "predictionVersion")
-    @TableField(value = "PREDICTION_VERSION")
-    private String predictionVersion;
+    @Excel(name = "ui.data.column.productionPrediction.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
+    @Excel(name = "ui.data.column.productionPrediction.updateTime")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(
+        value = "UPDATE_TIME",
+        fill = FieldFill.INSERT_UPDATE,
+        jdbcType = JdbcType.TIMESTAMP
+    )
+    private Date updateTime;
+
 
     /** 预测需求版本号 */
-    @Excel(name = "ui.data.column.productionPrediction.monthPlanVersion")
     @ApiModelProperty(value = "预测需求版本号", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
     /** 预测排产计划版本 */
-    @Excel(name = "ui.data.column.productionPrediction.productionVersion")
     @ApiModelProperty(value = "预测排产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
     /** 产品结构 */
-    @Excel(name = "ui.data.column.productionPrediction.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
     /** 英寸 */
-    @Excel(name = "ui.data.column.productionPrediction.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
     /** 规格 */
-    @Excel(name = "ui.data.column.productionPrediction.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
 
     /** 花纹 */
-    @Excel(name = "ui.data.column.productionPrediction.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;
 
     /** 主花纹 */
-    @Excel(name = "ui.data.column.productionPrediction.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
 
     /** 主物料 */
-    @Excel(name = "ui.data.column.productionPrediction.mainMaterialDesc")
     @ApiModelProperty(value = "主物料", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 
     /** 模具数量(同主花纹的模具数量) */
-    @Excel(name = "ui.data.column.productionPrediction.mouldQty")
     @ApiModelProperty(value = "模具数量(同主花纹的模具数量)", name = "mouldQty")
     @TableField(value = "MOULD_QTY")
     private Integer mouldQty;
 
     /** 活块数量(同主花纹的物料模具数量) */
-    @Excel(name = "ui.data.column.productionPrediction.typeBlockQty")
     @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
     @TableField(value = "TYPE_BLOCK_QTY")
     private Integer typeBlockQty;
 
     /** 净需求 */
-    @Excel(name = "ui.data.column.productionPrediction.netQty")
     @ApiModelProperty(value = "净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Integer netQty;
 
     /** 高优先级数量 */
-    @Excel(name = "ui.data.column.productionPrediction.heightQty")
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
 
     /** 排产总量 */
-    @Excel(name = "ui.data.column.productionPrediction.productionQty")
     @ApiModelProperty(value = "排产总量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
 
     /** 计划类型 */
-    @Excel(name = "ui.data.column.productionPrediction.planType")
     @ApiModelProperty(value = "计划类型", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;
