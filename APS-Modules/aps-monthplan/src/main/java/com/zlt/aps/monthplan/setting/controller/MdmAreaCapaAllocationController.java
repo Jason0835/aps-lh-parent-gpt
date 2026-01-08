@@ -1,30 +1,43 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
+import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -52,6 +65,12 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
 
     @Autowired
     private MdmAreaCapaAllocationEntityMapper entityMapper;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     /**
      * 查询区域产能分配列表
@@ -126,7 +145,34 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext, updateSupport);
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        ExcelUtil<MdmAreaCapaAllocation> util = new ExcelUtil<>(this.getTClass());
+        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        List<MdmAreaCapaAllocation> list = util.importExcel(is);
+        return this.doImportDataAsync(list, updateSupport, importLog.getId(), importLog, beginTime);
+    }
+
+    public AjaxResult doImportDataAsync(List<MdmAreaCapaAllocation> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        if (list.size() > 500) {
+            // 传递请求头信息（主要是语言包），避免主线程执行后清空request，拷贝一个虚拟的request
+            ServletRequestAttributes virtualAttr = RemoteImportExcelUtils.copyRequestHeaderAttribute();
+            mdmAreaCapaAllocationService.importDataAsync(list, updateSupport, importLogId, importLog, beginTime, virtualAttr);
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.common.importTimeOut"));
+        }
+        AjaxResult result = getDocService().importData(list, updateSupport, importLogId);
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(result, this.iImportErrorLogService);
+        return result;
     }
 
     /**

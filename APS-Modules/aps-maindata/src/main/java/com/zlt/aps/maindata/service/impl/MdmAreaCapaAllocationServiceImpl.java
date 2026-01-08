@@ -3,7 +3,9 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
@@ -14,8 +16,11 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
+import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -23,13 +28,13 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -56,6 +61,12 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
 
     @Autowired
     private DpAreaEntityMapper dpAreaEntityMapper;
+
+    @Autowired
+    private IRemoteImportLogService iRemoteImportLogService;
+
+    @Autowired
+    private IRemoteImportErrorLogService iRemoteImportErrorLogService;
 
     @Override
     protected String getDocTypeCode() {
@@ -116,6 +127,28 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
             }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
+
+    /**
+     * 异步导入
+     */
+    @Async
+    @Override
+    public void importDataAsync(List<MdmAreaCapaAllocation> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
+        try {
+            RequestContextHolder.setRequestAttributes(attributes, true);
+
+            AjaxResult result = this.importData(list, updateSupport, importLogId);
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(list.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            RemoteImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, iRemoteImportLogService);
+            RemoteImportExcelUtils.saveImportErrorLogs(result, iRemoteImportErrorLogService);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     /**
