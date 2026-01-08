@@ -75,6 +75,7 @@ public class CxMouldProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         String groupName = productionPlanInfo.getGroupName();
+        log.info(TbrMouldProductionLogRecorder.addStartCxMachineMouldProductionPlanLog(context, cxMachineCode, groupName));
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionPlanList)) {

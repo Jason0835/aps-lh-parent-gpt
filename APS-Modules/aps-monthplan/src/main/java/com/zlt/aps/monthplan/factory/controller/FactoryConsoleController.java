@@ -139,7 +139,7 @@ public class FactoryConsoleController extends BaseController {
      */
     @PostMapping("/oneClickProductionProcess")
     @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
-    @DistributedLock(key = "'redissonLock:factoryConsole:oneClickProductionProcess:'#factoryProductionParam.factoryCode" + "#factoryProductionParam.year" + "#factoryProductionParam.month" + "#factoryProductionParam.monthPlanVersion",
+    @DistributedLock(key = "'redissonLock:factoryConsole:oneClickProductionProcess:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion",
             failMsg = "ui.data.alert.factoryConsole.oneClickProductionProcess.run",
             args = {"#factoryProductionParam.monthPlanVersion", "#factoryProductionParam.factoryCode"},
             waitTime = 5,
@@ -162,7 +162,7 @@ public class FactoryConsoleController extends BaseController {
      */
     @PostMapping("/resetConfigurationInitProduction")
     @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
-    @DistributedLock(key = "'redissonLock:factoryConsole:resetConfigurationInitProduction:'#factoryProductionParam.factoryCode" + "#factoryProductionParam.year" + "#factoryProductionParam.month" + "#factoryProductionParam.monthPlanVersion" + "#factoryProductionParam.productionVersion",
+    @DistributedLock(key = "'redissonLock:factoryConsole:resetConfigurationInitProduction:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion + #factoryProductionParam.productionVersion",
             failMsg = "ui.data.alert.factoryConsole.resetConfigurationInitProduction.run",
             args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryCode"},
             waitTime = 5,

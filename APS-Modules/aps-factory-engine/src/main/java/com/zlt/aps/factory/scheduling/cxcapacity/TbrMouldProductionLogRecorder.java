@@ -16,6 +16,24 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TbrMouldProductionLogRecorder {
     /**
+     * 增加成型机台开始进行分组计划的模具排产日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s 成型机台：%s，结构：%s 开始进行模具排产====
+     *
+     * @param context       排程上下文
+     * @param cxMachineCode 成型机台编码
+     * @param groupName     分组名-结构
+     * @return
+     */
+    public static String addStartCxMachineMouldProductionPlanLog(Context context, String cxMachineCode, String groupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s 成型机台：%s，结构：%s 开始进行模具排产====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.START_CX_MACHINE_GROUP_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+    /**
      * 增加分组结构排产成型机台没有需要排产的计划日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有待排产计划====
      *
