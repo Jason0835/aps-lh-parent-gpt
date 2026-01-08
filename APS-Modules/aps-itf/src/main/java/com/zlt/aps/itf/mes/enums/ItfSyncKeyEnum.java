@@ -14,7 +14,7 @@ public enum ItfSyncKeyEnum {
     /**
      * 月计划下发接口
      */
-    SYNC_MONTH_PLAN("MONTH_PLAN_FBK", "APS", "MES", "月计划下发接口"),
+    SYNC_MONTH_PLAN("MONTH_PLAN_ISSUE", "APS", "MES", "月计划下发接口"),
 
     ;
 	/**

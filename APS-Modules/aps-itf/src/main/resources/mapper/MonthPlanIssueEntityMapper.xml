@@ -77,7 +77,7 @@
         </foreach>
         ) AS t
         WHERE NOT EXISTS (
-        SELECT 1 FROM MONTH_PLAN_ISSUE WHERE ORDER_NO = t.ORDER_NO
+        SELECT 1 FROM MONTH_PLAN_ISSUE WHERE ORDER_NO = t.ORDER_NO AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -134,17 +134,16 @@
             DAY29 = #{item.day29},
             DAY30 = #{item.day30},
             DAY31 = #{item.day31},
-            DATA_VERSION = #{item.dataVersion},
             COMPANY_CODE = #{item.companyCode},
             FACTORY_CODE = #{item.factoryCode},
             CONSTRUCTION_STAGE = #{item.constructionStage}
-            WHERE ORDER_NO = #{item.orderNo}
+            WHERE ORDER_NO = #{item.orderNo} AND DATA_VERSION = #{item.dataVersion}
         </foreach>
     </update>
 
     <insert id="batchInsertCxMonthPlanIssue">
         INSERT INTO CX_MONTH_PLAN_ISSUE (
-        MONTH, MATERIAL_CODE, CONSTRUCTION_STAGE, DEMAND_QTY, REMARK
+        MONTH, MATERIAL_CODE, CONSTRUCTION_STAGE, DEMAND_QTY, DATA_VERSION, REMARK
         )
         SELECT * FROM (
         <foreach collection="list" item="item" separator=" UNION ALL ">
@@ -153,6 +152,7 @@
             #{item.materialCode} AS MATERIAL_CODE,
             #{item.constructionStage} AS CONSTRUCTION_STAGE,
             #{item.demandQty} AS DEMAND_QTY,
+            #{item.dataVersion} AS DATA_VERSION,
             #{item.remark} AS REMARK
         </foreach>
         ) AS t
@@ -168,7 +168,8 @@
             CONSTRUCTION_STAGE = #{item.constructionStage},
             DEMAND_QTY = #{item.demandQty},
             REMARK = #{item.remark}
-            WHERE `MONTH` = #{item.month} AND MATERIAL_CODE = #{item.materialCode}
+            WHERE `MONTH` = #{item.month} AND MATERIAL_CODE = #{item.materialCode} AND DATA_VERSION =
+            #{item.dataVersion}
         </foreach>
     </update>
 </mapper>

@@ -181,4 +181,17 @@ public class FactoryMonthPlanProdResultUIController extends BaseController {
         }
         return false;
     }
+
+    /**
+     * 下发月计划
+     *
+     * @param factoryMonthPlanProdFinal 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @PostMapping("/issueMonthPlan")
+    @ResponseBody
+    public AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal) {
+        return factoryMonthPlanProdFinalRemoteService.issueMonthPlan(factoryMonthPlanProdFinal);
+    }
 }

@@ -1,12 +1,15 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.itf.constant.DataSource;
+import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.MonthPlanIssueEntityMapper;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
@@ -85,13 +88,21 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         List<MonthPlanIssue> monthPlanIssues = new ArrayList<>();
         Map<String, FactoryMonthPlanProductionFinalResult> groupMap = new HashMap<>(16);
         genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues);
-        monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
-        monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
-        // 成型月计划
+
         List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
         genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList);
-        monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
-        monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
+        try {
+            // 切换MES数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
+            monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
+            // 成型月计划
+            monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
+            monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
         // 发送MQ
         AjaxResult ajaxResult = null;
         // 获取下发接口版本号
@@ -104,12 +115,14 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
             SyncParamsVO syncParamsVO = new SyncParamsVO();
             syncParamsVO.setSyncKey(ItfSyncKeyEnum.SYNC_MONTH_PLAN.getCode());
             syncParamsVO.setDataVersion(dataVersion);
+//            syncParamsVO.setDataVersion("1767835129632");
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("monthPlanVersion", monthPlanVersion);
             params.put("productionVersion", productionVersion);
             params.put("rowCount", monthPlanIssues.size());
             syncParamsVO.setParams(params);
+            syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);
             syncParamsVO.setFactoryCode(factoryCode);
             syncParamsVO.setCompanyCode(factoryCode);
@@ -191,7 +204,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
     private BigDecimal getTotalDayResult(FactoryMonthPlanProductionFinalResult finalResult) {
         BigDecimal result = BigDecimal.ZERO;
         for (int i = 1; i <= 31; i++) {
-            BigDecimal fieldValue = ObjectUtils.defaultIfNull(ReflectUtils.getFieldValue(finalResult, "day" + i), BigDecimal.ZERO);
+            Integer fieldValue = ObjectUtils.defaultIfNull(ReflectUtils.getFieldValue(finalResult, "day" + i), 0);
             result = BigDecimalUtils.add(result, fieldValue);
         }
         return result;

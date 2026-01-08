@@ -2,6 +2,7 @@ package com.zlt.aps.itf.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -57,6 +58,14 @@ public class CxMonthPlanIssue implements Serializable {
     @ApiModelProperty(value = "需求量", name = "demandQty")
     @TableField(value = "DEMAND_QTY")
     private BigDecimal demandQty;
+
+    /**
+     * 版本号
+     */
+    @Excel(name = "ui.data.column.monthPlanIssue.dataVersion")
+    @ApiModelProperty(value = "版本号", name = "dataVersion")
+    @TableField(value = "DATA_VERSION")
+    private String dataVersion;
 
     /**
      * 备注
