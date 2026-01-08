@@ -531,20 +531,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                         moreThanFiftyMonthCount++;
                     }
                 }
-                String scheduleType = "";
+                // 按单排产产品
+                String scheduleType = BizScheduleTypeEnum.ORDINARY_ORDER_PRODUCT.getCode();
                 if (averageSaleQty.compareTo(BigDecimal.ZERO) > 0 && averageSaleQty.compareTo(BigDecimal.valueOf(150)) < 0) {
-                    if (moreThanZeroMonthCount < 11) {
-                        // 按单排产产品
-                        scheduleType = BizScheduleTypeEnum.ORDINARY_ORDER_PRODUCT.getCode();
-                    } else {
+                    if (moreThanZeroMonthCount >= 10) {
                         // 常规周期产品
                         scheduleType = BizScheduleTypeEnum.ORDINARY_CYCLE_PRODUCT.getCode();
                     }
                 } else if (averageSaleQty.compareTo(BigDecimal.valueOf(150)) >= 0) {
-                    if (moreThanZeroMonthCount < 8) {
-                        // 波动产品
-                        scheduleType = BizScheduleTypeEnum.WAVE_PRODUCT.getCode();
-                    }
                     if (averageSaleQty.compareTo(BigDecimal.valueOf(500)) < 0) {
                         if (moreThanFiftyMonthCount >= 8) {
                             // 常规产品
