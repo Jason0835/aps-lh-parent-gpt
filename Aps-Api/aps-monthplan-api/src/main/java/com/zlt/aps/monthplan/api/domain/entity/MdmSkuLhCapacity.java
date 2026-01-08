@@ -114,7 +114,7 @@ public class MdmSkuLhCapacity extends BaseEntity {
 
     /** 检查胶囊、喷胶膜 模具清理2次 */
     @ImportExcelValidated(digits = true, min = 0, max = 999999)
-    @Excel(name = "ui.data.column.mdmSkuLhCapacity.clearTime")
+    @Excel(name = "ui.data.column.mdmSkuLhCapacity.clearTime", width = 30)
     @ApiModelProperty(value = "检查胶囊、喷胶膜 模具清理2次", name = "clearTime")
     @TableField(value = "CLEAR_TIME")
     private Integer clearTime;
@@ -139,6 +139,12 @@ public class MdmSkuLhCapacity extends BaseEntity {
     @ApiModelProperty(value = "就餐时间", name = "dineTime")
     @TableField(value = "DINE_TIME")
     private Integer dineTime;
+
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
 
 
 }

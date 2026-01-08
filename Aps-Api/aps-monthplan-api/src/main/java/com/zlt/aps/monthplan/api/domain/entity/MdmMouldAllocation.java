@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -84,5 +85,10 @@ public class MdmMouldAllocation extends BaseEntity {
     @TableField(value = "ALLOCATION_QTY")
     private Integer allocationQty;
 
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
 
 }

@@ -30,7 +30,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      *
      * @return 定稿的月度排产计划
      */
-    List<FactoryMonthPlanProductionFinalResult> findLastTwelveMonthProdFinalPlan();
+    Map<String,Integer> calculateStructureFrequency();
 
     /**
      * 根据物料编号,通过月度生产计划表，获取近12个月有排产的月份个数
@@ -38,7 +38,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * @param materialCode 物料编号
      * @return 近12个月有排产的月份个数
      */
-    int getProductionMonthInLastTwelveMonth(String materialCode);
+    int calculateStructureFrequency(String materialCode);
 
     /**
      * 库存抓取日~（同月）月底的月度计划量汇总

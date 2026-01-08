@@ -165,6 +165,40 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加在机结构续作Sku模具排产没有排产量日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 模具排产当前阶段没有排产量====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param materialDesc Sku信息
+     * @return
+     */
+    public static String addContinueSkuNoProductionQtyLog(Context context, String groupName, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 模具排产当前阶段没有排产量====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY, logContent);
+        return logContent;
+    }
+    /**
+     * 增加在机结构续作Sku降膜排产没有结果日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param materialDesc Sku信息
+     * @return
+     */
+    public static String addContinueSkuNoProductionResultLog(Context context, String groupName, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY, logContent);
+        return logContent;
+    }
+    /**
      * 增加在机结构续作Sku开始同规格同花纹或是同生胎共模具物料模具排产日志记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 开始进行%s物料：%s 模具排产====
      *

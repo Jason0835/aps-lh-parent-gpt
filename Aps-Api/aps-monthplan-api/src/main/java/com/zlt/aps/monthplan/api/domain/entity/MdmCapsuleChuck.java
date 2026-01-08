@@ -66,5 +66,11 @@ public class MdmCapsuleChuck extends BaseEntity {
     @TableField(value = "NEW_CHUCK_QTY")
     private Integer newChuckQty;
 
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
+
 
 }
