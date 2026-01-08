@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import lombok.extern.slf4j.Slf4j;
@@ -52,12 +53,12 @@ public class CxContinueSkuAllocationMouldHandler {
      * @param realWholeMachineNumber 需要的机台数
      */
     @Deprecated
-    public static void allocationContinueSkuMouldNumber(ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Integer realWholeMachineNumber) {
+    public static void allocationContinueSkuMouldNumber(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Integer realWholeMachineNumber) {
         if (null == groupContinueInfo || CollectionUtils.isEmpty(groupContinueInfo.getCxMachineCodeSet())) {
             return;
         }
         //设置续作Sku的计划排产量：先暂时取高优先级量
-        ContinueSkuCalculator.setContinueSkuPlanDemandQty(groupPlanInfo, groupContinueInfo);
+        ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, groupContinueInfo);
         Set<String> cxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (isBuilderFullLhMachine(cxMachineCodeSet, realWholeMachineNumber)) {
             //todo 构建续作？

@@ -39,6 +39,7 @@ import com.zlt.core.queryformulas.QueryFormulaUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -285,6 +286,42 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     /**
+     * 通用排序方法：按Value对Map排序，返回有序的LinkedHashMap
+     *
+     * @param map   待排序的Map（任意Map，包括LinkedHashMap/TreeMap/HashMap）
+     * @param isAsc true=升序，false=降序
+     * @return 按Value排序后的有序Map（LinkedHashMap）
+     */
+    public static <K, V extends Comparable<? super V>> Map<K, V> sortMapByValue(Map<K, V> map, boolean isAsc) {
+        // 空值处理：避免空指针
+        if (map == null || map.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+
+        // 核心步骤1：将Map.Entry转为List，便于排序
+        List<Map.Entry<K, V>> entryList = new ArrayList<>(map.entrySet());
+
+        // 核心步骤2：按Value排序（升序/降序）
+        entryList.sort((entry1, entry2) -> {
+            if (isAsc) {
+                // 升序：entry1.value < entry2.value → 返回负数，排在前面
+                return entry1.getValue().compareTo(entry2.getValue());
+            } else {
+                // 降序：反转升序结果
+                return entry2.getValue().compareTo(entry1.getValue());
+            }
+        });
+
+        // 核心步骤3：将排序后的List存入LinkedHashMap（保证有序）
+        Map<K, V> sortedMap = new LinkedHashMap<>();
+        for (Map.Entry<K, V> entry : entryList) {
+            sortedMap.put(entry.getKey(), entry.getValue());
+        }
+
+        return sortedMap;
+    }
+
+    /**
      * 生成月均销量
      *
      * @param factoryCode     工厂
@@ -296,9 +333,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
      */
     private void genMonthSaleQty(String factoryCode, String last12YearMonth, String maxYearMonth, String last3YearMonth, String last6YearMonth, int passThreeMonth, int passSixMonth) {
         List<MpHistorySaleRecord> rollMonthSaleQtyList = mpHistorySaleRecordEntityMapper.selectRollMonthSaleQty(factoryCode, last12YearMonth, maxYearMonth);
-        Map<String, Integer> rollMonthSaleQtyMap = new HashMap<>(16);
+        Map<String, MpHistorySaleRecord> rollMonthSaleQtyMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(rollMonthSaleQtyList)) {
-            rollMonthSaleQtyMap = rollMonthSaleQtyList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getMaterialCode, MpHistorySaleRecord::getSaleQty));
+            rollMonthSaleQtyMap = rollMonthSaleQtyList.stream().collect(Collectors.toMap(MpHistorySaleRecord::getMaterialCode, Function.identity(), (old, item) -> item));
         }
 
         List<MpMonthlySaleQty> monthlySaleQtyList = new ArrayList<>();
@@ -353,16 +390,11 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
                 List<MpHistorySaleRecord> passSixMonthList = new ArrayList<>();
                 for (MpHistorySaleRecord record : value) {
-                    if (record.getYearMonth() == Integer.parseInt(last6YearMonth)) {
+                    if (record.getYearMonth() < Integer.parseInt(last6YearMonth)) {
                         break;
                     }
                     passSixMonthList.add(record);
                 }
-
-                // 按SKU分组，销量降序，适销区域用逗号分隔
-                String area = passSixMonthList.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getSaleQty).reversed())
-                        .map(MpHistorySaleRecord::getAreaCode).distinct().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
-                monthlySaleQty.setSaleArea(area);
 
                 // 月均销量=销量汇总/6，近3个月销量=取月份最大三个月汇总/3，向上取整
                 Integer totalSaleQty = 0;
@@ -372,6 +404,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 monthlySaleQty.setPassSixMonthSaleQty(0);
                 monthlySaleQty.setRollTwelveMonthSaleQty(0);
 
+                Map<String, Integer> areaSaleQtyMap = new HashMap<>();
+                Set<Integer> deliveryFrequencySet = new HashSet<>();
                 // 不重复的年月集合
                 Set<Integer> yearMonthCount = new HashSet<>();
                 for (int i = 0; i < size; i++) {
@@ -381,25 +415,43 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                     Integer yearMonth = historySaleRecord.getYearMonth();
 
                     yearMonthCount.add(yearMonth);
-                    if (yearMonth > Integer.parseInt(last3YearMonth)) {
+                    if (yearMonth >= Integer.parseInt(last3YearMonth)) {
                         // 近3个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
-                    if (yearMonth > Integer.parseInt(last6YearMonth)) {
+                    if (yearMonth >= Integer.parseInt(last6YearMonth)) {
                         // 近6个月
                         BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                         monthlySaleQty.setPassSixMonthSaleQty(result.intValue());
                     }
+                    // 销售区域汇总
+                    String areaCode = historySaleRecord.getAreaCode();
+                    if (areaSaleQtyMap.containsKey(areaCode)) {
+                        areaSaleQtyMap.put(areaCode, areaSaleQtyMap.get(areaCode) + saleQty);
+                    } else {
+                        areaSaleQtyMap.put(areaCode, saleQty);
+                    }
                 }
+                areaSaleQtyMap = sortMapByValue(areaSaleQtyMap, false);
+
+                // 按SKU分组，销量降序，适销区域用逗号分隔
+                Set<String> areaCode = areaSaleQtyMap.keySet();
+
+                String area = areaCode.stream().filter(StringUtils::isNotBlank).collect(Collectors.joining(","));
+                monthlySaleQty.setSaleArea(area);
+
                 // 月均销量
                 BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                 monthlySaleQty.setAverageSaleQty(result.intValue());
 
                 // 滚动月销量
                 if (rollMonthSaleQtyMap.containsKey(materialCode)) {
-                    Integer saleQty = rollMonthSaleQtyMap.get(materialCode);
+                    MpHistorySaleRecord record = rollMonthSaleQtyMap.get(materialCode);
+                    Integer saleQty = ObjectUtils.defaultIfNull(record.getSaleQty(), 0);
                     monthlySaleQty.setRollTwelveMonthSaleQty(saleQty);
+                    Integer deliveryFrequency = ObjectUtils.defaultIfNull(record.getDeliveryFrequency(), 0);
+                    monthlySaleQty.setDeliveryFrequency(deliveryFrequency);
                 }
 
                 // 根据物料信息回写物料信息

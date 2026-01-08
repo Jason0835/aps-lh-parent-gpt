@@ -6,6 +6,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -30,25 +31,30 @@ public class ContinueSkuCalculator {
      * 并设置到groupContinueInfo对象中
      * 取高优先级量还是总净需求量？
      *
+     * @param context           排产上下文
      * @param groupPlanInfo     分组计划-TBR为结构
      * @param groupContinueInfo 分组对应的续作信息-TBR为结构
      */
-    public static void setContinueSkuPlanDemandQty(ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    public static void setContinueSkuPlanDemandQty(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+        String groupName = groupContinueInfo.getGroupName();
         List<MonthPlanProductionRequirePlanVo> groupPlanList = groupPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanList)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoGroupPlanLog(context, groupName));
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuMouldNumberMap)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName));
             return;
         }
         //提取续作Sku计划
         Set<String> skuMaterialDescSet = continueSkuMouldNumberMap.keySet();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName));
             return;
         }
         //分组合计续作Sku的计划量-高优先级
@@ -56,13 +62,14 @@ public class ContinueSkuCalculator {
         //设置续作Sku的高优级量及单模日硫化量
         continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
             List<MonthPlanProductionRequirePlanVo> planList = continueSkuGroupMap.get(materialDesc);
-            if (CollectionUtils.isEmpty(planList)) {
-                return;
-            }
             Integer planDemandQty = getContinueSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet());
+            if (CollectionUtils.isEmpty(planList)) {
+                log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc));
+                return;
+            }
             MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());
             cxContinueSkuInfo.setDayVulcanizationQty(plan.getDayVulcanizationQty());
         });

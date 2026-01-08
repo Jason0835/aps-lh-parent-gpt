@@ -20,7 +20,7 @@
 
     <!-- 批量插入原材料月差异数据 -->
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO raw_material_month_diff (
+        INSERT INTO T_RAW_MATERIAL_MONTH_DIFF (
         factory_code,
         year,
         month,

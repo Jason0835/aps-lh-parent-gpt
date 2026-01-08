@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.tlt.aps.annotation.DataImportCheck;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
@@ -109,6 +111,17 @@ public class LhMachineInfoServiceImpl extends AbstractDocService<LhMachineInfo> 
     @Override
     protected List<String> getCheckUniqueFields() {
         return new ArrayList<>(Arrays.asList("factoryCode", "machineCode"));
+    }
+
+
+    @DataImportCheck(
+            maxCount = 2,
+            messageKey = "ui.data.import.count.exceed",
+            params = {"#list.size()", "2"}
+    )
+    @Override
+    public AjaxResult importData(List<LhMachineInfo> list, boolean updateSupport, Long importLogId) {
+        return super.importData(list, updateSupport, importLogId);
     }
 
 
