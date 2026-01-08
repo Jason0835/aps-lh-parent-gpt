@@ -34,11 +34,16 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月度计划版本")
     private String monthPlanVersion;
 
+    @ApiModelProperty(value = "产品品类")
+    private String productType;
     /**
      * 调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构
      */
     @ApiModelProperty(value = "调整类型")
     private String adjustType;
+
+    @ApiModelProperty(value = "调整日")
+    private Integer adjustDay;
 
     @ApiModelProperty(value = "锁定截止日")
     private Integer lockEndDay;
@@ -52,6 +57,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "产品结构")
     private String structureName;
 
+    @ApiModelProperty(value = "结构收尾日")
+    private Integer structureDeadLine;
+
     /**
      * 排产机台,多个机台用逗号分隔
      */
@@ -63,6 +71,10 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList;
+
+    @ApiModelProperty(value = "月计划结构转产表")
+    private List<MpStructureAllocation> structureAllocationList;
+
 
     @ApiModelProperty(value = "销售订单池列表")
     private List<SalesOrderPool> salesOrderPoolList;
@@ -93,5 +105,8 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "日产能限制Map")
     private Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap;
+
+    @ApiModelProperty(value = "参数")
+    private Map<String, Object> paramMap;
 
 }

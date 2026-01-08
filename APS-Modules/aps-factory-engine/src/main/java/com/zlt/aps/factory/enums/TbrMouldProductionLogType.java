@@ -150,6 +150,14 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_NO_CONTINUE_GROUP_INFO("20-14-00", "分组计划为非在机分组(TBR结构)"),
     /**
+     * 20-14-01 分组计划为在机分组(TBR结构)数据设置
+     */
+    ON_LINE_GROUP_SET_UP_DATA_INFO("20-14-01", "分组计划为在机分组(TBR结构)数据设置"),
+    /**
+     * 20-14-01-01 在机分组计划没有在产机台
+     */
+    CONTINUE_GROUP_NO_ON_LINE_MACHINE_EMPTY("20-14-01-01", "在机分组计划没有在产机台"),
+    /**
      * 20-14-00-01 在机分组(TBR结构)没有排产计划
      */
     CONTINUE_GROUP_NO_PRODUCTION_PLAN_INFO("20-14-00-01", "在机分组(TBR结构)没有排产计划"),
@@ -286,6 +294,10 @@ public enum TbrMouldProductionLogType {
      * 30-03-01 在机结构续作Sku开始模具排产
      */
     CONTINUE_GROUP_CONTINUE_SKU_START_MOULD_PRODUCTION("30-03-01", "在机结构续作Sku开始模具排产"),
+    /**
+     * 30-03-00 在机结构续作Sku使用模具排产
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_FOR_MOULD_PRODUCTION("30-03-00", "在机结构续作Sku使用模具排产"),
     /**
      * 30-03-01-01 在机结构续作Sku开始模具排产当前阶段没有排产量
      */

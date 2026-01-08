@@ -80,10 +80,12 @@ public class DeductMouldScheduler {
         //收尾日
         context.setDeadLineDate(deductMouldVo.getDeadline());
         // 1、第1天：延续上个月不变
-        DailyScheduleVo firstDayVo = createFirstDaySchedule(deductMouldVo, context.getCurrentDate());
-        schedules.add(firstDayVo);
-        updateRemainingQuantities(deductMouldVo, firstDayVo);
-        context.setCurrentDate(getValidDate(context.getCurrentDate() + 1, deductMouldVo, schedules));
+        if (deductMouldVo.isFirstDayDelay()){
+            DailyScheduleVo firstDayVo = createFirstDaySchedule(deductMouldVo, context.getCurrentDate());
+            schedules.add(firstDayVo);
+            updateRemainingQuantities(deductMouldVo, firstDayVo);
+            context.setCurrentDate(getValidDate(context.getCurrentDate() + 1, deductMouldVo, schedules));
+        }
 
         // 初始化：第1天延续上月配置
         context.setPreDayMachines(deductMouldVo.getMachinesAssigned());

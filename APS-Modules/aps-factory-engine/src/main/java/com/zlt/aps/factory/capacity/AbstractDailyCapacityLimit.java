@@ -30,7 +30,7 @@ public abstract class AbstractDailyCapacityLimit {
                                         List<MpStructureAllocation> mpStructAllocList){
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i< 31; i++){
+        for (int i = startDay; i< FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
                 dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
@@ -40,6 +40,7 @@ public abstract class AbstractDailyCapacityLimit {
             setMaxLhMachinesWithEmbryoTypes(mpStructAllocList,i,dailyCapacityLimitVo);
             // 2、计算每日硫化机台数、每日胎胚种类数
             calcLhMachinesWithEmbryoTypes(mpProdFinalList,i,dailyCapacityLimitVo,null);
+            dailyCapacityLimitVoMap.put(i,dailyCapacityLimitVo);
         }
         return dailyCapacityLimitVoMap;
     }
@@ -60,8 +61,8 @@ public abstract class AbstractDailyCapacityLimit {
         int iMaxEmbryoTypes = 0;
         for (MpStructureAllocation strutAllocVo: mpStructAllocList){
             if (iDay >= strutAllocVo.getBeginDay() && iDay <= strutAllocVo.getEndDay()){
-                iMaxLhMachines += dailyCapacityLimitVo.getMaxLhMachines();
-                iMaxEmbryoTypes += dailyCapacityLimitVo.getMaxEmbryoTypes();
+                iMaxLhMachines += strutAllocVo.getMaxLhMachineCount();
+                iMaxEmbryoTypes += strutAllocVo.getMaxEmbryoCodeCount();
             }
         }
         dailyCapacityLimitVo.setMaxLhMachines(iMaxLhMachines);
@@ -197,7 +198,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @return
      */
     public  String getEmbryoCodeField(){
-        return "embryoCode";
+        return "mainMaterialDesc";
     }
 
     /**

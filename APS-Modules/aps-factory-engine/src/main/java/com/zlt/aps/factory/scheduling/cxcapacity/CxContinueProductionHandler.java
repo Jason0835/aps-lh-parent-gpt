@@ -47,7 +47,6 @@ public class CxContinueProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //取得最早收尾的硫化组
         EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context);
-//        CxLhProductionHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhGroup();
         if (null == earliestConclusionLhGroup) {
             //todo 记录日志
             return;

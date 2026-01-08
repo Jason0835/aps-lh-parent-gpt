@@ -125,11 +125,29 @@ public class TbrProductionGroupLogRecorder {
      * @return
      */
     public static String addGroupNoContinueGroupLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有续作信息，非在机结构====",
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 为非在机结构，没有续作Sku信息====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_CONTINUE_GROUP_INFO, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构数据设置日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构：%s设置续作Sku需求量及在机结构配比硫化组====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名
+     * @return
+     */
+    public static String addOnLineGroupSetUpDataLog(Context context, String groupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构：%s设置续作Sku需求量及在机结构配比硫化组====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.ON_LINE_GROUP_SET_UP_DATA_INFO, logContent);
         return logContent;
     }
 
@@ -354,6 +372,7 @@ public class TbrProductionGroupLogRecorder {
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.REVERSE_MACHINE_SELECTED_NEXT_GROUP_PLAN, logContent);
         return logContent;
     }
+
     /**
      * 增加没有获取到下一个优先级分组数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到下一组优先级的分组计划====

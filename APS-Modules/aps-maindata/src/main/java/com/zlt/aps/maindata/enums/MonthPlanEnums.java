@@ -140,6 +140,16 @@ public enum MonthPlanEnums {
      */
     MONTH_AVG_HIS_SUB_MONTH("SYS0103002", "单位：月，月均销量统计之前月份的历史销售记录"),
     /**
+     * SYS0206001 单台成型机的月度生产计划锁定期天数
+     */
+    SINGLE_CX_MACHINE_LOCK_DAYS("SYS0206001", "单台成型机的月度生产计划锁定期天数"),
+
+    /**
+     * SYS0206002 多台成型机的月度生产计划锁定期天数
+     */
+    MULTI_CX_MACHINE_LOCK_DAYS("SYS0206002", "多台成型机的月度生产计划锁定期天数"),
+
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001","单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),

@@ -342,6 +342,9 @@ public class ProductionMouldInfoVo implements Serializable {
             return false;
         }
         for (int day = startDay; day <= endDay; day++) {
+            if (!productionDaySet.contains(day)) {
+                return false;
+            }
             if (finishDaySet.contains(day)) {
                 return false;
             }
@@ -360,5 +363,28 @@ public class ProductionMouldInfoVo implements Serializable {
             return BigDecimal.ZERO.intValue();
         }
         return associationMaterialSet.size();
+    }
+
+    /**
+     * 获取模具剩余产能
+     * 排产天数 - 已排产日
+     *
+     * @return
+     */
+    public Integer getLeftOverCapacity() {
+        if (CollectionUtils.isEmpty(productionDaySet)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return productionDaySet.size();
+        }
+        Set<Integer> leftOverSet = new HashSet<>();
+        productionDaySet.forEach(needProductionDay -> {
+            if (dayProductionInfo.containsKey(needProductionDay)) {
+                return;
+            }
+            leftOverSet.add(needProductionDay);
+        });
+        return leftOverSet.size();
     }
 }
