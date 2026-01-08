@@ -460,16 +460,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     monthSurplusFuture, productStockFuture, planMonitorFuture
             ).join();
 
-            log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
-
         } catch (CompletionException e) {
             // 异常处理
             Throwable throwable = e.getCause();
             log.error("初始化任务执行失败! 失败原因:{}", throwable.getMessage(), throwable);
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
         } finally {
+            watch.stop();
             ThreadPoolUtil.shutdown();
         }
+        log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
     }
 
 

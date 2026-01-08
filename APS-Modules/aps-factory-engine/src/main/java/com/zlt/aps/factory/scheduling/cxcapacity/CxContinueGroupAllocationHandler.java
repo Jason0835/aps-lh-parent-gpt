@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.Context;
@@ -60,6 +61,7 @@ public class CxContinueGroupAllocationHandler {
             }
             List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo, mouldShellMap);
             if (CollectionUtils.isEmpty(singleGroupAllocationResult)) {
+                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName));
                 return;
             }
             allAllocationResult.addAll(singleGroupAllocationResult);
@@ -279,6 +281,8 @@ public class CxContinueGroupAllocationHandler {
             //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
             Integer maxMouldNumber = resultList.stream().mapToInt(DailyScheduleVo::getSkuMachines).max().getAsInt() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, materialDesc, maxMouldNumber);
+            String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo));
             //2、将排产结果，逐日分配到模具上，按排产日由小到大排序
             resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
             resultList.forEach(dailySchedule -> {
@@ -298,86 +302,6 @@ public class CxContinueGroupAllocationHandler {
             });
         });
     }
-
-    /**
-     * 续作Sku使用续作模具排产
-     * 可能需要进行降膜排产
-     *
-     * @param context            排产上下文
-     * @param groupPlanInfo      分组计划信息对象
-     * @param continueSkuInfoMap 续作Sku信息
-     * @param assignedLhGroupNo  选中的硫化组集合
-     */
-    private static void productionContinueSku(TbrProductionContext context, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap, Set<Integer> assignedLhGroupNo) {
-        Set<Integer> stopDays = context.getStopDays();
-        Integer monthDays = context.getMonthDays();
-        ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
-        continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty().intValue();
-            //降膜排产
-            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(monthDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
-            List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
-            //分配结果
-            if (CollectionUtils.isEmpty(resultList)) {
-                //todo 记录日志
-                return;
-            }
-            //挑选的模具 使用最大的模具数
-            Integer maxMouldNumber = resultList.stream().mapToInt(DailyScheduleVo::getSkuMachines).max().getAsInt() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, materialDesc, maxMouldNumber);
-//            List<CxLhProductionHelper> allocationGroupList = ContinueSkuCalculator.continueSkuAllocationLhGroup(context, groupPlanInfo, assignedLhGroupNo, cxContinueSkuInfo);
-//            if (CollectionUtils.isEmpty(allocationGroupList)) {
-//                //todo 记录日志
-//                return;
-//            }
-//            //按硫化组编号排序
-//            allocationGroupList.sort(Comparator.comparing(CxLhProductionHelper::getLhGroupNo));
-            //按排产日进行排序
-            resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
-            resultList.forEach(dailySchedule -> {
-                Integer lhMachineCount = dailySchedule.getSkuMachines();
-                Integer sumProductionQty = dailySchedule.getSkuQuantity();
-                Integer productionDay = dailySchedule.getScheduleDate();
-                for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= lhMachineCount; lhGroupNo++) {
-                    Integer productionQty = Math.min(sumProductionQty, maxDayQty);
-                    Integer startIndex = (lhGroupNo - BigDecimal.ONE.intValue()) * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                    Integer endIndex = lhGroupNo * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                    List<ProductionMouldInfoVo> doubleMouldList = selectMouldList.subList(startIndex, endIndex);
-                    CxLhMouldProductionCalculator.continueSkuLhProductionHandler(context, groupPlanInfo, cxContinueSkuInfo, productionDay, productionQty, doubleMouldList);
-                    sumProductionQty = sumProductionQty - productionQty;
-                }
-
-//                List<CxLhProductionHelper> selectedLhGroupList = allocationGroupList.subList(BigDecimal.ZERO.intValue(), lhMachineCount);
-//                for (CxLhProductionHelper lhGroupInfo : selectedLhGroupList) {
-//                    Integer productionQty = Math.min(sumProductionQty, maxDayQty);
-//                    CxLhMouldProductionCalculator.continueSkuLhProductionHandler(context, groupPlanInfo, cxContinueSkuInfo, productionDay, productionQty, lhGroupInfo);
-//                    sumProductionQty = sumProductionQty - productionQty;
-//                }
-            });
-        });
-    }
-
-    /**
-     * @param context
-     * @param groupPlanInfo
-     * @param groupContinueInfo
-     * @return
-     */
-    private static List<CxMachineAllocationPlanHelper> buildProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
-        BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
-        //最少需要的机台数
-        Integer needMinCxMachineCount = needCount.setScale(0, RoundingMode.UP).intValue();
-        //续作Sku高优先级排产
-        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
-        List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
-
-
-        Integer productionCount = productionCxMachineCodeSet.size();
-
-
-        return null;
-    }
-
 
     /**
      * 获取在机结构，可释放机台数和续作收尾时间点

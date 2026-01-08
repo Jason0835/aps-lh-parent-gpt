@@ -144,6 +144,10 @@ public class CxCapacityAllocationHandler {
         if (null == continueSkuMap) {
             continueSkuMap = new HashMap<>();
         }
+        //如果分配结束点 + 停产 = 周期天数，则分配结束点调整到最末
+        if (endAllocationDay + stopDayInfo.size() == monthDays) {
+            endAllocationDay = monthDays;
+        }
         return new CxMachineAllocationPlanHelper(cxMachineBaseInfo.getCxMachineCode(), groupPlanInfo, lhRatio, continueSkuMap, allocationDay, startAllocationDay, endAllocationDay);
     }
 
@@ -171,7 +175,8 @@ public class CxCapacityAllocationHandler {
         reverseFindSet.forEach(cxMachineCode -> reverseCxMachineList.add(productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode)));
         //最先收尾的先-剩余天数多的
         if (CollectionUtils.isEmpty(reverseCxMachineList)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context));
             return;
         }
         //收尾机台
@@ -200,34 +205,39 @@ public class CxCapacityAllocationHandler {
         }
         List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
         if (CollectionUtils.isEmpty(allocationList)) {
-            //todo 记录日志 空机台不是收尾
+            //记录日志 空机台不是收尾
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context, cxMachineInfo));
             return;
         }
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         if (remainingDays <= BigDecimal.ZERO.intValue()) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
             return;
         }
         //成型剩余产能能覆盖结构剩余排产净需求量
         Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(estimateGroupCxAllocationMap, cxMachineInfo);
         if (CollectionUtils.isEmpty(capacityCoverageMap)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
             return;
         }
         //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
         Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(capacityCoverageMap, cxMachineInfo);
         if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
             return;
         }
         //获取合适优先级的一个结构
         ProductionPlanGroupInfo allocationGroupPlan = selectedOne(enableGroupPlanMap, cxMachineInfo);
         if (null == allocationGroupPlan) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
             return;
         }
+        log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
-        //cxMachineInfo.getRatio();
         Integer lhRatio = lhRatioInfo.getMaxLhMachineCount();
         //todo 判断成型鼓是否符合条件
         Integer needAllocationDays = allocationGroupPlan.calculateNeedDays(lhRatio);
@@ -242,6 +252,7 @@ public class CxCapacityAllocationHandler {
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
         if (leftOver >= 5) {
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineFindNextGroupPlanLog(context, cxMachineInfo));
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
         }
     }

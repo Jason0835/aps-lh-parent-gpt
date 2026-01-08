@@ -14,6 +14,7 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
@@ -257,7 +258,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         List<CxMachineBaseInfoVo> cxMachineInfoList = factoryMonthPlanCxInfoMapper.getMachineBaseInfo(factoryCode);
         if (CollectionUtils.isEmpty(cxMachineInfoList)) {
-            log.info(TbrProductionGroupLogRecorder.addCxMachineInfoEmptyLog(context));
+            log.info(TbrBeforeProductionGroupLogRecorder.addCxMachineInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
@@ -620,7 +621,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //获取月计划-成型维修停机信息
         List<CxDevicePlanShutInfoVo> cxStopList = factoryMonthPlanCxInfoMapper.getDevicePlanShutInfo(factoryCode, productionStartDate, productionEndDate);
         if (CollectionUtils.isEmpty(cxStopList)) {
-            log.info(TbrProductionGroupLogRecorder.addCxMachineMaintenanceInfoEmptyLog(context));
+            log.info(TbrBeforeProductionGroupLogRecorder.addCxMachineMaintenanceInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         //按成型机分组

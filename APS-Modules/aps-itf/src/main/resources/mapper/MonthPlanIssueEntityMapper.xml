@@ -148,7 +148,7 @@
         SELECT * FROM (
         <foreach collection="list" item="item" separator=" UNION ALL ">
             SELECT
-            #{item.month} AS `MONTH`,
+            #{item.month} AS MONTH,
             #{item.materialCode} AS MATERIAL_CODE,
             #{item.constructionStage} AS CONSTRUCTION_STAGE,
             #{item.demandQty} AS DEMAND_QTY,
@@ -158,7 +158,7 @@
         ) AS t
         WHERE NOT EXISTS (
         SELECT 1 FROM CX_MONTH_PLAN_ISSUE
-        WHERE `MONTH` = t.MONTH AND MATERIAL_CODE = t.MATERIAL_CODE
+        WHERE MONTH = t.MONTH AND MATERIAL_CODE = t.MATERIAL_CODE AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -168,7 +168,7 @@
             CONSTRUCTION_STAGE = #{item.constructionStage},
             DEMAND_QTY = #{item.demandQty},
             REMARK = #{item.remark}
-            WHERE `MONTH` = #{item.month} AND MATERIAL_CODE = #{item.materialCode} AND DATA_VERSION =
+            WHERE MONTH = #{item.month} AND MATERIAL_CODE = #{item.materialCode} AND DATA_VERSION =
             #{item.dataVersion}
         </foreach>
     </update>
