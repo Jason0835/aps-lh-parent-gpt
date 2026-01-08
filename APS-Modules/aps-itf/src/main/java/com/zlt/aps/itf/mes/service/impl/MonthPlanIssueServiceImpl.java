@@ -1,14 +1,12 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.MonthPlanIssueEntityMapper;
@@ -59,7 +57,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
     @Autowired
     private MonthPlanIssueEntityMapper monthPlanIssueEntityMapper;
 
-    private static void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<CxMonthPlanIssue> cxMonthPlanIssuesList) {
+    private static void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<CxMonthPlanIssue> cxMonthPlanIssuesList, String dataVersion) {
         Set<Map.Entry<String, FactoryMonthPlanProductionFinalResult>> entrySet = groupMap.entrySet();
         for (Map.Entry<String, FactoryMonthPlanProductionFinalResult> entry : entrySet) {
             FactoryMonthPlanProductionFinalResult value = entry.getValue();
@@ -67,6 +65,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
             cxMonthPlanIssue.setMonth(value.getMonth());
             cxMonthPlanIssue.setMaterialCode(value.getMaterialCode());
             cxMonthPlanIssue.setConstructionStage(value.getConstructionStage());
+            cxMonthPlanIssue.setDataVersion(dataVersion);
             Map<String, Object> params = value.getParams();
             BigDecimal totalDayResultOld = (BigDecimal) params.get("totalDayResult");
             cxMonthPlanIssue.setDemandQty(totalDayResultOld);
@@ -85,28 +84,23 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         if (CollectionUtils.isEmpty(monthPlanIssueList)) {
             return AjaxResult.success();
         }
-        List<MonthPlanIssue> monthPlanIssues = new ArrayList<>();
-        Map<String, FactoryMonthPlanProductionFinalResult> groupMap = new HashMap<>(16);
-        genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues);
-
-        List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
-        genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList);
-        try {
-            // 切换MES数据源 start
-            DynamicDataSourceContextHolder.push(DataSource.MES);
-            monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
-            monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
-            // 成型月计划
-            monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
-            monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
-        } finally {
-            DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
-        }
-        // 发送MQ
-        AjaxResult ajaxResult = null;
         // 获取下发接口版本号
         String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.SYNC_MONTH_PLAN.getCode());
+
+        List<MonthPlanIssue> monthPlanIssues = new ArrayList<>();
+        Map<String, FactoryMonthPlanProductionFinalResult> groupMap = new HashMap<>(16);
+        genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues, dataVersion);
+
+        List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
+        genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList, dataVersion);
+
+        monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
+        monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
+        // 成型月计划
+        monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
+        monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
+        // 发送MQ
+        AjaxResult ajaxResult = null;
         String factoryCode = monthPlanIssueList.get(0).getFactoryCode();
         String monthPlanVersion = monthPlanIssueList.get(0).getMonthPlanVersion();
         String productionVersion = monthPlanIssueList.get(0).getProductionVersion();
@@ -115,7 +109,6 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
             SyncParamsVO syncParamsVO = new SyncParamsVO();
             syncParamsVO.setSyncKey(ItfSyncKeyEnum.SYNC_MONTH_PLAN.getCode());
             syncParamsVO.setDataVersion(dataVersion);
-//            syncParamsVO.setDataVersion("1767835129632");
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("monthPlanVersion", monthPlanVersion);
@@ -145,7 +138,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         return ajaxResult;
     }
 
-    private void genMonthPlanIssueList(List<FactoryMonthPlanProductionFinalResult> monthPlanIssueList, Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<MonthPlanIssue> monthPlanIssues) {
+    private void genMonthPlanIssueList(List<FactoryMonthPlanProductionFinalResult> monthPlanIssueList, Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<MonthPlanIssue> monthPlanIssues, String dataVersion) {
         List<List<FactoryMonthPlanProductionFinalResult>> splitList = ScmListUtils.getSplitList(monthPlanIssueList, 1000);
         for (List<FactoryMonthPlanProductionFinalResult> finalResultList : splitList) {
             for (FactoryMonthPlanProductionFinalResult finalResult : finalResultList) {
@@ -186,7 +179,6 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
                     Object fieldValue = ReflectUtils.getFieldValue(finalResult, "day" + i);
                     ReflectUtils.setFieldValue(monthPlanIssue, "day" + i, fieldValue);
                 }
-                String dataVersion = String.valueOf(System.currentTimeMillis());
                 monthPlanIssue.setDataVersion(dataVersion);
                 monthPlanIssue.setCompanyCode(finalResult.getFactoryCode());
                 monthPlanIssue.setFactoryCode(finalResult.getFactoryCode());
