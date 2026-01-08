@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -8,6 +9,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -45,7 +47,7 @@ public class DpDemandPlan extends BaseEntity {
      * 年份
      */
     @Excel(name = "ui.data.column.demandPlan.year", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "年份", name = "year")
+    @ApiModelProperty(value = "年", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
@@ -53,38 +55,23 @@ public class DpDemandPlan extends BaseEntity {
      * 月份
      */
     @Excel(name = "ui.data.column.demandPlan.month", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "月份", name = "month")
+    @ApiModelProperty(value = "月", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
 
-    /**
-     * 需求计划版本号
-     */
-    @Excel(name = "ui.data.column.demandPlan.monthPlanVersion")
-    @ApiModelProperty(value = "需求计划版本号", name = "monthPlanVersion")
-    @TableField(value = "MONTH_PLAN_VERSION")
-    private String monthPlanVersion;
 
     /**
      * 优先级(订单类型)
      */
-    @Excel(name = "ui.data.column.demandPlan.orderPriority")
     @ApiModelProperty(value = "优先级(订单类型)", name = "orderPriority")
     @TableField(value = "ORDER_PRIORITY")
     private String orderPriority;
 
-    /**
-     * 供应链优先级
-     */
-    @Excel(name = "ui.data.column.demandPlan.scmPriority")
-    @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
-    @TableField(value = "SCM_PRIORITY")
-    private String scmPriority;
+
 
     /**
      * 是否替换料
      */
-    @Excel(name = "ui.data.column.demandPlan.isAlternateMaterial", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
     @TableField(value = "IS_ALTERNATE_MATERIAL")
     private String isAlternateMaterial;
@@ -98,13 +85,19 @@ public class DpDemandPlan extends BaseEntity {
     private String productTypeCode;
 
     /**
-     * 库位类别
+     * 类型
      */
-    @Excel(name = "ui.data.column.demandPlan.locationType")
-    @ApiModelProperty(value = "库位类别", name = "locationType")
+    @Excel(name = "ui.data.column.demandPlan.locationType", dictType = "biz_stor_type")
+    @ApiModelProperty(value = "类型", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
-
+    /**
+     * 需求计划版本号
+     */
+    @Excel(name = "ui.data.column.demandPlan.monthPlanVersion")
+    @ApiModelProperty(value = "需求计划版本号", name = "monthPlanVersion")
+    @TableField(value = "MONTH_PLAN_VERSION")
+    private String monthPlanVersion;
     /**
      * 品牌
      */
@@ -112,6 +105,14 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
+
+    /**
+     * 供应链优先级
+     */
+    @Excel(name = "ui.data.column.demandPlan.scmPriority", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
+    @TableField(value = "SCM_PRIORITY")
+    private String scmPriority;
 
     /**
      * 产品结构
@@ -160,15 +161,6 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "年周号", name = "yearWeek")
     @TableField(value = "YEAR_WEEK")
     private String yearWeek;
-
-    /**
-     * 动平衡
-     */
-    @Excel(name = "ui.data.column.demandPlan.isDynamicBalance", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
-    @TableField(value = "IS_DYNAMIC_BALANCE")
-    private String isDynamicBalance;
-
     /**
      * 均匀性
      */
@@ -176,7 +168,13 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
-
+    /**
+     * 动平衡
+     */
+    @Excel(name = "ui.data.column.demandPlan.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
     /**
      * 订单量
      */
@@ -196,7 +194,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 月结库存余量
      */
-    @Excel(name = "ui.data.column.demandPlan.remainingQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月结库存余量", name = "remainingQty")
     @TableField(value = "REMAINING_QTY")
     private Integer remainingQty;
@@ -204,7 +201,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.demandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
     private Integer averageSaleQty;
@@ -285,7 +281,7 @@ public class DpDemandPlan extends BaseEntity {
      * 常规储备
      */
     @Excel(name = "ui.data.column.demandPlan.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @ApiModelProperty(value = "常规排产储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
     private Integer conventionReserveQty;
 
@@ -304,6 +300,21 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "最小投产量值", name = "minProductionQty")
     @TableField(value = "MIN_PRODUCTION_QTY")
     private Integer minProductionQty;
+
+    @Excel(name = "ui.data.column.demandPlan.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
+    @Excel(name = "ui.data.column.demandPlan.updateTime")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(
+        value = "UPDATE_TIME",
+        fill = FieldFill.INSERT_UPDATE,
+        jdbcType = JdbcType.TIMESTAMP
+    )
+    private Date updateTime;
 
     /**
      * 计划类型
@@ -356,7 +367,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 层级
      */
-    @Excel(name = "ui.data.column.demandPlan.hierarchy")
     @ApiModelProperty(value = "层级", name = "hierarchy")
     @TableField(value = "HIERARCHY")
     private String hierarchy;
@@ -364,7 +374,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 速级
      */
-    @Excel(name = "ui.data.column.demandPlan.speed")
     @ApiModelProperty(value = "速级", name = "speed")
     @TableField(value = "SPEED")
     private String speed;
@@ -372,7 +381,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 是否重要客户
      */
-    @Excel(name = "ui.data.column.demandPlan.isImportantCustom", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否重要客户", name = "isImportantCustom")
     @TableField(value = "IS_IMPORTANT_CUSTOM")
     private String isImportantCustom;
@@ -380,7 +388,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 是否必保计划
      */
-    @Excel(name = "ui.data.column.demandPlan.isEnsurePlan", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否必保计划", name = "isEnsurePlan")
     @TableField(value = "IS_ENSURE_PLAN")
     private String isEnsurePlan;
@@ -388,7 +395,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 是否紧急订单
      */
-    @Excel(name = "ui.data.column.demandPlan.isEmergency", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否紧急订单", name = "isEmergency")
     @TableField(value = "IS_EMERGENCY")
     private String isEmergency;
@@ -396,7 +402,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 是否欠产
      */
-    @Excel(name = "ui.data.column.demandPlan.isDebitPlan", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否欠产", name = "isDebitPlan")
     @TableField(value = "IS_DEBIT_PLAN")
     private String isDebitPlan;
@@ -405,7 +410,6 @@ public class DpDemandPlan extends BaseEntity {
      * 期望交期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.demandPlan.deliveryDateDue", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "期望交期", name = "deliveryDateDue")
     @TableField(value = "DELIVERY_DATE_DUE")
     private Date deliveryDateDue;
@@ -413,10 +417,11 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 是否EXCEL导入
      */
-    @Excel(name = "ui.data.column.demandPlan.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
+
+
 
 
     /**
