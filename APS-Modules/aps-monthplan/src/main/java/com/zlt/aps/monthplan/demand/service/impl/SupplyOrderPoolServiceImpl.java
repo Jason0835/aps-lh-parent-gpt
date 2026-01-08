@@ -3,15 +3,20 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -61,6 +66,8 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPool>  implements ISupplyOrderPoolService {
     private static final int DAYS_PER_MONTH = 30;
+
+    private final DpAreaEntityMapper dpAreaEntityMapper;
 
     private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
 
@@ -635,7 +642,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setThreeAverageQty(monthlySaleQty.getPassThreeMonthSaleQty());
             supplyOrderPool.setSixAverageQty(monthlySaleQty.getPassSixMonthSaleQty());
             supplyOrderPool.setDeliveryFrequency(monthlySaleQty.getDeliveryFrequency());
-            supplyOrderPool.setSaleArea(monthlySaleQty.getSaleArea());
             supplyOrderPool.setAverageSaleQty(monthlySaleQty.getAverageSaleQty());
             BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
             supplyOrderPool.setStockLimit(stockLimit.intValue());
@@ -646,6 +652,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setAverageSaleQty(BigDecimal.ZERO.intValue());
             supplyOrderPool.setStockLimit(BigDecimal.ZERO.intValue());
         }
+        supplyOrderPool.setSaleArea(this.getSaleAreaByMonthlySaleQty(monthlySaleQty));
         //   (3)通过成品库存表，获取超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
         List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.getMpFinishedProductStockByMaterialCode(supplyOrderPool.getMaterialCode());
         if(CollectionUtils.isNotEmpty(finishedProductStocks)) {
@@ -668,6 +675,28 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         int  productionMonth = this.factoryMonthPlanProductionFinalResultService.getProductionMonthInLastTwelveMonth(supplyOrderPool.getMaterialCode());
         supplyOrderPool.setStructureFrequency(productionMonth);
         return supplyOrderPool;
+    }
+
+    private String getSaleAreaByMonthlySaleQty(MpMonthlySaleQty monthlySaleQty) {
+        if(null == monthlySaleQty || StringUtils.isBlank(monthlySaleQty.getSaleArea())) {
+            return StringUtils.EMPTY;
+        }
+        Set<String> areaSet = Sets.newHashSet();
+        areaSet.addAll(Arrays.asList(monthlySaleQty.getSaleArea().split(StringConstant.COMMA)));
+        // 加载区域
+        LambdaQueryWrapper<DpArea> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(DpArea::getAreaCode, areaSet);
+        queryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<DpArea> areas = dpAreaEntityMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(areas)) {
+            return StringUtils.EMPTY;
+        }
+        List<DpArea> filterAreas = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark())).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(filterAreas)) {
+            return StringUtils.EMPTY;
+        }
+        JsonI18nConvertUtils.conventJsonI18n(filterAreas, DpArea.class);
+        return filterAreas.stream().map(DpArea::getAreaNameI18n).distinct().collect(Collectors.joining(StringConstant.COMMA));
     }
 
     @Override
