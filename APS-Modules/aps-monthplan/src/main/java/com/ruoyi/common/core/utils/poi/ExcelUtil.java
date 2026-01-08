@@ -1553,10 +1553,12 @@ public class ExcelUtil<T> {
                     }
                 } else if (cell.getCellType() == CellType.STRING) {
                     val = cell.getStringCellValue();
+                    val = StringUtils.trim(val.toString());
                 } else if (cell.getCellType() == CellType.BOOLEAN) {
                     val = cell.getBooleanCellValue();
                 } else if (cell.getCellType() == CellType.ERROR) {
                     val = cell.getStringCellValue();
+                    val = StringUtils.trim(val.toString());
                 }
 
             }
@@ -1611,6 +1613,7 @@ public class ExcelUtil<T> {
                     }
                 } else if (cell.getCellType() == CellType.STRING) {
                     val = cell.getStringCellValue();
+                    val = StringUtils.trim(val.toString());
                 } else if (cell.getCellType() == CellType.BOOLEAN) {
                     val = cell.getBooleanCellValue();
                 } else if (cell.getCellType() == CellType.ERROR) {
