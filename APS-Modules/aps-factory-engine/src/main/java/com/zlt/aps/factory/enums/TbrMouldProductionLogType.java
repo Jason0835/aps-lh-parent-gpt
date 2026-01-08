@@ -134,6 +134,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_SUM_CAPACITY_INFO("20-13-02", "分组总产能预算"),
     /**
+     * 20-13-04 汇总
+     */
+    SUMMARY_INFO_SUM("20-13-04", "汇总"),
+    /**
      * 20-13-03 分组预算机台数
      */
     GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-13-03", "分组预算机台数"),

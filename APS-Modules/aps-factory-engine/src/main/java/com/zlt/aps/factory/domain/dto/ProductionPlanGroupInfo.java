@@ -114,6 +114,22 @@ public class ProductionPlanGroupInfo {
     private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
 
     /**
+     * 获取所有有效需求量
+     *
+     * @return
+     */
+    public Integer getAllDemandQty() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = groupPlanData.stream().filter(singlePlan -> singlePlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return effectiveList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
      * 粗步计算 结构需求量需要的成型产能分配
      * 结构有效总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
      * 保留1位小数

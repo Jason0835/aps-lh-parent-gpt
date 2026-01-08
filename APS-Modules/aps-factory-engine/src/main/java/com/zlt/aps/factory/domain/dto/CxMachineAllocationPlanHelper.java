@@ -97,6 +97,18 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 分配的分组名
+     *
+     * @return
+     */
+    public String getAllocationGroup() {
+        if (null == productionPlanInfo) {
+            return "";
+        }
+        return productionPlanInfo.getGroupName();
+    }
+
+    /**
      * 增加排产计划
      * 模具排产后，需增加
      *
