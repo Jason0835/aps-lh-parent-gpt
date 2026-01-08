@@ -112,6 +112,10 @@ public class ProductionPlanGroupInfo {
      */
     @Deprecated
     private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
+    /**
+     * 是否分配完毕
+     */
+    private Integer isAllocationFinish;
 
     /**
      * 获取所有有效需求量
@@ -382,6 +386,10 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getRemainingProductionQty() {
+        //标记是否分配完毕
+        if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
+            return BigDecimal.ZERO.intValue();
+        }
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return BigDecimal.ZERO.intValue();
         }

@@ -641,8 +641,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer startDay = selectedCxMachine.getAllocationStartDay();
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(addHelper);
-        //TODO 对成型机台进行模拟模具排产
+        //对成型机台进行模拟模具排产
+
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
+        if(needAllocationDays <= remainingDays){
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+        }
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);

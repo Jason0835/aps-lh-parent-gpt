@@ -105,6 +105,8 @@ public class CxMouldProductionHandler {
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
         buildNewLhConclusionInfo(cxMachineInfo, cxLhRatio.getLhMachineMaxQty(), productionPlan);
+        //20260108 开启本轮可排产
+        productionPlanInfo.setThisRoundCanProduction();
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
     }
 
