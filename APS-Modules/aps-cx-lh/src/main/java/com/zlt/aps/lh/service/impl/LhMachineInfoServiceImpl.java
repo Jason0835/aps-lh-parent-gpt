@@ -114,15 +114,15 @@ public class LhMachineInfoServiceImpl extends AbstractDocService<LhMachineInfo> 
     }
 
 
-//    @DataImportCheck(
-//            maxCount = 2,
-//            messageKey = "ui.data.import.count.exceed",
-//            params = {"#list.size()", "2"}
-//    )
-//    @Override
-//    public AjaxResult importData(List<LhMachineInfo> list, boolean updateSupport, Long importLogId) {
-//        return super.importData(list, updateSupport, importLogId);
-//    }
+    @DataImportCheck(
+            maxCount = 2,
+            messageKey = "ui.data.import.count.exceed",
+            params = {"#list.size()", "2"}
+    )
+    @Override
+    public AjaxResult importData(List<LhMachineInfo> list, boolean updateSupport, Long importLogId) {
+        return super.importData(list, updateSupport, importLogId);
+    }
 
 
 }
