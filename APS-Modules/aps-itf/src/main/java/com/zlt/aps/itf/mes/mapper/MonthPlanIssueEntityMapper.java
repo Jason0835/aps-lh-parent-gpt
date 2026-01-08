@@ -1,6 +1,7 @@
 package com.zlt.aps.itf.mes.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.CxMonthPlanIssue;
 import com.zlt.aps.itf.vo.MonthPlanIssue;
 import org.apache.ibatis.annotations.Mapper;
@@ -22,8 +23,9 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-24
  */
+@DS(DataSource.MES)
 @Mapper
-public interface MonthPlanIssueEntityMapper extends BaseMapper<MonthPlanIssue> {
+public interface MonthPlanIssueEntityMapper {
 
     /**
      * 批量新增

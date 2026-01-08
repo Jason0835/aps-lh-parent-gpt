@@ -137,4 +137,14 @@ public interface IFactoryMonthPlanProdFinalRemoteService {
     @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
     @PostMapping("/factoryMonthPlanProdFinal/getProductionMonthType")
     AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal condition);
+
+    /**
+     * 下发月计划
+     *
+     * @param factoryMonthPlanProdFinal 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @PostMapping("/factoryMonthPlanProdFinal/issueMonthPlan")
+    public AjaxResult issueMonthPlan(@RequestBody FactoryMonthPlanProdFinal factoryMonthPlanProdFinal);
 }

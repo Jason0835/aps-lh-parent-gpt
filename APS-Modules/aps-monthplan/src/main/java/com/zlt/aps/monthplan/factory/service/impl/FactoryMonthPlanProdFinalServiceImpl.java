@@ -20,6 +20,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -1211,7 +1212,10 @@ public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanPr
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
                 .set(FactoryMonthPlanProductionFinalResult::getIsRelease, ReleaseStatusEnum.RELEASING.getCode());
         factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
-        mesItfService.issueMonthPlan(monthPlanProdFinalList);
+        AjaxResult ajaxResult = mesItfService.issueMonthPlan(monthPlanProdFinalList);
+        if (AjaxResultUtils.checkAjaxError(ajaxResult)) {
+            throw new RuntimeException(String.valueOf(ajaxResult.get(AjaxResult.MSG_TAG)));
+        }
         // 更新发布状态=已发布
         updateWrapper.clear();
         updateWrapper

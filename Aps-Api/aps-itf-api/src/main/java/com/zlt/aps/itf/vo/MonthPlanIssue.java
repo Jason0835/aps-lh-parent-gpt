@@ -462,5 +462,20 @@ public class MonthPlanIssue implements Serializable {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    /**
+     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage")
+    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @TableField(value = "CONSTRUCTION_STAGE")
+    private String constructionStage;
+
+    /**
+     * 文字示方书号
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.textNo")
+    @ApiModelProperty(value = "文字示方书号", name = "textNo")
+    @TableField(value = "TEXT_NO")
+    private String textNo;
 
 }
