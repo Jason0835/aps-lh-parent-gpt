@@ -157,7 +157,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     private List<SupplyOrderPool> buildSupplyOrderPoolsInParallel(YearMonth yearMonth,
         Set<String> skus, CalculationData data) {
 
-        return skus.parallelStream()
+        return skus.stream()
             .map(sku -> buildSupplyOrderPool(yearMonth,
                 sku,
                 data))
@@ -838,6 +838,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      */
     private void calculateFinalQuantity(SupplyOrderPool order, CalculationData data) {
         MpMonthlySaleQty monthlySaleQty = data.getSku2AverageSaleQty().get(order.getMaterialCode());
+        order.setSaleArea(null != monthlySaleQty && StringUtils.isNotBlank(monthlySaleQty.getSaleArea())?monthlySaleQty.getSaleArea():StringUtils.EMPTY);
         int turnoverMonth = getTurnoverMonth(order.getStructureName(),data);
 
         if (monthlySaleQty != null && turnoverMonth > 0) {
@@ -849,6 +850,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         } else {
             order.setQty(0);
         }
+
         // 设置结构上机频次
         int structureFrequency = data.getCountSkuMap()
             .getOrDefault(order.getMaterialCode(), 0);
