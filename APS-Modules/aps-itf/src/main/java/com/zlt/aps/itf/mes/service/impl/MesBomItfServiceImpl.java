@@ -92,8 +92,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	 * @return
 	 */
 	private String getMapKey(MdmSkuConstructionRef info) {
-		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getMesMaterialCode(),
-				info.getMaterialCode(), info.getBomVersion(), info.getEmbryoCode());
+		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(),
+//				info.getMesMaterialCode(),
+				info.getMaterialCode(),
+				info.getTrialStatus()
+//				info.getBomVersion(), info.getEmbryoCode()
+		);
 	}
 
 	/**

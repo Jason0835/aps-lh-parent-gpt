@@ -54,6 +54,14 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
+    /**
+     * 产品状态
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.trialStatus", dictType = "trial_status", sort = 20)
+    @ApiModelProperty(value = "产品状态", name = "trialStatus")
+    @TableField(value = "TRIAL_STATUS")
+    private String trialStatus;
+
     /** 规格代号 */
 //    @Excel(name = "ui.data.column.mdmSkuConstructionRef.specCode")
     @ApiModelProperty(value = "规格代号", name = "specCode")
@@ -147,7 +155,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 制造示方书类型
      */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoType", sort = 65)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoType", dictType = "trial_status", sort = 65)
     @ApiModelProperty(value = "制造示方书类型", name = "embryoType")
     @TableField(value = "EMBRYO_TYPE")
     private String embryoType;
@@ -173,7 +181,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 文字示方书类型
      */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textType", sort = 80)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textType", dictType = "trial_status", sort = 80)
     @ApiModelProperty(value = "文字示方书类型", name = "textType")
     @TableField(value = "TEXT_TYPE")
     private String textType;
@@ -199,7 +207,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 硫化示方书类型
      */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhType", sort = 95)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhType", dictType = "trial_status", sort = 95)
     @ApiModelProperty(value = "硫化示方书类型", name = "lhType")
     @TableField(value = "LH_TYPE")
     private String lhType;
