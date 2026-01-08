@@ -140,7 +140,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 物料描述
      */
-    @Excel(name = "ui.data.column.dpDemandPlan.materialDesc")
+    @Excel(name = "ui.data.column.demandPlan.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
@@ -180,7 +180,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 订单量
      */
-    @Excel(name = "ui.data.column.dpDemandPlan.orderQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.demandPlan.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Integer orderQty;
@@ -204,7 +204,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.dpDemandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.demandPlan.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
     private Integer averageSaleQty;
@@ -244,7 +244,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 净需求(不含暂缓)
      */
-    @Excel(name = "ui.data.column.dpDemandPlan.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.demandPlan.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
     private Integer unPostponeNetQty;
