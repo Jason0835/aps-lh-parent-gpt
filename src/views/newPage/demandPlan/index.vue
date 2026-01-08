@@ -343,6 +343,52 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
+          width:120,
+          render: ({ row }) => {
+            return (
+              <div>
+                {this.hasPermission("monthplan:demandPlan:edit") &&row.isReachMinProductionQty==0&& (
+                  <el-select
+
+                    v-model={row.isProduction}
+                    onChange={(val) => this.handlePriorityChange(row, val)}
+                  >
+                    {this.dict.type.biz_yes_no.map((item) => (
+                      <el-option
+                        key={item.value}
+                        label={item.label}
+                        value={item.value}
+                      ></el-option>
+                    ))}
+                  </el-select>
+                )}
+                {this.hasPermission("monthplan:demandPlan:edit") &&row.isReachMinProductionQty==1 &&(
+                  <el-select
+                    disabled
+                    v-model={row.isProduction}
+                    onChange={(val) => this.handlePriorityChange(row, val)}
+                  >
+                    {this.dict.type.biz_yes_no.map((item) => (
+                      <el-option
+
+                        key={item.value}
+                        label={item.label}
+                        value={item.value}
+                      ></el-option>
+                    ))}
+                  </el-select>
+                )}
+                {!this.hasPermission("monthplan:demandPlan:edit") && (
+                  <span>
+                    {this.selectDictLabel(
+                      this.dict.type.biz_yes_no,
+                      row.isProduction
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          },
         },
         {
           prop: "postponeNetQty",
@@ -375,38 +421,10 @@ export default {
         {
           prop: "isReachMinProductionQty",
           label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
-          // formatter: (row, column, value) => {
-          //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          // },
-          render: ({ row }) => {
-            return (
-              <div>
-                {this.hasPermission("monthplan:demandPlan:edit") && (
-                  <el-select
-
-                    v-model={row.isReachMinProductionQty}
-                    onChange={(val) => this.handlePriorityChange(row, val)}
-                  >
-                    {this.dict.type.biz_yes_no.map((item) => (
-                      <el-option
-                        key={item.value}
-                        label={item.label}
-                        value={item.value}
-                      ></el-option>
-                    ))}
-                  </el-select>
-                )}
-                {!this.hasPermission("monthplan:demandPlan:edit") && (
-                  <span>
-                    {this.selectDictLabel(
-                      this.dict.type.biz_yes_no,
-                      row.handlePriorityChange
-                    )}
-                  </span>
-                )}
-              </div>
-            );
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
+
         },
         {
           prop: "minProductionQty",

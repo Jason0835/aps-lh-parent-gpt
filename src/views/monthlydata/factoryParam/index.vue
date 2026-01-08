@@ -125,7 +125,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryParam.factoryName"),
+          label: this.$t("生产工厂"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -155,7 +155,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("备注"),
-          minWidth: 100, 
+          minWidth: 100,
         },
         {
           prop: "updateBy",
@@ -191,7 +191,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: "分厂",
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

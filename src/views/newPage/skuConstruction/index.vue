@@ -100,7 +100,7 @@ export default {
     TltUploadForm
     // infoDialog,
   },
-  dicts: ["molding_method",'biz_factory_name','biz_yes_no'],
+  dicts: ["molding_method",'biz_factory_name','biz_yes_no','trial_status'],
   provide() {
     return {
       parentDict: this.dict,
@@ -156,21 +156,29 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
-         {
-          prop: "bomVersion",
-          label: this.$t("ui.data.column.boom.boomVersion"),
-          width: 120,
-        },
+        //  {
+        //   prop: "bomVersion",
+        //   label: this.$t("ui.data.column.boom.boomVersion"),
+        //   width: 120,
+        // },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width: 180,
         },
-        {
-          prop: "mouldCavity",
-          label: this.$t("ui.data.column.skuConstruction.mouldCavity"),
+          {
+          prop: "trialStatus",
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
           width: 180,
         },
+        // {
+        //   prop: "mouldCavity",
+        //   label: this.$t("ui.data.column.skuConstruction.mouldCavity"),
+        //   width: 180,
+        // },
         // {
         //   prop: "mouldClampingPressure",
         //   label: this.$t("ui.data.column.lhTireConstructionInfo.clampingPressure"),
@@ -202,18 +210,18 @@ export default {
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),
           width: 180,
         },
-        {
-          prop: "curingTime",
-          label: this.$t("ui.data.column.skuConstruction.curingTime"),
-          align:'left',
-          width: 160,
-        },
-        {
-          prop: "curingTime2",
-          label: this.$t("ui.data.column.skuConstruction.curingTime2"),
-          align:'left',
-          width: 160,
-        },
+        // {
+        //   prop: "curingTime",
+        //   label: this.$t("ui.data.column.skuConstruction.curingTime"),
+        //   align:'left',
+        //   width: 160,
+        // },
+        // {
+        //   prop: "curingTime2",
+        //   label: this.$t("ui.data.column.skuConstruction.curingTime2"),
+        //   align:'left',
+        //   width: 160,
+        // },
 
         // {
         //   prop: "hydraulicPressureCuringTime",
@@ -234,6 +242,9 @@ export default {
         {
           prop: "embryoType",
           label: this.$t("ui.data.column.trialPlan.embryoType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
           width: 180,
         },
         {
@@ -250,6 +261,9 @@ export default {
           prop: "textType",
           label: this.$t("ui.data.column.trialPlan.textType"),
           width: 180,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
         },
         {
           prop: "textReleaseDate",
@@ -265,6 +279,9 @@ export default {
           prop: "lhType",
           label: this.$t("ui.data.column.trialPlan.lhType"),
           width: 180,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
         },
         {
           prop: "lhReleaseDate",
