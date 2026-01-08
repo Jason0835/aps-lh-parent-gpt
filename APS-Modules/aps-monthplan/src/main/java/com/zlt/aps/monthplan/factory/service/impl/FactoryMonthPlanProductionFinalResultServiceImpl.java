@@ -48,7 +48,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
     private final BaseDao baseDao;
 
     @Override
-    public List<FactoryMonthPlanProductionFinalResult> findLastTwelveMonthProdFinalPlan() {
+    public Map<String,Integer> calculateStructureFrequency() {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
@@ -56,11 +56,21 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        return this.list(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        Map<String,Integer> structureFrequencyMap = Maps.newHashMap();
+        Map<String,List<FactoryMonthPlanProductionFinalResult>>  map = list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        map.forEach((materialCode, value) -> {
+            Set<Integer> yearMonths = value.stream().map(FactoryMonthPlanProductionFinalResult::getYearMonth).collect(Collectors.toSet());
+            structureFrequencyMap.put(materialCode,yearMonths.size());
+        });
+        return structureFrequencyMap;
     }
 
     @Override
-    public int getProductionMonthInLastTwelveMonth(String materialCode) {
+    public int calculateStructureFrequency(String materialCode) {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
@@ -69,8 +79,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
-        return CollectionUtils.isEmpty(factoryMonthPlanProdFinals) ? 0 : factoryMonthPlanProdFinals.size();
+        List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return BigDecimal.ZERO.intValue();
+        }
+        Set<Integer> yearMonths = list.stream().map(FactoryMonthPlanProductionFinalResult::getYearMonth).collect(Collectors.toSet());
+        return yearMonths.size();
     }
 
     @Override

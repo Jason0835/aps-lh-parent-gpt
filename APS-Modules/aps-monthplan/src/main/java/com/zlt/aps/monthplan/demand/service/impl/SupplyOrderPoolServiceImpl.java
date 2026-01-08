@@ -183,14 +183,14 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         CompletableFuture<List<SalesOrderPool>> salesOrderFuture =
             CompletableFuture.supplyAsync(salesOrderPoolService::findCurrentSalesOrderPool);
 
-        CompletableFuture<List<FactoryMonthPlanProductionFinalResult>> planFuture =
+        CompletableFuture<Map<String,Integer>> calculateStructureFrequencyFuture =
             CompletableFuture.supplyAsync(
-                factoryMonthPlanProductionFinalResultService::findLastTwelveMonthProdFinalPlan);
+                factoryMonthPlanProductionFinalResultService::calculateStructureFrequency);
 
         // 合并所有结果
         return CompletableFuture.allOf(
                 monthlySaleQtyFuture, materialsFuture, cycleSchStruConfFuture,
-                stocksFuture, salesOrderFuture, planFuture)
+                stocksFuture, salesOrderFuture, calculateStructureFrequencyFuture)
             .thenApply(v -> {
                 try {
                     List<MpMonthlySaleQty> monthlySaleQties =  monthlySaleQtyFuture.get();
@@ -198,7 +198,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                     List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
                     List<MdmProductStock> productStocks = stocksFuture.get();
                     List<SalesOrderPool> salesOrderPools = salesOrderFuture.get();
-                    List<FactoryMonthPlanProductionFinalResult> planFinalResults = planFuture.get();
+                    Map<String,Integer> structureFrequency = calculateStructureFrequencyFuture.get();
 
                     Map<String, MpMonthlySaleQty> sku2AverageSaleQty = sku2AverageSaleQty(monthlySaleQties);
 
@@ -208,16 +208,13 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                     Map<String,List<MdmProductStock>> stockMap = this.getProductStockMapGroupByMaterialCode(productStocks);
                     Map<String,Integer> stockWithoutOrderMap = calculateStockWithoutOrder(productStocks,salesOrderPools);
 
-
-                    Map<String, Integer> countSkuMap = countSkuMap(planFinalResults);
-
                     return new CalculationData(
                         sku2AverageSaleQty,
                         sku2StructureMap,
                         structure2TurnoverMonthMap,
                         stockMap,
                         stockWithoutOrderMap,
-                        countSkuMap
+                        structureFrequency
                     );
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to prepare calculation data", e);
@@ -348,10 +345,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         Map<String,Integer> stockWithoutOrderMap = calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
         Map<String,List<MdmProductStock>> stockMap = this.getProductStockMapGroupByMaterialCode(finishedProductStocks);
-        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.factoryMonthPlanProductionFinalResultService.findLastTwelveMonthProdFinalPlan();
-        Map<String,Integer> productionCountMap = this.countSkuMap(factoryMonthPlanProdFinals);
+        Map<String,Integer> structureFrequency = this.factoryMonthPlanProductionFinalResultService.calculateStructureFrequency();
         return eligibleSkus.parallelStream()
-            .map(sku -> calculateOrderForSku(yearMonth,sku, context, monthlySaleQtyMap,stockMap, stockWithoutOrderMap, productionCountMap))
+            .map(sku -> calculateOrderForSku(yearMonth,sku, context, monthlySaleQtyMap,stockMap, stockWithoutOrderMap, structureFrequency))
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
     }
@@ -672,7 +668,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
         //通过月度生产计划表，获取近12个月有排产的月份个数
         // 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
-        int  productionMonth = this.factoryMonthPlanProductionFinalResultService.getProductionMonthInLastTwelveMonth(supplyOrderPool.getMaterialCode());
+        int  productionMonth = this.factoryMonthPlanProductionFinalResultService.calculateStructureFrequency(supplyOrderPool.getMaterialCode());
         supplyOrderPool.setStructureFrequency(productionMonth);
         return supplyOrderPool;
     }
@@ -779,27 +775,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         wrapper.eq(SupplyOrderPool::getMonth, yearMonth.getMonthValue());
         wrapper.eq(SupplyOrderPool::getOrderType, orderType);
         this.supplyOrderPoolEntityMapper.delete(wrapper);
-    }
-
-
-    private Map<String, Integer> countSkuMap(List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals) {
-        if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
-            return Collections.emptyMap();
-        }
-
-        return factoryMonthPlanProdFinals.stream()
-            .filter(Objects::nonNull)
-            .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()) && item.getYearMonth() != null)
-            .collect(Collectors.groupingBy(
-                FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                Collectors.mapping(
-                    FactoryMonthPlanProductionFinalResult::getYearMonth,
-                    Collectors.collectingAndThen(
-                        Collectors.toSet(),
-                        Set::size
-                    )
-                )
-            ));
     }
 
 
