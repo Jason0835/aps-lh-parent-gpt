@@ -149,7 +149,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 排产分类
      */
-    @Excel(name = "ui.data.column.demandPlan.productionType")
+    @Excel(name = "ui.data.column.demandPlan.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;

@@ -35,19 +35,19 @@ public class MpProductionPrediction extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.productionPrediction.factoryCode")
+    @Excel(name = "ui.data.column.productionPrediction.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.productionPrediction.year")
+    @Excel(name = "ui.data.column.productionPrediction.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.productionPrediction.month")
+    @Excel(name = "ui.data.column.productionPrediction.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -59,13 +59,13 @@ public class MpProductionPrediction extends BaseEntity {
     private String predictionVersion;
 
     /** 产品品类 */
-    @Excel(name = "ui.data.column.productionPrediction.productTypeCode")
+    @Excel(name = "ui.data.column.productionPrediction.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 内外销 */
-    @Excel(name = "ui.data.column.productionPrediction.locationType")
+    @Excel(name = "ui.data.column.productionPrediction.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "内外销", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -96,19 +96,19 @@ public class MpProductionPrediction extends BaseEntity {
 
 
     /** T月 */
-    @Excel(name = "ui.data.column.productionPrediction.month1")
+    @Excel(name = "ui.data.column.productionPrediction.month1", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "T月", name = "month1")
     @TableField(value = "MONTH_1")
     private Integer month1;
 
     /** T+1月 */
-    @Excel(name = "ui.data.column.productionPrediction.month2")
+    @Excel(name = "ui.data.column.productionPrediction.month2", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "T+1月", name = "month2")
     @TableField(value = "MONTH_2")
     private Integer month2;
 
     /** T+2月 */
-    @Excel(name = "ui.data.column.productionPrediction.month3")
+    @Excel(name = "ui.data.column.productionPrediction.month3", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "T+2月", name = "month3")
     @TableField(value = "MONTH_3")
     private Integer month3;
