@@ -59,7 +59,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProductionPrediction>  implements IMpProductionPredictionService {
     private static final String PREFIX = "PRE";
-
+    private final static String ZERO_YEAR_WEEK = "0000";
     private final RequirementVersionService requirementVersionService;
 
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
@@ -812,6 +812,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         BeanUtils.copyProperties(supplyOrder, demandPlan);
         demandPlan.setYear(yearMonth.getYear());
         demandPlan.setMonth(yearMonth.getMonthValue());
+        demandPlan.setYearWeek(ZERO_YEAR_WEEK);
         demandPlan.setMonthPlanVersion(predictionVersion);
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());
