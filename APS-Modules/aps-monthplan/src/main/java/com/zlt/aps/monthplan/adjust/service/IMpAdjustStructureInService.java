@@ -1,8 +1,16 @@
 package com.zlt.aps.monthplan.adjust.service;
 
 
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+import java.util.Map;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpAdjustStructureInService.java
@@ -18,4 +26,35 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStructureIn>{
 
+    /**
+     * 获取月定稿数据
+     * @param contextDTO 周程滚动调整上下文对象
+     * @return 月定稿列表
+     */
+    List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取周程滚动参数
+     * @return
+     */
+    Map<String, Object> getMpWeekAdjustParam(String factoryCode,String productType);
+
+    /**
+     * 根据排产版本获取结构转产列表
+     * @param contextDTO 周程滚动调整上下文对象
+     * @return 结构转产列表
+     */
+    List<MpStructureAllocation> selectMpStructureAllocationList(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 初始锁定日
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    Integer getLockEndDay(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取结构收尾日
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO);
 }

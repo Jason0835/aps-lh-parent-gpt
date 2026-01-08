@@ -98,4 +98,9 @@ public class DeductMouldVo {
      */
     private Set<Integer> productionStartDaySet;
 
+    /**
+     * 首日延迟，默认true
+     */
+    private boolean firstDayDelay = true;
+
 }
