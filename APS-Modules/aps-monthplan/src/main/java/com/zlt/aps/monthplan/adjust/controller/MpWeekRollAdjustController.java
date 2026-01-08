@@ -54,7 +54,7 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("获取调整明细列表")
     @PostMapping("/getAdjustDetailList")
     @DistributedLock(
-            key = "'ADJ:GET:' #weekRollAdjustDTO.adjustType + #weekRollAdjustDTO.mpYear + #weekRollAdjustDTO.mpMonth",
+            key = "'ADJ:GET:' + #weekRollAdjustDTO.adjustType + #weekRollAdjustDTO.mpYear + #weekRollAdjustDTO.mpMonth",
             waitTime = 0,
             leaseTime = -1,
             failMsg = "ui.data.alert.getAdjustDetail.run",
