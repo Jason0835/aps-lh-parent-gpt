@@ -1,15 +1,30 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.monthplan.common.utils.PubUtil;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -32,6 +47,17 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustStructureIn>  implements IMpAdjustStructureInService {
+
+    @Autowired
+    private FactoryMonthPlanProdFinalMapper factoryMonthPlanProdFinalMapper;
+
+    @Autowired
+    private MpStructureAllocationEntityMapper structureAllocationEntityMapper;
+
+    @Autowired
+    private ProductionSchedulingDataService productionSchedulingDataService;
+
+
     @Override
     protected String getDocTypeCode() {
         return "MP0802";
@@ -57,5 +83,69 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
+        return factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
+    }
+
+    @Override
+    public Map<String, Object> getMpWeekAdjustParam(String factoryCode,String productType) {
+        Context context = new Context();
+        context.setFactoryCode(factoryCode);
+        context.setProductType(ProductTypeEnum.getEnumByValue(productType));
+        List<String> paramCodeList = new ArrayList<>();
+        paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
+        paramCodeList.add(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode());
+        return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
+    }
+
+    @Override
+    public List<MpStructureAllocation> selectMpStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+        QueryWrapper<MpStructureAllocation> wrapper = new QueryWrapper<>();
+        wrapper.eq( "FACTORY_CODE", contextDTO.getFactoryCode());
+        wrapper.eq("PRODUCTION_VERSION", contextDTO.getMonthPlanVersion());
+        return structureAllocationEntityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public Integer getLockEndDay(MpRollAdjustContextDTO contextDTO) {
+        int lockDays = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        if (PubUtil.isEmpty(structureAllocationList)){
+            return lockDays;
+        }
+        //1、统计调整日成型机台数
+        int iCount = 0;
+        for (MpStructureAllocation allocation:structureAllocationList){
+            if (contextDTO.getAdjustDay()>=allocation.getBeginDay() &&
+                    contextDTO.getAdjustDay()<= allocation.getEndDay()){
+                iCount +=1;
+            }
+        }
+        //2、按成型机数，取月度生产计划锁定期天数
+        if (iCount > 1){
+            lockDays = (Integer)contextDTO.getParamMap().get(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode());
+        }
+        // 今天算在内，故-1;
+        lockDays = contextDTO.getAdjustDay() + lockDays -1;
+        return lockDays > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:lockDays;
+    }
+
+    @Override
+    public Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO) {
+        int endDay = 0;
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        if (PubUtil.isEmpty(structureAllocationList)){
+            return endDay;
+        }
+        // 取最大的成型机收尾日作为结构的收尾日
+        for (MpStructureAllocation allocation:structureAllocationList){
+            if (endDay < allocation.getEndDay()){
+                endDay = allocation.getEndDay();
+            }
+        }
+        return endDay;
     }
 }

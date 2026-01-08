@@ -21,6 +21,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
+import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
@@ -117,7 +118,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
-
+        MpWeekRollAdjustEngine adjustEngine = new MpWeekRollAdjustEngine();
+        adjustEngine.structureInAutoAdjust(contextDTO);
     }
 
 
@@ -1053,6 +1055,5 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .filter(monitor -> monitor != null && monitor.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
     }
-
 
 }

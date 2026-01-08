@@ -2,6 +2,8 @@ package com.zlt.aps.monthplan.factory.mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.vo.DayProductionTotalVo;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanProdFinalVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -49,4 +51,15 @@ public interface FactoryMonthPlanProdFinalMapper extends CommBaseMapper<FactoryM
      * @return
      */
     List<DayProductionTotalVo> getStatisticsDay(@Param("productionVersion") String productionVersion, @Param("days") List<Integer> days);
+
+    /**
+     * 查询月定稿列表For周程滚动调整
+     *
+     * @param year 年度
+     * @param month 月度
+     * @param factoryCode 工厂
+     * @return 月定稿列表
+     */
+    List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(@Param("year") Integer year, @Param("month") Integer month,
+                                                          @Param("factoryCode") String factoryCode);
 }

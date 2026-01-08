@@ -37,7 +37,7 @@ public class FactoryConstant {
     /**
      * 日期前缀
      */
-    public static final String DAY_FIELD = "DAY_";
+    public static final String DAY_FIELD = "day";
     /**
      * 搭配日期前缀
      */
