@@ -1,19 +1,19 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.service.IMdmHolidayService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
-import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.aps.maindata.service.IMdmHolidayService;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -48,7 +48,7 @@ public class MdmHolidayServiceImpl extends AbstractDocService<MdmHoliday>  imple
     public String checkUnique(MdmHoliday docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmHoliday.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.column.mdmHoliday.checkUnique"));
         }
         return unique;
     }
@@ -56,6 +56,6 @@ public class MdmHolidayServiceImpl extends AbstractDocService<MdmHoliday>  imple
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>(Collections.singletonList("holidayDate"));
     }
 }
