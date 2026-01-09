@@ -19,7 +19,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary"  :loading="createLoading" plain @click="createVersion">{{ $t("插单模拟排产") }}</el-button>
+        <el-button type="primary" v-hasPermi="['monthplan:simulatedResult:createVmMonthPrediction']"  :loading="createLoading" plain @click="createVersion">{{ $t("插单模拟排产") }}</el-button>
         <!-- <el-button
           type="primary"
           plain
@@ -41,7 +41,7 @@
         > -->
         <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:ProductMoldingLimit:export']"
+          v-hasPermi="['monthplan:simulatedResult:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
