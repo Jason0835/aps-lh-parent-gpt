@@ -12,6 +12,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -452,7 +453,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 初始化月度硫化监控
         CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
         // 初始化成品实时库存
-//        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
+        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(
+                // 解决父子上下文传递问题
+                SpringContextSupplierUtil.wrap(() -> initProductStock(contextDTO)),
+                executor
+        );
+
 
         try {
             // 等待所有异步任务执行完成
@@ -461,13 +467,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     saleOrderFuture,
                     trialPlanFuture,
                     monthSurplusFuture,
-//                    productStockFuture,
+                    productStockFuture,
                     planMonitorFuture
             ).join();
 
             log.info("并行初始化任务执行完成");
-            // 初始化成品实时库存
-            initProductStock(contextDTO);
 
         } catch (CompletionException e) {
             // 异常处理
