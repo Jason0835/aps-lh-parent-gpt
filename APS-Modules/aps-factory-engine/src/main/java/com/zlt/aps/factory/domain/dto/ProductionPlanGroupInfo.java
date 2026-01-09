@@ -10,6 +10,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -316,43 +317,20 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
-        Integer startDay = preSelected.getClosingDay();
-        Integer endDay = preSelected.getEndDay();
-        Integer realStartDay = startDay;
-        Integer realEndDay = startDay;
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
-        for (int productionDay = startDay; productionDay <= endDay; productionDay++) {
-            GroupPlanCxLhCapacityLimitHelper dayLimitInfo = dayProductionLimitInfo.get(productionDay);
-            if(null == dayLimitInfo){
-                if(realStartDay < productionDay){
-                    realStartDay = productionDay;
-                }
-                if(realEndDay > productionDay){
-                    realEndDay = productionDay;
-                }
-                continue;
-            }
-            Set<String> existEmbryoCode = dayLimitInfo.getProductionEmbryoCodeSet();
-            if(existEmbryoCode.contains(productionEmbryoCode)){
-                if(realStartDay < productionDay){
-                    realStartDay = productionDay;
-                }
-                if(realEndDay > productionDay){
-                    realEndDay = productionDay;
-                }
-                continue;
-            }
-            //不可上机，延后
-            if(existEmbryoCode.size() + BigDecimal.ONE.intValue() > dayLimitInfo.getMaxEmbryoCodeCount()){
-                realStartDay = productionDay;
-                break;
-            }
-        }
-
-
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-
-
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
+        //说明达到胎胚种类数限制
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        Set<Integer> productionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionDaySet, context.getStopDays());
+        List<Integer> sortList = new ArrayList<>(resultSet);
+        Collections.sort(sortList);
+        int size = sortList.size();
+        preSelected.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
     }
 
     /**

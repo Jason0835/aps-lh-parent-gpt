@@ -39,41 +39,61 @@ public class CxAddSkuProductionHandler {
      */
     public static void productionAddSkuByContinueCxMachine(Context context, ProductionPlanGroupInfo groupPlanInfo) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        String groupName = groupPlanInfo.getGroupName();
+        String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanData)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
             return;
         }
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
             return;
         }
         //获取最先收尾的硫化组
         EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext);
         if (null == lhGroup) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
             return;
         }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = lhGroup.getEndDay();
-        if (startDay >= endDay) {
-            //todo 记录日志
+        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+        if (startDay > endDay) {
             return;
         }
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
+        log.info(TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc));
         if (StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        //计算需要排产的量
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(leftOverHasProductionList, materialDesc);
+        if (null == needProductionInfo) {
             //todo 记录日志
             return;
         }
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(leftOverHasProductionList, materialDesc);
-        if (null == needProductionInfo) {
-            //todo 记录日志
+        if (CollectionUtils.isEmpty(doubleMouldList)) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuNoFindMouldLog(context, groupName, onLineMachineInfo, materialDesc));
+            retrieveNextSku(context, groupPlanInfo, needProductionInfo);
+            return;
+        }
+        //重新确认排产时间访问
+        groupPlanInfo.correctProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), lhGroup);
+        startDay = lhGroup.getClosingDay();
+        endDay = lhGroup.getEndDay();
+        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+        if (null == startDay || null == endDay) {
+            retrieveNextSku(context, groupPlanInfo, needProductionInfo);
             return;
         }
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
@@ -81,9 +101,8 @@ public class CxAddSkuProductionHandler {
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
-        //开始排产
+        //开始排产 CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
-//        CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         productionAddSkuByContinueCxMachine(context, groupPlanInfo);
     }
@@ -138,18 +157,18 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoFindMouldLog(context, groupName, cxMachineCode, materialDesc));
-            //没有模具则标记本轮不再参与
-            List<MonthPlanProductionRequirePlanVo> needProductionList = needProductionInfo.getNeedProductionList();
-            needProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
-            //递归：重新获取下一组
-            productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+            retrieveNextSku(context, needProductionInfo, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
             return;
         }
-        //todo 判断选择的Sku，能否进行上机排产-此时判断胎胚种类数？
-
-
-
-
+        //判断选择的Sku，能否进行上机排产-此时判断胎胚种类数
+        CxLhProductionHelper newLh = cxMachineInfo.getCorrectProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), cxLhGroup);
+        if (null == newLh) {
+            log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuEmbryoLimitLog(context, groupName, cxMachineCode, materialDesc));
+            retrieveNextSku(context, needProductionInfo, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+            return;
+        }
+        startDay = newLh.getProductionDay();
+        endDay = newLh.getEndDay();
         String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
         log.info(TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay));
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
@@ -287,4 +306,36 @@ public class CxAddSkuProductionHandler {
         return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
     }
 
+    /**
+     * 当前选择的Sku不能正常上机，则重新获取下一组Sku
+     *
+     * @param context         排产上下文
+     * @param groupPlanInfo   分组计划
+     * @param currentSelected 当前选择的Sku信息
+     */
+    private static void retrieveNextSku(Context context, ProductionPlanGroupInfo groupPlanInfo, SkuNeedProductionInfo currentSelected) {
+        //没有模具则标记本轮不再参与
+        List<MonthPlanProductionRequirePlanVo> needProductionList = currentSelected.getNeedProductionList();
+        needProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+        //递归：重新获取下一组
+        productionAddSkuByContinueCxMachine(context, groupPlanInfo);
+    }
+
+    /**
+     * 当前选择的Sku不能正常上机，则重新获取下一组Sku
+     *
+     * @param context            排产上下文
+     * @param currentSelected    当前选择的Sku信息
+     * @param cxMachineCode      成型机台
+     * @param productionPlanList 还需排产的计划
+     * @param productionPlan     分组排产信息，包含分组名(TBR=结构名)、起始及理论收尾日期
+     * @param mouldShellMap      模壳信息
+     */
+    private static void retrieveNextSku(Context context, SkuNeedProductionInfo currentSelected, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> productionPlanList, CxMachineAllocationPlanHelper productionPlan, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+        //没有模具则标记本轮不再参与
+        List<MonthPlanProductionRequirePlanVo> needProductionList = currentSelected.getNeedProductionList();
+        needProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+        //递归：重新获取下一组
+        productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+    }
 }

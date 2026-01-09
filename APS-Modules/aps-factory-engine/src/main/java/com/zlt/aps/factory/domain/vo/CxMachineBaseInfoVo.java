@@ -4,11 +4,15 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -126,6 +130,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 成型硫化配比最后一天排产分组信息
      */
     private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
+    /**
+     * 日排产限制--只在第一轮按机台分配中使用-机台反选和计划挑选机台
+     */
+    private Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo;
 
     /**
      * 获取剩余产能，以剩余天数*此时的硫化配比
@@ -304,6 +312,37 @@ public class CxMachineBaseInfoVo implements Serializable {
         cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
         return cxLhGroupList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
+     *
+     * @param context         排产上下文
+     * @param addSkuInfo      需要上机的Sku
+     * @param selectedLhGroup 预计选中
+     * @return
+     */
+    public CxLhProductionHelper getCorrectProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, CxLhProductionHelper selectedLhGroup) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
+            return null;
+        }
+        String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
+        //说明达到胎胚种类数限制
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        //拷贝，否则数据丢失
+        CxLhProductionHelper newLhGroup = new CxLhProductionHelper();
+        BeanUtils.copyProperties(selectedLhGroup, newLhGroup);
+        Set<Integer> productionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionDaySet, context.getStopDays());
+        List<Integer> sortList = new ArrayList<>(resultSet);
+        Collections.sort(sortList);
+        int size = sortList.size();
+        newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
+        return newLhGroup;
     }
 
     /**
