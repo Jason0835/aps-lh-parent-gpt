@@ -57,7 +57,7 @@ public class CxAddSkuProductionHandler {
         }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
-        Integer endDay = groupPlanInfo.getLatestEndDay();
+        Integer endDay = lhGroup.getEndDay();
         if (startDay >= endDay) {
             //todo 记录日志
             return;
