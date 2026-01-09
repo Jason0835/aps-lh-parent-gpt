@@ -624,27 +624,28 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, addNewGroupPlan.getGroupName()));
+            //20260109 标记分配完成--没有找到合适，说明后面也找不到
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //todo 结构标记不可排产
             return;
         }
         //分配产能
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
-        //selectedCxMachine.getRatio()
-        Integer lhRatio = lhRatioInfo.getMaxLhMachineCount();
         Integer remainingDays = selectedCxMachine.getRemainingDays();
         //todo 判断成型鼓是否符合条件
-        Integer needAllocationDays = addNewGroupPlan.calculateNeedDays(lhRatio);
+        Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
         Integer leftOver = remainingDays - realAllocationDays;
         selectedCxMachine.setRemainingDays(leftOver);
+        addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         Integer startDay = selectedCxMachine.getAllocationStartDay();
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(addHelper);
         //对成型机台进行模拟模具排产
-
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
-        if(needAllocationDays <= remainingDays){
+        if (needAllocationDays <= remainingDays) {
+            //20260108 标记分配完成
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         }
         //反向机台匹配结构计划
