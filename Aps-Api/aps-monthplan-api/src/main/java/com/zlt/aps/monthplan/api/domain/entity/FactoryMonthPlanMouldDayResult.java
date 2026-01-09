@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -103,6 +104,14 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "产品状态", name = "productStatus")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
+
+    /**
+     * 产品分类
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
 
     /**
      * 产品结构
