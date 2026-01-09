@@ -99,7 +99,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 产品状态
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus", dictType = "trial_status")
     @ApiModelProperty(value = "产品状态", name = "productStatus")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
