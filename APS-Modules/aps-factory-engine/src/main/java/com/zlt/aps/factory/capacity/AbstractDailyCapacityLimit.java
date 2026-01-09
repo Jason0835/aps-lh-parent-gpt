@@ -198,7 +198,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @return
      */
     public  String getEmbryoCodeField(){
-        return "embryoCode";
+        return "mainMaterialDesc";
     }
 
     /**

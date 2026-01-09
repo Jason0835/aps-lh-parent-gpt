@@ -168,7 +168,7 @@ public class MpWeekRollAdjustEngine {
      */
     private List<FactoryMonthPlanFinalAdjustVo> findCanMoveSkuList(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int secStartDay) {
         List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream()
-                .filter(x->secStartDay == x.getBeginDate()).sorted((o1, o2) -> {
+                .filter(x->secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
                     // 自定义比较逻辑(总的已排实单量)
                     int totalQty1 = o1.getHeightProductionQty() + o1.getMidProductionQty();
                     int totalQty2 = o2.getHeightProductionQty() + o2.getMidProductionQty();
@@ -424,7 +424,7 @@ public class MpWeekRollAdjustEngine {
 
         int startDay = contextDTO.getLockEndDay() + 1;
         //1、排序：在机SKU上机日期早的优先增量排产
-        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDate));
+        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
         Map<String, MpAdjustStructureIn> mpAdjustStructInMap = onIncrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                  Collectors.collectingAndThen(Collectors.toList(),m-> {
                      return m.get(0);
@@ -688,7 +688,7 @@ public class MpWeekRollAdjustEngine {
 
         int startDay = contextDTO.getLockEndDay() + 1;
         //1、排序：在机SKU上机日期早的优先增量排产
-        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDate));
+        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
         Map<String, MpAdjustStructureIn> mpAdjustStructInMap = incrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                 Collectors.collectingAndThen(Collectors.toList(),m-> {
                     return m.get(0);

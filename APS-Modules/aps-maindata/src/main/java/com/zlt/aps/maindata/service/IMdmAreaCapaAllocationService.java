@@ -1,9 +1,12 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.bill.common.service.IDocService;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -29,6 +32,11 @@ public interface IMdmAreaCapaAllocationService extends IDocService<MdmAreaCapaAl
      * @return 结果
      */
     AjaxResult copy(MdmAreaCapaAllocation entity);
+
+    /**
+     * 异步导入
+     */
+    void importDataAsync(List<MdmAreaCapaAllocation> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
 
     /**
      * 复制前校验

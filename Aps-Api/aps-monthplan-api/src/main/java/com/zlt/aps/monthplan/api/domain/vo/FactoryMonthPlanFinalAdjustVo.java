@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.domain.vo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
@@ -12,7 +13,7 @@ import lombok.Data;
  * @date 2025-12-22
  */
 @Data
-public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProdFinal {
+public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFinalResult {
 
     /**
      * 锁定量
