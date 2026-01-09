@@ -805,13 +805,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap);
+            matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap, Convert.toInt(salesOrder.getOrdQty(),0));
         }
         return resultList;
     }
 
     protected void matchMonthPlanList(MpRollAdjustContextDTO contextDTO, List<MpAdjustDetailVo> resultList,
-                                      String materialCode, Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap) {
+                                      String materialCode, Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap,
+                                      Integer ordQty) {
         // 根据物料编码获取对应的生产计划列表
         List<FactoryMonthPlanFinalAdjustVo> matchMonthPlanProdList = monthPlanMap.get(materialCode);
         if (PubUtil.isEmpty(matchMonthPlanProdList)) {
@@ -821,6 +822,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 组装结果集
         for (FactoryMonthPlanFinalAdjustVo monthPlan : matchMonthPlanProdList) {
             MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
+            adjustDetailVo.setOrdQty(ordQty);
             adjustDetailVo.setMaterialCode(materialCode);
             adjustDetailVo.setScheduledMachines(monthPlan.getCxMachineCode());
             // todo 暂时写死，后续获取
