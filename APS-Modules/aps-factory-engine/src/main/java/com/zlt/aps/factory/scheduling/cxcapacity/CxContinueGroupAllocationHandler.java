@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.Context;
@@ -102,6 +103,11 @@ public class CxContinueGroupAllocationHandler {
          *
          */
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {
+            if (needCount.compareTo(BigDecimal.valueOf(productionCount)) > BigDecimal.ZERO.intValue()) {
+                return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+            }
+            //20260109 标记结构成型产能分配完成
+            groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
         }
         //2、最后确定在产机台各自收尾时间点及分配
@@ -120,11 +126,6 @@ public class CxContinueGroupAllocationHandler {
      * @param mouldShellMap     模壳信息
      */
     private static void productionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
-//        Map<Integer, CxLhProductionHelper> cxLhRatioMap = groupPlanInfo.getCxLhRatioMap();
-//        if (CollectionUtils.isEmpty(cxLhRatioMap)) {
-//            //todo 记录日志
-//            return;
-//        }
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuInfoMap)) {
             //todo 记录日志
@@ -173,6 +174,7 @@ public class CxContinueGroupAllocationHandler {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
             cxMachineInfo.setRemainingDays(BigDecimal.ZERO.intValue());
+            groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
             ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
             CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
             cxMachineInfo.addAllocationPlanInfo(helper);
@@ -224,6 +226,7 @@ public class CxContinueGroupAllocationHandler {
                 Integer remainingDays = cxMachineInfo.getRemainingDays();
                 Integer allocationDay = Math.min(sumDays, remainingDays);
                 cxMachineInfo.setRemainingDays(remainingDays - allocationDay);
+                groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
                 CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
                 cxMachineInfo.addAllocationPlanInfo(helper);
                 allocationList.add(helper);
@@ -240,11 +243,14 @@ public class CxContinueGroupAllocationHandler {
             Integer leftOverAllocationDay = Math.min(leftOverSplitDays, remainingDays);
             Integer allocationDay = leftOverAllocationDay + minAllocationDays;
             cxMachineInfo.setRemainingDays(remainingDays - leftOverAllocationDay);
+            groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
             cxMachineInfo.addAllocationPlanInfo(helper);
             allocationList.add(helper);
             leftOverSplitDays = leftOverSplitDays - leftOverAllocationDay;
         }
+        //20260109 标记分组计划分配完毕
+        groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         return allocationList;
     }
 
