@@ -66,10 +66,17 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             throw new ServiceException(String.format(I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.notUnique"), docEntityVO.getCxMachineCode()));
         }
         // 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
-        String structureErrorMsg = this.checkFixedStructure(docEntityVO);
+        String structureErrorMsg = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.structureRepeat");
+        String materialCodeErrorMsg = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.skuRepeat");
+        List<String> errorStructure = this.checkFixedStructure(docEntityVO);
         // 校验固定SKU，对比不可作业SKU，不可有相同
-        String materialCodeErrorMsg = this.checkFixedMaterialCode(docEntityVO);
-        if (StringUtils.isNotBlank(structureErrorMsg) || StringUtils.isNotBlank(materialCodeErrorMsg)) {
+        List<String> errorMaterialCode = this.checkFixedMaterialCode(docEntityVO);
+        if (CollectionUtils.isNotEmpty(errorStructure) || CollectionUtils.isNotEmpty(errorMaterialCode)) {
+            structureErrorMsg = CollectionUtils.isEmpty(errorStructure) ? "" : structureErrorMsg;
+            structureErrorMsg = String.format(structureErrorMsg, String.join(",", errorStructure));
+
+            materialCodeErrorMsg = CollectionUtils.isEmpty(errorMaterialCode) ? "" : materialCodeErrorMsg;
+            materialCodeErrorMsg = String.format(materialCodeErrorMsg, String.join(",", errorMaterialCode));
             throw new RuntimeException(structureErrorMsg + materialCodeErrorMsg);
         }
         return unique;
@@ -80,7 +87,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
      *
      * @param docEntityVO 校验对象
      */
-    private String checkFixedMaterialCode(MdmCxMachineFixed docEntityVO) {
+    private List<String> checkFixedMaterialCode(MdmCxMachineFixed docEntityVO) {
         String fixedMaterialCode = StringUtils.defaultIfBlank(docEntityVO.getFixedMaterialCode(), "");
         List<String> fixedMaterialCodeList = Arrays.stream(fixedMaterialCode.split(",")).collect(Collectors.toList());
 
@@ -94,12 +101,9 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
                     errorMaterialCode.add(materialCode);
                 }
             }
-            if (CollectionUtils.isNotEmpty(errorMaterialCode)) {
-                String message = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.skuRepeat");
-                return String.format(message, String.join(",", errorMaterialCode));
-            }
+            return errorMaterialCode;
         }
-        return StringUtils.EMPTY;
+        return Collections.emptyList();
     }
 
     /**
@@ -107,7 +111,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
      *
      * @param docEntityVO 校验对象
      */
-    private String checkFixedStructure(MdmCxMachineFixed docEntityVO) {
+    private List<String> checkFixedStructure(MdmCxMachineFixed docEntityVO) {
         String fixedStructure1 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure1(), "");
         List<String> fixedStructureList = Arrays.stream(fixedStructure1.split(",")).collect(Collectors.toList());
         String fixedStructure2 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure2(), "");
@@ -123,12 +127,9 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
                     errorStructure.add(structure);
                 }
             }
-            if (CollectionUtils.isNotEmpty(errorStructure)) {
-                String message = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.structureRepeat");
-                return String.format(message, String.join(",", errorStructure));
-            }
+            return errorStructure;
         }
-        return StringUtils.EMPTY;
+        return Collections.emptyList();
     }
 
     @Override
@@ -168,9 +169,21 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             }
         }
         // 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
-        String structureErrorMsg = this.checkFixedStructure(importDocEntity);
+        String structureErrorMsg = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.structureRepeat");
+        String materialCodeErrorMsg = I18nUtil.getMessage("ui.data.alert.mdmCxMachineFixed.skuRepeat");
+        List<String> errorStructure = this.checkFixedStructure(importDocEntity);
         // 校验固定SKU，对比不可作业SKU，不可有相同
-        String materialCodeErrorMsg = this.checkFixedMaterialCode(importDocEntity);
+        List<String> errorMaterialCode = this.checkFixedMaterialCode(importDocEntity);
+        if (CollectionUtils.isNotEmpty(errorStructure) || CollectionUtils.isNotEmpty(errorMaterialCode)) {
+            structureErrorMsg = CollectionUtils.isEmpty(errorStructure) ? "" : structureErrorMsg;
+            structureErrorMsg = String.format(structureErrorMsg, String.join(",", errorStructure));
+
+            materialCodeErrorMsg = CollectionUtils.isEmpty(errorMaterialCode) ? "" : materialCodeErrorMsg;
+            materialCodeErrorMsg = String.format(materialCodeErrorMsg, String.join(",", errorMaterialCode));
+            String message = structureErrorMsg + materialCodeErrorMsg;
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         if (StringUtils.isNotBlank(structureErrorMsg) || StringUtils.isNotBlank(materialCodeErrorMsg)) {
             String message = structureErrorMsg + materialCodeErrorMsg;
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);

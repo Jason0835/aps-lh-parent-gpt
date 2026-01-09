@@ -9,9 +9,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="factoryCode" column="FACTORY_CODE"/>
         <result property="year" column="YEAR"/>
         <result property="month" column="MONTH"/>
-        <result property="productCode" column="PRODUCT_CODE"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
         <result property="productTypeName" column="PRODUCT_TYPE_NAME"/>
-        <result property="productDesc" column="PRODUCT_DESC"/>
+        <result property="materialDesc" column="MATERIAL_DESC"/>
         <result property="remark" column="REMARK"/>
         <result property="isDelete" column="IS_DELETE"/>
         <result property="createTime" column="CREATE_TIME"/>
@@ -27,9 +27,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         fnp.FACTORY_CODE,
         fnp.YEAR,
         fnp.MONTH,
-        fnp.PRODUCT_CODE,
+        fnp.MATERIAL_CODE,
         pi.PRODUCT_TYPE_NAME,
-        fnp.PRODUCT_DESC,
+        fnp.MATERIAL_DESC,
         fnp.REMARK,
         fnp.IS_DELETE,
         fnp.CREATE_TIME,
@@ -38,15 +38,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         fnp.UPDATE_BY
         FROM
         T_MDM_FACTORY_NO_PRODUCTION fnp
-        LEFT JOIN t_mdm_material_info pi ON fnp.PRODUCT_CODE = pi.PRODUCT_CODE
+        LEFT JOIN t_mdm_material_info pi ON fnp.MATERIAL_CODE = pi.MATERIAL_CODE
         WHERE
         fnp.IS_DELETE = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND fnp.FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null "> AND fnp.YEAR = #{year}</if>
         <if test="month != null "> AND fnp.MONTH = #{month}</if>
-        <if test="productCode != null  and productCode != ''">AND fnp.PRODUCT_CODE like CONCAT('%',
+        <if test="materialCode != null  and materialCode != ''">AND fnp.MATERIAL_CODE like CONCAT('%',
             #{productCode},'%')
         </if>
-        <if test="productDesc != null  and productDesc != ''"> AND fnp.PRODUCT_DESC = #{productDesc}</if>
+        <if test="materialDesc != null  and materialDesc != ''">AND fnp.MATERIAL_DESC = like CONCAT('%',
+            #{materialDesc},'%')
+        </if>
     </select>
 </mapper>

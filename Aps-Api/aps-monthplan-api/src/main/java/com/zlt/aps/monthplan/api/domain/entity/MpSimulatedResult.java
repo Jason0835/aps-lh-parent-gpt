@@ -30,19 +30,19 @@ public class MpSimulatedResult extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.simulatedResult.factoryCode")
+    @Excel(name = "ui.data.column.simulatedResult.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.simulatedResult.year")
+    @Excel(name = "ui.data.column.simulatedResult.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.simulatedResult.month")
+    @Excel(name = "ui.data.column.simulatedResult.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -60,7 +60,7 @@ public class MpSimulatedResult extends BaseEntity {
     private String productionVersion;
 
     /** 产品品类 数据字典：biz_product_type  全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.simulatedResult.productTypeCode")
+    @Excel(name = "ui.data.column.simulatedResult.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type  全钢 PCR 半钢", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -126,175 +126,175 @@ public class MpSimulatedResult extends BaseEntity {
     private String materialDesc;
 
     /** 模具数量(同主花纹的模具数量) */
-    @Excel(name = "ui.data.column.simulatedResult.mouldQty")
+    @Excel(name = "ui.data.column.simulatedResult.mouldQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "模具数量(同主花纹的模具数量)", name = "mouldQty")
     @TableField(value = "MOULD_QTY")
     private Integer mouldQty;
 
     /** 活块数量(同主花纹的物料模具数量) */
-    @Excel(name = "ui.data.column.simulatedResult.typeBlockQty")
+    @Excel(name = "ui.data.column.simulatedResult.typeBlockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
     @TableField(value = "TYPE_BLOCK_QTY")
     private Integer typeBlockQty;
 
     /** 净需求 */
-    @Excel(name = "ui.data.column.simulatedResult.netQty")
+    @Excel(name = "ui.data.column.simulatedResult.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Integer netQty;
 
     /** 高优先级数量 */
-    @Excel(name = "ui.data.column.simulatedResult.heightQty")
+    @Excel(name = "ui.data.column.simulatedResult.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
 
     /** 排产总量 */
-    @Excel(name = "ui.data.column.simulatedResult.productionQty")
+    @Excel(name = "ui.data.column.simulatedResult.productionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产总量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
 
     /** 第1个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month1")
+    @Excel(name = "ui.data.column.simulatedResult.month1", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第1个月排产量", name = "month1")
     @TableField(value = "MONTH_1")
     private Integer month1;
 
     /** 第2个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month2")
+    @Excel(name = "ui.data.column.simulatedResult.month2", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第2个月排产量", name = "month2")
     @TableField(value = "MONTH_2")
     private Integer month2;
 
     /** 第3个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month3")
+    @Excel(name = "ui.data.column.simulatedResult.month3", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第3个月排产量", name = "month3")
     @TableField(value = "MONTH_3")
     private Integer month3;
 
     /** 第4个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month4")
+    @Excel(name = "ui.data.column.simulatedResult.month4", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第4个月排产量", name = "month4")
     @TableField(value = "MONTH_4")
     private Integer month4;
 
     /** 第5个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month5")
+    @Excel(name = "ui.data.column.simulatedResult.month5", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第5个月排产量", name = "month5")
     @TableField(value = "MONTH_5")
     private Integer month5;
 
     /** 第6个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month6")
+    @Excel(name = "ui.data.column.simulatedResult.month6", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第6个月排产量", name = "month6")
     @TableField(value = "MONTH_6")
     private Integer month6;
 
     /** 第7个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month7")
+    @Excel(name = "ui.data.column.simulatedResult.month7", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第7个月排产量", name = "month7")
     @TableField(value = "MONTH_7")
     private Integer month7;
 
     /** 第8个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month8")
+    @Excel(name = "ui.data.column.simulatedResult.month8", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第8个月排产量", name = "month8")
     @TableField(value = "MONTH_8")
     private Integer month8;
 
     /** 第9个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month9")
+    @Excel(name = "ui.data.column.simulatedResult.month9", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第9个月排产量", name = "month9")
     @TableField(value = "MONTH_9")
     private Integer month9;
 
     /** 第10个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month10")
+    @Excel(name = "ui.data.column.simulatedResult.month10", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第10个月排产量", name = "month10")
     @TableField(value = "MONTH_10")
     private Integer month10;
 
     /** 第11个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month11")
+    @Excel(name = "ui.data.column.simulatedResult.month11", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第11个月排产量", name = "month11")
     @TableField(value = "MONTH_11")
     private Integer month11;
 
     /** 第12个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month12")
+    @Excel(name = "ui.data.column.simulatedResult.month12", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第12个月排产量", name = "month12")
     @TableField(value = "MONTH_12")
     private Integer month12;
 
     /** 第13个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month13")
+    @Excel(name = "ui.data.column.simulatedResult.month13", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第13个月排产量", name = "month13")
     @TableField(value = "MONTH_13")
     private Integer month13;
 
     /** 第14个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month14")
+    @Excel(name = "ui.data.column.simulatedResult.month14", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第14个月排产量", name = "month14")
     @TableField(value = "MONTH_14")
     private Integer month14;
 
     /** 第15个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month15")
+    @Excel(name = "ui.data.column.simulatedResult.month15", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第15个月排产量", name = "month15")
     @TableField(value = "MONTH_15")
     private Integer month15;
 
     /** 第16个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month16")
+    @Excel(name = "ui.data.column.simulatedResult.month16", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第16个月排产量", name = "month16")
     @TableField(value = "MONTH_16")
     private Integer month16;
 
     /** 第17个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month17")
+    @Excel(name = "ui.data.column.simulatedResult.month17", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第17个月排产量", name = "month17")
     @TableField(value = "MONTH_17")
     private Integer month17;
 
     /** 第18个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month18")
+    @Excel(name = "ui.data.column.simulatedResult.month18", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第18个月排产量", name = "month18")
     @TableField(value = "MONTH_18")
     private Integer month18;
 
     /** 第19个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month19")
+    @Excel(name = "ui.data.column.simulatedResult.month19", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第19个月排产量", name = "month19")
     @TableField(value = "MONTH_19")
     private Integer month19;
 
     /** 第20个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month20")
+    @Excel(name = "ui.data.column.simulatedResult.month20", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第20个月排产量", name = "month20")
     @TableField(value = "MONTH_20")
     private Integer month20;
 
     /** 第21个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month21")
+    @Excel(name = "ui.data.column.simulatedResult.month21", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第21个月排产量", name = "month21")
     @TableField(value = "MONTH_21")
     private Integer month21;
 
     /** 第22个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month22")
+    @Excel(name = "ui.data.column.simulatedResult.month22", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第22个月排产量", name = "month22")
     @TableField(value = "MONTH_22")
     private Integer month22;
 
     /** 第23个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month23")
+    @Excel(name = "ui.data.column.simulatedResult.month23", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第23个月排产量", name = "month23")
     @TableField(value = "MONTH_23")
     private Integer month23;
 
     /** 第24个月排产量 */
-    @Excel(name = "ui.data.column.simulatedResult.month24")
+    @Excel(name = "ui.data.column.simulatedResult.month24", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "第24个月排产量", name = "month24")
     @TableField(value = "MONTH_24")
     private Integer month24;

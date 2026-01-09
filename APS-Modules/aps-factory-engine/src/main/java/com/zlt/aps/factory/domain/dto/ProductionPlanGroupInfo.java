@@ -71,6 +71,10 @@ public class ProductionPlanGroupInfo {
      */
     private Integer theoryDays;
     /**
+     * 剩余需要分配的天数
+     */
+    private Integer leftOverNeedAllocationDays;
+    /**
      * 成型-硫化配比信息
      * key=机型brandCode ： value=配比信息
      */
@@ -113,7 +117,7 @@ public class ProductionPlanGroupInfo {
     @Deprecated
     private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
     /**
-     * 是否分配完毕
+     * 是否分配完毕 1 分配完成
      */
     private Integer isAllocationFinish;
 
@@ -167,6 +171,27 @@ public class ProductionPlanGroupInfo {
             groupInfo.calculateNeedCxCapacityMachineCount(context, context.getMaxProductionDays());
         });
         return groupInfoMap;
+    }
+
+    /**
+     * 更新剩余分配天数
+     *
+     * @param allocationDays 当前分配天数
+     */
+    public void updateLeftOverNeedAllocationDays(Integer allocationDays) {
+        if (null == allocationDays || allocationDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (null == leftOverNeedAllocationDays) {
+            return;
+        }
+        if (leftOverNeedAllocationDays <= allocationDays) {
+            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        }
+        leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
+        if (leftOverNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
+            isAllocationFinish = YesOrNoEnum.YES.getValue();
+        }
     }
 
     /**
@@ -332,30 +357,14 @@ public class ProductionPlanGroupInfo {
             needCxCapacityMachineCount = integerPart.add(BigDecimal.ONE);
             theoryDays = needCxCapacityMachineCount.multiply(monthMaxDays).intValue();
             this.theoryDays = theoryDays;
+            this.leftOverNeedAllocationDays = theoryDays;
+            log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(context, groupName, sumPlanQty, minLhMachineCount, minLhDayCapacityQty, theoryDays, needCxCapacityMachineCount));
             return;
         }
         this.theoryDays = theoryDays;
+        this.leftOverNeedAllocationDays = theoryDays;
         needCxCapacityMachineCount = machineCount.setScale(1, RoundingMode.UP);
         log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(context, groupName, sumPlanQty, minLhMachineCount, minLhDayCapacityQty, theoryDays, needCxCapacityMachineCount));
-    }
-
-    /**
-     * 根据成型对应硫化配比，得到剩余需求量需要分配的天数
-     *
-     * @param lhRatio 硫化配比
-     * @return
-     */
-    public Integer calculateNeedDays(Integer lhRatio) {
-        if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue() || null == lhRatio || lhRatio <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        //剩余需求量
-        Integer remainingProductionQty = getRemainingProductionQty();
-        if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal dayCapacity = getDayCapacityByLhRatio(lhRatio);
-        return BigDecimal.valueOf(remainingProductionQty).divide(dayCapacity, 0, RoundingMode.UP).intValue();
     }
 
     /**
@@ -381,11 +390,53 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取结构剩余待分配天数
+     * 不能根据剩余待排产量来估算，
+     * 因为有超出模具产能的干扰
+     *
+     * @return
+     */
+    public Integer getRemainingNeedAllocationDays() {
+        //标记是否分配完毕
+        if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (null == leftOverNeedAllocationDays) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return leftOverNeedAllocationDays;
+    }
+
+    /**
+     * 根据成型对应硫化配比，得到剩余需求量需要分配的天数
+     *
+     * @param lhRatio 硫化配比
+     * @return
+     */
+    @Deprecated
+    public Integer calculateNeedDays(Integer lhRatio) {
+        if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue() || null == lhRatio || lhRatio <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //剩余需求量
+        Integer remainingProductionQty = getRemainingProductionQty();
+        if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        BigDecimal dayCapacity = getDayCapacityByLhRatio(lhRatio);
+        return BigDecimal.valueOf(remainingProductionQty).divide(dayCapacity, 0, RoundingMode.UP).intValue();
+    }
+
+    /**
      * 获取结构分组下剩余还需排产量
      *
      * @return
      */
-    public Integer getRemainingProductionQty() {
+    @Deprecated
+    private Integer getRemainingProductionQty() {
         //标记是否分配完毕
         if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
             return BigDecimal.ZERO.intValue();
@@ -1053,5 +1104,7 @@ public class ProductionPlanGroupInfo {
     private void setAllocationZero() {
         needCxCapacityMachineCount = BigDecimal.ZERO;
         theoryDays = BigDecimal.ZERO.intValue();
+        leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        isAllocationFinish = YesOrNoEnum.YES.getValue();
     }
 }

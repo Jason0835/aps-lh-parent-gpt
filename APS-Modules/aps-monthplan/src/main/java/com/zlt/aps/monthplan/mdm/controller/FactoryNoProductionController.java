@@ -90,7 +90,7 @@ public class FactoryNoProductionController extends BaseController<FactoryNoProdu
         if (YesOrNoEnum.YES.getCode().equals(checkUnique)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.factoryNoProduction.unique"));
         }
-        String productCode = factoryNoProduction.getProductCode();
+        String productCode = factoryNoProduction.getMaterialCode();
         String factoryCode = factoryNoProduction.getFactoryCode();
         if (StringUtils.isBlank(productCode) || StringUtils.isBlank(factoryCode)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.factoryNoProduction.checkData.empty"));
