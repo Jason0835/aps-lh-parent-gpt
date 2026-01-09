@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -105,38 +106,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private String productTypeCode;
 
     /**
-     * 产品状态
-     */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productStatus")
-    @ApiModelProperty(value = "产品状态", name = "productStatus")
-    @TableField(value = "PRODUCT_STATUS")
-    private String productStatus;
-
-    /**
-     * 产品结构
-     */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.structureName")
-    @ApiModelProperty(value = "产品结构", name = "structureName")
-    @TableField(value = "STRUCTURE_NAME")
-    private String structureName;
-
-    /**
-     * 主物料(胎胚号)
-     */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
-    @TableField(value = "MAIN_MATERIAL_DESC")
-    private String mainMaterialDesc;
-
-    /**
-     * MES物料编码
-     */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
-
-    /**
      * 物料编码
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.materialCode")
@@ -153,12 +122,66 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     private String materialDesc;
 
     /**
+     * MES物料编码
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
+
+    /**
+     * 产品结构
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.structureName")
+    @ApiModelProperty(value = "产品结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
+
+    /**
      * 英寸
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
+
+    /**
+     * 产品分类
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
+    /**
+     * 产品状态
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productStatus")
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+    /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    @ApiModelProperty(value = "结构类型", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
+    /**
+     * 排产分类
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productionType", dictType = "biz_schedule_type")
+    @ApiModelProperty(value = "排产分类", name = "productionType")
+    @TableField(value = "PRODUCTION_TYPE")
+    private String productionType;
+
+    /**
+     * 主物料(胎胚号)
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
 
     /**
      * 施工阶段 0 无工艺 1 试制 2 量试 3 正式

@@ -145,6 +145,11 @@ public class CxAddSkuProductionHandler {
             productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
             return;
         }
+        //todo 判断选择的Sku，能否进行上机排产-此时判断胎胚种类数？
+
+
+
+
         String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
         log.info(TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay));
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();

@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -71,10 +72,20 @@ public class SupplyOrderPool extends BaseEntity {
     private String orderType;
 
     /** 适销区域 */
-    @Excel(name = "ui.data.column.supplyOrderPool.saleArea")
     @ApiModelProperty(value = "适销区域", name = "saleArea")
     @TableField(value = "SALE_AREA")
     private String saleArea;
+
+    /** 适销区域转译 */
+    @ApiModelProperty(value = "适销区域名称", name = "saleAreaName")
+    @TableField(exist = false)
+    private String saleAreaName;
+
+    /** 适销区域国际化 */
+    @Excel(name = "ui.data.column.supplyOrderPool.saleArea")
+    @ApiModelProperty(value = "适销区域国际化", name = "saleAreaNameI18n")
+    @TableField(exist = false)
+    private String saleAreaNameI18n;
 
     /** 品牌 */
     @Excel(name = "ui.data.column.supplyOrderPool.brand", dictType = "biz_brand_type")
