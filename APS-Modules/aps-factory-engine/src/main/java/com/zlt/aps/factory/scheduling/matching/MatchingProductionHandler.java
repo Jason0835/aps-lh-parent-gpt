@@ -31,10 +31,12 @@ import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
@@ -44,6 +46,8 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
+import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
+import com.zlt.aps.factory.scheduling.init.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -98,7 +102,7 @@ public class MatchingProductionHandler {
 		TbrProductionContext productionContext = initProductionContext(planList); // 初始化上下文
 		Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap = this.loadRequirePlan(productionContext); // 构建需求计划
 		List<MonthPlanProductionRequirePlanVo> requirePlanList = new ArrayList<>(requirePlanMap.values()); // 需求计划列表
-		this.buildProductionContext(productionContext, planList, requirePlanMap); // 填充上下文各项必要数据
+		this.buildProductionContext(productionContext, planList, requirePlanMap, requirePlanList); // 填充上下文各项必要数据
 		List<MonthPlanStructureLhRatioVo> structureLhRatioList = this.getLhRatioConfiguration(productionContext,
 				requirePlanList); // 加载结构硫化配比
 		Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo
@@ -135,7 +139,7 @@ public class MatchingProductionHandler {
 		Map<String, MonthPlanStructureLhRatioVo> structureLhRatioMap = structureLhRatioList.stream().collect(
 				Collectors.toMap(MonthPlanStructureLhRatioVo::getStructureName, Function.identity(), (r1, r2) -> r1));
 
-		List<FactoryMonthPlanMouldDayDetail> detailLogList = new ArrayList<>();
+//		List<FactoryMonthPlanMouldDayDetail> detailLogList = new ArrayList<>();
 		// 遍历所有结构
 		for (Entry<String, ProductionPlanGroupInfo> entry : estimateGroupCxAllocationMap.entrySet()) {
 			String structureName = entry.getKey(); // 分组名称（TBR：结构）
@@ -222,6 +226,7 @@ public class MatchingProductionHandler {
 			} while (true);
 		}
 		log.info(context.getProductionVersion() + "搭配排产end");
+        List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler.getMouldProductionResult(productionContext);
 		return detailLogList;
 	}
 
@@ -304,6 +309,8 @@ public class MatchingProductionHandler {
 		if (CollectionUtils.isEmpty(demandPlanList)) {
 			return requirePlanMap;
 		}
+		ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
+        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
 
 		// 需求计划需要按物料号合并各需求量
 		for (DpDemandPlan demandPlan : demandPlanList) {
@@ -313,7 +320,8 @@ public class MatchingProductionHandler {
 				requirePlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(null, productionVersion,
 						demandPlan);
 				requirePlan.setHeightLossQty(demandPlan.getMidQty());
-				requirePlan.setFactProdReqQty(requirePlan.getNetQty());
+				requirePlan.setFactProdReqQty(demandPlan.getNetQty());
+	            requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
 				requirePlanMap.put(materialCode, requirePlan);
 				continue;
 			}
@@ -370,7 +378,7 @@ public class MatchingProductionHandler {
 	 */
 	private TbrProductionContext buildProductionContext(TbrProductionContext productionContext,
 			List<FactoryMonthPlanMouldDayResult> planList,
-			Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap) {
+			Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
 		// 构建模具排产数据
 		Map<String, ProductionMouldInfoVo> mouldInfoMap = new HashMap<>();
 		for (FactoryMonthPlanMouldDayResult plan : planList) {
@@ -415,6 +423,7 @@ public class MatchingProductionHandler {
 		productionContext.getBaseDataContainer()
 				.setParamConfiguration(this.createParamConfiguration(productionContext));
 		productionContext.getBaseDataContainer().setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext));
+		productionContext.setAllProductionPlan(requirePlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity())));
 		return productionContext;
 	}
 
@@ -723,4 +732,52 @@ public class MatchingProductionHandler {
 		return allMouldRelationInfoList.stream()
 				.collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
 	}
+    /**
+     * 获取SKU的日硫化产能信息
+     * key = materialDesc: value = MonthPlanProductLhCapacityVo
+     *
+     * @param productionContext 排产上下文
+     * @param mode              日硫化量模式
+     * @return
+     */
+    private Map<String, MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(TbrProductionContext productionContext, DayVulcanizationModeEnum mode) {
+        List<MonthPlanProductLhCapacityVo> lhCapacityList = productionSchedulingDataService.getProductLhCapacityInfo(productionContext);
+        if (CollectionUtils.isEmpty(lhCapacityList)) {
+            log.info(TbrProductionInitLogRecorder.addDayLhCapacityInfoEmptyLog(productionContext));
+            return Collections.emptyMap();
+        }
+        //计算日硫化产能
+        lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
+        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity(), (before, after) -> after));
+    }
+    
+
+    /**
+     * 获取初始化业务的参数设定
+     *
+     * @param productionContext
+     * @return
+     */
+    private ProductionInitParamConfiguration createInitParamConfiguration(TbrProductionContext productionContext) {
+        ProductionInitParamConfiguration configuration = new ProductionInitParamConfiguration();
+        List<String> paramCodeList = new ArrayList<>(16);
+        paramCodeList.add(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode());
+        paramCodeList.add(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        Map<String, Object> paramConfigurationMap = productionSchedulingDataService.getFactoryParamByCondition(productionContext, paramCodeList);
+        if (CollectionUtils.isEmpty(paramConfigurationMap)) {
+            log.info(TbrProductionInitLogRecorder.addInitParamEmptyLog(productionContext));
+            return configuration;
+        }
+        configuration.setOpenPreemptionMouldCapacity((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode()));
+        configuration.setOpenLevelRatio((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode()));
+        //日硫化量获取
+        String dayVulcanizationParam = (String) paramConfigurationMap.get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        if (StringUtils.isBlank(dayVulcanizationParam)) {
+            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.STANDARD_CAPACITY);
+        } else {
+            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.getInstance(dayVulcanizationParam));
+        }
+        return configuration;
+    }
 }
