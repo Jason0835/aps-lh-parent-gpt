@@ -57,7 +57,7 @@ public class CxAddSkuProductionHandler {
         }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
-        Integer endDay = groupPlanInfo.getLatestEndDay();
+        Integer endDay = lhGroup.getEndDay();
         if (startDay >= endDay) {
             //todo 记录日志
             return;
@@ -145,6 +145,11 @@ public class CxAddSkuProductionHandler {
             productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
             return;
         }
+        //todo 判断选择的Sku，能否进行上机排产-此时判断胎胚种类数？
+
+
+
+
         String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
         log.info(TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay));
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();

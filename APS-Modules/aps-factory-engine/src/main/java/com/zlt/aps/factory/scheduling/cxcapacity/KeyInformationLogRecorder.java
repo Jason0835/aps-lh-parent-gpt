@@ -105,7 +105,7 @@ public class KeyInformationLogRecorder {
             skuInfo.append("没有续作Sku");
         } else {
             String skuFormat = "续作Sku：%s 模具数 %s";
-            continueSkuInfo.forEach((materialDesc, detail) -> skuInfo.append(String.format(skuFormat, materialDesc, detail.getMouldNumber())));
+            continueSkuInfo.forEach((materialDesc, detail) -> skuInfo.append(System.lineSeparator()).append(String.format(skuFormat, materialDesc, detail.getMouldNumber())));
         }
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构 %s 在产机台 %s 续作Sku信息：%s ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
@@ -144,7 +144,7 @@ public class KeyInformationLogRecorder {
         } else {
             onLineMachineInfo = allocationInfo.stream().map(CxMachineAllocationPlanHelper::getCxMachineCode).collect(Collectors.joining(StringConstant.COMMA));
             String onLineMachineFormat = "在产机台：%s 分配天数 %s 从%s~%s";
-            allocationInfo.forEach(singleAllocation -> cxMachineAllocationInfo.append(String.format(onLineMachineFormat, singleAllocation.getCxMachineCode(), singleAllocation.getAllocationDay(), singleAllocation.getStartDay(), singleAllocation.getEndDay())));
+            allocationInfo.forEach(singleAllocation -> cxMachineAllocationInfo.append(System.lineSeparator()).append(String.format(onLineMachineFormat, singleAllocation.getCxMachineCode(), singleAllocation.getAllocationDay(), singleAllocation.getStartDay(), singleAllocation.getEndDay())));
         }
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构 %s 在产机台 %s 机台分配信息：%s ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),

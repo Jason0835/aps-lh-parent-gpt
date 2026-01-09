@@ -83,6 +83,14 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String planType;
 
     /**
+     * 产品品类
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productTypeCode", dictType = "biz_product_type")
+    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
+
+    /**
      * 需求计划ID 可是需求计划或是试制量试计划
      */
     @ApiModelProperty(value = "需求计划", name = "monthPlanId")
@@ -114,14 +122,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String materialDesc;
 
     /**
-     * 产品品类
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productTypeCode", dictType = "biz_product_type")
-    @ApiModelProperty(value = "产品品类", name = "productTypeCode")
-    @TableField(value = "PRODUCT_TYPE_CODE")
-    private String productTypeCode;
-
-    /**
      * 产品结构
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.structureName")
@@ -130,11 +130,44 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String structureName;
 
     /**
+     * 英寸
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
+
+    /**
+     * 产品分类
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
+
+    /**
+     * 产品状态
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productStatus")
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+    /**
      * 结构类型 01 周期结构 02 常规结构
      */
-    @ApiModelProperty(value = "产品结构", name = "structureType")
+    @ApiModelProperty(value = "结构类型", name = "structureType")
     @TableField(value = "STRUCTURE_TYPE")
     private String structureType;
+
+    /**
+     * 排产分类
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.productionType", dictType = "biz_schedule_type")
+    @ApiModelProperty(value = "排产分类", name = "productionType")
+    @TableField(value = "PRODUCTION_TYPE")
+    private String productionType;
+
     /**
      * 施工阶段
      */
@@ -230,15 +263,6 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
-
-    /**
-     * 英寸 todo 字符类型
-     */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.proSize")
-    @ApiModelProperty(value = "英寸", name = "proSize")
-    @TableField(value = "PRO_SIZE")
-    private String proSize;
-
 
     /**
      * 规格

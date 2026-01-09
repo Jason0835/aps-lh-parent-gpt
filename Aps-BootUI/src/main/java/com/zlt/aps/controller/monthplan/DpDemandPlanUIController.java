@@ -187,6 +187,17 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     }
 
     /**
+     * 生成需求计划
+     */
+    @ApiOperation("生成需求计划版本")
+    @PostMapping("/createMonthRequireVersion")
+    @RequiresPermissions("monthplan:demandPlan:createMonthRequire")
+    @ResponseBody
+    public AjaxResult createMonthRequireVersion() {
+        return iDpDemandPlanService.createMonthRequireVersion();
+    }
+
+    /**
      * 查询需求计划版本号
      */
     @ApiOperation("查询需求计划版本号")

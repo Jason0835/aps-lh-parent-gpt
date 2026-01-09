@@ -282,24 +282,77 @@ public class ProductionPlanGroupInfo {
         }
         hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
         Integer conclusionDay = selectedDayLimit.getDay();
+        Integer endDay = endDayLimit.getDay();
         if (isGroupStartDayByFormalProduction(conclusionDay)) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         Integer previousDay = getPreviousDay(conclusionDay);
         if (null == previousDay) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
         Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
         if (BigDecimal.ONE.intValue() == canAddCount) {
-            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, previousSku.getUsedMouldSet());
+            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, endDay, previousSku.getUsedMouldSet());
         }
-        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, previousSku.getUsedMouldSet());
+        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+    }
+
+    /**
+     * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
+     *
+     * @param context     排产上下文
+     * @param addSkuInfo  需要上机的Sku
+     * @param preSelected 预计选中
+     * @return
+     */
+    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
+            return;
+        }
+        Integer startDay = preSelected.getClosingDay();
+        Integer endDay = preSelected.getEndDay();
+        Integer realStartDay = startDay;
+        Integer realEndDay = startDay;
+        String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        for (int productionDay = startDay; productionDay <= endDay; productionDay++) {
+            GroupPlanCxLhCapacityLimitHelper dayLimitInfo = dayProductionLimitInfo.get(productionDay);
+            if(null == dayLimitInfo){
+                if(realStartDay < productionDay){
+                    realStartDay = productionDay;
+                }
+                if(realEndDay > productionDay){
+                    realEndDay = productionDay;
+                }
+                continue;
+            }
+            Set<String> existEmbryoCode = dayLimitInfo.getProductionEmbryoCodeSet();
+            if(existEmbryoCode.contains(productionEmbryoCode)){
+                if(realStartDay < productionDay){
+                    realStartDay = productionDay;
+                }
+                if(realEndDay > productionDay){
+                    realEndDay = productionDay;
+                }
+                continue;
+            }
+            //不可上机，延后
+            if(existEmbryoCode.size() + BigDecimal.ONE.intValue() > dayLimitInfo.getMaxEmbryoCodeCount()){
+                realStartDay = productionDay;
+                break;
+            }
+        }
+
+
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+
+
     }
 
     /**
