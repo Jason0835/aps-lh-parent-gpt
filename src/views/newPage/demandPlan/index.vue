@@ -533,17 +533,17 @@ export default {
       return permissions.includes(permission);
     },
     async generPlan() {
-      // this.handleAdd()
-      // return
-      try {
-        this.createLoading=true
-        let res = await genenrDemandPlan(this.formatParams());
-        this.$modal.msgSuccess(res.msg);
-        this.getList();
-        this.createLoading=false
-      } catch (err) {
-        this.createLoading=false
-      }
+      this.handleAdd()
+      return
+      // try {
+      //   this.createLoading=true
+      //   let res = await genenrDemandPlan(this.formatParams());
+      //   this.$modal.msgSuccess(res.msg);
+      //   this.getList();
+      //   this.createLoading=false
+      // } catch (err) {
+      //   this.createLoading=false
+      // }
     },
     save() {},
     hide() {

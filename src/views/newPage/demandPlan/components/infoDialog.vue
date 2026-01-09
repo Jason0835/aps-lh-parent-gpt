@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { genenrDemandPlan } from "@/api/monthplan/demandPlan";
+import { genenrDemandPlan, getVersion } from "@/api/monthplan/demandPlan";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -81,6 +81,7 @@ export default {
         {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+          maxlength:30,
         },
       ],
     };
@@ -101,6 +102,7 @@ export default {
           params.year = year;
           params.month = month;
         }
+        params.monthPlanVersion=params.monthPlanVersion.replace(/\s/g, '')
         const data = await genenrDemandPlan(params);
         this.$modal.msgSuccess(data.msg);
         this.$emit("success");
@@ -113,10 +115,20 @@ export default {
     },
 
     //utils
-    show(data) {
+    async show(data) {
       this.visible = true;
 
-      this.form =data;
+      try {
+        let res = await getVersion();
+        this.form = {
+          ...data,
+          monthPlanVersion: res.msg,
+        };
+      } catch (err) {
+        this.form = {
+          ...data,
+        };
+      }
     },
     hide() {
       this.$refs.form.triggerResetForm();

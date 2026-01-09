@@ -23,8 +23,10 @@
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
           <el-tab-pane label="结构内" name="first">
-            <el-button @click="adjustOrder">{{ $t("获取调整订单") }}</el-button>
-            <el-button @click="handShowResult(true)">{{
+            <el-button @click="adjustOrder" :loading="getLoading">{{
+              $t("获取调整订单")
+            }}</el-button>
+            <el-button @click="handShowResult(true)" :loading="autoLoading">{{
               $t("自动调整")
             }}</el-button>
           </el-tab-pane>
@@ -123,6 +125,8 @@ export default {
   },
   data() {
     return {
+      getLoading: false,
+      autoLoading: false,
       adjustType: "01",
       show: true,
       subLoading: false,
@@ -214,7 +218,7 @@ export default {
                       size="mini"
                     ></el-input>
                   )}
-                  {!this.isEdit && <span >{row.confirmAdjustQty}</span>}
+                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
                 </div>
               );
             },
@@ -232,11 +236,7 @@ export default {
                       <el-option label="3" value="3" key="3" />
                     </el-select>
                   )}
-                  {!this.isEdit && (
-                    <span>{row.adjustPriorities}</span>
-                  )}
-
-
+                  {!this.isEdit && <span>{row.adjustPriorities}</span>}
                 </div>
               );
             },
@@ -388,6 +388,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "cxMachineCode",
@@ -444,6 +447,16 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+    },
     backPlan() {
       if (this.adjustType == "01") {
         this.activeName = "first";
@@ -464,6 +477,7 @@ export default {
     //获取调整订单
     async adjustOrder() {
       try {
+        this.getLoading = true;
         let params = {
           ...this.query,
           ...this.sort,
@@ -482,8 +496,13 @@ export default {
         params.adjustType = this.adjustType;
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
-        console.log(res);
-      } catch (err) {}
+        if(res.rows){
+          this.data = res.rows;
+        }
+        this.getLoading = false;
+      } catch (err) {
+        this.getLoading = false;
+      }
     },
     handleExpandChange(row, expandedRows) {
       // console.log(row, expandedRows, this.expands);
@@ -519,6 +538,7 @@ export default {
     async handShowResult() {
       this.show = false;
       this.loading = true;
+      this.autoLoading = true;
       try {
         let params = {
           ...this.query,
@@ -534,12 +554,17 @@ export default {
         }
         console.log(params);
         let res = await autoAdjust(params);
-        console.log(res);
+        if(res.rows){
+          this.data = res.rows;
+        }
+        // this.data=res.rows
         this.show = true;
         this.loading = false;
+        this.autoLoading = false;
       } catch (err) {
         this.show = true;
         this.loading = false;
+        this.autoLoading = false;
       }
 
       // setTimeout(() => {

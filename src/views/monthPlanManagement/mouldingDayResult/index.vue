@@ -110,7 +110,15 @@ export default {
     infoDialog,
     specDialog,
   },
-  dicts: ["biz_factory_name", "biz_product_type", "biz_brand_type",'biz_plan_type','biz_construction_stage'],
+  dicts: [
+    "biz_factory_name",
+    "biz_product_type",
+    "biz_brand_type",
+    "biz_plan_type",
+    "biz_construction_stage",
+    "trial_status",
+    "product_category"
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -140,15 +148,31 @@ export default {
   computed: {
     columns() {
       let columns = [
-        // {
-        //   prop: "productStatus",
-        //   label: this.$t("产品状态"),
-        //   width: 120,
-        // },
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width: 120,
+        },
+        {
+          prop: "productStatus",
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          width: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
+        },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           width: 180,
+        },
+        {
+          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          prop: "productTypeCode",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.product_category, value);
+          },
+          width: 120,
         },
         {
           label: this.$t("ui.data.column.monthplan.productType"),
@@ -170,7 +194,10 @@ export default {
           label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
           prop: "constructionStage",
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+            return this.selectDictLabel(
+              this.dict.type.biz_construction_stage,
+              value
+            );
           },
           width: 120,
         },
@@ -241,13 +268,13 @@ export default {
         if (query.productionStartDate) {
           //
           let start = moment(query.productionStartDate);
-          let end =  moment(query.productionStartDate).add(1 ,"M");
+          let end = moment(query.productionStartDate).add(1, "M");
 
           let list = [];
 
-          while(start.isBefore(end)) {
-            list.push(start.format("DD"))
-            start.add(1, 'd')
+          while (start.isBefore(end)) {
+            list.push(start.format("DD"));
+            start.add(1, "d");
           }
           // console.log(list);
           for (let i = 0; i < list.length; i++) {
@@ -257,12 +284,11 @@ export default {
               // label: this.$t("ui.data.column.mouldingDayResult.day", {
               //   day: Number(dayNumStr),
               // }),
-              prop: `day${i+1}`,
+              prop: `day${i + 1}`,
               minWidth: "80px",
               type: "number",
             });
           }
-
         } else {
           //显示每日数据
           // const date = moment(this.query.yearMonth);
@@ -311,12 +337,12 @@ export default {
           label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "mainPattern",
         },
-        // {
-        //   label: this.$t("产品状态"),
-        //   prop: "productStatus",
-        //   type: "select",
-        //   dictData: this.dict.type.biz_product_type,
-        // },
+        {
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          prop: "productStatus",
+          type: "select",
+          dictData: this.dict.type.trial_status,
+        },
         // {
         //   label: this.$t("规格"),
         //   prop: "materialDesc",
@@ -518,7 +544,7 @@ export default {
     console.log(this.$route);
     if (this.$route.query) {
       let defaultParams = {
-       ...this.$route.query
+        ...this.$route.query,
       };
       this.search = {
         ...defaultParams,

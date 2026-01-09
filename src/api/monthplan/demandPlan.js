@@ -22,3 +22,10 @@ export function genenrDemandPlan(query) {
     data: query
   })
 }
+export function getVersion(query) {
+  return request({
+    url: '/monthplan/demandPlan/createMonthRequireVersion',
+    method: 'post',
+    data: query
+  })
+}
