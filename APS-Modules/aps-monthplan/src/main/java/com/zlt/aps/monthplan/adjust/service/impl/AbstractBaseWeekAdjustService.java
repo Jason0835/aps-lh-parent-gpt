@@ -5,12 +5,10 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -40,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -450,17 +449,25 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         CompletableFuture<Void> trialPlanFuture = CompletableFuture.runAsync(() -> initTrialPlan(contextDTO), executor);
         // 初始化月底计划余量
         CompletableFuture<Void> monthSurplusFuture = CompletableFuture.runAsync(() -> initMonthSurplus(contextDTO), executor);
-        // 初始化成品实时库存
-        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
         // 初始化月度硫化监控
         CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
+        // 初始化成品实时库存
+//        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
 
         try {
             // 等待所有异步任务执行完成
             CompletableFuture.allOf(
-                    versionAndMonthPlanFuture, saleOrderFuture, trialPlanFuture,
-                    monthSurplusFuture, productStockFuture, planMonitorFuture
+                    versionAndMonthPlanFuture,
+                    saleOrderFuture,
+                    trialPlanFuture,
+                    monthSurplusFuture,
+//                    productStockFuture,
+                    planMonitorFuture
             ).join();
+
+            log.info("并行初始化任务执行完成");
+            // 初始化成品实时库存
+            initProductStock(contextDTO);
 
         } catch (CompletionException e) {
             // 异常处理
@@ -527,9 +534,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     private void initProductStock(MpRollAdjustContextDTO contextDTO) {
         MdmProductStock queryVO = new MdmProductStock();
+        queryVO.setFactoryCode(contextDTO.getFactoryCode());
+        queryVO.setStockDate(DateUtil.parse(DateUtil.today()));
         Map<String, Object> param = Maps.newHashMap();
-        param.put("factoryCode", contextDTO.getFactoryCode());
-        param.put("stockDate", new Date());
         // 传空查询所有
         param.put("materialCodeList", null);
         queryVO.setParams(param);
@@ -686,6 +693,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(MpFactoryProductionVersion::getMonth, queryVO.getMonth());
         queryWrapper.eq(MpFactoryProductionVersion::getPlanType, queryVO.getPlanType());
         queryWrapper.eq(queryVO.getIsFinal() != null, MpFactoryProductionVersion::getIsFinal, queryVO.getIsFinal());
+        queryWrapper.eq(MpFactoryProductionVersion::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
 
@@ -751,9 +759,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @return
      */
     private MpFactoryProductionVersion getIsFinalVersion(MpRollAdjustContextDTO contextDTO) {
-        // 初始化排产版本
-        initVersion(contextDTO);
-
+        if (PubUtil.isEmpty(contextDTO.getFactoryProductionVersionList())) {
+            // 初始化排产版本
+            initVersion(contextDTO);
+        }
         List<MpFactoryProductionVersion> sourceVersionList = contextDTO.getFactoryProductionVersionList();
         if (PubUtil.isEmpty(sourceVersionList)) {
             return null;
@@ -891,11 +900,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
+            // 当前订单量
             Integer ordQty = Convert.toInt(adjust.getOrdQty(), 0);
-            Integer planSurplusQty = MapUtil.getInt(surplusMap, materialCode, 0);
-            Integer stockQty = MapUtil.getInt(stockMap, materialCode, 0);
+            // 月底计划余量
+            BigDecimal planSurplusQty = BigDecimal.ZERO;
+            if (PubUtil.isNotEmpty(surplusMap)) {
+                planSurplusQty = surplusMap.get(materialCode) == null ? BigDecimal.ZERO : surplusMap.get(materialCode).getPlanSurplusQty();
+            }
+            // 实时库存
+            Integer stockQty = 0;
+            if (PubUtil.isNotEmpty(stockMap)) {
+                stockQty = stockMap.get(materialCode) == null ? 0 : stockMap.get(materialCode).getStockQty();
+            }
             // 计算赋值 净需求 = 销售订单池.当前订单量 - 实时库存 - 月底计划余量
-            Integer currentNetQty = ordQty - planSurplusQty - stockQty;
+            Integer currentNetQty = ordQty - stockQty - planSurplusQty.intValue() ;
             adjust.setCurrentNetQty(currentNetQty);
         }
 
@@ -968,7 +986,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 计算：day1~targetDay的累计值
             Integer totalScheduledQty = calculateQty(planGroupMap, materialCode, targetDay);
             // 获取已生产量（空值按0处理）
-            Integer productionQty = MapUtil.getInt(monitorGroupMap, materialCode, 0);
+            Integer productionQty = 0;
+            if (PubUtil.isNotEmpty(monitorGroupMap)) {
+                if (PubUtil.isNotEmpty(monitorGroupMap.get(materialCode))) {
+                    productionQty = monitorGroupMap.get(materialCode).get(0).getProductionQty();
+                }
+            }
             // 计划已排产量
             adjust.setMonthScheduledQty(totalScheduledQty);
             // 计划剩余排产量 = 累计已排产量 - 已生产量
