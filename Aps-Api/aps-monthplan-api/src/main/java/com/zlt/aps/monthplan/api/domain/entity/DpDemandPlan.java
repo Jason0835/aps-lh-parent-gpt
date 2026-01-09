@@ -256,7 +256,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 中优先级
      */
-    @Excel(name = "ui.data.column.demandPlandemandPlan.midQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.demandPlan.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
     private Integer midQty;
