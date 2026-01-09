@@ -157,7 +157,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 1. 前置校验
         validateProductionVersionFinalized(createCondition);
 
-        // 2. 生成版本号
+        // 2. 生成版本号不能重复
         String monthPlanVersion = requirementVersionService.generateVersion(PREFIX);
         if (createCondition.getMonthPlanVersion() != null) {
             // 19409 净需求计划----->点击生成需求计划需要弹框获取需求计划版本号，然后允许用户修改需求计划版本号

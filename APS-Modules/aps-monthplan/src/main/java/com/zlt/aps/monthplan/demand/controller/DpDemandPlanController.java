@@ -1,9 +1,11 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.impl.DpDemandPlanServiceImpl;
@@ -225,6 +227,17 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     )
     @PostMapping("/createMonthRequire")
     public AjaxResult createMonthRequire(@RequestBody DpDemandPlan createCondition){
+        if (createCondition == null || StringUtil.isEmpty(createCondition.getMonthPlanVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.demandPlan.isnull"));
+        }
+
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("MONTH_PLAN_VERSION", createCondition.getMonthPlanVersion());
+        entityMapper.selectCount(queryWrapper);
+        if (entityMapper.selectCount(queryWrapper) > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.demandPlan.notUnique"));
+        }
+
         dpDemandPlanService.createMonthRequire(createCondition);
         return AjaxResult.success();
     }
