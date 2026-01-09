@@ -134,6 +134,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_SUM_CAPACITY_INFO("20-13-02", "分组总产能预算"),
     /**
+     * 20-13-04 汇总
+     */
+    SUMMARY_INFO_SUM("20-13-04", "汇总"),
+    /**
      * 20-13-03 分组预算机台数
      */
     GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-13-03", "分组预算机台数"),
@@ -290,6 +294,10 @@ public enum TbrMouldProductionLogType {
      * 30-02-04 非在机结构模具排产硫化组排产Sku没有合适的排产模具
      */
     GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-02-04", "非在机结构模具排产硫化组排产Sku没有合适的排产模具"),
+    /**
+     * 30-02-05 非在机结构使用模具排产硫化组
+     */
+    GROUP_MOULD_SKU_USED_FIND_MOULD_PRODUCTION("30-02-05", "非在机结构使用模具排产硫化组"),
     /**
      * 30-03-01 在机结构续作Sku开始模具排产
      */

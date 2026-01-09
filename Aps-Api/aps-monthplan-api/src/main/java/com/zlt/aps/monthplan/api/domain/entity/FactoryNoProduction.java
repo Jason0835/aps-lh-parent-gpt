@@ -63,9 +63,9 @@ public class FactoryNoProduction extends BaseEntity {
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.factoryNoProduction.productCode")
-    @ApiModelProperty(value = "物料编号", name = "productCode")
-    @TableField(value = "PRODUCT_CODE")
-    private String productCode;
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
     /**
      * 品名
@@ -78,8 +78,8 @@ public class FactoryNoProduction extends BaseEntity {
      * 产品描述
      */
     @Excel(name = "ui.data.column.factoryNoProduction.productDesc")
-    @ApiModelProperty(value = "产品描述", name = "productDesc")
-    @TableField(value = "PRODUCT_DESC")
-    private String productDesc;
+    @ApiModelProperty(value = "产品描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
 }

@@ -65,6 +65,25 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     /**
      * 结构排产
      * 1、构建排产Tbr排产上下文(设置排产版本信息、构建排产周期信息)
+     * 2、根据工厂、年份、月份、需求版本号获取排产需求(前面初始化部分已经处理-故而从初始化表中获取t_mp_proc_month_plan_init)
+     * 3、构建排产前的基础配置数据获取
+     * 3.1、工厂排产参数配置读取：t_mp_factory_param
+     * 3.2、胎胚需要使用的特殊材料信息 t_mdm_material_consume_detail
+     * 4、按结构分组，并根据结构+主花纹的最大模具数，控制结构的合理最大排产量，以此数据来估算使用的机台数
+     * 5、对在机结构进行在产机台分配(需要根据模拟排产续作Sku部分来分配)
+     * 5.1、续作Sku分为3步：续作Sku使用续作模具数排产高优先级部分、接着排续作Sku同规格同花纹部分的高优先级量，最后排同生胎、共模具部分的高优先级量
+     * 6、在机结构在产机台分配完后，继续对在机结构的新增Sku模拟模具排产，同时确定是否需要提前收尾，最终确认收尾时间点
+     * 7、对在产机台有收尾的机台，反向匹配分组计划(机台剩余产能能够覆盖需求量，并满足匹配条件)
+     * 8、对新增结构和在机结构剩余量进行产能分配，比较结构的优先级，确认最高优先级结构，挑选机台
+     * 8.1、确认机台与分组计划关系后，进行模拟模具排产，确定其准确的收尾时间
+     * 9、每排完一次匹配，则进行机台反向选择分组计划
+     * 9.1、每确定一组机台与分组计划关系后，进行模拟模具排产，确定其准确的收尾时间
+     * 10、模拟完成后，得到最终结构排产结果(结构与机台的上机时间~收尾时间、机台结构间的衔接)
+     * 11、根据最终结果排产结果，按结构维度重新开始正式模具排产
+     * 11.1、优先在机机构排产
+     * 11.1.1、在机结构续作Sku先排->续作Sku的同规格同花纹->续作Sku的同生胎同模具
+     * 11.1.2、在机结构新增Sku排产
+     * 11.2、新增结构排产
      *
      * @param context 排产上下文
      * @param userObj 用户数据
@@ -106,10 +125,11 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(productionContext, structureLhRatioList);
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //todo 采用新的逻辑进行分配在机结构的在产机台
+        KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         productionContext.setReverseFindSet(new HashSet<>());
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         //在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //7、对收尾成型机台，反向匹配待排结构
@@ -604,25 +624,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, addNewGroupPlan.getGroupName()));
+            //20260109 标记分配完成--没有找到合适，说明后面也找不到
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //todo 结构标记不可排产
             return;
         }
         //分配产能
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
-        //selectedCxMachine.getRatio()
-        Integer lhRatio = lhRatioInfo.getMaxLhMachineCount();
         Integer remainingDays = selectedCxMachine.getRemainingDays();
         //todo 判断成型鼓是否符合条件
-        Integer needAllocationDays = addNewGroupPlan.calculateNeedDays(lhRatio);
+        Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
         Integer leftOver = remainingDays - realAllocationDays;
         selectedCxMachine.setRemainingDays(leftOver);
+        addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         Integer startDay = selectedCxMachine.getAllocationStartDay();
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(addHelper);
-        //TODO 对成型机台进行模拟模具排产
+        //对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
+        if (needAllocationDays <= remainingDays) {
+            //20260108 标记分配完成
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+        }
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);

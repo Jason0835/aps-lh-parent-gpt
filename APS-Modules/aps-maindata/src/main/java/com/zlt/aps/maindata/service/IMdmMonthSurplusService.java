@@ -1,7 +1,12 @@
 package com.zlt.aps.maindata.service;
 
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.bill.common.service.IDocService;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.Date;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -18,5 +23,10 @@ import com.zlt.bill.common.service.IDocService;
  * @date 2025-12-08
  */
 public interface IMdmMonthSurplusService extends IDocService<MdmMonthSurplus> {
+
+    /**
+     * 异步导入
+     */
+    void importDataAsync(List<MdmMonthSurplus> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
 
 }

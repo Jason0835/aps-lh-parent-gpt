@@ -485,7 +485,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
             // 年月
-            contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + contextDTO.getMpMonth()));
+            contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
         }
     }
 
@@ -760,7 +760,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 筛选：定稿的排产版本
         MpFactoryProductionVersion factoryProductionVersion = sourceVersionList.stream()
-                .filter(item -> Constant.TRUE.equals(item.getIsFinal()))
+                .filter(item -> ApsConstant.TRUE.equals(item.getIsFinal()))
                 .findFirst()
                 .orElse(null);
         return factoryProductionVersion;

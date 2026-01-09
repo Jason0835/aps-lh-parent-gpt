@@ -69,17 +69,17 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
 
     @Override
     public boolean save(FactoryNoProduction noProduction) {
-        String productCode = noProduction.getProductCode();
+        String materialCode = noProduction.getMaterialCode();
         String factoryCode = noProduction.getFactoryCode();
         QueryWrapper<MdmMaterialInfo> productQuery = new QueryWrapper<>();
         productQuery.eq("FACTORY_CODE", factoryCode);
-        productQuery.eq("PRODUCT_CODE", productCode);
+        productQuery.eq("MATERIAL_CODE", materialCode);
         productQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo> productInfoList = productInfoEntityMapper.selectList(productQuery);
         if (CollectionUtils.isEmpty(productInfoList)) {
             return super.save(noProduction);
         }
-        noProduction.setProductDesc(productInfoList.get(0).getMaterialDesc());
+        noProduction.setMaterialDesc(productInfoList.get(0).getMaterialDesc());
         return super.save(noProduction);
     }
 
@@ -110,7 +110,7 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
         List<FactoryNoProduction> filteredList = new ArrayList<>();
         for (FactoryNoProduction entity : list) {
             // 构建一个基于特定字段的唯一键
-            String uniqueKey = entity.getYear() + "-" + entity.getMonth() + "-" + entity.getFactoryCode() + "-" + entity.getProductCode();
+            String uniqueKey = entity.getYear() + "-" + entity.getMonth() + "-" + entity.getFactoryCode() + "-" + entity.getMaterialCode();
             // 如果Set中不存在此键，则表示数据未重复，可以添加到新列表中
             if (uniqueKeys.add(uniqueKey)) {
                 filteredList.add(entity);
@@ -140,7 +140,7 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
                 addImportErrorLog(importLogId, errorNum, errorMessage, validated);
             }
             //查询和赋值物料号
-            MdmMaterialInfo productInfo = productInfoEntityMapper.selectByProductCode(info.getProductCode());
+            MdmMaterialInfo productInfo = productInfoEntityMapper.selectByProductCode(info.getMaterialCode());
             if (productInfo == null) {
                 failureNum++;
                 String message = String.format(rowCountStr, i + 2) + productCodeError;
@@ -148,7 +148,7 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
                         message, importErrorLogs);
                 continue;
             } else {
-                info.setProductDesc(productInfo.getMaterialDesc());
+                info.setMaterialDesc(productInfo.getMaterialDesc());
             }
 
             if (org.apache.commons.collections4.CollectionUtils.isNotEmpty(validated)) {
@@ -176,10 +176,10 @@ public class FactoryNoProductionServiceImpl extends ServiceImpl<FactoryNoProduct
                 if (CollectionUtils.isEmpty(dataList)) {
                     saveBatch(importList);
                 } else {
-                    Set<String> productCodeSet = dataList.stream().map(FactoryNoProduction::getProductCode).collect(Collectors.toSet());
+                    Set<String> productCodeSet = dataList.stream().map(FactoryNoProduction::getMaterialCode).collect(Collectors.toSet());
                     List<FactoryNoProduction> insertList = new ArrayList<>();
                     importList.stream().forEach(importData -> {
-                        if (!productCodeSet.contains(importData.getProductCode())) {
+                        if (!productCodeSet.contains(importData.getMaterialCode())) {
                             insertList.add(importData);
                         }
                     });

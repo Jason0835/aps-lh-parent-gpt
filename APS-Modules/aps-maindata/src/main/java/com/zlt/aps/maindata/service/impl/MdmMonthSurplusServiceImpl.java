@@ -2,21 +2,31 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonthSurplusService;
+import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.*;
 import java.util.function.Function;
@@ -44,6 +54,12 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
 
   private final MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
+    @Autowired
+    private IRemoteImportLogService iRemoteImportLogService;
+
+    @Autowired
+    private IRemoteImportErrorLogService iRemoteImportErrorLogService;
+
   @Override
     protected String getDocTypeCode() {
         return "MDM0140";
@@ -69,6 +85,28 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "materialCode"));
+    }
+
+    /**
+     * 异步导入
+     */
+    @Async
+    @Override
+    public void importDataAsync(List<MdmMonthSurplus> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
+        try {
+            RequestContextHolder.setRequestAttributes(attributes, true);
+
+            AjaxResult result = this.importData(list, updateSupport, importLogId);
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(list.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            RemoteImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, iRemoteImportLogService);
+            RemoteImportExcelUtils.saveImportErrorLogs(result, iRemoteImportErrorLogService);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     @Override
