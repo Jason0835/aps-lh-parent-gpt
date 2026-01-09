@@ -49,9 +49,8 @@ public class CxMouldProductionHandler {
             //todo 记录日志
             return;
         }
-        //先续作排产： 续作SKU ->同规格同花纹 -> 换活字块共生胎同模具
+        //先续作排产： 续作SKU ->同规格同花纹 -> 换活字块共生胎同模具 cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
         Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
-//                cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
         if (!CollectionUtils.isEmpty(continueSkuMap)) {
             CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, productionPlan, mouldInfoMap, mouldShellMap);
         }
