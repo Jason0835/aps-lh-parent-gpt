@@ -6,6 +6,7 @@ import com.google.common.collect.Sets;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.StringConstant;
@@ -14,12 +15,15 @@ import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -71,12 +75,10 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody SupplyOrderPool queryVO) {
-        TableDataInfo tableResult = super.list(queryVO);
-        if(CollectionUtils.isEmpty(tableResult.getRows())) {
-            return tableResult;
-        }
-        this.translationList((List<SupplyOrderPool>)tableResult.getRows());
-        return tableResult;
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        List<SupplyOrderPool> list = (List<SupplyOrderPool>) tableDataInfo.getRows();
+        JsonI18nConvertUtils.conventJsonI18n(list, SupplyOrderPool.class);
+        return tableDataInfo;
     }
 
     private void translationList(List<SupplyOrderPool> rows) {
@@ -112,6 +114,14 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     protected String getOrderBy() {
         return "create_time desc";
     }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "saleAreaName->getcolvaluewithcondition(t_dp_area, area_name, area_code, saleArea, is_delete = 0)",
+        };
+    }
+
 
     /**
      * 保存
@@ -182,7 +192,13 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         QueryWrapper<SupplyOrderPool> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         List<SupplyOrderPool> list = entityMapper.selectList(wrapper);
-        this.translationList(list);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(list, SupplyOrderPool.class);
         return list;
     }
 
