@@ -6,6 +6,7 @@ import com.google.common.collect.Sets;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.StringConstant;
@@ -14,12 +15,16 @@ import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -30,10 +35,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -79,38 +81,52 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         return tableResult;
     }
 
-    private void translationList(List<SupplyOrderPool> rows) {
-        // 加载区域
-        LambdaQueryWrapper<DpArea> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<DpArea> areas = dpAreaEntityMapper.selectList(queryWrapper);
-        if(CollectionUtils.isEmpty(areas)) {
-            return;
-        }
-        List<DpArea> filterAreas = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark())).collect(Collectors.toList());
-        if(CollectionUtils.isEmpty(filterAreas)) {
-            return;
-        }
-        JsonI18nConvertUtils.conventJsonI18n(filterAreas, DpArea.class);
-        Map<String, String> areaMap = filterAreas.stream()
-            .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
-        for (SupplyOrderPool item: rows) {
-            String area = item.getSaleArea();
-            if(StringUtils.isBlank(area)) {
-                item.setSaleArea(StringUtils.EMPTY);
-                continue;
+    private void translationList(List<SupplyOrderPool> list) {
+        // 把区域都转成名称
+        List<AreaConvertVo> convertVoList = list.stream().map(SupplyOrderPool::getSaleArea)
+                .flatMap(item -> Arrays.stream(item.split(",")))
+                .distinct()
+                .filter(com.ruoyi.common.utils.StringUtils::isNotBlank)
+                .map(item -> {
+                    AreaConvertVo areaConvertVo = new AreaConvertVo();
+                    areaConvertVo.setAreaCode(item);
+                    return areaConvertVo;
+                })
+                .sorted(Comparator.comparing(AreaConvertVo::getAreaCode))
+                .collect(Collectors.toList());
+        Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
+        for (SupplyOrderPool supplyOrderPool : list) {
+            String saleArea = supplyOrderPool.getSaleArea();
+            String[] areaSplitArr = saleArea.split(",");
+            List<String> areaNameList = new ArrayList<>();
+            for (String areaCode : areaSplitArr) {
+                if (areaNameMap.containsKey(areaCode)) {
+                    String name = areaNameMap.get(areaCode);
+                    areaNameList.add(name);
+                }
             }
-            Set<String> areaSet = Sets.newHashSet();
-            Arrays.stream(area.split(StringConstant.COMMA)).forEach(areaCode -> {
-                areaSet.add(areaMap.getOrDefault(areaCode, StringUtils.EMPTY));
-            });
-            item.setSaleArea(String.join(StringConstant.COMMA, areaSet));
+            supplyOrderPool.setSaleAreaName(String.join(",", areaNameList));
         }
     }
 
     @Override
     protected String getOrderBy() {
         return "create_time desc";
+    }
+
+    private Map<String, String> getAreaNameMap(List<AreaConvertVo> convertVoList) {
+        // 执行表达式，转义区域
+        try {
+            QueryFormulaUtil.execFormula(convertVoList, new String[]{
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+            });
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("转换区域，执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
+        return convertVoList.stream().filter(item -> com.ruoyi.common.utils.StringUtils.isNotBlank(item.getAreaCodeNameI18n()))
+                .collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n, (k1, k2) -> k1));
     }
 
     /**

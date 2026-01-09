@@ -3,8 +3,10 @@ package com.zlt.aps.monthplan.demand.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.impl.DpDemandPlanServiceImpl;
 import com.zlt.common.utils.PubUtil;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -56,6 +58,9 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
 
     @Autowired
     private IDpDemandPlanService dpDemandPlanService;
+
+    @Autowired
+    private RequirementVersionService requirementVersionService;
 
     @Autowired
     private DpDemandPlanEntityMapper entityMapper;
@@ -222,6 +227,12 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     public AjaxResult createMonthRequire(@RequestBody DpDemandPlan createCondition){
         dpDemandPlanService.createMonthRequire(createCondition);
         return AjaxResult.success();
+    }
+
+    @ApiOperation("生成需求计划版本")
+    @PostMapping("/createMonthRequireVersion")
+    public AjaxResult createMonthRequireVersion(){
+        return AjaxResult.success( requirementVersionService.generateVersion(DpDemandPlanServiceImpl.PREFIX));
     }
 
     @ApiOperation("查询需求计划版本号")

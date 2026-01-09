@@ -556,7 +556,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
             //首先设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
-            //todo 在机结构-新增Sku模拟排产
+            //在机结构-新增Sku模拟排产
             CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo);
             //再次设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();

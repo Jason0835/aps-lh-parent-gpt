@@ -75,12 +75,22 @@ public interface IDpDemandPlanRemoteService {
     @ApiOperation("导入需求计划")
     @PostMapping("/demandPlan/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
     /**
      * 生成需求计划数据
      */
     @ApiOperation("生成需求计划")
     @PostMapping("/demandPlan/createMonthRequire")
     AjaxResult createMonthRequire(@RequestBody  DpDemandPlan createCondition);
+
+    /**
+     * 生成需求计划数据
+     */
+    @ApiOperation("生成需求计划")
+    @PostMapping("/demandPlan/createMonthRequireVersion")
+    AjaxResult createMonthRequireVersion();
+
+
     /**
      * 查询需求计划版本号
      */

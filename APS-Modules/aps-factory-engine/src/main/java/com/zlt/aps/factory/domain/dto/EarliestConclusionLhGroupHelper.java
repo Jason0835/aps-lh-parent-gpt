@@ -26,9 +26,13 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
      */
     private Integer beforeProductionQty;
     /**
-     * 收尾日
+     * 收尾日-即下一个Sku上机日
      */
     private Integer closingDay;
+    /**
+     * 排产结束日
+     */
+    private Integer endDay;
     /**
      * 使用的模具
      */
@@ -41,12 +45,14 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
      * @param beforeMaterialCode  前Sku物料编码
      * @param beforeProductionQty 前Sku排产量
      * @param closingDay          收尾日
+     * @param endDay              排产结束日
      */
-    public EarliestConclusionLhGroupHelper(String beforeMaterialDesc, String beforeMaterialCode, Integer beforeProductionQty, Integer closingDay, Set<String> usedMouldSet) {
+    public EarliestConclusionLhGroupHelper(String beforeMaterialDesc, String beforeMaterialCode, Integer beforeProductionQty, Integer closingDay, Integer endDay, Set<String> usedMouldSet) {
         this.beforeMaterialDesc = beforeMaterialDesc;
         this.beforeMaterialCode = beforeMaterialCode;
         this.beforeProductionQty = beforeProductionQty;
         this.closingDay = closingDay;
+        this.endDay = endDay;
         this.usedMouldSet = usedMouldSet;
     }
 }

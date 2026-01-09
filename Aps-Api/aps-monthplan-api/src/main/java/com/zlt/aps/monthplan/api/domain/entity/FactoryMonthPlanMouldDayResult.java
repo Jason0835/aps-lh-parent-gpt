@@ -97,38 +97,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String productTypeCode;
 
     /**
-     * 产品状态
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus")
-    @ApiModelProperty(value = "产品状态", name = "productStatus")
-    @TableField(value = "PRODUCT_STATUS")
-    private String productStatus;
-
-    /**
-     * 产品结构
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.structureName")
-    @ApiModelProperty(value = "产品结构", name = "structureName")
-    @TableField(value = "STRUCTURE_NAME")
-    private String structureName;
-
-    /**
-     * 主物料(胎胚号)
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
-    @TableField(value = "MAIN_MATERIAL_DESC")
-    private String mainMaterialDesc;
-
-    /**
-     * MES物料编码
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
-
-    /**
      * 物料编码
      */
     @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.materialCode")
@@ -145,20 +113,67 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String materialDesc;
 
     /**
-     * 动平衡数量
+     * MES物料编码
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.dynamicBalanceQty")
-    @ApiModelProperty(value = "动平衡数量", name = "dynamicBalanceQty")
-    @TableField(value = "DYNAMIC_BALANCE_QTY")
-    private String dynamicBalanceQty;
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     /**
-     * 均匀性数量
+     * 产品结构
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.uniformityQty")
-    @ApiModelProperty(value = "均匀性数量", name = "uniformityQty")
-    @TableField(value = "UNIFORMITY_QTY")
-    private Integer uniformityQty;
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.structureName")
+    @ApiModelProperty(value = "产品结构", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
+
+    /**
+     * 英寸
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
+
+    /**
+     * 产品分类
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
+
+    /**
+     * 产品状态
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus")
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+    /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    @ApiModelProperty(value = "结构类型", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
+
+    /**
+     * 排产分类
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionType", dictType = "biz_schedule_type")
+    @ApiModelProperty(value = "排产分类", name = "productionType")
+    @TableField(value = "PRODUCTION_TYPE")
+    private String productionType;
+
+    /**
+     * 主物料(胎胚号)
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
 
     /**
      * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
@@ -207,14 +222,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String brand;
 
     /**
-     * 英寸
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.proSize")
-    @ApiModelProperty(value = "英寸", name = "proSize")
-    @TableField(value = "PRO_SIZE")
-    private String proSize;
-
-    /**
      * 规格
      */
     @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.specifications")
@@ -253,6 +260,22 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
     @TableField(value = "TYPE_BLOCK_QTY")
     private Integer typeBlockQty;
+
+    /**
+     * 动平衡数量
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.dynamicBalanceQty")
+    @ApiModelProperty(value = "动平衡数量", name = "dynamicBalanceQty")
+    @TableField(value = "DYNAMIC_BALANCE_QTY")
+    private String dynamicBalanceQty;
+
+    /**
+     * 均匀性数量
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.uniformityQty")
+    @ApiModelProperty(value = "均匀性数量", name = "uniformityQty")
+    @TableField(value = "UNIFORMITY_QTY")
+    private Integer uniformityQty;
 
     /**
      * 高优先级数量
