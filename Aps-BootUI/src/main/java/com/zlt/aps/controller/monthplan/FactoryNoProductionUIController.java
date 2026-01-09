@@ -12,7 +12,6 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.ai.DifyFileUploader;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
 import com.zlt.aps.monthplan.api.service.IFactoryNoProductionRemoteService;
-import com.zlt.common.utils.PubUtil;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,11 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
-
-import static com.zlt.aps.ai.AiContents.DIFY_API_KEY;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -81,7 +77,7 @@ public class FactoryNoProductionUIController extends BaseUIController<FactoryNoP
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(FactoryNoProduction factoryNoProduction) {
-        String productCode = factoryNoProduction.getProductCode();
+        String productCode = factoryNoProduction.getMaterialCode();
         String factoryCode = factoryNoProduction.getFactoryCode();
         if (StringUtils.isBlank(productCode) || StringUtils.isBlank(factoryCode)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.factoryNoProduction.checkData.empty"));

@@ -15,7 +15,6 @@ import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
@@ -468,7 +467,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(noProductionList)) {
             return Collections.emptyMap();
         }
-        return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getProductCode, Function.identity()));
+        return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getMaterialCode, Function.identity()));
     }
 
     @Override
