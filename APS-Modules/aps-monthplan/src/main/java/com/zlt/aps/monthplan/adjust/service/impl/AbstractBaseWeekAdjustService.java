@@ -9,7 +9,6 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -450,17 +449,25 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         CompletableFuture<Void> trialPlanFuture = CompletableFuture.runAsync(() -> initTrialPlan(contextDTO), executor);
         // 初始化月底计划余量
         CompletableFuture<Void> monthSurplusFuture = CompletableFuture.runAsync(() -> initMonthSurplus(contextDTO), executor);
-        // 初始化成品实时库存
-        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
         // 初始化月度硫化监控
         CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
+        // 初始化成品实时库存
+//        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
 
         try {
             // 等待所有异步任务执行完成
             CompletableFuture.allOf(
-                    versionAndMonthPlanFuture, saleOrderFuture, trialPlanFuture,
-                    monthSurplusFuture, productStockFuture, planMonitorFuture
+                    versionAndMonthPlanFuture,
+                    saleOrderFuture,
+                    trialPlanFuture,
+                    monthSurplusFuture,
+//                    productStockFuture,
+                    planMonitorFuture
             ).join();
+
+            log.info("并行初始化任务执行完成");
+            // 初始化成品实时库存
+            initProductStock(contextDTO);
 
         } catch (CompletionException e) {
             // 异常处理
