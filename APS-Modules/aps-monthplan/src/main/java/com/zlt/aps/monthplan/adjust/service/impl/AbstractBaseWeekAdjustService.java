@@ -616,7 +616,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         SalesOrderPool queryVO = new SalesOrderPool();
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
         // 订单状态，0-关单，1-正常
-        queryVO.setOrderStatus(ApsConstant.TRUE);
+//        queryVO.setOrderStatus(ApsConstant.TRUE);
 
         LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
         buildSaleOrderPoolCondition(queryWrapper, queryVO);
