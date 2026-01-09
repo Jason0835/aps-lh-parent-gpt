@@ -86,13 +86,13 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("分厂"),
+          label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          prop: "productCode",
-          label: this.$t("SAP代码"),
+          prop: "materialCode",
+          label: this.$t("SKU代码"),
         },
         {
           prop: "remark",

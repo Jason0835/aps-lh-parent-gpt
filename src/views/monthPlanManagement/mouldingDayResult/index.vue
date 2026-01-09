@@ -207,12 +207,12 @@ export default {
         },
         {
           prop: "totalQty",
-          label: this.$t("生产实际排产量"),
+          label: this.$t("ui.data.mouldingDayResult.totalQty"),
           width: 120,
         },
         {
           prop: "differenceQty",
-          label: this.$t("差异量（未排产数量）"),
+          label: this.$t("ui.data.mouldingDayResult.differenceQty"),
           width: 120,
         },
         {

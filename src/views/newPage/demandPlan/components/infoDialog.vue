@@ -80,7 +80,7 @@ export default {
         },
         {
           prop: "monthPlanVersion",
-          label: this.$t("需求计划版本号"),
+          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
         },
       ],
     };

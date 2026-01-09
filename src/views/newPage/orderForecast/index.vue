@@ -98,7 +98,7 @@ export default {
         },
         {
           prop: "predictionVersion",
-          label: this.$t("预测版本号"),
+          label: this.$t("ui.data.orderForecast.predictionVersion"),
           width:120
         },
         // {

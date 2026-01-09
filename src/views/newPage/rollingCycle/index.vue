@@ -90,7 +90,7 @@ import {
   getAdjustDetailList,
   listOutsideStructure,
   confirmAdjust,
-  autoAdjust
+  autoAdjust,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -207,13 +207,14 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  <el-input
-                    v-if={this.isEdit}
-                    v-model={row.confirmAdjustQty}
-                    placeholder="请输入内容"
-                    size="mini"
-                  ></el-input>
-                  <span v-else>{row.confirmAdjustQty}</span>
+                  {this.isEdit && (
+                    <el-input
+                      v-model={row.confirmAdjustQty}
+                      placeholder="请输入内容"
+                      size="mini"
+                    ></el-input>
+                  )}
+                  {!this.isEdit && <span >{row.confirmAdjustQty}</span>}
                 </div>
               );
             },
@@ -224,16 +225,18 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  <el-select
-                    v-model={row.adjustPriorities}
-                    size="mini"
-                    v-if={this.isEdit}
-                  >
-                    <el-option label="1" value="1" key="1" />
-                    <el-option label="2" value="2" key="2" />
-                    <el-option label="3" value="3" key="3" />
-                  </el-select>
-                  <span v-else>{row.adjustPriorities}</span>
+                  {this.isEdit && (
+                    <el-select v-model={row.adjustPriorities} size="mini">
+                      <el-option label="1" value="1" key="1" />
+                      <el-option label="2" value="2" key="2" />
+                      <el-option label="3" value="3" key="3" />
+                    </el-select>
+                  )}
+                  {!this.isEdit && (
+                    <span>{row.adjustPriorities}</span>
+                  )}
+
+
                 </div>
               );
             },
@@ -513,15 +516,15 @@ export default {
       //   this.loading = false;
       // }, 300);
     },
-  async  handShowResult() {
+    async handShowResult() {
       this.show = false;
       this.loading = true;
-      try{
+      try {
         let params = {
           ...this.query,
           ...this.sort,
           adjustType: this.adjustType,
-          adjustResultList:this.data
+          adjustResultList: this.data,
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
@@ -529,12 +532,12 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        console.log(params)
-        let res=await autoAdjust(params)
-        console.log(res)
+        console.log(params);
+        let res = await autoAdjust(params);
+        console.log(res);
         this.show = true;
         this.loading = false;
-      }catch(err){
+      } catch (err) {
         this.show = true;
         this.loading = false;
       }
@@ -553,7 +556,7 @@ export default {
         this.$refs.specialRef.show();
       }
     },
-   async handleAdd() {
+    async handleAdd() {
       try {
         let params = {
           ...this.query,
@@ -565,19 +568,17 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.scheduledMachines=this.selection[0].cxMachineCode
-        params.structureName=this.selection[0].structureName
+        params.scheduledMachines = this.selection[0].cxMachineCode;
+        params.structureName = this.selection[0].structureName;
 
         params.adjustType = this.adjustType;
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         console.log(res);
         if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(res);
-      }
+          this.$refs.infoRef.show(res);
+        }
       } catch (err) {}
-
-
     },
 
     handleDelete(row) {

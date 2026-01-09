@@ -19,7 +19,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" v-hasPermi="['monthplan:simulatedResult:createVmMonthPrediction']"  :loading="createLoading" plain @click="createVersion">{{ $t("插单模拟排产") }}</el-button>
+        <el-button type="primary" v-hasPermi="['monthplan:simulatedResult:createVmMonthPrediction']"  :loading="createLoading" plain @click="createVersion">{{ $t("ui.data.insertOrder.creater") }}</el-button>
         <!-- <el-button
           type="primary"
           plain
@@ -176,7 +176,7 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("主物料(共用生胎)"),
+          label: this.$t("ui.data.insertOrder.mainMaterialDesc"),
           width:120,
         },
         {
@@ -191,7 +191,7 @@ export default {
         },
         {
           prop: "mouldQty",
-          label: this.$t("模具"),
+          label: this.$t("ui.data.insertOrder.mouldQty"),
           width:120,
         },
         {
@@ -206,17 +206,17 @@ export default {
         },
         {
           prop: "heightQty",
-          label: this.$t("高优先级订单净需求"),
+          label: this.$t("ui.data.insertOrder.heightQty"),
           width:120,
         },
         {
           prop: "productionQty",
-          label: this.$t("排产总量"),
+          label: this.$t("ui.data.insertOrder.productionQty"),
           width:120,
         },
         {
           prop: "month1",
-          label: 'T'+this.$t("月排产量"),
+          label: 'T'+this.$t("ui.data.insertOrder.monthQty"),
         },
         // {
         //   prop: "T+1月排产量",
@@ -263,7 +263,7 @@ export default {
 
       for (let i = 0; i < 23; i++) {
         columns.push({
-          label: `T+${i + 1}`+ this.$t("月排产量"),
+          label: `T+${i + 1}`+ this.$t("ui.data.insertOrder.monthQty"),
           // label: this.$t("ui.data.column.mouldingDayResult.day", {
           //   day: i + 1,
           // }),

@@ -126,19 +126,19 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("分厂"),
+          label: this.$t("common.factory"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          prop: "productCode",
-          label: this.$t("SAP代码"),
+          prop: "materialCode",
+          label: this.$t("SKU代码"),
         },
         {
           prop: "remark",
           label: this.$t("备注"),
-          minWidth: 100, 
+          minWidth: 100,
         },
         // {
         //   prop: "updateBy",
@@ -181,14 +181,14 @@ export default {
           valueFormat: "yyyy-MM",
         },
         {
-          label: "分厂",
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "productCode",
-          label: this.$t("SAP代码"),
+          prop: "materialCode",
+          label: this.$t("SKU代码"),
         },
       ];
     },

@@ -209,10 +209,12 @@ export default {
         {
           prop: "destination",
           label: this.$t("ui.data.column.trialPlan.destination"),
+          width:120
         },
         {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          width:180
         },
         // {
         //   prop: "embryoType",
@@ -225,6 +227,7 @@ export default {
         {
           prop: "textNo",
           label: this.$t("ui.data.column.trialPlan.textNo"),
+          width:180
         },
         // {
         //   prop: "textType",
@@ -237,6 +240,7 @@ export default {
         {
           prop: "lhNo",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
+          width:180
         },
         // {
         //   prop: "lhType",
