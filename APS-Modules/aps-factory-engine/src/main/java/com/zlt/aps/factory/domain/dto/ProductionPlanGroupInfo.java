@@ -282,24 +282,26 @@ public class ProductionPlanGroupInfo {
         }
         hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
         Integer conclusionDay = selectedDayLimit.getDay();
+        Integer endDay = endDayLimit.getDay();
         if (isGroupStartDayByFormalProduction(conclusionDay)) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         Integer previousDay = getPreviousDay(conclusionDay);
         if (null == previousDay) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
         Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, new HashSet<>());
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
         }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
         if (BigDecimal.ONE.intValue() == canAddCount) {
-            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, previousSku.getUsedMouldSet());
+            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, endDay, previousSku.getUsedMouldSet());
         }
-        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, previousSku.getUsedMouldSet());
+        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, endDay, previousSku.getUsedMouldSet());
     }
 
     /**

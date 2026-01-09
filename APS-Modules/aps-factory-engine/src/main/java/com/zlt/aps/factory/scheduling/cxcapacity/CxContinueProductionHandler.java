@@ -52,7 +52,9 @@ public class CxContinueProductionHandler {
             return;
         }
         Integer startDay = earliestConclusionLhGroup.getClosingDay();
-        if (startDay > endDay) {
+        //20260109 使用判断的结束日
+        Integer realEndDay = earliestConclusionLhGroup.getEndDay();
+        if (startDay > realEndDay) {
             //todo 记录日志
             return;
         }
@@ -80,7 +82,7 @@ public class CxContinueProductionHandler {
             return;
         }
         //选中的续作模具
-        List<ProductionMouldInfoVo> selectedMouldList = SkuMouldSelector.getSelectedMouldList(context, selectedMaterialDesc, earliestConclusionLhGroup, startDay, endDay);
+        List<ProductionMouldInfoVo> selectedMouldList = SkuMouldSelector.getSelectedMouldList(context, selectedMaterialDesc, earliestConclusionLhGroup, startDay, realEndDay);
         if (CollectionUtils.isEmpty(selectedMouldList)) {
             //todo 记录日志
             return;
@@ -94,9 +96,8 @@ public class CxContinueProductionHandler {
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
-        //逐日进行排产
-//        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
-        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, earliestConclusionLhGroup, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+        //逐日进行排产 CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
+        CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, earliestConclusionLhGroup, lhProductionQtyHelper, startDay, realEndDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
         productionContinueByType(productionContext, productionPlanInfo, continueType, endDay, continueSkuMap, mouldShellMap);
     }

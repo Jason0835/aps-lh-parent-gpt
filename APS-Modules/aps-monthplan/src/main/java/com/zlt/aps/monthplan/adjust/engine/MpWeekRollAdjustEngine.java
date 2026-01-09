@@ -106,13 +106,19 @@ public class MpWeekRollAdjustEngine {
         int startDay = contextDTO.getLockEndDay() + 1;
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(startDay,mpProdFinalList,contextDTO.getStructureAllocationList());
         contextDTO.setDailyCapacityLimitVoMap(dailyCapacityLimitVoMap);
+        //4、拆出搭配量，用于快速判断是否搭配
+        mpProdFinalList.stream().forEach(x->{
+            if (x.getConventionProductionQty() >0) {
+                splitMatchQtyByDay(x.getConventionProductionQty(), startDay, x);
+            }
+        });
 
-        //4.在机SKU增量
+        //5.在机SKU增量
         structureInAdjustWithOnIncrement(contextDTO,onIncrementAdjustList,mpProdFinalList);
-        //5.新增SKU
+        //6.新增SKU
         incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         structureInAdjustWithIncrement(contextDTO,incrementAdjustList,mpProdFinalList);
-        //6.优化：其他SKU往前移动
+        //7.优化：其他SKU往前移动
         otherSkuForwardMove(contextDTO,startDay,mpProdFinalList);
     }
 
@@ -385,7 +391,7 @@ public class MpWeekRollAdjustEngine {
         int dayQty;
         String dayField,matchDayField;
         //实单肯定在前，从后向前扣减
-        for (int i = FactoryConstant.MONTH_MAX_DAY; i> startDay; i--){
+        for (int i = FactoryConstant.MONTH_MAX_DAY; i>= startDay; i--){
             dayField = FactoryConstant.DAY_FIELD+i;
             matchDayField = FactoryConstant.MATCH_DAY_FIELD+i;
             if (prodFinal.getFieldValueByFieldName(dayField) == null){
@@ -422,49 +428,78 @@ public class MpWeekRollAdjustEngine {
             return;
         }
 
-        int startDay = contextDTO.getLockEndDay() + 1;
+        int lockNextDay = contextDTO.getLockEndDay() + 1;
         //1、排序：在机SKU上机日期早的优先增量排产
         mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
         Map<String, MpAdjustStructureIn> mpAdjustStructInMap = onIncrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                  Collectors.collectingAndThen(Collectors.toList(),m-> {
                      return m.get(0);
                  })));
-        //2、拆出搭配量，用于快速判断是否搭配
-        mpProdFinalList.stream().forEach(x->{
-            if (x.getConventionProductionQty() >0) {
-                splitMatchQtyByDay(x.getConventionProductionQty(), startDay, x);
-            }
-        });
 
         MpAdjustStructureIn adjustStructInVo;
         Integer newOnLineDay,newPlanQty;
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        //3、先排实单->自带的搭配
+
+        //2、先排实单->自带的搭配
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
             adjustStructInVo = mpAdjustStructInMap.get(mpFinalVo.getMaterialCode());
             if (adjustStructInVo == null) {
+                // 非在机SKU，继续
                 continue;
             }
-            //3.1、敲定在机SKU新的上机日期
-            newOnLineDay = adjustDailyCapacityLimitObj.getNewOnLineDay(startDay,mpFinalVo.getBeginDay(),contextDTO.getDailyCapacityLimitVoMap());
-            //3.2、计算新需要排产的计划量 = 实单量+自带的搭配量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
+            if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo,lockNextDay -1)){
+                // 开始日 < 锁定日 且 锁定前日没有值,继续
+                continue;
+            }
+            //2.1、敲定在机SKU新的上机日期
+            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, mpFinalVo);
+            //2.2、计算新需要排产的计划量 = 实单量+自带的搭配量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
             newPlanQty = getNewPlanQty(adjustStructInVo,mpFinalVo);
 
-            //3.3、清空定稿表日计划量
-            clearMpFinalDayValue(startDay, mpFinalVo);
+            //2.3、清空定稿表日计划量
+            clearMpFinalDayValue(lockNextDay, mpFinalVo);
 
-            //3.4、增模排产
+            //2.4、增模排产
             int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO.getDailyCapacityLimitVoMap(), newOnLineDay, newPlanQty, mpFinalVo);
             if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
                 // 若剩余量 > 搭配量，说明实单还有剩余
                 // 实单剩余  = 剩余量 - 搭配量
                 remainPlanQty -= mpFinalVo.getConventionProductionQty();
                 // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                deductMatchOtherSku(startDay,newOnLineDay-1,remainPlanQty,mpFinalVo,mpProdFinalList,contextDTO.getDailyCapacityLimitVoMap());
+                deductMatchOtherSku(lockNextDay,newOnLineDay-1,remainPlanQty,mpFinalVo,mpProdFinalList,contextDTO.getDailyCapacityLimitVoMap());
             }
         }
     }
 
+    /**
+     * 获取新上机日
+     * @param contextDTO 周程滚动上下文
+     * @param lockNextDay 开始日
+     * @param mpFinalVo 定稿Vo
+     * @return 新上机日
+     */
+    private Integer getNewOnLineDay(MpRollAdjustContextDTO contextDTO, int lockNextDay, FactoryMonthPlanFinalAdjustVo mpFinalVo) {
+        int endDay;
+        if (mpFinalVo.getBeginDay() < lockNextDay){
+            //若开始日 < 锁定日，可开始日设定锁定日
+            endDay = FactoryConstant.MONTH_MAX_DAY;
+        }else{
+            //若开始日 >= 锁定日，截止日设为计划开始日，因为已排计划不能往后延
+            endDay = mpFinalVo.getBeginDay();
+        }
+        return new MpAdjustDailyCapacityLimit().getNewOnLineDay(lockNextDay, endDay, contextDTO.getDailyCapacityLimitVoMap());
+    }
+
+    /**
+     * 判断某天是否有计划
+     * @param mpFinalVo 定稿Vo
+     * @param iDay 某天
+     * @return true 有计划，false 无计划
+     */
+    private boolean hasPlanByDay(FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
+        String dayField = FactoryConstant.DAY_FIELD+iDay;
+        return mpFinalVo.getFieldValueByFieldName(dayField) != null &&
+                (Integer)mpFinalVo.getFieldValueByFieldName(dayField) > 0;
+    }
     /**
      * 扣减其他SKU的搭配量，并模拟挤占
      * @param startDay 锁定次日
@@ -693,31 +728,25 @@ public class MpWeekRollAdjustEngine {
                 Collectors.collectingAndThen(Collectors.toList(),m-> {
                     return m.get(0);
                 })));
-        //2、拆出搭配量，用于快速判断是否搭配
-        mpProdFinalList.stream().forEach(x->{
-            if (x.getConventionProductionQty() >0) {
-                splitMatchQtyByDay(x.getConventionProductionQty(), startDay, x);
-            }
-        });
 
         MpAdjustStructureIn adjustStructInVo;
         Integer newOnLineDay,newPlanQty;
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        //3、排实单
+        //2、排实单
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
             adjustStructInVo = mpAdjustStructInMap.get(mpFinalVo.getMaterialCode());
             if (adjustStructInVo == null) {
                 continue;
             }
-            //3.1、敲定在机SKU新的上机日期
+            //2.1、敲定在机SKU新的上机日期
             newOnLineDay = adjustDailyCapacityLimitObj.getNewOnLineDay(startDay,mpFinalVo.getBeginDay(),contextDTO.getDailyCapacityLimitVoMap());
-            //3.2、计算新需要排产的计划量 = 实单量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
+            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
             newPlanQty = adjustStructInVo.getConfirmAdjustQty();
 
-            //3.3、清空定稿表日计划量
+            //2.3、清空定稿表日计划量
             clearMpFinalDayValue(startDay, mpFinalVo);
 
-            //3.4、增模排产
+            //2.4、增模排产
             int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO.getDailyCapacityLimitVoMap(), newOnLineDay, newPlanQty, mpFinalVo);
             if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
                 // 若剩余量 > 搭配量，说明实单还有剩余
