@@ -107,7 +107,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhScheduleResultRemoteService.importData(context, false);
+        AjaxResult ajaxResult = iLhScheduleResultRemoteService.importData(context, updateSupport);
         return ajaxResult;
     }
 

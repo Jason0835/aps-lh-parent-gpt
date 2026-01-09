@@ -64,8 +64,8 @@ public class MdmSkuLhCapacity extends BaseEntity {
     private Integer classCapacity;
 
     /** MES实际产量 */
-    @ImportExcelValidated(digits = true, min = 0, max = 999999)
-    @Excel(name = "ui.data.column.mdmSkuLhCapacity.mesCapacity")
+//    @ImportExcelValidated(digits = true, min = 0, max = 999999)
+//    @Excel(name = "ui.data.column.mdmSkuLhCapacity.mesCapacity")
     @ApiModelProperty(value = "MES实际产量", name = "mesCapacity")
     @TableField(value = "MES_CAPACITY")
     private Integer mesCapacity;
