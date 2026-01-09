@@ -306,7 +306,7 @@ public class DpDemandPlan extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
-    @Excel(name = "ui.data.column.demandPlan.updateTime")
+    @Excel(name = "ui.data.column.demandPlan.updateTime", dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty("更新时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(
@@ -319,7 +319,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 计划类型
      */
-    @Excel(name = "ui.data.column.demandPlan.planType")
     @ApiModelProperty(value = "计划类型", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;
@@ -327,7 +326,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * MES物料编号
      */
-    @Excel(name = "ui.data.column.demandPlan.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -335,7 +333,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 渠道
      */
-    @Excel(name = "ui.data.column.demandPlan.channel")
     @ApiModelProperty(value = "渠道", name = "channel")
     @TableField(value = "CHANNEL")
     private String channel;
@@ -343,7 +340,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 英寸
      */
-    @Excel(name = "ui.data.column.demandPlan.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
@@ -351,7 +347,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 规格
      */
-    @Excel(name = "ui.data.column.demandPlan.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
@@ -359,7 +354,6 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 花纹
      */
-    @Excel(name = "ui.data.column.demandPlan.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;

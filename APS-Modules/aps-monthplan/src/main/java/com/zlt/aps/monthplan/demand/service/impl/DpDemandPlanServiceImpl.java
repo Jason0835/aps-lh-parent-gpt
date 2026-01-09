@@ -631,6 +631,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
         // 设置基本数量
         demandPlan.setOrderQty(statistics.totalOrderQty);
+
+        // 设净排程需求
+        int totalNetQty = statistics.heightQty + statistics.midQty + statistics.cycleReserveQty;
+        demandPlan.setNetQty(totalNetQty);
+
         // 设置优先级相关数量
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
@@ -641,7 +646,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         calculateDerivedQuantities(demandPlan, statistics);
 
         // 设置生产和优先级标识
-        setProductionAndPriorityFlags(demandPlan, minProductionQty, statistics.totalNetQty);
+        setProductionAndPriorityFlags(demandPlan, minProductionQty, totalNetQty);
     }
 
 
@@ -785,7 +790,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             }
 
             totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
-            totalNetQty += plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             // 根据订单优先级累加对应数量
             String priority = plan.getOrderPriority();
@@ -806,7 +810,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         void combine(QuantityStatistics other) {
             this.totalOrderQty += other.totalOrderQty;
-            this.totalNetQty += other.totalNetQty;
             this.heightQty += other.heightQty;
             this.midQty += other.midQty;
             this.postponeQty += other.postponeQty;
