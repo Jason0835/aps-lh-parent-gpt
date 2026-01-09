@@ -15,7 +15,6 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonthSurplusService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -138,14 +137,14 @@ public class MdmMonthSurplusController extends AbstractDocBizController<MdmMonth
         return this.doImportDataAsync(list, updateSupport, importLog.getId(), importLog, beginTime);
     }
 
-    public AjaxResult doImportDataAsync(List<MdmAreaCapaAllocation> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime) {
+    public AjaxResult doImportDataAsync(List<MdmMonthSurplus> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime) {
         if (CollectionUtils.isEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
         if (list.size() > 500) {
             // 传递请求头信息（主要是语言包），避免主线程执行后清空request，拷贝一个虚拟的request
             ServletRequestAttributes virtualAttr = RemoteImportExcelUtils.copyRequestHeaderAttribute();
-            mdmAreaCapaAllocationService.importDataAsync(list, updateSupport, importLogId, importLog, beginTime, virtualAttr);
+            mdmMonthSurplusService.importDataAsync(list, updateSupport, importLogId, importLog, beginTime, virtualAttr);
             return AjaxResult.success(I18nUtil.getMessage("ui.data.column.common.importTimeOut"));
         }
         AjaxResult result = getDocService().importData(list, updateSupport, importLogId);
