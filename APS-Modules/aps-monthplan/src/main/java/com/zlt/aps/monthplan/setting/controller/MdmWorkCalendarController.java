@@ -7,8 +7,10 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.maindata.mapper.MdmHolidayEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -16,6 +18,7 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,9 +27,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -54,6 +56,9 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     @Autowired
     private MdmWorkCalendarEntityMapper entityMapper;
 
+    @Autowired
+    private MdmHolidayEntityMapper holidayEntityMapper;
+
     /**
      * 查询工作日历列表
      */
@@ -63,6 +68,16 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     public TableDataInfo list(@RequestBody MdmWorkCalendar queryVO) {
         TableDataInfo tableDataInfo = super.list(queryVO);
         List<MdmWorkCalendar> list = (List<MdmWorkCalendar>) tableDataInfo.getRows();
+        Integer queryYear = queryVO.getYear();
+        if (queryYear == null) {
+            return tableDataInfo;
+        }
+        // 查询节假日配置
+        List<MdmHoliday> mdmHolidayList = holidayEntityMapper.selectByYear(queryYear);
+        Map<Date, String> holidayMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(mdmHolidayList)) {
+            holidayMap = mdmHolidayList.stream().collect(Collectors.toMap(MdmHoliday::getHolidayDate, MdmHoliday::getHolidayNames));
+        }
         for (MdmWorkCalendar mdmWorkCalendar : list) {
             Integer year = mdmWorkCalendar.getYear();
             Integer month = mdmWorkCalendar.getMonth();
@@ -74,13 +89,15 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
                 log.error("日期转换异常", e);
             }
             mdmWorkCalendar.setCalendarTime(date);
+
+            mdmWorkCalendar.setHolidayNames(holidayMap.getOrDefault(date, ""));
         }
         return tableDataInfo;
     }
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "PROC_CODE, YEAR, MONTH, DAY ASC";
     }
 
     /**

@@ -126,4 +126,11 @@ public class MdmWorkCalendar extends BaseEntity {
     @ApiModelProperty(value = "日期", name = "calendarTime")
     @TableField(exist = false)
     private Date calendarTime;
+
+    /**
+     * 节假日名称
+     */
+    @ApiModelProperty(value = "节假日名称", name = "holidayNames")
+    @TableField(exist = false)
+    private String holidayNames;
 }
