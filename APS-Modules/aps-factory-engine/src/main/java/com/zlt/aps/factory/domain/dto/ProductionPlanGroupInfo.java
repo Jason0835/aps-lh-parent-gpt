@@ -305,6 +305,57 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
+     *
+     * @param context     排产上下文
+     * @param addSkuInfo  需要上机的Sku
+     * @param preSelected 预计选中
+     * @return
+     */
+    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
+            return;
+        }
+        Integer startDay = preSelected.getClosingDay();
+        Integer endDay = preSelected.getEndDay();
+        Integer realStartDay = startDay;
+        Integer realEndDay = startDay;
+        String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        for (int productionDay = startDay; productionDay <= endDay; productionDay++) {
+            GroupPlanCxLhCapacityLimitHelper dayLimitInfo = dayProductionLimitInfo.get(productionDay);
+            if(null == dayLimitInfo){
+                if(realStartDay < productionDay){
+                    realStartDay = productionDay;
+                }
+                if(realEndDay > productionDay){
+                    realEndDay = productionDay;
+                }
+                continue;
+            }
+            Set<String> existEmbryoCode = dayLimitInfo.getProductionEmbryoCodeSet();
+            if(existEmbryoCode.contains(productionEmbryoCode)){
+                if(realStartDay < productionDay){
+                    realStartDay = productionDay;
+                }
+                if(realEndDay > productionDay){
+                    realEndDay = productionDay;
+                }
+                continue;
+            }
+            //不可上机，延后
+            if(existEmbryoCode.size() + BigDecimal.ONE.intValue() > dayLimitInfo.getMaxEmbryoCodeCount()){
+                realStartDay = productionDay;
+                break;
+            }
+        }
+
+
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+
+
+    }
+
+    /**
      * 获取结构提前收尾的最低硫化配比信息
      *
      * @return
