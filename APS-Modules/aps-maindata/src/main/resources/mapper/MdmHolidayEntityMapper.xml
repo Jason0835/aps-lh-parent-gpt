@@ -4,4 +4,10 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmHolidayEntityMapper">
 
+    <select id="selectByYear" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmHoliday">
+        select HOLIDAY_DATE, HOLIDAY_NAMES
+        from T_MDM_HOLIDAY
+        where IS_DELETE = 0
+                  AND YEAR (HOLIDAY_DATE) = #{year}
+    </select>
 </mapper>
