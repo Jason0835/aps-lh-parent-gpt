@@ -3,29 +3,30 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.monthplan.enums.SupplyOrderTypeEnum;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.exception.QueryExprException;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.Builder;
 import lombok.Data;
@@ -641,6 +642,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setAverageSaleQty(monthlySaleQty.getAverageSaleQty());
             BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
             supplyOrderPool.setStockLimit(stockLimit.intValue());
+            supplyOrderPool.setSaleArea(monthlySaleQty.getSaleArea());
+            getSaleAreaByMonthlySaleQty(supplyOrderPool);
         }else{
             supplyOrderPool.setThreeAverageQty(BigDecimal.ZERO.intValue());
             supplyOrderPool.setSixAverageQty(BigDecimal.ZERO.intValue());
@@ -648,7 +651,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setAverageSaleQty(BigDecimal.ZERO.intValue());
             supplyOrderPool.setStockLimit(BigDecimal.ZERO.intValue());
         }
-        supplyOrderPool.setSaleArea(this.getSaleAreaByMonthlySaleQty(monthlySaleQty));
         //   (3)通过成品库存表，获取超期12个月的库存数、超期6个月的库存数、超期3个月的库存数
         List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.getMpFinishedProductStockByMaterialCode(supplyOrderPool.getMaterialCode());
         if(CollectionUtils.isNotEmpty(finishedProductStocks)) {
@@ -673,27 +675,51 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return supplyOrderPool;
     }
 
-    private String getSaleAreaByMonthlySaleQty(MpMonthlySaleQty monthlySaleQty) {
-        if(null == monthlySaleQty || StringUtils.isBlank(monthlySaleQty.getSaleArea())) {
-            return StringUtils.EMPTY;
+    private void getSaleAreaByMonthlySaleQty(SupplyOrderPool monthlySaleQty) {
+        List<SupplyOrderPool> list = new ArrayList<>();
+        list.add(monthlySaleQty);
+        // 把区域都转成名称
+        List<AreaConvertVo> convertVoList = list.stream().map(SupplyOrderPool::getSaleArea)
+                .flatMap(item -> Arrays.stream(item.split(",")))
+                .distinct()
+                .filter(com.ruoyi.common.utils.StringUtils::isNotBlank)
+                .map(item -> {
+                    AreaConvertVo areaConvertVo = new AreaConvertVo();
+                    areaConvertVo.setAreaCode(item);
+                    return areaConvertVo;
+                })
+                .sorted(Comparator.comparing(AreaConvertVo::getAreaCode))
+                .collect(Collectors.toList());
+        Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
+        for (SupplyOrderPool supplyOrderPool : list) {
+            String saleArea = supplyOrderPool.getSaleArea();
+            String[] areaSplitArr = saleArea.split(",");
+            List<String> areaNameList = new ArrayList<>();
+            for (String areaCode : areaSplitArr) {
+                if (areaNameMap.containsKey(areaCode)) {
+                    String name = areaNameMap.get(areaCode);
+                    areaNameList.add(name);
+                }
+            }
+            supplyOrderPool.setSaleAreaName(String.join(",", areaNameList));
         }
-        Set<String> areaSet = Sets.newHashSet();
-        areaSet.addAll(Arrays.asList(monthlySaleQty.getSaleArea().split(StringConstant.COMMA)));
-        // 加载区域
-        LambdaQueryWrapper<DpArea> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(DpArea::getAreaCode, areaSet);
-        queryWrapper.eq(DpArea::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<DpArea> areas = dpAreaEntityMapper.selectList(queryWrapper);
-        if(CollectionUtils.isEmpty(areas)) {
-            return StringUtils.EMPTY;
-        }
-        List<DpArea> filterAreas = areas.stream().filter(item -> StringUtils.isNotBlank(item.getAreaCode()) && StringUtils.isNotBlank(item.getRemark())).collect(Collectors.toList());
-        if(CollectionUtils.isEmpty(filterAreas)) {
-            return StringUtils.EMPTY;
-        }
-        JsonI18nConvertUtils.conventJsonI18n(filterAreas, DpArea.class);
-        return filterAreas.stream().map(DpArea::getAreaNameI18n).distinct().collect(Collectors.joining(StringConstant.COMMA));
     }
+
+    private Map<String, String> getAreaNameMap(List<AreaConvertVo> convertVoList) {
+        // 执行表达式，转义区域
+        try {
+            QueryFormulaUtil.execFormula(convertVoList, new String[]{
+                    "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+            });
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("转换区域，执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(convertVoList, AreaConvertVo.class);
+        return convertVoList.stream().filter(item -> com.ruoyi.common.utils.StringUtils.isNotBlank(item.getAreaCodeNameI18n()))
+                .collect(Collectors.toMap(AreaConvertVo::getAreaCode, AreaConvertVo::getAreaCodeNameI18n, (k1, k2) -> k1));
+    }
+
 
     @Override
     public List<SupplyOrderPool> findCurrentSupplyOrderPool() {
