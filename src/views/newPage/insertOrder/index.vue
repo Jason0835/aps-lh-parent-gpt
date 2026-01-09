@@ -19,11 +19,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
-          type="primary"
-          plain
-          >{{ $t("插单模拟排产") }}</el-button
-        >
+        <el-button type="primary"  :loading="createLoading" plain @click="createVersion">{{ $t("插单模拟排产") }}</el-button>
         <!-- <el-button
           type="primary"
           plain
@@ -66,10 +62,10 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-// import {
-//   listProductMoldingLimit,
-//   removeProductMoldingLimit,
-// } from "@/api/mdm/productMoldingLimit";
+import {
+  listSimulateResult,
+  createVmMonthPrediction,
+} from "@/api/monthplan/insertOrder";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -82,7 +78,13 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: [
+    "LINE_TYPE",
+    "JOB_TYPE",
+    "biz_factory_name",
+    "biz_product_type",
+    "biz_brand_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -90,6 +92,7 @@ export default {
   },
   data() {
     return {
+      createLoading:false,
       loading: false,
       data: [],
       selection: [],
@@ -113,97 +116,121 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "工厂",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+          width:120,
         },
         {
-          prop: "年份",
-          label: this.$t("年份"),
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          width:120,
         },
         {
-          prop: "月份",
-          label: this.$t("月份"),
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          width:120,
         },
         {
-          prop: "产品分类",
-          label: this.$t("产品分类"),
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
+          width:120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
+        },
+        // {
+        //   prop: "类型",
+        //   label: this.$t("类型"),
+        //   width:120,
+        // },
+        {
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          width:180,
         },
         {
-          prop: "类型",
-          label: this.$t("类型"),
+          prop: "specifications",
+          label: this.$t("ui.data.column.trialPlan.specifications"),
+          width:120,
         },
         {
-          prop: "结构",
-          label: this.$t("结构"),
+          prop: "pattern",
+          label: this.$t("ui.data.column.modelinfo.pattern"),
+          width:120,
         },
         {
-          prop: "规格",
-          label: this.$t("规格"),
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          width:120,
         },
         {
-          prop: "花纹",
-          label: this.$t("花纹"),
+          prop: "brand",
+          label: this.$t("common.brand"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
+          width:120,
         },
         {
-          prop: "品牌",
-          label: this.$t("品牌"),
-        },
-        {
-          prop: "主物料(共用生胎)",
+          prop: "mainMaterialDesc",
           label: this.$t("主物料(共用生胎)"),
+          width:120,
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          width:120,
         },
         {
-          prop: "物料描述",
-          label: this.$t("物料描述"),
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width:320,
         },
         {
-          prop: "模具",
+          prop: "mouldQty",
           label: this.$t("模具"),
+          width:120,
         },
         {
-          prop: "活块",
-          label: this.$t("活块"),
+          prop: "typeBlockQty",
+          label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
+          width:120,
         },
         {
-          prop: "净需求",
-          label: this.$t("净需求"),
+          prop: "netQty",
+          label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
+          width:120,
         },
         {
-          prop: "高优先级订单净需求",
+          prop: "heightQty",
           label: this.$t("高优先级订单净需求"),
+          width:120,
         },
         {
-          prop: "排产总量",
+          prop: "productionQty",
           label: this.$t("排产总量"),
+          width:120,
         },
         {
-          prop: "T月排产量",
-          label: this.$t("T月排产量"),
+          prop: "month1",
+          label: 'T'+this.$t("月排产量"),
         },
-        {
-          prop: "T+1月排产量",
-          label: this.$t("T+1月排产量"),
-        },
-        {
-          prop: "T+2月排产量",
-          label: this.$t("T+2月排产量"),
-        },
-        {
-          prop: "T+n月排产量",
-          label: this.$t("T+n月排产量"),
-        },
-        {
-          prop: "备注",
-          label: this.$t("备注"),
-        },
-        {
-          prop: "更新日期",
-          label: this.$t("更新日期"),
-        },
+        // {
+        //   prop: "T+1月排产量",
+        //   label: this.$t("T+1月排产量"),
+        // },
+        // {
+        //   prop: "T+2月排产量",
+        //   label: this.$t("T+2月排产量"),
+        // },
+        // {
+        //   prop: "T+n月排产量",
+        //   label: this.$t("T+n月排产量"),
+        // },
+
 
         // {
         //   align: "center",
@@ -234,46 +261,82 @@ export default {
         // },
       ];
 
+      for (let i = 0; i < 23; i++) {
+        columns.push({
+          label: `T+${i + 1}`+ this.$t("月排产量"),
+          // label: this.$t("ui.data.column.mouldingDayResult.day", {
+          //   day: i + 1,
+          // }),
+          prop: `month${i + 2}`,
+          minWidth: "80px",
+          type: "number",
+        });
+      }
+      columns.push(
+        {
+          prop: "remark",
+          label: this.$t("common.remark"),
+          width:120,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          width: 180,
+        },
+      )
+
       return columns;
     },
     searchColumns() {
       return [
         {
-          prop: "工厂",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
           type: "select",
+          dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "结构",
-          label: this.$t("结构"),
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
         },
         {
-          prop: "产品分类",
-          label: this.$t("产品分类"),
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
+          dictData: this.dict.type.biz_product_type,
         },
         {
-          prop: "规格",
-          label: this.$t("规格"),
+          prop: "specifications",
+          label: this.$t("ui.data.column.trialPlan.specifications"),
         },
         {
-          prop: "主花纹",
-          label: this.$t("主花纹"),
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
-          prop: "物料描述",
-          label: this.$t("物料描述"),
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
-
-
       ];
     },
   },
   methods: {
+    async createVersion() {
+
+      try {
+        this.createLoading=true
+        let res = await createVmMonthPrediction(this.formatParams());
+        this.$modal.msgSuccess(res.msg);
+        this.getList();
+        this.createLoading=false
+      } catch (err) {
+        this.createLoading=false
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -326,7 +389,10 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/simulatedResult/export",
+        this.formatParams(false)
+      );
     },
 
     formatParams(hasPage = true) {
@@ -352,9 +418,9 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        // const data = await listProductMoldingLimit(this.formatParams());
-        // this.data = data.rows;
-        // this.page.total = data.total;
+        const data = await listSimulateResult(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {
@@ -363,13 +429,18 @@ export default {
     },
   },
   created() {
-    if (this.moldingMachines.length === 0) {
-      this.$store.dispatch("molding/getMachineList");
-    }
-  },
-  activated() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

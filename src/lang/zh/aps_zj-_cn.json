@@ -274,5 +274,11 @@
   "ui.data.mouldingDayResult.differenceQty": "差异量（未排产数量）",
   "ui.data.orderForecast.predictionVersion": "预测版本号",
   "ui.data.demandPlan.isAlternateMaterial": "是否替换料",
-  "ui.data.demandPlan.monthPlanVersion": "需求计划版本号"
+  "ui.data.demandPlan.monthPlanVersion": "需求计划版本号",
+  "ui.data.insertOrder.creater": "插单模拟排产",
+  "ui.data.insertOrder.mainMaterialDesc": "主物料(共用生胎)",
+  "ui.data.insertOrder.mouldQty": "模具",
+  "ui.data.insertOrder.heightQty": "高优先级订单净需求",
+  "ui.data.insertOrder.productionQty": "排产总量",
+  "ui.data.insertOrder.monthQty": "月排产量"
 }

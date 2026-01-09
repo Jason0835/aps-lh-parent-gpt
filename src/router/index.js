@@ -452,7 +452,7 @@ constantRoutes.push(
   //       path: "insertOrder",
   //       component: () => import("@/views/newPage/insertOrder/index"),
   //       name: "insertOrder",
-  //       meta: { title: "插单模拟排产" },
+  //       meta: { title: "实单模拟排产" },
   //     },
   //     // {
   //     //   path: "periodicSched",

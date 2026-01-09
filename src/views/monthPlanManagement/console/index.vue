@@ -399,8 +399,12 @@ export default {
           prop: "productTypeCode",
         },
         {
-          label: this.$t("版本号"),
+          label: this.$t("需求计划版本"),
           prop: "monthPlanVersion",
+        },
+        {
+          label: this.$t("月度生产计划版本"),
+          prop: "productionVersion",
         },
       ];
     },
