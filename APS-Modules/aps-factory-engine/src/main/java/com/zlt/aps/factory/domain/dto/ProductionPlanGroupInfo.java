@@ -112,6 +112,26 @@ public class ProductionPlanGroupInfo {
      */
     @Deprecated
     private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
+    /**
+     * 是否分配完毕
+     */
+    private Integer isAllocationFinish;
+
+    /**
+     * 获取所有有效需求量
+     *
+     * @return
+     */
+    public Integer getAllDemandQty() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = groupPlanData.stream().filter(singlePlan -> singlePlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return effectiveList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
 
     /**
      * 粗步计算 结构需求量需要的成型产能分配
@@ -366,6 +386,10 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getRemainingProductionQty() {
+        //标记是否分配完毕
+        if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
+            return BigDecimal.ZERO.intValue();
+        }
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return BigDecimal.ZERO.intValue();
         }

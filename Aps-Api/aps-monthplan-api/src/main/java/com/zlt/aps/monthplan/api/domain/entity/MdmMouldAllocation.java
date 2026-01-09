@@ -44,7 +44,7 @@ public class MdmMouldAllocation extends BaseEntity {
     private String mainPattern;
 
     /** 花纹 */
-    @Excel(name = "ui.data.column.mdmMouldAllocation.pattern")
+//    @Excel(name = "ui.data.column.mdmMouldAllocation.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;

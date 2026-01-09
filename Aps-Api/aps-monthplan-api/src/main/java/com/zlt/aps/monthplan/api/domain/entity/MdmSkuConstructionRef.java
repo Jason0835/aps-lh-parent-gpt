@@ -93,7 +93,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private String mouldMethod;
 
     /** BOM版本 */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.bomVersion", sort = 10)
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.bomVersion", sort = 10)
     @ApiModelProperty(value = "BOM版本", name = "bomVersion")
     @TableField(value = "BOM_VERSION")
     private String bomVersion;
@@ -105,7 +105,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private BigDecimal mouldClampingPressure;
 
     /** 模具型腔 */
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldCavity", sort = 20)
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mouldCavity", sort = 20)
     @ApiModelProperty(value = "模具型腔", name = "mouldCavity")
     @TableField(value = "MOULD_CAVITY")
     private String mouldCavity;
@@ -117,8 +117,8 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private String isZeroRack;
 
     /** 夏季机械硫化时间(分) */
-    @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime", width = 25, sort = 35)
+//    @ImportExcelValidated(digits = true)
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime", width = 25, sort = 35)
     @ApiModelProperty(value = "夏季机械硫化时间(分)", name = "curingTime")
     @TableField(value = "CURING_TIME")
     private Integer curingTime;
@@ -131,8 +131,8 @@ public class MdmSkuConstructionRef extends BaseEntity {
     private Integer hydraulicPressureCuringTime;
 
     /** 冬季机械硫化时间(分) */
-    @ImportExcelValidated(digits = true)
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime2", width = 25, sort = 40)
+//    @ImportExcelValidated(digits = true)
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.curingTime2", width = 25, sort = 40)
     @ApiModelProperty(value = "冬季机械硫化时间(分)", name = "curingTime2")
     @TableField(value = "CURING_TIME2")
     private Integer curingTime2;

@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
@@ -50,7 +51,7 @@ public class CxAddSkuProductionHandler {
         }
         //获取最先收尾的硫化组
         EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext);
-        if(null == lhGroup){
+        if (null == lhGroup) {
             //todo 记录日志
             return;
         }
@@ -137,8 +138,15 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoFindMouldLog(context, groupName, cxMachineCode, materialDesc));
+            //没有模具则标记本轮不再参与
+            List<MonthPlanProductionRequirePlanVo> needProductionList = needProductionInfo.getNeedProductionList();
+            needProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+            //递归：重新获取下一组
+            productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
             return;
         }
+        String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
+        log.info(TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay));
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
@@ -173,13 +181,17 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(productionPlanList)) {
             return "";
         }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = productionPlanList.stream().filter(singlePlan -> singlePlan.hasProductionThisRound()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return "";
+        }
         //提取所有sku的物料描述
-        Set<String> allMaterialDescSet = productionPlanList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
+        Set<String> allMaterialDescSet = hasProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
         Set<String> enableMaterialDescSet = productionContext.getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
         if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
             return "";
         }
-        List<MonthPlanProductionRequirePlanVo> enablePlanList = productionPlanList.stream().filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> enablePlanList = hasProductionList.stream().filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(enablePlanList)) {
             return "";
         }
