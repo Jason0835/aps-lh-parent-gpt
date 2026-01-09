@@ -52,7 +52,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 物料信息表Controller
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MdmMaterialInfoController.java
+ * 描    述：物料信息 控制层类：....
  *
  * @author leo
  * @date 2021-08-24

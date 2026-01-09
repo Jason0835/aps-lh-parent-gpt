@@ -179,8 +179,8 @@ public class MpWeekRollAdjustController extends BaseController {
         structureIn.setCurrentNetQty(1400);
         structureIn.setNetQtyChange(600);
         structureIn.setMonthScheduledQty(800);
-        structureIn.setPendingQty(900);
-        structureIn.setConfirmAdjustQty(900);
+        structureIn.setPendingQty(1000);
+        structureIn.setConfirmAdjustQty(1000);
 
         MpAdjustStructureIn structureIn2 = new MpAdjustStructureIn();
         structureIn2.setMaterialCode("3302001162");

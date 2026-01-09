@@ -1,30 +1,27 @@
 package com.zlt.aps.monthplan.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmHolidayEntityMapper;
 import com.zlt.aps.maindata.service.IMdmHolidayService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.log.annotation.Log;
-import com.ruoyi.common.log.enums.BusinessType;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -153,9 +150,11 @@ public class MdmHolidayController extends AbstractDocBizController<MdmHoliday> {
     @Override
     protected void builderCondition(QueryWrapper<MdmHoliday> queryWrapper, MdmHoliday queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("holidayDate")), "HOLIDAY_DATE", queryVO.getFieldValueByFieldName("holidayDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("holidayNames")), "HOLIDAY_NAMES", queryVO.getFieldValueByFieldName("holidayNames"));
-    }
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("holidayNames")), "HOLIDAY_NAMES", queryVO.getFieldValueByFieldName("holidayNames"));
 
+        queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("holidayDateStartTime")), "HOLIDAY_DATE", queryVO.getFieldValueByFieldName("holidayDateStartTime"));
+        queryWrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("holidayDateEndTime")), "HOLIDAY_DATE", queryVO.getFieldValueByFieldName("holidayDateEndTime"));
+    }
 
     @Override
     protected String getTypeCode(){

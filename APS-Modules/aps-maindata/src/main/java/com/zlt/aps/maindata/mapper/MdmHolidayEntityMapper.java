@@ -1,8 +1,11 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -20,4 +23,11 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
 @Mapper
 public interface MdmHolidayEntityMapper extends CommBaseMapper<MdmHoliday> {
 
+    /**
+     * 根据年查询
+     *
+     * @param year 年
+     * @return 结果
+     */
+    List<MdmHoliday> selectByYear(@Param("year") Integer year);
 }
