@@ -107,7 +107,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         //  (2). 根据选择的储备类型校验近12个月是否出现过超期周期排产储备/超期常规储备，如果出现过，则提示信息“近12个月有出现过超期胎，不可新增”
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String notUniqueMsg =  String.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
+            String notUniqueMsg =  com.ruoyi.common.utils.StringUtils.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
             throw new BusinessException(notUniqueMsg);
         }
         return unique;
