@@ -3,7 +3,9 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
@@ -16,19 +18,26 @@ import com.zlt.aps.common.core.enums.OperationBusinessEnums;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
+import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -53,6 +62,12 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
     private final RedisService redisService;
     private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
     private final MdmMonCycleSchStruConfEntityMapper monCycleSchStruConfEntityMapper;
+
+    @Autowired
+    private IRemoteImportLogService iRemoteImportLogService;
+
+    @Autowired
+    private IRemoteImportErrorLogService iRemoteImportErrorLogService;
 
     @Override
     protected String getDocTypeCode() {
@@ -79,6 +94,27 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "structureName"));
+    }
+
+    /**
+     * 异步导入
+     */
+    @Override
+    public void importDataAsync(List<MdmCycleSchStruConf> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
+        try {
+            RequestContextHolder.setRequestAttributes(attributes, true);
+
+            AjaxResult result = this.importData(list, updateSupport, importLogId);
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(list.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            RemoteImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, iRemoteImportLogService);
+            RemoteImportExcelUtils.saveImportErrorLogs(result, iRemoteImportErrorLogService);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     /**
