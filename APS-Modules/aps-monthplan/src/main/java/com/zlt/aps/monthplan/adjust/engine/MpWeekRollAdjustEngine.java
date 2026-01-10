@@ -129,10 +129,10 @@ public class MpWeekRollAdjustEngine {
     /**
      * 优化：其他SKU往前移动
      * @param contextDTO 调整上下文
-     * @param startDay 锁定次日
+     * @param lockNextDay 锁定次日
      * @param mpProdFinalList 定稿列表
      */
-    private void otherSkuForwardMove(MpRollAdjustContextDTO contextDTO,int startDay,
+    private void otherSkuForwardMove(MpRollAdjustContextDTO contextDTO,int lockNextDay,
                                      List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         //1、从锁定次日向后遍历排产计划，检测每日硫化机台数不超限制数且每日胎胚种类数不超限制数的日期，记为有空间的日期；
         //2、在有空间的日期向后依次找SKU，越靠近的SKU优先移动；
@@ -141,7 +141,7 @@ public class MpWeekRollAdjustEngine {
         List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         //从锁定次日到月底次日，依次遍历
-        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
+        for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, contextDTO.getDailyCapacityLimitVoMap().get(i), null);
             //1、检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
             if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
@@ -837,13 +837,14 @@ public class MpWeekRollAdjustEngine {
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
         mpFinalVo.setFactoryCode(contextDTO.getFactoryCode());
-        mpFinalVo.setYear(adjustStructInVo.getYear());
-        mpFinalVo.setMonth(adjustStructInVo.getMonth());
-        String yearAndMonth = String.format("%s%02d", adjustStructInVo.getYear(), adjustStructInVo.getMonth());
+        mpFinalVo.setYear(contextDTO.getMpYear());
+        mpFinalVo.setMonth(contextDTO.getMpMonth());
+        String yearAndMonth = String.format("%s%02d", contextDTO.getMpYear(), contextDTO.getMpMonth());
         mpFinalVo.setYearMonth(Integer.valueOf(yearAndMonth));
         mpFinalVo.setMonthPlanVersion(adjustStructInVo.getMonthPlanVersion());
         mpFinalVo.setProductionVersion(adjustStructInVo.getProductionVersion());
         mpFinalVo.setLastMonthPlanVersion(adjustStructInVo.getVersion());
+        mpFinalVo.setStructureName(adjustStructInVo.getStructureName());
         mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
         mpFinalVo.setProductStatus(adjustStructInVo.getProductStatus());
         mpFinalVo.setMainMaterialDesc(adjustStructInVo.getMainMaterialDesc());
