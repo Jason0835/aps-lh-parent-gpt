@@ -162,6 +162,34 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_NO_ON_LINE_MACHINE_EMPTY("20-14-01-01", "在机分组计划没有在产机台"),
     /**
+     * 20-14-01-02 在机分组使用在产机台没有计划
+     */
+    CONTINUE_GROUP_ON_LINE_MACHINE_PLAN_EMPTY("20-14-01-02", "在机分组使用在产机台没有计划"),
+    /**
+     * 20-14-01-03 在机分组使用在产机台没有待排产计划
+     */
+    CONTINUE_GROUP_ON_LINE_MACHINE_PRODUCTION_PLAN_EMPTY("20-14-01-03", "在机分组使用在产机台没有待排产计划"),
+    /**
+     * 20-14-01-04 在机分组使用在产机台没有待排硫化组
+     */
+    CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP("20-14-01-04", "在机分组使用在产机台没有待排硫化组"),
+    /**
+     * 20-14-01-05 在机分组使用在产机台排产硫化组
+     */
+    CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE("20-14-01-05", "在机分组使用在产机台排产硫化组"),
+    /**
+     * 20-14-01-06 在机结构模具排产硫化组找到排产Sku
+     */
+    CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP("20-14-01-06", "在机结构模具排产硫化组找到排产Sku"),
+    /**
+     * 30-14-01-07 在机结构硫化组排产Sku没有合适的排产模具
+     */
+    CONTINUE_GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-14-01-07", "在机结构硫化组排产Sku没有合适的排产模具"),
+    /**
+     * 30-14-01-08 硫化组排产Sku超出胎胚种类数限制
+     */
+    MOULD_SKU_LIMIT_EMBRYO_LH_GROUP("30-14-01-08", "硫化组排产Sku超出胎胚种类数限制"),
+    /**
      * 20-14-00-01 在机分组(TBR结构)没有排产计划
      */
     CONTINUE_GROUP_NO_PRODUCTION_PLAN_INFO("20-14-00-01", "在机分组(TBR结构)没有排产计划"),

@@ -8,10 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -103,7 +100,7 @@ public class CxMouldProductionHandler {
             return;
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
-        buildNewLhConclusionInfo(cxMachineInfo, cxLhRatio.getLhMachineMaxQty(), productionPlan);
+        buildNewLhConclusionInfo(context, cxMachineInfo, cxLhRatio, productionPlan);
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
@@ -112,13 +109,15 @@ public class CxMouldProductionHandler {
     /**
      * 重新构建成型对应的收尾信息，从分配的起始天数开始
      *
+     * @param context        排产上下文
      * @param cxMachineInfo  成型机台
-     * @param maxLhCount     最大硫化数
+     * @param ratio          配比信息
      * @param productionPlan 排产计划
      */
-    private static void buildNewLhConclusionInfo(CxMachineBaseInfoVo cxMachineInfo, Integer maxLhCount, CxMachineAllocationPlanHelper productionPlan) {
+    private static void buildNewLhConclusionInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         Integer startDay = productionPlan.getStartDay();
+        Integer maxLhCount = ratio.getLhMachineMaxQty();
         Set<Integer> newCxLhGroupNo = new HashSet<>();
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
         for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
@@ -131,6 +130,13 @@ public class CxMouldProductionHandler {
                 needDeletedGroupNo.add(cxLhGroupNo);
             }
         });
+        //按日构建限制
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> newLimit = new HashMap<>();
+        for (Integer day = startDay; day <= productionPlan.getEndDay(); day++) {
+            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByCxMachineAllocation(context, cxMachineInfo, day, productionPlan);
+            newLimit.put(day, dayLimit);
+        }
+        cxMachineInfo.setDayProductionLimitInfo(newLimit);
         if (CollectionUtils.isEmpty(needDeletedGroupNo)) {
             return;
         }
