@@ -79,6 +79,14 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 重置Sku的已排产量及排产损耗量
+     */
+    public void resetSkuProductionAndWastageQty() {
+        skuPlannedQtyMap = new HashMap<>(64);
+        skuWastageQtyMap = new HashMap<>(64);
+    }
+
+    /**
      * 增加sku已排产量及排产损耗量
      *
      * @param materialDesc 物料描述

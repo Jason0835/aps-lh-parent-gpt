@@ -89,9 +89,12 @@ public class CxContinueGroupAllocationHandler {
      */
     private static List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(productionCxMachineCodeSet)) {
+            return Collections.emptyList();
+        }
         //粗算得到的机台
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
-        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         Integer productionCount = productionCxMachineCodeSet.size();
         //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
         productionContinue(productionContext, groupPlanInfo, groupContinueInfo, mouldShellMap);
