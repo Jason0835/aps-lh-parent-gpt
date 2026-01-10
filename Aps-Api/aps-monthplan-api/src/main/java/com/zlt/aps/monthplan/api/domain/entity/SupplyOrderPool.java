@@ -77,12 +77,12 @@ public class SupplyOrderPool extends BaseEntity {
     private String saleArea;
 
     /** 适销区域转译 */
+    @Excel(name = "ui.data.column.supplyOrderPool.saleArea")
     @ApiModelProperty(value = "适销区域名称", name = "saleAreaName")
     @TableField(exist = false)
     private String saleAreaName;
 
     /** 适销区域国际化 */
-    @Excel(name = "ui.data.column.supplyOrderPool.saleArea")
     @ApiModelProperty(value = "适销区域国际化", name = "saleAreaNameI18n")
     @TableField(exist = false)
     private String saleAreaNameI18n;
