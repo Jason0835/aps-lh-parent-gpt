@@ -118,7 +118,7 @@ public class MpWeekRollAdjustController extends BaseController {
             weekAdjustStrategy.autoAdjust(contextDTO);
             log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode("01").getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
-            return AjaxResult.success();
+            return AjaxResult.success(contextDTO.getFactoryMonthPlanProdFinalList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
