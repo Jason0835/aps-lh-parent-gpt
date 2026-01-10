@@ -398,7 +398,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, lhRatio.getLhMachineMinQty());
         //最大胎胚种类数
         Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
-        maxEmbryoCodeCount = maxLhMachineCount + lhRatio.getMaxEmbryoQty();
+        maxEmbryoCodeCount = maxEmbryoCodeCount + lhRatio.getMaxEmbryoQty();
         initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
     }
 
@@ -437,7 +437,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
         //最大胎胚种类数
         Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
-        maxEmbryoCodeCount = maxLhMachineCount + singleCxMachineAllocation.getMaxEmbryoCodeCount();
+        maxEmbryoCodeCount = maxEmbryoCodeCount + singleCxMachineAllocation.getMaxEmbryoCodeCount();
         initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
     }
 }

@@ -64,6 +64,10 @@ public class ProductionPlanGroupInfo {
      */
     private List<MonthPlanProductionRequirePlanVo> groupPlanData;
     /**
+     * 结构指定机台集合
+     */
+    private Set<String> fixedCxMachineSet;
+    /**
      * 估算需要的机台数
      */
     private BigDecimal needCxCapacityMachineCount;
@@ -121,6 +125,24 @@ public class ProductionPlanGroupInfo {
      * 是否分配完毕 1 分配完成
      */
     private Integer isAllocationFinish;
+
+    /**
+     * 构建初始化分组信息对象
+     *
+     * @param groupName     分组名 TBR 结构 PCR 英寸
+     * @param productType   产品品类 TBR PCR
+     * @param groupPlanData 分组所有计划
+     * @return
+     */
+    public static ProductionPlanGroupInfo createInitByGroupList(String groupName, ProductTypeEnum productType, List<MonthPlanProductionRequirePlanVo> groupPlanData) {
+        ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
+        groupInfo.setGroupName(groupName);
+        groupInfo.setProductType(productType);
+        groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
+        groupInfo.setGroupPlanData(groupPlanData);
+        groupInfo.setFixedCxMachineSet(new HashSet<>());
+        return groupInfo;
+    }
 
     /**
      * 获取所有有效需求量
@@ -955,11 +977,7 @@ public class ProductionPlanGroupInfo {
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
-            ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
-            groupInfo.setGroupName(structureName);
-            groupInfo.setProductType(context.getProductType());
-            groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
-            groupInfo.setGroupPlanData(planList);
+            ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(structureName, context.getProductType(), planList);
             //是否零度结构
             List<MonthPlanProductionRequirePlanVo> isZeroRackList = planList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack())).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(isZeroRackList)) {
