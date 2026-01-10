@@ -94,6 +94,27 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 根据机台分配情况，构建日排产限制数据对象
+     *
+     * @param context        排产上下文
+     * @param productionDay  排产日
+     * @param allocationInfo 分配信息
+     * @return
+     */
+    public static GroupPlanCxLhCapacityLimitHelper buildByCxMachineAllocation(Context context, CxMachineBaseInfoVo cxMachineInfo, Integer productionDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (context.getStopDays().contains(productionDay)) {
+            return null;
+        }
+        Integer minLimit = BigDecimal.ZERO.intValue();
+        GroupPlanCxLhCapacityLimitHelper initLimitHelper = buildEmptyData(productionDay, minLimit, minLimit);
+        if (null == allocationInfo) {
+            return initLimitHelper;
+        }
+        updateBaseLimitInfo(initLimitHelper, cxMachineInfo, allocationInfo);
+        return initLimitHelper;
+    }
+
+    /**
      * 根据结构转产配置，构建分组某日的限制对象信息
      *
      * @param context             排产上下文
@@ -201,6 +222,22 @@ public class GroupPlanCxLhCapacityLimitHelper {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 判断增加胎胚是否达到胎胚种类数限制
+     * true 表示达到限制，不可增加
+     * false 表示没有达到限制，可增加
+     *
+     * @param addEmbryoCode 要加入的胎胚种类数
+     * @return
+     */
+    public boolean isReachLimitByEmbryoCode(String addEmbryoCode) {
+        if (productionMouldSet.contains(addEmbryoCode)) {
+            return false;
+        }
+        Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        return currentEmbryoCodeCount + BigDecimal.ONE.intValue() > maxEmbryoCodeCount;
     }
 
     /**

@@ -10,6 +10,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -184,9 +185,11 @@ public class CxLhMouldProductionCalculator {
         Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         Set<String> cxMachineInfoSet = lhProductionQtyHelper.getCxMachineInfo();
+        Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         String cxMachineCode = new ArrayList<>(cxMachineInfoSet).get(BigDecimal.ZERO.intValue());
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
-        String skuMaterialDesc = skuProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        MonthPlanProductionRequirePlanVo productionSkuInfo = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        String skuMaterialDesc = productionSkuInfo.getMaterialDesc();
         Set<Integer> stopDay = context.getStopDays();
         //进行排产
         for (int day = startDay; day <= endDay; day++) {
@@ -207,10 +210,13 @@ public class CxLhMouldProductionCalculator {
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, cxMachineInfoSet, BigDecimal.ZERO.intValue());
             updateMouldDayProductionInfo(doubleMouldList, skuProductionPlanList, updateInfo);
             //更新硫化组日期和日排产量
-            cxLhGroup.setProductionQty(realDayProductionQty);
-            cxLhGroup.setProductionDay(day);
-            cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-            cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
+            updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, day, dayMaxProductionQty, realDayProductionQty);
+//            cxLhGroup.setProductionQty(realDayProductionQty);
+//            cxLhGroup.setProductionDay(day);
+//            cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+//            cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
+//            cxMachineInfo.getDayProductionLimitInfo().get(day)
+
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
         }
@@ -338,6 +344,35 @@ public class CxLhMouldProductionCalculator {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));
         });
+    }
+
+    /**
+     * 更新成型机的硫化组信息
+     *
+     * @param cxLhGroup            成型对应的硫化组
+     * @param productionSkuInfo    排产Sku信息
+     * @param cxMachineInfo        成型机台
+     * @param usedMouldSet         使用模具
+     * @param productionDay        排产日
+     * @param dayMaxProductionQty  日最大硫化值
+     * @param realDayProductionQty 实际排产值
+     */
+    private static void updateCxMachineLhInfo(CxLhProductionHelper cxLhGroup, MonthPlanProductionRequirePlanVo productionSkuInfo, CxMachineBaseInfoVo cxMachineInfo, Set<String> usedMouldSet, Integer productionDay, Integer dayMaxProductionQty, Integer realDayProductionQty) {
+        cxLhGroup.setProductionQty(realDayProductionQty);
+        cxLhGroup.setProductionDay(productionDay);
+        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+        cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = cxMachineInfo.getDayProductionLimitInfo();
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return;
+        }
+        GroupPlanCxLhCapacityLimitHelper dayLimit = dayProductionLimitInfo.get(productionDay);
+        if (null == dayLimit) {
+            return;
+        }
+        //更新生胎及模具
+        dayLimit.getProductionEmbryoCodeSet().add(productionSkuInfo.getEmbryoCode());
+        dayLimit.getProductionMouldSet().addAll(usedMouldSet);
     }
 
     private CxLhMouldProductionCalculator() {

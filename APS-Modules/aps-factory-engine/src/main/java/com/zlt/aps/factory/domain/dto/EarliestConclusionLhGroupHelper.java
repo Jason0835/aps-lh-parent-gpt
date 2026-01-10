@@ -55,4 +55,15 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         this.endDay = endDay;
         this.usedMouldSet = usedMouldSet;
     }
+
+    /**
+     * 更新可排产时间范围
+     *
+     * @param closingDay 新收尾日
+     * @param endDay     新排产结束日
+     */
+    public void updateProductionDateRange(Integer closingDay, Integer endDay) {
+        this.closingDay = closingDay;
+        this.endDay = endDay;
+    }
 }

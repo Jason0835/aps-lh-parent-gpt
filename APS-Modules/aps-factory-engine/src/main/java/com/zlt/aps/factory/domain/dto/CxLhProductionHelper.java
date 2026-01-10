@@ -60,7 +60,10 @@ public class CxLhProductionHelper implements Serializable {
      * 有可能一个，也有可能多个
      */
     private Set<String> cxMachineInfo;
-
+    /**
+     * 结束日--修正时使用
+     */
+    private Integer endDay;
     /**
      * 构建空的成型下硫化分组信息
      *
@@ -93,5 +96,16 @@ public class CxLhProductionHelper implements Serializable {
         this.materialCode = null;
         this.materialDesc = null;
         //排产模具是否要清空？
+    }
+
+    /**
+     * 更新可排产时间范围
+     *
+     * @param closingDay 新收尾日
+     * @param endDay     新排产结束日
+     */
+    public void updateProductionDateRange(Integer closingDay, Integer endDay) {
+        this.productionDay = closingDay;
+        this.endDay = endDay;
     }
 }

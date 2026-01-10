@@ -51,6 +51,165 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加在机结构对在产机台排产没有计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有计划====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @return
+     */
+    public static String addContinueGroupContinueCxMachineNoPlanLog(Context context, String groupName, String onLineMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有计划====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_PLAN_EMPTY, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构对在产机台排产没有待排产计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有待排产计划====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @return
+     */
+    public static String addContinueGroupContinueCxMachineNoProductionPlanLog(Context context, String groupName, String onLineMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有待排产计划====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_PRODUCTION_PLAN_EMPTY, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构对在产机台排产没有找到可排产硫化分组日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到待待硫化组====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @return
+     */
+    public static String addContinueGroupContinueCxMachineNoLhGroupLog(Context context, String groupName, String onLineMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到待待硫化组====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构对在产机台可排产硫化组日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产硫化组%s~%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param startDay          开始日
+     * @param endDay            结束日
+     * @return
+     */
+    public static String addContinueGroupContinueCxMachineLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 排产硫化组%s~%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构对在产机台可排产硫化组日期范围修正日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产硫化组修正后排产日范围：%s~%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param startDay          开始日
+     * @param endDay            结束日
+     * @return
+     */
+    public static String addContinueGroupContinueMachineCorrectLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产硫化组修正后排产日范围：%s~%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构对在产机台硫化组找到可排产Sku日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 排产硫化组找到可排产Sku：%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台
+     * @param materialDesc      Sku
+     * @return
+     */
+    public static String addContinueGroupLhGroupFindSkuLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 排产硫化组找到可排产Sku：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构-硫化组排产Sku没有可排产模具日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 没有找到合适的模具====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台编码
+     * @param materialDesc      Sku信息
+     * @return
+     */
+    public static String addContinueLhGroupSkuNoFindMouldLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 没有找到合适的模具====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构-硫化组排产Sku超出胎胚种类数限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 超出胎胚种类数限制====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台编码
+     * @param materialDesc      Sku信息
+     * @return
+     */
+    public static String addContinueLhGroupSkuEmbryoLimitLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 超出胎胚种类数限制====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_EMBRYO_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加分组结构排产成型机台没有找到机台信息日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有找到机台====
      *
