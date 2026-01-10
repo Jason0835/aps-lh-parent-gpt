@@ -295,40 +295,21 @@ public class CxCapacityAllocationHandler {
     }
 
     /**
-     * 对分组(结构)计划，挑选合适的成型机台
+     * 对分组(结构)计划，挑选合适成型机台
      *
      * @param context         排产上下文
      * @param addNewGroupPlan 排产分组计划
      * @return
      */
-    public static CxMachineBaseInfoVo selectedCxMachine(Context context, ProductionPlanGroupInfo addNewGroupPlan) {
+    public static CxMachineBaseInfoVo selectedCxMachineForGroupPlan(Context context, ProductionPlanGroupInfo addNewGroupPlan) {
         if (null == addNewGroupPlan) {
             return null;
         }
-        //获取机台信息
-        TbrProductionContext productionContext = (TbrProductionContext) context;
+        //获取分组及零度零度供料架
         String structureName = addNewGroupPlan.getGroupName();
-        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        if (CollectionUtils.isEmpty(allCxMachineMap)) {
-            return null;
-        }
-        //获取有剩余产能的机台信息
-        List<CxMachineBaseInfoVo> cxMachineList = new ArrayList<>(allCxMachineMap.values());
-        List<CxMachineBaseInfoVo> leftOverCxMachineList = cxMachineList.stream().filter(cxMachine -> cxMachine.getRemainingDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(leftOverCxMachineList)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLeftOverCapacityLog(context, structureName));
-            return null;
-        }
-        //成型机台基础条件匹配
         String isZeroRack = addNewGroupPlan.getIsZero();
-        List<CxMachineBaseInfoVo> enableCxMachineList = new ArrayList<>(leftOverCxMachineList.size());
-        leftOverCxMachineList.forEach(cxMachineInfo -> {
-            //零度匹配，不可作业剔除
-            boolean isSelected = GroupPlanCxMachineSelector.isSelectMatchCxMachineForGroupPlan(context, addNewGroupPlan, cxMachineInfo);
-            if (isSelected) {
-                enableCxMachineList.add(cxMachineInfo);
-            }
-        });
+        //挑选机台
+        List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
@@ -426,7 +407,7 @@ public class CxCapacityAllocationHandler {
         }
         Map<String, ProductionPlanGroupInfo> enableProductionMap = new HashMap<>(capacityCoverageMap.size());
         capacityCoverageMap.forEach((structureName, groupPlan) -> {
-            boolean isBaseSelected = GroupPlanCxMachineSelector.isSelectMatchCxMachineForGroupPlan(context, groupPlan, cxMachineInfo);
+            boolean isBaseSelected = GroupPlanCxMachineSelector.isMatch(context, groupPlan, cxMachineInfo);
             if (!isBaseSelected) {
                 return;
             }

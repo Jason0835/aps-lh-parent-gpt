@@ -1,10 +1,7 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.zlt.aps.factory.domain.dto.DayCapacityLimitHelper;
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Data;
 
@@ -60,4 +57,8 @@ public class BaseDataContainer implements Serializable {
      * key=排产日 : value=日排产控制信息
      */
     Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap;
+    /**
+     * 分组(结构)成型硫化配比
+     */
+    List<MonthPlanStructureLhRatioVo> structureLhRatioList;
 }

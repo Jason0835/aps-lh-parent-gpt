@@ -168,13 +168,13 @@ public class ProductionPlanGroupInfo {
      *
      * @param context              排产上下文
      * @param requirePlanList      需排产的计划
-     * @param structureLhRatioList 结构硫化配比信息
      * @return
      */
-    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = ((TbrProductionContext) context).getBaseDataContainer().getStructureLhRatioList();
         //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);

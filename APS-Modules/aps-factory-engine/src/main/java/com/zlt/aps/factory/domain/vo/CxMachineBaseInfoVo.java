@@ -165,7 +165,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT.getPriorityValue();
         }
         //无固定配置
-        if (hasFixed()) {
+        if (!hasFixed()) {
             return CxMachineFixedPriorityEnum.DEFAULT.getPriorityValue();
         }
         String structureName = groupPlanInfo.getGroupName();
@@ -191,7 +191,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return false;
         }
         //无固定配置
-        if (hasFixed()) {
+        if (!hasFixed()) {
             return false;
         }
         //判定结构
