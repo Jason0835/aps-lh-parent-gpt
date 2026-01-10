@@ -36,9 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
@@ -89,6 +91,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     private final IMpHistorySaleRecordService historySaleRecordService;
     // 排产设定
     private final IFactoryParamService iFactoryParamService;
+    // 库存冲减
+    @Resource
+    private  StockAllocationServiceImpl stockAllocationServiceImpl;
 
     @Override
     protected String getDocTypeCode() {
@@ -365,24 +370,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             return Collections.emptyMap();
         }
 
-        Map<String, MdmProductStock> stockMap = this.calculateStockQtyMap(finishedProductStocks);
-        if(org.springframework.util.CollectionUtils.isEmpty(stockMap)){
-            return Collections.emptyMap();
-        }
-        Map<String,Integer> stockWithoutOrderMap = new HashMap<>();
-        Map<String, SalesOrderPool> salesOrderMap = this.calculateOrderQtyMap(salesOrderPools);
-        stockMap.forEach((key,value) -> {
-            if(!salesOrderMap.containsKey(key)){
-                return;
-            }
-            value.setStockQty(value.getStockQty() - salesOrderMap.get(key).getOrdQty().intValue());
-            if(!stockWithoutOrderMap.containsKey(value.getMaterialCode())){
-                stockWithoutOrderMap.put(value.getMaterialCode(),value.getStockQty());
-                return;
-            }
-            stockWithoutOrderMap.compute(value.getMaterialCode(), (k, stockWithoutOrder) -> (stockWithoutOrder==null?0:stockWithoutOrder) + value.getStockQty());
-        });
-        return stockWithoutOrderMap;
+          // 20260110 修改原来是完全匹配年周，物料，动平衡，均匀性，现在改为物料满足, 年周满足即可, 动平衡，均匀性属于优先扣减，不满足时，再扣减其他库存
+          return stockAllocationServiceImpl.calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
     }
 
     private Map<String, MdmProductStock> calculateStockQtyMap(List<MdmProductStock> finishedProductStocks) {
@@ -467,6 +456,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         if (monthlySaleQty == null || monthlySaleQty.getAverageSaleQty() <= 0) {
             return null;
         }
+
         int stockWithoutOrder = stockWithoutOrderMap.getOrDefault(materialCode, BigDecimal.ZERO.intValue());
         // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
         BigDecimal productionQty = calculateProductionQty(
