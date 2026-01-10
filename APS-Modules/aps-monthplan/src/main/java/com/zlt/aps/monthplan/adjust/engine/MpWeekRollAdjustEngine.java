@@ -21,6 +21,7 @@ import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -495,14 +496,12 @@ public class MpWeekRollAdjustEngine {
      * @return 新上机日
      */
     private Integer getNewOnLineDay(MpRollAdjustContextDTO contextDTO, int lockNextDay, FactoryMonthPlanFinalAdjustVo mpFinalVo) {
-        int endDay;
-        if (mpFinalVo.getBeginDay() < lockNextDay){
-            //若开始日 < 锁定日，可开始日设定锁定日
-            endDay = contextDTO.getStructureDeadLine();
-        }else{
+        int endDay = contextDTO.getStructureDeadLine();
+        if (mpFinalVo != null && mpFinalVo.getBeginDay() >= lockNextDay){
             //若开始日 >= 锁定日，截止日设为计划开始日，因为已排计划不能往后延
             endDay = mpFinalVo.getBeginDay();
         }
+
         return new MpAdjustDailyCapacityLimit().getNewOnLineDay(lockNextDay, endDay, contextDTO.getDailyCapacityLimitVoMap());
     }
 
@@ -801,41 +800,66 @@ public class MpWeekRollAdjustEngine {
         if(PubUtil.isEmpty(incrementAdjustList)){
             return;
         }
-
-        int startDay = contextDTO.getLockEndDay() + 1;
-        //1、排序：在机SKU上机日期早的优先增量排产
-        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
-        Map<String, MpAdjustStructureIn> mpAdjustStructInMap = incrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
-                Collectors.collectingAndThen(Collectors.toList(),m-> {
-                    return m.get(0);
-                })));
-
-        MpAdjustStructureIn adjustStructInVo;
-        Integer newOnLineDay,newPlanQty;
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        int lockNextDay = contextDTO.getLockEndDay() + 1;
+        Integer newOnLineDay,newPlanQty,newEndDay;
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
         //2、排实单
-        for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
-            adjustStructInVo = mpAdjustStructInMap.get(mpFinalVo.getMaterialCode());
-            if (adjustStructInVo == null) {
-                continue;
-            }
+        for (MpAdjustStructureIn adjustStructInVo:incrementAdjustList){
+            mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
+
             //2.1、敲定在机SKU新的上机日期
-            newOnLineDay = adjustDailyCapacityLimitObj.getNewOnLineDay(startDay,mpFinalVo.getBeginDay(),contextDTO.getDailyCapacityLimitVoMap());
-            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
+            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
+            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
             newPlanQty = adjustStructInVo.getConfirmAdjustQty();
 
-            //2.3、清空定稿表日计划量
-            clearMpFinalDayValue(contextDTO,startDay, mpFinalVo);
-
-            //2.4、增模排产
+            //2.4、增模排产,挤占空产能
             int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
-            if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
-                // 若剩余量 > 搭配量，说明实单还有剩余
-                // 实单剩余  = 剩余量 - 搭配量
-                remainPlanQty -= mpFinalVo.getConventionProductionQty();
+            //2.5、若还有剩余，向前挤占其他SKU的搭配量
+            if (remainPlanQty > 0){
+                // 若剩余量 > 0，说明实单还有剩余
                 // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                deductMatchOtherSku(contextDTO,startDay,newOnLineDay-1,remainPlanQty,mpFinalVo,mpProdFinalList);
+                newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay-1;
+                deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
             }
+
+            //2.6、将新增的SKU纳入定稿列表
+            mpProdFinalList.add(mpFinalVo);
         }
+    }
+
+    /**
+     * 创建定稿记录对象
+     * @param contextDTO 周程滚动上下文
+     * @param adjustStructInVo 结构内调整Vo
+     * @return 定稿记录对象
+     */
+    private FactoryMonthPlanFinalAdjustVo createMpFinalAdjustVo(MpRollAdjustContextDTO contextDTO, MpAdjustStructureIn adjustStructInVo) {
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
+        mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        mpFinalVo.setFactoryCode(contextDTO.getFactoryCode());
+        mpFinalVo.setYear(adjustStructInVo.getYear());
+        mpFinalVo.setMonth(adjustStructInVo.getMonth());
+        String yearAndMonth = String.format("%s%02d", adjustStructInVo.getYear(), adjustStructInVo.getMonth());
+        mpFinalVo.setYearMonth(Integer.valueOf(yearAndMonth));
+        mpFinalVo.setMonthPlanVersion(adjustStructInVo.getMonthPlanVersion());
+        mpFinalVo.setProductionVersion(adjustStructInVo.getProductionVersion());
+        mpFinalVo.setLastMonthPlanVersion(adjustStructInVo.getVersion());
+        mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
+        mpFinalVo.setProductStatus(adjustStructInVo.getProductStatus());
+        mpFinalVo.setMainMaterialDesc(adjustStructInVo.getMainMaterialDesc());
+        mpFinalVo.setMesMaterialCode(adjustStructInVo.getMesMaterialCode());
+        mpFinalVo.setMaterialCode(adjustStructInVo.getMaterialCode());
+        mpFinalVo.setMaterialDesc(adjustStructInVo.getMaterialDesc());
+        mpFinalVo.setConstructionStage(adjustStructInVo.getConstructionStage());
+        mpFinalVo.setBrand(adjustStructInVo.getBrand());
+        mpFinalVo.setProSize(adjustStructInVo.getProSize());
+        mpFinalVo.setSpecifications(adjustStructInVo.getSpecifications());
+        mpFinalVo.setMainPattern(adjustStructInVo.getMainPattern());
+        mpFinalVo.setPattern(adjustStructInVo.getPattern());
+        mpFinalVo.setMouldCavityQty(adjustStructInVo.getMouldCavityQty());
+        mpFinalVo.setTypeBlockQty(adjustStructInVo.getTypeBlockQty());
+        mpFinalVo.setDayVulcanizationQty(adjustStructInVo.getDayVulcanizationQty());
+        mpFinalVo.setCuringTime(adjustStructInVo.getCuringTime());
+        return mpFinalVo;
     }
 }
