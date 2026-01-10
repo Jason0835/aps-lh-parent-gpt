@@ -179,6 +179,56 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 判定机台是否为结构指定机台
+     * 需要判断 指定结构和指定Sku
+     * 先判断指定结构，后判断指定Sku
+     *
+     * @param groupPlanInfo 结构信息
+     * @return
+     */
+    public boolean hasFixedMachine(ProductionPlanGroupInfo groupPlanInfo) {
+        if (null == groupPlanInfo) {
+            return false;
+        }
+        //无固定配置
+        if (hasFixed()) {
+            return false;
+        }
+        //判定结构
+        Set<String> fixedStructureSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedStructure1)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure1.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (StringUtils.isNotBlank(fixedStructure2)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure2.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (StringUtils.isNotBlank(fixedStructure3)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure3.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
+            return true;
+        }
+        //判定Sku
+        Set<String> fixedMaterialCodeSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedMaterialCode)) {
+            fixedMaterialCodeSet.addAll(Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (CollectionUtils.isEmpty(fixedMaterialCodeSet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return false;
+        }
+        for (MonthPlanProductionRequirePlanVo singlePlan : groupPlanData) {
+            if (fixedMaterialCodeSet.contains(singlePlan.getMaterialCode())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 根据固定结构值及优先级，得到其真实优先级
      *
      * @param fixedStructure 固定结构
