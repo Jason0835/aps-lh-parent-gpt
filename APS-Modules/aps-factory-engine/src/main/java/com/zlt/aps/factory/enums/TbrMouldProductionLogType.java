@@ -253,6 +253,11 @@ public enum TbrMouldProductionLogType {
      * 20-16-02 零度供料架不匹配
      */
     GROUP_NO_SELECTED_ZERO_MATCH_CX_MACHINE("20-16-02", "零度供料架不匹配"),
+
+    /**
+     * 20-16-02 分组计划与成型机台条件匹配
+     */
+    GROUP_CX_MACHINE_BASE_MACHE("20-16-02", "分组计划与成型机台条件匹配"),
     /**
      * 20-16-03 机台限制生产
      */
@@ -285,7 +290,10 @@ public enum TbrMouldProductionLogType {
      * 20-16 没有获取到下一组优先级高的分组计划
      */
     GROUP_NO_SELECTED_CX_MACHINE("20-16", "分组计划没有找到合适的机台"),
-
+    /**
+     * 20-16-01 分组计划找机台
+     */
+    GROUP_SELECTED_CX_MACHINE("20-16-01", "分组计划找机台"),
     /**
      * 30-01-00 开始分组计划模具排产
      */

@@ -34,20 +34,4 @@ public class MonthPlanStructureLhRatioVo implements Serializable {
      */
     private Integer lhMachineMinQty;
 
-    /**
-     * 结构成型硫化是否匹配
-     *
-     * @param structureName      结构名
-     * @param cxMachineBrandCode 成型类型
-     * @return
-     */
-    public boolean isMatch(String structureName, String cxMachineBrandCode) {
-        if (StringUtils.isBlank(structureName) || StringUtils.isBlank(cxMachineBrandCode)) {
-            return false;
-        }
-        if (!structureName.equals(this.structureName)) {
-            return false;
-        }
-        return cxMachineBrandCode.equals(this.cxMachineBrandCode);
-    }
 }
