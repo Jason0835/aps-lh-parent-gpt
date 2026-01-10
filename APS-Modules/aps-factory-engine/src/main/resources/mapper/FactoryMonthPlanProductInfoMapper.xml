@@ -15,6 +15,7 @@
                mmi.COMMON_TYPE,
                mmi.STRUCTURE_NAME,
                mmi.CANT_PRODUCE,
+               mmi.PRODUCT_CATEGORY,
                mmi.GROSS_RATE_JSON,
                mmi.FORBID_TAG
           FROM t_mdm_material_info mmi

@@ -74,7 +74,10 @@ public class ProductBaseInfoVo implements Serializable {
      * 不可生产
      */
     private String cantProduce;
-
+    /**
+     * 产品分类
+     */
+    private String productCategory;
     /**
      * 废停
      */
