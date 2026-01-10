@@ -284,14 +284,14 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
-
+    
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.averageQty")
-    @ApiModelProperty(value = "月均销量", name = "averageQty")
-    @TableField(value = "AVERAGE_QTY")
-    private Integer averageQty;
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.averageSaleQty")
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Integer averageSaleQty;
 
     /**
      * 库销比
