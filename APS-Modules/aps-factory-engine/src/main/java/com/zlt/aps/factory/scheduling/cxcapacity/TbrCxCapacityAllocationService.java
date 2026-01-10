@@ -112,9 +112,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
-        //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数
+        //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(productionContext, requirePlanList, structureLhRatioList);
+        setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         /**
          * 5、构建续作信息
@@ -907,6 +908,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             }
         });
         return structureLhRatioList;
+    }
+
+    /**
+     * 设置结构的指定机台信息
+     *
+     * @param productionContext 排产上下文
+     * @param allGroupMap       所有分组信息
+     */
+    private void setGroupFixedCxMachineInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupMap) {
+        if (CollectionUtils.isEmpty(allGroupMap)) {
+            return;
+        }
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfoMap)) {
+            return;
+        }
+        List<CxMachineBaseInfoVo> allCxMachineInfo = allCxMachineInfoMap.values().stream().collect(Collectors.toList());
+        allGroupMap.forEach((structureName, groupInfo) -> {
+            List<CxMachineBaseInfoVo> hasFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasFixedMachine(groupInfo)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(hasFixedList)) {
+                return;
+            }
+            groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
+        });
     }
 
     /**
