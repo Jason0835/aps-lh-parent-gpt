@@ -430,13 +430,15 @@ public class ProductionPlanGroupInfo {
      */
     public Integer getRealOnlineMachineDay(MonthPlanProductionRequirePlanVo productionPlan, Integer startDay, Integer endDay) {
         Integer realStartDay = startDay;
+        boolean canProduction = false;
         for (; realStartDay <= endDay; ) {
             if (isAddSkuProductionByOneLhMachine(productionPlan, realStartDay)) {
+                canProduction = true;
                 break;
             }
             realStartDay = realStartDay + BigDecimal.ONE.intValue();
         }
-        if (realStartDay.equals(endDay)) {
+        if (!canProduction) {
             return null;
         }
         return realStartDay;
