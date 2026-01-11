@@ -2,6 +2,7 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -57,6 +58,7 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     @Override
     public int save(MdmSkuLhCapacity docEntityVO) {
         docEntityVO.setBaseVale(null);
+        docEntityVO.setRowState(docEntityVO.getId() != null ? RowStateEnum.MODIFIED : RowStateEnum.ADDED);
         this.checkUnique(docEntityVO);
         // 计算APS日硫化量
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = new ArrayList<>();
