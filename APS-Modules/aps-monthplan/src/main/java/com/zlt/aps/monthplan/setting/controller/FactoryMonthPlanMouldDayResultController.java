@@ -230,6 +230,8 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("day31")), "DAY_31", queryVO.getFieldValueByFieldName("day31"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("totalVulcanizationMinutes")), "TOTAL_VULCANIZATION_MINUTES", queryVO.getFieldValueByFieldName("totalVulcanizationMinutes"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("displaySeq")), "DISPLAY_SEQ", queryVO.getFieldValueByFieldName("displaySeq"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productCategory")), "PRODUCT_CATEGORY", queryVO.getFieldValueByFieldName("productCategory"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("remark")), "REMARK", queryVO.getFieldValueByFieldName("remark"));
     }
 
 
