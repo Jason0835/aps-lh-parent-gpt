@@ -216,7 +216,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.brand")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -328,7 +328,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isImport", readConverterExp = "0=：默认不是，1：是")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
