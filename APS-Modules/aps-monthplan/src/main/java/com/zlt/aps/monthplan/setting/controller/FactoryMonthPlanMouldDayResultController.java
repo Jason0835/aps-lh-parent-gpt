@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.text.Convert;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanMouldDayResultService;
@@ -64,7 +65,25 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody FactoryMonthPlanMouldDayResult queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        calculateDayVulcanizationQty(tableDataInfo.getRows());
+        return tableDataInfo;
+    }
+
+    /**
+     * 计算机台日硫化量
+     */
+    private void calculateDayVulcanizationQty(List<?> sourceList) {
+        if (PubUtil.isEmpty(sourceList)) {
+            return;
+        }
+        List<FactoryMonthPlanMouldDayResult> list = (List<FactoryMonthPlanMouldDayResult>) sourceList;
+        // 计算机台日硫化量 = 日硫化量（单模）* 2
+        list.stream()
+                .forEach(vo -> {
+                    Integer dayVulcanizationQty = Convert.toInt(vo.getDayVulcanizationQty(),0);
+                    vo.setDayVulcanizationQty(dayVulcanizationQty * 2);
+                });
     }
 
     @Override
@@ -136,7 +155,9 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     protected List<FactoryMonthPlanMouldDayResult> listExportData(FactoryMonthPlanMouldDayResult obj) {
         QueryWrapper<FactoryMonthPlanMouldDayResult> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<FactoryMonthPlanMouldDayResult> list = entityMapper.selectList(wrapper);
+        calculateDayVulcanizationQty(list);
+        return list;
     }
 
     @Override
