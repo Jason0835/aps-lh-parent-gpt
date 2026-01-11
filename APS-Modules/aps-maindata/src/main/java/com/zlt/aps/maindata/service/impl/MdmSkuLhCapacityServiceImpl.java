@@ -51,7 +51,10 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     @Override
     public int save(MdmSkuLhCapacity docEntityVO) {
         docEntityVO.setBaseVale(null);
-        super.checkUnique(docEntityVO);
+        String unique = super.checkUnique(docEntityVO);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmSkuLhCapacity.notUnique"));
+        }
         // 计算APS日硫化量
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = new ArrayList<>();
         mdmSkuLhCapacityList.add(docEntityVO);
