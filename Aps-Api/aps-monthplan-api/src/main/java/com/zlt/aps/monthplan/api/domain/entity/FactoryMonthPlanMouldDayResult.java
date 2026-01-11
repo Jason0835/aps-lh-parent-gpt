@@ -162,7 +162,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 排产分类
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionType", dictType = "biz_schedule_type")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
@@ -185,7 +185,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 是否零度材料
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isZeroRack")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isZeroRack")
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
@@ -193,7 +193,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 制造示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoNo")
     @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
     @TableField(value = "EMBRYO_NO")
     private String embryoNo;
@@ -201,7 +201,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 文字示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.textNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.textNo")
     @ApiModelProperty(value = "文字示方书号", name = "textNo")
     @TableField(value = "TEXT_NO")
     private String textNo;
@@ -209,7 +209,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 硫化示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.lhNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.lhNo")
     @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
     @TableField(value = "LH_NO")
     private String lhNo;
