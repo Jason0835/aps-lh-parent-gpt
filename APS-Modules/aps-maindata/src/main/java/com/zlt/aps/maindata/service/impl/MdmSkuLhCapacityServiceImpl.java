@@ -58,13 +58,12 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     @Override
     public int save(MdmSkuLhCapacity docEntityVO) {
         docEntityVO.setBaseVale(null);
-        docEntityVO.setRowState(docEntityVO.getId() != null ? RowStateEnum.MODIFIED : RowStateEnum.ADDED);
         this.checkUnique(docEntityVO);
         // 计算APS日硫化量
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = new ArrayList<>();
         mdmSkuLhCapacityList.add(docEntityVO);
         calculateApsCapacity(mdmSkuLhCapacityList);
-        return docEntityVO.getId() != null ? mapper.updateById(docEntityVO) : mapper.insert(docEntityVO);
+        return baseDao.save(docEntityVO);
     }
 
     @Override
