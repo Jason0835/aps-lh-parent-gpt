@@ -538,6 +538,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .factoryCode(contextDTO.getFactoryCode())
                 .year(contextDTO.getMpYear())
                 .month(contextDTO.getMpMonth())
+                .monthPlanVersion(contextDTO.getMonthPlanVersion())
                 .build();
 
         LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
@@ -557,6 +558,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(MpMonthPlanMonitor::getYear, queryVO.getYear());
         queryWrapper.eq(MpMonthPlanMonitor::getMonth, queryVO.getMonth());
         queryWrapper.eq(MpMonthPlanMonitor::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMonthPlanVersion()), MpMonthPlanMonitor::getMonthPlanVersion, queryVO.getMonthPlanVersion());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), MpMonthPlanMonitor::getProductionVersion, queryVO.getProductionVersion());
     }
 
     /**
@@ -710,6 +713,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
+        contextDTO.setMonthPlanVersion(queryVO.getMonthPlanVersion());
     }
 
 
@@ -1030,6 +1034,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 计划已排产量
             adjust.setMonthScheduledQty(totalScheduledQty);
+            // 已生产量
+            adjust.setProductionQty(productionQty);
             // 计划剩余排产量 = 累计已排产量 - 已生产量
             Integer monthUnScheduledQty = totalScheduledQty - productionQty;
             // 计划剩余排产量为负数时，默认为0
