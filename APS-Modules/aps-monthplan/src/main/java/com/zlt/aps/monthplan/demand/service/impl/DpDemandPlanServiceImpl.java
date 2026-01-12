@@ -767,7 +767,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         return salesOrders.stream()
             .collect(Collectors.partitioningBy(
-                item -> ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getOrderPriority())
+                item -> ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getScmPriority())
             ));
     }
 
@@ -840,6 +840,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         DpDemandPlan mergedPlan = BeanCopyUtils.copyBean(template,DpDemandPlan.class);
         // 重置ID和基础值
         mergedPlan.setId(null);
+        mergedPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(mergedPlan.getIsDynamicBalance()) ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        mergedPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(mergedPlan.getIsUniformity()) ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         mergedPlan.setBaseVale(null);
         return mergedPlan;
     }
