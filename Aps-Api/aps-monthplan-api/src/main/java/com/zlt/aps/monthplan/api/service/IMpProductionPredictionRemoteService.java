@@ -83,5 +83,5 @@ public interface IMpProductionPredictionRemoteService {
 
     @ApiOperation("查询预测版本号")
     @PostMapping("/productionPrediction/findPredictionVersion")
-    AjaxResult findPredictionVersion(MpProductionPrediction queryCondition);
+    AjaxResult findPredictionVersion(@RequestBody MpProductionPrediction queryCondition);
 }
