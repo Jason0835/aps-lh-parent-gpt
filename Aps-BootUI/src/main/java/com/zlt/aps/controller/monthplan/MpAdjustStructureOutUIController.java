@@ -216,7 +216,8 @@ public class MpAdjustStructureOutUIController extends BaseUIController<MpAdjustS
      */
     @ApiOperation("查询版本列表")
     @PostMapping("/getVersionList")
-    public TableDataInfo getVersionList(@RequestBody MpAdjustStructureOut queryVO) {
+    @ResponseBody
+    public TableDataInfo getVersionList(MpAdjustStructureOut queryVO) {
         return iMpAdjustStructureOutService.getVersionList(queryVO);
     }
 
