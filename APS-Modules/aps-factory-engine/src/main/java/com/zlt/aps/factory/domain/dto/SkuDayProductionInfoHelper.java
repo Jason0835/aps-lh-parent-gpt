@@ -51,16 +51,21 @@ public class SkuDayProductionInfoHelper implements Serializable {
      * 单模日硫化量
      */
     private Integer dayVulcanizationQty;
+    /**
+     * 换模或是换活字块的损耗量
+     */
+    private Integer lossQty;
 
     /**
      * 创建空排产数据对象
      *
      * @param productionDay  排产日
      * @param productionPlan 排产计划--无关具体Id
-     * @param productionQty  排产量
+     * @param productionQty  实际排产量
+     * @param lossQty        损耗量(换模或是换活字块)
      * @param usedMouldSet   排产的模具集合
      */
-    public static SkuDayProductionInfoHelper buildEmpty(Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, Integer productionQty, Set<String> usedMouldSet) {
+    public static SkuDayProductionInfoHelper buildEmpty(Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, Integer productionQty, Integer lossQty, Set<String> usedMouldSet) {
         String materialDesc = productionPlan.getMaterialDesc();
         String materialCode = productionPlan.getMaterialCode();
         String groupName = productionPlan.getStructureName();
@@ -69,6 +74,7 @@ public class SkuDayProductionInfoHelper implements Serializable {
         helper.sumProductionQty = productionQty;
         helper.embryoCode = productionPlan.getEmbryoCode();
         helper.usedMouldSet = usedMouldSet;
+        helper.lossQty = lossQty;
         return helper;
     }
 

@@ -90,7 +90,7 @@ public class SaleRequirePlanHelper {
                 processDemandPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
             } else {
                 sortedOrders.forEach(order ->
-                        order.setOrderPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+                        order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
             }
 
             result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
@@ -129,7 +129,7 @@ public class SaleRequirePlanHelper {
             } else {
                 // 累加净需求量并设置优先级
                 accumulatedQty += currentOrderQty;
-                order.setOrderPriority(ApsConstant.SAL_PRIORITY_MID);
+                order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
             }
         }
     }

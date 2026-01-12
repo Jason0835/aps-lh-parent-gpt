@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
@@ -52,11 +53,14 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 实际排产的胎胚信息
      */
     private Set<String> productionEmbryoCodeSet;
-
     /**
      * 实际排产的模具信息
      */
     private Set<String> productionMouldSet;
+    /**
+     * 各Sku实际排产的模具信息
+     */
+    private Map<String, Set<String>> skuProductionMouldMap;
     /**
      * 排产的Sku排产量信息
      */
@@ -160,8 +164,10 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
-     * @param previousLimit
-     * @param releaseLhMachineCount
+     * 获取最早收尾的硫化组信息
+     *
+     * @param previousLimit         前一日的排产限制情况
+     * @param releaseLhMachineCount 需要释放的硫化组机台数
      * @return
      */
     public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
@@ -188,12 +194,13 @@ public class GroupPlanCxLhCapacityLimitHelper {
 
     /**
      * 判断能否加一台硫化
-     * 如果改日已经
+     * 如果该日硫化机台已经达到限制，则不用判断生胎
+     * 否则需要判断生胎种类数是否达到限制
      *
      * @return
      */
     public boolean isAddOneLhMachine(String embryoCode) {
-        Integer currentLhMachineCount = getProductionLhMachineCount();
+        Integer currentLhMachineCount = getProductionLhMachineCountByQty();
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
         if (!productionMouldSet.contains(embryoCode) && currentEmbryoCodeCount >= maxEmbryoCodeCount) {
             return false;
@@ -214,13 +221,52 @@ public class GroupPlanCxLhCapacityLimitHelper {
      */
     public boolean isReachLimit() {
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
-        Integer currentLhMachineCount = getProductionLhMachineCount();
         if (currentEmbryoCodeCount >= maxEmbryoCodeCount) {
             return true;
         }
+        //按量
+        Integer currentLhMachineCount = getProductionLhMachineCountByQty();
         if (currentLhMachineCount >= maxLhMachineCount) {
             return true;
         }
+        return false;
+    }
+
+    /**
+     * 判断是否达到限制条件
+     * 需要根据前一日的情况来判断
+     * 胎胚种类数没有超
+     * 硫化配比数没有超
+     * 先挑选还有硫化组的，胎胚种类数也没超的
+     *
+     * @param previousDayLimitInfo 前一日的限制情况
+     * @return
+     */
+    public boolean isReachLimitByMouldNumber(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo) {
+        Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        //按模具数
+        Integer currentLhMachineCount = getProductionLhMachineCountByMouldNumber();
+        //结构排产首日
+        if (null == previousDayLimitInfo) {
+            if (currentLhMachineCount >= maxLhMachineCount) {
+                return true;
+            }
+            if (currentEmbryoCodeCount >= maxEmbryoCodeCount) {
+                return true;
+            }
+            return false;
+        }
+        //当日没有硫化组信息
+        Map<String, Integer> currentDaySkuLhMachineMap = getSkuUsedLhMachineCountByMouldNumber();
+        if(CollectionUtils.isEmpty(currentDaySkuLhMachineMap)){
+            return false;
+        }
+        Map<String, Integer> previousDaySkuLhMachineMap = previousDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
+        //新增的Sku机台数
+        currentDaySkuLhMachineMap.forEach((materialDesc,usedMachineCount) ->{
+
+        });
+
         return false;
     }
 
@@ -246,7 +292,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @return
      */
     public Integer getUsedLhMachineCount() {
-        return getProductionLhMachineCount();
+        return getProductionLhMachineCountByQty();
     }
 
     /**
@@ -280,6 +326,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         this.productionEmbryoCodeSet = new HashSet<>();
         this.productionMouldSet = new HashSet<>();
         this.cxMachineCodeSet = new HashSet<>();
+        this.skuProductionMouldMap = new HashMap<>();
         this.productionSkuQtyInfo = new HashMap<>();
     }
 
@@ -327,12 +374,14 @@ public class GroupPlanCxLhCapacityLimitHelper {
         return skuUsedLhMachine;
     }
 
+
     /**
      * 获取使用的硫化机台数
+     * 采用排产量来估算
      *
      * @return
      */
-    private Integer getProductionLhMachineCount() {
+    private Integer getProductionLhMachineCountByQty() {
         if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -361,6 +410,47 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         Integer leftOver = Math.max(passLeftOverSet.size(), noWholeSet.size());
         return sumCount + leftOver;
+    }
+
+    /**
+     * 获取使用的硫化机台数
+     * 使用模具数来测算
+     *
+     * @return
+     */
+    private Integer getProductionLhMachineCountByMouldNumber() {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo) || CollectionUtils.isEmpty(skuProductionMouldMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Map<String, Integer> skuLhMachineCountMap = getSkuUsedLhMachineCountByMouldNumber();
+        if (CollectionUtils.isEmpty(skuLhMachineCountMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return skuLhMachineCountMap.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    /**
+     * 根据各Sku排产的模具数，得到各Sku使用的硫化组数
+     *
+     * @return
+     */
+    private Map<String, Integer> getSkuUsedLhMachineCountByMouldNumber() {
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo) || CollectionUtils.isEmpty(skuProductionMouldMap)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> skuLhMachineCountMap = new HashMap<>();
+        skuProductionMouldMap.forEach((materialDesc, usedMouldSet) -> {
+            Integer mouldNumber = usedMouldSet.size();
+            Integer lhMachineCount = BigDecimal.valueOf(mouldNumber).divide(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION), 0, RoundingMode.UP).intValue();
+            if (lhMachineCount <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            skuLhMachineCountMap.put(materialDesc, lhMachineCount);
+        });
+        if (CollectionUtils.isEmpty(skuLhMachineCountMap)) {
+            return Collections.emptyMap();
+        }
+        return skuLhMachineCountMap;
     }
 
     /**

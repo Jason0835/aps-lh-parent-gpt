@@ -315,7 +315,7 @@ public class CxLhMouldProductionCalculator {
         MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         String skuMaterialDesc = productionPlan.getMaterialDesc();
         //分组-日排产信息
-        SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, usedMouldSet);
+        SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, lossQty, usedMouldSet);
         groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
         //模具排产信息-计划分配
         updateMouldDayProductionInfo(doubleMouldList, skuProductionPlanList, updateInfo);

@@ -464,6 +464,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             context.getTurnOverDays(),
             stockWithoutOrder
         );
+
         SupplyOrderPool entity = new SupplyOrderPool();
         entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         entity.setOrderType(SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
@@ -482,7 +483,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         String    saleArea = monthlySaleQty.getSaleArea();
         BigDecimal stockLimit = calculateStockLimit(monthlySaleQty);
         entity.setStockLimit(stockLimit.intValue());
-        entity.setQty(productionQty.intValue());
+        entity.setQty(Math.max(0, productionQty.intValue()));
         entity.setBaseVale(null);
         entity.setIsDelete(YesOrNoEnum.NO.getValue());
         int threeOverdueStockQty = 0;
