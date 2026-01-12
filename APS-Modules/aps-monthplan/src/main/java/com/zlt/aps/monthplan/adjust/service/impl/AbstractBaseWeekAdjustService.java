@@ -114,10 +114,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 后置处理
      */
     private void postProcess(MpRollAdjustContextDTO contextDTO) {
-        // 保存调整明细
-        saveAdjustDetailList(contextDTO);
         // 排序调整明细
         sortAdjustDetailList(contextDTO);
+        // 保存调整明细
+        saveAdjustDetailList(contextDTO);
     }
 
     /**
@@ -131,14 +131,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(adjustDetailList)) {
             return;
         }
-        adjustDetailList.sort(getSortComparator());
+        Collections.sort(adjustDetailList, getSortComparator());
     }
 
     protected Comparator<MpAdjustDetailVo> getSortComparator() {
         return Comparator
-                .comparing(MpAdjustDetailVo::getStructureName)
-                .thenComparing(MpAdjustDetailVo::getPendingQty, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(MpAdjustDetailVo::getMaterialCode);
+                .comparing(MpAdjustDetailVo::getStructureName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(MpAdjustDetailVo::getPendingQty,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(MpAdjustDetailVo::getMaterialCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     @Override
