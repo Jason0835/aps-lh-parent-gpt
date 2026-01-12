@@ -909,6 +909,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 组装结果集
         for (FactoryMonthPlanFinalAdjustVo monthPlan : matchMonthPlanProdList) {
             MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
+            adjustDetailVo.setFactoryCode(contextDTO.getFactoryCode());
             adjustDetailVo.setOrdQty(ordQty);
             adjustDetailVo.setMaterialCode(materialCode);
             adjustDetailVo.setScheduledMachines(monthPlan.getCxMachineCode());
