@@ -940,9 +940,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected void setCurrentNetQty(MpRollAdjustContextDTO contextDTO) {
+        // 生成调整需求计划
+        createAdjustRequire(contextDTO);
         // 需求计划列表
         List<DpDemandPlan> dpDemandPlanList = contextDTO.getDpDemandPlanList();
+        log.warn("设置净需求 ==> 需求计划列表大小：{}", CollUtil.size(dpDemandPlanList));
         if (PubUtil.isEmpty(dpDemandPlanList)) {
+            log.warn("设置净需求 ==> 根据工厂:[{}] 年月:[{}] 创建需求计划列表为空，返回", contextDTO.getFactoryCode(),
+                    contextDTO.getYearMonth());
             return;
         }
         // 调整明细列表
