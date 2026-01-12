@@ -4,14 +4,14 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.MesViewMapper">
     <select id="selectProductStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductStock">
-        SELECT STOCK_DATE,
+        SELECT CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE,
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
         STOCK_NUM AS STOCK_QTY,
         WEEK_YEAR,
         IS_UNIFORMITY,
         IS_DYNAMIC_BALANCE,
-        STOCK_END_TIME,
+        CONVERT(DATE, STOCK_END_TIME, 23) AS STOCK_END_TIME,
         DATA_VERSION,
         COMPANY_CODE,
         FACTORY_CODE
@@ -31,7 +31,7 @@
     </select>
 
     <select id="selectUnqualifiedStock" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock">
-        SELECT STOCK_DATE,
+        SELECT CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE,
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
         STOCK_NUM AS STOCK_QTY,
@@ -47,7 +47,7 @@
 
     <select id="selectRawSpecialMaterialStock"
             resultType="com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock">
-        SELECT STOCK_DATE,
+        SELECT CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE,
         SPEC_MATERIAL_CODE AS MATERIAL_CODE,
         STANDARD_CODE AS STANDARD_LENGTH,
         STOCK_NUM AS STOCK,

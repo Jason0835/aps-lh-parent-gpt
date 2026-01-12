@@ -127,7 +127,7 @@ public class MesItfController {
      * @param mdmUnqualifiedStock 参数
      * @return 结果
      */
-    @ApiOperation("获取不合格库存")
+    @ApiOperation("获取实时不合格库存")
     @PostMapping("/getUnqualifiedStock")
     public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) {
         return mesItfService.getUnqualifiedStock(mdmUnqualifiedStock);
@@ -151,7 +151,7 @@ public class MesItfController {
      * @param rawSpecialMaterialStock 参数
      * @return 结果
      */
-    @ApiOperation("同步特殊材料库存")
+    @ApiOperation("获取实时特殊材料库存")
     @PostMapping("/getRawSpecialMaterialStock")
     public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) {
         return mesItfService.getRawSpecialMaterialStock(rawSpecialMaterialStock);
