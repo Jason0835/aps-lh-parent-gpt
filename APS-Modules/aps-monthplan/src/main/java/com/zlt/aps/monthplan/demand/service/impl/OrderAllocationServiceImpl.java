@@ -113,7 +113,7 @@ public class OrderAllocationServiceImpl{
                         .eq(DpOrderOffsetDetail::getFactoryCode, factoryCode)
                         .eq(DpOrderOffsetDetail::getMonthPlanVersion, monthPlanVersion)
                         // 排除暂缓订单，优先级为5表示暂缓
-                        .notIn(DpOrderOffsetDetail::getOrderPriority, "5")
+                        .notIn(DpOrderOffsetDetail::getScmPriority, "5")
         );
     }
 
@@ -138,7 +138,7 @@ public class OrderAllocationServiceImpl{
                 @Override
                 public int compare(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
                     // 1. 按订单优先级排序（高优先级1 > 中优先级3）
-                    int priorityCompare = comparePriority(o1.getOrderPriority(), o2.getOrderPriority());
+                    int priorityCompare = comparePriority(o1.getScmPriority(), o2.getScmPriority());
                     if (priorityCompare != 0) {
                         return priorityCompare;
                     }
