@@ -169,7 +169,7 @@ export default {
           prop: "turnoverMonth",
           label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
           type:"number",
-          max:999999,
+          max:50,
           min:0
         },
         {

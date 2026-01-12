@@ -81,7 +81,7 @@ export default {
         {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
-          maxlength:30,
+          maxlength:20,
         },
       ],
     };

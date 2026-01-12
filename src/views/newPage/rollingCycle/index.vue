@@ -202,6 +202,10 @@ export default {
             label: this.$t("月计划已排产量"),
           },
           {
+            prop: "productionQty",
+            label: this.$t("月计划已生产量"),
+          },
+          {
             prop: "pendingQty",
             label: this.$t("待调整量（降序）"),
           },
@@ -516,7 +520,7 @@ export default {
     },
     handleAddSpecial() {
       if (this.$refs.addModalRef) {
-        this.$refs.addModalRef.show(true);
+        this.$refs.addModalRef.show({yearMonth:this.search.yearMonth});
       }
     },
     handleClick(tab, event) {

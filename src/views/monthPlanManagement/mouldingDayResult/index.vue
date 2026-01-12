@@ -201,7 +201,11 @@ export default {
           },
           width: 120,
         },
-
+        {
+          label: this.$t("ui.data.column.trialPlan.specifications"),
+          prop: "specifications",
+          width: 120,
+        },
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
@@ -326,6 +330,23 @@ export default {
           prop: "structureName",
         },
         {
+          prop: "productStatus",
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          type: "select",
+          dictData: this.dict.type.trial_status,
+
+        },
+        {
+          label: this.$t("ui.data.column.monthplan.productType"),
+          prop: "productTypeCode",
+          type: "select",
+          dictData: this.dict.type.biz_product_type,
+        },
+        {
+          label: this.$t("ui.data.column.trialPlan.specifications"),
+          prop: "specifications",
+        },
+        {
           label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
           prop: "mainMaterialDesc",
         },
@@ -352,11 +373,10 @@ export default {
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.monthplan.productType"),
-          prop: "productTypeCode",
-          type: "select",
-          dictData: this.dict.type.biz_product_type,
+          label: this.$t("common.remark"),
+          prop: "remark",
         },
+
       ];
     },
   },

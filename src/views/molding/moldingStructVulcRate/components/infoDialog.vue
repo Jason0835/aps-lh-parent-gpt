@@ -69,13 +69,13 @@ export default {
             trigger: "blur",
           },
         ],
-        cxMachineBrandCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
+        // cxMachineBrandCode: [
+        //   {
+        //     required: true,
+        //     message: this.$t("common.rule.input"),
+        //     trigger: "blur",
+        //   },
+        // ],
         structureName: [
           {
             required: true,

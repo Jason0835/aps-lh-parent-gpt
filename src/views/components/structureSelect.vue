@@ -105,21 +105,11 @@ export default {
     },
     columns: function () {
       const list = [
-      // {
-      //     prop: "materialCode",
-      //     label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-      //   },
-        // {
-        //   prop: "mesMaterialCode",
-        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-        // // },
-        // {
-        //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        // },
+
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          width:800
 
         },
       ];

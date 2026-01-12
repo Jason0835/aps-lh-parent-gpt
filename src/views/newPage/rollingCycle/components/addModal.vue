@@ -70,21 +70,21 @@ export default {
             trigger: "change",
           },
         ],
-        embryoCode: [
+        structureName: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        machineCode: [
+        beginDay: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        lineType: [
+        endDay: [
           {
             required: true,
             message: this.$t("common.rule.select"),

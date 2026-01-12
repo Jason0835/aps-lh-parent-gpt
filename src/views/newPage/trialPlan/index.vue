@@ -293,6 +293,7 @@ export default {
                   v-hasPermi={["monthplan:mpTrialPlan:edit"]}
                   class="minus"
                   type="success"
+                  disabled={row.productionDate}
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t("ui.frame.btn.update")}

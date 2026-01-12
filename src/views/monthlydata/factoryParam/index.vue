@@ -132,7 +132,7 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("胎别"),
+          label: this.$t("产品品类"),
         },
         {
           prop: "paramCode",
