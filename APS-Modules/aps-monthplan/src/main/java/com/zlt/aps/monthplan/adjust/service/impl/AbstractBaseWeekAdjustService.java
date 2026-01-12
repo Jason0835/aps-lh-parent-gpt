@@ -135,7 +135,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     protected Comparator<MpAdjustDetailVo> getSortComparator() {
-        return Comparator.comparing(MpAdjustDetailVo::getStructureName)
+        return Comparator
+                .comparing(MpAdjustDetailVo::getStructureName)
+                .thenComparing(MpAdjustDetailVo::getPendingQty, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(MpAdjustDetailVo::getMaterialCode);
     }
 
@@ -1079,6 +1081,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 计算: 调整量 = 净需求 - 计划剩余排产量
             Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0);
             vo.setPendingQty(pendingQty);
+            // 确认调整量默认等于待调整量
+            vo.setConfirmAdjustQty(pendingQty);
             // 计算：净需求变动 = 净需求 - 调整前净需求量
             Integer netQtyChange = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getPreviousNetQty(),0);
             vo.setNetQtyChange(netQtyChange);
