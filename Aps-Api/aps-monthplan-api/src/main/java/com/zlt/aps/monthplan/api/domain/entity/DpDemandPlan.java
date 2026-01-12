@@ -414,6 +414,18 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
+    /**
+     * 暂缓订单是否参与冲减
+     */
+    @ApiModelProperty(value = "暂缓订单是否参与冲减", name = "isAllocationByPostponeOrder")
+    @TableField(exist = false)
+    private boolean includePostpone;
+    /**
+     * 需求版本号前缀
+     */
+    @ApiModelProperty(value = "需求版本号前缀", name = "prefix")
+    @TableField(exist = false)
+    private String prefix;
 
 
 

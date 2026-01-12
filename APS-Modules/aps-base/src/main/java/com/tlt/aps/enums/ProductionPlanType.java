@@ -22,7 +22,11 @@ public enum ProductionPlanType {
     /**
      * 03 实单模拟
      */
-    SIMULATE("03", "实单模拟");
+    SIMULATE("03", "实单模拟"),
+    /**
+     * 04、周程调整
+     */
+    ADJUST("04","周程调整");
 
     private String planType;
 
