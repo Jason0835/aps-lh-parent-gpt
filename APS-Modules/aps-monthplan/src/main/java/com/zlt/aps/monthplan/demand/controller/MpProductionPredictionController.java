@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import io.seata.common.util.CollectionUtils;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -138,6 +139,7 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
     protected List<MpProductionPrediction> listExportData(MpProductionPrediction obj) {
         QueryWrapper<MpProductionPrediction> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        List<MpProductionPrediction> list =  entityMapper.selectList(wrapper);
         return entityMapper.selectList(wrapper);
     }
 
