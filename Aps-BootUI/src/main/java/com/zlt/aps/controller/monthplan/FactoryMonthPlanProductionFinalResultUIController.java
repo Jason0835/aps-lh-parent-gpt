@@ -9,6 +9,7 @@ import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -66,6 +70,42 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         return iFactoryMonthPlanProductionFinalResultService.list(condition);
     }
 
+    /**
+     * 获取SKU排产明细
+     */
+    @ResponseBody
+    @PostMapping("/listSkuScheduleItems")
+    @ApiOperation("获取SKU排产明细")
+    public TableDataInfo listSkuScheduleItems(FactoryMonthPlanProductionFinalResultParam param) {
+        if (null == param || null == param.getMonth() || null == param.getYear() || StringUtils.isBlank(param.getFactoryCode())) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+        FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
+        BeanUtils.copyProperties(param, condition);
+        TableDataInfo list = iFactoryMonthPlanProductionFinalResultService.list(condition);
+        // SKU排产明细排序
+        sortSkuScheduleItem((List<FactoryMonthPlanProductionFinalResult>) list.getRows());
+        return list;
+    }
+
+
+
+    private void sortSkuScheduleItem(List<FactoryMonthPlanProductionFinalResult> list) {
+        if (PubUtil.isEmpty(list)) {
+            return;
+        }
+        Collections.sort(list, getSkuScheduleItemSortComparator());
+    }
+
+    private Comparator<FactoryMonthPlanProductionFinalResult> getSkuScheduleItemSortComparator() {
+        return Comparator
+                .comparing(FactoryMonthPlanProductionFinalResult::getCxMachineCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(FactoryMonthPlanProductionFinalResult::getStructureName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(FactoryMonthPlanProductionFinalResult::getMaterialCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+    }
 
     /**
      * 校验工厂月生产计划-最终排产计划定稿唯一性

@@ -58,4 +58,9 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         // 唯一校验字段
         return Collections.emptyList();
     }
+
+    @Override
+    public void saveMpAdjustResult(List<MpAdjustResult> mpAdjustResultList) {
+        baseDao.insertBatch(mpAdjustResultList);
+    }
 }

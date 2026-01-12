@@ -157,8 +157,9 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
         if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
             FactoryMonthPlanFinalAdjustVo firstFinalVo = contextDTO.getFactoryMonthPlanProdFinalList().get(0);
-            contextDTO.setMonthPlanVersion(firstFinalVo.getProductionVersion());
+            contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
             contextDTO.setProductType(firstFinalVo.getProductTypeCode());
+            contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
         }
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
@@ -168,6 +169,7 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setLockEndDay(mpAdjustStructureInService.getLockEndDay(contextDTO));
         //初始结构收尾日
         contextDTO.setStructureDeadLine(mpAdjustStructureInService.getStructureDeadline(contextDTO));
+        contextDTO.setVersion("ADJ20260112001");
 
         //测试数据
         //TODO sandy
@@ -181,6 +183,7 @@ public class MpWeekRollAdjustController extends BaseController {
         structureIn.setMonthScheduledQty(800);
         structureIn.setPendingQty(1000);
         structureIn.setConfirmAdjustQty(1000);
+        structureIn.setDayVulcanizationQty(25);
 
         MpAdjustStructureIn structureIn2 = new MpAdjustStructureIn();
         structureIn2.setMaterialCode("3302001162");
@@ -192,6 +195,7 @@ public class MpWeekRollAdjustController extends BaseController {
         structureIn2.setMonthScheduledQty(1000);
         structureIn2.setPendingQty(-400);
         structureIn2.setConfirmAdjustQty(-400);
+        structureIn2.setDayVulcanizationQty(25);
 
         MpAdjustStructureIn structureIn3 = new MpAdjustStructureIn();
         structureIn3.setMaterialCode("3302001877");
@@ -207,6 +211,7 @@ public class MpWeekRollAdjustController extends BaseController {
         structureIn3.setDayVulcanizationQty(25);
         structureIn3.setMouldCavityQty(6);
         structureIn3.setTypeBlockQty(4);
+        structureIn3.setDayVulcanizationQty(25);
 
         List<MpAdjustStructureIn> mpAdjustStructureInList = new ArrayList<>();
         mpAdjustStructureInList.add(structureIn);

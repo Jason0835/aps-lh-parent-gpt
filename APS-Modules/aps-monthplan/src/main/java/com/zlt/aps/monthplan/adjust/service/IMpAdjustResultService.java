@@ -1,8 +1,12 @@
 package com.zlt.aps.monthplan.adjust.service;
 
 
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpAdjustResultService.java
@@ -18,4 +22,5 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
 
+    void saveMpAdjustResult(List<MpAdjustResult> mpAdjustResultList);
 }

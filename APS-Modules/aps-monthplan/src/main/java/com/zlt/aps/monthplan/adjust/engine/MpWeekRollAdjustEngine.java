@@ -12,19 +12,24 @@ import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.ProductionSkuParamHelper;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
+import com.zlt.core.dao.basedao.BaseDao;
 import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -45,7 +50,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class MpWeekRollAdjustEngine {
-
 
 
     /**
@@ -101,6 +105,7 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> incrementAdjustList = new ArrayList<>();
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
+        StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
             if (adjustStructureIn.getConfirmAdjustQty() < 0){
                 //1.1 减量
@@ -116,6 +121,11 @@ public class MpWeekRollAdjustEngine {
                     incrementAdjustList.add(adjustStructureIn);
                 }
             }
+            //4.1 检查日硫化量
+            checkDayLhQty(sbError,adjustStructureIn);
+        }
+        if (!StringUtil.isEmptyWithTrim(sbError.toString())){
+            throw new BusinessException(sbError.toString());
         }
         //2.减量调整
         startTime = new Date();
@@ -159,6 +169,17 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
 
+    /**
+     * 检查日硫化量是否为空
+     * @param sbError
+     * @param structureIn
+     */
+    private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureIn structureIn){
+        if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    structureIn.getMaterialCode()));
+        }
+    }
     /**
      * 优化：其他SKU往前移动
      * @param contextDTO 调整上下文
