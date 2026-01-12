@@ -30,11 +30,13 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
@@ -85,6 +87,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected MpAdjustStructureInEntityMapper mpAdjustStructureInEntityMapper;
+
+    @Autowired
+    protected IDpDemandPlanService dpDemandPlanService;
 
     @Autowired
     protected BaseDao baseDao;
@@ -476,16 +481,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         CompletableFuture<Void> saleOrderFuture = CompletableFuture.runAsync(() -> initSaleOrderPool(contextDTO), executor);
         // 初始化试制量试计划
         CompletableFuture<Void> trialPlanFuture = CompletableFuture.runAsync(() -> initTrialPlan(contextDTO), executor);
-        // 初始化月底计划余量
-        CompletableFuture<Void> monthSurplusFuture = CompletableFuture.runAsync(() -> initMonthSurplus(contextDTO), executor);
+//        // 初始化月底计划余量
+//        CompletableFuture<Void> monthSurplusFuture = CompletableFuture.runAsync(() -> initMonthSurplus(contextDTO), executor);
         // 初始化月度硫化监控
         CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
-        // 初始化成品实时库存
-        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(
-                // 解决父子上下文传递问题
-                SpringContextSupplierUtil.wrap(() -> initProductStock(contextDTO)),
-                executor
-        );
+//        // 初始化成品实时库存
+//        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(
+//                // 解决父子上下文传递问题
+//                SpringContextSupplierUtil.wrap(() -> initProductStock(contextDTO)),
+//                executor
+//        );
 
 
         try {
@@ -494,8 +499,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     versionAndMonthPlanFuture,
                     saleOrderFuture,
                     trialPlanFuture,
-                    monthSurplusFuture,
-                    productStockFuture,
+//                    monthSurplusFuture,
+//                    productStockFuture,
                     planMonitorFuture
             ).join();
 
@@ -916,23 +921,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         return mergedList;
     }
 
+    /**
+     * 生成调整需求计划
+     * @param contextDTO
+     */
+    protected void createAdjustRequire(MpRollAdjustContextDTO contextDTO) {
+        DpDemandPlan queryVo = new DpDemandPlan();
+        queryVo.setFactoryCode(contextDTO.getFactoryCode());
+        queryVo.setYear(contextDTO.getMpYear());
+        queryVo.setMonth(contextDTO.getMpMonth());
+        List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
+        contextDTO.setDpDemandPlanList(dpDemandPlanList);
+    }
+
 
     /**
      * 设置净需求
-     * 净需求 = 销售订单池.当前订单量 - 实时库存 - 月底计划余量
-     *
      * @param contextDTO
      */
     protected void setCurrentNetQty(MpRollAdjustContextDTO contextDTO) {
-        // 月底计划余量列表
-        List<MdmMonthSurplus> surplusList = contextDTO.getMdmMonthSurplusesList();
-        // 实时成品库存列表
-        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList();
-        // 结构内调整记录
+        // 需求计划列表
+        List<DpDemandPlan> dpDemandPlanList = contextDTO.getDpDemandPlanList();
+        if (PubUtil.isEmpty(dpDemandPlanList)) {
+            return;
+        }
+        // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
-        // 将列表转为Map
-        Map<String, MdmMonthSurplus> surplusMap = convertToSurplusMap(surplusList);
-        Map<String, MdmProductStock> stockMap = convertToStockMap(stockList);
+        // 需求计划分组Map
+        Map<String, DpDemandPlan> demandPlanMap = convertToDpDemandPlanMap(dpDemandPlanList);
 
         // 遍历计算
         for (MpAdjustDetailVo adjust : adjustList) {
@@ -940,23 +956,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
-            // 当前订单量
-            Integer ordQty = Convert.toInt(adjust.getOrdQty(), 0);
-            // 月底计划余量
-            BigDecimal planSurplusQty = BigDecimal.ZERO;
-            if (PubUtil.isNotEmpty(surplusMap)) {
-                planSurplusQty = surplusMap.get(materialCode) == null ? BigDecimal.ZERO : surplusMap.get(materialCode).getPlanSurplusQty();
+            DpDemandPlan dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode);
+            Integer currentNetQty = 0;
+            if (dpDemandPlan != null) {
+                currentNetQty = dpDemandPlan.getNetQty();
             }
-            // 实时库存
-            Integer stockQty = 0;
-            if (PubUtil.isNotEmpty(stockMap)) {
-                stockQty = stockMap.get(materialCode) == null ? 0 : stockMap.get(materialCode).getStockQty();
-            }
-            // 计算赋值 净需求 = 销售订单池.当前订单量 - 实时库存 - 月底计划余量
-            Integer currentNetQty = ordQty - stockQty - planSurplusQty.intValue() ;
-            adjust.setCurrentNetQty(currentNetQty);
+            adjust.setCurrentNetQty(Convert.toInt(currentNetQty,0));
         }
 
+    }
+
+    /**
+     * 将DpDemandPlan转Map
+     */
+    private Map<String, DpDemandPlan> convertToDpDemandPlanMap(List<DpDemandPlan> dpDemandPlanList) {
+        if (PubUtil.isEmpty(dpDemandPlanList)) {
+            return Collections.emptyMap();
+        }
+        return dpDemandPlanList.stream()
+                .filter(vo -> StringUtils.isNotEmpty(vo.getMaterialCode()))
+                .collect(Collectors.toMap(
+                        DpDemandPlan::getMaterialCode,
+                        vo -> vo,
+                        (existingVal, newVal) -> newVal
+                ));
     }
 
 

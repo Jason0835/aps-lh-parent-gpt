@@ -54,7 +54,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setAdjustDetailList(resultList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);
-        // 5、设置计划剩余排产量、计划已排产量
+        // 5、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
         // 6、筛选：净需求 - 计划剩余排产量 > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
