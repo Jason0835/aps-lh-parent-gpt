@@ -32,6 +32,12 @@ public class MpAdjustStructureIn extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    /** 分厂编号 */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
      /** 年份 */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.year")
     @ApiModelProperty(value = "年份", name = "year")
