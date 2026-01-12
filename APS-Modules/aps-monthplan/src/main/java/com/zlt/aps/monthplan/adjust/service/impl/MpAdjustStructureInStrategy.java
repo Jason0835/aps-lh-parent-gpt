@@ -128,4 +128,13 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         });
     }
 
+    @Override
+    public void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
+            return;
+        }
+        List<MpAdjustDetailVo> resultList = baseDao.saveWithQuery(contextDTO.getAdjustDetailList());
+        contextDTO.setAdjustDetailList(resultList);
+    }
+
 }

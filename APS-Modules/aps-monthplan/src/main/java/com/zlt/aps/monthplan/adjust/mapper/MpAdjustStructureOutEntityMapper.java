@@ -4,6 +4,8 @@ import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpAdjustStructureOutMapper.java
@@ -19,5 +21,13 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MpAdjustStructureOutEntityMapper extends CommBaseMapper<MpAdjustStructureOut> {
+
+    /**
+     * 查询版本列表
+     * @param queryVO 查询参数
+     * @return 结果
+     */
+    List<MpAdjustStructureOut> getVersionList(MpAdjustStructureOut queryVO);
+
 
 }

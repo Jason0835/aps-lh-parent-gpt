@@ -91,7 +91,6 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:factoryMonthPlanMouldDayResult:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
@@ -102,7 +101,6 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:factoryMonthPlanMouldDayResult:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
@@ -117,7 +115,6 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      * 删除S2-0604.排产结果-生产计划排产结果
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:factoryMonthPlanMouldDayResult:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {

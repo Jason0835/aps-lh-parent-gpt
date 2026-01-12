@@ -176,4 +176,17 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
     }
 
 
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpAdjustStructureIn queryVO) {
+        this.startPage();
+        List<MpAdjustStructureIn> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
+    }
+
+
 }

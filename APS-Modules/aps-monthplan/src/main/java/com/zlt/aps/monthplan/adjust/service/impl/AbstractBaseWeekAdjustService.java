@@ -117,20 +117,31 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 排序调整明细
         sortAdjustDetailList(contextDTO);
         // 保存调整明细
-        baseDao.saveBatch(contextDTO.getAdjustDetailList());
+        saveAdjustDetailList(contextDTO);
     }
+
+    /**
+     * 保存调整明细
+     * @param contextDTO
+     */
+    public abstract void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO);
 
     protected void sortAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
         if (PubUtil.isEmpty(adjustDetailList)) {
             return;
         }
-        adjustDetailList.sort(getSortComparator());
+        Collections.sort(adjustDetailList, getSortComparator());
     }
 
     protected Comparator<MpAdjustDetailVo> getSortComparator() {
-        return Comparator.comparing(MpAdjustDetailVo::getStructureName)
-                .thenComparing(MpAdjustDetailVo::getMaterialCode);
+        return Comparator
+                .comparing(MpAdjustDetailVo::getStructureName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(MpAdjustDetailVo::getPendingQty,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(MpAdjustDetailVo::getMaterialCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     @Override
@@ -1073,6 +1084,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 计算: 调整量 = 净需求 - 计划剩余排产量
             Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0);
             vo.setPendingQty(pendingQty);
+            // 确认调整量默认等于待调整量
+            vo.setConfirmAdjustQty(pendingQty);
             // 计算：净需求变动 = 净需求 - 调整前净需求量
             Integer netQtyChange = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getPreviousNetQty(),0);
             vo.setNetQtyChange(netQtyChange);
