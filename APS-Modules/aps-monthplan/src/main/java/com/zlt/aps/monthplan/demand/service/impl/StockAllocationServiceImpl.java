@@ -325,7 +325,8 @@ public class StockAllocationServiceImpl {
         int qualityCount2 = (Integer) order2.get("qualityCount");
 
         if (qualityCount1 != qualityCount2) {
-            return Integer.compare(qualityCount2, qualityCount1); // 降序
+            // 降序
+            return Integer.compare(qualityCount2, qualityCount1);
         }
 
         // 质量要求相同，按周号从小到大
@@ -359,7 +360,8 @@ public class StockAllocationServiceImpl {
         try {
             int week = Integer.parseInt(weekYear.substring(0, 2));
             int year = Integer.parseInt(weekYear.substring(2, 4));
-            return year * 100 + week; // 如2501表示25年01周
+            // 如2501表示25年01周
+            return year * 100 + week;
         } catch (NumberFormatException e) {
             // 解析失败返回0
             return 0;

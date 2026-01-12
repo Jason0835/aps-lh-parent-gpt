@@ -172,13 +172,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
-
+        Map<String, List<DpOrderOffsetDetail>> allocationMap = allocationResult.getNetDemands().stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getMaterialCode));
         // 5. 批量保存分配结果
         saveAllocationResults(createCondition, monthPlanVersion, allocationResult);
 
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition, allocationResult.getNetDemands(), data);
+         Map<String, List<DpDemandPlan>> demandPlanMap = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
 
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
@@ -368,6 +369,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
+
+        Map<String, List<DpOrderOffsetDetail>> allocationMap = allocations.stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getMaterialCode));
         // 过滤净需求
         List<DpOrderOffsetDetail> netDemands = allocations.stream()
             .filter(allocation -> allocation.getProduceQtyDue() > 0)
@@ -407,9 +410,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 处理净需求
         if (CollectionUtils.isNotEmpty(netDemands)) {
             List<MdmAreaCapaAllocation> areaCapaAllocations =
-                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth());
+                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth(),createCondition.getFactoryCode());
             demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(netDemands,areaCapaAllocations));
         }
+        Map<String, List<DpDemandPlan>> demandPlanMap = demandPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
+
 
         // 处理暂缓订单
         if (CollectionUtils.isNotEmpty(data.getPostponeOrders())) {
@@ -496,7 +501,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         return salesOrders.stream()
             .collect(Collectors.partitioningBy(
-                item -> ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getOrderPriority())
+                item -> ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getScmPriority())
             ));
     }
 
@@ -569,6 +574,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         DpDemandPlan mergedPlan = BeanCopyUtils.copyBean(template,DpDemandPlan.class);
         // 重置ID和基础值
         mergedPlan.setId(null);
+        mergedPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(mergedPlan.getIsDynamicBalance()) ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        mergedPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(mergedPlan.getIsUniformity()) ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         mergedPlan.setBaseVale(null);
         return mergedPlan;
     }
@@ -636,10 +643,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 设置基本数量
         demandPlan.setOrderQty(statistics.totalOrderQty);
 
-        // 设净排程需求
-        int totalNetQty = statistics.heightQty + statistics.midQty + statistics.cycleReserveQty;
-        demandPlan.setNetQty(totalNetQty);
-
         // 设置优先级相关数量
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
@@ -650,7 +653,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         calculateDerivedQuantities(demandPlan, statistics);
 
         // 设置生产和优先级标识
-        setProductionAndPriorityFlags(demandPlan, minProductionQty, totalNetQty);
+        setProductionAndPriorityFlags(demandPlan, minProductionQty, demandPlan.getNetQty());
     }
 
 
@@ -680,7 +683,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());
         demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.intValue() : supplyOrder.getQty());
-        demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
 
@@ -696,7 +698,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setIsDynamicBalance(postponeOrder.getIsDynamicBalance());
         demandPlan.setIsUniformity(postponeOrder.getIsUniformity());
         demandPlan.setOrderQty(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.intValue() : postponeOrder.getOrdQty().intValue());
-        demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
 
@@ -773,6 +774,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
             this.stockMap = stockMap != null ? stockMap : new HashMap<>();
         }
+
+        public List<DpOrderOffsetDetail> getAllocations() {
+            return allocations;
+        }
     }
 
     /**
@@ -796,7 +801,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
 
             // 根据订单优先级累加对应数量
-            String priority = plan.getOrderPriority();
+            String priority = plan.getScmPriority();
             int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {

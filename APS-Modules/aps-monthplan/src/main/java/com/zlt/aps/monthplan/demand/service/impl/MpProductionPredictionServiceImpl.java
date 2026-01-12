@@ -790,7 +790,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         List<DpDemandPlan> demandPlans = new ArrayList<>();
         // 处理净需求
         if (CollectionUtils.isNotEmpty(netDemands)) {
-            List<MdmAreaCapaAllocation> areaCapaAllocations = mdmAreaCapaAllocationService.findAreaCapaAllocation(yearMonth.getYear(),yearMonth.getMonthValue());
+            List<MdmAreaCapaAllocation> areaCapaAllocations = mdmAreaCapaAllocationService.findAreaCapaAllocation(yearMonth.getYear(),yearMonth.getMonthValue(),netDemands.get(0).getFactoryCode());
             demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(netDemands,areaCapaAllocations));
         }
         // 处理供应链订单

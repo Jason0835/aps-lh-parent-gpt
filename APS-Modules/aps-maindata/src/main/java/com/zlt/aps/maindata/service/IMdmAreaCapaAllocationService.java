@@ -51,5 +51,5 @@ public interface IMdmAreaCapaAllocationService extends IDocService<MdmAreaCapaAl
      * @param month 月
      * @return 区域产能
      */
-    List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month);
+    List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month,String factoryCode);
 }
