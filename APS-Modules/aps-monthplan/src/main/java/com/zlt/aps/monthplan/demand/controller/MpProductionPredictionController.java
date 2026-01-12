@@ -140,6 +140,7 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
     protected List<MpProductionPrediction> listExportData(MpProductionPrediction obj) {
         QueryWrapper<MpProductionPrediction> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.orderByDesc("create_time");
         List<MpProductionPrediction> list =  entityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyList();
