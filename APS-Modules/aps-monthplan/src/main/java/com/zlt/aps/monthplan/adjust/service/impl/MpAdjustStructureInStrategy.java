@@ -49,6 +49,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
+        // 按照结构、物料编码维度进行分组，并汇总订单量
+        resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);
@@ -124,6 +126,15 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             Integer monthUnScheduledQty = Convert.toInt(adjust.getMonthUnScheduledQty(),0);
             return (currentNetQty - monthUnScheduledQty) <= 0;
         });
+    }
+
+    @Override
+    public void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
+            return;
+        }
+        List<MpAdjustDetailVo> resultList = baseDao.saveWithQuery(contextDTO.getAdjustDetailList());
+        contextDTO.setAdjustDetailList(resultList);
     }
 
 }

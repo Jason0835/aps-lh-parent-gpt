@@ -1,16 +1,46 @@
 package com.zlt.aps.factory.scheduling.matching;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
@@ -30,20 +60,15 @@ import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
-import com.zlt.aps.monthplan.api.domain.entity.*;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.core.dao.basedao.BaseDao;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 搭配排产处理类
@@ -63,6 +88,8 @@ public class MatchingProductionHandler {
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
     private FactoryParamMapper factoryParamMapper;
+    @Autowired
+    private BaseDao baseDao;
 
     /**
      * 搭配排产（已排产结果入口）
@@ -256,8 +283,13 @@ public class MatchingProductionHandler {
             Integer conventionProductionQty = newSkuQtyMap.get(plan.getMaterialDesc()); // 本次排产常规储备量
             plan.setConventionProductionQty(
                     BigDecimalUtils.add(plan.getConventionProductionQty(), conventionProductionQty).intValue()); // 加到原有的常规储备已拍量中
+
+			if (null != plan.getInventorySalesRatio()
+					&& plan.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
+				plan.setInventorySalesRatio(BigDecimal.ZERO);
+			}
         });
-        this.getDataService().saveMouldProductionResult(dayResultList);
+        baseDao.saveBatch(dayResultList);
     }
 
     /**
@@ -353,6 +385,7 @@ public class MatchingProductionHandler {
                 requirePlan.setHeightLossQty(demandPlan.getMidQty());
                 requirePlan.setFactProdReqQty(demandPlan.getNetQty());
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
+                requirePlan.setInventorySalesRatio(0D);//默认0
                 requirePlanMap.put(materialCode, requirePlan);
                 continue;
             }
@@ -421,6 +454,7 @@ public class MatchingProductionHandler {
         container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, planList, requirePlanMap));
         container.setParamConfiguration(this.createParamConfiguration(productionContext));
         container.setCxMachineBaseInfo(getDataService().getCxMachineBaseInfo(productionContext));
+        this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
 
         // 各项已排产统计数据
         productionContext.setAllProductionPlan(requirePlanMap.values().stream()
@@ -617,7 +651,8 @@ public class MatchingProductionHandler {
         }
         // 库销比低的优先
         Double minInventorySalesRatio = hasReserveQtyPlanList.stream()
-                .mapToDouble(MonthPlanProductionRequirePlanVo::getInventorySalesRatio).min().getAsDouble();
+        		.filter(plan -> plan.getInventorySalesRatio() != null)
+                .mapToDouble(MonthPlanProductionRequirePlanVo::getInventorySalesRatio).min().orElse(0);
         List<MonthPlanProductionRequirePlanVo> minInventorySalesRatioList = hasReserveQtyPlanList.stream()
                 .filter(plan -> minInventorySalesRatio.equals(plan.getInventorySalesRatio()))
                 .collect(Collectors.toList());
@@ -1076,6 +1111,23 @@ public class MatchingProductionHandler {
             groupMainPatternMouldMap.put(groupNameAndMainPattern, groupMainPatternList);
         });
         baseDataContainer.setGroupMainPatternMouldRelationMap(groupMainPatternMouldMap);
+    }
+    
+    /**
+     * 加载超6个月的库存信息
+     *
+     * @param productionContext
+     */
+    private void overSixMonthStockHandler(TbrProductionContext productionContext) {
+        List<MdmProductStock> stockList = getDataService().getMdmProductStock(productionContext);
+        //过滤库存为空的值
+        Map<String, Integer> overSixMonthStockMap = stockList.stream()
+                .filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()) && null != s.getStockQty())
+                .collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc,
+                        Collectors.collectingAndThen(Collectors.toList(),
+                                list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth()))
+                                        .collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
+        productionContext.setOverSixMonthStockMap(overSixMonthStockMap);
     }
 
     /**

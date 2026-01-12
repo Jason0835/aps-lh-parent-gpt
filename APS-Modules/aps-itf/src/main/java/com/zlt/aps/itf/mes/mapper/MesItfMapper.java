@@ -3,10 +3,7 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -52,4 +49,12 @@ public interface MesItfMapper {
      * @return 结果
      */
     List<MdmMouldShellInfo> selectMoldShellList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 获取原材料出库记录列表
+     *
+     * @param syncDataLogs 同步数据日志
+     * @return 列表
+     */
+    List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(AuxReqSyncDataLogs syncDataLogs);
 }

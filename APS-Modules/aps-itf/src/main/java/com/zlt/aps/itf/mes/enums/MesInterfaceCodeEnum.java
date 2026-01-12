@@ -37,9 +37,9 @@ public enum MesInterfaceCodeEnum {
     SYNC_SPEC_STOCK("SPEC_STOCK_SYNC", "mesItfService", "syncRawSpecialMaterialStock", "同步特殊材料库存"),
 
     /**
-     * 同步原材料出库-MES提供视图同步，不通过MQ
+     * 同步原材料出库
      */
-    SYNC_ORI_MATERIAL_OUT("ORI_MATERIAL_OUT_SYNC", "mesItfService", "syncRawSpecialMaterialStock", "同步特殊材料库存"),
+    SYNC_ORI_MATERIAL_OUT("ORI_MATERIAL_OUT_SYNC", "mesItfService", "syncRawMaterialOutboundRecord", "原材料出库"),
 
     /**
      * SKU与施工关系表

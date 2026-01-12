@@ -91,7 +91,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mpStructureAllocation:list")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
@@ -102,7 +102,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mpStructureAllocation:edit")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MpStructureAllocation mpStructureAllocation) {
@@ -117,7 +117,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * 删除排产过程_结构排产
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
@@ -179,7 +179,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     }
 
 
-    @RequiresPermissions("monthplan:mpStructureAllocation:export")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -193,7 +193,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mpStructureAllocation:import")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

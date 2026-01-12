@@ -187,7 +187,7 @@ public class MouldProductionResultHandler {
         logDetail.setProdReqPlan(planInfo.getNetQty());
         Integer lossQty = planInfo.getHeightLossQty() + planInfo.getFactProdReqQty() - planInfo.getHeightQty() - planInfo.getNetQty();
         logDetail.setFactProdReqQty(planInfo.getFactProdReqQty() + lossQty);
-        logDetail.setAverageQty(planInfo.getAverageSaleQty());
+        logDetail.setAverageSaleQty(planInfo.getAverageSaleQty());
         logDetail.setInventorySalesRatio(BigDecimal.valueOf(planInfo.getInventorySalesRatio()));
         //统计总排产量
         Integer totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);

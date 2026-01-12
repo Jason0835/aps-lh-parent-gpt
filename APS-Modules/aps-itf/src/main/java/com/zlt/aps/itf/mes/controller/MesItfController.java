@@ -7,7 +7,10 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -157,13 +160,13 @@ public class MesItfController {
     /**
      * 同步原材料出库
      *
-     * @param materialOutboundRecord 参数
+     * @param syncDataLogs 参数
      * @return 结果
      */
     @ApiOperation("同步原材料出库")
     @PostMapping("/syncRawMaterialOutboundRecord")
-    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody RawMaterialOutboundRecord materialOutboundRecord) throws ParseException {
-        return mesItfService.syncRawMaterialOutboundRecord(materialOutboundRecord);
+    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody AuxReqSyncDataLogs syncDataLogs) throws ParseException {
+        return mesItfService.syncRawMaterialOutboundRecord(syncDataLogs);
     }
 
     /**

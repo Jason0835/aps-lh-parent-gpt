@@ -147,7 +147,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 产品状态
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productStatus", dictType = "trial_status")
     @ApiModelProperty(value = "产品状态", name = "productStatus")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
@@ -162,7 +162,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 排产分类
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionType", dictType = "biz_schedule_type")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
@@ -185,7 +185,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 是否零度材料
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isZeroRack")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isZeroRack")
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
@@ -193,7 +193,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 制造示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoNo")
     @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
     @TableField(value = "EMBRYO_NO")
     private String embryoNo;
@@ -201,7 +201,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 文字示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.textNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.textNo")
     @ApiModelProperty(value = "文字示方书号", name = "textNo")
     @TableField(value = "TEXT_NO")
     private String textNo;
@@ -209,14 +209,14 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 硫化示方书号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.lhNo")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.lhNo")
     @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
     @TableField(value = "LH_NO")
     private String lhNo;
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.brand")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -284,11 +284,11 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
-    
+
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.averageSaleQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.averageSaleQty")
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
     private Integer averageSaleQty;
@@ -328,7 +328,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isImport", readConverterExp = "0=：默认不是，1：是")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;

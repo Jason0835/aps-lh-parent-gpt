@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.ProductSpecificationsUtils;
@@ -11,8 +12,11 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -161,20 +165,32 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 更新设置整个分组计划不排产
+     */
+    public void setNoProductionNoReachMinProductionDays() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME);
+        groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
+    }
+
+    /**
      * 粗步计算 结构需求量需要的成型产能分配
      * 结构有效总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
      * 保留1位小数
      * 如果 小数部分 > 0.9，则向上取整
      *
-     * @param context              排产上下文
-     * @param requirePlanList      需排产的计划
+     * @param context         排产上下文
+     * @param requirePlanList 需排产的计划
      * @return
      */
     public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
-        List<MonthPlanStructureLhRatioVo> structureLhRatioList = ((TbrProductionContext) context).getBaseDataContainer().getStructureLhRatioList();
+        BaseDataContainer baseDataContainer = ((TbrProductionContext) context).getBaseDataContainer();
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = baseDataContainer.getStructureLhRatioList();
         //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
@@ -193,7 +209,43 @@ public class ProductionPlanGroupInfo {
             //粗算所需成型机台数
             groupInfo.calculateNeedCxCapacityMachineCount(context, context.getMaxProductionDays());
         });
+        //4、对分组计划中小于最小要求天数的分组设置为不可排产，达到最小要求天数，没有满足最低上机天数的，将天数上调到最低上机天数
+        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
+        Integer minProductionDays = paramConfiguration.getMinProductionDays();
+        Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
+        groupInfoMap.forEach((structureName, groupInfo) -> {
+            Integer theoryDays = groupInfo.getTheoryDays();
+            if (theoryDays < minProductionDays) {
+                groupInfo.setNoProductionNoReachMinProductionDays();
+                return;
+            }
+            Integer realTheoryDays = Math.max(theoryDays, minAllocationDays);
+            groupInfo.setTheoryDays(realTheoryDays);
+            if (realTheoryDays.equals(theoryDays)) {
+                return;
+            }
+            //重新计算估算的机台数
+            BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(realTheoryDays).divide(BigDecimal.valueOf(context.getMonthDays()), 1, RoundingMode.UP);
+            groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
+        });
         return groupInfoMap;
+    }
+
+    /**
+     * 获取续作Sku的收尾时间点
+     * 1、如果dayProductionLimit没有数据，则取周期排产天数
+     * 2、dayProductionLimit有值，则取其最大的排产天
+     *
+     * @param context
+     * @return
+     */
+    public Integer getContinueSkuDeadLineDay(Context context) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return context.getMonthDays();
+        }
+        List<Integer> productionDayList = new ArrayList<>(dayProductionLimitInfo.keySet());
+        Collections.sort(productionDayList);
+        return productionDayList.get(productionDayList.size() - BigDecimal.ONE.intValue());
     }
 
     /**
@@ -430,13 +482,15 @@ public class ProductionPlanGroupInfo {
      */
     public Integer getRealOnlineMachineDay(MonthPlanProductionRequirePlanVo productionPlan, Integer startDay, Integer endDay) {
         Integer realStartDay = startDay;
+        boolean canProduction = false;
         for (; realStartDay <= endDay; ) {
             if (isAddSkuProductionByOneLhMachine(productionPlan, realStartDay)) {
+                canProduction = true;
                 break;
             }
             realStartDay = realStartDay + BigDecimal.ONE.intValue();
         }
-        if (realStartDay.equals(endDay)) {
+        if (!canProduction) {
             return null;
         }
         return realStartDay;

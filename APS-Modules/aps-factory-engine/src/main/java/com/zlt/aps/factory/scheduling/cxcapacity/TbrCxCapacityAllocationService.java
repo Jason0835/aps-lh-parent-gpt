@@ -184,7 +184,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
         setMonthProductionDays(productionContext);
-        //构建日排产信息
+        //构建全局日排产限制信息
         buildDayCapacityLimitInfo(productionContext);
         //获取成型机台信息--日产信息
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
@@ -696,6 +696,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
+        //物料已排产量及损耗量清空
+        productionContext.resetSkuProductionAndWastageQty();
         //处理计划的待排产量及排产标记重置
         Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
         if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
@@ -978,7 +980,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         setContinueGroupByProduct(context, continueProductionInfoList, continueGroupInfo);
         //设置对应的最新成型硫化配比信息
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = baseDataContainer.getStructureLhRatioList();
-        return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+        Map<String, CxContinueInfoHelper> initMap = CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+        //删除无在产机台的在机结构-脏数据
+        initMap.entrySet().removeIf(entry -> CollectionUtils.isEmpty(entry.getValue().getCxMachineCodeSet()));
+        return initMap;
     }
 
     /**

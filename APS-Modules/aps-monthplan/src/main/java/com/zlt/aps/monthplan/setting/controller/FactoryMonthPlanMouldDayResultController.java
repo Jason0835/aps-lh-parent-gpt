@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.text.Convert;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanMouldDayResultService;
@@ -64,12 +65,30 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody FactoryMonthPlanMouldDayResult queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        calculateDayVulcanizationQty(tableDataInfo.getRows());
+        return tableDataInfo;
+    }
+
+    /**
+     * 计算机台日硫化量
+     */
+    private void calculateDayVulcanizationQty(List<?> sourceList) {
+        if (PubUtil.isEmpty(sourceList)) {
+            return;
+        }
+        List<FactoryMonthPlanMouldDayResult> list = (List<FactoryMonthPlanMouldDayResult>) sourceList;
+        // 计算机台日硫化量 = 日硫化量（单模）* 2
+        list.stream()
+                .forEach(vo -> {
+                    Integer dayVulcanizationQty = Convert.toInt(vo.getDayVulcanizationQty(),0);
+                    vo.setDayVulcanizationQty(dayVulcanizationQty * 2);
+                });
     }
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "STRUCTURE_NAME,SPECIFICATIONS,MAIN_PATTERN,PATTERN,MAIN_MATERIAL_DESC,PRO_SIZE,UPDATE_TIME DESC";
     }
 
     /**
@@ -136,7 +155,9 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     protected List<FactoryMonthPlanMouldDayResult> listExportData(FactoryMonthPlanMouldDayResult obj) {
         QueryWrapper<FactoryMonthPlanMouldDayResult> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<FactoryMonthPlanMouldDayResult> list = entityMapper.selectList(wrapper);
+        calculateDayVulcanizationQty(list);
+        return list;
     }
 
     @Override
@@ -177,7 +198,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldCavityQty")), "MOULD_CAVITY_QTY", queryVO.getFieldValueByFieldName("mouldCavityQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("typeBlockQty")), "TYPE_BLOCK_QTY", queryVO.getFieldValueByFieldName("typeBlockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("averageQty")), "AVERAGE_QTY", queryVO.getFieldValueByFieldName("averageQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("averageSaleQty")), "AVERAGE_SALE_QTY", queryVO.getFieldValueByFieldName("averageSaleQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("inventorySalesRatio")), "INVENTORY_SALES_RATIO", queryVO.getFieldValueByFieldName("inventorySalesRatio"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dayVulcanizationQty")), "DAY_VULCANIZATION_QTY", queryVO.getFieldValueByFieldName("dayVulcanizationQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", queryVO.getFieldValueByFieldName("cxMachineCode"));
@@ -230,6 +251,8 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("day31")), "DAY_31", queryVO.getFieldValueByFieldName("day31"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("totalVulcanizationMinutes")), "TOTAL_VULCANIZATION_MINUTES", queryVO.getFieldValueByFieldName("totalVulcanizationMinutes"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("displaySeq")), "DISPLAY_SEQ", queryVO.getFieldValueByFieldName("displaySeq"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productCategory")), "PRODUCT_CATEGORY", queryVO.getFieldValueByFieldName("productCategory"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("remark")), "REMARK", queryVO.getFieldValueByFieldName("remark"));
     }
 
 

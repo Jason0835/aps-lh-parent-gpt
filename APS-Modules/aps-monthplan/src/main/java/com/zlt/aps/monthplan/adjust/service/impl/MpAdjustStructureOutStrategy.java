@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -9,6 +10,7 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.PubUtil;
@@ -35,13 +37,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、通过排产机台、结构筛选结构外调整明细
         List<MpAdjustDetailVo> matchAdjustList = filterAdjustDetailList(contextDTO,adjustDetailList);
-        contextDTO.setAdjustDetailList(matchAdjustList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(matchAdjustList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
+        // 按照结构、物料编码维度进行分组，并汇总订单量
+        sumByStructureAndMaterial(matchAdjustList);
+        contextDTO.setAdjustDetailList(matchAdjustList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);
         // 5、设置计划剩余排产量、计划已排产量
@@ -109,6 +113,16 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         Assert.isFalse(StringUtils.isEmpty(contextDTO.getScheduledMachines()), I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.scheduledMachinesEmpty"));
         // 判断结构是否为空
         Assert.isFalse(StringUtils.isEmpty(contextDTO.getStructureName()), I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structureNameEmpty"));
+    }
+
+    @Override
+    public void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
+            return;
+        }
+        List<MpAdjustStructureOut> adjustStructureOutList = baseDao.saveWithQuery(BeanUtil.copyToList(contextDTO.getAdjustDetailList(), MpAdjustStructureOut.class));
+        List<MpAdjustDetailVo> resultList = BeanUtil.copyToList(adjustStructureOutList, MpAdjustDetailVo.class);
+        contextDTO.setAdjustDetailList(resultList);
     }
 
 }

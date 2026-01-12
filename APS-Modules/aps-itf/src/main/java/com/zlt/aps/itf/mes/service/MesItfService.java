@@ -99,11 +99,11 @@ public interface MesItfService {
     /**
      * 同步原材料出库
      *
-     * @param materialOutboundRecord 参数
+     * @param syncDataLogs 参数
      * @throws ParseException 异常
      * @return 结果
      */
-    AjaxResult syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord) throws ParseException;
+    AjaxResult syncRawMaterialOutboundRecord(AuxReqSyncDataLogs syncDataLogs) throws ParseException;
 
     /**
      * 同步成品物料信息

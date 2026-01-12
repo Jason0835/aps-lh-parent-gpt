@@ -89,9 +89,12 @@ public class CxContinueGroupAllocationHandler {
      */
     private static List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(productionCxMachineCodeSet)) {
+            return Collections.emptyList();
+        }
         //粗算得到的机台
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
-        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         Integer productionCount = productionCxMachineCodeSet.size();
         //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
         productionContinue(productionContext, groupPlanInfo, groupContinueInfo, mouldShellMap);
@@ -264,7 +267,7 @@ public class CxContinueGroupAllocationHandler {
      */
     static void productionContinueSku(TbrProductionContext context, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
         Set<Integer> stopDays = context.getStopDays();
-        Integer monthDays = context.getMonthDays();
+        Integer continueSkuDeadLineDays = groupPlanInfo.getContinueSkuDeadLineDay(context);
         ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
         //续作Sku轮询排产
         String groupName = groupPlanInfo.getGroupName();
@@ -276,7 +279,7 @@ public class CxContinueGroupAllocationHandler {
             }
             Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
             //1、降膜排产
-            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(monthDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
+            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {
