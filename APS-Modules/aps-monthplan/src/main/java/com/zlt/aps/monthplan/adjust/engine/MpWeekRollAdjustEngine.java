@@ -23,6 +23,7 @@ import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -79,7 +80,7 @@ public class MpWeekRollAdjustEngine {
             //规格挑选可用机台
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-            structureInAdjustForOne(contextDTO,entry.getValue(),mpProdFinalMap.get(entry.getKey()));
+            structureInAdjustForOne(contextDTO,entry.getValue(), MapUtils.getObject(mpProdFinalMap, entry.getKey(), new ArrayList<>()));
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
         }
