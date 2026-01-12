@@ -217,7 +217,7 @@ public class ProductionPlanGroupInfo {
         groupInfoMap.forEach((structureName, groupInfo) -> {
             Integer theoryDays = groupInfo.getTheoryDays();
             //分配天数为零，或是小于最小要求天数，则设置不排产
-            if (theoryDays <= BigDecimal.ZERO.intValue() || theoryDays < minProductionDays) {
+            if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
                 groupInfo.setNoProductionNoReachMinProductionDays();
                 return;
             }
@@ -231,6 +231,25 @@ public class ProductionPlanGroupInfo {
             groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
         });
         return groupInfoMap;
+    }
+
+    /**
+     * 理论需排产天数是否低于最小要求排产天数
+     * 如果theoryDays或是minProductionDays为空，
+     * 则都认为低于
+     * 否则 theoryDays < minProductionDays
+     *
+     * @param minProductionDays
+     * @return
+     */
+    public boolean isBelowMinProductionDays(Integer minProductionDays) {
+        if (null == minProductionDays || null == theoryDays) {
+            return true;
+        }
+        if (theoryDays <= BigDecimal.ZERO.intValue()) {
+            return true;
+        }
+        return theoryDays < minProductionDays;
     }
 
     /**
