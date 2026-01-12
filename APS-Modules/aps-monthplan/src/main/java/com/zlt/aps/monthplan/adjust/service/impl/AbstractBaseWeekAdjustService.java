@@ -875,12 +875,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setProductionVersion(monthPlan.getProductionVersion());
             adjustDetailVo.setStructureName(monthPlan.getStructureName());
             adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
-            // todo 暂时写死，后续获取
-            adjustDetailVo.setPreviousNetQty(0);
+            // 调整前净需求量（上周）
+            setPreviousNetQty(adjustDetailVo,monthPlan);
             // 添加到结果集
             resultList.add(adjustDetailVo);
         }
+    }
 
+    /**
+     * 调整前净需求量（上周）
+     * @param adjustDetailVo
+     * @param monthPlan
+     */
+    private void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+        // 获取上周的周数
+        int week = DateUtil.weekOfMonth(new Date()) - 1;
+        Integer previousNetQty = Convert.toInt(monthPlan.getTotalQty(),0);
+        Integer adjustQty = Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week),0);
+        if (adjustQty != 0 && week > 0) {
+            previousNetQty = adjustQty;
+        }
+        adjustDetailVo.setPreviousNetQty(previousNetQty);
     }
 
 
@@ -953,38 +968,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 需求计划分组Map
-        Map<String, DpDemandPlan> demandPlanMap = convertToDpDemandPlanMap(dpDemandPlanList);
-
+        Map<String, List<DpDemandPlan>> demandPlanMap = convertToDpDemandPlanMap(dpDemandPlanList);
         // 遍历计算
         for (MpAdjustDetailVo adjust : adjustList) {
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
-            DpDemandPlan dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode);
-            Integer currentNetQty = 0;
-            if (dpDemandPlan != null) {
-                currentNetQty = dpDemandPlan.getNetQty();
-            }
-            adjust.setCurrentNetQty(Convert.toInt(currentNetQty,0));
+            List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            // 汇总排产净需求
+            Integer netQtySum = dpDemandPlan.stream()
+                    .filter(e -> e.getNetQty() != null)
+                    .mapToInt(DpDemandPlan::getNetQty)
+                    .sum();
+            adjust.setCurrentNetQty(Convert.toInt(netQtySum,0));
         }
-
     }
 
     /**
      * 将DpDemandPlan转Map
      */
-    private Map<String, DpDemandPlan> convertToDpDemandPlanMap(List<DpDemandPlan> dpDemandPlanList) {
+    private Map<String, List<DpDemandPlan>> convertToDpDemandPlanMap(List<DpDemandPlan> dpDemandPlanList) {
         if (PubUtil.isEmpty(dpDemandPlanList)) {
             return Collections.emptyMap();
         }
         return dpDemandPlanList.stream()
-                .filter(vo -> StringUtils.isNotEmpty(vo.getMaterialCode()))
-                .collect(Collectors.toMap(
-                        DpDemandPlan::getMaterialCode,
-                        vo -> vo,
-                        (existingVal, newVal) -> newVal
-                ));
+                .filter(demandPlan -> demandPlan != null && demandPlan.getMaterialCode() != null)
+                .collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
     }
 
 
@@ -1023,7 +1033,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 设置计划剩余排产量
-     * 计划剩余排产量 =【 1日 至 （调整日+锁定3天）】.计划量 - 已生产量，出现负数，默认等于0
+     * 计划剩余排产量 =【 1日 至 月底】.计划量 - 已生产量，出现负数，默认等于0
      *
      * @param contextDTO
      */
@@ -1043,19 +1053,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 遍历目标列表，计算赋值
         for (MpAdjustDetailVo adjust : adjustList) {
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
-                adjust.setMonthUnScheduledQty(0);
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
             // 计算：day1~targetDay的累计值
             Integer totalScheduledQty = calculateQty(planGroupMap, materialCode, maxDayOfMonth);
             // 获取已生产量（空值按0处理）
-            Integer productionQty = 0;
-            if (PubUtil.isNotEmpty(monitorGroupMap)) {
-                if (PubUtil.isNotEmpty(monitorGroupMap.get(materialCode))) {
-                    productionQty = monitorGroupMap.get(materialCode).get(0).getProductionQty();
-                }
-            }
+            List<MpMonthPlanMonitor> monthPlanMonitorList = MapUtils.getObject(monitorGroupMap, materialCode, new ArrayList<>());
+            Integer productionQty = Convert.toInt(monthPlanMonitorList.stream()
+                    .filter(e -> e.getProductionQty() != null)
+                    .mapToInt(MpMonthPlanMonitor::getProductionQty)
+                    .sum(), 0);
             // 计划已排产量
             adjust.setMonthScheduledQty(totalScheduledQty);
             // 已生产量
@@ -1082,17 +1090,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(planList)) {
             return 0;
         }
-        // 取第一个计划对象
-        FactoryMonthPlanFinalAdjustVo plan = planList.get(0);
         int total = 0;
         // 遍历day1~targetDay字段，累加值
         for (int day = 1; day <= targetDay; day++) {
             try {
                 // 拼接字段名
                 String fieldName = "day" + day;
-                // 获取字段值，空值按0处理
-                Integer dayValue = (Integer) plan.getFieldValueByFieldName(fieldName);
-                total += Convert.toInt(dayValue);
+                List<FactoryMonthPlanFinalAdjustVo> monthPlanList = MapUtils.getObject(planGroupMap, materialCode, new ArrayList<>());
+                Integer dayValue = monthPlanList.stream()
+                        .filter(e -> e.getFieldValueByFieldName(fieldName) != null)
+                        .mapToInt(e -> ((Integer) e.getFieldValueByFieldName(fieldName)))
+                        .sum();
+                total += Convert.toInt(dayValue, 0);
             } catch (Exception e) {
                 // 异常时跳过
                 continue;
