@@ -662,7 +662,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildSaleOrderPoolCondition(queryWrapper, queryVO);
         List<SalesOrderPool> salesOrderPoolList = salesOrderPoolEntityMapper.selectList(queryWrapper);
         // 排除暂缓订单
-        CollUtil.filter(salesOrderPoolList, pool -> !"5".equals(pool.getOrderPriority()));
+        CollUtil.filter(salesOrderPoolList, pool -> !"5".equals(pool.getScmPriority()));
         contextDTO.setSalesOrderPoolList(salesOrderPoolList);
     }
 
