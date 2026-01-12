@@ -1,7 +1,5 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -9,9 +7,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import org.apache.ibatis.type.JdbcType;
-
-import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -120,13 +115,8 @@ public class MpProductionPrediction extends BaseEntity {
 
     @Excel(name = "ui.data.column.productionPrediction.updateTime")
     @ApiModelProperty("更新时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @TableField(
-        value = "UPDATE_TIME",
-        fill = FieldFill.INSERT_UPDATE,
-        jdbcType = JdbcType.TIMESTAMP
-    )
-    private Date updateTime;
+    @TableField(exist = false)
+    private String updateDate;
 
 
     /** 预测需求版本号 */
