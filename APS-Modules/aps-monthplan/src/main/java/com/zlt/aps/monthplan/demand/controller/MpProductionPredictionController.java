@@ -203,6 +203,12 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         return mpProductionPredictionService.createMonthPrediction(createCondition);
     }
 
+    @ApiOperation("查询预测版本号")
+    @PostMapping("/findPredictionVersion")
+    public AjaxResult findPredictionVersion(@RequestBody MpProductionPrediction queryCondition){
+        return AjaxResult.success(mpProductionPredictionService.findPredictionVersion(queryCondition));
+    }
+
     @Override
     protected String getTypeCode(){
         return "2025122822";

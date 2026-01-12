@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
@@ -10,6 +11,7 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
@@ -52,7 +54,7 @@ import java.util.stream.Collectors;
 public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProductionPrediction>  implements IMpProductionPredictionService {
     // 预测需求计划
     private static final String PREFIX  = "PRE";
-
+    private final MpProductionPredictionEntityMapper mpProductionPredictionEntityMapper;
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
@@ -120,11 +122,27 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         List<DpDemandPlan> leftDemandsByTplus1Month = calculateLeftDemand(tPlus1MonthDemands,finalVersionByTplus1Month);
         List<DpDemandPlan> tPlus2MonthDemands = createDemandPlan(leftDemandsByTplus1Month,monthRangeResult.getTPlus2Month());
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
+        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tMonthDemands,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
         if(CollectionUtils.isNotEmpty(list)) {
             this.baseDao.insertBatch(list);
         }
         return AjaxResult.success();
+    }
+
+    @Override
+    public Set<String> findPredictionVersion(MpProductionPrediction queryCondition) {
+        LambdaQueryWrapper<MpProductionPrediction> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpProductionPrediction::getFactoryCode, queryCondition.getFactoryCode());
+        wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
+        wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
+        wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
+        wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
+        List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptySet();
+        }
+        return list.stream().map(MpProductionPrediction::getPredictionVersion).collect(Collectors.toSet());
     }
 
     private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
@@ -373,7 +391,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
 
-    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
+    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tMonthDemands,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
         if(CollectionUtils.isEmpty(productionFinalResults)) {
             return Collections.emptyList();
@@ -387,6 +405,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         Map<String,Integer> tPlus2MonthDemandQty = this.getMonthQty(productionFinalResultsTplus2Month);
         List<MpProductionPrediction> list = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
+        String predictionVersion = this.getPredictionVersion(tMonthDemands,tPlus1MonthDemands,tPlus2MonthDemands);
         tMonthDemandQty.forEach((materialCode, productionQty) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;
@@ -400,6 +419,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setYear(yearMonth.getYear());
                 productionPrediction.setMonth(yearMonth.getMonthValue());
                 productionPrediction.setLocationType(materialInfo.getCommonType());
+                productionPrediction.setPredictionVersion(predictionVersion);
                 productionPrediction.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
                 productionPrediction.setProductionVersion(finalVersion.getProductionVersion());
                 productionPrediction.setMonth1(productionQty);
@@ -408,6 +428,16 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 list.add(productionPrediction);
         });
         return list;
+    }
+
+    private String getPredictionVersion(List<DpDemandPlan> tMonthDemands, List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands) {
+        if(CollectionUtils.isEmpty(tPlus2MonthDemands)) {
+            return tPlus2MonthDemands.get(0).getMonthPlanVersion();
+        }
+        if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
+            return tPlus1MonthDemands.get(0).getMonthPlanVersion();
+        }
+        return tMonthDemands.get(0).getMonthPlanVersion();
     }
 
     private Map<String, Integer> getMonthQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {

@@ -215,4 +215,14 @@ public class MpProductionPredictionUIController extends BaseUIController<MpProdu
     public AjaxResult createMonthPrediction(MpProductionPrediction createCondition){
         return iMpProductionPredictionService.createMonthPrediction(createCondition);
     }
+
+    /**
+     * 查询预测版本号
+     */
+    @ApiOperation("查询预测版本号")
+    @PostMapping("/findPredictionVersion")
+    @ResponseBody
+    public AjaxResult findPredictionVersion(MpProductionPrediction queryCondition) {
+        return iMpProductionPredictionService.findPredictionVersion(queryCondition);
+    }
 }
