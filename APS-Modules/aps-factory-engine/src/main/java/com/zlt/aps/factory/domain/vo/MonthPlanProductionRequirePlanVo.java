@@ -472,6 +472,19 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 设置不排产，并增加不排产原因
+     *
+     * @param addNoProductionReason 不排产原因
+     */
+    public void setNoProductionAndAddReason(String addNoProductionReason) {
+        if (StringUtils.isBlank(addNoProductionReason)) {
+            return;
+        }
+        setIsProduction(YesOrNoEnum.NO.getCode());
+        addNoProductionReason(addNoProductionReason);
+    }
+
+    /**
      * 检测不排继续往下匹配的不排产原因
      * 1、计划本身不排产
      * 2、没有物料编码
