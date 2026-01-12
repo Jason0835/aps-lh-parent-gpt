@@ -268,6 +268,12 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "ADJUST_REASON")
     private String adjustReason;
 
+    /** 已生产量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.productionQty")
+    @ApiModelProperty(value = "已生产量", name = "productionQty")
+    @TableField(value = "PRODUCTION_QTY")
+    private Integer productionQty;
+
     /**
      * 获取分组key
      * @return

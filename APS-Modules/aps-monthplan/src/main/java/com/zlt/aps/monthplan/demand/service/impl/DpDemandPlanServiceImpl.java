@@ -182,7 +182,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            saveDemandPlans(createCondition, demandPlans, data);
+            saveDemandPlans(demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -255,7 +255,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> adjustRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            adjustRequirePlans =  saveDemandPlans(createCondition, demandPlans, data);
+            adjustRequirePlans =  saveDemandPlans(demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -284,7 +284,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> predictionRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            predictionRequirePlans =  saveDemandPlans(createCondition, demandPlans, data);
+            predictionRequirePlans =  saveDemandPlans(demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -321,7 +321,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> predictionRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            predictionRequirePlans = saveDemandPlans(createCondition, demandPlans, data);
+            predictionRequirePlans = saveDemandPlans(demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -520,20 +520,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 保存需求计划
      */
     private List<DpDemandPlan> saveDemandPlans(
-        DpDemandPlan createCondition,
         List<DpDemandPlan> demandPlans,
         DataCollection data) {
-
-        // 获取最小投产量
-        int minProductionQty = getMinProductionQty(
-            createCondition.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue());
-
-        // 获取SKU映射
-        Map<String, MdmMaterialInfo> skuMap = materialInfoService.skuToMaterialInfo();
-
         // 合并需求计划
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
-            demandPlans, minProductionQty, skuMap,
+            demandPlans, data.minProductionQty, data.materialInfoMap,
             data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
         if (CollectionUtils.isNotEmpty(mergedPlans)) {
             this.baseDao.insertBatch(mergedPlans);
@@ -953,9 +944,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private DpDemandPlan buildDemandPlan(SupplyOrderPool supplyOrder, DpDemandPlan createCondition) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(supplyOrder, demandPlan);
+        demandPlan.setFactoryCode(createCondition.getFactoryCode());
+        demandPlan.setPlanType(createCondition.getPlanType());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setYearWeek(ZERO_YEAR_WEEK);
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.NO.getCode());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());
@@ -967,37 +962,21 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private DpDemandPlan buildDemandPlan(SalesOrderPool postponeOrder, DpDemandPlan createCondition) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(postponeOrder, demandPlan);
+        demandPlan.setFactoryCode(createCondition.getFactoryCode());
+        demandPlan.setPlanType(createCondition.getPlanType());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setProductTypeCode(postponeOrder.getProductType());
         demandPlan.setMaterialCode(postponeOrder.getOriMaterialCode());
         demandPlan.setYearWeek(postponeOrder.getWeekYear());
-        demandPlan.setIsDynamicBalance(postponeOrder.getIsDynamicBalance());
-        demandPlan.setIsUniformity(postponeOrder.getIsUniformity());
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(postponeOrder.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(postponeOrder.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setOrderQty(postponeOrder.getOrdQty()==null? BigDecimal.ZERO.intValue() : postponeOrder.getOrdQty().intValue());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         return demandPlan;
     }
 
-
-    /**
-     * 获取最小投产量
-     * @return 最小投产量
-     */
-    private int getMinProductionQty(String factoryCode, String productTypeCode) {
-        FactoryParam factoryParam = new FactoryParam();
-        factoryParam.setFactoryCode(factoryCode);
-        factoryParam.setParamCode(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
-        factoryParam.setProductTypeCode(productTypeCode);
-        FactoryParam param = factoryParamService.getFacParamSingle(factoryParam);
-        int paramValue = BigDecimal.ZERO.intValue();
-        if (param != null) {
-            paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? Integer.valueOf(param.getParamValue())
-                : Integer.valueOf(param.getDefauleValue());
-        }
-        return paramValue;
-    }
 
     /**
      * 数据集合
@@ -1067,7 +1046,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private static class QuantityStatistics {
         int totalOrderQty = 0;
-        int totalNetQty = 0;
         int heightQty = 0;
         int midQty = 0;
         int postponeQty = 0;
@@ -1080,7 +1058,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             }
 
             totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
-
             // 根据订单优先级累加对应数量
             String priority = plan.getOrderPriority();
             int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
@@ -1139,7 +1116,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         // 设置其他固定值
         demandPlan.setMinProductionQty(minProductionQty);
-        demandPlan.setPlanType(ProductionPlanType.NORMAL.getPlanType());
         demandPlan.setIsImport(YesOrNoEnum.NO.getCode());
     }
 

@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
@@ -253,6 +254,9 @@ public class SaleRequirePlanHelper {
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setPlanType(createCondition.getPlanType());
+        demandPlan.setOrderQty(netDemand.getOrderQty());
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setNetQty(netDemand.getProduceQtyDue());
         demandPlan.setYearWeek(netDemand.getWeekYear());
         return demandPlan;
