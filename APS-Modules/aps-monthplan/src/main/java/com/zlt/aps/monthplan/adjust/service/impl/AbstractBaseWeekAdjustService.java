@@ -7,12 +7,13 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -25,7 +26,16 @@ import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
@@ -41,10 +51,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -153,8 +168,39 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         MpWeekRollAdjustEngine adjustEngine = new MpWeekRollAdjustEngine();
         adjustEngine.structureInAutoAdjust(contextDTO);
+        //保存调整结果
+        saveMpAdjustResult(contextDTO);
     }
 
+    /**
+     * 保存调整结果
+     * @param contextDTO
+     */
+    private void saveMpAdjustResult(MpRollAdjustContextDTO contextDTO){
+        List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(factoryMonthPlanProdFinalList)){
+            return;
+        }
+        //1、根据调整版本 先删除
+        LambdaQueryWrapper<MpAdjustResult> adjustResultWrapper = new LambdaQueryWrapper<>();
+        adjustResultWrapper.eq(MpAdjustResult::getFactoryCode, contextDTO.getFactoryCode());
+        adjustResultWrapper.eq(MpAdjustResult::getYear, contextDTO.getMpYear());
+        adjustResultWrapper.eq(MpAdjustResult::getMonth, contextDTO.getMpMonth());
+        adjustResultWrapper.eq(MpAdjustResult::getVersion, contextDTO.getVersion());
+        mpAdjustResultEntityMapper.delete(adjustResultWrapper);
+
+        //2、保存调整记录
+        MpAdjustResult mpAdjustResult;
+        List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
+        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:factoryMonthPlanProdFinalList){
+            mpAdjustResult = new MpAdjustResult();
+            BeanUtils.copyProperties(finalAdjustVo,mpAdjustResult);
+            mpAdjustResult.setAdjustType("01");
+            mpAdjustResult.setVersion(contextDTO.getVersion());
+            mpAdjustResultList.add(mpAdjustResult);
+        }
+        //baseDao.insertBatch(mpAdjustResultList);
+    }
 
     @Override
     public void confirmAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -366,7 +412,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 月份
         Integer month = contextDTO.getMpMonth();
         // 月度计划版本
-        String monthPlanVersion = contextDTO.getMonthPlanVersion();
+        String monthPlanVersion = contextDTO.getProductionVersion();
 
         FactoryMonthPlanProdFinal queryVO = new FactoryMonthPlanProdFinal();
         queryVO.setYear(year);
@@ -543,7 +589,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .factoryCode(contextDTO.getFactoryCode())
                 .year(contextDTO.getMpYear())
                 .month(contextDTO.getMpMonth())
-                .monthPlanVersion(contextDTO.getMonthPlanVersion())
+                .monthPlanVersion(contextDTO.getProductionVersion())
                 .build();
 
         LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
@@ -718,7 +764,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
-        contextDTO.setMonthPlanVersion(queryVO.getMonthPlanVersion());
+        contextDTO.setProductionVersion(queryVO.getMonthPlanVersion());
     }
 
 

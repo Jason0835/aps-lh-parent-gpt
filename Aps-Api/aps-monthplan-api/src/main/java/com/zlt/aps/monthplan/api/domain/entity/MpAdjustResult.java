@@ -34,6 +34,46 @@ public class MpAdjustResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    /** 分厂编号 */
+    @Excel(name = "ui.data.column.mpAdjustResult.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /** 年份 */
+    @Excel(name = "ui.data.column.mpAdjustResult.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /** 月份 */
+    @Excel(name = "ui.data.column.mpAdjustResult.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
+
+    /** 版本规则：ADJ+年月日+3位流水号； */
+    @Excel(name = "ui.data.column.mpAdjustResult.version")
+    @ApiModelProperty(value = "版本规则：ADJ+年月日+3位流水号；", name = "version")
+    @TableField(value = "VERSION")
+    private String version;
+
+    /**
+     * 销售生产需求计划版本
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.monthPlanVersion")
+    @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
+    @TableField(value = "MONTH_PLAN_VERSION")
+    private String monthPlanVersion;
+
+    /**
+     * 排产计划版本
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.productionVersion")
+    @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
+    @TableField(value = "PRODUCTION_VERSION")
+    private String productionVersion;
+
      /** 调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构 */
     @Excel(name = "ui.data.column.mpAdjustResult.adjustType")
     @ApiModelProperty(value = "调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构", name = "adjustType")

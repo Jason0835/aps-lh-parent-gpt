@@ -223,6 +223,7 @@ public class ProductionPlanGroupInfo {
             }
             Integer realTheoryDays = Math.max(theoryDays, minAllocationDays);
             groupInfo.setTheoryDays(realTheoryDays);
+            groupInfo.setLeftOverNeedAllocationDays(realTheoryDays);
             if (realTheoryDays.equals(theoryDays)) {
                 return;
             }
@@ -363,6 +364,47 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取结构下，最早续作收尾的硫化组信息
+     *
+     * @return
+     */
+    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfoByContinueSku(Context context, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || CollectionUtils.isEmpty(continueSkuMap)) {
+            return null;
+        }
+        //得到续作最大硫化组可使用的模具数
+        Integer sumMouldNumber = continueSkuMap.values().stream().mapToInt(CxContinueSkuInfoHelper::getMouldNumber).sum();
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> dayLimit.getProductionMouldSet().size() < sumMouldNumber).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasAddContinueSkuList)) {
+            return null;
+        }
+        //按日期由小到大排序，找出最早的
+        hasAddContinueSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
+        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddContinueSkuList.get(BigDecimal.ZERO.intValue());
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddContinueSkuList.get(hasAddContinueSkuList.size() - BigDecimal.ONE.intValue());
+        Integer conclusionDay = selectedDayLimit.getDay();
+        Integer endDay = endDayLimit.getDay();
+        if (isGroupStartDayByFormalProduction(conclusionDay)) {
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+        }
+        Integer previousDay = getPreviousDay(conclusionDay);
+        if (null == previousDay) {
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+        }
+        GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
+        Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        if (canAddCount <= BigDecimal.ZERO.intValue()) {
+            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+        }
+        SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
+        if (BigDecimal.ONE.intValue() == canAddCount) {
+            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+        }
+        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+    }
+
+    /**
      * 获取结构下，最早收尾的硫化信息
      *
      * @return
@@ -373,8 +415,8 @@ public class ProductionPlanGroupInfo {
         }
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> {
-            //todo
-            return !dayLimit.isReachLimit();
+            GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
+            return !dayLimit.isReachLimitByMouldNumber(previousDayLimit);
         }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
@@ -1176,11 +1218,15 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取当前排产日前一日排产信息
      *
-     * @param productionDay 排产日信息
+     * @param currentLimit 当前排产限制信息
      * @return
      */
-    private GroupPlanCxLhCapacityLimitHelper getPreviousDayInfo(Integer productionDay) {
-        if (null == productionDay || dayProductionLimitInfo.containsKey(productionDay)) {
+    private GroupPlanCxLhCapacityLimitHelper getPreviousDayInfo(GroupPlanCxLhCapacityLimitHelper currentLimit) {
+        if (null == currentLimit) {
+            return null;
+        }
+        Integer productionDay = currentLimit.getDay();
+        if (null == productionDay || !dayProductionLimitInfo.containsKey(productionDay)) {
             return null;
         }
         //获取所有排产日，并按排产日排序

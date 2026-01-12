@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -142,7 +143,9 @@ public class CxLhMouldProductionCalculator {
             skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
             return;
         }
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         //进行排产
+        Integer firstDay = null;
         for (int day = startDay; day <= endDay; day++) {
             if (sumProductionQty <= BigDecimal.ZERO.longValue()) {
                 break;
@@ -151,14 +154,27 @@ public class CxLhMouldProductionCalculator {
             if (stopDay.contains(day)) {
                 continue;
             }
+            if (null == firstDay) {
+                firstDay = day;
+            }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
             Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer theoryProductionQty = realDayProductionQty;
+            Integer lossQty = BigDecimal.ZERO.intValue();
+            //首日换模排产
+            if (firstDay.equals(day)) {
+                realDayProductionQty = Math.min(realDayProductionQty, paramConfiguration.getChangeMouldFirstQty());
+            }
+            lossQty = theoryProductionQty - realDayProductionQty;
+            if (lossQty < BigDecimal.ZERO.intValue()) {
+                lossQty = BigDecimal.ZERO.intValue();
+            }
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
-            //todo 判断模具是否排产完毕
-            boolean isDayFinish = true;
+            //判断模具是否排产完毕，首日排产则排产完毕，否则看排产量
+            boolean isDayFinish = firstDay.equals(day) ? true : realDayProductionQty.equals(dayMaxProductionQty);
             //更新日产信息
-            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, lhProductionQtyHelper.getCxMachineInfo(), BigDecimal.ZERO.intValue());
+            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, lhProductionQtyHelper.getCxMachineInfo(), lossQty);
             updateDayProductionInfo(productionContext, productionPlanInfo, doubleMouldList, skuProductionPlanList, updateInfo);
         }
         //更新还需排产量及实际排产量

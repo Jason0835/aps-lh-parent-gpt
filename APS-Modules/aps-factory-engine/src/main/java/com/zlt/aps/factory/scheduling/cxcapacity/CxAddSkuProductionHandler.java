@@ -87,7 +87,7 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, groupPlanInfo, needProductionInfo);
             return;
         }
-        //重新确认排产时间访问
+        //重新确认排产时间范围
         groupPlanInfo.correctProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), lhGroup);
         startDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();

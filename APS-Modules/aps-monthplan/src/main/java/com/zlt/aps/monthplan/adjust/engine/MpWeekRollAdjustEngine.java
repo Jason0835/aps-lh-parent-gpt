@@ -12,19 +12,24 @@ import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.ProductionSkuParamHelper;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
+import com.zlt.core.dao.basedao.BaseDao;
 import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -45,7 +50,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class MpWeekRollAdjustEngine {
-
 
 
     /**
