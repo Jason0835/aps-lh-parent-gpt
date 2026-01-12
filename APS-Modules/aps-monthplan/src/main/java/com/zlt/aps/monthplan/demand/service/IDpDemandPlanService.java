@@ -43,4 +43,25 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return 需求计划版本号列表
      */
     Set<String> findMonthPlanVersion(DpDemandPlan queryCondition);
+
+    /**
+     * 生成调整需求计划
+     *
+     * @param createCondition 参数
+     */
+    List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition);
+    /**
+     *  生成预测需求计划
+     * @param createCondition
+     * @param finalVersion
+     * @return
+     */
+    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion);
+    /**
+     *  生成预测需求计划
+     * @param createCondition
+     * @param leftDemands
+     * @return
+     */
+    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,List<DpDemandPlan> leftDemands);
 }
