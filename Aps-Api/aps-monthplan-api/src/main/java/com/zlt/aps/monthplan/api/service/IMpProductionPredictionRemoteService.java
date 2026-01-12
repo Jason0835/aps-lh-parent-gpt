@@ -80,4 +80,8 @@ public interface IMpProductionPredictionRemoteService {
     @ApiOperation("生成订单预测")
     @PostMapping("/productionPrediction/createMonthPrediction")
     AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition);
+
+    @ApiOperation("查询预测版本号")
+    @PostMapping("/productionPrediction/findPredictionVersion")
+    AjaxResult findPredictionVersion(@RequestBody MpProductionPrediction queryCondition);
 }

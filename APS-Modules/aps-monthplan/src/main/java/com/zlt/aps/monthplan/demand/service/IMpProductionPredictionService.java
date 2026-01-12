@@ -4,6 +4,9 @@ package com.zlt.aps.monthplan.demand.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.Set;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpProductionPredictionService.java
@@ -24,4 +27,10 @@ public interface IMpProductionPredictionService  extends IDocService<MpProductio
    * @return 结果
    */
   AjaxResult createMonthPrediction(MpProductionPrediction createCondition);
+  /**
+   *  获取预测版本号列表
+   * @param queryCondition 查询条件
+   * @return 预测版本号列表
+   */
+  Set<String> findPredictionVersion(MpProductionPrediction queryCondition);
 }

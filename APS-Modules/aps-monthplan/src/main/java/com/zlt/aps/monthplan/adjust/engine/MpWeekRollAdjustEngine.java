@@ -101,6 +101,7 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> incrementAdjustList = new ArrayList<>();
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
+        StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
             if (adjustStructureIn.getConfirmAdjustQty() < 0){
                 //1.1 减量
@@ -116,6 +117,11 @@ public class MpWeekRollAdjustEngine {
                     incrementAdjustList.add(adjustStructureIn);
                 }
             }
+            //4.1 检查日硫化量
+            checkDayLhQty(sbError,adjustStructureIn);
+        }
+        if (!StringUtil.isEmptyWithTrim(sbError.toString())){
+            throw new BusinessException(sbError.toString());
         }
         //2.减量调整
         startTime = new Date();
@@ -159,6 +165,17 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
 
+    /**
+     * 检查日硫化量是否为空
+     * @param sbError
+     * @param structureIn
+     */
+    private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureIn structureIn){
+        if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    structureIn.getMaterialCode()));
+        }
+    }
     /**
      * 优化：其他SKU往前移动
      * @param contextDTO 调整上下文

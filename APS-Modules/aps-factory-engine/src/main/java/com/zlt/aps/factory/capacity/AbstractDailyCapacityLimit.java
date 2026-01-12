@@ -82,6 +82,9 @@ public abstract class AbstractDailyCapacityLimit {
      */
     public void calcLhMachinesWithEmbryoTypes(List<? extends BaseEntity> mpProdFinalList, int iDay,
                                                MpDailyCapacityLimitVo dailyCapacityLimitVo,String mainPattern) {
+        if (PubUtil.isEmpty(mpProdFinalList)){
+            return;
+        }
         // 按日期向下，统计日硫化机台数
         int intPart = 0;
         int remainderCount = 0;
