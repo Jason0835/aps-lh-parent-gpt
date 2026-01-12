@@ -29,6 +29,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
@@ -776,24 +777,27 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
         }
+
+        Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(demandPlans);
+        if(org.springframework.util.CollectionUtils.isEmpty(groupMap)) {
+            return Collections.emptyList();
+        }
         List<DpDemandPlan> list = Lists.newArrayList();
-        Set<String>  groupKeys = demandPlans.stream().map(DpDemandPlan::getGroupKey).collect(Collectors.toSet());
-        groupKeys.forEach(groupKey -> {
-            List<DpDemandPlan> groupPlans = demandPlans.stream().filter(demandPlan -> groupKey.equals(demandPlan.getGroupKey())).collect(Collectors.toList());
+        groupMap.forEach((key, value) -> {
             // 获取基础模板（第一个元素）
-            DpDemandPlan template = groupPlans.get(0);
+            DpDemandPlan template = value.get(0);
             if(!skuMap.containsKey(template.getMaterialCode())) {
                 return;
             }
             list.add(buildMergedDemandPlan(
-                groupPlans,
+                value,
                 minProductionQty,
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
                 productionTypeMap,monthlySaleQty));
         });
-        log.info("groupKeys:{}",groupKeys);
+        log.info("groupKeys:{}",groupMap.keySet());
         return list;
     }
 
