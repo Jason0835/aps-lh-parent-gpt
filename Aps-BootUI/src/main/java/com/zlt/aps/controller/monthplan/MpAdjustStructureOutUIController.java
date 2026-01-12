@@ -30,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -209,4 +210,14 @@ public class MpAdjustStructureOutUIController extends BaseUIController<MpAdjustS
         AjaxResult ajaxResult = iMpAdjustStructureOutService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpAdjustStructureOut queryVO) {
+        return iMpAdjustStructureOutService.getVersionList(queryVO);
+    }
+
 }

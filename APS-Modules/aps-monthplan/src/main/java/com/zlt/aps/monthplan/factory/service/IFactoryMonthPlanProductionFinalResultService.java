@@ -26,11 +26,19 @@ import java.util.Map;
 public interface IFactoryMonthPlanProductionFinalResultService extends IService<FactoryMonthPlanProductionFinalResult> {
 
     /**
+     * 根据条件，列表查询
+     *
+     * @param condition
+     * @return
+     */
+    List<FactoryMonthPlanProductionFinalResult> getDataList(FactoryMonthPlanProductionFinalResult condition);
+
+    /**
      * 8、12个月结构上机频次 = 从定稿的月度排产计划，获取近12个月的已排产的月份个数
      *
      * @return 定稿的月度排产计划
      */
-    Map<String,Integer> calculateStructureFrequency();
+    Map<String, Integer> calculateStructureFrequency();
 
     /**
      * 根据物料编号,通过月度生产计划表，获取近12个月有排产的月份个数

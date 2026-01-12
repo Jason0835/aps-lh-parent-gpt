@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
@@ -45,18 +46,18 @@ public class SaleRequirePlanHelper {
      * 处理净需求
      */
     public static List<DpDemandPlan> processNetDemands(
-            List<DpOrderOffsetDetail> netDemands, List<MdmAreaCapaAllocation> areaCapaAllocations) {
+        DpDemandPlan createCondition,List<DpOrderOffsetDetail> netDemands, List<MdmAreaCapaAllocation> areaCapaAllocations) {
         if (CollectionUtils.isEmpty(areaCapaAllocations)) {
-            return transformAllocationsToDemandPlans(netDemands);
+            return transformAllocationsToDemandPlans(createCondition,netDemands);
         }
-        return processNetDemandsWithCapacity(netDemands, areaCapaAllocations);
+        return processNetDemandsWithCapacity(createCondition,netDemands, areaCapaAllocations);
     }
 
     /**
      * 处理有产能配置的净需求
      */
     private static List<DpDemandPlan> processNetDemandsWithCapacity(
-            List<DpOrderOffsetDetail> netDemands,
+        DpDemandPlan createCondition,List<DpOrderOffsetDetail> netDemands,
             List<MdmAreaCapaAllocation> areaCapaAllocations) {
         List<DpDemandPlan> result = new ArrayList<>();
         // 按区域分组净需求
@@ -71,7 +72,7 @@ public class SaleRequirePlanHelper {
             List<MdmAreaCapaAllocation> areaCapacities = capacityByArea.get(areaCode);
 
             if (org.apache.commons.collections.CollectionUtils.isEmpty(areaCapacities)) {
-                result.addAll(transformAllocationsToDemandPlans(sortedOrders));
+                result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
                 return;
             }
 
@@ -89,10 +90,10 @@ public class SaleRequirePlanHelper {
                 processDemandPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
             } else {
                 sortedOrders.forEach(order ->
-                        order.setOrderPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+                        order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
             }
 
-            result.addAll(transformAllocationsToDemandPlans(sortedOrders));
+            result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
         });
 
         return result;
@@ -128,7 +129,7 @@ public class SaleRequirePlanHelper {
             } else {
                 // 累加净需求量并设置优先级
                 accumulatedQty += currentOrderQty;
-                order.setOrderPriority(ApsConstant.SAL_PRIORITY_MID);
+                order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
             }
         }
     }
@@ -238,16 +239,24 @@ public class SaleRequirePlanHelper {
      * 转换订单分配为需求计划
      */
     private static List<DpDemandPlan> transformAllocationsToDemandPlans(
-            List<DpOrderOffsetDetail> orders) {
+        DpDemandPlan createCondition,List<DpOrderOffsetDetail> orders) {
 
         return orders.stream()
-                .map(SaleRequirePlanHelper::buildDemandPlanFromAllocation)
+                .map(item -> buildDemandPlanFromAllocation(createCondition,item))
                 .collect(Collectors.toList());
     }
 
-    private static DpDemandPlan buildDemandPlanFromAllocation(DpOrderOffsetDetail netDemand) {
+    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition,DpOrderOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
+        demandPlan.setFactoryCode(createCondition.getFactoryCode());
+        demandPlan.setYear(createCondition.getYear());
+        demandPlan.setMonth(createCondition.getMonth());
+        demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        demandPlan.setPlanType(createCondition.getPlanType());
+        demandPlan.setOrderQty(netDemand.getOrderQty());
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setNetQty(netDemand.getProduceQtyDue());
         demandPlan.setYearWeek(netDemand.getWeekYear());
         return demandPlan;

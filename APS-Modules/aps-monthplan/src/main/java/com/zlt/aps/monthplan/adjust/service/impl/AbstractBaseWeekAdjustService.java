@@ -117,20 +117,31 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 排序调整明细
         sortAdjustDetailList(contextDTO);
         // 保存调整明细
-        baseDao.saveBatch(contextDTO.getAdjustDetailList());
+        saveAdjustDetailList(contextDTO);
     }
+
+    /**
+     * 保存调整明细
+     * @param contextDTO
+     */
+    public abstract void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO);
 
     protected void sortAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
         if (PubUtil.isEmpty(adjustDetailList)) {
             return;
         }
-        adjustDetailList.sort(getSortComparator());
+        Collections.sort(adjustDetailList, getSortComparator());
     }
 
     protected Comparator<MpAdjustDetailVo> getSortComparator() {
-        return Comparator.comparing(MpAdjustDetailVo::getStructureName)
-                .thenComparing(MpAdjustDetailVo::getMaterialCode);
+        return Comparator
+                .comparing(MpAdjustDetailVo::getStructureName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(MpAdjustDetailVo::getPendingQty,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(MpAdjustDetailVo::getMaterialCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     @Override
@@ -527,6 +538,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .factoryCode(contextDTO.getFactoryCode())
                 .year(contextDTO.getMpYear())
                 .month(contextDTO.getMpMonth())
+                .monthPlanVersion(contextDTO.getMonthPlanVersion())
                 .build();
 
         LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
@@ -546,6 +558,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(MpMonthPlanMonitor::getYear, queryVO.getYear());
         queryWrapper.eq(MpMonthPlanMonitor::getMonth, queryVO.getMonth());
         queryWrapper.eq(MpMonthPlanMonitor::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMonthPlanVersion()), MpMonthPlanMonitor::getMonthPlanVersion, queryVO.getMonthPlanVersion());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), MpMonthPlanMonitor::getProductionVersion, queryVO.getProductionVersion());
     }
 
     /**
@@ -699,6 +713,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
+        contextDTO.setMonthPlanVersion(queryVO.getMonthPlanVersion());
     }
 
 
@@ -1019,6 +1034,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 计划已排产量
             adjust.setMonthScheduledQty(totalScheduledQty);
+            // 已生产量
+            adjust.setProductionQty(productionQty);
             // 计划剩余排产量 = 累计已排产量 - 已生产量
             Integer monthUnScheduledQty = totalScheduledQty - productionQty;
             // 计划剩余排产量为负数时，默认为0
@@ -1073,6 +1090,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 计算: 调整量 = 净需求 - 计划剩余排产量
             Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0);
             vo.setPendingQty(pendingQty);
+            // 确认调整量默认等于待调整量
+            vo.setConfirmAdjustQty(pendingQty);
             // 计算：净需求变动 = 净需求 - 调整前净需求量
             Integer netQtyChange = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getPreviousNetQty(),0);
             vo.setNetQtyChange(netQtyChange);

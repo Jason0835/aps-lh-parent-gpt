@@ -202,11 +202,12 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     }
 
     @Override
-    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month) {
+    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month, String factoryCode) {
         LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();
         sourceWrapper
             .eq(MdmAreaCapaAllocation::getYear, year)
             .eq(MdmAreaCapaAllocation::getMonth,month)
+            .eq(MdmAreaCapaAllocation::getFactoryCode, factoryCode)
             .eq(MdmAreaCapaAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmAreaCapaAllocationEntityMapper.selectList(sourceWrapper);
     }
