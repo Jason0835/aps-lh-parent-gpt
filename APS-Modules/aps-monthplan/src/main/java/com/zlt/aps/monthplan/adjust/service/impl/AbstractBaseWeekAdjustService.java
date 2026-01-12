@@ -1071,11 +1071,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 循环设置
         adjustList.stream().forEach(vo -> {
             // 计算: 调整量 = 净需求 - 计划剩余排产量
-            Integer pendingQty = vo.getCurrentNetQty() - vo.getMonthUnScheduledQty();
-            vo.setPendingQty(Convert.toInt(pendingQty, 0));
+            Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0);
+            vo.setPendingQty(pendingQty);
             // 计算：净需求变动 = 净需求 - 调整前净需求量
-            Integer netQtyChange = vo.getCurrentNetQty() - vo.getPreviousNetQty();
-            vo.setNetQtyChange(Convert.toInt(netQtyChange, 0));
+            Integer netQtyChange = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getPreviousNetQty(),0);
+            vo.setNetQtyChange(netQtyChange);
         });
     }
 
