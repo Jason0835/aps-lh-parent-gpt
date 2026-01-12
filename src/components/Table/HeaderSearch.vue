@@ -96,6 +96,7 @@ export default {
             disabled={item.disabled}
             placeholder={this.$t("common.rule.select")}
             filterable={item.filterable}
+            on={item.listeners}
           >
             {item.dictData.map((row) => {
               return (

@@ -113,10 +113,12 @@ import {
   listDemandPlan,
   saveDemandPlan,
   genenrDemandPlan,
+  getVersionSelect,
 } from "@/api/monthplan/demandPlan";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoForm from "@/views/components/infoForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+import { di } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "DemandPlan",
@@ -133,7 +135,7 @@ export default {
     "biz_stor_type",
     "biz_brand_type",
     "biz_product_characteristics",
-    "biz_schedule_type"
+    "biz_schedule_type",
   ],
   provide() {
     return {
@@ -143,7 +145,8 @@ export default {
   data() {
     return {
       title: "优先级调整",
-      createLoading:false,
+      versionList:[],
+      createLoading: false,
       loading: false,
       visible: false,
       data: [],
@@ -225,7 +228,7 @@ export default {
         {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
-          width:180
+          width: 180,
         },
         {
           prop: "brand",
@@ -233,7 +236,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width:120
+          width: 120,
         },
         {
           prop: "scmPriority",
@@ -247,7 +250,6 @@ export default {
               <div>
                 {this.hasPermission("monthplan:demandPlan:edit") && (
                   <el-select
-
                     v-model={row.scmPriority}
                     onChange={(val) => this.handlePriorityChange(row, val)}
                   >
@@ -275,17 +277,17 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:180
+          width: 180,
         },
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
-          width:120
+          width: 120,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:120
+          width: 120,
         },
         {
           prop: "materialDesc",
@@ -295,7 +297,7 @@ export default {
         {
           prop: "productionType",
           label: this.$t("ui.data.DemandPlan.productionType"),
-          width:120,
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.biz_schedule_type,
@@ -343,41 +345,41 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-          width:120,
+          width: 120,
           render: ({ row }) => {
             return (
               <div>
-                {this.hasPermission("monthplan:demandPlan:edit") &&row.isReachMinProductionQty==0&& (
-                  <el-select
-
-                    v-model={row.isProduction}
-                    onChange={(val) => this.handlePriorityChange(row, val)}
-                  >
-                    {this.dict.type.biz_yes_no.map((item) => (
-                      <el-option
-                        key={item.value}
-                        label={item.label}
-                        value={item.value}
-                      ></el-option>
-                    ))}
-                  </el-select>
-                )}
-                {this.hasPermission("monthplan:demandPlan:edit") &&row.isReachMinProductionQty==1 &&(
-                  <el-select
-                    disabled
-                    v-model={row.isProduction}
-                    onChange={(val) => this.handlePriorityChange(row, val)}
-                  >
-                    {this.dict.type.biz_yes_no.map((item) => (
-                      <el-option
-
-                        key={item.value}
-                        label={item.label}
-                        value={item.value}
-                      ></el-option>
-                    ))}
-                  </el-select>
-                )}
+                {this.hasPermission("monthplan:demandPlan:edit") &&
+                  row.isReachMinProductionQty == 0 && (
+                    <el-select
+                      v-model={row.isProduction}
+                      onChange={(val) => this.handlePriorityChange(row, val)}
+                    >
+                      {this.dict.type.biz_yes_no.map((item) => (
+                        <el-option
+                          key={item.value}
+                          label={item.label}
+                          value={item.value}
+                        ></el-option>
+                      ))}
+                    </el-select>
+                  )}
+                {this.hasPermission("monthplan:demandPlan:edit") &&
+                  row.isReachMinProductionQty == 1 && (
+                    <el-select
+                      disabled
+                      v-model={row.isProduction}
+                      onChange={(val) => this.handlePriorityChange(row, val)}
+                    >
+                      {this.dict.type.biz_yes_no.map((item) => (
+                        <el-option
+                          key={item.value}
+                          label={item.label}
+                          value={item.value}
+                        ></el-option>
+                      ))}
+                    </el-select>
+                  )}
                 {!this.hasPermission("monthplan:demandPlan:edit") && (
                   <span>
                     {this.selectDictLabel(
@@ -424,7 +426,6 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-
         },
         {
           prop: "minProductionQty",
@@ -451,6 +452,9 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -459,14 +463,17 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-          // listeners: {
-          //   change: this.handleYearMonthChange,
-          // },
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
 
         {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+          type: "select",
+          filterable: true,
+          dictData: this.versionList,
         },
         {
           prop: "productTypeCode",
@@ -504,14 +511,13 @@ export default {
     },
   },
   methods: {
-    tableRowClassName({row, rowIndex}) {
-        if (row.isReachMinProductionQty ==0) {
-          return 'warning-row';
-        }
-        return '';
-      },
+    tableRowClassName({ row, rowIndex }) {
+      if (row.isReachMinProductionQty == 0) {
+        return "warning-row";
+      }
+      return "";
+    },
     handleYearMonthChange(val) {
-
       this.search = {
         ...this.search,
         yearMonth: val,
@@ -520,10 +526,19 @@ export default {
         ...this.search,
         yearMonth: val,
       };
-      console.log(this.search);
-      console.log(this.query);
-      // this.query.yearMonth = val;
-      // this.search.yearMonth = val;
+      this.getVersionList();
+
+    },
+    handleFactoryChange(val){
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
     },
     hasPermission(permission) {
       const permissions = this.$store.state.user.permissions || [];
@@ -533,8 +548,8 @@ export default {
       return permissions.includes(permission);
     },
     async generPlan() {
-      this.handleAdd()
-      return
+      this.handleAdd();
+      return;
       // try {
       //   this.createLoading=true
       //   let res = await genenrDemandPlan(this.formatParams());
@@ -678,6 +693,24 @@ export default {
         this.loading = false;
       }
     },
+    async getVersionList() {
+      try {
+        const data = await getVersionSelect(this.formatParams());
+        let list=[]
+        for (let i = 0; i < data.length; i++) {
+          let obj={
+            label:data[i],
+            value:data[i]
+          }
+          list.push(obj)
+
+        }
+        this.versionList=list
+      } catch (error) {
+        console.error(error);
+      } finally {
+      }
+    },
   },
   created() {
     const now = new Date();
@@ -694,6 +727,7 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.getVersionList();
     this.getList();
   },
   activated() {},

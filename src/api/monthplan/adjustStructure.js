@@ -49,3 +49,30 @@ export function autoAdjust(query) {
     data: query
   })
 }
+
+
+//结构内行内调整
+export function saveAdjust(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureIn/save',
+    method: 'post',
+    data: query
+  })
+}
+//结构内行删除
+export function removeStructure(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureIn/remove',
+    method: 'post',
+    data: query
+  })
+}
+
+//结构外删除
+export function removeAdjust(query) {
+  return request({
+    url: '/monthplan/mpStructureAllocation/remove',
+    method: 'post',
+    data: query
+  })
+}

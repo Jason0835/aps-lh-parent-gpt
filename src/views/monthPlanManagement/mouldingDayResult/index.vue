@@ -266,6 +266,11 @@ export default {
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 120,
         },
+        {
+          label: this.$t("common.remark"),
+          prop: "remark",
+          width: 120,
+        },
       ];
       if (this.dailyVisible) {
         const query = this.$route.query;

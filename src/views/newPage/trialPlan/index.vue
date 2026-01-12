@@ -133,7 +133,9 @@ export default {
     }),
     columns() {
       let columns = [
-        { type: "selection", fixed: "left" },
+        { type: "selection", fixed: "left" ,selectable: (row) => row.productionDate },
+
+
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -301,6 +303,7 @@ export default {
                 <el-button
                   v-hasPermi={["monthplan:mpTrialPlan:remove"]}
                   class="minus"
+                  disabled={row.productionDate}
                   type="danger"
                   onClick={() => this.handleDelete(row)}
                 >

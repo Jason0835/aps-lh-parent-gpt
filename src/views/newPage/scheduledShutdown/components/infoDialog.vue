@@ -121,13 +121,13 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
-        {
-          prop: "procCode",
-          label: this.$t("schedule.scheduleReport.procedure"),
-          type: "select",
-          dictData: this.parentDict.type.work_calendar_proc,
+        // {
+        //   prop: "procCode",
+        //   label: this.$t("schedule.scheduleReport.procedure"),
+        //   type: "select",
+        //   dictData: this.parentDict.type.work_calendar_proc,
 
-        },
+        // },
       {
           prop: "machineType",
           label: this.$t("ui.data.column.cx.machine.type"),

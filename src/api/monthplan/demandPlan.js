@@ -29,3 +29,11 @@ export function getVersion(query) {
     data: query
   })
 }
+
+export function getVersionSelect(query) {
+  return request({
+    url: '/monthplan/demandPlan/findMonthPlanVersion',
+    method: 'post',
+    data: query
+  })
+}

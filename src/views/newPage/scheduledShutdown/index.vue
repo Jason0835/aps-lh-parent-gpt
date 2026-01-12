@@ -155,16 +155,16 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
-        {
-          prop: "procCode",
-          label: this.$t("schedule.scheduleReport.procedure"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(
-              this.dict.type.work_calendar_proc,
-              value
-            );
-          },
-        },
+        // {
+        //   prop: "procCode",
+        //   label: this.$t("schedule.scheduleReport.procedure"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(
+        //       this.dict.type.work_calendar_proc,
+        //       value
+        //     );
+        //   },
+        // },
         {
           prop: "machineType",
           label: this.$t("ui.data.column.cx.machine.type"),
@@ -237,12 +237,12 @@ export default {
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.biz_factory_name,
         },
-        {
-          prop: "procCode",
-          label: this.$t("schedule.scheduleReport.procedure"),
-          type: "select", //GLUE_TYPE
-          dictData: this.dict.type.work_calendar_proc,
-        },
+        // {
+        //   prop: "procCode",
+        //   label: this.$t("schedule.scheduleReport.procedure"),
+        //   type: "select", //GLUE_TYPE
+        //   dictData: this.dict.type.work_calendar_proc,
+        // },
         {
           prop: "machineType",
           label: this.$t("ui.data.column.cx.machine.type"),

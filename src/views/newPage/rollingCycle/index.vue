@@ -41,6 +41,14 @@
               $t("新增结构")
             }}</el-button>
           </el-tab-pane>
+          <el-tab-pane
+            label="单结构调整"
+            disabled
+            name="result"
+            v-if="isShowResult"
+          >
+          </el-tab-pane>
+
           <el-tab-pane label="调整结果" disabled name="three"> </el-tab-pane>
         </el-tabs>
       </template>
@@ -93,6 +101,9 @@ import {
   listOutsideStructure,
   confirmAdjust,
   autoAdjust,
+  saveAdjust,
+  removeAdjust,
+  removeStructure
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -125,6 +136,7 @@ export default {
   },
   data() {
     return {
+      isShowResult: false,
       getLoading: false,
       autoLoading: false,
       adjustType: "01",
@@ -133,23 +145,18 @@ export default {
       activeName: "first",
       expands: [],
       tableData: [],
-
       subLoading: false,
       subTableData: [],
       loading: false,
       data: [],
       selection: [],
-      page: {
-        current: 1,
-        pageSize: 20,
-        total: 0,
-      },
+      page: null,
       sort: {},
       search: {},
       query: {},
       importDefaultValue: {},
       importRules: {},
-      isEdit: false,
+      isEdit: true,
     };
   },
   computed: {
@@ -161,6 +168,244 @@ export default {
         return [];
       }
       if (this.activeName == "first") {
+        return [
+          {
+            prop: "structureName",
+            label: this.$t("产品结构"),
+          },
+          {
+            prop: "scheduledMachines",
+            label: this.$t("排产机台"),
+          },
+          {
+            prop: "materialCode",
+            label: this.$t("NC物料编码"),
+          },
+          {
+            prop: "materialDesc",
+            label: this.$t("物料描述"),
+          },
+          {
+            prop: "hasSpecialMaterial",
+            label: this.$t("是否含材料"),
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
+          },
+          {
+            prop: "previousNetQty",
+            label: this.$t("调整前净需求量（上周）"),
+          },
+          {
+            prop: "currentNetQty",
+            label: this.$t("当前净需求量"),
+          },
+          {
+            prop: "netQtyChange",
+            label: this.$t("净需求变动"),
+          },
+          {
+            prop: "monthScheduledQty",
+            label: this.$t("月计划已排产量"),
+          },
+          {
+            prop: "productionQty",
+            label: this.$t("月计划已生产量"),
+          },
+          {
+            prop: "pendingQty",
+            label: this.$t("待调整量（降序）"),
+          },
+          {
+            prop: "confirmAdjustQty",
+            label: this.$t("确认调整量"),
+            render: ({ row }) => {
+              return (
+                <div>
+                  {this.isEdit && (
+                    <el-input
+                      key={row.id}
+                      v-model={row.confirmAdjustQty}
+                      placeholder="请输入内容"
+                      onBlur={(e) => {
+                        e.preventDefault(); // 如果需要阻止默认行为
+                        this.editAdjust(row);
+                      }}
+                      size="mini"
+                    ></el-input>
+                  )}
+                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
+                </div>
+              );
+            },
+          },
+          {
+            prop: "adjustPriorities",
+            label: this.$t("调整优先级"),
+            render: ({ row }) => {
+              return (
+                <div>
+                  {this.isEdit && (
+                    <el-select v-model={row.adjustPriority}   onChange={(val) => this.editAdjust(row, val)}   size="mini">
+                      <el-option label="1" value="1" key="1" />
+                      <el-option label="2" value="2" key="2" />
+                      <el-option label="3" value="3" key="3" />
+                    </el-select>
+                  )}
+                  {!this.isEdit && <span>{row.adjustPriority}</span>}
+                </div>
+              );
+            },
+          },
+          {
+            prop: "actualAdjustment",
+            label: this.$t("实际调整"),
+          },
+          {
+            prop: "adjustmentReason",
+            label: this.$t("调整原因"),
+          },
+          {
+            align: "center",
+            label: this.$t("ui.data.btn.option"),
+            fixed: "right",
+            render: ({ row }) => {
+              return (
+                <div>
+                  <el-button
+                    v-hasPermi={["monthplan:ProductMoldingLimit:remove"]}
+                    class="minus"
+                    type="danger"
+                    onClick={() => this.handleDelete(row)}
+                  >
+                    {this.$t("ui.frame.btn.delete")}
+                  </el-button>
+                </div>
+              );
+            },
+          },
+        ];
+      }
+      if (this.activeName == "second") {
+        return [
+          { type: "selection", fixed: "left" },
+          {
+            prop: "expand",
+            type: "expand",
+            render: () => {
+              return (
+                <div class="expend-table" v-loading={this.subLoading}>
+                  <el-table border data={this.subTableData} max-height="200px">
+                    {this.subColumns.map((item) => {
+                      return (
+                        <el-table-column
+                          prop={item.prop}
+                          label={item.label}
+                          minWidth={80}
+                        />
+                      );
+                    })}
+                  </el-table>
+                </div>
+              );
+            },
+          },
+
+          {
+            prop: "cxMachineCode",
+            label: this.$t("成型机台"),
+          },
+          {
+            prop: "structureName",
+            label: this.$t("产品结构"),
+          },
+
+          {
+            prop: "beginDay",
+            label: this.$t("开始日期"),
+          },
+          {
+            prop: "endDay",
+            label: this.$t("结束日期"),
+          },
+          {
+            align: "center",
+            label: this.$t("ui.data.btn.option"),
+            fixed: "right",
+            render: ({ row }) => {
+              return (
+                <div>
+                  <el-button
+
+                    class="minus"
+                    type="danger"
+                    onClick={() => this.handleStructureDelete(row)}
+                  >
+                    {this.$t("ui.frame.btn.delete")}
+                  </el-button>
+                </div>
+              );
+            },
+          },
+          // {
+          //   prop: "beforePlanQty",
+          //   label: this.$t("计划量"),
+          // },
+          // {
+          //   prop: "afterPlanQty",
+          //   label: this.$t("调整后计划量"),
+          // },
+          // {
+          //   prop: "beforeEndDate",
+          //   label: this.$t("调整后开始日期"),
+          // },
+          // {
+          //   prop: "afterStartDate",
+          //   label: this.$t("调整后结束日期"),
+          // },
+        ];
+      }
+      if (this.activeName == "three") {
+        return [
+          {
+            prop: "formingMachine",
+            label: this.$t("成型机台"),
+          },
+          {
+            prop: "productStructure",
+            label: this.$t("产品结构"),
+          },
+          {
+            prop: "planQuantity",
+            label: this.$t("NC物料编码"),
+          },
+          {
+            prop: "startDate",
+            label: this.$t("物料描述"),
+          },
+          {
+            prop: "endDate",
+            label: this.$t("是否含材料"),
+          },
+          {
+            prop: "adjustPlanQuantity",
+            label: this.$t("计划量"),
+          },
+          {
+            prop: "adjustStartDate",
+            label: this.$t("开始日期"),
+          },
+          {
+            prop: "adjustEndDate",
+            label: this.$t("结束日期"),
+          },
+          {
+            prop: "adjustEndDate",
+            label: this.$t("锁定上机日期"),
+          },
+        ];
+      }
+      if (this.activeName == "result") {
         return [
           {
             prop: "structureName",
@@ -274,108 +519,8 @@ export default {
           },
         ];
       }
-      if (this.activeName == "second") {
-        return [
-          { type: "selection", fixed: "left" },
-          {
-            prop: "expand",
-            type: "expand",
-            render: () => {
-              return (
-                <div class="expend-table" v-loading={this.subLoading}>
-                  <el-table border data={this.subTableData} max-height="200px">
-                    {this.subColumns.map((item) => {
-                      return (
-                        <el-table-column
-                          prop={item.prop}
-                          label={item.label}
-                          minWidth={80}
-                        />
-                      );
-                    })}
-                  </el-table>
-                </div>
-              );
-            },
-          },
 
-          {
-            prop: "cxMachineCode",
-            label: this.$t("成型机台"),
-          },
-          {
-            prop: "structureName",
-            label: this.$t("产品结构"),
-          },
-
-          {
-            prop: "beginDay",
-            label: this.$t("开始日期"),
-          },
-          {
-            prop: "endDay",
-            label: this.$t("结束日期"),
-          },
-          // {
-          //   prop: "beforePlanQty",
-          //   label: this.$t("计划量"),
-          // },
-          // {
-          //   prop: "afterPlanQty",
-          //   label: this.$t("调整后计划量"),
-          // },
-          // {
-          //   prop: "beforeEndDate",
-          //   label: this.$t("调整后开始日期"),
-          // },
-          // {
-          //   prop: "afterStartDate",
-          //   label: this.$t("调整后结束日期"),
-          // },
-        ];
-      }
-      if (this.activeName == "three") {
-        return [
-          {
-            prop: "formingMachine",
-            label: this.$t("成型机台"),
-          },
-          {
-            prop: "productStructure",
-            label: this.$t("产品结构"),
-          },
-          {
-            prop: "planQuantity",
-            label: this.$t("NC物料编码"),
-          },
-          {
-            prop: "startDate",
-            label: this.$t("物料描述"),
-          },
-          {
-            prop: "endDate",
-            label: this.$t("是否含材料"),
-          },
-          {
-            prop: "adjustPlanQuantity",
-            label: this.$t("计划量"),
-          },
-          {
-            prop: "adjustStartDate",
-            label: this.$t("开始日期"),
-          },
-          {
-            prop: "adjustEndDate",
-            label: this.$t("结束日期"),
-          },
-          {
-            prop: "adjustEndDate",
-            label: this.$t("锁定上机日期"),
-          },
-        ];
-      }
-
-      return columns;
+      return [];
     },
     searchColumns() {
       return [
@@ -421,36 +566,62 @@ export default {
     subColumns() {
       return [
         {
-          label: "机台号",
+          label: this.$t("成型机台"),
           prop: "deviceCode",
         },
         {
-          label: "设备组分类",
+          label: this.$t("产品结构"),
           prop: "deviceGroupDetailName",
         },
         {
-          label: "计划执行月",
+          label: this.$t("物料编码"),
           prop: "planMonth",
         },
         {
-          label: "执行人",
+          label: this.$t("物料描述"),
           prop: "execByName",
         },
         {
-          label: "实际执行月",
+          label: this.$t("是否含物料"),
           prop: "execMonth",
         },
         {
-          label: "完成状态",
-          prop: "status",
-          formatter: (row, column, cellValue) => {
-            return this.selectDictLabel(this.dict.type.task_type, cellValue);
-          },
+          label: this.$t("计划量"),
+          prop: "execMonth",
         },
+        {
+          label: this.$t("开始日期"),
+          prop: "execMonth",
+        },
+        {
+          label: this.$t("结束日期"),
+          prop: "execMonth",
+        },
+        // {
+        //   label:this.$t("是否含物料"),
+        //   prop: "execMonth",
+        // },
+        // {
+        //   label: this.$t("计划量"),
+        //   prop: "status",
+        //   formatter: (row, column, cellValue) => {
+        //     return this.selectDictLabel(this.dict.type.task_type, cellValue);
+        //   },
+        // },
       ];
     },
   },
   methods: {
+    async editAdjust(row) {
+      try {
+        let res = await saveAdjust(row);
+        this.$modal.msgSuccess(res.msg);
+        this.getList();
+      } catch (err) {}
+    },
+    fouceInout(row) {
+      console.log("row", row);
+    },
     handleYearMonthChange(val) {
       this.search = {
         ...this.search,
@@ -500,7 +671,7 @@ export default {
         params.adjustType = this.adjustType;
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
-        if(res.rows){
+        if (res.rows) {
           this.data = res.rows;
         }
         this.getLoading = false;
@@ -509,7 +680,7 @@ export default {
       }
     },
     handleExpandChange(row, expandedRows) {
-      // console.log(row, expandedRows, this.expands);
+      console.log(row, expandedRows, this.expands);
       this.expands = [];
       //通过当前的行获取
       if (expandedRows.length > 0) {
@@ -520,24 +691,26 @@ export default {
     },
     handleAddSpecial() {
       if (this.$refs.addModalRef) {
-        this.$refs.addModalRef.show({yearMonth:this.search.yearMonth});
+        this.$refs.addModalRef.show({ yearMonth: this.search.yearMonth });
       }
     },
     handleClick(tab, event) {
       this.loading = true;
       this.show = false;
-      this.getList();
       if (this.activeName == "first") {
         this.adjustType = "01";
+        this.isEdit = true;
+        this.page = null;
       } else {
+        this.page = {
+          current: 1,
+          pageSize: 20,
+          total: 0,
+        };
         this.adjustType = "02";
+        this.isEdit = false;
       }
-
-      // setTimeout(() => {
-      //   // this.$refs.tableRef.onReset()
-      //   this.show = true;
-      //   this.loading = false;
-      // }, 300);
+      this.getList();
     },
     async handShowResult() {
       this.show = false;
@@ -558,7 +731,7 @@ export default {
         }
         console.log(params);
         let res = await autoAdjust(params);
-        if(res.rows){
+        if (res.rows) {
           this.data = res.rows;
         }
         // this.data=res.rows
@@ -586,6 +759,8 @@ export default {
       }
     },
     async handleAdd() {
+      // this.isShowResult=true
+      // this.activeName = "result";
       try {
         let params = {
           ...this.query,
@@ -607,7 +782,9 @@ export default {
         if (this.$refs.infoRef) {
           this.$refs.infoRef.show(res);
         }
-      } catch (err) {}
+      } catch (err) {
+        console.log(err);
+      }
     },
 
     handleDelete(row) {
@@ -615,17 +792,30 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        // removeProductMoldingLimit({ ids }).then((data) => {
-        //   this.$modal.msgSuccess(data.msg);
-        //   this.$set(this.page, "current", 1);
-        //   this.getList();
-        // });
+        removeAdjust({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.getList();
+        });
+      });
+    },
+    handleStructureDelete(row) {
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = row.id;
+        removeStructure({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.getList();
+        });
       });
     },
 
     handleSearch(data) {
       this.query = data;
-      this.$set(this.page, "current", 1);
+      if (this.activeName == "second") {
+        this.$set(this.page, "current", 1);
+      }
+
       this.getList();
     },
     handlePageChange(current, pageSize) {
@@ -656,13 +846,13 @@ export default {
       downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
     },
 
-    formatParams(hasPage = true) {
+    formatParams() {
       const params = {
         ...this.query,
         ...this.sort,
       };
 
-      if (hasPage) {
+      if (this.activeName == "second") {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
@@ -677,9 +867,7 @@ export default {
     },
     // api
     async getList() {
-      console.log(this.adjustType);
       try {
-        this.isEdit = false;
         this.loading = true;
         let data;
         if (this.activeName == "first") {
@@ -689,7 +877,10 @@ export default {
           data = await listOutsideStructure(this.formatParams());
         }
         this.data = data.rows;
-        this.page.total = data.total;
+        if (this.activeName == "second") {
+          this.page.total = data.total;
+        }
+
         this.show = true;
       } catch (error) {
         console.error(error);
