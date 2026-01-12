@@ -411,13 +411,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Integer year = contextDTO.getMpYear();
         // 月份
         Integer month = contextDTO.getMpMonth();
-        // 月度计划版本
-        String monthPlanVersion = contextDTO.getProductionVersion();
+        // 月度计划排产版本
+        String productionVersion = contextDTO.getProductionVersion();
 
         FactoryMonthPlanProdFinal queryVO = new FactoryMonthPlanProdFinal();
         queryVO.setYear(year);
         queryVO.setMonth(month);
-        queryVO.setMonthPlanVersion(monthPlanVersion);
+        queryVO.setProductionVersion(productionVersion);
 
         LambdaQueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new LambdaQueryWrapper<>();
         buildMonthPlanCondition(queryWrapper, queryVO);
@@ -427,7 +427,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
             contextDTO.setFactoryMonthPlanProdFinalList(resultList);
         } catch (Exception e) {
-            log.error("查询月度生产计划异常，年份：{}，月份：{}，版本：{}", year, month, monthPlanVersion, e);
+            log.error("查询月度生产计划异常，年份：{}，月份：{}，版本：{}", year, month, productionVersion, e);
             throw new RuntimeException("查询月度生产计划失败", e);
         }
     }
@@ -589,7 +589,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .factoryCode(contextDTO.getFactoryCode())
                 .year(contextDTO.getMpYear())
                 .month(contextDTO.getMpMonth())
-                .monthPlanVersion(contextDTO.getProductionVersion())
+                .productionVersion(contextDTO.getProductionVersion())
                 .build();
 
         LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
@@ -764,7 +764,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProdFinal> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
-        contextDTO.setProductionVersion(queryVO.getMonthPlanVersion());
+        contextDTO.setProductionVersion(queryVO.getProductionVersion());
     }
 
 
