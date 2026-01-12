@@ -503,16 +503,13 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 同步原材料出库
      *
-     * @param materialOutboundRecord 参数
+     * @param syncDataLogs 参数
      * @return 结果
      */
     @Override
-    public AjaxResult syncRawMaterialOutboundRecord(RawMaterialOutboundRecord materialOutboundRecord) throws ParseException {
-        Date outboundDate = materialOutboundRecord.getOutboundDate();
-        if (outboundDate == null) {
-            outboundDate = DateUtils.getNowDate("yyyy-MM-dd");
-        }
-        List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesViewMapper.syncRawMaterialOutboundRecord(materialOutboundRecord);
+    public AjaxResult syncRawMaterialOutboundRecord(AuxReqSyncDataLogs syncDataLogs) throws ParseException {
+        Date outboundDate = DateUtils.getNowDate("yyyy-MM-dd");
+        List<RawMaterialOutboundRecord> rawMaterialOutboundRecords = mesItfMapper.syncRawMaterialOutboundRecord(syncDataLogs);
         try {
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
@@ -527,6 +524,7 @@ public class MesItfServiceImpl implements MesItfService {
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
                     record.setMaterialDesc(materialInfo.getMaterialDesc());
+                    record.setMesMaterialCode(materialInfo.getMesMaterialCode());
                     saveList.add(record);
                 }
             }

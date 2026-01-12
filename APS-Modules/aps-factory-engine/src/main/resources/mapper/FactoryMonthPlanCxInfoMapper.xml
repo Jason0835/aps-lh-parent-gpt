@@ -44,7 +44,6 @@
                dps.END_DATE
           FROM t_mdm_device_plan_shut dps
          WHERE IFNULL(dps.IS_DELETE, 0) = 0
-           AND dps.PROC_CODE = '01'
            AND dps.MACHINE_TYPE = '02'
            AND ((dps.BEGIN_DATE >= #{productionStartDate,jdbcType=DATE} AND dps.BEGIN_DATE &lt;= #{productionEndDate,jdbcType=DATE})
             OR (dps.END_DATE >= #{productionStartDate,jdbcType=DATE} AND dps.END_DATE &lt;= #{productionEndDate,jdbcType=DATE}))
