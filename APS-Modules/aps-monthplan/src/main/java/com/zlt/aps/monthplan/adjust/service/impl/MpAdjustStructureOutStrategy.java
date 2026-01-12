@@ -35,13 +35,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、通过排产机台、结构筛选结构外调整明细
         List<MpAdjustDetailVo> matchAdjustList = filterAdjustDetailList(contextDTO,adjustDetailList);
-        contextDTO.setAdjustDetailList(matchAdjustList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(matchAdjustList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
+        // 按照结构、物料编码维度进行分组，并汇总订单量
+        sumByStructureAndMaterial(matchAdjustList);
+        contextDTO.setAdjustDetailList(matchAdjustList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);
         // 5、设置计划剩余排产量、计划已排产量

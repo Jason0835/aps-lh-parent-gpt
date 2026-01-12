@@ -27,6 +27,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
@@ -63,6 +64,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.core.dao.basedao.BaseDao;
 
@@ -383,6 +385,7 @@ public class MatchingProductionHandler {
                 requirePlan.setHeightLossQty(demandPlan.getMidQty());
                 requirePlan.setFactProdReqQty(demandPlan.getNetQty());
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
+                requirePlan.setInventorySalesRatio(0D);//默认0
                 requirePlanMap.put(materialCode, requirePlan);
                 continue;
             }
@@ -451,6 +454,7 @@ public class MatchingProductionHandler {
         container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, planList, requirePlanMap));
         container.setParamConfiguration(this.createParamConfiguration(productionContext));
         container.setCxMachineBaseInfo(getDataService().getCxMachineBaseInfo(productionContext));
+        this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
 
         // 各项已排产统计数据
         productionContext.setAllProductionPlan(requirePlanMap.values().stream()
@@ -647,7 +651,8 @@ public class MatchingProductionHandler {
         }
         // 库销比低的优先
         Double minInventorySalesRatio = hasReserveQtyPlanList.stream()
-                .mapToDouble(MonthPlanProductionRequirePlanVo::getInventorySalesRatio).min().getAsDouble();
+        		.filter(plan -> plan.getInventorySalesRatio() != null)
+                .mapToDouble(MonthPlanProductionRequirePlanVo::getInventorySalesRatio).min().orElse(0);
         List<MonthPlanProductionRequirePlanVo> minInventorySalesRatioList = hasReserveQtyPlanList.stream()
                 .filter(plan -> minInventorySalesRatio.equals(plan.getInventorySalesRatio()))
                 .collect(Collectors.toList());
@@ -1106,6 +1111,23 @@ public class MatchingProductionHandler {
             groupMainPatternMouldMap.put(groupNameAndMainPattern, groupMainPatternList);
         });
         baseDataContainer.setGroupMainPatternMouldRelationMap(groupMainPatternMouldMap);
+    }
+    
+    /**
+     * 加载超6个月的库存信息
+     *
+     * @param productionContext
+     */
+    private void overSixMonthStockHandler(TbrProductionContext productionContext) {
+        List<MdmProductStock> stockList = getDataService().getMdmProductStock(productionContext);
+        //过滤库存为空的值
+        Map<String, Integer> overSixMonthStockMap = stockList.stream()
+                .filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()) && null != s.getStockQty())
+                .collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc,
+                        Collectors.collectingAndThen(Collectors.toList(),
+                                list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth()))
+                                        .collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
+        productionContext.setOverSixMonthStockMap(overSixMonthStockMap);
     }
 
     /**

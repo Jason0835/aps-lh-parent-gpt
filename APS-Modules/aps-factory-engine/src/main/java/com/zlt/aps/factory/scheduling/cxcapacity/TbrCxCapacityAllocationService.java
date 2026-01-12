@@ -184,7 +184,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         initProductionRequirePlanInfo(productionContext, requirePlanList);
         //获取周期内的生产日历信息
         setMonthProductionDays(productionContext);
-        //构建日排产信息
+        //构建全局日排产限制信息
         buildDayCapacityLimitInfo(productionContext);
         //获取成型机台信息--日产信息
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
