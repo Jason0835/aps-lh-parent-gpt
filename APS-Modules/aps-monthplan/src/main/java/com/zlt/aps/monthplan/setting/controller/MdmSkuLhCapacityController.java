@@ -72,39 +72,7 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
         } catch (QueryExprException e) {
             throw new ServiceException("执行查询公式时发生错误.");
         }
-        // 计算APS日硫化量
-        calculateApsCapacity(tableDataInfo.getRows());
         return tableDataInfo;
-    }
-
-
-    /**
-     * 计算APS日硫化量
-     */
-    private void calculateApsCapacity(List<?> sourceList) {
-        if (PubUtil.isEmpty(sourceList)) {
-            return;
-        }
-        List<MdmSkuLhCapacity> mdmSkuLhCapacityList = (List<MdmSkuLhCapacity>) sourceList;
-        // 计算APS日硫化量：APS日硫化量 = 24 * 60 / 硫化总时间(min)
-        mdmSkuLhCapacityList.stream()
-                .filter(skuCapacity -> {
-                    Integer sum = skuCapacity.getSumVulcanization();
-                    return sum != null && sum > 0;
-                })
-                .forEach(skuCapacity -> {
-                    Integer sumVulcanization = skuCapacity.getSumVulcanization();
-                    double divisionResult = (double) ApsConstant.MINUTES_PER_DAY / sumVulcanization;
-                    double ceilResult = Math.ceil(divisionResult);
-                    skuCapacity.setApsCapacity(Convert.toInt(ceilResult));
-                });
-            // 设置默认值
-            mdmSkuLhCapacityList.stream()
-                    .filter(skuCapacity -> {
-                        Integer sum = skuCapacity.getSumVulcanization();
-                        return sum == null || sum <= 0;
-                    })
-                    .forEach(skuCapacity -> skuCapacity.setApsCapacity(0));
     }
 
 
@@ -184,10 +152,7 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     protected List<MdmSkuLhCapacity> listExportData(MdmSkuLhCapacity obj) {
         QueryWrapper<MdmSkuLhCapacity> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        List<MdmSkuLhCapacity> resultList = entityMapper.selectList(wrapper);
-        // 计算APS日硫化量
-        calculateApsCapacity(resultList);
-        return resultList;
+        return entityMapper.selectList(wrapper);
     }
 
     @Override

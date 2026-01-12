@@ -83,7 +83,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
 
     private void translationList(List<SupplyOrderPool> list) {
         // 把区域都转成名称
-        List<AreaConvertVo> convertVoList = list.stream().map(SupplyOrderPool::getSaleArea)
+        List<AreaConvertVo> convertVoList = list.stream().filter(item -> StringUtils.isNotBlank(item.getSaleArea())).map(SupplyOrderPool::getSaleArea)
                 .flatMap(item -> Arrays.stream(item.split(",")))
                 .distinct()
                 .filter(com.ruoyi.common.utils.StringUtils::isNotBlank)
@@ -97,15 +97,17 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
         for (SupplyOrderPool supplyOrderPool : list) {
             String saleArea = supplyOrderPool.getSaleArea();
-            String[] areaSplitArr = saleArea.split(",");
-            List<String> areaNameList = new ArrayList<>();
-            for (String areaCode : areaSplitArr) {
-                if (areaNameMap.containsKey(areaCode)) {
-                    String name = areaNameMap.get(areaCode);
-                    areaNameList.add(name);
+            if (StringUtils.isNotBlank(saleArea)){
+                String[] areaSplitArr = saleArea.split(",");
+                List<String> areaNameList = new ArrayList<>();
+                for (String areaCode : areaSplitArr) {
+                    if (areaNameMap.containsKey(areaCode)) {
+                        String name = areaNameMap.get(areaCode);
+                        areaNameList.add(name);
+                    }
                 }
+                supplyOrderPool.setSaleAreaName(String.join(",", areaNameList));
             }
-            supplyOrderPool.setSaleAreaName(String.join(",", areaNameList));
         }
     }
 

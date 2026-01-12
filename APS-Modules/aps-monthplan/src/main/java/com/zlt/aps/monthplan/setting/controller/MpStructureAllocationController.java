@@ -65,7 +65,6 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     /**
      * 查询排产过程_结构排产列表
      */
-    @RequiresPermissions( "monthplan:mpStructureAllocation:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override

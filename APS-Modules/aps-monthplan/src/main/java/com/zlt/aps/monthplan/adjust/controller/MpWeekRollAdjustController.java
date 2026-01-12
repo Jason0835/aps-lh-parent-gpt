@@ -118,7 +118,7 @@ public class MpWeekRollAdjustController extends BaseController {
             weekAdjustStrategy.autoAdjust(contextDTO);
             log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode("01").getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
-            return AjaxResult.success();
+            return AjaxResult.success(contextDTO.getFactoryMonthPlanProdFinalList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
@@ -193,9 +193,25 @@ public class MpWeekRollAdjustController extends BaseController {
         structureIn2.setPendingQty(-400);
         structureIn2.setConfirmAdjustQty(-400);
 
+        MpAdjustStructureIn structureIn3 = new MpAdjustStructureIn();
+        structureIn3.setMaterialCode("3302001877");
+        structureIn3.setMaterialDesc("215/75R17.5 135/133L 16PR BF177 BL3EBL");
+        structureIn3.setStructureName("245/70R19.5");
+        structureIn3.setMainPattern("315/80R22.5 161/157K 20PR JA665 BL0HJY");
+        structureIn3.setPreviousNetQty(0);
+        structureIn3.setCurrentNetQty(500);
+        structureIn3.setNetQtyChange(500);
+        structureIn3.setMonthScheduledQty(0);
+        structureIn3.setPendingQty(500);
+        structureIn3.setConfirmAdjustQty(500);
+        structureIn3.setDayVulcanizationQty(25);
+        structureIn3.setMouldCavityQty(6);
+        structureIn3.setTypeBlockQty(4);
+
         List<MpAdjustStructureIn> mpAdjustStructureInList = new ArrayList<>();
         mpAdjustStructureInList.add(structureIn);
         mpAdjustStructureInList.add(structureIn2);
+        mpAdjustStructureInList.add(structureIn3);
         contextDTO.setMpAdjustStructureInList(mpAdjustStructureInList);
         return contextDTO;
     }

@@ -1,10 +1,12 @@
 package com.zlt.aps.monthplan.adjust.engine;
 
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
@@ -21,11 +23,15 @@ import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import io.swagger.models.auth.In;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,6 +54,8 @@ public class MpWeekRollAdjustEngine {
      * @throws BusinessException
      */
     public void structureInAutoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        //初始化日志
+        contextDTO.setLogDetail(new StringBuilder());
         //注：结构内自动调整列表：关单直接排除，同时取订单列表与月计划最大并集；
         //1.结构内订单调整记录空检查
         if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureInList())){
@@ -60,13 +68,23 @@ public class MpWeekRollAdjustEngine {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
 
+        //规格挑选可用机台
+        contextDTO.getLogDetail().append("========结构内调整（开始）========").append(ApsConstant.DIVISION);
         //4.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        Date startTime,endTime;
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //结构内，按结构分别调整
-            structureInAdjustForOne(contextDTO,entry.getValue(),mpProdFinalMap.get(entry.getKey()));
+            contextDTO.setStructureName(entry.getKey());
+            //规格挑选可用机台
+            startTime = new Date();
+            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+            structureInAdjustForOne(contextDTO,entry.getValue(), MapUtils.getObject(mpProdFinalMap, entry.getKey(), new ArrayList<>()));
+            endTime = new Date();
+            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
         }
+        contextDTO.getLogDetail().append("========结构内调整（结束）========").append(ApsConstant.DIVISION);
     }
 
     /**
@@ -82,6 +100,7 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> onIncrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> incrementAdjustList = new ArrayList<>();
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
+        Date startTime,endTime;
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
             if (adjustStructureIn.getConfirmAdjustQty() < 0){
                 //1.1 减量
@@ -99,13 +118,16 @@ public class MpWeekRollAdjustEngine {
             }
         }
         //2.减量调整
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         structureInAdjustWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(lockNextDay,mpProdFinalList,contextDTO.getStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(lockNextDay,mpProdFinalList,contextDTO.getStructureAllocationList());
         contextDTO.setDailyCapacityLimitVoMap(dailyCapacityLimitVoMap);
         //4、拆出搭配量，用于快速判断是否搭配
         mpProdFinalList.stream().forEach(x->{
@@ -116,21 +138,35 @@ public class MpWeekRollAdjustEngine {
         });
 
         //5.在机SKU增量
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         structureInAdjustWithOnIncrement(contextDTO,onIncrementAdjustList,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+
         //6.新增SKU
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         structureInAdjustWithIncrement(contextDTO,incrementAdjustList,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+
         //7.优化：其他SKU往前移动
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         otherSkuForwardMove(contextDTO,lockNextDay,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
 
     /**
      * 优化：其他SKU往前移动
      * @param contextDTO 调整上下文
-     * @param startDay 锁定次日
+     * @param lockNextDay 锁定次日
      * @param mpProdFinalList 定稿列表
      */
-    private void otherSkuForwardMove(MpRollAdjustContextDTO contextDTO,int startDay,
+    private void otherSkuForwardMove(MpRollAdjustContextDTO contextDTO,int lockNextDay,
                                      List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         //1、从锁定次日向后遍历排产计划，检测每日硫化机台数不超限制数且每日胎胚种类数不超限制数的日期，记为有空间的日期；
         //2、在有空间的日期向后依次找SKU，越靠近的SKU优先移动；
@@ -139,7 +175,7 @@ public class MpWeekRollAdjustEngine {
         List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         //从锁定次日到月底次日，依次遍历
-        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
+        for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, contextDTO.getDailyCapacityLimitVoMap().get(i), null);
             //1、检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
             if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
@@ -226,7 +262,8 @@ public class MpWeekRollAdjustEngine {
             //允许扣减量,实单-锁定量
             int allowDeductQty = calcAllowDeductQty(mpFinalVo);
             needDeductQty = allowDeductQty >= reAdjustQty ? reAdjustQty:allowDeductQty;
-            needDeductProductionQty(needDeductQty, mpFinalVo);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,getRealBillQty(mpFinalVo),mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
+            needDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
         }
@@ -239,16 +276,26 @@ public class MpWeekRollAdjustEngine {
      */
     private int calcAllowDeductQty(FactoryMonthPlanFinalAdjustVo mpFinalVo){
         //允许扣减量  = 实单-锁定
-        int allowDeductQty = mpFinalVo.getHeightProductionQty() + mpFinalVo.getMidProductionQty() + mpFinalVo.getPostponeProductionQty();
+        int allowDeductQty = getRealBillQty(mpFinalVo);
         allowDeductQty -= mpFinalVo.getLockQty();
         return allowDeductQty < 0 ? 0:allowDeductQty;
     }
+
+    /**
+     * 实单 = 高优先级+中优先级+暂缓
+     * @param mpFinalVo
+     * @return
+     */
+    private int getRealBillQty(FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        return mpFinalVo.getHeightProductionQty() + mpFinalVo.getMidProductionQty() + mpFinalVo.getPostponeProductionQty();
+    }
+
     /**
      * 按需要扣减的量，分别扣减高优先级，再扣减中优先级
      * @param needDeductQty 需要扣减的量
      * @param prodFinal 定额记录
      */
-    private void needDeductProductionQty(int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
+    private void needDeductProductionQty(MpRollAdjustContextDTO contextDTO,int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
         int tmpNeedDeductQty = needDeductQty;
         int oriRealOrdQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() + prodFinal.getPostponeProductionQty();
         //根据 需要扣减量，从高优先级->中优先级->暂缓
@@ -277,6 +324,7 @@ public class MpWeekRollAdjustEngine {
         prodFinal.setTotalQty(prodFinal.getTotalQty() - emptyQty);
         //将调减量置到空产能
         prodFinal.setEmptyQty(emptyQty);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getEmptyQty())).append(ApsConstant.DIVISION);
     }
 
     /**
@@ -440,7 +488,7 @@ public class MpWeekRollAdjustEngine {
                  })));
 
         MpAdjustStructureIn adjustStructInVo;
-        Integer newOnLineDay,newPlanQty;
+        Integer newOnLineDay,newPlanQty,newEndDay;
 
         //2、先排实单->自带的搭配
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
@@ -471,7 +519,8 @@ public class MpWeekRollAdjustEngine {
                 // 本身搭配被挤掉，置0
                 mpFinalVo.setConventionProductionQty(0);
                 // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                deductMatchOtherSku(contextDTO,lockNextDay,newOnLineDay-1,remainPlanQty,mpFinalVo,mpProdFinalList,contextDTO.getDailyCapacityLimitVoMap());
+                newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay-1;
+                deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
             }else {
 
                 if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
@@ -493,14 +542,12 @@ public class MpWeekRollAdjustEngine {
      * @return 新上机日
      */
     private Integer getNewOnLineDay(MpRollAdjustContextDTO contextDTO, int lockNextDay, FactoryMonthPlanFinalAdjustVo mpFinalVo) {
-        int endDay;
-        if (mpFinalVo.getBeginDay() < lockNextDay){
-            //若开始日 < 锁定日，可开始日设定锁定日
-            endDay = contextDTO.getStructureDeadLine();
-        }else{
+        int endDay = contextDTO.getStructureDeadLine();
+        if (mpFinalVo != null && mpFinalVo.getBeginDay() >= lockNextDay){
             //若开始日 >= 锁定日，截止日设为计划开始日，因为已排计划不能往后延
             endDay = mpFinalVo.getBeginDay();
         }
+
         return new MpAdjustDailyCapacityLimit().getNewOnLineDay(lockNextDay, endDay, contextDTO.getDailyCapacityLimitVoMap());
     }
 
@@ -522,33 +569,52 @@ public class MpWeekRollAdjustEngine {
      * @param remainPlanQty 剩余计划量
      * @param curFinalVo 当前定稿Vo
      * @param mpProdFinalList 定稿列表
-     * @param dailyCapacityLimitVoMap 日产能限制Map
      */
     private void deductMatchOtherSku(MpRollAdjustContextDTO contextDTO,int startDay,int endDay,int remainPlanQty,FactoryMonthPlanFinalAdjustVo curFinalVo,
-                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap){
+                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         if (PubUtil.isEmpty(mpProdFinalList)){
             return;
         }
         if (endDay < startDay){
             return;
         }
-        // 1. 获取某日有搭配量的其他SKU定稿列表
-        List<FactoryMonthPlanFinalAdjustVo> newOtherFinalList = getMatchFinalListByDay(endDay, curFinalVo, mpProdFinalList);
-        if (PubUtil.isNotEmpty(newOtherFinalList)){
+        int startMould = getStartMould(endDay,curFinalVo);
+        if (startMould > curFinalVo.getTypeBlockQty()){
+            // 在机的已排模具数已达到活块数，则退出
             return;
         }
-        // 2.从多个SKU中，匹配其他最优的定稿SKU记录
-        FactoryMonthPlanFinalAdjustVo optimalFinalVo = getOptimalOtherSku(curFinalVo, newOtherFinalList);
-        // 3.清空搭配日计划 及扣减搭配总量
-        int clearDayValue = clearMpFinalDayValue(contextDTO,endDay,optimalFinalVo);
-        optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
-        // 4.增模模拟排产
-        remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, remainPlanQty, curFinalVo);
-        if (remainPlanQty > curFinalVo.getConventionProductionQty()){
-            // 5.递归，扣减其他SKU的搭配量，并模拟挤占
-            deductMatchOtherSku(contextDTO,startDay,endDay-1,remainPlanQty,curFinalVo,mpProdFinalList,dailyCapacityLimitVoMap);
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,endDay, dailyCapacityLimitVoMap.get(endDay), curFinalVo.getMainPattern());
+        //检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
+        //检查：主花纹向下模具数量(/2转成机台数) 符合性
+        if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(endDay)) ||
+                !checkMouldSatisfy(dailyCapacityLimitVoMap.get(endDay),curFinalVo)){
+           return;
         }
+
+        // 1. 获取某日有搭配量的其他SKU定稿列表
+        List<FactoryMonthPlanFinalAdjustVo> newOtherFinalList = getMatchFinalListByDay(endDay, curFinalVo, mpProdFinalList);
+        if (PubUtil.isEmpty(newOtherFinalList)){
+            return;
+        }
+        FactoryMonthPlanFinalAdjustVo optimalFinalVo;
+        while (newOtherFinalList.size() >0 ){
+            // 2.从多个SKU中，匹配其他最优的定稿SKU记录
+            optimalFinalVo = getOptimalOtherSku(curFinalVo, newOtherFinalList);
+            // 3.清空搭配日计划 及扣减搭配总量
+            int clearDayValue = clearMpFinalDayValue(contextDTO,endDay,optimalFinalVo);
+            optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
+            // 4.增模模拟排产
+            remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, remainPlanQty, curFinalVo);
+            if (remainPlanQty > curFinalVo.getConventionProductionQty()){
+                newOtherFinalList.remove(optimalFinalVo);
+            }else{
+                break;
+            }
+        }
+        // 5.递归，扣减其他SKU的搭配量，并模拟挤占
+        deductMatchOtherSku(contextDTO,startDay,endDay-1,remainPlanQty,curFinalVo,mpProdFinalList);
     }
 
     /**
@@ -571,8 +637,8 @@ public class MpWeekRollAdjustEngine {
                 continue;
             }
             String matchDayField = FactoryConstant.MATCH_DAY_FIELD + endDay;
-            int matchDayQty = (Integer) mpFinalVo.getFieldValueByFieldName(matchDayField);
-            if (matchDayQty > 0){
+            if (mpFinalVo.getFieldValueByFieldName(matchDayField) != null &&
+                    (Integer)mpFinalVo.getFieldValueByFieldName(matchDayField) > 0){
                 newOtherFinalList.add(mpFinalVo);
             }
         }
@@ -602,7 +668,7 @@ public class MpWeekRollAdjustEngine {
                     curFinalVo.getMainPattern().equals(tFinalVo.getMainPattern())){
                 sameEmbryo2MainPatternVo = tFinalVo;
             }
-            if (tFinalVo.getConventionProductionQty() < minMatchQty){
+            if (minMatchQty < tFinalVo.getConventionProductionQty() ){
                 minMatchQtyVo = tFinalVo;
                 minMatchQty = tFinalVo.getConventionProductionQty();
             }
@@ -632,8 +698,9 @@ public class MpWeekRollAdjustEngine {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         int structureDeadLine = contextDTO.getStructureDeadLine();
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        int startMould = 2;
+        int startMould = getStartMould(newOnLineDay,mpFinalVo);
         int dayVulcanizationQty = getDayVulcanizationQty(mpFinalVo);
+
         while (newPlanQty > 0){
 
             for (int i = newOnLineDay; i<= structureDeadLine; i++){
@@ -669,6 +736,23 @@ public class MpWeekRollAdjustEngine {
             startMould += 2;
         }
         return newPlanQty < 0 ? 0:newPlanQty;
+    }
+
+    /**
+     * 获取初始模具
+     * @param newOnLineDay 新的上机日
+     * @param mpFinalVo 定稿Vo
+     * @return
+     */
+    private int getStartMould(Integer newOnLineDay, FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        int startMould = 2;
+        String dayField = FactoryConstant.DAY_FIELD + newOnLineDay;
+        if (mpFinalVo.getFieldValueByFieldName(dayField) == null || (Integer) mpFinalVo.getFieldValueByFieldName(dayField) == 0){
+            return startMould;
+        }
+        int dayValue = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+        // 原模具数据+新增2副模
+        return (int)Math.ceil((double) dayValue / mpFinalVo.getDayVulcanizationQty()) + startMould;
     }
 
     /**
@@ -762,41 +846,67 @@ public class MpWeekRollAdjustEngine {
         if(PubUtil.isEmpty(incrementAdjustList)){
             return;
         }
-
-        int startDay = contextDTO.getLockEndDay() + 1;
-        //1、排序：在机SKU上机日期早的优先增量排产
-        mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
-        Map<String, MpAdjustStructureIn> mpAdjustStructInMap = incrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
-                Collectors.collectingAndThen(Collectors.toList(),m-> {
-                    return m.get(0);
-                })));
-
-        MpAdjustStructureIn adjustStructInVo;
-        Integer newOnLineDay,newPlanQty;
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        int lockNextDay = contextDTO.getLockEndDay() + 1;
+        Integer newOnLineDay,newPlanQty,newEndDay;
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
         //2、排实单
-        for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
-            adjustStructInVo = mpAdjustStructInMap.get(mpFinalVo.getMaterialCode());
-            if (adjustStructInVo == null) {
-                continue;
-            }
+        for (MpAdjustStructureIn adjustStructInVo:incrementAdjustList){
+            mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
+
             //2.1、敲定在机SKU新的上机日期
-            newOnLineDay = adjustDailyCapacityLimitObj.getNewOnLineDay(startDay,mpFinalVo.getBeginDay(),contextDTO.getDailyCapacityLimitVoMap());
-            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：新的净需求量 - （调整日~锁定日）的每日排产量
+            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
+            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
             newPlanQty = adjustStructInVo.getConfirmAdjustQty();
 
-            //2.3、清空定稿表日计划量
-            clearMpFinalDayValue(contextDTO,startDay, mpFinalVo);
-
-            //2.4、增模排产
+            //2.4、增模排产,挤占空产能
             int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
-            if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
-                // 若剩余量 > 搭配量，说明实单还有剩余
-                // 实单剩余  = 剩余量 - 搭配量
-                remainPlanQty -= mpFinalVo.getConventionProductionQty();
+            //2.5、若还有剩余，向前挤占其他SKU的搭配量
+            if (remainPlanQty > 0){
+                // 若剩余量 > 0，说明实单还有剩余
                 // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                deductMatchOtherSku(contextDTO,startDay,newOnLineDay-1,remainPlanQty,mpFinalVo,mpProdFinalList,contextDTO.getDailyCapacityLimitVoMap());
+                newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay-1;
+                deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
             }
+
+            //2.6、将新增的SKU纳入定稿列表
+            mpProdFinalList.add(mpFinalVo);
         }
+    }
+
+    /**
+     * 创建定稿记录对象
+     * @param contextDTO 周程滚动上下文
+     * @param adjustStructInVo 结构内调整Vo
+     * @return 定稿记录对象
+     */
+    private FactoryMonthPlanFinalAdjustVo createMpFinalAdjustVo(MpRollAdjustContextDTO contextDTO, MpAdjustStructureIn adjustStructInVo) {
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
+        mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        mpFinalVo.setFactoryCode(contextDTO.getFactoryCode());
+        mpFinalVo.setYear(contextDTO.getMpYear());
+        mpFinalVo.setMonth(contextDTO.getMpMonth());
+        String yearAndMonth = String.format("%s%02d", contextDTO.getMpYear(), contextDTO.getMpMonth());
+        mpFinalVo.setYearMonth(Integer.valueOf(yearAndMonth));
+        mpFinalVo.setMonthPlanVersion(adjustStructInVo.getMonthPlanVersion());
+        mpFinalVo.setProductionVersion(adjustStructInVo.getProductionVersion());
+        mpFinalVo.setLastMonthPlanVersion(adjustStructInVo.getVersion());
+        mpFinalVo.setStructureName(adjustStructInVo.getStructureName());
+        mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
+        mpFinalVo.setProductStatus(adjustStructInVo.getProductStatus());
+        mpFinalVo.setMainMaterialDesc(adjustStructInVo.getMainMaterialDesc());
+        mpFinalVo.setMesMaterialCode(adjustStructInVo.getMesMaterialCode());
+        mpFinalVo.setMaterialCode(adjustStructInVo.getMaterialCode());
+        mpFinalVo.setMaterialDesc(adjustStructInVo.getMaterialDesc());
+        mpFinalVo.setConstructionStage(adjustStructInVo.getConstructionStage());
+        mpFinalVo.setBrand(adjustStructInVo.getBrand());
+        mpFinalVo.setProSize(adjustStructInVo.getProSize());
+        mpFinalVo.setSpecifications(adjustStructInVo.getSpecifications());
+        mpFinalVo.setMainPattern(adjustStructInVo.getMainPattern());
+        mpFinalVo.setPattern(adjustStructInVo.getPattern());
+        mpFinalVo.setMouldCavityQty(adjustStructInVo.getMouldCavityQty());
+        mpFinalVo.setTypeBlockQty(adjustStructInVo.getTypeBlockQty());
+        mpFinalVo.setDayVulcanizationQty(adjustStructInVo.getDayVulcanizationQty());
+        mpFinalVo.setCuringTime(adjustStructInVo.getCuringTime());
+        return mpFinalVo;
     }
 }

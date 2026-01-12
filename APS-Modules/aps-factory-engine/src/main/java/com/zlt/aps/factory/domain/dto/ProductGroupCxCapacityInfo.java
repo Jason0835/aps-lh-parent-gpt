@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 分组计划-成型产能信息对象
@@ -93,7 +95,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
             return capacityInfo;
         }
         //得到结构成型类型的配比
-        MonthPlanStructureLhRatioVo lhRatio = structureLhRatioList.stream().filter(match -> match.isMatch(structureName, baseInfo.getCxMachineBrandCode())).findFirst().orElse(null);
+        MonthPlanStructureLhRatioVo lhRatio = getLhRation(baseInfo.getCxMachineBrandCode(), structureName, structureLhRatioList);
         if (null == lhRatio) {
             return capacityInfo;
         }
@@ -152,5 +154,30 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         this.realMaxLhMachineCount = BigDecimal.ZERO.intValue();
         this.maxLhMachineCount = BigDecimal.ZERO.intValue();
         this.minLhMachineCount = BigDecimal.ZERO.intValue();
+    }
+
+    /**
+     * 根据成型机型及结构名，得到其配比信息
+     *
+     * @param machineBrandCode     成型机机型
+     * @param structureName        分组结构名
+     * @param structureLhRatioList 成型硫化配比信息
+     * @return
+     */
+    private static MonthPlanStructureLhRatioVo getLhRation(String machineBrandCode, String structureName, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        if (CollectionUtils.isEmpty(structureLhRatioList) || StringUtils.isBlank(machineBrandCode) || StringUtils.isBlank(structureName)) {
+            return null;
+        }
+        List<MonthPlanStructureLhRatioVo> groupList = structureLhRatioList.stream().filter(lhRatio -> structureName.equals(lhRatio.getStructureName())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(groupList)) {
+            return null;
+        }
+        Map<String, MonthPlanStructureLhRatioVo> brandCodeMap = groupList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity(), (before, after) -> after));
+        MonthPlanStructureLhRatioVo find = brandCodeMap.get(machineBrandCode);
+        if (null != find) {
+            return find;
+        }
+        return brandCodeMap.get(ProductionConstant.ALL_BRAND_CODE_MATCH);
+
     }
 }

@@ -4,11 +4,15 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -126,6 +130,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 成型硫化配比最后一天排产分组信息
      */
     private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
+    /**
+     * 日排产限制--只在第一轮按机台分配中使用-机台反选和计划挑选机台
+     */
+    private Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo;
 
     /**
      * 获取剩余产能，以剩余天数*此时的硫化配比
@@ -157,7 +165,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT.getPriorityValue();
         }
         //无固定配置
-        if (hasFixed()) {
+        if (!hasFixed()) {
             return CxMachineFixedPriorityEnum.DEFAULT.getPriorityValue();
         }
         String structureName = groupPlanInfo.getGroupName();
@@ -168,6 +176,56 @@ public class CxMachineBaseInfoVo implements Serializable {
         fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue3);
         Integer fixedPrioritySku = getFixedMaterialCodePriority(groupPlanInfo).getPriorityValue();
         return Math.min(fixedPriorityValue, fixedPrioritySku);
+    }
+
+    /**
+     * 判定机台是否为结构指定机台
+     * 需要判断 指定结构和指定Sku
+     * 先判断指定结构，后判断指定Sku
+     *
+     * @param groupPlanInfo 结构信息
+     * @return
+     */
+    public boolean hasFixedMachine(ProductionPlanGroupInfo groupPlanInfo) {
+        if (null == groupPlanInfo) {
+            return false;
+        }
+        //无固定配置
+        if (!hasFixed()) {
+            return false;
+        }
+        //判定结构
+        Set<String> fixedStructureSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedStructure1)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure1.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (StringUtils.isNotBlank(fixedStructure2)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure2.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (StringUtils.isNotBlank(fixedStructure3)) {
+            fixedStructureSet.addAll(Stream.of(fixedStructure3.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
+            return true;
+        }
+        //判定Sku
+        Set<String> fixedMaterialCodeSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedMaterialCode)) {
+            fixedMaterialCodeSet.addAll(Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        if (CollectionUtils.isEmpty(fixedMaterialCodeSet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return false;
+        }
+        for (MonthPlanProductionRequirePlanVo singlePlan : groupPlanData) {
+            if (fixedMaterialCodeSet.contains(singlePlan.getMaterialCode())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -304,6 +362,37 @@ public class CxMachineBaseInfoVo implements Serializable {
         cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
         return cxLhGroupList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
+     *
+     * @param context         排产上下文
+     * @param addSkuInfo      需要上机的Sku
+     * @param selectedLhGroup 预计选中
+     * @return
+     */
+    public CxLhProductionHelper getCorrectProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, CxLhProductionHelper selectedLhGroup) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
+            return null;
+        }
+        String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
+        //说明达到胎胚种类数限制
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        //拷贝，否则数据丢失
+        CxLhProductionHelper newLhGroup = new CxLhProductionHelper();
+        BeanUtils.copyProperties(selectedLhGroup, newLhGroup);
+        Set<Integer> productionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionDaySet, context.getStopDays());
+        List<Integer> sortList = new ArrayList<>(resultSet);
+        Collections.sort(sortList);
+        int size = sortList.size();
+        newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
+        return newLhGroup;
     }
 
     /**

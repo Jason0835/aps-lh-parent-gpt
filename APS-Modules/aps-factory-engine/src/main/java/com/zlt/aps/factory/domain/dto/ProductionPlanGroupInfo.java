@@ -10,6 +10,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -62,6 +63,10 @@ public class ProductionPlanGroupInfo {
      * 分组的计划信息
      */
     private List<MonthPlanProductionRequirePlanVo> groupPlanData;
+    /**
+     * 结构指定机台集合
+     */
+    private Set<String> fixedCxMachineSet;
     /**
      * 估算需要的机台数
      */
@@ -122,6 +127,24 @@ public class ProductionPlanGroupInfo {
     private Integer isAllocationFinish;
 
     /**
+     * 构建初始化分组信息对象
+     *
+     * @param groupName     分组名 TBR 结构 PCR 英寸
+     * @param productType   产品品类 TBR PCR
+     * @param groupPlanData 分组所有计划
+     * @return
+     */
+    public static ProductionPlanGroupInfo createInitByGroupList(String groupName, ProductTypeEnum productType, List<MonthPlanProductionRequirePlanVo> groupPlanData) {
+        ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
+        groupInfo.setGroupName(groupName);
+        groupInfo.setProductType(productType);
+        groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
+        groupInfo.setGroupPlanData(groupPlanData);
+        groupInfo.setFixedCxMachineSet(new HashSet<>());
+        return groupInfo;
+    }
+
+    /**
      * 获取所有有效需求量
      *
      * @return
@@ -145,13 +168,13 @@ public class ProductionPlanGroupInfo {
      *
      * @param context              排产上下文
      * @param requirePlanList      需排产的计划
-     * @param structureLhRatioList 结构硫化配比信息
      * @return
      */
-    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = ((TbrProductionContext) context).getBaseDataContainer().getStructureLhRatioList();
         //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
@@ -316,43 +339,20 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
-        Integer startDay = preSelected.getClosingDay();
-        Integer endDay = preSelected.getEndDay();
-        Integer realStartDay = startDay;
-        Integer realEndDay = startDay;
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
-        for (int productionDay = startDay; productionDay <= endDay; productionDay++) {
-            GroupPlanCxLhCapacityLimitHelper dayLimitInfo = dayProductionLimitInfo.get(productionDay);
-            if(null == dayLimitInfo){
-                if(realStartDay < productionDay){
-                    realStartDay = productionDay;
-                }
-                if(realEndDay > productionDay){
-                    realEndDay = productionDay;
-                }
-                continue;
-            }
-            Set<String> existEmbryoCode = dayLimitInfo.getProductionEmbryoCodeSet();
-            if(existEmbryoCode.contains(productionEmbryoCode)){
-                if(realStartDay < productionDay){
-                    realStartDay = productionDay;
-                }
-                if(realEndDay > productionDay){
-                    realEndDay = productionDay;
-                }
-                continue;
-            }
-            //不可上机，延后
-            if(existEmbryoCode.size() + BigDecimal.ONE.intValue() > dayLimitInfo.getMaxEmbryoCodeCount()){
-                realStartDay = productionDay;
-                break;
-            }
-        }
-
-
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-
-
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
+        //说明达到胎胚种类数限制
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        Set<Integer> productionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionDaySet, context.getStopDays());
+        List<Integer> sortList = new ArrayList<>(resultSet);
+        Collections.sort(sortList);
+        int size = sortList.size();
+        preSelected.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
     }
 
     /**
@@ -430,13 +430,15 @@ public class ProductionPlanGroupInfo {
      */
     public Integer getRealOnlineMachineDay(MonthPlanProductionRequirePlanVo productionPlan, Integer startDay, Integer endDay) {
         Integer realStartDay = startDay;
+        boolean canProduction = false;
         for (; realStartDay <= endDay; ) {
             if (isAddSkuProductionByOneLhMachine(productionPlan, realStartDay)) {
+                canProduction = true;
                 break;
             }
             realStartDay = realStartDay + BigDecimal.ONE.intValue();
         }
-        if (realStartDay.equals(endDay)) {
+        if (!canProduction) {
             return null;
         }
         return realStartDay;
@@ -977,11 +979,7 @@ public class ProductionPlanGroupInfo {
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
-            ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
-            groupInfo.setGroupName(structureName);
-            groupInfo.setProductType(context.getProductType());
-            groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
-            groupInfo.setGroupPlanData(planList);
+            ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(structureName, context.getProductType(), planList);
             //是否零度结构
             List<MonthPlanProductionRequirePlanVo> isZeroRackList = planList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack())).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(isZeroRackList)) {

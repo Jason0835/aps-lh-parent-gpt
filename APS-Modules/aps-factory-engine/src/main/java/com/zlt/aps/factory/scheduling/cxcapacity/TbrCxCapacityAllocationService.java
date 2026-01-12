@@ -105,16 +105,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
             singlePlan.initProductionDataInfo();
         });
-        //2、初始排产需要的基础数据，成型、模具关系、计划初始库销比
+        //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
         initProductionBaseData(productionContext, requirePlanList);
-        //获取结构的硫化配比
-        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
-        //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数
+        //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(productionContext, requirePlanList, structureLhRatioList);
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(productionContext, requirePlanList);
+        setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         /**
          * 5、构建续作信息
@@ -122,7 +121,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
          * 5.2、获取上个月度的结构排产信息，得到在产结构在产机台信息
          * 并构建续作Sku及其对应结构及结构在产成型机、在产SKU和SKU使用模具数
          */
-        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(productionContext, structureLhRatioList);
+        Map<String, CxContinueInfoHelper> cxContinueInfoMap = getContinueInfo(productionContext);
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
@@ -198,6 +197,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
+        //获取结构的硫化配比
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
+        productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return;
         }
@@ -620,7 +622,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             return;
         }
         //对挑选出的机构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachine(context, addNewGroupPlan);
+        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, addNewGroupPlan.getGroupName()));
@@ -694,6 +696,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
+        //物料已排产量及损耗量清空
+        productionContext.resetSkuProductionAndWastageQty();
         //处理计划的待排产量及排产标记重置
         Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
         if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
@@ -910,16 +914,39 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
+     * 设置结构的指定机台信息
+     *
+     * @param productionContext 排产上下文
+     * @param allGroupMap       所有分组信息
+     */
+    private void setGroupFixedCxMachineInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupMap) {
+        if (CollectionUtils.isEmpty(allGroupMap)) {
+            return;
+        }
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfoMap)) {
+            return;
+        }
+        List<CxMachineBaseInfoVo> allCxMachineInfo = allCxMachineInfoMap.values().stream().collect(Collectors.toList());
+        allGroupMap.forEach((structureName, groupInfo) -> {
+            List<CxMachineBaseInfoVo> hasFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasFixedMachine(groupInfo)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(hasFixedList)) {
+                return;
+            }
+            groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
+        });
+    }
+
+    /**
      * 获取续作排产信息
      * 续作的分组信息(结构)，对应的成型产能机台和续作的SKU，使用模具-硫化机台数
      * key = structureName(TBR)
      * CxContinueInfoHelper.continueSkuMouldNumberMap = { key = materialDesc : value = 胎胚、硫化机台数(模具数)等}
      *
-     * @param context              排产上下文
-     * @param structureLhRatioList 成型结构硫化配比信息
+     * @param context 排产上下文
      * @return
      */
-    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+    private Map<String, CxContinueInfoHelper> getContinueInfo(Context context) {
         //获取前一个月的排产版本信息
         String factoryCode = context.getFactoryCode();
         LocalDate previousMonth = context.getPreviousMonth();
@@ -948,9 +975,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = ((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo();
+        BaseDataContainer baseDataContainer = ((TbrProductionContext) context).getBaseDataContainer();
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = baseDataContainer.getCxMachineBaseInfo();
         setContinueGroupByProduct(context, continueProductionInfoList, continueGroupInfo);
-        return CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+        //设置对应的最新成型硫化配比信息
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = baseDataContainer.getStructureLhRatioList();
+        Map<String, CxContinueInfoHelper> initMap = CxContinueInfoHelper.createGroupInfo(continueProductionInfoList, cxMachineBaseInfo, structureLhRatioList);
+        //删除无在产机台的在机结构-脏数据
+        initMap.entrySet().removeIf(entry -> CollectionUtils.isEmpty(entry.getValue().getCxMachineCodeSet()));
+        return initMap;
     }
 
     /**

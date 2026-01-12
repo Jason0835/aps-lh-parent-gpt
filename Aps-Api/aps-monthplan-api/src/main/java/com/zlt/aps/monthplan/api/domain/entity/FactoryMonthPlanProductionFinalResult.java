@@ -281,10 +281,10 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.averageQty")
-    @ApiModelProperty(value = "月均销量", name = "averageQty")
-    @TableField(value = "AVERAGE_QTY")
-    private Integer averageQty;
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.averageSaleQty")
+    @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Integer averageSaleQty;
 
     /**
      * 库销比

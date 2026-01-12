@@ -106,10 +106,6 @@ public class MdmSkuLhCapacityUIController extends BaseUIController<MdmSkuLhCapac
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MdmSkuLhCapacity mdmSkuLhCapacity) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmSkuLhCapacityService.checkUnique(mdmSkuLhCapacity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmSkuLhCapacity.checkUnique"));
-        }
-
         return iMdmSkuLhCapacityService.save(mdmSkuLhCapacity);
     }
 

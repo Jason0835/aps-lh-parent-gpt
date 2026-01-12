@@ -12,6 +12,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -452,7 +453,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 初始化月度硫化监控
         CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
         // 初始化成品实时库存
-//        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(() -> initProductStock(contextDTO), executor);
+        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(
+                // 解决父子上下文传递问题
+                SpringContextSupplierUtil.wrap(() -> initProductStock(contextDTO)),
+                executor
+        );
+
 
         try {
             // 等待所有异步任务执行完成
@@ -461,13 +467,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     saleOrderFuture,
                     trialPlanFuture,
                     monthSurplusFuture,
-//                    productStockFuture,
+                    productStockFuture,
                     planMonitorFuture
             ).join();
 
             log.info("并行初始化任务执行完成");
-            // 初始化成品实时库存
-            initProductStock(contextDTO);
 
         } catch (CompletionException e) {
             // 异常处理
@@ -616,7 +620,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         SalesOrderPool queryVO = new SalesOrderPool();
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
         // 订单状态，0-关单，1-正常
-        queryVO.setOrderStatus(ApsConstant.TRUE);
+//        queryVO.setOrderStatus(ApsConstant.TRUE);
 
         LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
         buildSaleOrderPoolCondition(queryWrapper, queryVO);
@@ -805,13 +809,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap);
+            matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap, Convert.toInt(salesOrder.getOrdQty(),0));
         }
         return resultList;
     }
 
     protected void matchMonthPlanList(MpRollAdjustContextDTO contextDTO, List<MpAdjustDetailVo> resultList,
-                                      String materialCode, Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap) {
+                                      String materialCode, Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap,
+                                      Integer ordQty) {
         // 根据物料编码获取对应的生产计划列表
         List<FactoryMonthPlanFinalAdjustVo> matchMonthPlanProdList = monthPlanMap.get(materialCode);
         if (PubUtil.isEmpty(matchMonthPlanProdList)) {
@@ -821,6 +826,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 组装结果集
         for (FactoryMonthPlanFinalAdjustVo monthPlan : matchMonthPlanProdList) {
             MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
+            adjustDetailVo.setOrdQty(ordQty);
             adjustDetailVo.setMaterialCode(materialCode);
             adjustDetailVo.setScheduledMachines(monthPlan.getCxMachineCode());
             // todo 暂时写死，后续获取

@@ -205,7 +205,7 @@ public class MdmStructureLhRatioUIController extends BaseUIController<MdmStructu
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmStructureLhRatioService.importData(context,false);
+        AjaxResult ajaxResult = iMdmStructureLhRatioService.importData(context,updateSupport);
         return ajaxResult;
     }
 }
