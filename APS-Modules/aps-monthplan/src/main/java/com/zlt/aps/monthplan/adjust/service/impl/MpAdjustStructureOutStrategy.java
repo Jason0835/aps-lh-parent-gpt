@@ -48,9 +48,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setAdjustDetailList(matchAdjustList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);
-        // 5、设置计划剩余排产量、计划已排产量
+        // 5、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 6、筛选：净需求 - 计划已排产量 > 0的数据
+        // 6、筛选：|净需求 - 计划已排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
@@ -80,7 +80,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     }
 
     /**
-     * 筛选：净需求 - 计划已排产量 > 0的数据
+     * 筛选：|净需求 - 计划已排产量| > 0的数据
      * @param adjustList
      */
     private void filterAdjustList(List<MpAdjustDetailVo> adjustList) {
@@ -90,7 +90,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         adjustList.removeIf(adjust -> {
             Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
             Integer monthScheduledQty = Convert.toInt(adjust.getMonthScheduledQty(),0);
-            return (currentNetQty - monthScheduledQty) <= 0;
+            return Math.abs(currentNetQty - monthScheduledQty) == 0;
         });
     }
 
