@@ -1121,6 +1121,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 existVo.setOrdQty(existVo.getOrdQty() + ordQty);
             } else {
                 MpAdjustDetailVo newVo = new MpAdjustDetailVo();
+                BeanUtil.copyProperties(vo, newVo, Boolean.FALSE);
                 newVo.setStructureName(structureName);
                 newVo.setMaterialCode(materialCode);
                 newVo.setOrdQty(ordQty);
