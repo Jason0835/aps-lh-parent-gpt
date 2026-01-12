@@ -29,6 +29,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
@@ -776,6 +777,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
         }
+
+        Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(demandPlans);
+        if(org.springframework.util.CollectionUtils.isEmpty(groupMap)) {
+            return Collections.emptyList();
+        }
+
         // 以SKU维度汇总demandPlans.OrderQty // 排除储备的数据
         Map<String, Integer> skuDemandQtyMap = demandPlans.stream()
                 .filter(item->StringUtils.isNotBlank(item.getScmPriority()) && ((
@@ -787,25 +794,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     DpDemandPlan::getOrderQty,
                 Integer::sum
             ));
-
         List<DpDemandPlan> list = Lists.newArrayList();
-        Set<String>  groupKeys = demandPlans.stream().map(DpDemandPlan::getGroupKey).collect(Collectors.toSet());
-        groupKeys.forEach(groupKey -> {
-            List<DpDemandPlan> groupPlans = demandPlans.stream().filter(demandPlan -> groupKey.equals(demandPlan.getGroupKey())).collect(Collectors.toList());
+        groupMap.forEach((key, value) -> {
             // 获取基础模板（第一个元素）
-            DpDemandPlan template = groupPlans.get(0);
+            DpDemandPlan template = value.get(0);
             if(!skuMap.containsKey(template.getMaterialCode())) {
                 return;
             }
             list.add(buildMergedDemandPlan(
-                groupPlans,
+                value,
                 minProductionQty,
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
                 productionTypeMap,monthlySaleQty,skuDemandQtyMap));
         });
-        log.info("groupKeys:{}",groupKeys);
+        log.info("groupKeys:{}",groupMap.keySet());
         return list;
     }
 
@@ -921,7 +925,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                         ! ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(item.getScmPriority())  &&
                                 ! ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(item.getScmPriority())
                 )));
-        Integer orderQty = 0;
+        Integer orderQty;
         if (isGroupPlansHasScmPriority) {
             //存在则汇总所有的orderQty
              orderQty = groupPlans.stream().mapToInt(DpDemandPlan::getOrderQty).sum();
