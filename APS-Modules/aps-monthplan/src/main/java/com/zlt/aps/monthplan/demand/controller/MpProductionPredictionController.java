@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
@@ -7,7 +8,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import io.seata.common.util.CollectionUtils;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -16,6 +16,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -53,7 +55,6 @@ import com.zlt.bill.common.service.IDocService ;
 @RestController
 @RequestMapping("/productionPrediction")
 public class MpProductionPredictionController extends AbstractDocBizController<MpProductionPrediction> {
-
     @Autowired
     private IMpProductionPredictionService mpProductionPredictionService;
 
@@ -139,8 +140,13 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
     protected List<MpProductionPrediction> listExportData(MpProductionPrediction obj) {
         QueryWrapper<MpProductionPrediction> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.orderByDesc("create_time");
         List<MpProductionPrediction> list =  entityMapper.selectList(wrapper);
-        return entityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyList();
+        }
+        list.forEach(item -> item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime())));
+        return list;
     }
 
     @Override
