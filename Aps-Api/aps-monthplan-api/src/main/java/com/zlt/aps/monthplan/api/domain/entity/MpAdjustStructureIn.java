@@ -268,5 +268,14 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "ADJUST_REASON")
     private String adjustReason;
 
+    /**
+     * 获取分组key
+     * @return
+     */
+    public String getGroupKey() {
+        String groupKeyFormat = "%s|*|%s";
+        return String.format(groupKeyFormat, structureName, materialCode);
+    }
+
 
 }

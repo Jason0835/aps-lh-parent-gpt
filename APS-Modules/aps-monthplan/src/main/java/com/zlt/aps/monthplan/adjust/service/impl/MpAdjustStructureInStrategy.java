@@ -49,6 +49,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
+        // 按照结构、物料编码维度进行分组，并汇总订单量
+        resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
         // 4、设置净需求
         setCurrentNetQty(contextDTO);

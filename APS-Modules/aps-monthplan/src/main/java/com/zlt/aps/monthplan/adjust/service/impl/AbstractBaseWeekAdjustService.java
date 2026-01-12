@@ -114,6 +114,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 后置处理
      */
     private void postProcess(MpRollAdjustContextDTO contextDTO) {
+        // 排序调整明细
+        sortAdjustDetailList(contextDTO);
+        // 保存调整明细
+        baseDao.saveBatch(contextDTO.getAdjustDetailList());
+    }
+
+    protected void sortAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return;
+        }
+        adjustDetailList.sort(getSortComparator());
+    }
+
+    protected Comparator<MpAdjustDetailVo> getSortComparator() {
+        return Comparator.comparing(MpAdjustDetailVo::getStructureName)
+                .thenComparing(MpAdjustDetailVo::getMaterialCode);
     }
 
     @Override
@@ -834,6 +851,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setYear(contextDTO.getMpYear());
             adjustDetailVo.setMonth(contextDTO.getMpMonth());
             adjustDetailVo.setVersion(contextDTO.getVersion());
+            adjustDetailVo.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
+            adjustDetailVo.setProductionVersion(monthPlan.getProductionVersion());
             adjustDetailVo.setStructureName(monthPlan.getStructureName());
             adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
             // todo 暂时写死，后续获取
@@ -1083,6 +1102,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         return monitorList.stream()
                 .filter(monitor -> monitor != null && monitor.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
+    }
+
+
+    protected List<MpAdjustDetailVo> sumByStructureAndMaterial(List<MpAdjustDetailVo> originalList) {
+        if (PubUtil.isEmpty(originalList)) {
+            return Collections.emptyList();
+        }
+        Map<String, MpAdjustDetailVo> sumMap = new HashMap<>();
+        // 遍历集合，进行分组汇总
+        for (MpAdjustDetailVo vo : originalList) {
+            String structureName = vo.getStructureName();
+            String materialCode = vo.getMaterialCode();
+            String groupKey = vo.getGroupKey();
+            Integer ordQty = Convert.toInt(vo.getOrdQty(),0);
+            if (sumMap.containsKey(groupKey)) {
+                MpAdjustDetailVo existVo = sumMap.get(groupKey);
+                existVo.setOrdQty(existVo.getOrdQty() + ordQty);
+            } else {
+                MpAdjustDetailVo newVo = new MpAdjustDetailVo();
+                newVo.setStructureName(structureName);
+                newVo.setMaterialCode(materialCode);
+                newVo.setOrdQty(ordQty);
+                sumMap.put(groupKey, newVo);
+            }
+        }
+        // 将Map中的汇总结果转换为List返回
+        return new ArrayList<>(sumMap.values());
     }
 
 }
