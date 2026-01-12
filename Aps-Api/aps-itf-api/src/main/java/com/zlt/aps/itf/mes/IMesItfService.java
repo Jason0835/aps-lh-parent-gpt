@@ -73,12 +73,12 @@ public interface IMesItfService {
     /**
      * 同步原材料出库
      *
-     * @param materialOutboundRecord 参数
+     * @param syncDataLogs 参数
      * @return 结果
      */
     @ApiOperation("同步原材料出库")
     @PostMapping("/mesItf/syncRawMaterialOutboundRecord")
-    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody RawMaterialOutboundRecord materialOutboundRecord);
+    public AjaxResult syncRawMaterialOutboundRecord(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询实时成品库存

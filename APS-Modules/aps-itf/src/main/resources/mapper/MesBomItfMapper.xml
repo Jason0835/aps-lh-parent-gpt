@@ -66,8 +66,7 @@
             RIGHT_REINFORCE BELT_CODE_RIGHT_CODE,
             TYPE_GLUE TYPE_ADHESIVE_CODE,
             DEL_FLAG IS_DELETE,
-            FACTORY_CODE,
-            CREATE_TIME
+            FACTORY_CODE
         FROM MES_CONSTRUCTION_INFO
         WHERE DEL_FLAG = 0
           AND FACTORY_CODE = #{factoryCode}
@@ -99,8 +98,7 @@
             COMPANY_CODE,
             FACTORY_CODE
         FROM MES_BOM_INFO
-        WHERE IS_DELETE = 0
-          AND FACTORY_CODE = #{factoryCode}
+        WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_VERSION = #{dataVersion}
     </select>
 </mapper>
