@@ -1,11 +1,14 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -14,6 +17,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +52,16 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
     private final BaseDao baseDao;
 
     @Override
-    public Map<String,Integer> calculateStructureFrequency() {
+    public List<FactoryMonthPlanProductionFinalResult> getDataList(FactoryMonthPlanProductionFinalResult condition) {
+        QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new QueryWrapper<>();
+        builderCondition(queryWrapper, condition);
+        List<FactoryMonthPlanProductionFinalResult> dataList = this.baseMapper.selectList(queryWrapper);
+        dealList(dataList);
+        return dataList;
+    }
+
+    @Override
+    public Map<String, Integer> calculateStructureFrequency() {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
@@ -57,14 +70,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
-        if(CollectionUtils.isEmpty(list)){
+        if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyMap();
         }
-        Map<String,Integer> structureFrequencyMap = Maps.newHashMap();
-        Map<String,List<FactoryMonthPlanProductionFinalResult>>  map = list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        Map<String, Integer> structureFrequencyMap = Maps.newHashMap();
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> map = list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
         map.forEach((materialCode, value) -> {
             Set<Integer> yearMonths = value.stream().map(FactoryMonthPlanProductionFinalResult::getYearMonth).collect(Collectors.toSet());
-            structureFrequencyMap.put(materialCode,yearMonths.size());
+            structureFrequencyMap.put(materialCode, yearMonths.size());
         });
         return structureFrequencyMap;
     }
@@ -80,7 +93,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
-        if(CollectionUtils.isEmpty(list)){
+        if (CollectionUtils.isEmpty(list)) {
             return BigDecimal.ZERO.intValue();
         }
         Set<Integer> yearMonths = list.stream().map(FactoryMonthPlanProductionFinalResult::getYearMonth).collect(Collectors.toSet());
@@ -97,9 +110,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
             return Collections.emptyMap();
         }
         Date maxDate = stockDates.stream()
-            .filter(Objects::nonNull)
-            .max(Date::compareTo).orElse(null);
-        if(null == maxDate) {
+                .filter(Objects::nonNull)
+                .max(Date::compareTo).orElse(null);
+        if (null == maxDate) {
             return Collections.emptyMap();
         }
         int year = DateUtils.getYear(maxDate);
@@ -170,7 +183,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
 
     @Override
     public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion) {
-        if(null == finalVersion) {
+        if (null == finalVersion) {
             return Collections.emptyList();
         }
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
@@ -187,6 +200,47 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
             return Collections.emptyMap();
         }
         return factoryMonthPlanProdFinals.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getGroupKey));
+    }
+
+    /**
+     * 解析不排产原因
+     *
+     * @param list
+     */
+    private void dealList(List<FactoryMonthPlanProductionFinalResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        Locale language = SecurityUtils.getUserLang();
+        JsonUtils.parseJsonRemarkList(list, language.toString(), "reason");
+    }
+
+    /**
+     * 构建查询条件
+     *
+     * @param queryWrapper 查询构建器
+     * @param condition    查询条件值对象
+     */
+    protected void builderCondition(QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper, FactoryMonthPlanProductionFinalResult condition) {
+        /**
+         * 工厂、年份、月份、需求版本、排产版本、产品品类
+         */
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getFactoryCode()), "FACTORY_CODE", condition.getFactoryCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getYear()), "YEAR", condition.getYear());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getMonth()), "MONTH", condition.getMonth());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getMonthPlanVersion()), "MONTH_PLAN_VERSION", condition.getMonthPlanVersion());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getProductionVersion()), "PRODUCTION_VERSION", condition.getProductionVersion());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getProductTypeCode()), "PRODUCT_TYPE_CODE", condition.getProductTypeCode());
+        /**
+         * 物料相关
+         */
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getMaterialCode()), "MATERIAL_CODE", condition.getMaterialCode());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getMaterialDesc()), "MATERIAL_DESC", condition.getMaterialDesc());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getConstructionStage()), "CONSTRUCTION_STAGE", condition.getConstructionStage());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getBrand()), "BRAND", condition.getBrand());
+        queryWrapper.eq(PubUtil.isNotEmpty(condition.getProSize()), "PRO_SIZE", condition.getProSize());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getSpecifications()), "SPECIFICATIONS", condition.getSpecifications());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getPattern()), "PATTERN", condition.getPattern());
     }
 
     public static void main(String[] args) {
