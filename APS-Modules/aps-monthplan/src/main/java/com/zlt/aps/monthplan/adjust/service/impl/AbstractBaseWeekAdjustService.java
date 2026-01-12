@@ -1032,13 +1032,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 转分组Map
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> planGroupMap = convertToPlanGroupMap(planList);
         Map<String, List<MpMonthPlanMonitor>> monitorGroupMap = convertToMonitorGroupMap(monitorList);
-        // 获取当前日期 + 锁定3天的日期，计算目标天数（如：5号+3天=7号，包含当天）
+        // 获取当前日期所属月份的最大天数
         LocalDate currentDate = LocalDate.now();
-        LocalDate targetDate = currentDate.plus(BusiConstant.WeekRollAdjust.LOCK_DAYS, ChronoUnit.DAYS).minusDays(1);
-        int targetDay = targetDate.getDayOfMonth();
-        // 目标天数不超过当月最大天数
         int maxDayOfMonth = currentDate.lengthOfMonth();
-        targetDay = Math.min(targetDay, maxDayOfMonth);
         // 遍历目标列表，计算赋值
         for (MpAdjustDetailVo adjust : adjustList) {
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
@@ -1047,7 +1043,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             String materialCode = adjust.getMaterialCode();
             // 计算：day1~targetDay的累计值
-            Integer totalScheduledQty = calculateQty(planGroupMap, materialCode, targetDay);
+            Integer totalScheduledQty = calculateQty(planGroupMap, materialCode, maxDayOfMonth);
             // 获取已生产量（空值按0处理）
             Integer productionQty = 0;
             if (PubUtil.isNotEmpty(monitorGroupMap)) {
