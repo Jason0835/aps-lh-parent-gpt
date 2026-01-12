@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
@@ -45,10 +46,14 @@ public class CxContinueProductionHandler {
      */
     public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        //取得最早收尾的硫化组
-        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context);
+        String groupName = productionPlanInfo.getGroupName();
+        Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
+        String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
+        //取得最早收尾的续作硫化组
+        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap);
         if (null == earliestConclusionLhGroup) {
-            //todo 记录日志
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, groupName, onLineMachineInfo, continueType));
             return;
         }
         Integer startDay = earliestConclusionLhGroup.getClosingDay();
@@ -87,7 +92,7 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return;
         }
-        log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, productionPlanInfo.getGroupName(), materialDesc, continueType, selectedMaterialDesc));
+        log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, groupName, materialDesc, continueType, selectedMaterialDesc));
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //总排产量
         Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(selectedProductionPlanList);

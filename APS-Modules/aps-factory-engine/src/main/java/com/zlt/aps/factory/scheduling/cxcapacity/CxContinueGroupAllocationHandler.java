@@ -38,7 +38,8 @@ import java.util.stream.Collectors;
 public class CxContinueGroupAllocationHandler {
 
     /**
-     * 对在机分组进行在机机台产能分配，并排产其续作部分
+     * 对在机分组进行在机机台产能分配
+     * 通过模拟排产其续作部分来确定
      * TBR 分组为结构
      * PCR 分组为英寸
      *
@@ -55,6 +56,7 @@ public class CxContinueGroupAllocationHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, MouldShellBaseInfoVo> mouldShellMap = productionContext.getBaseDataContainer().getMouldShellMap();
         List<CxMachineAllocationPlanHelper> allAllocationResult = new ArrayList<>();
+        //按在机结构分组--排产在机结构的续作Sku在 在产机台的排产，并得到各在产机台的产能分配
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(structureName);
             if (null == groupPlan) {
