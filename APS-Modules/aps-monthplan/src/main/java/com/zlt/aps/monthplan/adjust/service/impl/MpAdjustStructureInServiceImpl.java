@@ -105,7 +105,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     public List<MpStructureAllocation> selectMpStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
         QueryWrapper<MpStructureAllocation> wrapper = new QueryWrapper<>();
         wrapper.eq( "FACTORY_CODE", contextDTO.getFactoryCode());
-        wrapper.eq("PRODUCTION_VERSION", contextDTO.getMonthPlanVersion());
+        wrapper.eq("PRODUCTION_VERSION", contextDTO.getProductionVersion());
         return structureAllocationEntityMapper.selectList(wrapper);
     }
 
