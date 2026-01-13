@@ -366,7 +366,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             }
             String key = demandPlan.getMonthPlanVersionKey();
             DpDemandPlan result = saleDemandMap.get(key);
-            Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, new HashMap<>());
+            Map<String,Integer> stockMap = stockQtyMap.getOrDefault(demandPlan.getGroupFactoryAndMaterialKey(), new HashMap<>());
             if (null == result) {
                 result = new DpDemandPlan();
                 BeanUtils.copyProperties(demandPlan, result);
