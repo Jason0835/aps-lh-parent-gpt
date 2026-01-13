@@ -87,6 +87,7 @@ public class SaleRequirePlanHelper {
                 long totalDemand = highSaleOrders.stream()
                     .mapToLong(DpOrderOffsetDetail::getProduceQtyDue)
                     .sum();
+                log.info("highPriority:{},totalCapacity:{}:",totalDemand,totalCapacity);
                 // 调整优先级
                 if (totalDemand > totalCapacity) {
                     processDemandHighPriorityExcludingLast(highSaleOrders, totalDemand - totalCapacity);
