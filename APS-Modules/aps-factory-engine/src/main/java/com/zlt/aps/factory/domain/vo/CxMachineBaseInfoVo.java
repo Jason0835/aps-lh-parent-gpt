@@ -262,7 +262,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
         Set<String> materialCodePlanSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
-        Set<String> fixedMaterialCodeSet = Stream.of(disableMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        Set<String> fixedMaterialCodeSet = Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet());
         for (String materialCode : materialCodePlanSet) {
             if (fixedMaterialCodeSet.contains(materialCode)) {
                 return CxMachineFixedPriorityEnum.FIXED_SKU;
