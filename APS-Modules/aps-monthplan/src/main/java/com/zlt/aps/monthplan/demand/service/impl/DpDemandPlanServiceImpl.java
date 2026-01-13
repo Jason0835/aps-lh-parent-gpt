@@ -120,13 +120,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     @Override
     protected String getDocTypeCode() {
-        return "2025122521";
+        return "0802";
     }
 
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
-        sysDocType.setDocTypeCode("2025122521");
+        sysDocType.setDocTypeCode("0802");
         return sysDocType;
     }
 
@@ -683,7 +683,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 处理净需求
         if (CollectionUtils.isNotEmpty(netDemands)) {
             List<MdmAreaCapaAllocation> areaCapaAllocations =
-                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth(),netDemands.get(0).getFactoryCode());
+                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth(),netDemands.get(0).getFactoryCode(), this.getDocTypeCode());
             demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(createCondition,netDemands,areaCapaAllocations));
         }
         // 处理暂缓订单
