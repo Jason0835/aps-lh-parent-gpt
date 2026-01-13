@@ -133,8 +133,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     public Set<String> findPredictionVersion(MpProductionPrediction queryCondition) {
         LambdaQueryWrapper<MpProductionPrediction> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpProductionPrediction::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(MpProductionPrediction::getMonthPlanVersion, queryCondition.getMonthPlanVersion());
-        wrapper.eq(MpProductionPrediction::getProductionVersion, queryCondition.getProductionVersion());
+        wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
+        wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
