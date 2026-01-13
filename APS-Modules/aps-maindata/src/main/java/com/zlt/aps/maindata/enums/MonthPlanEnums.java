@@ -176,7 +176,12 @@ public enum MonthPlanEnums {
     /**
      * SYS0205007 单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值
      */
-    LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205007","单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值");
+    LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205007","单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值"),
+
+    /**
+     * SYS0208001 净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能
+     */
+    NET_REQUIREMENT_DAY_CAPACITY("SYS0208001", "净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能");
 
     private final String code;
     private final String name;
