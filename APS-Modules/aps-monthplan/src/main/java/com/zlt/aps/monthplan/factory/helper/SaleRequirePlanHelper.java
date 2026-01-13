@@ -129,9 +129,6 @@ public class SaleRequirePlanHelper {
             // 检查当前累加值是否已经达到或超过阈值
             // 注意：先检查，再累加
             long currentOrderQty = order.getProduceQtyDue();
-            if(accumulatedQty + currentOrderQty > overAreaCapacityValue &&  accumulatedQty < overAreaCapacityValue) {
-                break;
-            }
             // 相当于调整某个订单时候，加上这个订单量大于总产能，但是减去这个订单量小于总产能情况，这个订单不需要调整为中优先级
             if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
                 break;
