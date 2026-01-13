@@ -252,7 +252,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
                     MdmAreaCapaAllocation allocation = list.get(i);
                     BigDecimal areaCapacity = BigDecimal.ZERO;
                     if (i == list.size() - 1) {
-                        areaCapacity = totalAreaCapacity.subtract(areaCapacity);
+                        areaCapacity = BigDecimal.valueOf(totalCapacity).subtract(areaCapacity);
                     }else {
                         areaCapacity = allocation.getCapacityAllocation().multiply(totalAreaCapacityRate).setScale(0, RoundingMode.UP);
                     }

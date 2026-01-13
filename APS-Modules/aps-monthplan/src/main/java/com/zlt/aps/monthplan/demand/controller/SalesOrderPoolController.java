@@ -222,7 +222,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productType")), "PRODUCT_TYPE", queryVO.getFieldValueByFieldName("productType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
-        queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("area")),"SELECT 0 FROM T_DP_AREA t WHERE t.AREA_CODE = T_DP_SALES_ORDER_POOL.AREA AND REMARK like concat('%', {0}, '%')", queryVO.getFieldValueByFieldName("area"));
+        queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("area")),"SELECT 0 FROM T_DP_AREA t WHERE t.AREA_CODE = T_DP_SALES_ORDER_POOL.AREA AND AREA_NAME like concat('%', {0}, '%')", queryVO.getFieldValueByFieldName("area"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCode")), "SAL_CODE", queryVO.getFieldValueByFieldName("salCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salNCode")), "SAL_N_CODE", queryVO.getFieldValueByFieldName("salNCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("natCode")), "NAT_CODE", queryVO.getFieldValueByFieldName("natCode"));

@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.adjust.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureLog;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,5 +20,15 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MpAdjustStructureLogEntityMapper extends CommBaseMapper<MpAdjustStructureLog> {
-
+    /**
+     * 通过版本删除调整结果
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @param version
+     */
+    void deleteAdjustLogByVersion(@Param("factoryCode") String factoryCode,
+                                     @Param("year") String year,
+                                     @Param("month") String month,
+                                     @Param("version") String version);
 }

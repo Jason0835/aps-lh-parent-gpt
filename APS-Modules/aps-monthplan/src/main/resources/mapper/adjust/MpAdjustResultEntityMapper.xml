@@ -4,4 +4,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper">
 
+    <delete id="deleteAdjustResultByVersion" parameterType="String">
+        DELETE FROM T_MP_ADJUST_RESULT
+        WHERE FACTORY_CODE = #{factoryCode} AND YEAR= #{year} AND MONTH= #{month}
+        AND VERSION= #{version}
+    </delete>
 </mapper>

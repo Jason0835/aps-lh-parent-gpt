@@ -112,7 +112,7 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
     @ApiOperation("新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少")
     @PostMapping("/queryStockUpByMaterialCode")
     @ResponseBody
-    public AjaxResult queryStockUpByMaterialCode(@RequestBody SupplyOrderPool supplyOrderPool){
+    public AjaxResult queryStockUpByMaterialCode(SupplyOrderPool supplyOrderPool){
         return AjaxResult.success(iSupplyOrderPoolService.queryStockUpByMaterialCode(supplyOrderPool));
     }
 
