@@ -129,7 +129,7 @@ public class SaleRequirePlanHelper {
             } else {
                 // 累加净需求量并设置优先级
                 accumulatedQty += currentOrderQty;
-                order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
+                // order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
             }
         }
     }
