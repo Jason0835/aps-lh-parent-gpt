@@ -21,4 +21,8 @@ public class MpAdjustDetailVo extends MpAdjustStructureIn {
     @TableField(exist = false)
     private Integer ordQty;
 
+    @ApiModelProperty(value = "是否试制量试")
+    @TableField(exist = false)
+    private String isTrial;
+
 }

@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DictUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -16,6 +17,7 @@ import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +49,7 @@ import com.ruoyi.common.exception.ServiceException;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPoolSnapshot>  implements IDpOrderPoolSnapshotService {
-
+    private final static String DICT_TYPE_BRAND = "biz_brand_type";
     private final DpOrderPoolSnapshotEntityMapper dpOrderPoolSnapshotEntityMapper;
     @Override
     protected String getDocTypeCode() {
@@ -138,6 +140,9 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         BeanUtils.copyProperties(supplyOrder, entity);
         entity.setId(null);
         entity.setBaseVale(null);
+        if(StringUtils.isNotBlank(supplyOrder.getBrand())) {
+            entity.setBrand(DictUtils.getLabel(DICT_TYPE_BRAND,supplyOrder.getBrand()));
+        }
         entity.setYear(yearMonth.getYear());
         entity.setMonth(yearMonth.getMonthValue());
         entity.setMonthPlanVersion(predictionVersion);
