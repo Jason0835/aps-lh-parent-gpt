@@ -643,7 +643,7 @@ constantRoutes.push(
         path: "console/productionMonthPlanInit/:id",
         component: () => import("@/views/monthPlanManagement/console/productionMonthPlanInit"),
         name: "ProductionMonthPlanInit",
-        meta: { title: "初始化" },
+        meta: { title: "排结构明细" },
       }],
   },
   {

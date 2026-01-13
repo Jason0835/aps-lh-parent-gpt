@@ -251,6 +251,7 @@ export default {
           prop: "areaCode",
           label: this.$t("common.area"),
           type: "select",
+          filterable: true,
           dictData:this.areaDist
         },
       ];

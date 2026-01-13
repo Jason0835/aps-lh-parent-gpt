@@ -85,6 +85,7 @@ export default {
     "biz_channel_type",
     "biz_brand_type",
     "biz_construction_stage",
+    "biz_plan_type",
   ],
   provide() {
     return {
@@ -113,8 +114,9 @@ export default {
       let columns = [
         // { type: "selection", fixed: "left" },
         {
-          label: this.$t("ui.data.column.productionMonthPlanInit.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
+          width: 120,
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -125,285 +127,101 @@ export default {
         {
           prop: "year",
           label: this.$t("common.year"),
+          width: 120,
         },
 
         {
           prop: "month",
           label: this.$t("common.month"),
+          width: 120,
         },
         {
           prop: "monthPlanVersion",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.monthPlanVersion"
-          ),
-          width:140,
-        },
-        {
-          prop: "productionVersion",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.productionVersion"
-          ),
+          label: this.$t("需求计划版本"),
           width: 140,
         },
         {
-          prop: "constructionStage",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.constructionStage"
-          ),
+          prop: "productionVersion",
+          label: this.$t("排产版本号"),
+          width: 140,
+        },
+        {
+          prop: "planType",
+          label: this.$t("计划类型"),
+          with: 120,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(
-              this.dict.type.biz_construction_stage,
-              value
-            );
+            return this.selectDictLabel(this.dict.type.biz_plan_type, value);
           },
         },
 
         {
-          prop: "productCode",
-          label: this.$t("ui.data.column.productionMonthPlanInit.productCode"),
+          prop: "structureName",
+          with: 120,
+          label: this.$t("产品结构"),
         },
         {
-          prop: "productDesc",
-          label: this.$t("ui.data.column.productionMonthPlanInit.productDesc"),
-          width: 250,
+          prop: "cxMachineCode",
+          label: this.$t("成型机编码"),
+          width: 120,
         },
         {
-          prop: "locationType",
-          label: this.$t("ui.data.column.productionMonthPlanInit.locationType"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
-          },
+          prop: "maxEmbryoCodeCount",
+          label: this.$t("最大胎胚种类数"),
+          with: 120,
         },
         {
-          prop: "channel",
-          label: this.$t("ui.data.column.productionMonthPlanInit.channel"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_channel_type, value);
-          },
+          prop: "maxLhMachineCount",
+          label: this.$t("最大硫化机台数"),
+          with: 120,
         },
         {
-          prop: "brand",
-          label: this.$t("ui.data.column.productionMonthPlanInit.brand"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
-          },
+          prop: "minLhMachineCount",
+          label: this.$t("实单最低硫化机台数"),
+          with: 120,
         },
         {
-          prop: "productTypeCode",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.productTypeCode"
-          ),
-          formatter: (row) => {
-            return row.productTypeName;
-          },
+          prop: "netQty",
+          label: this.$t("排产净需求"),
+          with: 120,
         },
         {
-          prop: "proSize",
-          label: this.$t("ui.data.column.productionMonthPlanInit.proSize"),
+          prop: "lossQty",
+          label: this.$t("排产净需求(含损耗)"),
+          with: 120,
         },
         {
-          prop: "specifications",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.specifications"
-          ),
-          width: 100,
-        },
-        {
-          prop: "pattern",
-          label: this.$t("ui.data.column.productionMonthPlanInit.pattern"),
-          width: 140,
-        },
-        {
-          prop: "prodReqPlan",
-          label: this.$t("ui.data.column.productionMonthPlanInit.prodReqPlan"),
-        },
-        {
-          prop: "factProdReqQty",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.factProdReqQty"
-          ),
-        },
-        {
-          prop: "isContinue",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isContinue"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "isImportantCustom",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.isImportantCustom"
-          ),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "isEnsurePlan",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isEnsurePlan"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "isEmergency",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isEmergency"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "isDebitPlan",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isDebitPlan"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "deliveryDateDue",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.deliveryDateDue"
-          ),
+          prop: "beginDay",
+          label: this.$t("开始日期"),
           width: 180,
         },
         {
-          prop: "isStockUp",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isStockUp"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
+          prop: "endDay",
+          label: this.$t("结束日期"),
+          width: 180,
         },
         {
-          prop: "profitGrade",
-          label: this.$t("ui.data.column.productionMonthPlanInit.profitGrade"),
-        },
-        {
-          prop: "isFactoryProduction",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.isFactoryProduction"
-          ),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "curingTime",
-          label: this.$t("ui.data.column.productionMonthPlanInit.curingTime"),
-        },
-        {
-          prop: "productionSequence",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.productionSequence"
-          ),
-        },
-        {
-          prop: "mouldQty",
-          label: this.$t("ui.data.column.productionMonthPlanInit.mouldQty"),
-        },
-        {
-          prop: "mouldFullQty",
-          label: this.$t("ui.data.column.productionMonthPlanInit.mouldFullQty"),
-        },
-        {
-          prop: "productionQty",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.productionQty"
-          ),
-        },
-        {
-          prop: "isProduction",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isProduction"),
-          align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "noProductionReason",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.noProductionReason"
-          ),
+          prop: "allotDays",
+          label: this.$t("分配天数"),
+          with: 120,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
-          width: 200,
+          label: this.$t("备注"),
+          with: 120,
         },
-        // {
-        //   align: "center",
-        //   halign: "center",
-        //   label: this.$t("ui.data.btn.option"),
-        //   render: ({ row }) => {
-        //     return (
-        //       <el-button
-        //         class="minus"
-        //         type="success"
-        //         onClick={() => this.handleEdit(row)}
-        //       >
-        //         {this.$t("ui.frame.btn.update")}
-        //       </el-button>
-        //     );
-        //   },
-        // },
       ];
 
       return columns;
     },
     searchColumns() {
       return [
-        {
-          prop: "productCode",
-          label: this.$t("ui.data.column.productionMonthPlanInit.productCode"),
+      {
+          prop: "structureName",
+          label: this.$t("产品结构"),
         },
         {
-          prop: "productDesc",
-          label: this.$t("ui.data.column.productionMonthPlanInit.productDesc"),
-        },
-        {
-          prop: "locationType",
-          label: this.$t("ui.data.column.productionMonthPlanInit.locationType"),
-          type: "select",
-          dictData: this.dict.type.biz_stor_type,
-        },
-        {
-          prop: "channel",
-          label: this.$t("ui.data.column.productionMonthPlanInit.channel"),
-          type: "select",
-          dictData: this.dict.type.biz_channel_type,
-        },
-        {
-          prop: "brand",
-          label: this.$t("ui.data.column.productionMonthPlanInit.brand"),
-          type: "select",
-          dictData: this.dict.type.biz_brand_type,
-        },
-        {
-          prop: "proSize",
-          label: this.$t("ui.data.column.productionMonthPlanInit.proSize"),
-        },
-        {
-          prop: "specifications",
-          label: this.$t(
-            "ui.data.column.productionMonthPlanInit.specifications"
-          ),
-        },
-        {
-          prop: "pattern",
-          label: this.$t("ui.data.column.productionMonthPlanInit.pattern"),
-        },
-        {
-          prop: "isProduction",
-          label: this.$t("ui.data.column.productionMonthPlanInit.isProduction"),
-          type: "select",
-          dictData: this.dict.type.biz_yes_no,
+          prop: "cxMachineCode",
+          label: this.$t("成型机编码"),
         },
       ];
     },
@@ -533,13 +351,20 @@ export default {
     },
   },
   created() {
-    if (this.$route.params.id) {
-      this.version = this.$route.params.id;
+    if (this.$route.query) {
+      let defaultParams = {
+        ...this.$route.query,
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
     }
-  },
-  activated() {
     this.getList();
   },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

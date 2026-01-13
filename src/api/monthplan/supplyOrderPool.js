@@ -52,3 +52,12 @@ export function queryRelationByMaterialCode(query) {
   })
 }
 
+
+export function cyclicSchedulingTips(query) {
+  return request({
+    url: '/monthplan/supplyOrderPool/queryStockUpByMaterialCode',
+    method: 'post',
+    data: query
+  })
+}
+

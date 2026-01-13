@@ -34,16 +34,17 @@ import { mapState } from "vuex";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import structureSelect from "@/views/components/structureSelect.vue";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
-import {
-  editCxMachineFixed
-} from "@/api/monthplan/mdmCxMachineFixed";
-
+import { editCxMachineFixed } from "@/api/monthplan/mdmCxMachineFixed";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-
 export default {
-  components: { infoForm,materialCodeSelect,structureSelect ,formingCapacitySelect},
+  components: {
+    infoForm,
+    materialCodeSelect,
+    structureSelect,
+    formingCapacitySelect,
+  },
   inject: ["parentDict"],
   data() {
     return {
@@ -52,6 +53,7 @@ export default {
       isEdit: false,
       editType: null,
       form: {},
+      oldFixedStructure1:[],
       rules: {
         factoryCode: [
           {
@@ -103,15 +105,13 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     title: function () {
-      return (
-        (this.isEdit
-          ? this.$t("common.button.edit")
-          : this.$t("common.button.add"))
-      );
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
     columns() {
       return [
-      {
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -259,11 +259,18 @@ export default {
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
     },
-    handleMaterialCodeChange(val, row) {
+    handleStructure1Change(val, row) {
       if (val) {
-        this.$set(this.form, "disableMaterialCode", val);
+        // let odlList = this.form.fixedStructure1
+        //   ? this.form.fixedStructure1.split(",")
+        //   : [];
+        // let newList = val.split(",");
+        // const merged = [...odlList, ...newList];
+        // const unique = [...new Set(merged)];
+        // let resultList = unique.join(",");
+       this.oldFixedStructure1=row
       } else {
-        this.$set(this.form, "disableMaterialCode", '');
+       this.oldFixedStructure1=[]
       }
     },
   },

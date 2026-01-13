@@ -35,6 +35,7 @@ import {
   saveSupplyOrderPool,
   queryRelationByMaterialCode,
   checkSupplyOrderPool,
+  cyclicSchedulingTips,
 } from "@/api/monthplan/supplyOrderPool";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
@@ -132,7 +133,6 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
-
       return [
         {
           prop: "factoryCode",
@@ -176,6 +176,9 @@ export default {
           prop: "qty",
           label: this.$t("ui.data.defectiveStock.qty"),
           type: "number",
+          listeners: {
+            blur: this.handleQtyBlur,
+          },
           min: 0,
           max: 99999999,
         },
@@ -234,12 +237,7 @@ export default {
           disabled: true,
           type: "number",
         },
-        // {
-        //   prop: "nightOverdueStockQty",
-        //   label: this.$t("ui.data.defectiveStock.nightOverdueStockQty"),
-        //   disabled: true,
-        //   type: "number",
-        // },
+
         {
           prop: "twelveOverdueStockQty",
           label: this.$t("ui.data.defectiveStock.twelveOverdueStockQty"),
@@ -260,6 +258,20 @@ export default {
     },
   },
   methods: {
+    async handleQtyBlur() {
+      try {
+        let arr = this.form.yearMonth.split("-");
+        let res = await cyclicSchedulingTips({
+          factoryCode: this.form.factoryCode,
+          materialCode: this.form.materialCode,
+          year:  arr[0],
+          month:  arr[1],
+        });
+        console.log(res)
+      } catch (err) {
+        console.log(err)
+      }
+    },
     async blurMaterialCode() {
       let res = await queryRelationByMaterialCode({
         materialCode: this.form.materialCode,
@@ -309,12 +321,11 @@ export default {
         type: "warning",
       })
         .then(() => {
-          this.confirmSave(params)
+          this.confirmSave(params);
         })
         .catch((action) => {
           this.hide();
           // 用户点击"取消"
-
         });
     },
 

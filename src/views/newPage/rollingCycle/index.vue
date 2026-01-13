@@ -784,7 +784,7 @@ export default {
           params.productionVersion = row.productionVersion;
           let res = await getStructureDetail(params);
           this.expands.push(row ? row.id : []);
-          this.subTableData = res.rows
+          this.subTableData = res.rows;
         } catch (err) {}
 
         console.log("展开");
@@ -830,11 +830,10 @@ export default {
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
-          params.year = arr[0];
-          params.month = arr[1];
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        console.log(params);
         let res = await autoAdjust(params);
         if (res.rows) {
           this.data = res.rows;
@@ -843,20 +842,12 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
+        this.activeName = "three";
       } catch (err) {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
       }
-
-      // setTimeout(() => {
-      //   this.show = true;
-      // }, 1000);
-      // this.$router.push("/new/rollingCycleResult");
-      // // if (this.$refs.resultRef) {
-      // //   this.$refs.resultRef.show(true);
-      // // }
-      this.activeName = "three";
     },
     handleShowSpecial() {
       if (this.$refs.specialRef) {

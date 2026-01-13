@@ -154,6 +154,7 @@ export default {
       if (this.multiple) {
         list.unshift({
           type: "selection",
+          reserveSelection:true
         });
       }
 

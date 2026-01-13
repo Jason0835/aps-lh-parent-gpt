@@ -266,7 +266,7 @@ export default {
                 </div>
                 <div>
                   <text-button
-                  //onClick={() => this.handleInitDetail(row)}
+                  onClick={() => this.handleInitDetail(row)}
                   >
                     {this.$t("明细")}
                   </text-button>
@@ -567,6 +567,12 @@ export default {
     handleInitDetail(row) {
       this.$router.push({
         path: `./console/productionMonthPlanInit/${row.initVersion}`,
+        query: {
+          year:row.year,
+          month: row.month,
+          factoryCode: row.factoryCode,
+          monthPlanVersion: row.monthPlanVersion,
+        }
       });
     },
     handleMould(row) {

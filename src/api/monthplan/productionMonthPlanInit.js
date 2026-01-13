@@ -3,7 +3,7 @@ import request, { downloadLink } from '@/utils/request'
 // =
 export function listProductionMonthPlanInit(query) {
   return request({
-    url: '/monthplan/productionMonthPlanInit/list',
+    url: '/monthplan/mpStructureAllocation/list',
     method: 'post',
     data: query
   })

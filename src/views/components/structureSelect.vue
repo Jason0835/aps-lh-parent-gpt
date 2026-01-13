@@ -54,6 +54,7 @@ export default {
     factoryCode: String | Number,
     machineType: String | Number,
     label: String,
+    oldList: Array|[],
     multiple: {
       type: Boolean,
       default: false,
@@ -79,6 +80,7 @@ export default {
       },
       query: {},
       showValue: "",
+
       loading: false,
       valueProp: "structureName",
       labelProp: "structureName",
@@ -116,6 +118,7 @@ export default {
       if (this.multiple) {
         list.unshift({
           type: "selection",
+          reserveSelection:true
         });
       }
 
@@ -125,6 +128,7 @@ export default {
 
   watch: {
     value: function (val) {
+      console.log("value", val);
       if (!val) {
         this.showValue = "";
       }
@@ -146,6 +150,20 @@ export default {
         const data = await selectSkuStructure(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
+        // this.$nextTick(()=>{
+        //   if(this.oldList&&this.oldList.length>0){
+        //     const tableRef = this.$refs.tableRef.getTableRef();
+        //     this.oldList.forEach(item=>{
+        //       const row = this.data.find(row=>row.structureName===item.structureName)
+        //       console.log('item',item)
+        //       console.log('row',row)
+        //       if(row){
+        //         tableRef.toggleRowSelection(row,true)
+        //       }
+        //       // tableRef.toggleRowSelection(item,true)
+        //     })
+        //   }
+        // })
       } catch (error) {
         console.log(error);
       } finally {
@@ -194,7 +212,6 @@ export default {
     },
 
     handleShow() {
-      console.log("sss");
       let defaultParams = {
         factoryCode: this.factoryCode ? this.factoryCode : "116",
       };
@@ -204,7 +221,6 @@ export default {
       this.query = {
         ...defaultParams,
       };
-      console.log(this.query);
       this.getList();
     },
     handleCancel() {
@@ -258,6 +274,7 @@ export default {
           this.showValue = this.selection
             .map((item) => item[this.labelProp])
             .join(",");
+            console.log(this.oldList)
           this.$emit("updateValue", ids);
           this.$emit("change", ids, deepClone(this.selection));
         }
