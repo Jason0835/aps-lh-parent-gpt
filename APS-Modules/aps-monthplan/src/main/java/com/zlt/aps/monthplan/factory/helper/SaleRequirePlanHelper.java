@@ -81,22 +81,66 @@ public class SaleRequirePlanHelper {
                     .mapToLong(item -> item.getCapacityAllocation().longValue())
                     .sum();
 
-            long totalDemand = sortedOrders.stream()
+
+            List<DpOrderOffsetDetail> highSaleOrders = sortedOrders.stream().filter(item -> ApsConstant.SAL_PRIORITY_HIGHT.equals(item.getScmPriority())).collect(Collectors.toList());
+            if(!CollectionUtils.isEmpty(highSaleOrders)) {
+                long totalDemand = highSaleOrders.stream()
                     .mapToLong(DpOrderOffsetDetail::getProduceQtyDue)
                     .sum();
-
-            // 调整优先级
-            if (totalDemand >= totalCapacity) {
-                processDemandPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
-            } else {
-                sortedOrders.forEach(order ->
+                // 调整优先级
+                if (totalDemand > totalCapacity) {
+                    processDemandHighPriorityExcludingLast(highSaleOrders, totalDemand - totalCapacity);
+                } else {
+                    sortedOrders.stream().filter(item -> ApsConstant.SAL_PRIORITY_MID.equals(item.getScmPriority())).forEach(order ->
                         order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+                }
+            }else{
+                List<DpOrderOffsetDetail> midSaleOrders = sortedOrders.stream().filter(item -> ApsConstant.SAL_PRIORITY_MID.equals(item.getScmPriority())).collect(Collectors.toList());
+                if(!CollectionUtils.isEmpty(midSaleOrders)) {
+                    long totalDemand = midSaleOrders.stream()
+                        .mapToLong(DpOrderOffsetDetail::getProduceQtyDue)
+                        .sum();
+                    // 调整优先级
+                    if (totalDemand > totalCapacity) {
+                        processDemandMidPriorityExcludingLast(highSaleOrders, totalDemand - totalCapacity);
+                    }
+                }
+
             }
 
             result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
         });
 
         return result;
+    }
+
+    private static void processDemandMidPriorityExcludingLast(List<DpOrderOffsetDetail> sortedOrders, long overAreaCapacityValue) {
+        if (org.apache.commons.collections.CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
+            return;
+        }
+        long accumulatedQty = 0;
+        // 从列表尾端开始遍历
+        for (int i = sortedOrders.size() - 1; i >= 0; i--) {
+            DpOrderOffsetDetail order = sortedOrders.get(i);
+            // 跳过已处理或无效的订单
+            if (order == null || order.getProduceQtyDue() == null || order.getProduceQtyDue() <= 0) {
+                continue;
+            }
+            // 检查当前累加值是否已经达到或超过阈值
+            // 注意：先检查，再累加
+            long currentOrderQty = order.getProduceQtyDue();
+            if(accumulatedQty + currentOrderQty > overAreaCapacityValue &&  accumulatedQty < overAreaCapacityValue) {
+                break;
+            }
+            // 相当于调整某个订单时候，加上这个订单量大于总产能，但是减去这个订单量小于总产能情况，这个订单不需要调整为中优先级
+            if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
+                break;
+            } else {
+                // 累加净需求量并设置优先级
+                accumulatedQty += currentOrderQty;
+                order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT);
+            }
+        }
     }
 
     /**
@@ -106,7 +150,7 @@ public class SaleRequirePlanHelper {
      * @param sortedOrders          排序后的净需求列表
      * @param overAreaCapacityValue 超出区域产能值
      */
-    private static void processDemandPriorityExcludingLast(
+    private static void processDemandHighPriorityExcludingLast(
             List<DpOrderOffsetDetail> sortedOrders,
             long overAreaCapacityValue) {
 
@@ -125,7 +169,7 @@ public class SaleRequirePlanHelper {
             // 注意：先检查，再累加
             long currentOrderQty = order.getProduceQtyDue();
             if(accumulatedQty + currentOrderQty > overAreaCapacityValue &&  accumulatedQty < overAreaCapacityValue) {
-                continue;
+                break;
             }
             // 相当于调整某个订单时候，加上这个订单量大于总产能，但是减去这个订单量小于总产能情况，这个订单不需要调整为中优先级
             if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
