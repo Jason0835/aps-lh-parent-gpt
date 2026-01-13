@@ -268,6 +268,7 @@ export default {
           month:  arr[1],
         });
         console.log(res)
+        this.$modal.msgWarning(res.data.msg);
       } catch (err) {
         console.log(err)
       }

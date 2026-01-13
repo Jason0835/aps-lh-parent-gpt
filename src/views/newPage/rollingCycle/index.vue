@@ -6,6 +6,7 @@
       ref="tableRef"
       :calcHeight="true"
       v-loading="loading"
+      element-loading-text="正在获取调整订单，请稍候!"
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
@@ -204,7 +205,7 @@ export default {
           },
           {
             prop: "hasSpecialMaterial",
-            label: this.$t("是否含材料"),
+            label: this.$t("是否含特殊材料"),
             width: 120,
             formatter: (row, column, value) => {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -399,44 +400,73 @@ export default {
         ];
       }
       if (this.activeName == "three") {
-        return [
+        let list= [
           {
-            prop: "formingMachine",
+            prop: "cxMachineCode",
             label: this.$t("成型机台"),
+            width: 120,
           },
           {
-            prop: "productStructure",
+            prop: "structureName",
             label: this.$t("产品结构"),
+            width: 180,
           },
           {
-            prop: "planQuantity",
-            label: this.$t("NC物料编码"),
+            prop: "materialCode",
+            label: this.$t("物料编码"),
+            width: 120,
+          },
+          {
+            prop: "materialDesc",
+            label: this.$t("物料描述"),
+            width: 320,
+          },
+          {
+            prop: "hasSpecialMaterial",
+            label: this.$t("是否含特殊材料"),
+            width: 120,
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
+          },
+          {
+            prop: "totalPlanQty",
+            label: this.$t("计划量"),
+            width: 120,
           },
           {
             prop: "startDate",
-            label: this.$t("物料描述"),
+            label: this.$t("开始日期"),
+            width: 120,
           },
           {
             prop: "endDate",
-            label: this.$t("是否含材料"),
-          },
-          {
-            prop: "adjustPlanQuantity",
-            label: this.$t("计划量"),
-          },
-          {
-            prop: "adjustStartDate",
-            label: this.$t("开始日期"),
-          },
-          {
-            prop: "adjustEndDate",
             label: this.$t("结束日期"),
+            width: 120,
           },
           {
             prop: "adjustEndDate",
+            width: 120,
             label: this.$t("锁定上机日期"),
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
           },
+
         ];
+        const days = 31;
+        for (let i = 0; i < days; i++) {
+            list.push({
+              label: `${i + 1}号`,
+              // label: this.$t("ui.data.column.mouldingDayResult.day", {
+              //   day: i + 1,
+              // }),
+              prop: `day${i + 1}`,
+              minWidth: "80px",
+              type: "number",
+            });
+          }
+        return list;
       }
       if (this.activeName == "result") {
         return [
@@ -458,7 +488,7 @@ export default {
           },
           {
             prop: "hasSpecialMaterial",
-            label: this.$t("是否含材料"),
+            label: this.$t("是否含特殊材料"),
             formatter: (row, column, value) => {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
@@ -723,20 +753,34 @@ export default {
       } else {
         this.activeName = "second";
       }
+      this.getList();
     },
     //确认调整结果
     async confirmResult() {
       try {
-        let res = await confirmAdjust({
-          adjustResultList: JSON.stringify(this.data),
+        let params = {
+          ...this.query,
+          ...this.sort,
           adjustType: this.adjustType,
-        });
+          version: this.data[0]?.version,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        let res = await confirmAdjust(params);
+        this.show=false
+        this.$modal.msgSuccess(res.msg);
+        this.backPlan();
         console.log(res);
       } catch (err) {}
     },
     //获取调整订单
     async adjustOrder() {
       try {
+        this.loading = true;
         this.getLoading = true;
         let params = {
           ...this.query,
@@ -760,8 +804,11 @@ export default {
           this.data = res.rows;
         }
         this.getLoading = false;
+        this.getVersionList();
+        this.loading = false;
       } catch (err) {
         this.getLoading = false;
+        this.loading = false;
       }
     },
     async handleExpandChange(row, expandedRows) {
@@ -835,15 +882,15 @@ export default {
           params.yearMonth = "";
         }
         let res = await autoAdjust(params);
-        if (res.rows) {
-          this.data = res.rows;
-        }
+        console.log(res);
+        this.data = res;
         // this.data=res.rows
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
         this.activeName = "three";
       } catch (err) {
+        console.log(err)
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
