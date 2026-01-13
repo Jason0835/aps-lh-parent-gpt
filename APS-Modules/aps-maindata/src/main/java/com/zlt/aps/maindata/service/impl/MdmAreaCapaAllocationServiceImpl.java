@@ -244,16 +244,18 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
 
             // 4.计算区域产能分配比例
             BigDecimal totalAreaCapacity = list.stream().map(MdmAreaCapaAllocation::getCapacityAllocation).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal totalAreaCapacityRate = (new BigDecimal(totalCapacity).divide(totalAreaCapacity, 2, RoundingMode.HALF_UP));
+            if (totalAreaCapacity.compareTo(BigDecimal.ZERO) != 0) {
+                BigDecimal totalAreaCapacityRate = (new BigDecimal(totalCapacity).divide(totalAreaCapacity, 2, RoundingMode.HALF_UP));
 
-            // 5.按照比例重新调整区域产能,最后一笔倒扣
-            for (int i = 0; i < list.size(); i++) {
-                MdmAreaCapaAllocation allocation = list.get(i);
-                BigDecimal areaCapacity = allocation.getCapacityAllocation().multiply(totalAreaCapacityRate);
-                if (i == list.size() - 1) {
-                    areaCapacity = new BigDecimal(totalCapacity).subtract(totalAreaCapacity);
+                // 5.按照比例重新调整区域产能,最后一笔倒扣
+                for (int i = 0; i < list.size(); i++) {
+                    MdmAreaCapaAllocation allocation = list.get(i);
+                    BigDecimal areaCapacity = allocation.getCapacityAllocation().multiply(totalAreaCapacityRate);
+                    if (i == list.size() - 1) {
+                        areaCapacity = new BigDecimal(totalCapacity).subtract(totalAreaCapacity);
+                    }
+                    allocation.setCapacityAllocation(areaCapacity);
                 }
-                allocation.setCapacityAllocation(areaCapacity);
             }
         }
         return list;
