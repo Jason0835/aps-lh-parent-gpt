@@ -24,22 +24,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface IFactoryConsoleRemoteService {
 
     /**
-     * 查询分厂的月份排产计划
+     * 查询工厂的月份排产计划
      *
      * @param queryCondition 查询条件
      * @return 结果集合
      */
-    @ApiOperation("查询工厂的月份排产计划----分厂同一计划可写入多个版本")
+    @ApiOperation("查询工厂的月份排产计划----工厂同一计划可写入多个版本")
     @PostMapping("/factoryConsole/productionVersionList")
     TableDataInfo getProductionVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
 
     /**
-     * 查询分厂月份对应还没选择的需求计划版本列表
+     * 查询工厂月份对应还没选择的需求计划版本列表
      *
      * @param queryCondition 查询条件
      * @return 结果集合
      */
-    @ApiOperation("查询分厂月份对应还没选择的需求计划版本列表")
+    @ApiOperation("查询工厂月份对应还没选择的需求计划版本列表")
     @PostMapping("/factoryConsole/getNoSelectedVersionList")
     TableDataInfo getNoSelectedVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
 
@@ -49,7 +49,7 @@ public interface IFactoryConsoleRemoteService {
      * @param confirmParam 需求信息
      * @return 结果信息
      */
-    @ApiOperation("查询分厂月份对应还没选择的需求计划版本列表")
+    @ApiOperation("查询工厂月份对应还没选择的需求计划版本列表")
     @PostMapping("/factoryConsole/confirmProductionRequireVersion")
     AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam);
 
@@ -80,47 +80,47 @@ public interface IFactoryConsoleRemoteService {
      * @param param 分厂编码、年份、月份
      * @return
      */
-    @ApiOperation("根据分厂、年、月获取其周期信息")
+    @ApiOperation("根据工厂、年、月获取其周期信息")
     @PostMapping("/factoryConsole/createImportVersion")
     MpFactoryProductionVersion createImportVersion(@RequestBody FactoryProductionParamVo param);
 
     /**
-     * 按分厂+日期，获取对应的定稿版本信息
+     * 按工厂+日期，获取对应的定稿版本信息
      *
      * @param queryCondition 条件
      * @return 结果
      */
-    @ApiOperation("按分厂+ 日期获取分厂的定稿排产版本信息")
+    @ApiOperation("按工厂+ 日期获取分厂的定稿排产版本信息")
     @PostMapping("/factoryConsole/getFinalVersionInfo")
     AjaxResult getFinalVersion(@RequestBody FactoryFinalVersionQueryDto queryCondition);
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式进行分厂排产
+     * 按工厂 + 年月 + 排产版本的方式进行分厂排产
      *
      * @param factoryProductionParam 分厂排产参数
      * @return
      */
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式分厂排产模具")
+    @ApiOperation("按工厂 + 年月 + 排产版本的方式分厂排产模具")
     @PostMapping("/factoryConsole/factoryMouldingProduction")
     AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
-     * 按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
+     * 按工厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
      *
      * @param factoryProductionParam
      * @return
      */
-    @ApiOperation("按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本")
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本")
     @PostMapping("/factoryConsole/deleteMonthPlanRequire")
     AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式删除排产计划版本
+     * 按工厂 + 年月 + 排产版本的方式删除排产计划版本
      *
      * @param factoryProductionParam
      * @return
      */
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")
+    @ApiOperation("按工厂 + 年月 + 排产版本的方式删除排产计划版本")
     @PostMapping("/factoryConsole/deleteMonthPlanProductionVersion")
     AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam);
 }

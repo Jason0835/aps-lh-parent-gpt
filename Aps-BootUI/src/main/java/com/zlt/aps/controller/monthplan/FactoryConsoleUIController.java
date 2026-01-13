@@ -15,7 +15,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,14 +60,14 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
-     * 确认对工厂 + 年月 + 需求计划版本进行工厂排产
+     * 按工厂 + 年月 + 需求计划版本确认工厂需求排产的需求版本
      *
      * @param confirmParam 工厂需排产的需求信息
      * @return
      */
     @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 需求计划版本的方式初始化分厂排产")
     @PostMapping("/confirmProductionRequireVersion")
+    @ApiOperation("按工厂 + 年月 + 需求计划版本确认工厂需求排产的需求版本")
     public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
         AjaxResult checkParamResult = checkEmptyMonthPlanVersion(confirmParam);
         //校验没通过
@@ -86,8 +85,8 @@ public class FactoryConsoleUIController extends BaseController {
      * @return
      */
     @ResponseBody
-    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
     @PostMapping("/oneClickProductionProcess")
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
     public AjaxResult oneClickProductionProcess(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkParamResult = checkEmptyMonthPlanVersion(factoryProductionParam);
         //校验没通过
@@ -104,8 +103,8 @@ public class FactoryConsoleUIController extends BaseController {
      * @return
      */
     @ResponseBody
-    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
     @PostMapping("/resetConfigurationInitProduction")
+    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
     public AjaxResult resetConfigurationInitProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkParamResult = checkEmptyProductionVersion(factoryProductionParam);
         //校验没通过
@@ -121,10 +120,10 @@ public class FactoryConsoleUIController extends BaseController {
      * @param queryCondition 查询条件
      * @return
      */
-    @ResponseBody
-    @ApiOperation("按分厂 + 排产日期获取分厂的定稿版本信息")
-    @PostMapping("/getFinalVersionInfo")
     @Deprecated
+    @ResponseBody
+    @PostMapping("/getFinalVersionInfo")
+    @ApiOperation("按分厂 + 排产日期获取分厂的定稿版本信息")
     AjaxResult getFinalVersion(@RequestBody FactoryFinalVersionQueryDto queryCondition) {
         if (null == queryCondition) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -144,8 +143,8 @@ public class FactoryConsoleUIController extends BaseController {
      * @return
      */
     @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂模具排产")
     @PostMapping("/factoryMouldingProduction")
+    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂模具排产")
     public AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -168,9 +167,10 @@ public class FactoryConsoleUIController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
+//    @RequiresPermissions("monthplan:console:deleteMonthPlanRequire")
     @ResponseBody
-    @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本")
     @PostMapping("/deleteMonthPlanRequire")
+    @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -191,9 +191,10 @@ public class FactoryConsoleUIController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
+//    @RequiresPermissions("monthplan:console:deleteMonthPlanProductionVersion")
     @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")
     @PostMapping("/deleteMonthPlanProductionVersion")
+    @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")
     public AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
             return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
@@ -212,7 +213,7 @@ public class FactoryConsoleUIController extends BaseController {
     /**
      * 定稿
      */
-    @RequiresPermissions("monthplan:console:finalized")
+//    @RequiresPermissions("monthplan:console:finalized")
     @ResponseBody
     @PostMapping("/finalized")
     @ApiOperation("定稿 - 对选定的年月 + 工厂+ 需求计划版本 + 工厂月计划排产版本进行定稿")

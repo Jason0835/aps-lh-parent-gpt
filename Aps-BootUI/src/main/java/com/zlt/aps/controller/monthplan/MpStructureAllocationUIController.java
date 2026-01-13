@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.maindata;
+package com.zlt.aps.controller.monthplan;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -10,6 +10,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.RequiredArgsConstructor;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -52,87 +53,21 @@ import com.zlt.aps.monthplan.api.service.IMpStructureAllocationRemoteService;
 @Slf4j
 @Api(tags = "排产过程_结构排产")
 @Controller
+@RequiredArgsConstructor
 @RequestMapping("/monthplan/mpStructureAllocation")
 public class MpStructureAllocationUIController extends BaseUIController<MpStructureAllocation> {
 
-    @Autowired
-    private IMpStructureAllocationRemoteService iMpStructureAllocationService;
-
-    private final String prefix = "aps/monthplan/mpStructureAllocation";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("monthplan:mpStructureAllocation:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/mpStructureAllocation";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("mpStructureAllocation", new MpStructureAllocation());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mpStructureAllocation", iMpStructureAllocationService.getInfo(id));
-        return prefix + "/edit";
-    }
+    private final IMpStructureAllocationRemoteService iMpStructureAllocationService;
 
     /**
      * 根据条件查询主表数据
      */
-    @ApiOperation("根据条件查询主表数据")
 //    @RequiresPermissions("monthplan:mpStructureAllocation:list")
-    @PostMapping("/list")
     @ResponseBody
+    @PostMapping("/list")
+    @ApiOperation("根据条件查询结构排产信息")
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         return iMpStructureAllocationService.list(mpStructureAllocation);
-    }
-
-    /**
-     * 修改或新增
-     */
-    @ApiOperation("修改或新增")
-//    @RequiresPermissions("monthplan:mpStructureAllocation:edit")
-    @PostMapping("/save")
-    @ResponseBody
-    public AjaxResult save(MpStructureAllocation mpStructureAllocation) {
-        if (UserConstants.NOT_UNIQUE.equals(iMpStructureAllocationService.checkUnique(mpStructureAllocation))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.checkUnique"));
-        }
-
-        return iMpStructureAllocationService.save(mpStructureAllocation);
-    }
-
-    /**
-     * 删除排产过程_结构排产
-     */
-    @ApiOperation("删除,id不为空")
-//    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
-    @PostMapping("/remove")
-    @ResponseBody
-    public AjaxResult remove(String ids) {
-        Long[] arr = Convert.toLongArray(ids);
-        return iMpStructureAllocationService.removeByIds(Arrays.asList(arr));
-    }
-
-    /**
-     * 校验排产过程_结构排产唯一性
-     */
-    @ApiOperation("校验唯一性")
-    @PostMapping("/checkUnique")
-    @ResponseBody
-    public String checkUnique(MpStructureAllocation mpStructureAllocation) {
-        return iMpStructureAllocationService.checkUnique(mpStructureAllocation);
     }
 
     /**

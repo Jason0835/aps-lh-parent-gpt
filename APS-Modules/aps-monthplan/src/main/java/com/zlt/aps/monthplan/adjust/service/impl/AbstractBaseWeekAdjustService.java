@@ -922,6 +922,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setProductionVersion(monthPlan.getProductionVersion());
             adjustDetailVo.setStructureName(monthPlan.getStructureName());
             adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
+
+            adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
+            adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
+            adjustDetailVo.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
+            adjustDetailVo.setConstructionStage(monthPlan.getConstructionStage());
+            adjustDetailVo.setBrand(monthPlan.getBrand());
+            adjustDetailVo.setProSize(monthPlan.getProSize());
+            adjustDetailVo.setSpecifications(monthPlan.getSpecifications());
+            adjustDetailVo.setMainPattern(monthPlan.getMainPattern());
+            adjustDetailVo.setPattern(monthPlan.getPattern());
+            adjustDetailVo.setMouldCavityQty(monthPlan.getMouldCavityQty());
+            adjustDetailVo.setTypeBlockQty(monthPlan.getTypeBlockQty());
+            adjustDetailVo.setDayVulcanizationQty(monthPlan.getDayVulcanizationQty());
+            adjustDetailVo.setCuringTime(monthPlan.getCuringTime());
             // 调整前净需求量（上周）
             setPreviousNetQty(adjustDetailVo,monthPlan);
             // 添加到结果集

@@ -427,6 +427,16 @@ public class DpDemandPlan extends BaseEntity {
     @TableField(exist = false)
     private String prefix;
 
+    @ApiModelProperty(value = "Y", name = "currentYearStockQty")
+    @TableField(exist = false)
+    private Integer currentYearStockQty;
+    @ApiModelProperty(value = "Y-1", name = "sub1YearStockQty")
+    @TableField(exist = false)
+    private Integer sub1YearStockQty;
+    @ApiModelProperty(value = "Y-2+", name = "sub2YearStockQty")
+    @TableField(exist = false)
+    private Integer sub2YearStockQty;
+
 
 
 
@@ -441,5 +451,15 @@ public class DpDemandPlan extends BaseEntity {
     public String getGroupFactoryAndMaterialKey() {
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, factoryCode, materialDesc);
+    }
+
+    /**
+     * 获取分厂销售需求版本计划分组Key
+     *
+     * @return
+     */
+    public String getMonthPlanVersionKey() {
+        String keyFormat = "%d|*|%d|*|%s|*|%s|*|%s|*|%s";
+        return String.format(keyFormat, this.year, this.month, this.factoryCode, this.productTypeCode, this.monthPlanVersion,this.materialDesc);
     }
 }

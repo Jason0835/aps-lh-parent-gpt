@@ -73,7 +73,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.planType")
+    @Excel(name = "ui.data.column.mpStructureAllocation.planType", dictType = "biz_plan_type")
     @ApiModelProperty(value = "计划类型：biz_plan_type 01 正常 02 订单预测 03 实单模拟", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;

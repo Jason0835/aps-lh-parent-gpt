@@ -99,6 +99,20 @@ public class MonthPlanSurplusServiceImpl implements IMonthPlanSurplusService {
         return mdmMonthSurplusEntityMapper.selectList(wrapper);
     }
 
+    @Override
+    public Map<String, Integer> calculateMonthSurplus() {
+        LambdaQueryWrapper<MdmMonthSurplus> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMonthSurplus::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMonthSurplus> list = mdmMonthSurplusEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .filter(monthSurplus ->  monthSurplus.getPlanSurplusQty() != null)
+            .collect(Collectors.groupingBy(MdmMonthSurplus::getMonthPlanVersionKey, Collectors.summingInt(item -> item.getPlanSurplusQty().intValue())));
+    }
+
     /**
      * 按照年月、分厂、物料、规格汇总月度外胎汇总和外胎汇总明细
      *

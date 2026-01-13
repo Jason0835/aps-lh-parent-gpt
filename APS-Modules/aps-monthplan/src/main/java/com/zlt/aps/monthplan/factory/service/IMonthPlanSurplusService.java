@@ -4,6 +4,7 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 月度剩余量业务接口
@@ -31,4 +32,9 @@ public interface IMonthPlanSurplusService {
      * @return 当前年月月底计划余量
      */
     List<MdmMonthSurplus> findCurrentMonthPlanSurplus();
+    /**
+     * 汇总月底计划余量
+     * @return 月底计划余量
+     */
+    Map<String,Integer> calculateMonthSurplus();
 }
