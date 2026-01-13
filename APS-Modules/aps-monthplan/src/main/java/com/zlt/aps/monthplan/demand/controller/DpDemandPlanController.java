@@ -77,7 +77,7 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>(queryVO);
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper,queryVO);
         List<DpDemandPlan> dataList =  dpDemandPlanService.list(queryWrapper);
         if(CollectionUtils.isEmpty(dataList)) {
