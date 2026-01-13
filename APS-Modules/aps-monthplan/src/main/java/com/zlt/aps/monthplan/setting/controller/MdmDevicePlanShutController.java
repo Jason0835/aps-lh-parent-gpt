@@ -147,7 +147,7 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
     @Override
     protected void builderCondition(QueryWrapper<MdmDevicePlanShut> queryWrapper, MdmDevicePlanShut queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("procCode")), "PROC_CODE", queryVO.getFieldValueByFieldName("procCode"));
+//        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("procCode")), "PROC_CODE", queryVO.getFieldValueByFieldName("procCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineType")), "MACHINE_TYPE", queryVO.getFieldValueByFieldName("machineType"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineStopType")), "MACHINE_STOP_TYPE", queryVO.getFieldValueByFieldName("machineStopType"));
