@@ -243,11 +243,4 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         queryWrapper.like(PubUtil.isNotEmpty(condition.getPattern()), "PATTERN", condition.getPattern());
     }
 
-    public static void main(String[] args) {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
-        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
-        System.out.println("yearMonth = " + yearMonth);
-    }
 }

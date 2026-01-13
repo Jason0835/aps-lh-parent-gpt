@@ -30,6 +30,9 @@
         <if test="monthPlanVersion != null  and monthPlanVersion != ''">
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
         </if>
+        <if test="productionVersion != null  and productionVersion != ''">
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+        </if>
          ORDER BY MONTH_PLAN_VERSION,PRODUCTION_VERSION
     </select>
 

@@ -250,7 +250,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
                 // 5.按照比例重新调整区域产能,最后一笔倒扣
                 for (int i = 0; i < list.size(); i++) {
                     MdmAreaCapaAllocation allocation = list.get(i);
-                    BigDecimal areaCapacity = null;
+                    BigDecimal areaCapacity = BigDecimal.ZERO;
                     if (i == list.size() - 1) {
                         areaCapacity = totalAreaCapacity.subtract(areaCapacity);
                     }else {

@@ -9,14 +9,14 @@ import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import java.util.List;
 
 /**
- * 分厂控制台业务接口定义类
+ * 工厂控制台业务接口定义类
  *
  * @author ZLT
- * @date 20250211
+ * @date 20251203
  */
 public interface IFactoryConsoleService {
     /**
-     * 根据条件，获取对应分厂的销售需求计划版本及排产版本信息列表
+     * 根据条件，获取对应工厂的销售需求计划版本及排产版本信息列表
      *
      * @param queryCondition
      * @return
@@ -24,7 +24,7 @@ public interface IFactoryConsoleService {
     List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition);
 
     /**
-     * 根据条件，获取对应分厂的还未选择的销售需求计划版本信息
+     * 根据条件，获取对应工厂的还未选择的销售需求计划版本信息
      *
      * @param queryCondition
      * @return
@@ -59,7 +59,7 @@ public interface IFactoryConsoleService {
     AjaxResult reMouldingProduction(FactoryProductionParamVo factoryProductionParam);
 
     /**
-     * 按分厂+年月+需求版本的方式，删除对应的需求制造计划及排产版本
+     * 按工厂 + 年月 + 需求版本的方式，删除对应的需求版本的排产版本记录及排产版本数据
      *
      * @param factoryProductionParam
      * @return
@@ -67,7 +67,7 @@ public interface IFactoryConsoleService {
     AjaxResult deleteMonthPlanRequire(FactoryProductionParamVo factoryProductionParam);
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式删除排产计划版本
+     * 按工厂 + 年月 + 排产版本的方式删除排产计划版本
      *
      * @param factoryProductionParam
      * @return

@@ -46,4 +46,9 @@ public class FactoryProductionPlanVo implements Serializable {
     @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
     private String monthPlanVersion;
 
+    /**
+     * 排产版本号
+     */
+    @ApiModelProperty(value = "排产版本号", name = "productionVersion")
+    private String productionVersion;
 }
