@@ -61,9 +61,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * 库存抓取日~（同月）月底的月度计划量汇总不保存
      *
      * @param finishedProductStocks 成品库存
+     * @param yearMonth
+     * @param days
      * @return 月度计划量汇总
      */
-    Map<String, Integer> calculateMonthSurplusNoSave(List<MdmProductStock> finishedProductStocks);
+    Map<String, Integer> calculateMonthSurplusNoSave(List<MdmProductStock> finishedProductStocks, String yearMonth, int days);
 
     /**
      * 获取最终排产结果

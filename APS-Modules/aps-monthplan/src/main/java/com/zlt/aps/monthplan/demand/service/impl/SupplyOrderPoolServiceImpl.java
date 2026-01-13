@@ -13,6 +13,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -381,6 +382,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      * @param supplyOrderPool 入参
      */
     public AjaxResult calculateStockMsg(SupplyOrderPool supplyOrderPool) {
+
+        String yearMonth = String.format("%s%02d", supplyOrderPool.getYear(), supplyOrderPool.getMonth());
+
+        int days = YearMonth.of(supplyOrderPool.getYear(), supplyOrderPool.getMonth()).lengthOfMonth();
+        // 获取当前年月
+
         // 1.计算无订单库存
         List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
         List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.findCurrentFinishStock();
@@ -390,7 +397,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.noOrderQty")).append(stockWithoutOrderMap.get(supplyOrderPool.getMaterialCode()));
 
         // 2.计算月底计划余量
-        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplusNoSave(finishedProductStocks);
+        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplusNoSave(finishedProductStocks, yearMonth, days);
         msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.monthSurplusQty")).append(monthSurplusMap.get(supplyOrderPool.getMaterialCode()));
 
         return AjaxResult.success(msg.toString());
