@@ -102,7 +102,7 @@ public class SaleRequirePlanHelper {
                         .sum();
                     // 调整优先级
                     if (totalDemand > totalCapacity) {
-                        processDemandMidPriorityExcludingLast(highSaleOrders, totalDemand - totalCapacity);
+                        processDemandMidPriorityExcludingLast(midSaleOrders, totalDemand - totalCapacity);
                     }
                 }
 
