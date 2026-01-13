@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.github.pagehelper.PageInfo;
 import com.ruoyi.common.core.web.page.PageDomain;
 import com.ruoyi.common.core.web.page.TableSupport;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -89,7 +90,12 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         pageNum = pageNum == null ? 1 : pageNum;
         pageSize = pageSize == null ? 10000000 : pageSize;
         List<DpDemandPlan>  list = CollectionKit.sortPageAll(pageNum,pageSize,comparator,dataList);
-        return new TableDataInfo(list,dataList.size());
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(list);
+        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+        rspData.setTotal((new PageInfo(list)).getTotal());
+        return rspData;
     }
 
 
