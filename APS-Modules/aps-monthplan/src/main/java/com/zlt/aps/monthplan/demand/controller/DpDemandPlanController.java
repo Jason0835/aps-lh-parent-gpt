@@ -94,7 +94,7 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         rspData.setCode(200);
         rspData.setRows(list);
         rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
-        rspData.setTotal((new PageInfo(list)).getTotal());
+        rspData.setTotal(dataList.size());
         return rspData;
     }
 
