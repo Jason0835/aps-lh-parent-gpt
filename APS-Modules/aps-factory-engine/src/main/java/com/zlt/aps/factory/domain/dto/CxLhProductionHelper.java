@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.tlt.aps.enums.YesOrNoEnum;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 
@@ -65,6 +66,11 @@ public class CxLhProductionHelper implements Serializable {
      */
     private Integer endDay;
     /**
+     * 不再参与排产 0 不参与 否则参与
+     */
+    private Integer isProduction;
+
+    /**
      * 构建空的成型下硫化分组信息
      *
      * @param groupName 分组计划名-TBR为结构名
@@ -75,6 +81,7 @@ public class CxLhProductionHelper implements Serializable {
         CxLhProductionHelper cxLh = new CxLhProductionHelper();
         cxLh.setGroupName(groupName);
         cxLh.setLhGroupNo(lhGroupNo);
+        cxLh.setIsProduction(YesOrNoEnum.YES.getValue());
         if (CollectionUtils.isEmpty(cxMachineInfo)) {
             cxMachineInfo = new HashSet<>();
         }
@@ -95,6 +102,7 @@ public class CxLhProductionHelper implements Serializable {
         this.dayMaxProductionQty = null;
         this.materialCode = null;
         this.materialDesc = null;
+        this.isProduction = YesOrNoEnum.YES.getValue();
         //排产模具是否要清空？
     }
 

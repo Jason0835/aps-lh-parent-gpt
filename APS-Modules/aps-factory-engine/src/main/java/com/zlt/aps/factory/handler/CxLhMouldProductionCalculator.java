@@ -160,12 +160,11 @@ public class CxLhMouldProductionCalculator {
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
             Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
             Integer theoryProductionQty = realDayProductionQty;
-            Integer lossQty = BigDecimal.ZERO.intValue();
             //首日换模排产
             if (firstDay.equals(day)) {
                 realDayProductionQty = Math.min(realDayProductionQty, paramConfiguration.getChangeMouldFirstQty());
             }
-            lossQty = theoryProductionQty - realDayProductionQty;
+            Integer lossQty = theoryProductionQty - realDayProductionQty;
             if (lossQty < BigDecimal.ZERO.intValue()) {
                 lossQty = BigDecimal.ZERO.intValue();
             }
@@ -207,6 +206,8 @@ public class CxLhMouldProductionCalculator {
         MonthPlanProductionRequirePlanVo productionSkuInfo = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         String skuMaterialDesc = productionSkuInfo.getMaterialDesc();
         Set<Integer> stopDay = context.getStopDays();
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer firstDay = null;
         //进行排产
         for (int day = startDay; day <= endDay; day++) {
             if (sumProductionQty <= BigDecimal.ZERO.longValue()) {
@@ -216,23 +217,29 @@ public class CxLhMouldProductionCalculator {
             if (stopDay.contains(day)) {
                 continue;
             }
+            if (null == firstDay) {
+                firstDay = day;
+            }
             //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
             Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
+            Integer theoryProductionQty = realDayProductionQty;
+            //首日换模排产
+            if (firstDay.equals(day)) {
+                realDayProductionQty = Math.min(realDayProductionQty, paramConfiguration.getChangeMouldFirstQty());
+            }
+            Integer lossQty = theoryProductionQty - realDayProductionQty;
+            if (lossQty < BigDecimal.ZERO.intValue()) {
+                lossQty = BigDecimal.ZERO.intValue();
+            }
             realSumProductionQty = realSumProductionQty + realDayProductionQty;
             sumProductionQty = sumProductionQty - realDayProductionQty;
-            //todo 判断当日模具是否排产完毕
-            boolean isDayFinish = true;
+            //判断模具是否排产完毕，首日排产则排产完毕，否则看排产量
+            boolean isDayFinish = firstDay.equals(day) ? true : realDayProductionQty.equals(dayMaxProductionQty);
             //更新模具日产信息
-            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, cxMachineInfoSet, BigDecimal.ZERO.intValue());
+            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, cxMachineInfoSet, lossQty);
             updateMouldDayProductionInfo(doubleMouldList, skuProductionPlanList, updateInfo);
             //更新硫化组日期和日排产量
             updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, day, dayMaxProductionQty, realDayProductionQty);
-//            cxLhGroup.setProductionQty(realDayProductionQty);
-//            cxLhGroup.setProductionDay(day);
-//            cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-//            cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
-//            cxMachineInfo.getDayProductionLimitInfo().get(day)
-
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
         }
