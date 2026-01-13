@@ -828,7 +828,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 处理净需求
         if (CollectionUtils.isNotEmpty(netDemands)) {
             List<MdmAreaCapaAllocation> areaCapaAllocations =
-                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth(),netDemands.get(0).getFactoryCode(), this.getDocTypeCode());
+                mdmAreaCapaAllocationService.findAreaCapaAllocation(createCondition.getYear(),createCondition.getMonth(),createCondition.getFactoryCode(), this.getDocTypeCode());
             demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(createCondition,netDemands,areaCapaAllocations));
         }
         // 处理暂缓订单
