@@ -141,6 +141,6 @@ public class MdmProductStockServiceImpl extends AbstractDocService<MdmProductSto
         String currentYearMonthStr = String.format("%s%02d", StringUtils.substring(String.valueOf(lastOneYearWeek.getYear()),2,4) ,Integer.valueOf(StringConstant.ONE));
         String transformed = item.getWeekYear().substring(2) + item.getWeekYear().substring(0,2);
         int yearWeek = Integer.parseInt(transformed);
-        return yearWeek <= Integer.parseInt(currentYearMonthStr);
+        return yearWeek < Integer.parseInt(currentYearMonthStr);
     }
 }
