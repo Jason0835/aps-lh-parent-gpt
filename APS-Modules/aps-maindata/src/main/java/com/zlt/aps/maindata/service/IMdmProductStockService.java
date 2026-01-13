@@ -4,7 +4,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -36,9 +35,5 @@ public interface IMdmProductStockService extends IDocService<MdmProductStock> {
      * @return 成品库存
      */
     List<MdmProductStock> getMpFinishedProductStockByMaterialCode(String materialCode);
-    /**
-     *  汇总库存
-     * @return
-     */
-    Map<String, Map<String, Integer>> calculateStockQty();
+
 }

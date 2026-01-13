@@ -348,7 +348,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         List<DpDemandPlan> datas = Lists.newArrayList();
         Map<String,DpDemandPlan> saleDemandMap = Maps.newHashMap();
-        Map<String,Map<String,Integer>> stockQtyMap = mdmProductStockService.calculateStockQty();
+        Map<String,Map<String,Integer>> stockQtyMap = dpStockVersionService.calculateStockQty();
         Map<String,Integer> orderQtyMap = calculateOrderQtyQty(dataList);
         Map<String,Integer> plannedSurplusMap = monthPlanSurplusService.calculateMonthSurplus();
         Map<String,Integer> netQtyMap = calculateNetQty(dataList);
@@ -365,7 +365,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             }
             String key = demandPlan.getMonthPlanVersionKey();
             DpDemandPlan result = saleDemandMap.get(key);
-            Map<String,Integer> stockMap = stockQtyMap.getOrDefault(demandPlan.getGroupFactoryAndMaterialKey(), new HashMap<>());
+            Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, new HashMap<>());
             if (null == result) {
                 result = new DpDemandPlan();
                 BeanUtils.copyProperties(demandPlan, result);

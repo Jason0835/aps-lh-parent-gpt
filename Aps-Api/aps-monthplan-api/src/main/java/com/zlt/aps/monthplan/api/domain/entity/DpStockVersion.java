@@ -178,4 +178,14 @@ public class DpStockVersion extends BaseEntity {
     @ApiModelProperty(value = "内外销", name = "domesticExportSale")
     @TableField(exist = false)
     private String domesticExportSale;
+
+    /**
+     * 获取分厂销售需求版本计划分组Key
+     *
+     * @return
+     */
+    public String getMonthPlanVersionKey() {
+        String keyFormat = "%d|*|%d|*|%s|*|%s|*|%s|*|%s";
+        return String.format(keyFormat, this.year, this.month, this.factoryCode, this.productTypeCode, this.requireVersion,this.materialDesc);
+    }
 }
