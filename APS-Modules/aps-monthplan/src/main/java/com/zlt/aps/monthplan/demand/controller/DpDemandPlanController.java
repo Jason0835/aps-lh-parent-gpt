@@ -194,7 +194,7 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion"))) {
-            String monthPlanVersion = String.valueOf(queryVO.getMonthPlanVersion());
+            String monthPlanVersion = queryVO.getMonthPlanVersion();
             if(StringUtils.isNotBlank(monthPlanVersion)) {
                 log.info("monthPlanVersion:{}",monthPlanVersion);
                 queryWrapper.like("MONTH_PLAN_VERSION", monthPlanVersion);
