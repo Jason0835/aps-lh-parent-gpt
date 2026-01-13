@@ -190,7 +190,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            saveDemandPlans(demandPlans, data);
+            saveDemandPlans(createCondition, demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -263,7 +263,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> adjustRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            adjustRequirePlans =  saveDemandPlans(demandPlans, data);
+            adjustRequirePlans =  saveDemandPlans(createCondition,demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -293,7 +293,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> predictionRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            predictionRequirePlans =  saveDemandPlans(demandPlans, data);
+            predictionRequirePlans =  saveDemandPlans(createCondition,demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -330,7 +330,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> predictionRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (CollectionUtils.isNotEmpty(demandPlans)) {
-            predictionRequirePlans = saveDemandPlans(demandPlans, data);
+            predictionRequirePlans = saveDemandPlans(createCondition,demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
@@ -672,10 +672,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 保存需求计划
      */
     private List<DpDemandPlan> saveDemandPlans(
+        DpDemandPlan createCondition,
         List<DpDemandPlan> demandPlans,
         DataCollection data) {
         // 合并需求计划
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
+            createCondition,
             demandPlans, data.minProductionQty, data.materialInfoMap,
             data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
         if (CollectionUtils.isNotEmpty(mergedPlans)) {
@@ -923,13 +925,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty) {
+    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
         }
 
-        Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(demandPlans);
+        Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(createCondition,demandPlans);
         if(org.springframework.util.CollectionUtils.isEmpty(groupMap)) {
             return Collections.emptyList();
         }
