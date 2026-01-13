@@ -18,4 +18,12 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpAdjustStructureLogService  extends IDocService<MpAdjustStructureLog>{
 
+    /**
+     * 通过版本删除调整日志
+     * @param factoryCode 工厂
+     * @param year 年份
+     * @param month 月份
+     * @param version 调整版本
+     */
+    void deleteAdjustLogByVersion(String factoryCode,String year,String month,String version);
 }

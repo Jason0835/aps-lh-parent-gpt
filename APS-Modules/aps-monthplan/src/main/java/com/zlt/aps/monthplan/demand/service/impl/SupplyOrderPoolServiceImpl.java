@@ -13,6 +13,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -36,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.aspectj.weaver.loadtime.Aj;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -373,6 +375,34 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
           // 20260110 修改原来是完全匹配年周，物料，动平衡，均匀性，现在改为物料满足, 年周满足即可, 动平衡，均匀性属于优先扣减，不满足时，再扣减其他库存
           return stockAllocationServiceImpl.calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
     }
+
+
+    /**
+     * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
+     * @param supplyOrderPool 入参
+     */
+    public AjaxResult calculateStockMsg(SupplyOrderPool supplyOrderPool) {
+
+        String yearMonth = String.format("%s%02d", supplyOrderPool.getYear(), supplyOrderPool.getMonth());
+
+        int days = YearMonth.of(supplyOrderPool.getYear(), supplyOrderPool.getMonth()).lengthOfMonth();
+        // 获取当前年月
+
+        // 1.计算无订单库存
+        List<SalesOrderPool> salesOrderPools = this.salesOrderPoolService.findCurrentSalesOrderPool();
+        List<MdmProductStock> finishedProductStocks = this.mdmProductStockService.findCurrentFinishStock();
+        Map<String, Integer> stockWithoutOrderMap = calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
+
+        StringBuilder msg = new StringBuilder();
+        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.noOrderQty")).append(stockWithoutOrderMap.get(supplyOrderPool.getMaterialCode()));
+
+        // 2.计算月底计划余量
+        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplusNoSave(finishedProductStocks, yearMonth, days);
+        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.monthSurplusQty")).append(monthSurplusMap.get(supplyOrderPool.getMaterialCode()));
+
+        return AjaxResult.success(msg.toString());
+    }
+
 
     private Map<String, MdmProductStock> calculateStockQtyMap(List<MdmProductStock> finishedProductStocks) {
         if(CollectionUtils.isEmpty(finishedProductStocks)){

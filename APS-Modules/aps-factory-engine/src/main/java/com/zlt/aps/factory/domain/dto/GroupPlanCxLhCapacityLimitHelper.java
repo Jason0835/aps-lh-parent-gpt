@@ -305,7 +305,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @return
      */
     public boolean isReachLimitByEmbryoCode(String addEmbryoCode) {
-        if (productionMouldSet.contains(addEmbryoCode)) {
+        if (productionEmbryoCodeSet.contains(addEmbryoCode)) {
             return false;
         }
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();

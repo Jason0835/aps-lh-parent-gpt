@@ -4,6 +4,7 @@ package com.zlt.aps.monthplan.adjust.service;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.bill.common.service.IDocService;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -22,5 +23,12 @@ import java.util.List;
  */
 public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
 
-    void saveMpAdjustResult(List<MpAdjustResult> mpAdjustResultList);
+    /**
+     * 通过版本删除调整结果
+     * @param factoryCode 工厂
+     * @param year 年份
+     * @param month 月份
+     * @param version 调整版本
+     */
+    void deleteAdjustResultByVersion(String factoryCode,String year,String month,String version);
 }

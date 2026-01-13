@@ -465,12 +465,18 @@ public class ProductionPlanGroupInfo {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
-        Set<Integer> productionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
-        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionDaySet, context.getStopDays());
+        Set<Integer> effectiveDaySet = getEffectiveDay(context, preSelected, hasAddSkuList);
+        if (CollectionUtils.isEmpty(effectiveDaySet)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(effectiveDaySet, context.getStopDays());
         List<Integer> sortList = new ArrayList<>(resultSet);
         Collections.sort(sortList);
         int size = sortList.size();
-        preSelected.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
+        Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
+        Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
+        preSelected.updateProductionDateRange(newClosingDay, newEndDay);
     }
 
     /**
@@ -1305,6 +1311,26 @@ public class ProductionPlanGroupInfo {
             return previousDay;
         }
         return getPreviousDay(previousDay);
+    }
+
+    /**
+     * 获取有效的排产日范围集合，取配比与胎胚的交集
+     *
+     * @param context               排产上下文
+     * @param preSelected           硫化组配比符合的排产日信息
+     * @param hasAddSkuByEmbryoList 胎胚种类数符合的排产日信息
+     */
+    private Set<Integer> getEffectiveDay(Context context, EarliestConclusionLhGroupHelper preSelected, List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuByEmbryoList) {
+        Set<Integer> productionDaySet = hasAddSkuByEmbryoList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Integer preClosingDay = preSelected.getClosingDay();
+        Integer preEndDay = preSelected.getEndDay();
+        Set<Integer> effectiveDaySet = new HashSet<>(context.getMonthDays());
+        for (Integer effectiveDay = preClosingDay; effectiveDay <= preEndDay; effectiveDay++) {
+            if (productionDaySet.contains(effectiveDay)) {
+                effectiveDaySet.add(effectiveDay);
+            }
+        }
+        return effectiveDaySet;
     }
 
     /**

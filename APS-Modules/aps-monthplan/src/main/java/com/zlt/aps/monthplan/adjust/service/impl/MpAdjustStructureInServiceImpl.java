@@ -8,6 +8,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -54,6 +55,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     private MpStructureAllocationEntityMapper structureAllocationEntityMapper;
 
     @Autowired
+    private MpAdjustStructureInEntityMapper structureInEntityMapper;
+
+    @Autowired
     private ProductionSchedulingDataService productionSchedulingDataService;
 
 
@@ -82,6 +86,16 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<MpAdjustStructureIn> selectMpAdjustStructureInList(MpRollAdjustContextDTO contextDTO) {
+        QueryWrapper<MpAdjustStructureIn> structureInQueryWrapper = new QueryWrapper<>();
+        structureInQueryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
+        structureInQueryWrapper.eq("YEAR", contextDTO.getMpYear());
+        structureInQueryWrapper.eq("MONTH", contextDTO.getMpMonth());
+        structureInQueryWrapper.eq("VERSION", contextDTO.getVersion());
+        return structureInEntityMapper.selectList(structureInQueryWrapper);
     }
 
     @Override

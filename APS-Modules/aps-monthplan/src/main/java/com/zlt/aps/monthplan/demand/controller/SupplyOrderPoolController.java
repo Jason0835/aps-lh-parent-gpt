@@ -230,6 +230,17 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     }
 
     /**
+     * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
+     * @param supplyOrderPool 入参
+     * @return AjaxResult
+     */
+    @ApiOperation("新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少")
+    @PostMapping("/queryStockUpByMaterialCode")
+    public AjaxResult queryStockUpByMaterialCode(@RequestBody SupplyOrderPool supplyOrderPool){
+        return AjaxResult.success(supplyOrderPoolService.calculateStockMsg(supplyOrderPool));
+    }
+
+    /**
      * 输入物料编码，带出对应信息
      */
     @ApiOperation("输入物料编码，带出对应信息")

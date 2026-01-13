@@ -2,9 +2,11 @@ package com.zlt.aps.monthplan.adjust.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
@@ -32,6 +34,10 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult>  implements IMpAdjustResultService {
+
+    @Autowired
+    protected MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MP0804";
@@ -60,7 +66,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     }
 
     @Override
-    public void saveMpAdjustResult(List<MpAdjustResult> mpAdjustResultList) {
-        baseDao.insertBatch(mpAdjustResultList);
+    public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version) {
+        mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version);
     }
 }

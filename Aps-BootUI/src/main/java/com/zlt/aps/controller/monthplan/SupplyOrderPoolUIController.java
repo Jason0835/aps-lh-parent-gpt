@@ -105,6 +105,19 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
     }
 
     /**
+     * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
+     * @param supplyOrderPool 入参
+     * @return AjaxResult
+     */
+    @ApiOperation("新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少")
+    @PostMapping("/queryStockUpByMaterialCode")
+    @ResponseBody
+    public AjaxResult queryStockUpByMaterialCode(SupplyOrderPool supplyOrderPool){
+        return AjaxResult.success(iSupplyOrderPoolService.queryStockUpByMaterialCode(supplyOrderPool));
+    }
+
+
+    /**
      * 删除供应链订单池
      */
     @ApiOperation("删除,id不为空")

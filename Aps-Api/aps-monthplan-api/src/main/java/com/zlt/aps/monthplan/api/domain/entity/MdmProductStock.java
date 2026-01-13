@@ -213,6 +213,8 @@ public class MdmProductStock extends BaseEntity {
         return String.format(keyFormat, materialCode,weekYear, isDynamicBalance,isUniformity);
     }
 
+
+
     /**
      * 初始化超龄状态
      *

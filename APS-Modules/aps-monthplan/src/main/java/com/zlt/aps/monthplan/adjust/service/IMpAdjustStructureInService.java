@@ -27,6 +27,13 @@ import java.util.Map;
 public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStructureIn>{
 
     /**
+     * 查询结构内列表
+     * @param contextDTO
+     * @return
+     */
+    List<MpAdjustStructureIn> selectMpAdjustStructureInList(MpRollAdjustContextDTO contextDTO);
+
+    /**
      * 获取月定稿数据
      * @param contextDTO 周程滚动调整上下文对象
      * @return 月定稿列表

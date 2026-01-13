@@ -81,7 +81,7 @@ public class MpWeekRollAdjustController extends BaseController {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
         }
         // 构建上下文对象
-        MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
+        MpRollAdjustContextDTO contextDTO = buildAdjustContext(weekRollAdjustDTO);
         log.info("获取调整明细 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
         // 执行周程滚动调整策略（生成调整明细）
@@ -106,12 +106,12 @@ public class MpWeekRollAdjustController extends BaseController {
         try{
             // 获取周程滚动调整策略
             //IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
-            IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy("01");
+            IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
             if (weekAdjustStrategy == null) {
                 throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
             }
             // 构建上下文对象
-            MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
+            MpRollAdjustContextDTO contextDTO = buildAutoAdjustContext(weekRollAdjustDTO);
             log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode("01").getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
             // 执行周程滚动调整策略（自动调整）
@@ -136,7 +136,7 @@ public class MpWeekRollAdjustController extends BaseController {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
         }
         // 构建上下文对象
-        MpRollAdjustContextDTO contextDTO = buildContext(weekRollAdjustDTO);
+        MpRollAdjustContextDTO contextDTO = buildAdjustContext(weekRollAdjustDTO);
         log.info("确认调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
         // 执行周程滚动调整策略（确认调整）
@@ -148,11 +148,20 @@ public class MpWeekRollAdjustController extends BaseController {
 
 
     /**
-     * 构建上下文对象
+     * 构建获取调整订单上下文对象
      * @param weekRollAdjustDTO
      * @return
      */
-    private MpRollAdjustContextDTO buildContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+    private MpRollAdjustContextDTO buildAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
+        return contextDTO;
+    }
+        /**
+         * 构建自动调整上下文对象
+         * @param weekRollAdjustDTO
+         * @return
+         */
+    private MpRollAdjustContextDTO buildAutoAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
         contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
         if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
@@ -169,10 +178,12 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setLockEndDay(mpAdjustStructureInService.getLockEndDay(contextDTO));
         //初始结构收尾日
         contextDTO.setStructureDeadLine(mpAdjustStructureInService.getStructureDeadline(contextDTO));
-        contextDTO.setVersion("ADJ20260112001");
+        contextDTO.setVersion(weekRollAdjustDTO.getVersion());
+        contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
+        //结构内调整记录
+        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO));
 
-        //测试数据
-        //TODO sandy
+       /* //测试数据
         MpAdjustStructureIn structureIn = new MpAdjustStructureIn();
         structureIn.setMaterialCode("3302001884");
         structureIn.setMaterialDesc("215/75R17.5 135/133L 16PR BF188 BL3EBL");
@@ -217,7 +228,7 @@ public class MpWeekRollAdjustController extends BaseController {
         mpAdjustStructureInList.add(structureIn);
         mpAdjustStructureInList.add(structureIn2);
         mpAdjustStructureInList.add(structureIn3);
-        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInList);
+        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInList);*/
         return contextDTO;
     }
 
