@@ -2,9 +2,12 @@ package com.zlt.aps.monthplan.adjust.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureLogEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureLogService;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureLog;
 import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
@@ -32,6 +35,10 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpAdjustStructureLogServiceImpl extends AbstractDocService<MpAdjustStructureLog>  implements IMpAdjustStructureLogService {
+
+    @Autowired
+    protected MpAdjustStructureLogEntityMapper adjustStructureLogEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MP0808";
@@ -57,5 +64,10 @@ public class MpAdjustStructureLogServiceImpl extends AbstractDocService<MpAdjust
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public void deleteAdjustLogByVersion(String factoryCode, String year, String month, String version) {
+        adjustStructureLogEntityMapper.deleteAdjustLogByVersion(factoryCode,year,month,version);
     }
 }
