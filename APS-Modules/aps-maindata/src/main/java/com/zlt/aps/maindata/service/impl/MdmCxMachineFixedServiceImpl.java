@@ -89,15 +89,15 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
      */
     private List<String> checkFixedMaterialCode(MdmCxMachineFixed docEntityVO) {
         String fixedMaterialCode = StringUtils.defaultIfBlank(docEntityVO.getFixedMaterialCode(), "");
-        List<String> fixedMaterialCodeList = Arrays.stream(fixedMaterialCode.split(",")).collect(Collectors.toList());
+        List<String> fixedMaterialCodeList = Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
 
         String disableMaterialCode = StringUtils.defaultIfBlank(docEntityVO.getDisableMaterialCode(), "");
-        List<String> disableMaterialCodeList = Arrays.stream(disableMaterialCode.split(",")).collect(Collectors.toList());
+        List<String> disableMaterialCodeList = Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
 
         if (CollectionUtils.isNotEmpty(fixedMaterialCodeList) && CollectionUtils.isNotEmpty(disableMaterialCodeList)) {
             List<String> errorMaterialCode = new ArrayList<>();
             for (String materialCode : disableMaterialCodeList) {
-                if (fixedMaterialCodeList.contains(materialCode)) {
+                if (StringUtils.isNotBlank(materialCode) && fixedMaterialCodeList.contains(materialCode)) {
                     errorMaterialCode.add(materialCode);
                 }
             }
@@ -113,17 +113,17 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
      */
     private List<String> checkFixedStructure(MdmCxMachineFixed docEntityVO) {
         String fixedStructure1 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure1(), "");
-        List<String> fixedStructureList = Arrays.stream(fixedStructure1.split(",")).collect(Collectors.toList());
+        List<String> fixedStructureList = Arrays.stream(fixedStructure1.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
         String fixedStructure2 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure2(), "");
-        fixedStructureList.addAll(Arrays.asList(fixedStructure2.split(",")));
+        fixedStructureList.addAll(Arrays.stream(fixedStructure2.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList()));
         String fixedStructure3 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure3(), "");
-        fixedStructureList.addAll(Arrays.asList(fixedStructure3.split(",")));
+        fixedStructureList.addAll(Arrays.stream(fixedStructure3.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList()));
         String disableStructure = StringUtils.defaultIfBlank(docEntityVO.getDisableStructure(), "");
-        List<String> disableStructureList = Arrays.stream(disableStructure.split(",")).collect(Collectors.toList());
+        List<String> disableStructureList = Arrays.stream(disableStructure.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(fixedStructureList) && CollectionUtils.isNotEmpty(disableStructureList)) {
             List<String> errorStructure = new ArrayList<>();
             for (String structure : disableStructureList) {
-                if (fixedStructureList.contains(structure)) {
+                if (StringUtils.isNotBlank(structure) && fixedStructureList.contains(structure)) {
                     errorStructure.add(structure);
                 }
             }
