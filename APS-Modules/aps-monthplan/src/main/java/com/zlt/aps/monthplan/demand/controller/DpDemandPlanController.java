@@ -193,8 +193,12 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("monthPlanVersion").toString()) ) {
-            queryWrapper.like("MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion"))) {
+            String monthPlanVersion = String.valueOf(queryVO.getMonthPlanVersion());
+            if(StringUtils.isNotBlank(monthPlanVersion)) {
+                log.info("monthPlanVersion:{}",monthPlanVersion);
+                queryWrapper.like("MONTH_PLAN_VERSION", monthPlanVersion);
+            }
         }
         if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialCode").toString()) ) {
             queryWrapper.like("MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
