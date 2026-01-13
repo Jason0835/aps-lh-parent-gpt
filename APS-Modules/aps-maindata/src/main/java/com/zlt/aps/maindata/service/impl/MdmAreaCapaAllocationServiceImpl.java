@@ -230,7 +230,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
             search.setFactoryCode(factoryCode);
             search.setBusinessGroup(sysDocTypeCode);
             search.setParamCode(MonthPlanEnums.NET_REQUIREMENT_DAY_CAPACITY.getCode());
-            search.setParamCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+            search.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
             FactoryParam factoryParam = factoryParamService.getFacParamSingle(search);
 
             // 3.从参数配置获取日产乘以天数
