@@ -155,11 +155,11 @@ public class DemandPlanGrouper {
         // 合并到目标分组
         List<DpDemandPlan> targetGroup = resultGroups.get(bestGroup.groupKey);
         targetGroup.addAll(reservePlans);
-        return;
+        continue;
       }
       // 如果找不到合适的分组，则舍弃这个纯储备订单分组
       if(createCondition.isIncludePostpone()) {
-        return;
+        continue;
       }
       resultGroups.put(reserveEntry.getKey(),reservePlans);
     }
