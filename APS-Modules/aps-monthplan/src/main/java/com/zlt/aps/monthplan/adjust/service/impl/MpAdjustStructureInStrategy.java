@@ -6,6 +6,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -108,7 +109,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            matchMonthPlanList(contextDTO,resultList,materialCode,monthPlanMap,Convert.toInt(trialPlan.getTrialQty(),0));
+            matchMonthPlanList(contextDTO,resultList,materialCode,monthPlanMap,
+                    Convert.toInt(trialPlan.getTrialQty(),0), ApsConstant.TRUE);
         }
         return resultList;
     }
