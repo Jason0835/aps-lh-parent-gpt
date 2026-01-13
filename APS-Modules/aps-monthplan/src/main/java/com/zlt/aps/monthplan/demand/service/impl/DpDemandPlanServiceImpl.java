@@ -227,9 +227,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         wrapper.eq(DpDemandPlan::getFactoryCode, queryCondition.getFactoryCode());
         wrapper.eq(DpDemandPlan::getYear, queryCondition.getYear());
         wrapper.eq(DpDemandPlan::getMonth, queryCondition.getMonth());
-        wrapper.eq(DpDemandPlan::getPlanType, ProductionPlanType.NORMAL.getPlanType());
         wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.orderByDesc(DpDemandPlan::getMonthPlanVersion);
+        wrapper.orderByDesc(DpDemandPlan::getCreateTime);
         List<DpDemandPlan> list =  this.demandPlanEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptySet();
