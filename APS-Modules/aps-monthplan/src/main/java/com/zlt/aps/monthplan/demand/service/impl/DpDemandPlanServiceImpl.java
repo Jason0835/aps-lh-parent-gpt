@@ -797,12 +797,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
-        // 过滤净需求
-        List<DpOrderOffsetDetail> netDemands = allocations.stream()
-            .filter(allocation -> allocation.getProduceQtyDue() > 0)
-            .collect(Collectors.toList());
-
-        return new OrderAllocationResult(allocations, netDemands, finishedProductStockMap);
+        return new OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }
 
     /**
