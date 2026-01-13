@@ -133,8 +133,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     public Set<String> findPredictionVersion(MpProductionPrediction queryCondition) {
         LambdaQueryWrapper<MpProductionPrediction> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpProductionPrediction::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
-        wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
+        wrapper.eq(MpProductionPrediction::getMonthPlanVersion, queryCondition.getMonthPlanVersion());
+        wrapper.eq(MpProductionPrediction::getProductionVersion, queryCondition.getProductionVersion());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
@@ -431,10 +431,10 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
     private String getPredictionVersion(List<DpDemandPlan> tMonthDemands, List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands) {
-        if(CollectionUtils.isEmpty(tPlus2MonthDemands)) {
+        if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             return tPlus2MonthDemands.get(0).getMonthPlanVersion();
         }
-        if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
+        if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             return tPlus1MonthDemands.get(0).getMonthPlanVersion();
         }
         return tMonthDemands.get(0).getMonthPlanVersion();

@@ -10,14 +10,18 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
 import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
@@ -34,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -67,6 +74,9 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
 
     @Autowired
     private IRemoteImportErrorLogService iRemoteImportErrorLogService;
+
+    @Autowired
+    private FactoryParamServiceImpl factoryParamService;
 
     @Override
     protected String getDocTypeCode() {
@@ -202,16 +212,69 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     }
 
     @Override
-    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month, String factoryCode) {
+    public List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year, int month, String factoryCode, String sysDocTypeCode) {
         LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();
         sourceWrapper
             .eq(MdmAreaCapaAllocation::getYear, year)
             .eq(MdmAreaCapaAllocation::getMonth,month)
             .eq(MdmAreaCapaAllocation::getFactoryCode, factoryCode)
             .eq(MdmAreaCapaAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
-        return mdmAreaCapaAllocationEntityMapper.selectList(sourceWrapper);
+        List<MdmAreaCapaAllocation> list = mdmAreaCapaAllocationEntityMapper.selectList(sourceWrapper);
+
+        if (StringUtils.isNotEmpty(sysDocTypeCode)) {
+            // desc  区域产能数据查询出来后要重新调整, 防止出现区域产能分配不均的情况 2026-1-13
+            // 1.获取当前年月的总天数
+            int days = getDaysOfMonth(year, month);
+            // 2.从参数表获取当前配置的日产
+            FactoryParam search = new FactoryParam();
+            search.setFactoryCode(factoryCode);
+            search.setBusinessGroup(sysDocTypeCode);
+            search.setParamCode(MonthPlanEnums.NET_REQUIREMENT_DAY_CAPACITY.getCode());
+            search.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+            FactoryParam factoryParam = factoryParamService.getFacParamSingle(search);
+
+            // 3.从参数配置获取日产乘以天数
+            Integer dayCapacity = null;
+            if (factoryParam == null) {
+                throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmAreaCapaAllocation.factoryParamNotExists"));
+            } else {
+                dayCapacity = factoryParam.getParamValue() == null ? Integer.parseInt(factoryParam.getDefauleValue() == null ? "0" : factoryParam.getDefauleValue()) : Integer.parseInt(factoryParam.getParamValue());
+            }
+            int totalCapacity = dayCapacity * days;
+
+            // 4.计算区域产能分配比例
+            BigDecimal totalAreaCapacity = list.stream().map(MdmAreaCapaAllocation::getCapacityAllocation).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (totalAreaCapacity.compareTo(BigDecimal.ZERO) != 0 && totalCapacity > 0) {
+                BigDecimal totalAreaCapacityRate = (new BigDecimal(totalCapacity).divide(totalAreaCapacity, 2, RoundingMode.HALF_UP));
+
+                // 5.按照比例重新调整区域产能,最后一笔倒扣
+                for (int i = 0; i < list.size(); i++) {
+                    MdmAreaCapaAllocation allocation = list.get(i);
+                    BigDecimal areaCapacity = null;
+                    if (i == list.size() - 1) {
+                        areaCapacity = totalAreaCapacity.subtract(areaCapacity);
+                    }else {
+                        areaCapacity = allocation.getCapacityAllocation().multiply(totalAreaCapacityRate).setScale(0, RoundingMode.UP);
+                    }
+                    allocation.setCapacityAllocation(areaCapacity);
+                }
+            }
+        }
+        return list;
     }
 
+    /**
+     * 获取指定年份和月份的总天数
+     *
+     * @param year  年份
+     * @param month 月份（1-12）
+     * @return 该月的总天数
+     */
+    public static int getDaysOfMonth(int year, int month) {
+        // 使用 YearMonth 类计算指定月份的天数
+        YearMonth yearMonth = YearMonth.of(year, month);
+        return yearMonth.lengthOfMonth();
+    }
 
     private List<MdmAreaCapaAllocation> selectByFactoryAndYearMonth(String factoryCode, Integer year, Integer month) {
         LambdaQueryWrapper<MdmAreaCapaAllocation> sourceWrapper = new LambdaQueryWrapper<>();

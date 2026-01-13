@@ -46,10 +46,12 @@ public interface IMdmAreaCapaAllocationService extends IDocService<MdmAreaCapaAl
      */
     AjaxResult checkBeforeCopy(MdmAreaCapaAllocation entity);
     /**
-     *  查询区域产能分配是否有配置
-     * @param year 年
-     * @param month 月
+     * 查询区域产能分配是否有配置
+     *
+     * @param year       年
+     * @param month      月
+     * @param sysDocType
      * @return 区域产能
      */
-    List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year,int month,String factoryCode);
+    List<MdmAreaCapaAllocation> findAreaCapaAllocation(int year, int month, String factoryCode, String sysDocType);
 }
