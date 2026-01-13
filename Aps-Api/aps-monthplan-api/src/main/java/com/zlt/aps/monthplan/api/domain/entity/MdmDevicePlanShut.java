@@ -42,14 +42,14 @@ public class MdmDevicePlanShut extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /**
-     * 工序，字典：work_calendar_proc；01-月计划,02-硫化,03-成型,04-胎面,05-胎侧,06--内衬,07-垫胶,08-胎圈,09-钢丝圈,10-斜裁,11-直裁,12-压延,15-零度,16-密炼
-     */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmDevicePlanShut.procCode", dictType = "work_calendar_proc")
-    @ApiModelProperty(value = "工序，字典：work_calendar_proc；01-月计划,02-硫化,03-成型,04-胎面,05-胎侧,06--内衬,07-垫胶,08-胎圈,09-钢丝圈,10-斜裁,11-直裁,12-压延,15-零度,16-密炼", name = "procCode")
-    @TableField(value = "PROC_CODE")
-    private String procCode;
+//    /**
+//     * 工序，字典：work_calendar_proc；01-月计划,02-硫化,03-成型,04-胎面,05-胎侧,06--内衬,07-垫胶,08-胎圈,09-钢丝圈,10-斜裁,11-直裁,12-压延,15-零度,16-密炼
+//     */
+//    @ImportExcelValidated(required = true)
+//    @Excel(name = "ui.data.column.mdmDevicePlanShut.procCode", dictType = "work_calendar_proc")
+//    @ApiModelProperty(value = "工序，字典：work_calendar_proc；01-月计划,02-硫化,03-成型,04-胎面,05-胎侧,06--内衬,07-垫胶,08-胎圈,09-钢丝圈,10-斜裁,11-直裁,12-压延,15-零度,16-密炼", name = "procCode")
+//    @TableField(value = "PROC_CODE")
+//    private String procCode;
 
     /**
      * 机台类型，字典：device_shut_machine_type；硫化、成型、压出、裁断、压延、密炼；

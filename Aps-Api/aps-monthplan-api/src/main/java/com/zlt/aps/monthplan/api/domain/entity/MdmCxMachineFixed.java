@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -54,7 +55,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedStructure1")
     @ApiModelProperty(value = "固定结构1 多个以,分隔拼接", name = "fixedStructure1")
-    @TableField(value = "FIXED_STRUCTURE1")
+    @TableField(value = "FIXED_STRUCTURE1", updateStrategy = FieldStrategy.IGNORED)
     private String fixedStructure1;
 
     /**
@@ -63,7 +64,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedStructure2")
     @ApiModelProperty(value = "固定结构2 多个以,分隔拼接", name = "fixedStructure2")
-    @TableField(value = "FIXED_STRUCTURE2")
+    @TableField(value = "FIXED_STRUCTURE2", updateStrategy = FieldStrategy.IGNORED)
     private String fixedStructure2;
 
     /**
@@ -72,7 +73,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedStructure3")
     @ApiModelProperty(value = "固定结构3 多个以,分隔拼接", name = "fixedStructure3")
-    @TableField(value = "FIXED_STRUCTURE3")
+    @TableField(value = "FIXED_STRUCTURE3", updateStrategy = FieldStrategy.IGNORED)
     private String fixedStructure3;
 
     /**
@@ -81,7 +82,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedMaterialCode")
     @ApiModelProperty(value = "固定SKU  多个以,分隔拼接", name = "fixedMaterialCode")
-    @TableField(value = "FIXED_MATERIAL_CODE")
+    @TableField(value = "FIXED_MATERIAL_CODE", updateStrategy = FieldStrategy.IGNORED)
     private String fixedMaterialCode;
 
     /**
@@ -90,7 +91,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.disableStructure")
     @ApiModelProperty(value = "不可作业结构  多个以,分隔拼接", name = "disableStructure")
-    @TableField(value = "DISABLE_STRUCTURE")
+    @TableField(value = "DISABLE_STRUCTURE", updateStrategy = FieldStrategy.IGNORED)
     private String disableStructure;
 
     /**
@@ -99,7 +100,7 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmCxMachineFixed.disableMaterialCode")
     @ApiModelProperty(value = "不可作业SKU  多个以,分隔拼接", name = "disableMaterialCode")
-    @TableField(value = "DISABLE_MATERIAL_CODE")
+    @TableField(value = "DISABLE_MATERIAL_CODE", updateStrategy = FieldStrategy.IGNORED)
     private String disableMaterialCode;
 
 }
