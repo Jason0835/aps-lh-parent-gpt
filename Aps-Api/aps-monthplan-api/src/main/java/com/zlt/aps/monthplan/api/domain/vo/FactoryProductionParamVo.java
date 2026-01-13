@@ -46,13 +46,13 @@ public class FactoryProductionParamVo extends FactoryProductionPlanVo {
     /**
      * 排产版本
      */
-    @ApiModelProperty(required = false, value = "排产版本", name = "productionVersion")
+    @ApiModelProperty(value = "排产版本", name = "productionVersion")
     private String productionVersion;
 
 
     /**
      * 版本前缀
      */
-    @ApiModelProperty(required = false, value = "排产版本前缀", name = "prefixVersion")
+    @ApiModelProperty(value = "排产版本前缀", name = "prefixVersion")
     private String prefixVersion;
 }

@@ -47,7 +47,7 @@ public class FactoryConsoleController extends BaseController {
      * @param queryCondition 查询条件
      * @return 结果集合
      */
-    @ApiOperation("查询分厂的月份排产计划----分厂同一计划可写入多个版本")
+    @ApiOperation("查询工厂的月份排产计划----工厂同一计划可写入多个版本")
     @PostMapping("/productionVersionList")
     public TableDataInfo getProductionVersionList(@RequestBody FactoryProductionPlanVo queryCondition) {
         List<FactoryProductionPlanVersionDto> dataList = factoryConsoleService.getProductionVersionList(queryCondition);
@@ -245,7 +245,7 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
-     * 按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
+     * 按工厂 + 年月 + 需求版本的方式删除需求计划版本记录及对应的排产版本
      *
      * @param factoryProductionParam
      * @return
@@ -268,13 +268,13 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
-     * 按分厂 + 年月 + 排产版本的方式删除排产计划版本
+     * 按工厂 + 年月 + 排产版本的方式删除排产计划版本
      *
      * @param factoryProductionParam
      * @return
      */
     @ResponseBody
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")
+    @ApiOperation("按工厂 + 年月 + 排产版本的方式删除排产计划版本")
     @PostMapping("/deleteMonthPlanProductionVersion")
     public AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {
