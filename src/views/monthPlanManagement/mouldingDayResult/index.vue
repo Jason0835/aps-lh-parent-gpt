@@ -566,7 +566,6 @@ export default {
     },
   },
   created() {
-    console.log(this.$route);
     if (this.$route.query) {
       let defaultParams = {
         ...this.$route.query,
@@ -578,9 +577,10 @@ export default {
         ...defaultParams,
       };
     }
+    this.getList();
   },
   activated() {
-    this.getList();
+
   },
 };
 </script>

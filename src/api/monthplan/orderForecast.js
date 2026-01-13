@@ -16,3 +16,11 @@ export function listOrderForecast(query) {
   })
 }
 
+export function getOrderForecastVersion(query) {
+  return request({
+    url: '/monthplan/productionPrediction/findPredictionVersion',
+    method: 'post',
+    data: query
+  })
+}
+

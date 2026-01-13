@@ -180,7 +180,7 @@ export default {
                 {row.monthPlanVersion}
                 <div>
                   <text-button
-                   // onClick={() => this.handleRouterMonthPlanVersion(row)}
+                   onClick={() => this.handleRouterMonthPlanVersion(row)}
                   >
                     {"明细"}
                   </text-button>
@@ -590,7 +590,7 @@ export default {
     },
     handleRouterMonthPlanVersion(row) {
       this.$router.push({
-        path: `./requireProductionPlan`,
+        name: `DemandPlan`,
         query: {
           yearMonth: `${row.year}-${row.month}`,
           factoryCode: row.factoryCode,

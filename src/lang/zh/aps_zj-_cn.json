@@ -266,9 +266,6 @@
   "ui.data.monthlyProductionPlan.inventorySalesRatio": "库销比",
   "ui.data.monthlyProductionPlan.dayVulcanizationQty": "日硫化量",
   "ui.data.productmodelrelation.updateMainPattern": "更新主花纹到物料信息表",
-
-
-
   "ui.data.skuEmbryoRelation.updateMainPattern": "更新结构到物料信息表",
   "ui.data.mouldingDayResult.totalQty": "生产实际排产量",
   "ui.data.mouldingDayResult.differenceQty": "差异量（未排产数量）",
@@ -280,5 +277,11 @@
   "ui.data.insertOrder.mouldQty": "模具",
   "ui.data.insertOrder.heightQty": "高优先级订单净需求",
   "ui.data.insertOrder.productionQty": "排产总量",
-  "ui.data.insertOrder.monthQty": "月排产量"
+  "ui.data.insertOrder.monthQty": "月排产量",
+
+
+
+  "ui.data.demandPlan.stockQtyTotal": "总库存"
+
+
 }

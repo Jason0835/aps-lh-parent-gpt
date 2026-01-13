@@ -86,9 +86,16 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm
+    TltUploadForm,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_trial_type','biz_construction_stage','biz_urgency_type'],
+  dicts: [
+    "LINE_TYPE",
+    "JOB_TYPE",
+    "biz_factory_name",
+    "biz_trial_type",
+    "biz_construction_stage",
+    "biz_urgency_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -133,8 +140,22 @@ export default {
     }),
     columns() {
       let columns = [
-        { type: "selection", fixed: "left" ,selectable: (row) => row.productionDate },
-
+        {
+          type: "selection",
+          fixed: "left",
+          selectable: (row) => {
+            if (!row.productionDate || row.productionDate.trim() === "") {
+              return true;
+            }
+            // 如果有 productionDate，返回 false（不可选）
+            return false;
+          },
+        },
+        {
+          prop: "id",
+          label: "ID",
+          width: 80,
+        },
 
         {
           prop: "factoryCode",
@@ -167,7 +188,7 @@ export default {
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
-          width: 120
+          width: 120,
         },
         {
           prop: "materialCode",
@@ -177,14 +198,17 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300,
+          width: 300,
         },
         {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           width: 120,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+            return this.selectDictLabel(
+              this.dict.type.biz_construction_stage,
+              value
+            );
           },
         },
         {
@@ -211,12 +235,12 @@ export default {
         {
           prop: "destination",
           label: this.$t("ui.data.column.trialPlan.destination"),
-          width:120
+          width: 120,
         },
         {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
-          width:180
+          width: 180,
         },
         // {
         //   prop: "embryoType",
@@ -229,7 +253,7 @@ export default {
         {
           prop: "textNo",
           label: this.$t("ui.data.column.trialPlan.textNo"),
-          width:180
+          width: 180,
         },
         // {
         //   prop: "textType",
@@ -242,7 +266,7 @@ export default {
         {
           prop: "lhNo",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
-          width:180
+          width: 180,
         },
         // {
         //   prop: "lhType",
@@ -287,7 +311,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
-          width:120,
+          width: 120,
           render: ({ row }) => {
             return (
               <div>
@@ -329,13 +353,12 @@ export default {
           prop: "yearMonth",
           label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
-          dateType:'month',
+          dateType: "month",
           valueFormat: "yyyy-MM",
         },
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
-
         },
         {
           prop: "trialStatus",
@@ -357,9 +380,8 @@ export default {
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern")
+          label: this.$t("ui.data.column.modelinfo.pattern"),
         },
-
       ];
     },
   },
@@ -448,9 +470,9 @@ export default {
       }
 
       if (params.yearMonth) {
-        let arr=params.yearMonth.split("-");
+        let arr = params.yearMonth.split("-");
         params.year = arr[0];
-        params.month =arr[1];
+        params.month = arr[1];
         params.yearMonth = undefined;
       }
 

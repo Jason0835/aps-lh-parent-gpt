@@ -22,7 +22,7 @@
       <template slot="header">
         <el-button
           type="primary"
-            :loading="createLoading"
+          :loading="createLoading"
           plain
           @click="generPlan"
           v-hasPermi="['monthplan:productionPrediction:createMonthPrediction']"
@@ -48,6 +48,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listOrderForecast,
   createOrderForecast,
+  getOrderForecastVersion,
 } from "@/api/monthplan/orderForecast";
 //components
 
@@ -56,10 +57,16 @@ export default {
   components: {
     // tltUpload,
   },
-  dicts: ["biz_factory_name",'biz_product_type','biz_brand_type','biz_stor_type'],
+  dicts: [
+    "biz_factory_name",
+    "biz_product_type",
+    "biz_brand_type",
+    "biz_stor_type",
+  ],
   data() {
     return {
-      createLoading:false,
+      versionList: [],
+      createLoading: false,
       loading: false,
       data: [],
       selection: [],
@@ -77,29 +84,28 @@ export default {
   computed: {
     columns() {
       let columns = [
-
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width:120
+          width: 120,
         },
         {
           prop: "year",
           label: this.$t("ui.data.colume.year"),
-          width:120
+          width: 120,
         },
         {
           prop: "month",
           label: this.$t("ui.data.colume.month"),
-          width:120
+          width: 120,
         },
         {
           prop: "predictionVersion",
           label: this.$t("ui.data.orderForecast.predictionVersion"),
-          width:120
+          width: 180,
         },
         // {
         //   prop: "productionVersion",
@@ -112,7 +118,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
-          width:120
+          width: 120,
         },
         {
           prop: "locationType",
@@ -120,8 +126,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
-          width:120
-
+          width: 120,
         },
         // {
         //   prop: "类型",
@@ -133,60 +138,59 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width:120
+          width: 120,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:180
+          width: 180,
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:300
+          width: 300,
         },
         {
           prop: "month1",
           label: this.$t("ui.data.orderForecast.month1"),
-          width:120
+          width: 120,
         },
 
         {
           prop: "month2",
           label: this.$t("ui.data.orderForecast.month2"),
-          width:120
-
+          width: 120,
         },
         {
           prop: "month3",
           label: this.$t("ui.data.orderForecast.month3"),
-          width:120
+          width: 120,
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          width:120
-
+          width: 120,
         },
         {
           prop: "updateTime",
           label: this.$t("ui.data.orderForecast.updateTime"),
-          width:180
+          width: 180,
         },
-
-
       ];
 
       return columns;
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -195,8 +199,17 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
-
+        {
+          prop: "predictionVersion",
+          label: this.$t("ui.data.orderForecast.predictionVersion"),
+          type: "select",
+          filterable: true,
+          dictData: this.versionList,
+        },
 
         {
           label: this.$t("ui.data.column.monthplan.productType"),
@@ -217,15 +230,55 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersionList();
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
+    //获取版本列表
+    async getVersionList() {
+      try {
+        let res = await getOrderForecastVersion(this.formatParams());
+        console.log("versionList", res);
+        let list = [];
+        for (let i = 0; i < res.length; i++) {
+          let obj = {
+            label: res[i],
+            value: res[i],
+          };
+          list.push(obj);
+        }
+        this.versionList=list
+
+      } catch (err) {}
+    },
     async generPlan() {
       try {
-        this.createLoading=true
+        this.createLoading = true;
         let res = await createOrderForecast(this.formatParams());
         this.$modal.msgSuccess(res.msg);
         this.getList();
-        this.createLoading=false
+        this.getVersionList();
+        this.createLoading = false;
       } catch (err) {
-        this.createLoading=false
+        this.createLoading = false;
       }
     },
     handleSearch(data) {
@@ -251,7 +304,10 @@ export default {
       this.getList();
     },
     handleExport() {
-      downloadLink("/monthplan/productionPrediction/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/productionPrediction/export",
+        this.formatParams(false)
+      );
     },
 
     // utils
@@ -360,7 +416,6 @@ export default {
 
         this.data = res.rows;
 
-
         this.page.total = res.total;
       } catch (error) {
         console.error(error);
@@ -384,9 +439,9 @@ export default {
       ...defaultParams,
     };
     this.getList();
+    this.getVersionList()
   },
-  activated() {
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

@@ -75,7 +75,7 @@
       uploadUrl="/monthplan/productionMouldConfiguration/importData"
       @uploadSuccess="getList"
     />
-    <infoDialog ref="infoRef" @success="getList" />
+    <infoDialog ref="infoRef" @success="getListResize" />
     <el-dialog
       :title="title"
       :visible="visible"
@@ -145,7 +145,7 @@ export default {
   data() {
     return {
       title: "优先级调整",
-      versionList:[],
+      versionList: [],
       createLoading: false,
       loading: false,
       visible: false,
@@ -306,31 +306,51 @@ export default {
           },
         },
         {
-          prop: "yearWeek",
-          label: this.$t("ui.data.column.monthplan.weekYear"),
+          prop: "stockQty",
+          label: this.$t("总库存"),
+          width: 120,
         },
         {
-          prop: "isUniformity",
-          label: this.$t("ui.data.column.monthplan.dynamicBalance"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
+          prop: "sub2YearStockQty",
+          label: this.$t("Y-2+(DOT)"),
+          width: 120,
         },
         {
-          prop: "isDynamicBalance",
-          label: this.$t("ui.data.column.monthplan.uniformity"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
+          prop: "sub1YearStockQty",
+          label: this.$t("Y-1+(DOT)"),
+          width: 120,
         },
+        {
+          prop: "currentYearStockQty",
+          label: this.$t("Y-0+(DOT)"),
+          width: 120,
+        },
+        // {
+        //   prop: "yearWeek",
+        //   label: this.$t("ui.data.column.monthplan.weekYear"),
+        // },
+        // {
+        //   prop: "isUniformity",
+        //   label: this.$t("ui.data.column.monthplan.dynamicBalance"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
+        // {
+        //   prop: "isDynamicBalance",
+        //   label: this.$t("ui.data.column.monthplan.uniformity"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
         {
           prop: "orderQty",
           label: this.$t("ui.data.DemandPlan.orderQty"),
         },
-        {
-          prop: "stockQty",
-          label: this.$t("ui.data.DemandPlan.stockQty"),
-        },
+        // {
+        //   prop: "stockQty",
+        //   label: this.$t("ui.data.DemandPlan.stockQty"),
+        // },
         {
           prop: "plannedSurplus",
           label: this.$t("ui.data.DemandPlan.plannedSurplus"),
@@ -482,7 +502,7 @@ export default {
           dictData: this.dict.type.biz_product_type,
         },
         {
-          prop: "orderPriority)",
+          prop: "orderPriority",
           label: this.$t("ui.data.DemandPlan.order"),
           type: "select",
           dictData: this.dict.type.biz_order_type,
@@ -511,6 +531,10 @@ export default {
     },
   },
   methods: {
+    getListResize() {
+      this.getList();
+      this.getVersionList();
+    },
     tableRowClassName({ row, rowIndex }) {
       if (row.isReachMinProductionQty == 0) {
         return "warning-row";
@@ -527,9 +551,8 @@ export default {
         yearMonth: val,
       };
       this.getVersionList();
-
     },
-    handleFactoryChange(val){
+    handleFactoryChange(val) {
       this.search = {
         ...this.search,
         factoryCode: val,
@@ -696,16 +719,15 @@ export default {
     async getVersionList() {
       try {
         const data = await getVersionSelect(this.formatParams());
-        let list=[]
+        let list = [];
         for (let i = 0; i < data.length; i++) {
-          let obj={
-            label:data[i],
-            value:data[i]
-          }
-          list.push(obj)
-
+          let obj = {
+            label: data[i],
+            value: data[i],
+          };
+          list.push(obj);
         }
-        this.versionList=list
+        this.versionList = list;
       } catch (error) {
         console.error(error);
       } finally {
@@ -713,20 +735,34 @@ export default {
     },
   },
   created() {
-    const now = new Date();
-    now.setMonth(now.getMonth() + 1);
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
-    let defaultParams = {
-      factoryCode: "116",
-      yearMonth: `${year}-${month}`,
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
+    console.log(this.$route.query);
+    if (this.$route.query.yearMonth) {
+      let defaultParams = {
+        ...this.$route.query,
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
+    } else {
+      const now = new Date();
+      now.setMonth(now.getMonth() + 1);
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
+      let defaultParams = {
+        factoryCode: "116",
+        yearMonth: `${year}-${month}`,
+      };
+      this.search = {
+        ...defaultParams,
+      };
+      this.query = {
+        ...defaultParams,
+      };
+    }
+
     this.getVersionList();
     this.getList();
   },

@@ -26,9 +26,12 @@
             <el-button @click="adjustOrder" :loading="getLoading">{{
               $t("获取调整订单")
             }}</el-button>
-            <el-button @click="handShowResult(true)" :loading="autoLoading">{{
-              $t("自动调整")
-            }}</el-button>
+            <el-button
+              @click="handShowResult"
+              :loading="autoLoading"
+              :disabled="data.length == 0"
+              >{{ $t("自动调整") }}</el-button
+            >
           </el-tab-pane>
           <el-tab-pane label="结构调整" name="second">
             <el-button @click="handleAdd" :disabled="selection.length != 1">{{
@@ -103,7 +106,10 @@ import {
   autoAdjust,
   saveAdjust,
   removeAdjust,
-  removeStructure
+  removeStructure,
+  versionAdjust,
+  versionStructure,
+  getStructureDetail,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -113,6 +119,7 @@ import infoDialog from "./components/infoDialog.vue";
 import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
+import r from "highlight.js/lib/languages/r";
 
 export default {
   name: "MoldingClosingStageProgress",
@@ -136,6 +143,7 @@ export default {
   },
   data() {
     return {
+      versionList: [],
       isShowResult: false,
       getLoading: false,
       autoLoading: false,
@@ -172,22 +180,32 @@ export default {
           {
             prop: "structureName",
             label: this.$t("产品结构"),
+            width: 180,
           },
           {
             prop: "scheduledMachines",
             label: this.$t("排产机台"),
+            width: 120,
+          },
+          {
+            prop: "version",
+            label: this.$t("版本号"),
+            width: 150,
           },
           {
             prop: "materialCode",
-            label: this.$t("NC物料编码"),
+            label: this.$t("物料编码"),
+            width: 120,
           },
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
+            width: 320,
           },
           {
             prop: "hasSpecialMaterial",
             label: this.$t("是否含材料"),
+            width: 120,
             formatter: (row, column, value) => {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
@@ -195,30 +213,37 @@ export default {
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
+            width: 120,
           },
           {
             prop: "currentNetQty",
             label: this.$t("当前净需求量"),
+            width: 120,
           },
           {
             prop: "netQtyChange",
             label: this.$t("净需求变动"),
+            width: 120,
           },
           {
             prop: "monthScheduledQty",
             label: this.$t("月计划已排产量"),
+            width: 120,
           },
           {
             prop: "productionQty",
             label: this.$t("月计划已生产量"),
+            width: 120,
           },
           {
             prop: "pendingQty",
             label: this.$t("待调整量（降序）"),
+            width: 120,
           },
           {
             prop: "confirmAdjustQty",
             label: this.$t("确认调整量"),
+
             render: ({ row }) => {
               return (
                 <div>
@@ -246,7 +271,11 @@ export default {
               return (
                 <div>
                   {this.isEdit && (
-                    <el-select v-model={row.adjustPriority}   onChange={(val) => this.editAdjust(row, val)}   size="mini">
+                    <el-select
+                      v-model={row.adjustPriority}
+                      onChange={(val) => this.editAdjust(row, val)}
+                      size="mini"
+                    >
                       <el-option label="1" value="1" key="1" />
                       <el-option label="2" value="2" key="2" />
                       <el-option label="3" value="3" key="3" />
@@ -260,10 +289,12 @@ export default {
           {
             prop: "actualAdjustment",
             label: this.$t("实际调整"),
+            width: 120,
           },
           {
             prop: "adjustmentReason",
             label: this.$t("调整原因"),
+            width: 120,
           },
           {
             align: "center",
@@ -310,7 +341,10 @@ export default {
               );
             },
           },
-
+          {
+            prop: "version",
+            label: this.$t("版本号"),
+          },
           {
             prop: "cxMachineCode",
             label: this.$t("成型机台"),
@@ -336,7 +370,6 @@ export default {
               return (
                 <div>
                   <el-button
-
                     class="minus"
                     type="danger"
                     onClick={() => this.handleStructureDelete(row)}
@@ -529,6 +562,10 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          clearable: false,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -552,10 +589,14 @@ export default {
         {
           prop: "version",
           label: this.$t("版本"),
+          type: "select",
+          clearable: false,
+          filterable: true,
+          dictData: this.versionList,
         },
         {
           prop: "materialCode",
-          label: this.$t("NC物料编码"),
+          label: this.$t("物料编码"),
         },
         {
           prop: "materialDesc",
@@ -631,7 +672,51 @@ export default {
         ...this.search,
         yearMonth: val,
       };
+      this.getVersionList();
     },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
+    //获取版本列表
+    async getVersionList(isGet = false) {
+      let res;
+      try {
+        if (this.activeName == "first") {
+          res = await versionAdjust(this.formatParams());
+        }
+        if (this.activeName == "second") {
+          res = await versionStructure(this.formatParams());
+        }
+        let list = [];
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj = {
+            label: res.rows[i].version,
+            value: res.rows[i].version,
+          };
+          list.push(obj);
+        }
+
+        this.versionList = list;
+        console.log("versionList", res);
+        if (list.length > 0) {
+          this.$set(this.search, "version", list[0].value);
+        } else {
+          this.$set(this.search, "version", "");
+        }
+        if (isGet) {
+          this.getList();
+        }
+      } catch (err) {}
+    },
+
     backPlan() {
       if (this.adjustType == "01") {
         this.activeName = "first";
@@ -679,14 +764,33 @@ export default {
         this.getLoading = false;
       }
     },
-    handleExpandChange(row, expandedRows) {
-      console.log(row, expandedRows, this.expands);
+    async handleExpandChange(row, expandedRows) {
       this.expands = [];
       //通过当前的行获取
       if (expandedRows.length > 0) {
         this.subTableData = [];
-        this.expands.push(row ? row.id : []);
+        try {
+          let params = {
+            ...this.query,
+            ...this.sort,
+          };
+          if (params.yearMonth) {
+            let arr = params.yearMonth.split("-");
+            params.year = arr[0];
+            params.month = arr[1];
+            params.yearMonth = "";
+          }
+          params.structureName = row.structureName;
+          params.productionVersion = row.productionVersion;
+          let res = await getStructureDetail(params);
+          this.expands.push(row ? row.id : []);
+          this.subTableData = res.rows
+        } catch (err) {}
+
+        console.log("展开");
         // this.getSubList(row.id);
+      } else {
+        console.log("收起");
       }
     },
     handleAddSpecial() {
@@ -710,7 +814,8 @@ export default {
         this.adjustType = "02";
         this.isEdit = false;
       }
-      this.getList();
+      // this.getList();
+      this.getVersionList(true);
     },
     async handShowResult() {
       this.show = false;
@@ -721,12 +826,12 @@ export default {
           ...this.query,
           ...this.sort,
           adjustType: this.adjustType,
-          adjustResultList: this.data,
+          version: this.data[0]?.version,
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
+          params.year = arr[0];
+          params.month = arr[1];
           params.yearMonth = "";
         }
         console.log(params);
@@ -909,7 +1014,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getList();
+    this.getVersionList(true);
   },
   activated() {
     // console.log('activated')

@@ -59,8 +59,17 @@ export function saveAdjust(query) {
     data: query
   })
 }
-//结构内行删除
+//结构外行删除
 export function removeStructure(query) {
+  return request({
+    url: '/monthplan/mpStructureAllocation/remove',
+    method: 'post',
+    data: query
+  })
+}
+
+//结构内删除
+export function removeAdjust(query) {
   return request({
     url: '/monthplan/mpAdjustStructureIn/remove',
     method: 'post',
@@ -68,10 +77,29 @@ export function removeStructure(query) {
   })
 }
 
-//结构外删除
-export function removeAdjust(query) {
+
+//结构内获取版本列表
+export function versionAdjust(query) {
   return request({
-    url: '/monthplan/mpStructureAllocation/remove',
+    url: '/monthplan/mpAdjustStructureIn/getVersionList',
+    method: 'post',
+    data: query
+  })
+}
+//结构外获取版本列表
+export function versionStructure(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureOut/getVersionList',
+    method: 'post',
+    data: query
+  })
+}
+
+
+//结构外获取列表明细
+export function getStructureDetail(query) {
+  return request({
+    url: '/monthplan/factoryMonthPlanFinalResult/listSkuScheduleItems',
     method: 'post',
     data: query
   })
