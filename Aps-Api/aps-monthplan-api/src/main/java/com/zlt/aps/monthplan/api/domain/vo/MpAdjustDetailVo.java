@@ -25,4 +25,8 @@ public class MpAdjustDetailVo extends MpAdjustStructureIn {
     @TableField(exist = false)
     private String isTrial;
 
+    @ApiModelProperty(value = "是否SKU新增")
+    @TableField(exist = false)
+    private String isSkuAdd;
+
 }
