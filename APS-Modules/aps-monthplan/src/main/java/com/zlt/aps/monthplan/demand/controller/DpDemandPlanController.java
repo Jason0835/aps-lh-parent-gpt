@@ -1,9 +1,12 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.web.page.PageDomain;
+import com.ruoyi.common.core.web.page.TableSupport;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.common.utils.CollectionKit;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
@@ -12,6 +15,7 @@ import com.zlt.aps.monthplan.demand.service.impl.DpDemandPlanServiceImpl;
 import com.zlt.common.utils.PubUtil;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -19,7 +23,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 
@@ -54,18 +60,14 @@ import com.zlt.bill.common.service.IDocService ;
 */
 @Slf4j
 @Api(tags = "需求计划")
+@AllArgsConstructor
 @RestController
 @RequestMapping("/demandPlan")
 public class DpDemandPlanController extends AbstractDocBizController<DpDemandPlan> {
 
-    @Autowired
-    private IDpDemandPlanService dpDemandPlanService;
-
-    @Autowired
-    private RequirementVersionService requirementVersionService;
-
-    @Autowired
-    private DpDemandPlanEntityMapper entityMapper;
+    private final IDpDemandPlanService dpDemandPlanService;
+    private final RequirementVersionService requirementVersionService;
+    private final DpDemandPlanEntityMapper entityMapper;
 
     /**
      * 查询需求计划列表
@@ -74,8 +76,22 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
-        return super.list(queryVO);
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>(queryVO);
+        builderCondition(queryWrapper,queryVO);
+        List<DpDemandPlan> dataList =  dpDemandPlanService.list(queryWrapper);
+        if(CollectionUtils.isEmpty(dataList)) {
+            return getDataTable(Collections.emptyList());
+        }
+        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
+        PageDomain pageDomain = TableSupport.buildPageRequest();
+        Integer pageNum = pageDomain.getPageNum();
+        Integer pageSize = pageDomain.getPageSize();
+        pageNum = pageNum == null ? 1 : pageNum;
+        pageSize = pageSize == null ? 10000000 : pageSize;
+        List<DpDemandPlan>  list = CollectionKit.sortPageAll(pageNum,pageSize,comparator,dataList);
+        return new TableDataInfo(list,dataList.size());
     }
+
 
     @Override
     protected String getOrderBy() {
@@ -146,7 +162,13 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     protected List<DpDemandPlan> listExportData(DpDemandPlan obj) {
         QueryWrapper<DpDemandPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<DpDemandPlan> dataList =  dpDemandPlanService.list(wrapper);
+        if(CollectionUtils.isEmpty(dataList)) {
+            return Collections.emptyList();
+        }
+        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
+        dataList.sort(comparator);
+        return dataList;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.service;
 
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.bill.common.service.IDocService;
@@ -64,4 +65,10 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return
      */
     List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,List<DpDemandPlan> leftDemands);
+    /**
+     *  列表查询数据
+     * @param queryWrapper
+     * @return
+     */
+    List<DpDemandPlan> list(QueryWrapper<DpDemandPlan> queryWrapper);
 }
