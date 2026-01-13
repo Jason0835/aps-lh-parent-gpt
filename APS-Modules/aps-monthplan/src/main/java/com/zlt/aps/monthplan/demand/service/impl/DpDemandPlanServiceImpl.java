@@ -782,48 +782,36 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(org.springframework.util.CollectionUtils.isEmpty(groupMap)) {
             return Collections.emptyList();
         }
-
-        // 以SKU维度汇总demandPlans.OrderQty // 排除储备的数据
-        Map<String, Integer> skuDemandQtyMap = demandPlans.stream()
-                .filter(item->StringUtils.isNotBlank(item.getScmPriority()) && ((
-                        ! ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(item.getScmPriority())  &&
-                        ! ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(item.getScmPriority())
-                        ) ))
-            .collect(Collectors.toMap(
-                    DpDemandPlan::getMaterialCode,
-                    DpDemandPlan::getOrderQty,
-                Integer::sum
-            ));
         List<DpDemandPlan> list = Lists.newArrayList();
         groupMap.forEach((key, value) -> {
             // 获取基础模板（第一个元素）
-            DpDemandPlan template = value.get(0);
-            if(!skuMap.containsKey(template.getMaterialCode())) {
+            DpDemandPlan template = value.stream().filter(item -> key.equals(item.getGroupKey())).findFirst().orElse(null);
+            if(null == template || !skuMap.containsKey(template.getMaterialCode())) {
                 return;
             }
+
             list.add(buildMergedDemandPlan(
+                template,
                 value,
                 minProductionQty,
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap,monthlySaleQty,skuDemandQtyMap));
+                productionTypeMap,monthlySaleQty));
         });
         log.info("groupKeys:{}",groupMap.keySet());
         return list;
     }
 
     private DpDemandPlan buildMergedDemandPlan(
+            DpDemandPlan template,
             List<DpDemandPlan> groupPlans,
             int minProductionQty,
             Map<String, MdmMaterialInfo> skuMap,
             Map<String, List<MdmProductStock>> finishedProductStockMap,
             Map<String, Integer> mdmMonthSurplusMap,
             Map<String, String> productionTypeMap,
-            Map<String, Integer> monthlySaleQty, Map<String, Integer> skuDemandQtyMap) {
-
-        // 获取基础模板（第一个元素）
-        DpDemandPlan template = groupPlans.get(0);
+            Map<String, Integer> monthlySaleQty) {
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置物料信息（使用computeIfAbsent优化Map访问）
@@ -833,7 +821,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 设置排产分类
         setProductionType(mergedPlan,productionTypeMap);
         // 计算并设置各类数量统计
-        setQuantityStatistics(mergedPlan, groupPlans, minProductionQty, skuDemandQtyMap);
+        setQuantityStatistics(mergedPlan, groupPlans, minProductionQty);
         // 设置月均销量
         setAverageSaleQty(mergedPlan,monthlySaleQty);
 
@@ -917,29 +905,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setQuantityStatistics(
             DpDemandPlan demandPlan,
             List<DpDemandPlan> groupPlans,
-            int minProductionQty, Map<String, Integer> skuDemandQtyMap) {
-
-        //检查groupPlans是否存在供应链订单级别的优先级
-        boolean isGroupPlansHasScmPriority = groupPlans.stream().anyMatch
-                (item->StringUtils.isNotBlank(item.getScmPriority()) && ((
-                        ! ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(item.getScmPriority())  &&
-                                ! ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(item.getScmPriority())
-                )));
-        Integer orderQty;
-        if (isGroupPlansHasScmPriority) {
-            //存在则汇总所有的orderQty
-             orderQty = groupPlans.stream().mapToInt(DpDemandPlan::getOrderQty).sum();
-        } else {
-            //不存在则汇总所有的netQty
-            orderQty = skuDemandQtyMap.get(demandPlan.getMaterialCode());
-        }
-
+            int minProductionQty) {
         // 使用统计对象收集所有数据，避免多次遍历
         QuantityStatistics statistics = groupPlans.stream()
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
-        // 设置基本数量
-        demandPlan.setOrderQty(orderQty);
         // 设置优先级相关数量
+        // 设置基本数量
+        demandPlan.setOrderQty(statistics.totalOrderQty);
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
         demandPlan.setPostponeQty(statistics.postponeQty);
@@ -1084,17 +1056,18 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             if (plan == null) {
                 return;
             }
-
-            totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
             // 根据订单优先级累加对应数量
             String priority = plan.getScmPriority();
             int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {
+                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 heightQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_MID.equals(priority)) {
+                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 midQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_POSTPONE.equals(priority)) {
+                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 postponeQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(priority)) {
                 cycleReserveQty += netQty;
