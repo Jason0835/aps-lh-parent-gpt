@@ -7,7 +7,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -43,7 +42,7 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @param queryCondition 查询条件
      * @return 需求计划版本号列表
      */
-    Set<String> findMonthPlanVersion(DpDemandPlan queryCondition);
+    List<String> findMonthPlanVersion(DpDemandPlan queryCondition);
 
     /**
      * 生成调整需求计划
