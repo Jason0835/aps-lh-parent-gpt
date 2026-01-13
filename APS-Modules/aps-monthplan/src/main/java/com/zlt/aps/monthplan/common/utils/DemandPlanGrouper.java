@@ -27,7 +27,7 @@ public class DemandPlanGrouper {
   /**
    * 主处理方法：按业务规则分组需求计划
    */
-  public static Map<String, List<DpDemandPlan>> groupDemandPlans(List<DpDemandPlan> demandPlans) {
+  public static Map<String, List<DpDemandPlan>> groupDemandPlans(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans) {
     if (CollectionUtils.isEmpty(demandPlans)) {
       return Collections.emptyMap();
     }
@@ -37,13 +37,14 @@ public class DemandPlanGrouper {
         .collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
 
     // 2. 分类处理
-    return processGroups(originalGroups);
+    return processGroups(createCondition,originalGroups);
   }
 
   /**
    * 处理分组：分离纯储备订单分组并进行合并
    */
   private static Map<String, List<DpDemandPlan>> processGroups(
+      DpDemandPlan createCondition,
       Map<String, List<DpDemandPlan>> originalGroups) {
 
     // 分离纯储备订单分组和销售订单分组
@@ -75,7 +76,7 @@ public class DemandPlanGrouper {
     Map<String, List<DpDemandPlan>> resultGroups = new HashMap<>(mixedGroups);
     resultGroups.putAll(salesGroups);
 
-    mergePureReserveGroups(pureReserveGroups, salesGroupIndex, resultGroups);
+    mergePureReserveGroups(createCondition,pureReserveGroups, salesGroupIndex, resultGroups);
 
     return resultGroups;
   }
@@ -131,6 +132,7 @@ public class DemandPlanGrouper {
    * 合并纯储备订单分组到合适的销售订单分组
    */
   private static void mergePureReserveGroups(
+      DpDemandPlan createCondition,
       Map<String, List<DpDemandPlan>> pureReserveGroups,
       SalesGroupIndex salesGroupIndex,
       Map<String, List<DpDemandPlan>> resultGroups) {
@@ -153,8 +155,13 @@ public class DemandPlanGrouper {
         // 合并到目标分组
         List<DpDemandPlan> targetGroup = resultGroups.get(bestGroup.groupKey);
         targetGroup.addAll(reservePlans);
+        continue;
       }
       // 如果找不到合适的分组，则舍弃这个纯储备订单分组
+      if(createCondition.isIncludePostpone()) {
+        continue;
+      }
+      resultGroups.put(reserveEntry.getKey(),reservePlans);
     }
   }
 
