@@ -23,6 +23,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -192,16 +193,16 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion"))) {
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("monthPlanVersion").toString()) ) {
             queryWrapper.like("MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
         }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode"))) {
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialCode").toString()) ) {
             queryWrapper.like("MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName"))) {
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("structureName").toString()) ) {
             queryWrapper.like("STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc"))) {
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialDesc").toString()) ) {
             queryWrapper.like("MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         }
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
