@@ -458,7 +458,7 @@ public class MpWeekRollAdjustEngine {
             sb.append(scheduleVo.getSkuQuantity());
             iDay +=1;
         }
-        contextDTO.getLogDetail().append(String.format("结构:%s,【降模排产】,物料编码:%s,降模前的计划量:%s,降模开始日:%s,降模每日计划量:%s",contextDTO.getStructureName(),prodFinal.getMaterialCode(),dayQty,iDay,sb.toString())).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【降模排产】,物料编码:%s,降模前的计划量:%s,降模开始日:%s,降模每日计划量:%s",contextDTO.getStructureName(),prodFinal.getMaterialCode(),dayQty,iDay-1,sb.toString())).append(ApsConstant.DIVISION);
     }
 
     /**
