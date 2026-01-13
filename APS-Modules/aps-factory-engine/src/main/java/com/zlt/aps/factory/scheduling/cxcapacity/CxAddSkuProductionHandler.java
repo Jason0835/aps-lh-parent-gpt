@@ -88,7 +88,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //重新确认排产时间范围
-        groupPlanInfo.correctProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), lhGroup);
+        groupPlanInfo.correctProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), lhGroup, doubleMouldList);
         startDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
         log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
@@ -96,6 +96,8 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, groupPlanInfo, needProductionInfo);
             return;
         }
+        //根据模具的排产范围再次修正排产范围
+
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
