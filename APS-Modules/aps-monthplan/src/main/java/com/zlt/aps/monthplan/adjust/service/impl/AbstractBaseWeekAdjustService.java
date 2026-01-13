@@ -9,6 +9,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
@@ -24,6 +25,8 @@ import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustResultService;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureLogService;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -32,6 +35,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureLog;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
@@ -39,6 +43,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
@@ -107,6 +112,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected IDpDemandPlanService dpDemandPlanService;
 
     @Autowired
+    protected IMpAdjustResultService mpAdjustResultService;
+
+    @Autowired
+    protected IMpAdjustStructureLogService mpAdjustLogService;
+
+    @Autowired
     protected BaseDao baseDao;
 
 
@@ -170,6 +181,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustEngine.structureInAutoAdjust(contextDTO);
         //保存调整结果
         saveMpAdjustResult(contextDTO);
+        //保存调整日志
+        saveMpAdjustLog(contextDTO);
     }
 
     /**
@@ -181,25 +194,47 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(factoryMonthPlanProdFinalList)){
             return;
         }
-        //1、根据调整版本 先删除
-        LambdaQueryWrapper<MpAdjustResult> adjustResultWrapper = new LambdaQueryWrapper<>();
-        adjustResultWrapper.eq(MpAdjustResult::getFactoryCode, contextDTO.getFactoryCode());
-        adjustResultWrapper.eq(MpAdjustResult::getYear, contextDTO.getMpYear());
-        adjustResultWrapper.eq(MpAdjustResult::getMonth, contextDTO.getMpMonth());
-        adjustResultWrapper.eq(MpAdjustResult::getVersion, contextDTO.getVersion());
-        mpAdjustResultEntityMapper.delete(adjustResultWrapper);
-
+        //1、根据调整版本 先删除(物理)
+        mpAdjustResultService.deleteAdjustResultByVersion(contextDTO.getFactoryCode(),
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
         //2、保存调整记录
         MpAdjustResult mpAdjustResult;
         List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
         for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:factoryMonthPlanProdFinalList){
             mpAdjustResult = new MpAdjustResult();
             BeanUtils.copyProperties(finalAdjustVo,mpAdjustResult);
+            mpAdjustResult.setId(null);
             mpAdjustResult.setAdjustType("01");
             mpAdjustResult.setVersion(contextDTO.getVersion());
             mpAdjustResultList.add(mpAdjustResult);
         }
-        //baseDao.insertBatch(mpAdjustResultList);
+        baseDao.insertBatch(mpAdjustResultList);
+    }
+
+    /**
+     * 保存调整日志
+     * @param contextDTO
+     */
+    private void saveMpAdjustLog(MpRollAdjustContextDTO contextDTO){
+        String logDetail = contextDTO.getLogDetail().toString();
+        if (StringUtil.isEmptyWithTrim(logDetail)){
+            return;
+        }
+        //1、根据调整版本 先删除(物理)
+        mpAdjustLogService.deleteAdjustLogByVersion(contextDTO.getFactoryCode(),
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
+        //2、保存调整日志
+        MpAdjustStructureLog structureLog = new MpAdjustStructureLog();
+        structureLog.setFactoryCode(contextDTO.getFactoryCode());
+        structureLog.setYear(contextDTO.getMpYear());
+        structureLog.setMonth(contextDTO.getMpMonth());
+        structureLog.setProductionVersion(contextDTO.getProductionVersion());
+        structureLog.setLastMonthPlanVersion(contextDTO.getVersion());
+        structureLog.setAdjVersion(contextDTO.getVersion());
+        structureLog.setAction("结构内调整");
+        structureLog.setOperator(SecurityUtils.getUsername());
+        structureLog.setLogDetail(logDetail);
+        baseDao.insert(structureLog);
     }
 
     @Override
