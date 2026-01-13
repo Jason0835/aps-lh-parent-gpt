@@ -163,6 +163,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
