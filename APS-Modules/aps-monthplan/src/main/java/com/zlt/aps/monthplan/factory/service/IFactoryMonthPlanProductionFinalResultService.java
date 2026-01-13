@@ -49,13 +49,21 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
     int calculateStructureFrequency(String materialCode);
 
     /**
-     * 库存抓取日~（同月）月底的月度计划量汇总
+     * 库存抓取日~（同月）月底的月度计划量汇总并保存
      *
      * @param requireVersion        需求版本号
      * @param finishedProductStocks 成品库存
      * @return 月度计划量汇总
      */
     Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks);
+
+    /**
+     * 库存抓取日~（同月）月底的月度计划量汇总不保存
+     *
+     * @param finishedProductStocks 成品库存
+     * @return 月度计划量汇总
+     */
+    Map<String, Integer> calculateMonthSurplusNoSave(List<MdmProductStock> finishedProductStocks);
 
     /**
      * 获取最终排产结果

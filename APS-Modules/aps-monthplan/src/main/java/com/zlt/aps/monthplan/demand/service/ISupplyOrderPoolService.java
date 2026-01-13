@@ -36,6 +36,13 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    */
   @Transactional
   void createPrecedentStockUp(SupplyOrderPool supplyOrderPool);
+
+  /**
+   * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
+   * @param supplyOrderPool 入参
+   * @return AjaxResult
+   */
+  AjaxResult calculateStockMsg(SupplyOrderPool supplyOrderPool);
   /**
    *  输入物料编码，带出对应信息
    * @param supplyOrderPool  物料编码

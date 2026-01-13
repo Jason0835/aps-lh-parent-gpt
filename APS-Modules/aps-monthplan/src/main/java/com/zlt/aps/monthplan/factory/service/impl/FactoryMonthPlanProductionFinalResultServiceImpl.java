@@ -157,6 +157,47 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         return monthSurplusMap;
     }
 
+
+    @Override
+    public Map<String, Integer> calculateMonthSurplusNoSave(List<MdmProductStock> finishedProductStocks) {
+        if (CollectionUtils.isEmpty(finishedProductStocks)) {
+            return Collections.emptyMap();
+        }
+        List<Date> stockDates = finishedProductStocks.stream().map(MdmProductStock::getStockDate).filter(Objects::nonNull).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(stockDates)) {
+            return Collections.emptyMap();
+        }
+        Date maxDate = stockDates.stream()
+                .filter(Objects::nonNull)
+                .max(Date::compareTo).orElse(null);
+        if (null == maxDate) {
+            return Collections.emptyMap();
+        }
+        int year = DateUtils.getYear(maxDate);
+        int month = DateUtils.getMonthsByYear(maxDate);
+        int stockDay = DateUtils.getDaysByMonth(maxDate);
+        // 获取当前年月
+        String yearMonth = String.format("%s%02d", year, month);
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
+        if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> monthSurplusMap = Maps.newHashMap();
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> groupByMaterialCode = this.getGroupMonthProdFinalPlanByMaterialCode(factoryMonthPlanProdFinals);
+        groupByMaterialCode.forEach((key, value) -> {
+            int planSurplusQty = this.calculateMonthSurplus(value, stockDay);
+            if (planSurplusQty <= BigDecimal.ZERO.longValue()) {
+                return;
+            }
+            monthSurplusMap.put(key, planSurplusQty);
+        });
+        return monthSurplusMap;
+    }
+
+
     private int calculateMonthSurplus(List<FactoryMonthPlanProductionFinalResult> productionFinalResults, int stockDay) {
         int totalMonthSuplus = BigDecimal.ZERO.intValue();
         //统计汇总值
