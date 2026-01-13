@@ -272,6 +272,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setIncludePostpone(true);
+        createCondition.setMonthPlanVersion(predictionVersion);
         // 2. 并行获取数据
         DataCollection data = fetchRequiredDataInParallel(predictionVersion,finalVersion);
         // 3. 处理销售订单分配
