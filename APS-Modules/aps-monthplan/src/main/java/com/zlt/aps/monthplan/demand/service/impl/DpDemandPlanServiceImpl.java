@@ -424,61 +424,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return datas;
     }
 
-    @Override
-    public List<DpDemandPlan> createTplus2DemandPlan(DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion) {
-        YearMonth tPlus1Month = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
-        // 		11、计算T+1月的需求量	  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量  + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
-        YearMonth tPlus2Month =   tPlus1Month.plusMonths(1);
-        // 		11、计算T+1月的需求量	  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量  + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
-        createCondition.setYear(tPlus2Month.getYear());
-        createCondition.setMonth(tPlus2Month.getMonthValue());
-        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
-        createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
-        createCondition.setMonthPlanVersion(predictionVersion);
-        // 2. 并行获取数据
-        DataCollection data = fetchRequiredDataInParallel(predictionVersion,finalVersion);
-        // 3. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tPlus2Month,
-            predictionVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
-            data.getMonthSurplusMap());
-        // 5. 批量保存分配结果
-        saveAllocationResults(createCondition, predictionVersion, allocationResult);
-        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(allocationResult.getNetDemands(),productionFinalResults,mpMonthPlanMonitors);
-        if(CollectionUtils.isEmpty(netDemands)){
-            return Collections.emptyList();
-        }
-        List<SupplyOrderPool> cycleStockOrders = PredictionAllocationHelper.calculateCycleStockOrder(data.getSupplyOrderPools(),productionFinalResults,mpMonthPlanMonitors);
-
-        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String monthPlanVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
-        createCondition.setMonthPlanVersion(monthPlanVersion);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus2Month);
-        if(CollectionUtils.isEmpty(supplyOrderPools)){
-            supplyOrderPools = Lists.newArrayList();
-        }
-        if(!CollectionUtils.isEmpty(cycleStockOrders)){
-            supplyOrderPools.addAll(cycleStockOrders);
-        }
-        data.supplyOrderPools = supplyOrderPools;
-        data.postponeOrders = null;
-        // 6. 处理需求计划生成
-        List<DpDemandPlan> demandPlans = generateDemandPlans(
-            createCondition,netDemands, data);
-        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
-        // 7. 合并并保存需求计划
-        if (!CollectionUtils.isEmpty(demandPlans)) {
-            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, data);
-        }
-        // 8. 保存订单池快照
-        saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
-        // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tPlus2Month,monthPlanVersion);
-        return mergedDemandPlans;
-    }
-
     private Map<String, Integer> calculateConventionReserveQty(List<DpDemandPlan> dataList) {
         if(CollectionUtils.isEmpty(dataList)) {
             return Collections.emptyMap();

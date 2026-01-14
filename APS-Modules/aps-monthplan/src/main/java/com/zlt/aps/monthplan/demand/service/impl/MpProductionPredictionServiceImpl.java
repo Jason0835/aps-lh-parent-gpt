@@ -123,10 +123,10 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             Context context = buildContext(tPlus1MonthDemands);
             monthPlanProductionSchedulingService.general(context);
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
-            tPlus2MonthDemands = dpDemandPlanService.createTplus2DemandPlan(param,finalVersionByTplus1Month);
+            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month);
         }
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
-            Context context = buildContext(tPlus1MonthDemands);
+            Context context = buildContext(tPlus2MonthDemands);
             monthPlanProductionSchedulingService.general(context);
         }
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
