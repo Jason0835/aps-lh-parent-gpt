@@ -112,6 +112,7 @@ public class SaleRequirePlanHelper {
         List<DpOrderOffsetDetail> midPriorityOrders = Lists.newArrayList();
         // 从后向前遍历
         for (int i = size - 1; i >= 0; i--) {
+            log.info("index:{},accumulatedDemand:{},produceQtyDue:{},overAreaCapacityValue:{}", i, accumulatedDemand,sortedOrders.get(i).getProduceQtyDue(),overAreaCapacityValue);
             if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() > overAreaCapacityValue) {
                 highPriorityOrders.add(sortedOrders.get(i));
             }else{
