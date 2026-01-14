@@ -552,6 +552,7 @@ public class MpWeekRollAdjustEngine {
         String dayField,matchDayField;
         StringBuffer sb = new StringBuffer();
         int structureDeadline = contextDTO.getStructureDeadLine();
+        int oriTotalMatchQty = totalMatchQty;
         //实单肯定在前，从后向前扣减
         for (int i = structureDeadline; i>= startDay; i--){
             dayField = FactoryConstant.DAY_FIELD+i;
@@ -571,7 +572,7 @@ public class MpWeekRollAdjustEngine {
             }
             sb.append(prodFinal.getFieldValueByFieldName(matchDayField)).append(",");
             if (totalMatchQty == 0){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,每日搭配量:%s",contextDTO.getStructureName(), totalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,收尾->开始的每日搭配量:%s",contextDTO.getStructureName(), oriTotalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
                 //剩余搭配量=0,退出
                 break;
             }
