@@ -278,7 +278,7 @@ public class MpWeekRollAdjustEngine {
      */
     private List<FactoryMonthPlanFinalAdjustVo> findCanMoveSkuList(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int secStartDay) {
         List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream()
-                .filter(x->secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
+                .filter(x->x.getBeginDay()!=null && secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
                     // 自定义比较逻辑(总的已排实单量)
                     int totalQty1 = o1.getHeightProductionQty() + o1.getMidProductionQty();
                     int totalQty2 = o2.getHeightProductionQty() + o2.getMidProductionQty();

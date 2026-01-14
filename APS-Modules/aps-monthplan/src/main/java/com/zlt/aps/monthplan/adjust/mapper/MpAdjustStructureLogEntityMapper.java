@@ -31,5 +31,5 @@ public interface MpAdjustStructureLogEntityMapper extends CommBaseMapper<MpAdjus
                                      @Param("year") String year,
                                      @Param("month") String month,
                                      @Param("version") String version,
-                                     @Param("structure") String structure);
+                                     @Param("structureName") String structureName);
 }
