@@ -324,7 +324,7 @@ public class CxCapacityAllocationHandler {
         List<CxMachineBaseInfoVo> fixedPriorityList = enableCxMachineList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
         if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
             CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineBrandCode()));
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode()));
             return fixedSelected;
         }
         //设置是否同规格，同英寸,断面宽
@@ -337,7 +337,7 @@ public class CxCapacityAllocationHandler {
                 .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
         fixedPriorityList.sort(sortComparator);
         CxMachineBaseInfoVo selected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineBrandCode()));
+        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode()));
         return selected;
     }
 

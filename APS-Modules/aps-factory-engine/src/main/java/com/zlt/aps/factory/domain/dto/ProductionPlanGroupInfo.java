@@ -82,7 +82,7 @@ public class ProductionPlanGroupInfo {
     private Integer leftOverNeedAllocationDays;
     /**
      * 成型-硫化配比信息
-     * key=机型brandCode ： value=配比信息
+     * key=机型typeCode ： value=配比信息
      */
     private Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap;
     /**
@@ -333,13 +333,13 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public MonthPlanStructureLhRatioVo getLhRatio(CxMachineBaseInfoVo cxMachineInfo) {
-        if (null == cxMachineInfo || StringUtils.isBlank(cxMachineInfo.getCxMachineBrandCode())) {
+        if (null == cxMachineInfo || StringUtils.isBlank(cxMachineInfo.getCxMachineTypeCode())) {
             return null;
         }
         if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
             return null;
         }
-        MonthPlanStructureLhRatioVo lhRatio = cxMachineLhRationMap.get(cxMachineInfo.getCxMachineBrandCode());
+        MonthPlanStructureLhRatioVo lhRatio = cxMachineLhRationMap.get(cxMachineInfo.getCxMachineTypeCode());
         if (null != lhRatio) {
             return lhRatio;
         }
@@ -383,22 +383,22 @@ public class ProductionPlanGroupInfo {
         Integer conclusionDay = selectedDayLimit.getDay();
         Integer endDay = endDayLimit.getDay();
         if (isGroupStartDayByFormalProduction(conclusionDay)) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         Integer previousDay = getPreviousDay(conclusionDay);
         if (null == previousDay) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
-        Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        Integer canAddCount = previousLimit.getReleaseLhMachineCount(selectedDayLimit);
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
-        if (BigDecimal.ONE.intValue() == canAddCount) {
-            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+        if (null == previousSku) {
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
-        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+        return EarliestConclusionLhGroupHelper.createEarliestConclusionLhGroup(conclusionDay, endDay, previousSku, true);
     }
 
     /**
@@ -433,22 +433,23 @@ public class ProductionPlanGroupInfo {
         Integer conclusionDay = selectedDayLimit.getDay();
         Integer endDay = endDayLimit.getDay();
         if (isGroupStartDayByFormalProduction(conclusionDay)) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         Integer previousDay = getPreviousDay(conclusionDay);
         if (null == previousDay) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
-        Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        //可释放的机台 Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        Integer canAddCount = previousLimit.getReleaseLhMachineCount(selectedDayLimit);
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
-            return new EarliestConclusionLhGroupHelper("", "", BigDecimal.ZERO.intValue(), conclusionDay, endDay, new HashSet<>());
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
-        if (BigDecimal.ONE.intValue() == canAddCount) {
-            return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), previousSku.getLastRemainder(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+        if (null == previousSku) {
+            return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
-        return new EarliestConclusionLhGroupHelper(previousSku.getMaterialDesc(), previousSku.getMaterialCode(), BigDecimal.ZERO.intValue(), conclusionDay, endDay, previousSku.getUsedMouldSet());
+        return EarliestConclusionLhGroupHelper.createEarliestConclusionLhGroup(conclusionDay, endDay, previousSku, true);
     }
 
     /**

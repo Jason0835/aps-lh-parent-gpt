@@ -133,15 +133,15 @@ public class GroupPlanCxMachineSelector {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
             return false;
         }
-        String brandCode = cxMachineInfo.getCxMachineBrandCode();
+        String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo lhRatioInfo = groupPlanInfo.getLhRatio(cxMachineInfo);
         if (null == lhRatioInfo) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, brandCode));
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
             return false;
         }
         cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, brandCode));
+        log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
         return true;
     }
 }

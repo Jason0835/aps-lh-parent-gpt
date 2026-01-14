@@ -95,7 +95,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
             return capacityInfo;
         }
         //得到结构成型类型的配比
-        MonthPlanStructureLhRatioVo lhRatio = getLhRation(baseInfo.getCxMachineBrandCode(), structureName, structureLhRatioList);
+        MonthPlanStructureLhRatioVo lhRatio = getLhRation(baseInfo.getCxMachineTypeCode(), structureName, structureLhRatioList);
         if (null == lhRatio) {
             return capacityInfo;
         }
@@ -159,13 +159,13 @@ public class ProductGroupCxCapacityInfo implements Serializable {
     /**
      * 根据成型机型及结构名，得到其配比信息
      *
-     * @param machineBrandCode     成型机机型
+     * @param machineTypeCode     成型机机型
      * @param structureName        分组结构名
      * @param structureLhRatioList 成型硫化配比信息
      * @return
      */
-    private static MonthPlanStructureLhRatioVo getLhRation(String machineBrandCode, String structureName, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        if (CollectionUtils.isEmpty(structureLhRatioList) || StringUtils.isBlank(machineBrandCode) || StringUtils.isBlank(structureName)) {
+    private static MonthPlanStructureLhRatioVo getLhRation(String machineTypeCode, String structureName, List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        if (CollectionUtils.isEmpty(structureLhRatioList) || StringUtils.isBlank(machineTypeCode) || StringUtils.isBlank(structureName)) {
             return null;
         }
         List<MonthPlanStructureLhRatioVo> groupList = structureLhRatioList.stream().filter(lhRatio -> structureName.equals(lhRatio.getStructureName())).collect(Collectors.toList());
@@ -173,7 +173,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
             return null;
         }
         Map<String, MonthPlanStructureLhRatioVo> brandCodeMap = groupList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity(), (before, after) -> after));
-        MonthPlanStructureLhRatioVo find = brandCodeMap.get(machineBrandCode);
+        MonthPlanStructureLhRatioVo find = brandCodeMap.get(machineTypeCode);
         if (null != find) {
             return find;
         }
