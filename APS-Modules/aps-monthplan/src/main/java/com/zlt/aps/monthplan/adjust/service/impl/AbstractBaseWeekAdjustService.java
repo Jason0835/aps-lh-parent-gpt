@@ -258,6 +258,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         structureLog.setBeforeEndDay(contextDTO.getEndDay());
         structureLog.setAfterBeginDay(contextDTO.getAdjustStartDay());
         structureLog.setAfterEndDay(contextDTO.getAdjustEndDay());
+        structureLog.setScheduledMachines(contextDTO.getScheduledMachines());
         structureLog.setOperator(SecurityUtils.getUsername());
         structureLog.setLogDetail(logDetail);
         baseDao.insert(structureLog);
