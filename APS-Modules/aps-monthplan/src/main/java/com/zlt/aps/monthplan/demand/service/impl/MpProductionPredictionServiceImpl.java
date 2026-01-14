@@ -120,15 +120,15 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
         // 排产汇总
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
-            Context context = buildContext(tPlus1MonthDemands);
-            monthPlanProductionSchedulingService.general(context);
+           /* Context context = buildContext(tPlus1MonthDemands);
+            monthPlanProductionSchedulingService.general(context);*/
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
             tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month);
         }
-        if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
+       /* if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             Context context = buildContext(tPlus2MonthDemands);
             monthPlanProductionSchedulingService.general(context);
-        }
+        }*/
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
         List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
         if(!CollectionUtils.isEmpty(list)) {
