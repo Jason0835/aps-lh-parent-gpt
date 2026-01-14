@@ -2,15 +2,22 @@ package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -30,14 +37,17 @@ import java.util.List;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class MpStructureAllocationServiceImpl extends ServiceImpl<MpStructureAllocationEntityMapper, MpStructureAllocation> implements IMpStructureAllocationService {
+@RequiredArgsConstructor
+public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStructureAllocation> implements IMpStructureAllocationService {
+
+    private final MpStructureAllocationEntityMapper entityMapper;
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
         QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, param);
         queryWrapper.orderByAsc("STRUCTURE_NAME", "CX_MACHINE_CODE");
-        return this.baseMapper.selectList(queryWrapper);
+        return this.entityMapper.selectList(queryWrapper);
     }
 
 
@@ -56,5 +66,32 @@ public class MpStructureAllocationServiceImpl extends ServiceImpl<MpStructureAll
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", param.getFieldValueByFieldName("structureName"));
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", param.getFieldValueByFieldName("cxMachineCode"));
+    }
+
+    @Override
+    protected String getDocTypeCode() {
+        return "MDM0408";
+    }
+
+    @Override
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("MDM0408");
+        return sysDocType;
+    }
+
+    @Override
+    public String checkUnique(MpStructureAllocation docEntityVO) {
+        String unique = super.checkUnique(docEntityVO);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.notUnique"));
+        }
+        return unique;
+    }
+
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        // 唯一校验字段
+        return Collections.emptyList();
     }
 }
