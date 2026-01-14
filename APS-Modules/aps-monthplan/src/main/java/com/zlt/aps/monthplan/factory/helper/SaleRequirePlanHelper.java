@@ -116,8 +116,8 @@ public class SaleRequirePlanHelper {
                 highPriorityOrders.add(sortedOrders.get(i));
             }else{
                 midPriorityOrders.add(sortedOrders.get(i));
-                accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
             }
+            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
         }
         if(!CollectionUtils.isEmpty(highPriorityOrders)) {
             highPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
