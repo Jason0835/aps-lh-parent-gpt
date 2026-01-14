@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
+import com.google.common.collect.Lists;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -107,26 +108,23 @@ public class SaleRequirePlanHelper {
         }
         int size = sortedOrders.size();
         long accumulatedDemand = 0L;
-        // 初始化为列表末尾
-        int splitIndex = size;
+        List<DpOrderOffsetDetail> highPriorityOrders = Lists.newArrayList();
+        List<DpOrderOffsetDetail> midPriorityOrders = Lists.newArrayList();
         // 从后向前遍历
         for (int i = size - 1; i >= 0; i--) {
             if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() > overAreaCapacityValue) {
-                break;
+                highPriorityOrders.add(sortedOrders.get(i));
+            }else{
+                midPriorityOrders.add(sortedOrders.get(i));
+                accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
             }
-            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
-            // 找到分割点
-            splitIndex = i;
         }
-        if (splitIndex == size) {
-            // 所有订单都需要调整为中优先级
-            sortedOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
-        } else {
-            // 前部分设置为高优先级
-            sortedOrders.subList(0, splitIndex).forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+        if(!CollectionUtils.isEmpty(highPriorityOrders)) {
+            highPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+        }
 
-            // 后部分设置为中优先级
-            sortedOrders.subList(splitIndex, size).forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
+        if(!CollectionUtils.isEmpty(midPriorityOrders)) {
+            midPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
         }
     }
 
