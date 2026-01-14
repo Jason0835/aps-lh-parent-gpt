@@ -48,6 +48,12 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "调整日")
     private Integer adjustDay;
 
+    @ApiModelProperty(value = "开始日期")
+    private Integer startDay;
+
+    @ApiModelProperty(value = "结束日期")
+    private Integer endDay;
+
     @ApiModelProperty(value = "调整开始日期")
     private Integer adjustStartDay;
 

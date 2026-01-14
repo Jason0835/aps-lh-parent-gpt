@@ -249,10 +249,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         structureLog.setFactoryCode(contextDTO.getFactoryCode());
         structureLog.setYear(contextDTO.getMpYear());
         structureLog.setMonth(contextDTO.getMpMonth());
+        structureLog.setStructureName(contextDTO.getStructureName());
         structureLog.setProductionVersion(contextDTO.getProductionVersion());
         structureLog.setLastMonthPlanVersion(contextDTO.getVersion());
         structureLog.setAdjVersion(contextDTO.getVersion());
         structureLog.setAction(contextDTO.getAdjustType());
+        structureLog.setBeforeBeginDay(contextDTO.getStartDay());
+        structureLog.setBeforeEndDay(contextDTO.getEndDay());
+        structureLog.setAfterBeginDay(contextDTO.getAdjustStartDay());
+        structureLog.setAfterEndDay(contextDTO.getAdjustEndDay());
         structureLog.setOperator(SecurityUtils.getUsername());
         structureLog.setLogDetail(logDetail);
         baseDao.insert(structureLog);
@@ -1620,10 +1625,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 获取结构收尾日
+     * 初始结构开始日\收尾日
      * @param contextDTO 周程滚动调整上下文对象
      */
-    protected Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO){
-        return mpAdjustStructureInService.getStructureDeadline(contextDTO);
+    protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
+        mpAdjustStructureInService.initStructureStartAndEndDay(contextDTO);
     }
 }

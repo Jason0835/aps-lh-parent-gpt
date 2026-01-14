@@ -137,7 +137,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //初始锁定日
         contextDTO.setLockEndDay(getLockEndDay(contextDTO));
         //初始结构收尾日
-        contextDTO.setStructureDeadLine(getStructureDeadline(contextDTO));
+        initStructureStartAndEndDay(contextDTO);
         //初始化日志
         contextDTO.setLogDetail(new StringBuilder());
         //规格挑选可用机台
@@ -196,13 +196,17 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setAdjustDetailList(resultList);
     }
 
+    /**
+     * 初始结构开始日\收尾日
+     * @param contextDTO 周程滚动调整上下文对象
+     */
     @Override
-    protected Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO) {
+    protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
         //若结构收尾日小于锁定日，提示
         if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
                     contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
         }
-        return contextDTO.getStructureDeadLine();
+        mpAdjustStructureInService.initStructureStartAndEndDay(contextDTO);
     }
 }
