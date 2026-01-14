@@ -58,23 +58,9 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      */
     List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion);
     /**
-     *  生成预测需求计划
-     * @param createCondition
-     * @param leftDemands
-     * @return
-     */
-    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,List<DpDemandPlan> leftDemands);
-    /**
      *  列表查询数据
      * @param queryWrapper
      * @return
      */
     List<DpDemandPlan> list(QueryWrapper<DpDemandPlan> queryWrapper);
-    /**
-     *  创建T+2预测需求计划
-     * @param createCondition
-     * @param finalVersionByTplus1Month
-     * @return
-     */
-    List<DpDemandPlan> createTplus2DemandPlan(DpDemandPlan createCondition, MpFactoryProductionVersion finalVersionByTplus1Month);
 }

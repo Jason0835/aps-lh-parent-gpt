@@ -1126,6 +1126,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setPreviousNetQty(adjustDetailVo.getOrdQty());
             return;
         }
+        if (monthPlan == null) {
+            return;
+        }
         // 获取上周的周数
         int week = DateUtil.weekOfMonth(new Date()) - 1;
         Integer previousNetQty = Convert.toInt(monthPlan.getTotalQty(),0);
