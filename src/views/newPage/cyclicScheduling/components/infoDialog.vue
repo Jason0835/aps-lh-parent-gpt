@@ -39,6 +39,7 @@ import {
 } from "@/api/monthplan/supplyOrderPool";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
+import { divide } from "lodash";
 
 export default {
   components: { infoForm, materialCodeSelect },
@@ -72,6 +73,8 @@ export default {
     };
     return {
       loading: false,
+      showTip: false,
+      tipMsg: "",
       visible: false,
       isEdit: false,
       editType: null,
@@ -176,11 +179,25 @@ export default {
           prop: "qty",
           label: this.$t("ui.data.defectiveStock.qty"),
           type: "number",
-          listeners: {
-            blur: this.handleQtyBlur,
+          render: (form) => {
+            return (
+              <div>
+                <el-input
+                  type="number"
+                  v-model={form.qty}
+                  min={0}
+                  max={99999999}
+                 onBlur={this.handleQtyBlur}
+                />
+                {this.showTip && <span class='tipText'>{this.tipMsg}</span>}
+              </div>
+            );
           },
-          min: 0,
-          max: 99999999,
+          // listeners: {
+          //   blur: this.handleQtyBlur,
+          // },
+          // min: 0,
+          // max: 99999999,
         },
 
         {
@@ -259,18 +276,21 @@ export default {
   },
   methods: {
     async handleQtyBlur() {
+      console.log("qty blur");
       try {
         let arr = this.form.yearMonth.split("-");
         let res = await cyclicSchedulingTips({
           factoryCode: this.form.factoryCode,
           materialCode: this.form.materialCode,
-          year:  arr[0],
-          month:  arr[1],
+          year: arr[0],
+          month: arr[1],
         });
-        console.log(res)
-        this.$modal.msgWarning(res.data.msg);
+        this.showTip = true;
+        this.tipMsg = res.data.msg;
+        // console.log(res);
+        // this.$modal.msgWarning(res.data.msg);
       } catch (err) {
-        console.log(err)
+        console.log(err);
       }
     },
     async blurMaterialCode() {
@@ -333,6 +353,7 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      this.showTip=false
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -370,3 +391,9 @@ export default {
   },
 };
 </script>
+<style scoped>
+  .tipText {
+    color: #1890ff;                /* 蓝色 - 信息色 */
+    font-size: 12px;
+  }
+</style>

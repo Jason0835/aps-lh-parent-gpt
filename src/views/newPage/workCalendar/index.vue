@@ -19,7 +19,11 @@
         </el-select>
       </div>
       <div class="itemForm">
-        <el-select v-model="search.year" placeholder="请选择" @change="changeYear">
+        <el-select
+          v-model="search.year"
+          placeholder="请选择"
+          @change="changeYear"
+        >
           <el-option
             v-for="item in yearRange"
             :key="item"
@@ -51,76 +55,81 @@
       <div style="display: flex; flex: 1">
         <FullCalendar :options="calendarOptions" ref="fullCalendar">
           <template v-slot:eventContent="arg">
-            <div
-              class="cus-event"
-              v-if="search.procCode == 1"
-              @click="changeDayFlag(arg.event.extendedProps)"
-              :style="{
-                background:
-                  arg.event.extendedProps.dayFlag == 0 ? '#ffebee' : '#e3f2fd',
-              }"
-            >
-              <div class="statusDiv"></div>
-              <el-button
-                v-if="arg.event.extendedProps.rate != 100"
-                type="text"
-                @click.stop="showModal(arg.event.extendedProps)"
-                >{{ arg.event.extendedProps.rate + "%" }}</el-button
-              >
-              <!-- <div class="shift">{{arg.event.extendedProps.randomNum }}</div> -->
-            </div>
-            <div class="cus-event" v-else>
+            <div style="display: flex; flex-direction: column; width: 100%">
+              <div style="text-align: right;color: #cf1322;font-size: 16px;">{{arg.event.extendedProps.holidayNames}}</div>
+
               <div
-                class="shift"
-                @click="
-                  changeShiftFlag(arg.event.extendedProps, 'oneShiftFlag')
-                "
+                class="cus-event"
+                v-if="search.procCode == 1"
+                @click="changeDayFlag(arg.event.extendedProps)"
                 :style="{
                   background:
-                    arg.event.extendedProps.oneShiftFlag == 0
+                    arg.event.extendedProps.dayFlag == 0
                       ? '#ffebee'
                       : '#e3f2fd',
                 }"
               >
-                <span
-                  :style="{
-                    color:
-                      arg.event.extendedProps.oneShiftFlag == 0
-                        ? '#c62828'
-                        : '#1565c0',
-                  }"
-                  >{{ $t("ui.data.workCalendar.night") }}</span
+                <div class="statusDiv"></div>
+                <el-button
+                  v-if="arg.event.extendedProps.rate != 100"
+                  type="text"
+                  @click.stop="showModal(arg.event.extendedProps)"
+                  >{{ arg.event.extendedProps.rate + "%" }}</el-button
                 >
+                <!-- <div class="shift">{{arg.event.extendedProps.randomNum }}</div> -->
+              </div>
+              <div class="cus-event" v-else>
+                <div
+                  class="shift"
+                  @click="
+                    changeShiftFlag(arg.event.extendedProps, 'oneShiftFlag')
+                  "
+                  :style="{
+                    background:
+                      arg.event.extendedProps.oneShiftFlag == 0
+                        ? '#ffebee'
+                        : '#e3f2fd',
+                  }"
+                >
+                  <span
+                    :style="{
+                      color:
+                        arg.event.extendedProps.oneShiftFlag == 0
+                          ? '#c62828'
+                          : '#1565c0',
+                    }"
+                    >{{ $t("ui.data.workCalendar.night") }}</span
+                  >
 
-                <!-- <div
+                  <!-- <div
                   class="statusDiv"
 
 
                 ></div> -->
-              </div>
-              <div
-                class="shift marginDiv"
-                @click="
-                  changeShiftFlag(arg.event.extendedProps, 'twoShiftFlag')
-                "
-                :style="{
-                  background:
-                    arg.event.extendedProps.twoShiftFlag == 0
-                      ? '#ffebee'
-                      : '#e3f2fd',
-                }"
-              >
-                <span
+                </div>
+                <div
+                  class="shift marginDiv"
+                  @click="
+                    changeShiftFlag(arg.event.extendedProps, 'twoShiftFlag')
+                  "
                   :style="{
-                    color:
+                    background:
                       arg.event.extendedProps.twoShiftFlag == 0
-                        ? '#c62828'
-                        : '#1565c0',
+                        ? '#ffebee'
+                        : '#e3f2fd',
                   }"
-                  >{{ $t("ui.data.workCalendar.morning") }}</span
                 >
+                  <span
+                    :style="{
+                      color:
+                        arg.event.extendedProps.twoShiftFlag == 0
+                          ? '#c62828'
+                          : '#1565c0',
+                    }"
+                    >{{ $t("ui.data.workCalendar.morning") }}</span
+                  >
 
-                <!-- <div
+                  <!-- <div
                   class="statusDiv"
 
                   :style="{
@@ -130,30 +139,30 @@
                         : '#fff',
                   }"
                 ></div> -->
-              </div>
-              <div
-                class="shift"
-                @click="
-                  changeShiftFlag(arg.event.extendedProps, 'threeShiftFlag')
-                "
-                :style="{
-                  background:
-                    arg.event.extendedProps.threeShiftFlag == 0
-                      ? '#ffebee'
-                      : '#e3f2fd',
-                }"
-              >
-                <span
+                </div>
+                <div
+                  class="shift"
+                  @click="
+                    changeShiftFlag(arg.event.extendedProps, 'threeShiftFlag')
+                  "
                   :style="{
-                    color:
+                    background:
                       arg.event.extendedProps.threeShiftFlag == 0
-                        ? '#c62828'
-                        : '#1565c0',
+                        ? '#ffebee'
+                        : '#e3f2fd',
                   }"
-                  >{{ $t("ui.data.workCalendar.noon") }}</span
                 >
+                  <span
+                    :style="{
+                      color:
+                        arg.event.extendedProps.threeShiftFlag == 0
+                          ? '#c62828'
+                          : '#1565c0',
+                    }"
+                    >{{ $t("ui.data.workCalendar.noon") }}</span
+                  >
 
-                <!--
+                  <!--
                 <div
                   class="statusDiv"
 
@@ -164,6 +173,7 @@
                         : '#fff',
                   }"
                 ></div> -->
+                </div>
               </div>
             </div>
           </template>
@@ -259,7 +269,7 @@ export default {
       search: {
         factoryCode: "116",
         procCode: "01",
-        year:''
+        year: "",
       },
       query: {},
       selectList: [],
@@ -301,15 +311,15 @@ export default {
         this.yearRange.push(i);
       }
     },
-      // 跳转到特定年份
+    // 跳转到特定年份
     changeYear() {
-      this.getList()
-      const calendarApi = this.$refs.fullCalendar.getApi()
-      calendarApi.gotoDate(this.search.year + '-01-01')
+      this.getList();
+      const calendarApi = this.$refs.fullCalendar.getApi();
+      calendarApi.gotoDate(this.search.year + "-01-01");
       this.calendarOptions.validRange = {
-        start: this.search.year + '-01-01',
-        end: (this.search.year + 1) + '-01-01'
-      }
+        start: this.search.year + "-01-01",
+        end: this.search.year + 1 + "-01-01",
+      };
     },
     hasPermission(permission) {
       const permissions = this.$store.state.user.permissions || [];
