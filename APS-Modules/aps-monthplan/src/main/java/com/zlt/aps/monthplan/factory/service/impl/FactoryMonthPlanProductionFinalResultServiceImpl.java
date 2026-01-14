@@ -160,6 +160,24 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
 
     @Override
     public Map<String, Integer> calculateMonthSurplusNoSave(List<MdmProductStock> finishedProductStocks, String yearMonth, int days) {
+        if (CollectionUtils.isEmpty(finishedProductStocks)) {
+            return Collections.emptyMap();
+        }
+        List<Date> stockDates = finishedProductStocks.stream().map(MdmProductStock::getStockDate).filter(Objects::nonNull).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(stockDates)) {
+            return Collections.emptyMap();
+        }
+        Date maxDate = stockDates.stream()
+                .filter(Objects::nonNull)
+                .max(Date::compareTo).orElse(null);
+        if (null == maxDate) {
+            return Collections.emptyMap();
+        }
+        int year = DateUtils.getYear(maxDate);
+        int month = DateUtils.getMonthsByYear(maxDate);
+        int stockDay = DateUtils.getDaysByMonth(maxDate);
+        // 获取当前年月
+         yearMonth = String.format("%s%02d", year, month);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
@@ -171,11 +189,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         Map<String, Integer> monthSurplusMap = Maps.newHashMap();
         Map<String, List<FactoryMonthPlanProductionFinalResult>> groupByMaterialCode = this.getGroupMonthProdFinalPlanByMaterialCode(factoryMonthPlanProdFinals);
         groupByMaterialCode.forEach((key, value) -> {
-            int planSurplusQty = this.calculateMonthSurplus(value, days);
+            int planSurplusQty = this.calculateMonthSurplus(value, stockDay);
             if (planSurplusQty <= BigDecimal.ZERO.longValue()) {
                 return;
             }
-            monthSurplusMap.put(key, planSurplusQty);
+            if (!value.isEmpty()) {
+                String materialCode = value.get(0).getMaterialCode();
+                monthSurplusMap.put(materialCode, planSurplusQty);
+            }
         });
         return monthSurplusMap;
     }
