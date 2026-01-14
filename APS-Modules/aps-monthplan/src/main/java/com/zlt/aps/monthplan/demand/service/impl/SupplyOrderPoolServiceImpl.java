@@ -394,11 +394,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         Map<String, Integer> stockWithoutOrderMap = calculateStockWithoutOrder(finishedProductStocks,salesOrderPools);
 
         StringBuilder msg = new StringBuilder();
-        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.noOrderQty")).append(stockWithoutOrderMap.get(supplyOrderPool.getMaterialCode()));
+        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.noOrderQty")).append(stockWithoutOrderMap.get(supplyOrderPool.getMaterialCode()) == null ? 0 : stockWithoutOrderMap.get(supplyOrderPool.getMaterialCode()));
 
         // 2.计算月底计划余量
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplusNoSave(finishedProductStocks, yearMonth, days);
-        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.monthSurplusQty")).append(monthSurplusMap.get(supplyOrderPool.getMaterialCode()));
+        msg.append(I18nUtil.getMessage("ui.data.column.supplyOrderPool.monthSurplusQty")).append(monthSurplusMap.get(supplyOrderPool.getMaterialCode()) == null ? 0 : monthSurplusMap.get(supplyOrderPool.getMaterialCode()));
 
         return AjaxResult.success(msg.toString());
     }

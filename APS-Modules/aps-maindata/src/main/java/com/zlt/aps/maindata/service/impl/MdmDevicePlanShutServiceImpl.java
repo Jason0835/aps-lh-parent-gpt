@@ -105,7 +105,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>(Arrays.asList("factoryCode", "machineType", "machineCode", "beginDate", "endDate"));
     }
 
     @Override
