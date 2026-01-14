@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -202,11 +203,22 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      */
     @Override
     protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
+        int endDay = 0;
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
+        if (PubUtil.isNotEmpty(structureAllocationList)){
+            // 取最大的成型机收尾日作为结构的收尾日
+            for (MpStructureAllocation allocation:structureAllocationList){
+                if (endDay < allocation.getEndDay()){
+                    endDay = allocation.getEndDay();
+                }
+            }
+        }
+
+        contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
         if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
                     contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
         }
-        mpAdjustStructureInService.initStructureStartAndEndDay(contextDTO);
     }
 }
