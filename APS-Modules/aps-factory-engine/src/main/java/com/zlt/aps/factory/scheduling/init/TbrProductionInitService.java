@@ -219,6 +219,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
     /**
      * 获取物料基础信息
      * key = materialDesc: value = MdmMaterialInfo
+     * 对物料描述去重(数据问题，应该源头控制)
      *
      * @param productionContext
      * @return
@@ -229,7 +230,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             log.info(TbrProductionInitLogRecorder.addMaterialInfoEmptyLog(productionContext));
             return Collections.emptyMap();
         }
-        return productBaseInfoList.stream().collect(Collectors.toMap(ProductBaseInfoVo::getMaterialDesc, Function.identity()));
+        return productBaseInfoList.stream().collect(Collectors.toMap(ProductBaseInfoVo::getMaterialDesc, Function.identity(), (before, after) -> before));
     }
 
     /**
