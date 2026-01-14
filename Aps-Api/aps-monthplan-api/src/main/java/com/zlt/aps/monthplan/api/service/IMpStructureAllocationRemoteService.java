@@ -85,5 +85,12 @@ public interface IMpStructureAllocationRemoteService {
     @DeleteMapping("/mpStructureAllocation/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
+    /**
+     * 获取日期最接近的下一个结构
+     */
+    @ApiOperation("获取日期最接近的下一个结构")
+    @PostMapping("/mpStructureAllocation/getNextStructure")
+    MpStructureAllocation getNextStructure(@RequestBody MpStructureAllocation queryVO);
+
 
 }

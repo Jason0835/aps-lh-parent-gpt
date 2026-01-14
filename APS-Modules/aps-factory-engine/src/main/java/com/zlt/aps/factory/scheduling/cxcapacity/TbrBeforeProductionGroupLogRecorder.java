@@ -2,10 +2,16 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
+import com.zlt.aps.factory.domain.vo.EmbryoSpecialMaterialInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.factory.domain.vo.SpecialMaterialStockVo;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
 
 /**
  * 分组计划排产前-数据准备日志记录器
@@ -85,75 +91,120 @@ public class TbrBeforeProductionGroupLogRecorder {
     /**
      * 增加获取排产参数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取排产参数====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取排产参数====
      *
-     * @param context 排程上下文
+     * @param context            排程上下文
+     * @param paramConfiguration 排产参数配置
      * @return
      */
-    public static String addReaderProductionParamLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取排产参数====",
+    public static String addReaderProductionParamLog(Context context, ProductionCapacityParamConfiguration paramConfiguration) {
+        String logContentFormat;
+        if (null == paramConfiguration) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到排产参数为空====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取排产参数====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.END_READER_PARAM_DATA, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
     /**
      * 增加获读取特殊原材料日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取特殊原材料信息为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料数据====
      *
-     * @param context 排程上下文
+     * @param context             排程上下文
+     * @param specialMaterialInfo 特殊原材料清单
      * @return
      */
-    public static String addReaderSpecialMaterialEmptyLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到特殊原材料信息为空====",
+    public static String addReaderSpecialMaterialLog(Context context, List<EmbryoSpecialMaterialInfoVo> specialMaterialInfo) {
+        String logContentFormat;
+        if (CollectionUtils.isEmpty(specialMaterialInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到特殊原材料数据为空====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料数据====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SPECIAL_MATERIAL_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
     /**
      * 增加获读取特殊原材料库存日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取特殊原材料库存为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料库存数据====
      *
-     * @param context 排程上下文
+     * @param context                  排程上下文
+     * @param specialMaterialStockInfo 特殊原材料库存信息
      * @return
      */
-    public static String addReaderSpecialMaterialStockEmptyLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到特殊原材料库存为空====",
+    public static String addReaderSpecialMaterialStockLog(Context context, List<SpecialMaterialStockVo> specialMaterialStockInfo) {
+        String logContentFormat;
+        if (CollectionUtils.isEmpty(specialMaterialStockInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到特殊原材料库存数据为空====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料库存数据====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SPECIAL_MATERIAL_STOCK_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
     /**
      * 增加获读取特殊原材料库存日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到生产日历信息为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到生产日历数据====
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
+     * @param productionDayInfo 生产日历信息
      * @return
      */
-    public static String addProductionCalendarEmptyLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到生产日历信息为空====",
+    public static String addProductionCalendarLog(Context context, List<ProductionDayInfoVo> productionDayInfo) {
+        String logContentFormat;
+        if (CollectionUtils.isEmpty(productionDayInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到生产日历数据为空====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到生产日历数据====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.PRODUCTION_CALENDAR_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
     /**
      * 增加没有停工日日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到有停工日设置===="
      *
-     * @param context 排程上下文
+     * @param context  排程上下文
+     * @param stopDays 停产信息
      * @return
      */
-    public static String addNoStopCalendarLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====",
+    public static String addStopCalendarLog(Context context, List<ProductionDayInfoVo> stopDays) {
+        String logContentFormat;
+        if (CollectionUtils.isEmpty(stopDays)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到有停工日设置====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.STOP_DAY_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -168,7 +219,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到成型机基础信息为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_MACHINE_BASE_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -183,7 +234,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到成型机维修信息为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_MACHINE_MAINTENANCE_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -198,7 +249,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具关系配置为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_RELATION_INFO_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -213,7 +264,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到可用模具关系为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_RELATION_INFO_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -228,7 +279,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具到货计划为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_DELIVERY_INFO_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -243,7 +294,22 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到结构成型硫化配比为空====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_GROUP_LH_RATIO_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加模具分配配比数据为空日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置为空====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addMouldAllocationEmptyLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置为空====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
@@ -258,7 +324,7 @@ public class TbrBeforeProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到续作Sku信息====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_SKU_DATA_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;
     }
 
