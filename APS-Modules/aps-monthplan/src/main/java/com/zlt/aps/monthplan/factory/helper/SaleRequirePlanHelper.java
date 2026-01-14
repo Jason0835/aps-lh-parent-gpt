@@ -111,12 +111,12 @@ public class SaleRequirePlanHelper {
         int splitIndex = size;
         // 从后向前遍历
         for (int i = size - 1; i >= 0; i--) {
-            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
-            if (accumulatedDemand >= overAreaCapacityValue) {
-                // 找到分割点
-                splitIndex = i;
+            if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() >= overAreaCapacityValue) {
                 break;
             }
+            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
+            // 找到分割点
+            splitIndex = i;
         }
         if (splitIndex == size) {
             // 所有订单都需要调整为中优先级
