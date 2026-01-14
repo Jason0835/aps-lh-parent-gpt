@@ -84,9 +84,27 @@ public class CollectionKit {
 		if(pageNo <=1 && result.size() <= numPerPage) {
 			return result;
 		}
-		
-		final int[] startEnd = PageKit.transToStartEnd(pageNo, numPerPage);
-		return result.subList(startEnd[0], startEnd[1]);
+		// 合并所有集合
+		List<T> mergedList = PageKit.mergeCollections(colls);
+
+		// 如果没有数据，直接返回空列表
+		if (mergedList.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		// 排序
+		mergedList.sort(comparator);
+
+		// 计算分页边界
+		PageKit.PaginationBounds bounds = PageKit.calculatePaginationBounds(pageNo, numPerPage, mergedList.size());
+
+		// 如果开始位置超出列表范围，返回空列表
+		if (bounds.start >= mergedList.size()) {
+			return Collections.emptyList();
+		}
+
+		// 返回分页子列表
+		return mergedList.subList(bounds.start, bounds.end);
 	}
 
 	/**

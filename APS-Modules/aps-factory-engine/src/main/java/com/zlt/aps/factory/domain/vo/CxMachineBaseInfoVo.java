@@ -358,10 +358,14 @@ public class CxMachineBaseInfoVo implements Serializable {
             return null;
         }
         List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
+        List<CxLhProductionHelper> hasProductionList = cxLhGroupList.stream().filter(singleGroup -> !YesOrNoEnum.NO.getValue().equals(singleGroup.getIsProduction())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return null;
+        }
         //按最后排产日，进行升序排序
-        cxLhGroupList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
+        hasProductionList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
-        return cxLhGroupList.get(BigDecimal.ZERO.intValue());
+        return hasProductionList.get(BigDecimal.ZERO.intValue());
     }
 
     /**

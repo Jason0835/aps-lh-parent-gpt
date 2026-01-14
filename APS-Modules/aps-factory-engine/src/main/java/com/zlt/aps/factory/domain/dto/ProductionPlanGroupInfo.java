@@ -6,10 +6,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
@@ -407,9 +404,11 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取结构下，最早收尾的硫化信息
      *
+     * @param context     排产上下文
+     * @param excludeDays 排除的收尾时间点
      * @return
      */
-    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context) {
+    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context, Set<Integer> excludeDays) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return null;
         }
@@ -418,6 +417,13 @@ public class ProductionPlanGroupInfo {
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
             return !dayLimit.isReachLimitByMouldNumber(previousDayLimit);
         }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            //20260113 剔除需要排除的收尾时间点
+            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
+        }
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
@@ -447,13 +453,15 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
+     * 兼容考虑模具的上机时间--新模具到货计划
      *
-     * @param context     排产上下文
-     * @param addSkuInfo  需要上机的Sku
-     * @param preSelected 预计选中
+     * @param context       排产上下文
+     * @param addSkuInfo    需要上机的Sku
+     * @param preSelected   预计选中
+     * @param selectedMould 选中的模具
      * @return
      */
-    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected) {
+    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected, List<ProductionMouldInfoVo> selectedMould) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
@@ -470,7 +478,12 @@ public class ProductionPlanGroupInfo {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
-        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(effectiveDaySet, context.getStopDays());
+        Set<Integer> effectiveMouldSet = getEffectiveDay(effectiveDaySet, selectedMould);
+        if (CollectionUtils.isEmpty(effectiveMouldSet)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(effectiveMouldSet, context.getStopDays());
         List<Integer> sortList = new ArrayList<>(resultSet);
         Collections.sort(sortList);
         int size = sortList.size();
@@ -1314,7 +1327,7 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 获取有效的排产日范围集合，取配比与胎胚的交集
+     * 获取有效排产日范围集合，取配比与胎胚的交集
      *
      * @param context               排产上下文
      * @param preSelected           硫化组配比符合的排产日信息
@@ -1322,6 +1335,38 @@ public class ProductionPlanGroupInfo {
      */
     private Set<Integer> getEffectiveDay(Context context, EarliestConclusionLhGroupHelper preSelected, List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuByEmbryoList) {
         Set<Integer> productionDaySet = hasAddSkuByEmbryoList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        return getEffectiveDay(context, preSelected, productionDaySet);
+    }
+
+    /**
+     * 获取取得的有效排产日与模具可排产日的交集
+     *
+     * @param limitProductionDaySet 符合条件的排产日范围(硫化组、胎胚种类数)
+     * @param selectedMould         选中的模具
+     * @return
+     */
+    private Set<Integer> getEffectiveDay(Set<Integer> limitProductionDaySet, List<ProductionMouldInfoVo> selectedMould) {
+        Set<Integer> firstProductionDaySet = selectedMould.get(BigDecimal.ZERO.intValue()).getProductionDaySet();
+        Set<Integer> secondProductionDaySet = selectedMould.get(BigDecimal.ONE.intValue()).getProductionDaySet();
+        if (CollectionUtils.isEmpty(firstProductionDaySet) || CollectionUtils.isEmpty(secondProductionDaySet)) {
+            return Collections.emptySet();
+        }
+        //取两个模具的排产日交集
+        Set<Integer> intersectionSet = firstProductionDaySet.stream().filter(secondProductionDaySet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            return Collections.emptySet();
+        }
+        return limitProductionDaySet.stream().filter(intersectionSet::contains).collect(Collectors.toSet());
+    }
+
+    /**
+     * 根据preSelected的排产日范围，取得与productionDaySet的交集排产范围
+     *
+     * @param context          排产上下文
+     * @param preSelected      硫化组配比符合的排产日信息
+     * @param productionDaySet 排产日范围
+     */
+    private Set<Integer> getEffectiveDay(Context context, EarliestConclusionLhGroupHelper preSelected, Set<Integer> productionDaySet) {
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         Set<Integer> effectiveDaySet = new HashSet<>(context.getMonthDays());

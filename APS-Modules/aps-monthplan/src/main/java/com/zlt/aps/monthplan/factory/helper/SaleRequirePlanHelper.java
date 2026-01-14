@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
+import com.google.common.collect.Lists;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -75,24 +76,16 @@ public class SaleRequirePlanHelper {
                 result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
                 return;
             }
-
             // 计算总产能和总需求
             long totalCapacity = areaCapacities.stream().filter(item -> null != item.getCapacityAllocation())
                     .mapToLong(item -> item.getCapacityAllocation().longValue())
                     .sum();
-
-            long totalDemand = sortedOrders.stream()
-                    .mapToLong(DpOrderOffsetDetail::getProduceQtyDue)
-                    .sum();
-
-            // 调整优先级
-            if (totalDemand >= totalCapacity) {
-                processDemandPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
-            } else {
-                sortedOrders.forEach(order ->
-                        order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+            long totalDemand = sortedOrders.stream().mapToLong(DpOrderOffsetDetail::getProduceQtyDue).sum();
+            if(totalDemand > totalCapacity) {
+                processDemandHighPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
+            }else {
+                sortedOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
             }
-
             result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
         });
 
@@ -106,31 +99,33 @@ public class SaleRequirePlanHelper {
      * @param sortedOrders          排序后的净需求列表
      * @param overAreaCapacityValue 超出区域产能值
      */
-    private static void processDemandPriorityExcludingLast(
+    private static void processDemandHighPriorityExcludingLast(
             List<DpOrderOffsetDetail> sortedOrders,
             long overAreaCapacityValue) {
 
-        if (org.apache.commons.collections.CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
+        if (CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
             return;
         }
-        long accumulatedQty = 0;
-        // 从列表尾端开始遍历
-        for (int i = sortedOrders.size() - 1; i >= 0; i--) {
-            DpOrderOffsetDetail order = sortedOrders.get(i);
-            // 跳过已处理或无效的订单
-            if (order == null || order.getProduceQtyDue() == null || order.getProduceQtyDue() <= 0) {
-                continue;
+        int size = sortedOrders.size();
+        long accumulatedDemand = 0L;
+        List<DpOrderOffsetDetail> highPriorityOrders = Lists.newArrayList();
+        List<DpOrderOffsetDetail> midPriorityOrders = Lists.newArrayList();
+        // 从后向前遍历
+        for (int i = size - 1; i >= 0; i--) {
+            log.info("index:{},accumulatedDemand:{},produceQtyDue:{},overAreaCapacityValue:{}", i, accumulatedDemand,sortedOrders.get(i).getProduceQtyDue(),overAreaCapacityValue);
+            if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() > overAreaCapacityValue) {
+                highPriorityOrders.add(sortedOrders.get(i));
+            }else{
+                midPriorityOrders.add(sortedOrders.get(i));
             }
-            // 检查当前累加值是否已经达到或超过阈值
-            // 注意：先检查，再累加
-            long currentOrderQty = order.getProduceQtyDue();
-            if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
-                break;
-            } else {
-                // 累加净需求量并设置优先级
-                accumulatedQty += currentOrderQty;
-                order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
-            }
+            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
+        }
+        if(!CollectionUtils.isEmpty(highPriorityOrders)) {
+            highPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+        }
+
+        if(!CollectionUtils.isEmpty(midPriorityOrders)) {
+            midPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
         }
     }
 
@@ -206,21 +201,31 @@ public class SaleRequirePlanHelper {
             return d1.compareTo(d2);
         }
 
+        /**
+         * 按生产应完成数量降序排列（从大到小）
+         * 空值处理：null 值排在最后
+         */
         private int compareOrdQty(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
             Integer q1 = o1.getProduceQtyDue();
             Integer q2 = o2.getProduceQtyDue();
 
+            // 两个都为 null，视为相等
             if (q1 == null && q2 == null) {
                 return 0;
             }
-            // null排最后
+
+            // 只有 q1 为 null，q2 不为 null，降序时 null 排最后，所以返回 1
             if (q1 == null) {
                 return 1;
             }
+
+            // 只有 q2 为 null，q1 不为 null，降序时非 null 值在前，所以返回 -1
             if (q2 == null) {
                 return -1;
             }
-            return q1.compareTo(q2);
+
+            // 降序排列：q2 在前，q1 在后
+            return q2.compareTo(q1);
         }
 
         private Integer parseScmPriority(String scmPriority) {

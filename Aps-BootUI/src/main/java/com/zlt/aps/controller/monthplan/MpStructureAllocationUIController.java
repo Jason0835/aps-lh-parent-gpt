@@ -145,4 +145,15 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         AjaxResult ajaxResult = iMpStructureAllocationService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public TableDataInfo getVersionList(MpStructureAllocation queryVO) {
+        return iMpStructureAllocationService.getVersionList(queryVO);
+    }
+
 }

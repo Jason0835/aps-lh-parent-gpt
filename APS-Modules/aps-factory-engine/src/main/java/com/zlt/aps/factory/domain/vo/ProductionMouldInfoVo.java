@@ -342,9 +342,6 @@ public class ProductionMouldInfoVo implements Serializable {
             return false;
         }
         for (int day = startDay; day <= endDay; day++) {
-            if (!productionDaySet.contains(day)) {
-                return false;
-            }
             if (finishDaySet.contains(day)) {
                 return false;
             }

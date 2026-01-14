@@ -40,4 +40,10 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    */
   void insertBatchData(String predictionVersion,
                        YearMonth yearMonth, Map<String, List<MdmProductStock>> finishedProductStockMap);
+
+  /**
+   *  汇总库存
+   * @return
+   */
+  Map<String, Map<String, Integer>> calculateStockQty();
 }

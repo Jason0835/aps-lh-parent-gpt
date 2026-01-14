@@ -8,9 +8,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -23,11 +26,11 @@ import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
@@ -62,7 +65,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final IMdmMaterialInfoService materialInfoService;
     // 需求计划
     private final IDpDemandPlanService dpDemandPlanService;
-
+    // 排产
+    private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
 
 
     @Override
@@ -109,25 +113,41 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         // 对冲规则：供应链优先级+提报日期逐笔扣除(先冲实单)
         DpDemandPlan param = new DpDemandPlan();
         param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        param.setYear(monthRangeResult.getTMonth().getYear());
-        param.setMonth(monthRangeResult.getTMonth().getMonthValue());
         param.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
         param.setPrefix(PREFIX);
-        List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion);
-        // 剩余需求量
-        List<DpDemandPlan> leftDemands = calculateLeftDemand(tMonthDemands,finalVersion);
-        List<DpDemandPlan> tPlus1MonthDemands = createDemandPlan(leftDemands,monthRangeResult.getTPlus1Month());
-        MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
-        // 剩余需求量
-        List<DpDemandPlan> leftDemandsByTplus1Month = calculateLeftDemand(tPlus1MonthDemands,finalVersionByTplus1Month);
-        List<DpDemandPlan> tPlus2MonthDemands = createDemandPlan(leftDemandsByTplus1Month,monthRangeResult.getTPlus2Month());
+        // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
+        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion);
+        List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
+        // 排产汇总
+        if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
+           /* Context context = buildContext(tPlus1MonthDemands);
+            monthPlanProductionSchedulingService.general(context);*/
+            MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
+            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month);
+        }
+       /* if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
+            Context context = buildContext(tPlus2MonthDemands);
+            monthPlanProductionSchedulingService.general(context);
+        }*/
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tMonthDemands,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
-        if(CollectionUtils.isNotEmpty(list)) {
+        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
+        if(!CollectionUtils.isEmpty(list)) {
             this.baseDao.insertBatch(list);
         }
         return AjaxResult.success();
     }
+
+    private Context buildContext(List<DpDemandPlan> tPlus1MonthDemands) {
+        Context context = new Context();
+        context.setFactoryCode(tPlus1MonthDemands.get(0).getFactoryCode());
+        context.setYear(tPlus1MonthDemands.get(0).getYear());
+        context.setMonth(tPlus1MonthDemands.get(0).getMonth());
+        context.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
+        context.setPrefixVersion(PREFIX);
+        context.setProductType(ProductTypeEnum.getEnumByValue(tPlus1MonthDemands.get(0).getProductTypeCode()));
+        return context;
+    }
+
 
     @Override
     public Set<String> findPredictionVersion(MpProductionPrediction queryCondition) {
@@ -157,241 +177,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return productionVersion;
     }
 
-    private List<DpDemandPlan> createDemandPlan(List<DpDemandPlan> leftDemands, YearMonth yearMonth) {
-        DpDemandPlan createCondition = new DpDemandPlan();
-        createCondition.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        createCondition.setYear(yearMonth.getYear());
-        createCondition.setMonth(yearMonth.getMonthValue());
-        createCondition.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
-        createCondition.setPrefix(PREFIX);
-        return dpDemandPlanService.createPredictionRequire(createCondition,leftDemands);
-    }
 
-    private List<DpDemandPlan> calculateLeftDemand(List<DpDemandPlan> tMonthDemands, MpFactoryProductionVersion finalVersion) {
-        if(CollectionUtils.isEmpty(tMonthDemands)  || null == finalVersion) {
-            return Collections.emptyList();
-        }
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> productionFinalResults  = calculateMonthDemandQty(finalVersion);
-        if(org.springframework.util.CollectionUtils.isEmpty(productionFinalResults)) {
-            return tMonthDemands;
-        }
-        // 获取排序配置并排序订单
-        List<DpDemandPlan> sortedDemandPlans = getSortedDemandPlans(tMonthDemands);
-        sortedDemandPlans.forEach(plan -> calculdateDemandQty(plan,productionFinalResults));
-        return sortedDemandPlans;
-    }
-
-    private void calculdateDemandQty(DpDemandPlan plan, Map<String, List<FactoryMonthPlanProductionFinalResult>> productionFinalResults) {
-        List<FactoryMonthPlanProductionFinalResult> list = productionFinalResults.get(plan.getMaterialCode());
-        if(CollectionUtils.isEmpty(list)) {
-            return;
-        }
-        int heightQty =  null == plan.getHeightQty()?BigDecimal.ZERO.intValue():plan.getHeightQty();
-        int leftHeightQty = calculateHeightQty(heightQty,list);
-
-        int midQty = null == plan.getMidQty()?BigDecimal.ZERO.intValue():plan.getMidQty();
-        int leftMidQty = calculateMidQty(midQty,list);
-
-        int postponeQty = null == plan.getPostponeQty()?BigDecimal.ZERO.intValue():plan.getPostponeQty();
-        int leftPostponeQty = calculatePostponeQty(postponeQty,list);
-
-        int cycleReserveQty = null == plan.getCycleReserveQty()?BigDecimal.ZERO.intValue():plan.getCycleReserveQty();
-        int leftCycleReserveQty = calculateCycleReserveQty(cycleReserveQty,list);
-
-        int conventionReserveQty = null == plan.getConventionReserveQty()?BigDecimal.ZERO.intValue():plan.getConventionReserveQty();
-        int leftConventionReserveQty = calculateConventionReserveQty(conventionReserveQty,list);
-
-        int netQty =  null == plan.getNetQty()?BigDecimal.ZERO.intValue():plan.getNetQty();
-        int leftNetQty = calculateNetQty(netQty,list);
-        plan.setHeightQty(leftHeightQty);
-        plan.setMidQty(leftMidQty);
-        plan.setPostponeQty(leftPostponeQty);
-        plan.setCycleReserveQty(leftCycleReserveQty);
-        plan.setConventionReserveQty(leftConventionReserveQty);
-        plan.setNetQty(leftNetQty);
-        // (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
-        plan.setPostponeQty(leftHeightQty + leftMidQty + leftPostponeQty);
-        // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
-        plan.setUnPostponeNetQty(leftHeightQty + leftMidQty);
-    }
-
-    private int calculateNetQty(int netQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (netQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(netQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getTotalQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getTotalQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setTotalQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setTotalQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private int calculateHeightQty(int heightQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (heightQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(heightQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getHeightProductionQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getHeightProductionQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setHeightProductionQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setHeightProductionQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private int calculateMidQty(int midQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (midQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(midQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getMidProductionQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getMidProductionQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setMidProductionQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setMidProductionQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private int calculatePostponeQty(int postponeQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (postponeQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(postponeQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getPostponeProductionQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getPostponeProductionQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setPostponeProductionQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setPostponeProductionQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private int calculateCycleReserveQty(int cycleReserveQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (cycleReserveQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(cycleReserveQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getCycleProductionQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getCycleProductionQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setCycleProductionQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setCycleProductionQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private int calculateConventionReserveQty(int conventionReserveQty, List<FactoryMonthPlanProductionFinalResult> list) {
-        if (conventionReserveQty  <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal remainingQty = BigDecimal.valueOf(conventionReserveQty);
-        for (FactoryMonthPlanProductionFinalResult stock : list) {
-            if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            // 获取当前库存数量
-            BigDecimal stockQty = stock.getConventionProductionQty() == null?BigDecimal.ZERO:BigDecimal.valueOf(stock.getConventionProductionQty());
-            if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            if (stockQty.compareTo(remainingQty) >= 0) {
-                // 当前库存足够冲减
-                stock.setConventionProductionQty(stockQty.subtract(remainingQty).intValue());
-                remainingQty = BigDecimal.ZERO;
-            } else {
-                // 当前库存不足，全部冲减
-                stock.setConventionProductionQty(0);
-                remainingQty = remainingQty.subtract(stockQty);
-            }
-        }
-        return remainingQty.intValue();
-    }
-
-    private List<DpDemandPlan> getSortedDemandPlans(List<DpDemandPlan> tMonthDemands) {
-        return tMonthDemands.stream()
-            .sorted(getHighPerformanceComparator())
-            .collect(Collectors.toList());
-    }
-
-    /**
-     * 高性能自定义比较器（适用于大数据量）
-     */
-    private static Comparator<DpDemandPlan> getHighPerformanceComparator() {
-        return new DemandPlanComparator();
-    }
-
-
-    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tMonthDemands,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
+    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
         if(CollectionUtils.isEmpty(productionFinalResults)) {
             return Collections.emptyList();
@@ -405,7 +192,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         Map<String,Integer> tPlus2MonthDemandQty = this.getMonthQty(productionFinalResultsTplus2Month);
         List<MpProductionPrediction> list = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
-        String predictionVersion = this.getPredictionVersion(tMonthDemands,tPlus1MonthDemands,tPlus2MonthDemands);
+        String predictionVersion = this.getPredictionVersion(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands);
         tMonthDemandQty.forEach((materialCode, productionQty) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;
@@ -430,14 +217,14 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return list;
     }
 
-    private String getPredictionVersion(List<DpDemandPlan> tMonthDemands, List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands) {
+    private String getPredictionVersion(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands) {
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             return tPlus2MonthDemands.get(0).getMonthPlanVersion();
         }
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             return tPlus1MonthDemands.get(0).getMonthPlanVersion();
         }
-        return tMonthDemands.get(0).getMonthPlanVersion();
+        return finalVersion.getMonthPlanVersion();
     }
 
     private Map<String, Integer> getMonthQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
@@ -451,17 +238,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 FactoryMonthPlanProductionFinalResult::getMaterialCode,
                 Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)
             ));
-    }
-
-    private Map<String, List<FactoryMonthPlanProductionFinalResult>> calculateMonthDemandQty(MpFactoryProductionVersion finalVersion) {
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        if(CollectionUtils.isEmpty(productionFinalResults)) {
-            return Collections.emptyMap();
-        }
-        return productionFinalResults.stream()
-            .filter(Objects::nonNull)
-            .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()))
-            .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
     }
 
 
@@ -482,102 +258,5 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 .eq(MpFactoryProductionVersion::getMonth, tMonth.getMonthValue())
                 .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
         );
-    }
-
-    /**
-     * 自定义高性能比较器实现
-     * 避免重复解析和lambda开销
-     */
-    private static class DemandPlanComparator implements Comparator<DpDemandPlan> {
-
-        @Override
-        public int compare(DpDemandPlan o1, DpDemandPlan o2) {
-            // 1. 比较供应链优先级
-            int scmPriorityCompare = compareScmPriority(o1, o2);
-            if (scmPriorityCompare != 0) {
-                return scmPriorityCompare;
-            }
-
-            // 2. 比较提报日期
-            int dateCompare = compareYearWeek(o1, o2);
-            if (dateCompare != 0) {
-                return dateCompare;
-            }
-
-            // 3. 比较提报量
-            return compareOrdQty(o1, o2);
-        }
-
-        private int compareScmPriority(DpDemandPlan o1, DpDemandPlan o2) {
-            Integer p1 = parseScmPriority(o1.getScmPriority());
-            Integer p2 = parseScmPriority(o2.getScmPriority());
-
-            if (p1 == null && p2 == null) {
-                return 0;
-            }
-            if (p1 == null) {
-                return 1; // null排最后
-            }
-            if (p2 == null) {
-                return -1;
-            }
-
-            return Integer.compare(p1, p2);
-        }
-
-        private int compareYearWeek(DpDemandPlan o1, DpDemandPlan o2) {
-            Integer d1 = parseYearWeek(o1.getYearWeek()) ;
-            Integer d2 = parseYearWeek(o2.getYearWeek()) ;
-
-            if (d1 == null && d2 == null) {
-                return 0;
-            }
-            if (d1 == null) {
-                return 1; // null排最后
-            }
-            if (d2 == null) {
-                return -1;
-            }
-            return Integer.compare(d1, d2);
-        }
-
-        private int compareOrdQty(DpDemandPlan o1, DpDemandPlan o2) {
-            Integer q1 = o1.getPostponeQty();
-            Integer q2 = o2.getPostponeQty();
-
-            if (q1 == null && q2 == null) {
-                return 0;
-            }
-            // null排最后
-            if (q1 == null) {
-                return 1;
-            }
-            if (q2 == null) {
-                return -1;
-            }
-            return q1.compareTo(q2);
-        }
-
-        private Integer parseScmPriority(String scmPriority) {
-            if (scmPriority == null || scmPriority.trim().isEmpty()) {
-                return null;
-            }
-            try {
-                return Integer.parseInt(scmPriority.trim());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-
-        private Integer parseYearWeek(String yearWeek) {
-            if (StringUtils.isEmpty(yearWeek)) {
-                return null;
-            }
-            try {
-                return Integer.parseInt(yearWeek.trim());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
     }
 }

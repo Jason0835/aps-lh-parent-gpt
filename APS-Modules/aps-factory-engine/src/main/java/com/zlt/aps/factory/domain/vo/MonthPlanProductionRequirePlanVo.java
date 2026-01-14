@@ -228,17 +228,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             plan.setIsProduction(require.getIsProduction());
         }
-        //需求量处理 todo 无效代码-类型没有统一
-        plan.setHeightQty(require.getHeightQty().intValue());
-        plan.setMidQty(require.getMidQty().intValue());
-        plan.setPostponeQty(require.getPostponeQty().intValue());
-        plan.setCycleReserveQty(require.getCycleReserveQty().intValue());
-        plan.setConventionReserveQty(require.getConventionReserveQty().intValue());
-        plan.setNetQty(require.getNetQty().intValue());
-        plan.setPostponeNetQty(require.getPostponeNetQty().intValue());
-        plan.setUnPostponeNetQty(require.getUnPostponeNetQty().intValue());
-        plan.setAverageSaleQty(require.getAverageSaleQty().intValue());
-        plan.setStockQty(require.getStockQty().intValue());
         return plan;
     }
 
@@ -346,8 +335,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
-     * 如果不排产，则不排
+     * 如果不排产，则标记不排
+     * 不排产场景：
+     * 1、本身不排产
+     * 2、没有排产量
      * 否则判断本轮次排产标记
+     * 会出现还有排产。但本轮次不再需要参与后续的排产，否则死循环
+     * <p>
+     * true 表示本轮次还需排产 false表示本轮次不再参与排产
      *
      * @return
      */
@@ -355,7 +350,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         if (hasProduction()) {
             return YesOrNoEnum.YES.getValue().equals(isThisRound);
         }
-        return YesOrNoEnum.YES.getValue().equals(isThisRound);
+        return false;
     }
 
     /**

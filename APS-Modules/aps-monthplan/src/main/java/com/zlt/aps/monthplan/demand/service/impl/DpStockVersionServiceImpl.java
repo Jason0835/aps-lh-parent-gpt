@@ -1,20 +1,28 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.util.CollectionUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -40,8 +49,10 @@ import com.ruoyi.common.exception.ServiceException;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion>  implements IDpStockVersionService {
+    private final DpStockVersionEntityMapper dpStockVersionEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2025122021";
@@ -96,6 +107,63 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             list.add(requireStock);
         });
         this.baseDao.insertBatch(list);
+    }
+
+    @Override
+    public Map<String, Map<String, Integer>> calculateStockQty() {
+        List<DpStockVersion> list = this.findCurrentStockVersion();
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        YearMonth now = YearMonth.now();
+        YearMonth lastOneYear = now.minusYears(BigDecimal.ONE.intValue());
+        YearMonth lastTwoYear = now.minusYears(BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue());
+        Map<String, Map<String, Integer>> result = new HashMap<>();
+        Map<String,List<DpStockVersion>> stockMap =   list.stream().collect(Collectors.groupingBy(DpStockVersion::getMonthPlanVersionKey));
+        stockMap.forEach((key,value)->{
+            Map<String, Integer> map = Maps.newHashMap();
+            int totalStockQty = value.stream().filter(item -> null != item.getStockQty()).mapToInt(DpStockVersion::getStockQty).sum();
+            int currentStockQty = value.stream().filter(item -> filter(item,now)).mapToInt(DpStockVersion::getStockQty).sum();
+            int lastOneYearStockQty = value.stream().filter(item -> filter(item,lastOneYear)).mapToInt(DpStockVersion::getStockQty).sum();
+            int lastTwoYearStockQty = value.stream().filter(item -> filter(item,lastTwoYear)).mapToInt(DpStockVersion::getStockQty).sum();
+            map.put(StringConstant.ZERO,totalStockQty);
+            map.put(StringConstant.ONE,currentStockQty);
+            map.put(StringConstant.TWO,lastOneYearStockQty);
+            map.put(StringConstant.THREE,lastTwoYearStockQty);
+            result.put(key, map);
+        });
+        return result;
+    }
+
+    private List<DpStockVersion> findCurrentStockVersion() {
+        LambdaQueryWrapper<DpStockVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpStockVersion::getIsDelete, YesOrNoEnum.NO.getValue());
+        return this.dpStockVersionEntityMapper.selectList(wrapper);
+    }
+
+    private boolean filter(DpStockVersion item, YearMonth yearMonth) {
+        if(StringUtils.isBlank(item.getWeekYear()) || null == item.getStockQty()){
+            return false;
+        }
+        if(yearMonth.equals(YearMonth.now())){
+            String currentYearMonthStr = String.format("%s%02d", StringUtils.substring(String.valueOf(yearMonth.getYear()),2,4) ,Integer.valueOf(StringConstant.ONE));
+            String transformed = item.getWeekYear().substring(2) + item.getWeekYear().substring(0,2);
+            int yearWeek = Integer.parseInt(transformed);
+            return yearWeek >= Integer.parseInt(currentYearMonthStr);
+        }
+        if(yearMonth.equals(YearMonth.now().minusYears(BigDecimal.ONE.intValue()))){
+            String currentYearMonthStr = String.format("%s%02d", StringUtils.substring(String.valueOf(yearMonth.getYear()),2,4) ,Integer.valueOf(StringConstant.ONE));
+            String transformed = item.getWeekYear().substring(2) + item.getWeekYear().substring(0,2);
+            int yearWeek = Integer.parseInt(transformed);
+            YearMonth now = YearMonth.now();
+            String nowYearMonthStr = String.format("%s%02d", StringUtils.substring(String.valueOf(now.getYear()),2,4) ,Integer.valueOf(StringConstant.ONE));
+            return yearWeek >= Integer.parseInt(currentYearMonthStr) && yearWeek < Integer.parseInt(nowYearMonthStr);
+        }
+        YearMonth lastOneYearWeek = YearMonth.now().minusYears(BigDecimal.ONE.intValue());
+        String currentYearMonthStr = String.format("%s%02d", StringUtils.substring(String.valueOf(lastOneYearWeek.getYear()),2,4) ,Integer.valueOf(StringConstant.ONE));
+        String transformed = item.getWeekYear().substring(2) + item.getWeekYear().substring(0,2);
+        int yearWeek = Integer.parseInt(transformed);
+        return yearWeek < Integer.parseInt(currentYearMonthStr);
     }
 
     private DpStockVersion buildRequireStock(String predictionVersion,

@@ -1,8 +1,12 @@
 package com.zlt.aps.maindata.service;
 
 
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpMonthPlanMonitorService.java
@@ -17,5 +21,10 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IMpMonthPlanMonitorService  extends IDocService<MpMonthPlanMonitor>{
-
+  /**
+   *  统计完成量
+   * @param finalVersion 参数
+   * @return 完成量
+   */
+  List<MpMonthPlanMonitor>  findCompleteQty(MpFactoryProductionVersion finalVersion);
 }

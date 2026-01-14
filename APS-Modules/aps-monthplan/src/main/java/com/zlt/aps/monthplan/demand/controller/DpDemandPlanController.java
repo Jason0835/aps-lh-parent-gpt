@@ -23,6 +23,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -76,7 +77,7 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>(queryVO);
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper,queryVO);
         List<DpDemandPlan> dataList =  dpDemandPlanService.list(queryWrapper);
         if(CollectionUtils.isEmpty(dataList)) {
@@ -192,17 +193,29 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion"))) {
+            String monthPlanVersion = queryVO.getMonthPlanVersion();
+            if(StringUtils.isNotBlank(monthPlanVersion)) {
+                log.info("monthPlanVersion:{}",monthPlanVersion);
+                queryWrapper.like("MONTH_PLAN_VERSION", monthPlanVersion);
+            }
+        }
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialCode").toString()) ) {
+            queryWrapper.like("MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        }
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("structureName").toString()) ) {
+            queryWrapper.like("STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        }
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialDesc").toString()) ) {
+            queryWrapper.like("MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        }
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isAlternateMaterial")), "IS_ALTERNATE_MATERIAL", queryVO.getFieldValueByFieldName("isAlternateMaterial"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("locationType")), "LOCATION_TYPE", queryVO.getFieldValueByFieldName("locationType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionType")), "PRODUCTION_TYPE", queryVO.getFieldValueByFieldName("productionType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("yearWeek")), "YEAR_WEEK", queryVO.getFieldValueByFieldName("yearWeek"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));

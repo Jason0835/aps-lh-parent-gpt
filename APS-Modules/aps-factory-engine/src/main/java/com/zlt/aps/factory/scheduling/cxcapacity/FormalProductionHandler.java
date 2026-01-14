@@ -10,6 +10,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
+import java.util.HashSet;
 import java.util.Map;
 
 /**
@@ -67,7 +68,7 @@ public class FormalProductionHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName));
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan);
+            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
         });
         //5、非在机结构，新增规格排产
         allGroupPlanInfo.forEach((structureName, groupPlan) -> {
@@ -75,7 +76,7 @@ public class FormalProductionHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName));
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan);
+            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
         });
     }
 
