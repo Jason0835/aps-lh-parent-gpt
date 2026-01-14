@@ -111,7 +111,7 @@ public class SaleRequirePlanHelper {
         int splitIndex = size;
         // 从后向前遍历
         for (int i = size - 1; i >= 0; i--) {
-            if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() >= overAreaCapacityValue) {
+            if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() > overAreaCapacityValue) {
                 break;
             }
             accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
