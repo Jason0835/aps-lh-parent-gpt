@@ -346,8 +346,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
-     * 如果不排产，则不排
+     * 如果不排产，则标记不排
+     * 不排产场景：
+     * 1、本身不排产
+     * 2、没有排产量
      * 否则判断本轮次排产标记
+     * 会出现还有排产。但本轮次不再需要参与后续的排产，否则死循环
+     * <p>
+     * true 表示本轮次还需排产 false表示本轮次不再参与排产
      *
      * @return
      */
@@ -355,7 +361,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         if (hasProduction()) {
             return YesOrNoEnum.YES.getValue().equals(isThisRound);
         }
-        return YesOrNoEnum.YES.getValue().equals(isThisRound);
+        return false;
     }
 
     /**

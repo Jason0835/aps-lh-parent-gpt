@@ -404,9 +404,11 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取结构下，最早收尾的硫化信息
      *
+     * @param context     排产上下文
+     * @param excludeDays 排除的收尾时间点
      * @return
      */
-    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context) {
+    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context, Set<Integer> excludeDays) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return null;
         }
@@ -415,6 +417,13 @@ public class ProductionPlanGroupInfo {
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
             return !dayLimit.isReachLimitByMouldNumber(previousDayLimit);
         }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            //20260113 剔除需要排除的收尾时间点
+            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
+        }
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
