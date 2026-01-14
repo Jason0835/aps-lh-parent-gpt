@@ -70,4 +70,11 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return
      */
     List<DpDemandPlan> list(QueryWrapper<DpDemandPlan> queryWrapper);
+    /**
+     *  创建T+2预测需求计划
+     * @param createCondition
+     * @param finalVersionByTplus1Month
+     * @return
+     */
+    List<DpDemandPlan> createTplus2DemandPlan(DpDemandPlan createCondition, MpFactoryProductionVersion finalVersionByTplus1Month);
 }
