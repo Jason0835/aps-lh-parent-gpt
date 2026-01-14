@@ -267,7 +267,8 @@ export default {
         }
         done();
       } else {
-        if (this.selection.length) {
+
+        if (this.selection) {
           const ids = this.selection
             .map((item) => item[this.valueProp])
             .join(",");
@@ -277,6 +278,9 @@ export default {
             console.log(this.oldList)
           this.$emit("updateValue", ids);
           this.$emit("change", ids, deepClone(this.selection));
+        }else{
+          this.$modal.msgWarning(this.$t('common.rule.select'));
+          return
         }
         done();
       }

@@ -272,15 +272,20 @@ export default {
               return (
                 <div>
                   {this.isEdit && (
-                    <el-select
-                      v-model={row.adjustPriority}
-                      onChange={(val) => this.editAdjust(row, val)}
+                    <el-input
+                      key={row.id}
+                      type='number'
+                      v-model={row.adjustPriorities}
+                      disabled={row.isAddSku!='1'}
+                      placeholder="请输入内容"
+                      min={1}
+                      onBlur={(e) => {
+                        e.preventDefault(); // 如果需要阻止默认行为
+                        this.editAdjust(row);
+                      }}
                       size="mini"
-                    >
-                      <el-option label="1" value="1" key="1" />
-                      <el-option label="2" value="2" key="2" />
-                      <el-option label="3" value="3" key="3" />
-                    </el-select>
+                    ></el-input>
+
                   )}
                   {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
@@ -609,7 +614,7 @@ export default {
           },
         },
         {
-          prop: "cxMachineCode",
+          prop: "scheduledMachines",
           label: this.$t("成型机台"),
         },
         {
@@ -618,7 +623,7 @@ export default {
         },
         {
           prop: "version",
-          label: this.$t("版本"),
+          label: this.$t("版本号"),
           type: "select",
           clearable: false,
           filterable: true,
@@ -741,10 +746,14 @@ export default {
         } else {
           this.$set(this.search, "version", "");
         }
+        // if (isGet) {
+        //   this.getList();
+        // }
+      } catch (err) {}finally {
         if (isGet) {
           this.getList();
         }
-      } catch (err) {}
+      }
     },
 
     backPlan() {
@@ -846,7 +855,7 @@ export default {
       }
     },
     handleClick(tab, event) {
-      this.loading = true;
+      // this.loading = true;
       this.show = false;
       if (this.activeName == "first") {
         this.adjustType = "01";
