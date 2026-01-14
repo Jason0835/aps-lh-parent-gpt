@@ -306,9 +306,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             return Collections.emptyList();
         }
         List<SupplyOrderPool> cycleStockOrders = PredictionAllocationHelper.calculateCycleStockOrder(data.getSupplyOrderPools(),productionFinalResults,mpMonthPlanMonitors);
-        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String monthPlanVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
-        createCondition.setMonthPlanVersion(monthPlanVersion);
         List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus1Month);
         if(CollectionUtils.isEmpty(supplyOrderPools)){
             supplyOrderPools = Lists.newArrayList();
@@ -329,7 +326,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tPlus1Month,monthPlanVersion);
+        saveFactoryProductionVersion(tPlus1Month,predictionVersion);
         return mergedDemandPlans;
     }
 
