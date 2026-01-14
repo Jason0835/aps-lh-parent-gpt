@@ -80,7 +80,7 @@ public class SaleRequirePlanHelper {
                     .mapToLong(item -> item.getCapacityAllocation().longValue())
                     .sum();
             long totalDemand = sortedOrders.stream().mapToLong(DpOrderOffsetDetail::getProduceQtyDue).sum();
-            if(totalDemand >= totalCapacity) {
+            if(totalDemand > totalCapacity) {
                 processDemandHighPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
             }else {
                 sortedOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
@@ -102,30 +102,31 @@ public class SaleRequirePlanHelper {
             List<DpOrderOffsetDetail> sortedOrders,
             long overAreaCapacityValue) {
 
-        if (org.apache.commons.collections.CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
+        if (CollectionUtils.isEmpty(sortedOrders) || overAreaCapacityValue <= 0) {
             return;
         }
-        long accumulatedQty = 0;
-        // 从列表尾端开始遍历
-        for (int i = sortedOrders.size() - 1; i >= 0; i--) {
-            DpOrderOffsetDetail order = sortedOrders.get(i);
-            // 跳过已处理或无效的订单
-            if (order == null || order.getProduceQtyDue() == null || order.getProduceQtyDue() <= 0) {
-                continue;
-            }
-
-            // 检查当前累加值是否已经达到或超过阈值
-            // 注意：先检查，再累加
-            long currentOrderQty = order.getProduceQtyDue();
-            log.info("index:{},currentOrderQty:{},accumulatedQty:{},overAreaCapacityValue:{}", i, currentOrderQty, accumulatedQty,overAreaCapacityValue);
-            // 相当于调整某个订单时候，加上这个订单量大于总产能，但是减去这个订单量小于总产能情况，这个订单不需要调整为中优先级
-            if (accumulatedQty + currentOrderQty >= overAreaCapacityValue) {
+        int size = sortedOrders.size();
+        long accumulatedDemand = 0L;
+        // 初始化为列表末尾
+        int splitIndex = size;
+        // 从后向前遍历
+        for (int i = size - 1; i >= 0; i--) {
+            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
+            if (accumulatedDemand >= overAreaCapacityValue) {
+                // 找到分割点
+                splitIndex = i;
                 break;
-            } else {
-                // 累加净需求量并设置优先级
-                accumulatedQty += currentOrderQty;
-                order.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
             }
+        }
+        if (splitIndex == size) {
+            // 所有订单都需要调整为中优先级
+            sortedOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
+        } else {
+            // 前部分设置为高优先级
+            sortedOrders.subList(0, splitIndex).forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+
+            // 后部分设置为中优先级
+            sortedOrders.subList(splitIndex, size).forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_MID));
         }
     }
 
