@@ -228,17 +228,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             plan.setIsProduction(require.getIsProduction());
         }
-        //需求量处理 todo 无效代码-类型没有统一
-        plan.setHeightQty(require.getHeightQty().intValue());
-        plan.setMidQty(require.getMidQty().intValue());
-        plan.setPostponeQty(require.getPostponeQty().intValue());
-        plan.setCycleReserveQty(require.getCycleReserveQty().intValue());
-        plan.setConventionReserveQty(require.getConventionReserveQty().intValue());
-        plan.setNetQty(require.getNetQty().intValue());
-        plan.setPostponeNetQty(require.getPostponeNetQty().intValue());
-        plan.setUnPostponeNetQty(require.getUnPostponeNetQty().intValue());
-        plan.setAverageSaleQty(require.getAverageSaleQty().intValue());
-        plan.setStockQty(require.getStockQty().intValue());
         return plan;
     }
 
