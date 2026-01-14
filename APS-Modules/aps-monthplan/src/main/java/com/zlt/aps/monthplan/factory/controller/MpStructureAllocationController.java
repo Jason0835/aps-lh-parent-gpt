@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.factory.controller;
 import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
 import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.Api;
@@ -38,6 +39,7 @@ import java.util.List;
 public class MpStructureAllocationController extends BusiController<MpStructureAllocation> {
 
     private final IMpStructureAllocationService mpStructureAllocationService;
+    private final MpStructureAllocationEntityMapper entityMapper;
 
     /**
      * 查询排产过程_结构排产列表
@@ -54,5 +56,17 @@ public class MpStructureAllocationController extends BusiController<MpStructureA
         } finally {
             PageUtils.clearPage();
         }
+    }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpStructureAllocation queryVO) {
+        this.startPage();
+        List<MpStructureAllocation> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
     }
 }
