@@ -181,7 +181,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         if (begin == null || end == null) {
             return Boolean.FALSE;
         }
-        if (begin > targetBegin) {
+        if (begin.equals(targetBegin) && end.equals(targetEnd)) {
+            return Boolean.TRUE;
+        } else if (begin > targetBegin) {
             return Boolean.TRUE;
         } else if (begin.equals(targetBegin)) {
             return end > targetEnd;
