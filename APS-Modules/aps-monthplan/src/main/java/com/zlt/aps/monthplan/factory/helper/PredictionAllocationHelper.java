@@ -264,21 +264,31 @@ public class PredictionAllocationHelper {
       return d1.compareTo(d2);
     }
 
+    /**
+     * 按生产应完成数量降序排列（从大到小）
+     * 空值处理：null 值排在最后
+     */
     private int compareOrdQty(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
       Integer q1 = o1.getProduceQtyDue();
       Integer q2 = o2.getProduceQtyDue();
 
+      // 两个都为 null，视为相等
       if (q1 == null && q2 == null) {
         return 0;
       }
-      // null排最后
+
+      // 只有 q1 为 null，q2 不为 null，降序时 null 排最后，所以返回 1
       if (q1 == null) {
         return 1;
       }
+
+      // 只有 q2 为 null，q1 不为 null，降序时非 null 值在前，所以返回 -1
       if (q2 == null) {
         return -1;
       }
-      return q1.compareTo(q2);
+
+      // 降序排列：q2 在前，q1 在后
+      return q2.compareTo(q1);
     }
 
     private Integer parseScmPriority(String scmPriority) {
