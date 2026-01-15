@@ -125,7 +125,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public Integer getLockEndDay(MpRollAdjustContextDTO contextDTO) {
         int lockDays = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
-        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isEmpty(structureAllocationList)){
             return lockDays;
         }
@@ -149,7 +149,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO) {
         int endDay = 0;
-        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isEmpty(structureAllocationList)){
             return endDay;
         }
