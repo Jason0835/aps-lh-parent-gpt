@@ -137,7 +137,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                         long beginTime = importDocEntity.getBeginDate().getTime();
                         long endTime = importDocEntity.getEndDate().getTime();
                         if (beginTime <= dbEndTime || endTime >= dbBeginTime) {
-                            String message = I18nUtil.getMessage("import.validated.repeat");
+                            String message = I18nUtil.getMessage("ui.data.alert.mdmDevicePlanShut.excel.notUnique");
                             String errorMsg = String.format(message, errorRowNum, Integer.parseInt(searchValue) + 2);
                             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, errorMsg, importErrorLogs);
                             return Boolean.FALSE;
