@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
@@ -217,8 +217,8 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @PostMapping("/finalized")
     @ApiOperation("定稿 - 对选定的年月 + 工厂+ 需求计划版本 + 工厂月计划排产版本进行定稿")
-    public AjaxResult finalized(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal) {
-        return iFactoryMonthPlanProdFinalRemoteService.finalized(factoryMonthPlanProdFinal);
+    public AjaxResult finalized(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+        return factoryConsoleService.finalized(factoryMonthPlanProdFinal);
     }
 
     /**
