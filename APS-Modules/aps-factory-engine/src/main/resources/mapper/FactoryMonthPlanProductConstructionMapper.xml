@@ -8,6 +8,7 @@
                mpc.CONSTRUCTION_CODE,
                mpc.SPEC_CODE,
                mpc.EMBRYO_CODE,
+               mpc.MAIN_MATERIAL_DESC,
                mpc.MOULD_METHOD,
                mpc.IS_ZERO_RACK,
                mpc.CURING_TIME,

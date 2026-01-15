@@ -1134,7 +1134,7 @@ public class ProductionPlanGroupInfo {
             if (CollectionUtils.isEmpty(cxLhRatioList)) {
                 groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
             } else {
-                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity(), (before, after) -> after));
+                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineTypeCode, Function.identity(), (before, after) -> after));
                 groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
             }
             groupInfoMap.put(structureName, groupInfo);

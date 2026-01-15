@@ -269,6 +269,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             setIsZeroRack(constructionInfo.getIsZeroRack());
         }
         setEmbryoNo(constructionInfo.getEmbryoNo());
+        setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
         setLhNo(constructionInfo.getLhNo());
         setTextNo(constructionInfo.getTextNo());
     }

@@ -159,7 +159,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
     /**
      * 根据成型机型及结构名，得到其配比信息
      *
-     * @param machineTypeCode     成型机机型
+     * @param machineTypeCode      成型机机型
      * @param structureName        分组结构名
      * @param structureLhRatioList 成型硫化配比信息
      * @return
@@ -172,12 +172,12 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         if (CollectionUtils.isEmpty(groupList)) {
             return null;
         }
-        Map<String, MonthPlanStructureLhRatioVo> brandCodeMap = groupList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineBrandCode, Function.identity(), (before, after) -> after));
-        MonthPlanStructureLhRatioVo find = brandCodeMap.get(machineTypeCode);
+        Map<String, MonthPlanStructureLhRatioVo> typeCodeMap = groupList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineTypeCode, Function.identity(), (before, after) -> after));
+        MonthPlanStructureLhRatioVo find = typeCodeMap.get(machineTypeCode);
         if (null != find) {
             return find;
         }
-        return brandCodeMap.get(ProductionConstant.ALL_BRAND_CODE_MATCH);
+        return typeCodeMap.get(ProductionConstant.ALL_BRAND_CODE_MATCH);
 
     }
 }
