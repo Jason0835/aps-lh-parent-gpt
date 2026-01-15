@@ -30,5 +30,6 @@ public interface MpAdjustStructureLogEntityMapper extends CommBaseMapper<MpAdjus
     void deleteAdjustLogByVersion(@Param("factoryCode") String factoryCode,
                                      @Param("year") String year,
                                      @Param("month") String month,
-                                     @Param("version") String version);
+                                     @Param("version") String version,
+                                     @Param("structure") String structure);
 }

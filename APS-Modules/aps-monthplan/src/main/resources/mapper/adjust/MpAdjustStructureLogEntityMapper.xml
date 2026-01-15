@@ -7,7 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <delete id="deleteAdjustLogByVersion" parameterType="String">
         DELETE FROM T_MP_ADJUST_STRUCTURE_LOG
         WHERE FACTORY_CODE = #{factoryCode} AND YEAR= #{year} AND MONTH= #{month}
-        AND ADJ_VERSION= #{version}
+        AND ADJ_VERSION= #{version} AND STRUCTURE_NAME = #{structureName}
     </delete>
 
 </mapper>

@@ -10,17 +10,14 @@ import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
-import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -45,6 +42,7 @@ import java.util.List;
 public class MpStructureAllocationController extends AbstractDocBizController<MpStructureAllocation> {
 
     private final IMpStructureAllocationService mpStructureAllocationService;
+
     private final MpStructureAllocationEntityMapper entityMapper;
 
     /**
@@ -65,6 +63,19 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         }
     }
 
+    @Override
+    protected List<MpStructureAllocation> listExportData(MpStructureAllocation condition) {
+        if (null == condition) {
+            return Collections.emptyList();
+        }
+        if (null == condition.getYear() || null == condition.getMonth() || StringUtils.isBlank(condition.getFactoryCode())) {
+            return Collections.emptyList();
+        }
+        if (StringUtils.isBlank(condition.getMonthPlanVersion()) || StringUtils.isBlank(condition.getProductionVersion())) {
+            return Collections.emptyList();
+        }
+        return mpStructureAllocationService.getDataList(condition);
+    }
 
     /**
      * 保存
@@ -73,7 +84,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MpStructureAllocation billVO){
+    public AjaxResult save(@RequestBody MpStructureAllocation billVO) {
         return super.save(billVO);
     }
 
@@ -84,17 +95,17 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
-    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
     @Override
-    protected IDocService getDocService(){
+    protected IDocService getDocService() {
         return mpStructureAllocationService;
     }
 
     @Override
-    protected String getTypeCode(){
+    protected String getTypeCode() {
         return "MDM0408";
     }
 

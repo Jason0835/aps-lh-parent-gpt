@@ -174,61 +174,10 @@ public class MpWeekRollAdjustController extends BaseController {
         //当日作为调整日
         contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
-        //初始锁定日
-        contextDTO.setLockEndDay(mpAdjustStructureInService.getLockEndDay(contextDTO));
-        //初始结构收尾日
-        contextDTO.setStructureDeadLine(mpAdjustStructureInService.getStructureDeadline(contextDTO));
+
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
-        //结构内调整记录
-        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO));
 
-       /* //测试数据
-        MpAdjustStructureIn structureIn = new MpAdjustStructureIn();
-        structureIn.setMaterialCode("3302001884");
-        structureIn.setMaterialDesc("215/75R17.5 135/133L 16PR BF188 BL3EBL");
-        structureIn.setStructureName("245/70R19.5");
-        structureIn.setPreviousNetQty(800);
-        structureIn.setCurrentNetQty(1400);
-        structureIn.setNetQtyChange(600);
-        structureIn.setMonthScheduledQty(800);
-        structureIn.setPendingQty(1000);
-        structureIn.setConfirmAdjustQty(1000);
-        structureIn.setDayVulcanizationQty(25);
-
-        MpAdjustStructureIn structureIn2 = new MpAdjustStructureIn();
-        structureIn2.setMaterialCode("3302001162");
-        structureIn2.setMaterialDesc("245/70R19.5 144/142J 18PR BF188 BL3EBL");
-        structureIn2.setStructureName("245/70R19.5");
-        structureIn2.setPreviousNetQty(1000);
-        structureIn2.setCurrentNetQty(600);
-        structureIn2.setNetQtyChange(-400);
-        structureIn2.setMonthScheduledQty(1000);
-        structureIn2.setPendingQty(-400);
-        structureIn2.setConfirmAdjustQty(-400);
-        structureIn2.setDayVulcanizationQty(25);
-
-        MpAdjustStructureIn structureIn3 = new MpAdjustStructureIn();
-        structureIn3.setMaterialCode("3302001877");
-        structureIn3.setMaterialDesc("215/75R17.5 135/133L 16PR BF177 BL3EBL");
-        structureIn3.setStructureName("245/70R19.5");
-        structureIn3.setMainPattern("315/80R22.5 161/157K 20PR JA665 BL0HJY");
-        structureIn3.setPreviousNetQty(0);
-        structureIn3.setCurrentNetQty(500);
-        structureIn3.setNetQtyChange(500);
-        structureIn3.setMonthScheduledQty(0);
-        structureIn3.setPendingQty(500);
-        structureIn3.setConfirmAdjustQty(500);
-        structureIn3.setDayVulcanizationQty(25);
-        structureIn3.setMouldCavityQty(6);
-        structureIn3.setTypeBlockQty(4);
-        structureIn3.setDayVulcanizationQty(25);
-
-        List<MpAdjustStructureIn> mpAdjustStructureInList = new ArrayList<>();
-        mpAdjustStructureInList.add(structureIn);
-        mpAdjustStructureInList.add(structureIn2);
-        mpAdjustStructureInList.add(structureIn3);
-        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInList);*/
         return contextDTO;
     }
 

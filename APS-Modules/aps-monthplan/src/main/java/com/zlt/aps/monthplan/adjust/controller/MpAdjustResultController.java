@@ -200,5 +200,17 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
         return "MP0804";
     }
 
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpAdjustResult queryVO) {
+        this.startPage();
+        List<MpAdjustResult> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
+    }
+
 
 }

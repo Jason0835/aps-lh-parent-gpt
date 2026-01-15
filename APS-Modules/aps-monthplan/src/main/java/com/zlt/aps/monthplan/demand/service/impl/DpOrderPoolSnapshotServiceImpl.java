@@ -104,13 +104,13 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
     }
 
     @Override
-    public List<SupplyOrderPool> fetchSupplyOrderPool(MpFactoryProductionVersion finalVersion) {
+    public List<SupplyOrderPool> fetchCycleStockOrder(MpFactoryProductionVersion finalVersion) {
         LambdaQueryWrapper<DpOrderPoolSnapshot> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DpOrderPoolSnapshot::getFactoryCode, finalVersion.getFactoryCode());
         wrapper.eq(DpOrderPoolSnapshot::getYear, finalVersion.getYear());
         wrapper.eq(DpOrderPoolSnapshot::getMonth, finalVersion.getMonth());
         wrapper.eq(DpOrderPoolSnapshot::getMonthPlanVersion,finalVersion.getMonthPlanVersion());
-        wrapper.in(DpOrderPoolSnapshot::getOrderPriority,Lists.newArrayList(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP,ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP));
+        wrapper.eq(DpOrderPoolSnapshot::getOrderPriority,ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP);
         wrapper.eq(DpOrderPoolSnapshot::getIsDelete, YesOrNoEnum.NO.getValue());
         List<DpOrderPoolSnapshot> list =  this.dpOrderPoolSnapshotEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){

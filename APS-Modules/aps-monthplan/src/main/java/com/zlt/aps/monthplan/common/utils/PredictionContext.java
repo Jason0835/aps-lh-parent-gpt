@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.common.utils;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -28,6 +29,7 @@ public class PredictionContext {
   private  Map<String, Integer>  monthlySaleQty;
   private  Integer  minProductionQty;
   private  Map<String, MdmMaterialInfo> materialInfoMap;
+  private  OrderAllocationResult allocationResult;
 
   public PredictionContext(
       List<SalesOrderPool> salesOrders,
@@ -52,6 +54,25 @@ public class PredictionContext {
     this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
     this.materialInfoMap = materialInfoMap != null ? materialInfoMap : new HashMap<>();
+  }
+
+  /**
+   * 订单分配结果
+   */
+  @Data
+  public static class OrderAllocationResult {
+    private  List<DpOrderOffsetDetail> allocations;
+    private  List<DpOrderOffsetDetail> netDemands;
+    private  Map<String, List<MdmProductStock>> stockMap;
+
+    public OrderAllocationResult(
+        List<DpOrderOffsetDetail> allocations,
+        List<DpOrderOffsetDetail> netDemands,
+        Map<String, List<MdmProductStock>> stockMap) {
+      this.allocations = allocations != null ? allocations : Collections.emptyList();
+      this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
+      this.stockMap = stockMap != null ? stockMap : new HashMap<>();
+    }
   }
 
 }

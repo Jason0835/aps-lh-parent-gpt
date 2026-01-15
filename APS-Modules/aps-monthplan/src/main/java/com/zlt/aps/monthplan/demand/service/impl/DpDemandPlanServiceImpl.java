@@ -52,7 +52,6 @@ import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
 import com.zlt.sysdef.domain.SysDocType;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 
@@ -187,7 +186,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 3. 并行获取数据
         PredictionContext data = fetchRequiredDataInParallel(monthPlanVersion);
         // 4. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
         // 5. 批量保存分配结果
@@ -259,7 +258,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 4. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
         // 5. 批量保存分配结果
@@ -282,6 +281,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     @Override
     public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) {
+        if(CollectionUtils.isEmpty(predictionContext.getAllocationResult().getNetDemands())) {
+            return Collections.emptyList();
+        }
         YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
         // 		11、计算T+1月的需求量	  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量  + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
         YearMonth tPlus1Month =   tMonth.plusMonths(1);
@@ -290,22 +292,18 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
-        createCondition.setIncludePostpone(true);
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        // 3. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tPlus1Month,
-            predictionVersion, predictionContext.getAllocationOrders(), predictionContext.getFinishedProductStockMap(),
-            predictionContext.getMonthSurplusMap());
-        // 5. 批量保存分配结果
-        saveAllocationResults(createCondition, predictionVersion, allocationResult);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(allocationResult.getNetDemands(),productionFinalResults,mpMonthPlanMonitors);
+        List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
+        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),cycleStockOrders,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(netDemands)){
+            predictionContext.getAllocationResult().setNetDemands(Collections.emptyList());
             return Collections.emptyList();
         }
+        predictionContext.getAllocationResult().setNetDemands(netDemands);
         List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus1Month);
         predictionContext.setSupplyOrderPools(supplyOrderPools);
         predictionContext.setPostponeOrders(null);
@@ -433,6 +431,40 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             throw new BusinessException("获取数据失败");
         }
 
+    }
+
+    @Override
+    public List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext) {
+        YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
+        createCondition.setYear(tMonth.getYear());
+        createCondition.setMonth(tMonth.getMonthValue());
+        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
+        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
+        createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
+        createCondition.setMonthPlanVersion(predictionVersion);
+        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        predictionContext.setMonthSurplusMap(monthSurplusMap);
+        // 3. 处理销售订单分配
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+            predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
+            predictionContext.getMonthSurplusMap());
+        // 5. 批量保存分配结果
+        saveAllocationResults(createCondition, predictionVersion, allocationResult);
+        List<SupplyOrderPool>   cycleStockOrders =  this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
+        predictionContext.setSupplyOrderPools(cycleStockOrders);
+        predictionContext.setPostponeOrders(null);
+        // 6. 处理需求计划生成
+        List<DpDemandPlan> demandPlans = generateDemandPlans(
+            createCondition, allocationResult.getNetDemands(), predictionContext);
+        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
+        // 7. 合并并保存需求计划
+        if (!CollectionUtils.isEmpty(demandPlans)) {
+            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext);
+        }
+        // 9. 保存分厂排产版本
+        saveFactoryProductionVersion(tMonth,predictionVersion);
+        predictionContext.setAllocationResult(allocationResult);
+        return mergedDemandPlans;
     }
 
     private Map<String, Integer> calculateConventionReserveQty(List<DpDemandPlan> dataList) {
@@ -702,7 +734,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 处理销售订单分配
      */
-    private OrderAllocationResult processSalesOrderAllocation(
+    private PredictionContext.OrderAllocationResult processSalesOrderAllocation(
         YearMonth tMonth,
         String monthPlanVersion,
         List<SalesOrderPool> allocationOrders,
@@ -710,7 +742,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, Integer> monthSurplusMap) {
 
         if (CollectionUtils.isEmpty(allocationOrders)) {
-            return new OrderAllocationResult(
+            return new PredictionContext.OrderAllocationResult(
                 Collections.emptyList(),
                 Collections.emptyList(),
                 finishedProductStockMap
@@ -722,7 +754,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
-        return new OrderAllocationResult(allocations, allocations, finishedProductStockMap);
+        return new PredictionContext.OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }
 
     /**
@@ -731,7 +763,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void saveAllocationResults(
         DpDemandPlan createCondition,
         String monthPlanVersion,
-        OrderAllocationResult allocationResult) {
+        PredictionContext.OrderAllocationResult allocationResult) {
 
         // 批量插入分配结果
         if (!CollectionUtils.isEmpty(allocationResult.getAllocations())) {
@@ -1050,24 +1082,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    /**
-     * 订单分配结果
-     */
-    @Getter
-    private static class OrderAllocationResult {
-        private final List<DpOrderOffsetDetail> allocations;
-        private final List<DpOrderOffsetDetail> netDemands;
-        private final Map<String, List<MdmProductStock>> stockMap;
 
-        public OrderAllocationResult(
-            List<DpOrderOffsetDetail> allocations,
-            List<DpOrderOffsetDetail> netDemands,
-            Map<String, List<MdmProductStock>> stockMap) {
-            this.allocations = allocations != null ? allocations : Collections.emptyList();
-            this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
-            this.stockMap = stockMap != null ? stockMap : new HashMap<>();
-        }
-    }
 
     /**
      * 数量统计内部类

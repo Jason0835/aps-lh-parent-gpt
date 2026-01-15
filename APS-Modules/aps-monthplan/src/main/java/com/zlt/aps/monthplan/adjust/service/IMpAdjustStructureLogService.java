@@ -24,6 +24,7 @@ public interface IMpAdjustStructureLogService  extends IDocService<MpAdjustStruc
      * @param year 年份
      * @param month 月份
      * @param version 调整版本
+     * @param structure 结构
      */
-    void deleteAdjustLogByVersion(String factoryCode,String year,String month,String version);
+    void deleteAdjustLogByVersion(String factoryCode,String year,String month,String version,String structure);
 }
