@@ -104,6 +104,8 @@ public class CxMouldProductionHandler {
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        //处理结构提前收尾
+        GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
     }
 
     /**

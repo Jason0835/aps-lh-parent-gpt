@@ -201,6 +201,20 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 判断使用模具数是否低于要求的模具数
+     * 最低硫化配比使用
+     *
+     * @param minMouldNumber 最低硫化配比的模具数
+     * @return
+     */
+    public boolean isLowMinMouldNumber(int minMouldNumber) {
+        if (CollectionUtils.isEmpty(productionMouldSet)) {
+            return true;
+        }
+        return productionMouldSet.size() < minMouldNumber;
+    }
+
+    /**
      * 判断能否加一台硫化
      * 如果该日硫化机台已经达到限制，则不用判断生胎
      * 否则需要判断生胎种类数是否达到限制

@@ -562,7 +562,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
             //再次设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
-            //todo 处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
+            //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
+            GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
             //设置收尾机台
             continueCxMachineAllocation.forEach(cxMachineAllocation -> {
                 String cxMachineCode = cxMachineAllocation.getCxMachineCode();
@@ -621,7 +622,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
             return;
         }
-        //对挑选出的机构，匹配还有排产量的成型机台
+        //对挑选出的结构，匹配还有排产量的成型机台
         CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
         if (null == selectedCxMachine) {
             //记录日志
@@ -650,6 +651,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             //20260108 标记分配完成
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         }
+        //重新获取机台的剩余日 提前收尾
+        leftOver = selectedCxMachine.getRemainingDays();
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
