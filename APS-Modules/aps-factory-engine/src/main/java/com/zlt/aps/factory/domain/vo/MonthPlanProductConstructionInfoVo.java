@@ -1,5 +1,7 @@
 package com.zlt.aps.factory.domain.vo;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
@@ -67,6 +69,18 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
      */
     @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     private String embryoCode;
+
+    /**
+     * 主物料(胎胚描述)
+     */
+    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    private String mainMaterialDesc;
+
+    /**
+     * 产品状态
+     */
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    private String productStatus;
 
     /**
      * 成型法
