@@ -47,18 +47,6 @@ public class MpSimulatedResult extends BaseEntity {
     @TableField(value = "MONTH")
     private Integer month;
 
-    /** 模拟排产需求版本号 */
-    @Excel(name = "ui.data.column.simulatedResult.monthPlanVersion")
-    @ApiModelProperty(value = "模拟排产需求版本号", name = "monthPlanVersion")
-    @TableField(value = "MONTH_PLAN_VERSION")
-    private String monthPlanVersion;
-
-    /** 模拟排产计划版本 = 模拟排产需求版本号 */
-    @Excel(name = "ui.data.column.simulatedResult.productionVersion")
-    @ApiModelProperty(value = "模拟排产计划版本 = 模拟排产需求版本号", name = "productionVersion")
-    @TableField(value = "PRODUCTION_VERSION")
-    private String productionVersion;
-
     /** 产品品类 数据字典：biz_product_type  全钢 PCR 半钢 */
     @Excel(name = "ui.data.column.simulatedResult.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type  全钢 PCR 半钢", name = "productTypeCode")
@@ -95,23 +83,11 @@ public class MpSimulatedResult extends BaseEntity {
     @TableField(value = "BRAND")
     private String brand;
 
-    /** 英寸 */
-    @Excel(name = "ui.data.column.simulatedResult.proSize")
-    @ApiModelProperty(value = "英寸", name = "proSize")
-    @TableField(value = "PRO_SIZE")
-    private String proSize;
-
     /** 主物料 */
     @Excel(name = "ui.data.column.simulatedResult.mainMaterialDesc")
     @ApiModelProperty(value = "主物料", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
-
-    /** MES物料编码 */
-    @Excel(name = "ui.data.column.simulatedResult.mesMaterialCode")
-    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
 
     /** 物料编码 */
     @Excel(name = "ui.data.column.simulatedResult.materialCode")
@@ -124,6 +100,7 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
+
 
     /** 模具数量(同主花纹的模具数量) */
     @Excel(name = "ui.data.column.simulatedResult.mouldQty", cellType = Excel.ColumnType.NUMERIC)
@@ -154,6 +131,12 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "排产总量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
+
+    /** 模拟排产需求版本号 */
+    @Excel(name = "ui.data.column.simulatedResult.monthPlanVersion")
+    @ApiModelProperty(value = "模拟排产需求版本号", name = "monthPlanVersion")
+    @TableField(value = "MONTH_PLAN_VERSION")
+    private String monthPlanVersion;
 
     /** 第1个月排产量 */
     @Excel(name = "ui.data.column.simulatedResult.month1", cellType = Excel.ColumnType.NUMERIC)
@@ -298,6 +281,18 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "第24个月排产量", name = "month24")
     @TableField(value = "MONTH_24")
     private Integer month24;
+    /** 模拟排产计划版本 = 模拟排产需求版本号 */
+    @ApiModelProperty(value = "模拟排产计划版本 = 模拟排产需求版本号", name = "productionVersion")
+    @TableField(value = "PRODUCTION_VERSION")
+    private String productionVersion;
 
+    /** 英寸 */
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
 
+    /** MES物料编码 */
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 }
