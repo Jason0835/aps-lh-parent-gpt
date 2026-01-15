@@ -69,4 +69,12 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return 预测上下文
      */
     PredictionContext buildPredictionContext();
+    /**
+     *  生成T月需求计划
+     * @param param
+     * @param finalVersion
+     * @param predictionContext
+     * @return
+     */
+    List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan param, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext);
 }

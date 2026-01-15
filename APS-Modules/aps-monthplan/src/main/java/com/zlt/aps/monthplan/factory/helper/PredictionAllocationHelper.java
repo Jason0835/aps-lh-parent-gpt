@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.factory.helper;
 
 
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
@@ -32,6 +31,7 @@ public class PredictionAllocationHelper {
    */
   public static List<DpOrderOffsetDetail> calculateSaleOrder(
       List<DpOrderOffsetDetail> netDemands,
+      List<SupplyOrderPool> cycleStockOrders,
       List<FactoryMonthPlanProductionFinalResult> productionFinalResults,
       List<MpMonthPlanMonitor>  mpMonthPlanMonitors) {
     List<DpOrderOffsetDetail> result = new ArrayList<>();
@@ -39,14 +39,16 @@ public class PredictionAllocationHelper {
       return result;
     }
     Map<String,List<DpOrderOffsetDetail>>  netDemandGroupMap = netDemands.stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getMaterialCode));
-    Map<String,List<FactoryMonthPlanProductionFinalResult>> productionGroupMap = getProductionGroupMap(productionFinalResults);
-    Map<String,List<MpMonthPlanMonitor>> completionGroupMap = getCompletionGroupMap(mpMonthPlanMonitors);
+    Map<String,Integer> productionGroupMap = calculateProductionQty(productionFinalResults);
+    Map<String,Integer> completionGroupMap = calculateCompleteQty(mpMonthPlanMonitors);
+    Map<String,Integer> cycleStockQtyMap = calculatecycleStockQty(cycleStockOrders);
     for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
       String groupKey = entry.getKey();
       List<DpOrderOffsetDetail> saleOrders = entry.getValue();
       DpOrderOffsetDetail saleOrder = processOrderGroup(
           groupKey,
           saleOrders,
+          cycleStockQtyMap,
           productionGroupMap,
           completionGroupMap
       );
@@ -58,19 +60,19 @@ public class PredictionAllocationHelper {
     return result;
   }
 
-  private static Map<String, List<MpMonthPlanMonitor>> getCompletionGroupMap(List<MpMonthPlanMonitor> mpMonthPlanMonitors) {
-    if(CollectionUtils.isEmpty(mpMonthPlanMonitors)) {
+  private static Map<String, Integer> calculatecycleStockQty(List<SupplyOrderPool> cycleStockOrders) {
+    if(CollectionUtils.isEmpty(cycleStockOrders)) {
       return Collections.emptyMap();
     }
-    return mpMonthPlanMonitors.stream().collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
+    return cycleStockOrders.stream()
+        .filter(Objects::nonNull)
+        .filter(supplyOrder -> StringUtils.isNotBlank(supplyOrder.getMaterialCode()) && null != supplyOrder.getQty())
+        .collect(Collectors.groupingBy(
+            SupplyOrderPool::getMaterialCode,
+            Collectors.summingInt(SupplyOrderPool::getQty)
+        ));
   }
 
-  private static Map<String, List<FactoryMonthPlanProductionFinalResult>> getProductionGroupMap(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-    if(CollectionUtils.isEmpty(productionFinalResults)) {
-      return Collections.emptyMap();
-    }
-    return productionFinalResults.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
-  }
 
   /**
    * 处理单个订单组的库存分配
@@ -78,20 +80,17 @@ public class PredictionAllocationHelper {
   private static DpOrderOffsetDetail processOrderGroup(
       String groupKey,
       List<DpOrderOffsetDetail> saleOrders,
-      Map<String,List<FactoryMonthPlanProductionFinalResult>> productionGroupMap,
-      Map<String,List<MpMonthPlanMonitor>> completionGroupMap
+      Map<String,Integer> cycleStockQtyMap,
+      Map<String,Integer> productionQtyMap,
+      Map<String,Integer> completedQtyMap
       ) {
          // 9、从7步骤中的订单数据，按SKU扣减T月月度计划对应实单已排产量(销售订单)+ T月已生产量，得到销售订单剩余还未排产量
          int netDemand = saleOrders.stream().mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
          if(BigDecimal.ZERO.intValue() == netDemand) {
            return null;
          }
-         List<FactoryMonthPlanProductionFinalResult> productionFinalResults = productionGroupMap.get(groupKey);
-         List<MpMonthPlanMonitor> mpMonthPlanMonitors = completionGroupMap.get(groupKey);
-         Map<String,Integer> productionQtyMap  = calculateProductionQty(productionFinalResults);
-         Map<String,Integer> completedQtyMap   = calculateCompleteQty(mpMonthPlanMonitors);
           // T月实单未排产量：	300	(高优先级净需求+中优先级+暂缓订单-T月实单排产量+T月实单已完成量)
-         int realUnproductionQty = netDemand - productionQtyMap.getOrDefault(groupKey, 0) + completedQtyMap.getOrDefault(groupKey, 0);
+         int realUnproductionQty = netDemand +  cycleStockQtyMap.getOrDefault(groupKey,0)  - productionQtyMap.getOrDefault(groupKey, 0) + completedQtyMap.getOrDefault(groupKey, 0);
           if(realUnproductionQty <= BigDecimal.ZERO.intValue()) {
             return null;
           }
@@ -143,66 +142,6 @@ public class PredictionAllocationHelper {
    */
   private static Comparator<DpOrderOffsetDetail> getHighPerformanceComparator() {
     return new SalesOrderComparator();
-  }
-
-  public static List<SupplyOrderPool> calculateCycleStockOrder(List<SupplyOrderPool> allSupplyOrders, List<FactoryMonthPlanProductionFinalResult> productionFinalResults, List<MpMonthPlanMonitor> mpMonthPlanMonitors) {
-    List<SupplyOrderPool> result = new ArrayList<>();
-    if(CollectionUtils.isEmpty(allSupplyOrders)) {
-      return result;
-    }
-    Map<String,List<SupplyOrderPool>>  cycleStockOrderGroupMap = allSupplyOrders.stream().filter(item -> ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(item.getOrderType())).collect(Collectors.groupingBy(SupplyOrderPool::getMaterialCode));
-    if(CollectionUtils.isEmpty(cycleStockOrderGroupMap)) {
-      return result;
-    }
-    Map<String,List<FactoryMonthPlanProductionFinalResult>> productionGroupMap = getProductionGroupMap(productionFinalResults);
-    Map<String,List<MpMonthPlanMonitor>> completionGroupMap = getCompletionGroupMap(mpMonthPlanMonitors);
-    for (Map.Entry<String, List<SupplyOrderPool>> entry : cycleStockOrderGroupMap.entrySet()) {
-      String groupKey = entry.getKey();
-      List<SupplyOrderPool> saleOrders = entry.getValue();
-      SupplyOrderPool supplyOrder = processSupplyOrderGroup(
-          groupKey,
-          saleOrders,
-          productionGroupMap,
-          completionGroupMap
-      );
-      if(null == supplyOrder) {
-        continue;
-      }
-      result.add(supplyOrder);
-    }
-    return result;
-  }
-
-  private static SupplyOrderPool processSupplyOrderGroup(String groupKey, List<SupplyOrderPool> supplyOrders, Map<String, List<FactoryMonthPlanProductionFinalResult>> productionGroupMap, Map<String, List<MpMonthPlanMonitor>> completionGroupMap) {
-    int netDemand = supplyOrders.stream().mapToInt(SupplyOrderPool::getQty).sum();
-    if(BigDecimal.ZERO.intValue() == netDemand) {
-      return null;
-    }
-    List<FactoryMonthPlanProductionFinalResult> productionFinalResults = productionGroupMap.get(groupKey);
-    List<MpMonthPlanMonitor> mpMonthPlanMonitors = completionGroupMap.get(groupKey);
-    Map<String,Integer> productionQtyMap  = calculateProductionCycleReserveQty(productionFinalResults);
-    Map<String,Integer> completedQtyMap   = calculateCompleteQty(mpMonthPlanMonitors);
-    //  T月周期储备未排产量：	0	    SKU:T月定稿版本的周期排产储备量 - T月月度计划周期储备已排产量 + T月周期已完成量
-    int realUnproductionQty = netDemand - productionQtyMap.getOrDefault(groupKey, 0) + completedQtyMap.getOrDefault(groupKey, 0);
-    if(realUnproductionQty <= BigDecimal.ZERO.intValue()) {
-      return null;
-    }
-    SupplyOrderPool supplyOrderOrder = supplyOrders.get(0);
-    supplyOrderOrder.setQty(realUnproductionQty);
-    return supplyOrderOrder;
-  }
-
-  private static Map<String, Integer> calculateProductionCycleReserveQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-    if(org.springframework.util.CollectionUtils.isEmpty(productionFinalResults)) {
-      return Collections.emptyMap();
-    }
-    return productionFinalResults.stream()
-        .filter(Objects::nonNull)
-        .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && null != productionFinalResult.getCycleProductionQty())
-        .collect(Collectors.groupingBy(
-            FactoryMonthPlanProductionFinalResult::getMaterialCode,
-            Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getCycleProductionQty)
-        ));
   }
 
   /**

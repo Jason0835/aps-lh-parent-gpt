@@ -108,7 +108,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
-
         PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
         // 生成T月模拟需求计划
         // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
@@ -118,6 +117,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         param.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
         param.setPrefix(PREFIX);
+        List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
         // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
         List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion,predictionContext);
         List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
