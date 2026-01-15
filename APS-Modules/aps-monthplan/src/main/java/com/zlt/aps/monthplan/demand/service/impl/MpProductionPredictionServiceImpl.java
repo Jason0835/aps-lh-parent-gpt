@@ -18,6 +18,7 @@ import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
+import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -107,6 +108,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
+
+        PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
         // 生成T月模拟需求计划
         // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
         // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
@@ -116,14 +119,14 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         param.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
         param.setPrefix(PREFIX);
         // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion);
+        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion,predictionContext);
         List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
         // 排产汇总
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
            /* Context context = buildContext(tPlus1MonthDemands);
             monthPlanProductionSchedulingService.general(context);*/
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
-            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month);
+            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
         }
        /* if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             Context context = buildContext(tPlus2MonthDemands);

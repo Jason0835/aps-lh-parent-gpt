@@ -14,7 +14,7 @@
             EMBRYO_CODE CONSTRUCTION_CODE,
             TRIAL_STATUS,
             SPEC_DESC,
-            EMBRYO_DESC,
+            EMBRYO_DESC AS MAIN_MATERIAL_DESC,
             EMBRYO_NO,
             EMBRYO_TYPE,
             EMBRYO_RELEASE_DATE,
