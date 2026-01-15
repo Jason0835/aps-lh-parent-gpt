@@ -30,17 +30,15 @@ import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalRes
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
-import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -187,101 +185,115 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     }
 
     private List<MpSimulatedResult> buildSimulatedResult(MonthCalculator.MonthRangeResult monthRange,Map<YearMonth, MpFactoryProductionVersion> productionVersions,List<DpDemandPlan> tMonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
-        MpFactoryProductionVersion  finalVersion = productionVersions.get(monthRange.getTMonth());
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        if(CollectionUtils.isEmpty(productionFinalResults)) {
+        Set<String> monthPlanVersions = productionVersions.values().stream().map(MpFactoryProductionVersion::getMonthPlanVersion).collect(Collectors.toSet());
+        List<FactoryMonthPlanProductionFinalResult> list = this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(monthPlanVersions);
+        if(CollectionUtils.isEmpty(list)) {
             return Collections.emptyList();
         }
-        List<MpSimulatedResult> list = Lists.newArrayList();
-        Map<String,Integer> tMonthDemandQty = this.getMonthQty(productionFinalResults);
-        Map<String,Integer> tPlus1MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus1Month());
-        Map<String,Integer> tPlus2MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus2Month());
-        Map<String,Integer> tPlus3MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus3Month());
-        Map<String,Integer> tPlus4MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus4Month());
-        Map<String,Integer> tPlus5MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus5Month());
-        Map<String,Integer> tPlus6MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus6Month());
-        Map<String,Integer> tPlus7MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus7Month());
-        Map<String,Integer> tPlus8MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus8Month());
-        Map<String,Integer> tPlus9MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus9Month());
-        Map<String,Integer> tPlus10MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus10Month());
-        Map<String,Integer> tPlus11MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus11Month());
-        Map<String,Integer> tPlus12MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus12Month());
-        Map<String,Integer> tPlus13MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus13Month());
-        Map<String,Integer> tPlus14MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus14Month());
-        Map<String,Integer> tPlus15MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus15Month());
-        Map<String,Integer> tPlus16MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus16Month());
-        Map<String,Integer> tPlus17MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus17Month());
-        Map<String,Integer> tPlus18MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus18Month());
-        Map<String,Integer> tPlus19MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus19Month());
-        Map<String,Integer> tPlus20MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus20Month());
-        Map<String,Integer> tPlus21MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus21Month());
-        Map<String,Integer> tPlus22MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus22Month());
-        Map<String,Integer> tPlus23MonthDemandQty = getProductionQty(productionVersions,monthRange.getTPlus23Month());
+        Map<String,List<FactoryMonthPlanProductionFinalResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        List<MpSimulatedResult> result = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
         DpDemandPlan tMonthDemandPlan = tMonthDemands.get(0);
-        tMonthDemandQty.forEach((materialCode, productionQty) -> {
+        MpFactoryProductionVersion currentFinalVersion = productionVersions.get(monthRange.getTMonth());
+        map.forEach((materialCode, value) -> {
             if(!materialInfoMap.containsKey(materialCode)) {
                 return;
             }
+            List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode = map.get(materialCode);
             MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
             MpSimulatedResult productionPrediction = new MpSimulatedResult();
             BeanUtils.copyProperties(materialInfo,productionPrediction);
             productionPrediction.setId(null);
             productionPrediction.setBaseVale(null);
-            productionPrediction.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            productionPrediction.setFactoryCode(currentFinalVersion.getFactoryCode());
             productionPrediction.setYear(yearMonth.getYear());
             productionPrediction.setMonth(yearMonth.getMonthValue());
             productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
-            productionPrediction.setProductionVersion(finalVersion.getProductionVersion());
-            productionPrediction.setMonth1(productionQty);
-            productionPrediction.setMonth2(tPlus1MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth3(tPlus2MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
+            productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
+            productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
+            productionPrediction.setNetQty(calculateNetQty(listGroupByMaterialCode));
+            productionPrediction.setHeightQty(calculateHeightQty(listGroupByMaterialCode));
+            productionPrediction.setProductionQty(calculateProductionQty(listGroupByMaterialCode));
+            productionPrediction.setMonth1(calculateProductionQty(listGroupByMaterialCode,monthRange.getTMonth()));
+            productionPrediction.setMonth2(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus1Month()));
+            productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus2Month()));
 
-            productionPrediction.setMonth4(tPlus3MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth5(tPlus4MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth4(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus3Month()));
+            productionPrediction.setMonth5(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus4Month()));
 
-            productionPrediction.setMonth6(tPlus5MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth7(tPlus6MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth6(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus5Month()));
+            productionPrediction.setMonth7(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus6Month()));
 
-            productionPrediction.setMonth8(tPlus7MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth9(tPlus8MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth8(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus7Month()));
+            productionPrediction.setMonth9(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus8Month()));
 
-            productionPrediction.setMonth10(tPlus9MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth11(tPlus10MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth10(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus9Month()));
+            productionPrediction.setMonth11(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus10Month()));
 
-            productionPrediction.setMonth12(tPlus11MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth13(tPlus12MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth12(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus11Month()));
+            productionPrediction.setMonth13(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus12Month()));
 
-            productionPrediction.setMonth14(tPlus13MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth15(tPlus14MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth14(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus13Month()));
+            productionPrediction.setMonth15(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus14Month()));
 
-            productionPrediction.setMonth16(tPlus15MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth17(tPlus16MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth16(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus15Month()));
+            productionPrediction.setMonth17(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus16Month()));
 
-            productionPrediction.setMonth18(tPlus17MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth19(tPlus18MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth18(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus17Month()));
+            productionPrediction.setMonth19(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus18Month()));
 
-            productionPrediction.setMonth20(tPlus19MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth21(tPlus20MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
+            productionPrediction.setMonth20(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus19Month()));
+            productionPrediction.setMonth21(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus20Month()));
 
-            productionPrediction.setMonth22(tPlus21MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth23(tPlus22MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            productionPrediction.setMonth24(tPlus23MonthDemandQty.getOrDefault(materialCode,BigDecimal.ZERO.intValue()));
-            list.add(productionPrediction);
+            productionPrediction.setMonth22(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus21Month()));
+            productionPrediction.setMonth23(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus22Month()));
+            productionPrediction.setMonth24(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus23Month()));
+            result.add(productionPrediction);
         });
-        return list;
+        return result;
     }
 
-    private Map<String,Integer> getProductionQty(Map<YearMonth, MpFactoryProductionVersion> productionVersions, YearMonth yearMonth) {
-         if(!productionVersions.containsKey(yearMonth)) {
-             return Collections.emptyMap();
-         }
-         MpFactoryProductionVersion productionVersion = productionVersions.get(yearMonth);
-         List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(productionVersion);
-         if(CollectionUtils.isEmpty(productionFinalResults)) {
-             return Collections.emptyMap();
-         }
-         return this.getMonthQty(productionFinalResults);
+    private int calculateProductionQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
+    }
+
+    private int calculateHeightQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getHeightQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getHeightQty).sum();
+    }
+
+    private int calculateNetQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getProdReqPlan()).mapToInt(FactoryMonthPlanProductionFinalResult::getProdReqPlan).sum();
+    }
+
+    private int calculateTypeBlockQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getTypeBlockQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTypeBlockQty).sum();
+    }
+
+    private int calculateMouldQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getMouldCavityQty).sum();
+    }
+
+    private int calculateProductionQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode, YearMonth yearMonth) {
+        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
+            return 0;
+        }
+        return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
     }
 
     private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
@@ -294,20 +306,6 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         productionVersion.setMonth(tPlus1MonthDemands.get(0).getMonth());
         productionVersion.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
         return productionVersion;
-    }
-
-
-    private Map<String, Integer> getMonthQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-        if (CollectionUtils.isEmpty(productionFinalResults)) {
-            return Collections.emptyMap();
-        }
-        return productionFinalResults.stream()
-            .filter(Objects::nonNull)
-            .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && productionFinalResult.getTotalQty() != null)
-            .collect(Collectors.groupingBy(
-                FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)
-            ));
     }
 
 
