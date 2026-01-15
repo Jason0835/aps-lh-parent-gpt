@@ -30,7 +30,6 @@ import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalRes
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +38,6 @@ import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -298,21 +296,6 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
     }
 
-    private Map<YearMonth,Map<String,List<FactoryMonthPlanProductionFinalResult>>> getProductionQty(Map<YearMonth, MpFactoryProductionVersion> productionVersions, YearMonth yearMonth) {
-         if(!productionVersions.containsKey(yearMonth)) {
-             return Collections.emptyMap();
-         }
-         MpFactoryProductionVersion productionVersion = productionVersions.get(yearMonth);
-         List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(productionVersion);
-         if(CollectionUtils.isEmpty(productionFinalResults)) {
-             return Collections.emptyMap();
-         }
-         Map<YearMonth,Map<String,List<FactoryMonthPlanProductionFinalResult>>> result = Maps.newHashMap();
-         Map<String,List<FactoryMonthPlanProductionFinalResult>> map =  productionFinalResults.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
-         result.put(yearMonth,map);
-         return result;
-    }
-
     private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
         if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             return null;
@@ -323,20 +306,6 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         productionVersion.setMonth(tPlus1MonthDemands.get(0).getMonth());
         productionVersion.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
         return productionVersion;
-    }
-
-
-    private Map<String, Integer> getMonthQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
-        if (CollectionUtils.isEmpty(productionFinalResults)) {
-            return Collections.emptyMap();
-        }
-        return productionFinalResults.stream()
-            .filter(Objects::nonNull)
-            .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && productionFinalResult.getTotalQty() != null)
-            .collect(Collectors.groupingBy(
-                FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)
-            ));
     }
 
 
