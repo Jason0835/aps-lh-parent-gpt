@@ -285,7 +285,7 @@ public class CxLhMouldProductionCalculator {
             if (null == firstDay) {
                 firstDay = day;
             }
-            //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
+            //需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
             DayProductionQtyHelper dayProductionInfo = calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionSkuInfo);
             Integer lossQty;
             if (dayProductionInfo.isProductionNextDay()) {

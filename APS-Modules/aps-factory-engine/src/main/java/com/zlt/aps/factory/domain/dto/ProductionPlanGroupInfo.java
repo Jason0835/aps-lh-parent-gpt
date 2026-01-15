@@ -1217,7 +1217,7 @@ public class ProductionPlanGroupInfo {
             }
             Map<String, Long> materialGroup = mouldRelationList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc, Collectors.counting()));
             List<Long> mouldNumberList = new ArrayList<>(materialGroup.values());
-            mouldNumberList.sort(Comparator.comparing(Long::valueOf));
+            mouldNumberList.sort(Comparator.comparing(Long::valueOf, Comparator.reverseOrder()));
             maxMouldNumber = mouldNumberList.get(BigDecimal.ZERO.intValue()).intValue();
             structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
         });

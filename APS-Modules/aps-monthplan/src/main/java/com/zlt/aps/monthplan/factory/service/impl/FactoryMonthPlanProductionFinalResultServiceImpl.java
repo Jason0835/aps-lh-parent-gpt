@@ -286,6 +286,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         queryWrapper.eq(PubUtil.isNotEmpty(condition.getProSize()), "PRO_SIZE", condition.getProSize());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getSpecifications()), "SPECIFICATIONS", condition.getSpecifications());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getPattern()), "PATTERN", condition.getPattern());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getStructureName()), "STRUCTURE_NAME", condition.getStructureName());
+
     }
 
 }
