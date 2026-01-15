@@ -149,8 +149,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
         // 结果集初始化
         List<MpAdjustDetailVo> resultList = new ArrayList<>();
-        // 任一列表为空则直接返回空结果
-        if (PubUtil.isEmpty(trialPlanList) || PubUtil.isEmpty(monthPlanProdList)) {
+        // 列表为空则直接返回空结果
+        if (PubUtil.isEmpty(trialPlanList)) {
             return resultList;
         }
         // 生产计划列表按照物料编码进行分组
