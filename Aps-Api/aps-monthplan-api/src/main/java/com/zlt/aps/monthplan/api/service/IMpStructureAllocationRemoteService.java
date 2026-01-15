@@ -50,6 +50,7 @@ public interface IMpStructureAllocationRemoteService {
 
     /**
      * 导出排产过程_结构排产列表
+     * @param fileName
      */
     @ApiOperation("导出列表")
     @PostMapping("/mpStructureAllocation/exportData/{fileName}")
