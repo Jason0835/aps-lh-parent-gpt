@@ -240,6 +240,26 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         return this.list(queryWrapper);
     }
 
+    @Override
+    public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions) {
+        if (CollectionUtils.isEmpty(monthPlanVersions)) {
+            return Collections.emptyList();
+        }
+        final int batchSize = 1000;
+        List<FactoryMonthPlanProductionFinalResult> result = new ArrayList<>();
+        List<String> versionList = new ArrayList<>(monthPlanVersions);
+        for (int i = 0; i < versionList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, versionList.size());
+            List<String> batchVersions = versionList.subList(i, end);
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                    .in(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, batchVersions)
+                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(this.list(queryWrapper));
+        }
+        return result;
+    }
+
     private Map<String, List<FactoryMonthPlanProductionFinalResult>> getGroupMonthProdFinalPlanByMaterialCode(List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals) {
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();

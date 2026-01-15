@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -74,4 +75,10 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * @return
      */
     List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
+    /**
+     * 查询最终排产结果
+     * @param monthPlanVersions
+     * @return
+     */
+    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions);
 }
