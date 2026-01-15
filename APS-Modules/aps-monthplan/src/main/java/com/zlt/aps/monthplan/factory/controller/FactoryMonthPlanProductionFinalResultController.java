@@ -45,7 +45,6 @@ public class FactoryMonthPlanProductionFinalResultController extends BusiControl
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
      */
-    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
