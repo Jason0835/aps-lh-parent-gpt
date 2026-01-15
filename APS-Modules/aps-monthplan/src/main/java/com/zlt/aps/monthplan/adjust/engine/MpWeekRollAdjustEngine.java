@@ -53,52 +53,13 @@ public class MpWeekRollAdjustEngine {
 
 
     /**
-     * 结构内自动调整
-     * @param contextDTO
-     * @throws BusinessException
-     */
-    public void structureInAutoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
-        //初始化日志
-        contextDTO.setLogDetail(new StringBuilder());
-        //注：结构内自动调整列表：关单直接排除，同时取订单列表与月计划最大并集；
-        //1.结构内订单调整记录空检查
-        if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureInList())){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
-                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
-        }
-        //2.月计划定稿数据空检查
-        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
-                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
-        }
-
-        //规格挑选可用机台
-        contextDTO.getLogDetail().append("========结构内调整（开始）========").append(ApsConstant.DIVISION);
-        //4.按结构序列化分组
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
-        Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
-        Date startTime,endTime;
-        for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
-            //结构内，按结构分别调整
-            contextDTO.setStructureName(entry.getKey());
-            //规格挑选可用机台
-            startTime = new Date();
-            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-            structureInAdjustForOne(contextDTO,entry.getValue(), MapUtils.getObject(mpProdFinalMap, entry.getKey(), new ArrayList<>()));
-            endTime = new Date();
-            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
-        }
-        contextDTO.getLogDetail().append("========结构内调整（结束）========").append(ApsConstant.DIVISION);
-    }
-
-    /**
      * 结构内调整，按结构分别调整
      * @param contextDTO 周程滚动调整上下文
      * @param mpAdjustStructureInList 结构内调整记录列表
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustForOne(MpRollAdjustContextDTO contextDTO,List<MpAdjustStructureIn> mpAdjustStructureInList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    public void structureInAdjustForOne(MpRollAdjustContextDTO contextDTO,List<MpAdjustStructureIn> mpAdjustStructureInList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         //1.解析出关单/减量、在产SKU、新增SKU以及暂缓
         List<MpAdjustStructureIn> deductAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> onIncrementAdjustList = new ArrayList<>();
@@ -137,7 +98,7 @@ public class MpWeekRollAdjustEngine {
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(lockNextDay,mpProdFinalList,contextDTO.getStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(lockNextDay,mpProdFinalList,contextDTO.getOneStructureAllocationList());
         contextDTO.setDailyCapacityLimitVoMap(dailyCapacityLimitVoMap);
         //4、拆出搭配量，用于快速判断是否搭配
         mpProdFinalList.stream().forEach(x->{
@@ -490,7 +451,7 @@ public class MpWeekRollAdjustEngine {
                 prodFinal.setFieldValueByFieldName(matchDayField,dayQty - totalMatchQty);
                 totalMatchQty = 0;
             }
-            sb.append(prodFinal.getFieldValueByFieldName(matchDayField));
+            sb.append(prodFinal.getFieldValueByFieldName(matchDayField)).append(",");
             if (totalMatchQty == 0){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,每日搭配量:%s",contextDTO.getStructureName(), totalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
                 //剩余搭配量=0,退出

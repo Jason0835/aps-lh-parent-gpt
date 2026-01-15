@@ -9,6 +9,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -198,12 +199,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
-        MpWeekRollAdjustEngine adjustEngine = new MpWeekRollAdjustEngine();
-        adjustEngine.structureInAutoAdjust(contextDTO);
+        doAutoAdjust(contextDTO);
         //保存调整结果
         saveMpAdjustResult(contextDTO);
-        //保存调整日志
-        saveMpAdjustLog(contextDTO);
     }
 
     /**
@@ -225,7 +223,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult = new MpAdjustResult();
             BeanUtils.copyProperties(finalAdjustVo,mpAdjustResult);
             mpAdjustResult.setId(null);
-            mpAdjustResult.setAdjustType("01");
+            mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
             mpAdjustResultList.add(mpAdjustResult);
         }
@@ -236,14 +234,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 保存调整日志
      * @param contextDTO
      */
-    private void saveMpAdjustLog(MpRollAdjustContextDTO contextDTO){
+    public void saveMpAdjustLog(MpRollAdjustContextDTO contextDTO){
         String logDetail = contextDTO.getLogDetail().toString();
         if (StringUtil.isEmptyWithTrim(logDetail)){
             return;
         }
         //1、根据调整版本 先删除(物理)
         mpAdjustLogService.deleteAdjustLogByVersion(contextDTO.getFactoryCode(),
-                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),
+                contextDTO.getVersion(),contextDTO.getStructureName());
         //2、保存调整日志
         MpAdjustStructureLog structureLog = new MpAdjustStructureLog();
         structureLog.setFactoryCode(contextDTO.getFactoryCode());
@@ -252,7 +251,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         structureLog.setProductionVersion(contextDTO.getProductionVersion());
         structureLog.setLastMonthPlanVersion(contextDTO.getVersion());
         structureLog.setAdjVersion(contextDTO.getVersion());
-        structureLog.setAction("结构内调整");
+        structureLog.setAction(contextDTO.getAdjustType());
         structureLog.setOperator(SecurityUtils.getUsername());
         structureLog.setLogDetail(logDetail);
         baseDao.insert(structureLog);

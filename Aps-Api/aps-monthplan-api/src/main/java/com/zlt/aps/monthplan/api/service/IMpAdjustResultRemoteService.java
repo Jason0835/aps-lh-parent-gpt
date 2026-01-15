@@ -77,4 +77,11 @@ public interface IMpAdjustResultRemoteService {
     @PostMapping("/mpAdjustResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/mpAdjustResult/getVersionList")
+    TableDataInfo getVersionList(@RequestBody MpAdjustResult queryVO);
+
 }

@@ -75,6 +75,8 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月计划结构转产表")
     private List<MpStructureAllocation> structureAllocationList;
 
+    @ApiModelProperty(value = "月计划结构转产表-单结构")
+    private List<MpStructureAllocation> oneStructureAllocationList;
 
     @ApiModelProperty(value = "销售订单池列表")
     private List<SalesOrderPool> salesOrderPoolList;
