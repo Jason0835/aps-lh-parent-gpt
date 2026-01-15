@@ -61,8 +61,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         queryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
         queryWrapper.eq("YEAR", param.getYear());
         queryWrapper.eq("MONTH", param.getMonth());
-        queryWrapper.eq("MONTH_PLAN_VERSION", param.getMonthPlanVersion());
-        queryWrapper.eq("PRODUCTION_VERSION", param.getProductionVersion());
+        queryWrapper.eq(PubUtil.isNotEmpty(param.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", param.getMonthPlanVersion());
+        queryWrapper.eq(PubUtil.isNotEmpty(param.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", param.getProductionVersion());
+
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", param.getFieldValueByFieldName("structureName"));
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", param.getFieldValueByFieldName("cxMachineCode"));
