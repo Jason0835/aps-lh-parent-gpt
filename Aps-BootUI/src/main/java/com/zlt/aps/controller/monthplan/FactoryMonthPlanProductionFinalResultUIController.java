@@ -85,33 +85,10 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         }
         FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
         BeanUtils.copyProperties(param, condition);
-        TableDataInfo list = iFactoryMonthPlanProductionFinalResultService.list(condition);
-        // 将rows中的LinkedHashMap转换为实体类对象
-        List<FactoryMonthPlanProductionFinalResult> resultList = convertToEntityList(list.getRows());
-        // SKU排产明细排序
-        sortSkuScheduleItem(resultList);
-        list.setRows(resultList);
-        return list;
+        return iFactoryMonthPlanProductionFinalResultService.list(condition);
     }
 
-    private List<FactoryMonthPlanProductionFinalResult> convertToEntityList(List<?> rows) {
-        List<FactoryMonthPlanProductionFinalResult> entityList = new ArrayList<>();
-        if (PubUtil.isEmpty(rows)) {
-            return entityList;
-        }
-        ObjectMapper objectMapper = new ObjectMapper();
-        for (Object obj : rows) {
-            if (obj instanceof FactoryMonthPlanProductionFinalResult) {
-                // 如果已经是实体类，直接添加
-                entityList.add((FactoryMonthPlanProductionFinalResult) obj);
-            } else if (obj instanceof Map) {
-                // 如果是LinkedHashMap，转换为实体类
-                FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
-                entityList.add(entity);
-            }
-        }
-        return entityList;
-    }
+
 
 
 
