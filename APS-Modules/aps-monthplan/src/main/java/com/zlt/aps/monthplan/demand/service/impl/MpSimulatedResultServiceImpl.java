@@ -21,6 +21,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
+import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 
@@ -115,6 +116,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
+        PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
         Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
         productionVersions.put(monthRange.getTMonth(),finalVersion);
         // 生成T月模拟需求计划
@@ -156,11 +158,11 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
           // 对应的历史数据偏移量（从5开始递减）
           for (YearMonth currentMonth : monthsToProcess) {
               // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-              currentMonthDemands =  dpDemandPlanService.createPredictionRequire(param,currentFinalVersion);
+              currentMonthDemands =  dpDemandPlanService.createPredictionRequire(param,currentFinalVersion,predictionContext);
               // 排产汇总
               if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
-                  Context context = buildContext(currentMonthDemands);
-                  monthPlanProductionSchedulingService.general(context);
+                /*  Context context = buildContext(currentMonthDemands);
+                  monthPlanProductionSchedulingService.general(context);*/
                   currentFinalVersion = createProductionVersion(currentMonthDemands);
                   productionVersions.put(currentMonth,currentFinalVersion);
               }
