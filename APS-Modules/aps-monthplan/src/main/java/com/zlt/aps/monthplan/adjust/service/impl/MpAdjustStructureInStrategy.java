@@ -79,6 +79,11 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     }
 
     @Override
+    public void specialInit(MpRollAdjustContextDTO contextDTO) {
+
+    }
+
+    @Override
     public void specialCheck(MpRollAdjustContextDTO contextDTO) {
 
     }

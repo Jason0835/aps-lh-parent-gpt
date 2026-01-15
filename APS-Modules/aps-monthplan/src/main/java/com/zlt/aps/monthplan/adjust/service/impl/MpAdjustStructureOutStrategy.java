@@ -74,8 +74,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return Collections.emptyList();
         }
         return adjustDetailList.stream()
-                .filter(vo -> vo.getStructureName().equals(contextDTO.getStructureName())
-                        && vo.getScheduledMachines().contains(contextDTO.getScheduledMachines()))
+                .filter(vo -> StringUtils.equals(vo.getStructureName(), contextDTO.getStructureName())
+                        && StringUtils.equals(vo.getScheduledMachines(), contextDTO.getScheduledMachines()))
                 .collect(Collectors.toList());
     }
 
@@ -105,6 +105,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     @Override
     public void doConfirmAdjust(MpRollAdjustContextDTO contextDTO) {
 
+    }
+
+    @Override
+    public void specialInit(MpRollAdjustContextDTO contextDTO) {
     }
 
     @Override
