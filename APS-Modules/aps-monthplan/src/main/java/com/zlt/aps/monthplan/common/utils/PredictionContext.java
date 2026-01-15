@@ -6,7 +6,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import lombok.Data;
-import lombok.Getter;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -60,11 +59,11 @@ public class PredictionContext {
   /**
    * 订单分配结果
    */
-  @Getter
+  @Data
   public static class OrderAllocationResult {
-    private final List<DpOrderOffsetDetail> allocations;
-    private final List<DpOrderOffsetDetail> netDemands;
-    private final Map<String, List<MdmProductStock>> stockMap;
+    private  List<DpOrderOffsetDetail> allocations;
+    private  List<DpOrderOffsetDetail> netDemands;
+    private  Map<String, List<MdmProductStock>> stockMap;
 
     public OrderAllocationResult(
         List<DpOrderOffsetDetail> allocations,
