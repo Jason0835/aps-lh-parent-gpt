@@ -100,6 +100,12 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "SKU日硫化产能列表")
     private List<MdmSkuLhCapacity> mdmSkuLhCapacityList;
 
+    @ApiModelProperty(value = "SKU与结构关系列表")
+    private List<MdmSkuStructureRef> mdmSkuStructureRefList;
+
+    @ApiModelProperty(value = "SKU与施工（示方书）关系列表")
+    private List<MdmSkuConstructionRef> mdmSkuConstructionRefList;
+
     @ApiModelProperty(value = "排程过程日志")
     private StringBuilder logDetail;
 
